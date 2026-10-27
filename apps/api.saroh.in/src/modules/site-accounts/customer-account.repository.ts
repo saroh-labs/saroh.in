@@ -11,6 +11,9 @@ import { prisma } from "@saroh/database";
  * its site (ADR-011, DEC-037). Round-2 plan A, A1: the table and its first
  * reads; sign-in (A2), the session (A3) and linking (A4) build on these.
  *
+ * An account holds a verified email or a verified phone, at least one
+ * (DEC-196): the database's CHECK and `createByPhone` keep it so.
+ *
  * Every call names the organization, so a query can never cross businesses
  * even where row-level security is not yet enforced. "Live" means any status
  * but REMOVED: a MERGED account keeps its email reserved (DEC-049), and the
@@ -43,6 +46,21 @@ export class CustomerAccountRepository {
             where: {
                 organizationId,
                 email: normaliseAccountEmail(email),
+                status: { in: [...LIVE_ACCOUNT_STATUSES] },
+            },
+        });
+    }
+
+    /** The live account holding this verified phone (E.164), if any. */
+    findLiveByPhone(
+        organizationId: string,
+        phoneE164: string,
+        db: Db = prisma,
+    ): Promise<CustomerAccount | null> {
+        return db.customerAccount.findFirst({
+            where: {
+                organizationId,
+                phoneE164,
                 status: { in: [...LIVE_ACCOUNT_STATUSES] },
             },
         });
@@ -84,6 +102,32 @@ export class CustomerAccountRepository {
                 contactId: input.contactId,
                 email: normaliseAccountEmail(input.email),
                 emailVerifiedAt: input.verifiedAt,
+                linkedAt: input.verifiedAt,
+                lastSignedInAt: input.verifiedAt,
+            },
+        });
+    }
+
+    /**
+     * Make an ACTIVE phone-only account (DEC-196): a just-verified phone and
+     * no email. The database refuses a second live account for the phone
+     * (P2002), as for an email.
+     */
+    createByPhone(
+        input: {
+            organizationId: string;
+            contactId: string;
+            phoneE164: string;
+            verifiedAt: Date;
+        },
+        db: Db = prisma,
+    ): Promise<CustomerAccount> {
+        return db.customerAccount.create({
+            data: {
+                organizationId: input.organizationId,
+                contactId: input.contactId,
+                phoneE164: input.phoneE164,
+                phoneVerifiedAt: input.verifiedAt,
                 linkedAt: input.verifiedAt,
                 lastSignedInAt: input.verifiedAt,
             },

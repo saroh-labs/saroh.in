@@ -43,7 +43,9 @@ export type PageRevalidateCause =
     | "domain"
     | "stock"
     | "product"
-    | "prices";
+    | "prices"
+    // The ways its customers sign in (DEC-196): the sheet is in every page.
+    | "sign-in";
 
 export interface PageRevalidatePayload {
     cause: PageRevalidateCause;

@@ -108,7 +108,7 @@ export interface MeProps {
     api: MeApi;
 }
 
-type Open = "details" | "email" | "note" | null;
+type Open = "details" | "email" | "phone" | "note" | null;
 
 export function Me({
     account: initial,
@@ -138,6 +138,17 @@ export function Me({
                     : "general")
         ];
     const contact = [account.phone, account.email].filter(Boolean).join(" · ");
+    // How they sign in (DEC-196): an email, a WhatsApp number, or both.
+    const signIn = [
+        account.email,
+        account.signInPhone ? `WhatsApp ${account.signInPhone}` : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    // A number can be added while the site signs in by WhatsApp.
+    const phoneAdd = api.phoneAdd;
+    const canAddPhone =
+        phoneAdd !== undefined && (options.ways ?? []).includes("WHATSAPP");
 
     async function signOut(everywhere: boolean) {
         if (signingOut) return;
@@ -184,13 +195,32 @@ export function Me({
                             >
                                 Edit
                             </button>
+                        </>
+                    }
+                />
+                <AccountRow
+                    title="Signing in"
+                    sub={signIn}
+                    actions={
+                        <>
                             <button
                                 type="button"
                                 className={smallButton}
                                 onClick={() => setOpen("email")}
                             >
-                                Change email
+                                {account.email ? "Change email" : "Add email"}
                             </button>
+                            {canAddPhone ? (
+                                <button
+                                    type="button"
+                                    className={smallButton}
+                                    onClick={() => setOpen("phone")}
+                                >
+                                    {account.signInPhone
+                                        ? "Change WhatsApp number"
+                                        : "Add WhatsApp number"}
+                                </button>
+                            ) : null}
                         </>
                     }
                 />
@@ -272,7 +302,8 @@ export function Me({
                 )}
             </AccountCard>
 
-            {notices ? (
+            {/* No email to send to: a phone-only account (DEC-196). */}
+            {notices && account.email ? (
                 <EmailChoice
                     notices={notices}
                     account={account}
@@ -360,18 +391,47 @@ export function Me({
             />
             <SignInSheet
                 open={open === "email"}
-                purpose="change-email"
+                purpose={account.email ? "change-email" : "add-email"}
                 onClose={() => setOpen(null)}
                 options={options}
                 api={api.emailChange}
                 onSignedIn={(customer) => {
+                    const added = !account.email;
                     setAccount((a) => ({ ...a, email: customer.email }));
                     setSaid(
-                        "Done. Use that email to sign in from now on. Other devices are signed out.",
+                        added
+                            ? "Done. You can sign in with that email too."
+                            : "Done. Use that email to sign in from now on. Other devices are signed out.",
                     );
                     router.refresh();
                 }}
             />
+            {phoneAdd ? (
+                <SignInSheet
+                    open={open === "phone"}
+                    purpose="add-phone"
+                    onClose={() => setOpen(null)}
+                    options={options}
+                    api={{
+                        // The sheet asks only for the number here.
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        ...phoneAdd,
+                    }}
+                    onSignedIn={(customer) => {
+                        setAccount((a) => ({
+                            ...a,
+                            signInPhone: customer.signInPhone ?? a.signInPhone,
+                        }));
+                        setSaid(
+                            "Done. You can sign in with a code on WhatsApp too.",
+                        );
+                        router.refresh();
+                    }}
+                />
+            ) : null}
             <NoteSheet
                 open={open === "note"}
                 title={words.sheet}

@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { CustomerAccount, Prisma } from "@saroh/database";
 
-import { reservedAccountEmail } from "../contacts/contact-email";
+import {
+    reservedAccountEmail,
+    reservedPhoneEmail,
+} from "../contacts/contact-email";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import {
     CustomerAccountRepository,
@@ -34,6 +37,9 @@ import {
  *   placeholder email, and an account on it. Staff see the pair in
  *   suggestions (C2) and merge it; nothing here joins them.
  *
+ * A business whose customers may sign up by phone alone (DEC-196) makes a
+ * phone-only account instead (`linkOrCreateByPhone`).
+ *
  * The contact holding `e` is locked (`FOR UPDATE`) before deciding, so two
  * first sign-ins for one email cannot both link it. Two first sign-ins for
  * an email no contact holds race on the contact's unique email instead: the
@@ -50,6 +56,23 @@ export function maskEmail(email: string): string {
     const at = email.lastIndexOf("@");
     if (at < 1) return "…";
     return `${email[0]}…@${email.slice(at + 1)}`;
+}
+
+/** "+919845012345" → "the number ending 2345". */
+export function maskPhone(phoneE164: string): string {
+    return `the number ending ${phoneE164.replace(/\D/g, "").slice(-4)}`;
+}
+
+/**
+ * How an account is named, masked, in a sentence: its email, or for a
+ * phone-only account (DEC-196) its number.
+ */
+export function maskSignIn(account: {
+    email: string | null;
+    phoneE164?: string | null;
+}): string {
+    if (account.email) return maskEmail(account.email);
+    return account.phoneE164 ? maskPhone(account.phoneE164) : "…";
 }
 
 const MAX_MERGE_HOPS = 5;
@@ -150,6 +173,52 @@ export class AccountLinkingService {
     }
 
     /**
+     * Who a phone just proved by WhatsApp code is, for a business whose
+     * customers may sign up by phone alone (DEC-196). The live account
+     * holding the phone signs in as an email's would (merged, blocked);
+     * with none, a new contact kept by the phone, with the reserved
+     * `phone+…@phone.invalid` placeholder for an email, and a phone-only
+     * account on it. Never an existing contact with that phone: its number
+     * was typed by someone, never proved, so joining them is staff's merge
+     * (C2's suggestions pair them), as for an unverified email.
+     *
+     * Two first sign-ins for one phone race on the account's unique phone:
+     * the loser's transaction fails with P2002 and the caller runs it again.
+     */
+    async linkOrCreateByPhone(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+        phoneE164: string,
+        now: Date,
+    ): Promise<SignInIdentity> {
+        const existing = await this.accounts.findLiveByPhone(
+            organizationId,
+            phoneE164,
+            tx,
+        );
+        if (existing) return this.signInTo(tx, existing, now);
+        const contact = await tx.contact.create({
+            data: {
+                organizationId,
+                email: reservedPhoneEmail(),
+                phone: phoneE164,
+                source: "site-account",
+            },
+            select: { id: true },
+        });
+        const account = await this.accounts.createByPhone(
+            {
+                organizationId,
+                contactId: contact.id,
+                phoneE164,
+                verifiedAt: now,
+            },
+            tx,
+        );
+        return { kind: "signed-in", account };
+    }
+
+    /**
      * Put a just-proved phone on an account whose email was just proved
      * (DEC-196). A phone another live account holds stays where it is:
      * moving it is staff's call (a recycled number), not a sign-in's.
@@ -210,7 +279,7 @@ export class AccountLinkingService {
             }
             return {
                 kind: "merged",
-                maskedEmail: maskEmail(survivor?.email ?? account.email),
+                maskedEmail: maskSignIn(survivor ?? account),
             };
         }
         const signedIn = await tx.customerAccount.update({

@@ -45,6 +45,8 @@ const ASKS: Record<string, How> = {
     "PATCH public/site-accounts/me/notifications": SESSION,
     "POST public/site-accounts/me/email": SESSION,
     "POST public/site-accounts/me/email/code": SESSION,
+    "POST public/site-accounts/me/phone": SESSION,
+    "POST public/site-accounts/me/phone/code": SESSION,
     "POST public/site-accounts/me/messages": SESSION,
     "POST public/site-accounts/me/notes": SESSION,
     "POST public/site-accounts/me/data-request": SESSION,

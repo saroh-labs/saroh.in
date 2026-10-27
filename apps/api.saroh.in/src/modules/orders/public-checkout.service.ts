@@ -14,6 +14,7 @@ import { isCustomerPhone } from "../../common/customer-phone";
 import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { reservedAccountEmail } from "../contacts/contact-email";
 import { DiscountsService } from "../discounts/discounts.service";
 import {
     assertOrganizationOpen,
@@ -620,7 +621,9 @@ export class PublicCheckoutService {
         if (!row) throw signedOut();
         return {
             accountId: customer.accountId,
-            email: row.email,
+            // A phone-only account (DEC-196) is kept at the storefront by
+            // its contact's reserved placeholder, which no reader mails.
+            email: row.email ?? reservedAccountEmail(row.contactId),
             contactId: row.contactId,
             firstName: row.contact.firstName,
             lastName: row.contact.lastName,

@@ -21,6 +21,7 @@ import { normalisePhoneNumber } from "@saroh/block-contract";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { siteCodeSecret } from "../site-accounts/site-secrets";
+import { enqueueBusinessSitesRevalidation } from "../sites/page-cache-revalidate";
 import { checkAbuse } from "./abuse-guard";
 import { VERIFICATION_MODULES } from "./dto";
 
@@ -290,10 +291,23 @@ export class VerificationService {
             });
         }
         await runInOrgContext(organizationId, () =>
-            prisma.messagingVerificationSetting.upsert({
-                where: { organizationId_module: { organizationId, module } },
-                create: { organizationId, module, enabled },
-                update: { enabled },
+            prisma.$transaction(async (tx) => {
+                await tx.messagingVerificationSetting.upsert({
+                    where: {
+                        organizationId_module: { organizationId, module },
+                    },
+                    create: { organizationId, module, enabled },
+                    update: { enabled },
+                });
+                // ACCOUNT codes decide whether the site's sign-in sheet,
+                // drawn into every page, offers WhatsApp (DEC-196).
+                if (module === "ACCOUNT") {
+                    await enqueueBusinessSitesRevalidation(
+                        tx,
+                        organizationId,
+                        "sign-in",
+                    );
+                }
             }),
         );
         return this.settings(organizationId);

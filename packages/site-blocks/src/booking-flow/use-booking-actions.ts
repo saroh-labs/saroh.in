@@ -1,6 +1,7 @@
 "use client";
 
 import type { SignedInCustomer } from "../account/api";
+import { customerHandle } from "../account/api";
 import { TEST_RELEASE_REASON } from "../test-release/words";
 import type { FlowActionsContext } from "./actions-context";
 import type { Result } from "./api";
@@ -117,7 +118,8 @@ export function useBookingActions(ctx: FlowActionsContext) {
             first: (who.name ?? ctx.s.name).trim().split(/\s+/)[0] ?? "",
             placeInLine: joined.placeInLine,
             reach: joined.reach,
-            email: who.email,
+            // A phone-only account is never emailed, so never said to be.
+            email: who.email ?? "",
         });
     };
 
@@ -154,7 +156,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
         // nothing booked or charged until they say so.
         if (service && chosenStart && ctx.pay !== "CREDIT") {
             const offered = await ctx.askCredit(
-                who.email,
+                customerHandle(who),
                 service.id,
                 chosenStart.startAt,
             );
@@ -191,7 +193,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
             ctx.pay !== "CREDIT"
         ) {
             const offered = await ctx.askCredit(
-                who.email,
+                customerHandle(who),
                 service.id,
                 chosenStart.startAt,
             );

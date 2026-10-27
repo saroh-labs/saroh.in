@@ -110,6 +110,7 @@ export class AccountHomeService {
             },
             select: {
                 email: true,
+                phoneE164: true,
                 contact: {
                     select: { firstName: true, lastName: true, phone: true },
                 },

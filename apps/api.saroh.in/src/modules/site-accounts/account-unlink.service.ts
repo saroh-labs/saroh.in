@@ -45,7 +45,10 @@ const SIGNS_IN: readonly CustomerAccountStatus[] = ["ACTIVE", "BLOCKED"];
 
 /** The site account as staff see it on the contact it's linked to. */
 export interface SiteAccountView {
-    email: string;
+    /** The sign-in email; null for a phone-only account (DEC-196). */
+    email: string | null;
+    /** The verified sign-in phone (E.164), or null. */
+    phone: string | null;
     status: "ACTIVE" | "BLOCKED";
     linkedAt: string;
     lastSignedInAt: string | null;
@@ -58,7 +61,9 @@ export interface SiteAccountView {
 }
 
 export interface UnlinkPreview {
-    email: string;
+    /** Null for a phone-only account (DEC-196), which `phone` names. */
+    email: string | null;
+    phone: string | null;
     moves: UnlinkMove[];
     /** "2 bookings they made online move with them." */
     sentence: string;
@@ -83,7 +88,8 @@ export function contactIsTheAccountsOwn(contact: {
 
 export function toSiteAccountView(
     account: {
-        email: string;
+        email: string | null;
+        phoneE164: string | null;
         status: CustomerAccountStatus;
         linkedAt: Date;
         lastSignedInAt: Date | null;
@@ -92,6 +98,7 @@ export function toSiteAccountView(
 ): SiteAccountView {
     return {
         email: account.email,
+        phone: account.phoneE164,
         status: account.status === "BLOCKED" ? "BLOCKED" : "ACTIVE",
         linkedAt: account.linkedAt.toISOString(),
         lastSignedInAt: account.lastSignedInAt?.toISOString() ?? null,
@@ -125,6 +132,7 @@ export class AccountUnlinkService {
             );
             return {
                 email: account.email,
+                phone: account.phoneE164,
                 moves,
                 sentence: unlinkSentence(moves),
             };
@@ -221,7 +229,12 @@ export class AccountUnlinkService {
         contactId: string,
         opts: { lock: boolean },
     ): Promise<{
-        account: { id: string; email: string; linkedAt: Date };
+        account: {
+            id: string;
+            email: string | null;
+            phoneE164: string | null;
+            linkedAt: Date;
+        };
         scope: UnlinkScope;
     }> {
         const organizationId = ctx.organizationId;
@@ -244,7 +257,7 @@ export class AccountUnlinkService {
                 contactId,
                 status: { in: [...SIGNS_IN] },
             },
-            select: { id: true, email: true, linkedAt: true },
+            select: { id: true, email: true, phoneE164: true, linkedAt: true },
         });
         if (!account) {
             throw new NotFoundException(

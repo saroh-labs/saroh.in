@@ -68,7 +68,7 @@ export interface BuyPackSheetProps {
     onClose: () => void;
     onSale: AccountPacksOnSale;
     businessName: string;
-    customer: { name: string | null; email: string };
+    customer: { name: string | null; email: string | null };
     api: PacksApi;
     /** The pack is on the account: say so and read the tab again. */
     onBought: (message: string) => void;
@@ -131,7 +131,7 @@ function BuyPack({
             handoff: started.payment,
             business: businessName,
             description: `${started.pack.name} · ${classesText(started.pack.credits, kind)}`,
-            booker: { name: customer.name ?? "", email: customer.email },
+            booker: { name: customer.name ?? "", email: customer.email ?? "" },
             apiUrl,
         });
         session.current = opened;

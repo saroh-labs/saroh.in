@@ -45,10 +45,15 @@ export type Block<T> = { ok: true; value: T } | { ok: false };
 export interface AccountView {
     /** The contact's name, or null until the customer gives one. */
     name: string | null;
-    /** The verified sign-in email: the account's, never a placeholder. */
-    email: string;
+    /**
+     * The verified sign-in email: the account's, never a placeholder. Null
+     * for an account made by phone alone (DEC-196).
+     */
+    email: string | null;
     /** A contact detail, not a way to sign in (default 75). */
     phone: string | null;
+    /** The verified phone they sign in with by WhatsApp (DEC-196), or null. */
+    signInPhone: string | null;
     businessName: string;
     tabs: AccountTab[];
     /** What the business offers, for which Home cards to draw. */
@@ -394,7 +399,7 @@ function blankToNull(value: string | null | undefined): string | null {
 }
 
 export function accountView(input: {
-    account: { email: string };
+    account: { email: string | null; phoneE164?: string | null };
     contact: Named & { phone: string | null };
     businessName: string;
     tabs: AccountTab[];
@@ -408,6 +413,7 @@ export function accountView(input: {
         name: personName(input.contact),
         email: input.account.email,
         phone: blankToNull(input.contact.phone),
+        signInPhone: input.account.phoneE164 ?? null,
         businessName: input.businessName,
         tabs: input.tabs.map((t) => ({ key: t.key, label: t.label })),
         offers: {

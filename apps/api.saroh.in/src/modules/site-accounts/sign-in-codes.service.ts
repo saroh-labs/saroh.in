@@ -14,6 +14,7 @@ import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
+import type { SignInIdentity } from "./account-linking.service";
 import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -33,6 +34,9 @@ import { readPhoneProof } from "./phone-proof";
 import { cleanBusinessName } from "./sender-name";
 import type { SessionIssued } from "./sessions.service";
 import { SessionsService } from "./sessions.service";
+import type { SignInWay } from "./sign-in-way-rules";
+import { UNAVAILABLE_MESSAGE } from "./sign-in-way-rules";
+import { SignInWaysService } from "./sign-in-ways";
 import type { SiteHost } from "./site-host";
 import { businessPublicPhone, resolveSiteHost } from "./site-host";
 import type { SiteRelay } from "./site-relay";
@@ -67,6 +71,13 @@ export interface SignInOptions {
     /** The business's public phone, for "Or call ‹Business› on ‹phone›". */
     phone: string | null;
     challenge: { required: boolean; siteKey: string | null };
+    /**
+     * The ways this site offers now, in the business's order (DEC-196):
+     * the first is the sheet's default, the rest "Use … instead".
+     */
+    ways: SignInWay[];
+    /** A WhatsApp sign-up may stand on the phone alone (no email asked). */
+    phoneOnlySignUp: boolean;
 }
 
 /**
@@ -87,8 +98,7 @@ const CODE_REQUESTS_PER_ADDRESS = 30;
 const VERIFY_TRIES_PER_ADDRESS = 60;
 const ADDRESS_WINDOW_MS = 10 * 60_000;
 
-export const UNAVAILABLE_MESSAGE =
-    "We couldn't send your code. Try again in a few minutes";
+export { UNAVAILABLE_MESSAGE };
 
 function hmac(parts: string[]): string {
     return createHmac("sha256", siteCodeSecret())
@@ -170,6 +180,7 @@ export class SignInCodesService {
         private readonly delivery: SiteCodeDelivery,
         private readonly challenge: ChallengeVerifier,
         private readonly alerts: SiteCodeAlerts,
+        private readonly ways: SignInWaysService,
         @Optional()
         private readonly codeLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
             CODE_REQUESTS_PER_ADDRESS,
@@ -184,6 +195,7 @@ export class SignInCodesService {
 
     async options(relay: SiteRelay): Promise<SignInOptions> {
         const site = await resolveSiteHost(relay.host);
+        const ways = await this.ways.view(site.organizationId);
         return runInOrgContext(site.organizationId, async () => {
             const now = new Date();
             const counts = await loadBusinessCounts(
@@ -203,6 +215,8 @@ export class SignInCodesService {
                     required: likely && this.challenge.configured,
                     siteKey: this.challenge.siteKey,
                 },
+                ways: ways.effective,
+                phoneOnlySignUp: ways.phoneOnlySignUp,
             };
         });
     }
@@ -216,6 +230,8 @@ export class SignInCodesService {
             // Signing in to see, pay or cancel what they already have
             // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
+            // Only while the business offers email sign-in (DEC-196).
+            await this.ways.assertOffered(site.organizationId, "EMAIL");
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
@@ -343,6 +359,7 @@ export class SignInCodesService {
             // Signing in to see, pay or cancel what they already have
             // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
+            await this.ways.assertOffered(site.organizationId, "EMAIL");
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
@@ -506,23 +523,58 @@ export class SignInCodesService {
     }
 
     /** Sign in (or up), and hand back a new session's token once. */
-    async openSession(
+    openSession(
         site: SiteHost,
         email: string,
         now: Date,
         addPhoneE164?: string | null,
     ): Promise<SessionIssued> {
-        const run = () =>
-            prisma.$transaction(async (tx) => {
-                const identity = await this.linking.linkOrCreate(
+        return this.issue(
+            site,
+            (tx) =>
+                this.linking.linkOrCreate(tx, site.organizationId, email, now),
+            now,
+            "This email",
+            addPhoneE164,
+        );
+    }
+
+    /**
+     * Sign in (or up, phone alone) with a phone just proved by WhatsApp
+     * code (DEC-196): a merged or blocked account answers as an email's.
+     */
+    openPhoneSession(
+        site: SiteHost,
+        phoneE164: string,
+        now: Date,
+    ): Promise<SessionIssued> {
+        return this.issue(
+            site,
+            (tx) =>
+                this.linking.linkOrCreateByPhone(
                     tx,
                     site.organizationId,
-                    email,
+                    phoneE164,
                     now,
-                );
+                ),
+            now,
+            "This number",
+        );
+    }
+
+    private async issue(
+        site: SiteHost,
+        link: (tx: Prisma.TransactionClient) => Promise<SignInIdentity>,
+        now: Date,
+        what: string,
+        addPhoneE164?: string | null,
+    ): Promise<SessionIssued> {
+        const run = () =>
+            prisma.$transaction(async (tx) => {
+                const identity = await link(tx);
                 if (identity.kind === "merged") {
                     throw new ConflictException({
-                        message: `This email now signs in as ${identity.maskedEmail}`,
+                        message: `${what} now signs in as ${identity.maskedEmail}`,
                         details: {
                             reason: "merged",
                             signsInAs: identity.maskedEmail,

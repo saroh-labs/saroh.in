@@ -3,6 +3,7 @@
 import { phoneNumberProblem } from "@saroh/block-contract";
 import { useCallback, useEffect, useRef } from "react";
 
+import { customerHandle } from "../account/api";
 import { timeWords } from "../lib/clock";
 import { useQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
@@ -92,7 +93,7 @@ export function useBookingFlow(
             : null;
     const waitlist = useWaitlist(
         account.waitlist,
-        s.customer?.email ?? null,
+        s.customer ? customerHandle(s.customer) : null,
         waitlistOn && service ? service.id : null,
     );
     const full = !!chosenStart && isClass && (chosenStart.placesLeft ?? 0) <= 0;
@@ -106,7 +107,7 @@ export function useBookingFlow(
             : "join";
     const credit = useCredit(
         account.credit,
-        s.customer?.email ?? null,
+        s.customer ? customerHandle(s.customer) : null,
         service?.id ?? null,
         chosenStart?.startAt ?? null,
     );

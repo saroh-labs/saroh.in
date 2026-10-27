@@ -31,6 +31,7 @@ import {
     SignInCodesService,
     UNAVAILABLE_MESSAGE,
 } from "./sign-in-codes.service";
+import type { SignInWaysService } from "./sign-in-ways";
 import { SignInController } from "./sign-in.controller";
 import type { SiteRelay } from "./site-relay";
 
@@ -80,14 +81,21 @@ function build(options: { addressLimit?: number; verifyLimit?: number } = {}) {
         new SiteCodeDelivery(alerts, sender, [0, 0]),
         challenge,
         alerts,
+        // Email only: the ways themselves are sign-in-ways.db.spec.ts.
+        {
+            assertOffered: () => Promise.resolve(),
+            view: () =>
+                Promise.resolve({
+                    effective: ["EMAIL"],
+                    phoneOnlySignUp: false,
+                }),
+        } as unknown as SignInWaysService,
         new FixedWindowRateLimiter(options.addressLimit ?? 1_000, 600_000),
         new FixedWindowRateLimiter(options.verifyLimit ?? 1_000, 600_000),
     );
     return {
         // The WhatsApp way is phone-sign-in.db.spec.ts; here it is never offered.
-        api: new SignInController(service, {
-            offered: () => Promise.resolve(false),
-        } as unknown as PhoneSignInService),
+        api: new SignInController(service, {} as PhoneSignInService),
         sent,
         sender,
         alerts,
@@ -740,6 +748,8 @@ describe("site sign-in: when the code can't be sent", () => {
             businessName: "Kavi Dental",
             phone: null,
             challenge: { required: false, siteKey: "site-key" },
+            ways: ["EMAIL"],
+            phoneOnlySignUp: false,
             whatsapp: false,
         });
     });
@@ -757,6 +767,8 @@ describe("site sign-in: when the code can't be sent", () => {
             businessName: "Kavi Dental",
             phone: "+918040001234",
             challenge: { required: false, siteKey: "site-key" },
+            ways: ["EMAIL"],
+            phoneOnlySignUp: false,
             whatsapp: false,
         });
     });

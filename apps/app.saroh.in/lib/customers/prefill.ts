@@ -36,7 +36,7 @@ export interface PrefillSource {
         phone: string | null;
         removedAt?: string | null;
     };
-    siteAccount?: { email: string } | null;
+    siteAccount?: { email: string | null } | null;
 }
 
 /**

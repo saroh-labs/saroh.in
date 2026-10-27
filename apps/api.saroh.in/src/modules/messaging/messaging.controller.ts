@@ -21,12 +21,14 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
+import { SignInWaysService } from "../site-accounts/sign-in-ways";
 import { resolveSiteHost } from "../site-accounts/site-host";
 import type { SiteRelay } from "../site-accounts/site-relay";
 import { RelayContext, SiteRelayGuard } from "../site-accounts/site-relay";
 import {
     CheckVerificationDto,
     LedgerQueryDto,
+    SetSignInWaysDto,
     SetVerificationSettingDto,
     StartTopupDto,
     StartVerificationDto,
@@ -49,6 +51,7 @@ export class MessagingController {
         private readonly verification: VerificationService,
         private readonly wallet: WalletService,
         private readonly topups: TopupService,
+        private readonly signInWays: SignInWaysService,
     ) {}
 
     @Get("verification-settings")
@@ -68,6 +71,31 @@ export class MessagingController {
             dto.module,
             dto.enabled,
         );
+    }
+
+    /**
+     * The ways the business's customers sign in and sign up on its site,
+     * in its order, and what each needs to work now (DEC-196). For the
+     * settings screen (U9, to be designed).
+     */
+    @Get("customer-sign-in")
+    customerSignIn(@OrgContext() ctx: OrganizationContext) {
+        authorize(ctx, "comms:manage");
+        return this.signInWays.view(ctx.organizationId);
+    }
+
+    /**
+     * Save the ways and their order. 400 for none, a repeat, an unknown
+     * way, SMS (not yet) or email off while no other chosen way works now;
+     * 403 `PHONE_CODES_NOT_APPROVED` for WhatsApp before Saroh approves.
+     */
+    @Put("customer-sign-in")
+    setCustomerSignIn(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetSignInWaysDto,
+    ) {
+        authorize(ctx, "comms:manage");
+        return this.signInWays.set(ctx.organizationId, dto.ways);
     }
 
     @Get("wallet")

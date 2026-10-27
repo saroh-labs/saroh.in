@@ -52,7 +52,7 @@ export function AutopaySheet({
     onClose: () => void;
     start: NonNullable<PlanApi["startAutopay"]>;
     businessName: string;
-    customer: { name: string | null; email: string };
+    customer: { name: string | null; email: string | null };
     openCheckout?: OpenCheckout;
     /** Where the window's return is posted (P1). */
     apiUrl?: string;
@@ -98,7 +98,7 @@ function Choose({
     checks: AutopayChecks;
     start: NonNullable<PlanApi["startAutopay"]>;
     businessName: string;
-    customer: { name: string | null; email: string };
+    customer: { name: string | null; email: string | null };
     openCheckout: OpenCheckout;
     apiUrl?: string;
 }) {
@@ -139,7 +139,7 @@ function Choose({
             openCheckout,
             business: businessName,
             description: `Autopay for ${plan.name}`,
-            booker: { name: customer.name ?? "", email: customer.email },
+            booker: { name: customer.name ?? "", email: customer.email ?? "" },
             apiUrl,
         });
         if (outcome === "redirected") return;

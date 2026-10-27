@@ -18,6 +18,8 @@ import { planRows } from "@saroh/pricing-catalog";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import { hashClientIp } from "../../common/client-ip";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { contactNoticeAddress } from "../communications/contact-address";
+import { theirAccounts } from "../customer-workspace/privacy-removal-writes";
 import { PublicVerificationsController } from "../messaging/messaging.controller";
 import { MessagingService } from "../messaging/messaging.service";
 import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
@@ -26,14 +28,19 @@ import { VerificationService } from "../messaging/verification.service";
 import { WalletService } from "../messaging/wallet.service";
 import { CatalogueService } from "../pricing/catalogue.service";
 import { ImpactService } from "../pricing/impact.service";
-import { AccountLinkingService } from "./account-linking.service";
+import { AccountHomeService } from "./account-home.service";
+import { AccountLinkingService, maskSignIn } from "./account-linking.service";
+import { toSiteAccountView } from "./account-unlink.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { CustomerAccountRepository } from "./customer-account.repository";
+import { EmailChangeService } from "./email-change.service";
 import { PhoneSignInService } from "./phone-sign-in.service";
 import { hashSessionToken, SessionsService } from "./sessions.service";
 import { SignInCodesService } from "./sign-in-codes.service";
+import { SignInWaysService } from "./sign-in-ways";
 import { SignInController } from "./sign-in.controller";
+import { resolveSiteHost } from "./site-host";
 import type { SiteRelay } from "./site-relay";
 
 const PRICE = 7;
@@ -59,9 +66,17 @@ const verification = new VerificationService();
 const wallet = new WalletService();
 const emails: { to: string; code: string }[] = [];
 
+const send = new VerificationSendService(
+    verification,
+    wallet,
+    new CatalogueService(new ImpactService()),
+    new MessagingService(transport),
+);
+const ways = new SignInWaysService(send, verification);
+const linking = new AccountLinkingService(new CustomerAccountRepository());
 const alerts = new SiteCodeAlerts();
 const codes = new SignInCodesService(
-    new AccountLinkingService(new CustomerAccountRepository()),
+    linking,
     new SessionsService(),
     new SiteCodeDelivery(
         alerts,
@@ -73,19 +88,18 @@ const codes = new SignInCodesService(
     ),
     new FakeChallenge(),
     alerts,
+    ways,
     new FixedWindowRateLimiter(1_000, 600_000),
     new FixedWindowRateLimiter(1_000, 600_000),
 );
-const send = new VerificationSendService(
-    verification,
-    wallet,
-    new CatalogueService(new ImpactService()),
-    new MessagingService(transport),
-);
-const api = new SignInController(
+const phoneSignIn = new PhoneSignInService(
     codes,
-    new PhoneSignInService(codes, send, verification),
+    send,
+    verification,
+    ways,
+    linking,
 );
+const api = new SignInController(codes, phoneSignIn);
 
 let hosts = 0;
 async function business(
@@ -558,6 +572,329 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
                     }),
                 ),
             ).toMatchObject({ status: 400, details: { field: "module" } });
+        });
+    });
+
+    describe("the business's ways and their order (DEC-196, unit 5)", () => {
+        async function signInByPhone(host: string, phone: string) {
+            await prisma.phoneVerification.updateMany({
+                where: { phoneE164: phone },
+                data: { createdAt: new Date(Date.now() - 60_000) },
+            });
+            await api.requestPhoneCode(relay(host), { phone, challenge: "ok" });
+            const answer = await api.verifyPhone(relay(host), {
+                phone,
+                code: lastCode(phone),
+            });
+            if (!("token" in answer)) throw new Error("expected a session");
+            return answer.token;
+        }
+
+        async function customerOf(host: string, token: string) {
+            const site = await resolveSiteHost(host);
+            const customer = await new SessionsService().resolve(token, site);
+            if (!customer) throw new Error("expected a customer");
+            return customer;
+        }
+
+        it("offers the ways in the business's order, WhatsApp first or email first", async () => {
+            const site = await business();
+            // Never chosen: email, then WhatsApp where it works (unit 3).
+            expect(await api.options(relay(site.host))).toMatchObject({
+                ways: ["EMAIL", "WHATSAPP"],
+                phoneOnlySignUp: false,
+                whatsapp: true,
+            });
+            await ways.set(site.organizationId, ["WHATSAPP", "EMAIL"]);
+            expect(await api.options(relay(site.host))).toMatchObject({
+                ways: ["WHATSAPP", "EMAIL"],
+                phoneOnlySignUp: true,
+            });
+            await ways.set(site.organizationId, ["EMAIL"]);
+            expect(await api.options(relay(site.host))).toMatchObject({
+                ways: ["EMAIL"],
+                whatsapp: false,
+            });
+            expect(await ways.view(site.organizationId)).toMatchObject({
+                chosen: ["EMAIL"],
+                chosenByBusiness: true,
+            });
+        });
+
+        it("refuses email off while nothing else works, SMS, a repeat, and WhatsApp before approval", async () => {
+            const off = await business({ on: false });
+            expect(
+                await refusal(ways.set(off.organizationId, ["WHATSAPP"])),
+            ).toMatchObject({ status: 400, details: { code: "EMAIL_NEEDED" } });
+            const broke = await business({ balance: 0 });
+            expect(
+                await refusal(ways.set(broke.organizationId, ["WHATSAPP"])),
+            ).toMatchObject({ status: 400, details: { code: "EMAIL_NEEDED" } });
+            // With email kept, WhatsApp can be chosen ahead of its balance.
+            await expect(
+                ways.set(broke.organizationId, ["WHATSAPP", "EMAIL"]),
+            ).resolves.toMatchObject({ effective: ["EMAIL"] });
+            expect(
+                await refusal(ways.set(broke.organizationId, ["SMS", "EMAIL"])),
+            ).toMatchObject({
+                status: 400,
+                details: { code: "SMS_NOT_AVAILABLE" },
+            });
+            expect(
+                await refusal(
+                    ways.set(broke.organizationId, ["EMAIL", "EMAIL"]),
+                ),
+            ).toMatchObject({ status: 400, details: { code: "REPEATED_WAY" } });
+            expect(
+                await refusal(ways.set(broke.organizationId, [])),
+            ).toMatchObject({ status: 400, details: { code: "NO_WAYS" } });
+            const unapproved = await business({ approved: false, on: false });
+            expect(
+                await refusal(
+                    ways.set(unapproved.organizationId, ["EMAIL", "WHATSAPP"]),
+                ),
+            ).toMatchObject({
+                status: 403,
+                details: { code: "PHONE_CODES_NOT_APPROVED" },
+            });
+            // Nothing was saved by a refusal.
+            expect(await ways.view(off.organizationId)).toMatchObject({
+                chosenByBusiness: false,
+            });
+        });
+
+        it("comes back to email on its own when approval is taken away", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["WHATSAPP"]);
+            expect((await api.options(relay(site.host))).ways).toEqual([
+                "WHATSAPP",
+            ]);
+            expect(
+                await refusal(
+                    api.requestCode(relay(site.host), { email: nextEmail() }),
+                ),
+            ).toMatchObject({
+                status: 503,
+                details: { reason: "unavailable" },
+            });
+
+            await prisma.featureFlagOverride.updateMany({
+                where: {
+                    flagKey: "CUSTOMER_PHONE_CODES",
+                    organizationId: site.organizationId,
+                },
+                data: { enabled: false },
+            });
+            expect(await api.options(relay(site.host))).toMatchObject({
+                ways: ["EMAIL"],
+                whatsapp: false,
+            });
+            await expect(
+                api.requestCode(relay(site.host), { email: nextEmail() }),
+            ).resolves.toMatchObject({ sent: true });
+            // The business's choice is kept for when approval comes back.
+            expect(await ways.view(site.organizationId)).toMatchObject({
+                chosen: ["WHATSAPP"],
+                effective: ["EMAIL"],
+                ways: expect.arrayContaining([
+                    { way: "WHATSAPP", usable: false, blocked: "NOT_APPROVED" },
+                ]),
+            });
+        });
+
+        it("comes back to email on its own when the balance runs out", async () => {
+            const site = await business({ balance: PRICE });
+            await ways.set(site.organizationId, ["WHATSAPP"]);
+            await wallet.hold(site.organizationId, PRICE);
+            expect((await api.options(relay(site.host))).ways).toEqual([
+                "EMAIL",
+            ]);
+            expect(await ways.view(site.organizationId)).toMatchObject({
+                ways: expect.arrayContaining([
+                    { way: "WHATSAPP", usable: false, blocked: "NO_BALANCE" },
+                ]),
+            });
+            await expect(
+                api.requestCode(relay(site.host), { email: nextEmail() }),
+            ).resolves.toMatchObject({ sent: true });
+        });
+
+        it("refuses a way the business turned off, on the server", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["EMAIL"]);
+            const phone = nextPhone();
+            for (const call of [
+                api.requestPhoneCode(relay(site.host), {
+                    phone,
+                    challenge: "ok",
+                }),
+                api.verifyPhone(relay(site.host), { phone, code: "123456" }),
+            ]) {
+                expect(await refusal(call)).toMatchObject({
+                    status: 503,
+                    details: { reason: "unavailable" },
+                });
+            }
+            expect(lastCode(phone)).toBe("");
+            await ways.set(site.organizationId, ["WHATSAPP"]);
+            expect(
+                await refusal(
+                    api.verify(relay(site.host), {
+                        email: nextEmail(),
+                        code: "123456",
+                    }),
+                ),
+            ).toMatchObject({
+                status: 503,
+                details: { reason: "unavailable" },
+            });
+        });
+
+        it("signs up with a phone alone, and signs in to the same account again", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["WHATSAPP", "EMAIL"]);
+            const phone = nextPhone();
+            const token = await signInByPhone(site.host, phone);
+            const account = await prisma.customerAccount.findFirstOrThrow({
+                where: {
+                    organizationId: site.organizationId,
+                    phoneE164: phone,
+                },
+                include: { contact: { select: { email: true, phone: true } } },
+            });
+            expect(account).toMatchObject({
+                email: null,
+                emailVerifiedAt: null,
+                status: "ACTIVE",
+            });
+            expect(account.phoneVerifiedAt).not.toBeNull();
+            expect(account.contact.email).toMatch(/@phone\.invalid$/);
+            expect(account.contact.phone).toBe(phone);
+
+            const customer = await customerOf(site.host, token);
+            expect(customer.accountId).toBe(account.id);
+            await expect(
+                new SessionsService().describe(customer),
+            ).resolves.toMatchObject({ email: null, signInPhone: phone });
+
+            const again = await signInByPhone(site.host, phone);
+            expect((await customerOf(site.host, again)).accountId).toBe(
+                account.id,
+            );
+            expect(
+                await prisma.customerAccount.count({
+                    where: {
+                        organizationId: site.organizationId,
+                        phoneE164: phone,
+                    },
+                }),
+            ).toBe(1);
+        });
+
+        it("lets a phone-only customer add an email with its code", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["WHATSAPP"]);
+            const phone = nextPhone();
+            const customer = await customerOf(
+                site.host,
+                await signInByPhone(site.host, phone),
+            );
+            const told = jest.fn(() => Promise.resolve("sent" as const));
+            const change = new EmailChangeService(codes, told);
+            const email = nextEmail();
+            await change.requestCode(customer, relay(site.host), { email });
+            await expect(
+                change.confirm(customer, relay(site.host), {
+                    email,
+                    code: emails.at(-1)?.code ?? "",
+                }),
+            ).resolves.toEqual({ done: true });
+            const account = await prisma.customerAccount.findFirstOrThrow({
+                where: { id: customer.accountId },
+                include: { contact: { select: { email: true } } },
+            });
+            expect(account).toMatchObject({ email, phoneE164: phone });
+            expect(account.emailVerifiedAt).not.toBeNull();
+            // The phone placeholder gives way to the real address.
+            expect(account.contact.email).toBe(email);
+            // No old address to tell.
+            expect(told).not.toHaveBeenCalled();
+        });
+
+        it("lets an email customer add a phone with its WhatsApp code", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["EMAIL", "WHATSAPP"]);
+            const email = nextEmail();
+            await api.requestCode(relay(site.host), { email });
+            const session = await api.verify(relay(site.host), {
+                email,
+                code: emails.at(-1)?.code ?? "",
+            });
+            const customer = await customerOf(site.host, session.token);
+            const phone = nextPhone();
+            await phoneSignIn.requestAddCode(customer, relay(site.host), {
+                phone,
+                challenge: "ok",
+            });
+            expect(
+                await refusal(
+                    phoneSignIn.confirmAdd(customer, relay(site.host), {
+                        phone,
+                        code: wrong(lastCode(phone)),
+                    }),
+                ),
+            ).toMatchObject({ status: 400 });
+            await expect(
+                phoneSignIn.confirmAdd(customer, relay(site.host), {
+                    phone,
+                    code: lastCode(phone),
+                }),
+            ).resolves.toEqual({ done: true });
+            expect(
+                await prisma.customerAccount.findFirstOrThrow({
+                    where: { id: customer.accountId },
+                    select: { email: true, phoneE164: true },
+                }),
+            ).toEqual({ email, phoneE164: phone });
+        });
+
+        it("reads a phone-only account safely wherever its email was read", async () => {
+            const site = await business();
+            await ways.set(site.organizationId, ["WHATSAPP"]);
+            const phone = nextPhone();
+            const customer = await customerOf(
+                site.host,
+                await signInByPhone(site.host, phone),
+            );
+            const { organizationId, contactId } = customer;
+            // No notice address: the placeholder is never one.
+            await expect(
+                contactNoticeAddress(prisma, organizationId, contactId),
+            ).resolves.toBeNull();
+            // The account's Me.
+            await expect(
+                new AccountHomeService().me(customer),
+            ).resolves.toMatchObject({ email: null, signInPhone: phone });
+            // Staff's view of the site account.
+            const account = await prisma.customerAccount.findFirstOrThrow({
+                where: { id: customer.accountId },
+            });
+            expect(
+                toSiteAccountView(account, {
+                    email: "phone+x@phone.invalid",
+                    source: "site-account",
+                }),
+            ).toMatchObject({ email: null, phone, canUnlink: false });
+            // A merge's words name the number.
+            expect(maskSignIn(account)).toBe(
+                `the number ending ${phone.slice(-4)}`,
+            );
+            // Privacy removal finds and removes it.
+            await expect(
+                theirAccounts(prisma, organizationId, contactId),
+            ).resolves.toEqual([
+                { id: account.id, email: null, phoneE164: phone },
+            ]);
         });
     });
 });

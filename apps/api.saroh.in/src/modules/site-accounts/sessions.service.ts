@@ -41,7 +41,10 @@ export interface SessionIssued {
 
 /** The signed-in customer as the site may show them: an allow-list. */
 export interface SignedInCustomer {
-    email: string;
+    /** Null for an account made by phone alone (DEC-196). */
+    email: string | null;
+    /** The verified phone they sign in with by WhatsApp, or null. */
+    signInPhone: string | null;
     /** The contact's name, or null until the customer gives one. */
     name: string | null;
     /**
@@ -157,6 +160,7 @@ export class SessionsService {
             },
             select: {
                 email: true,
+                phoneE164: true,
                 contact: {
                     select: { firstName: true, lastName: true, phone: true },
                 },
@@ -169,6 +173,7 @@ export class SessionsService {
         const phone = account.contact.phone?.trim();
         return {
             email: account.email,
+            signInPhone: account.phoneE164,
             name: name || null,
             phone: phone === undefined || phone === "" ? null : phone,
         };

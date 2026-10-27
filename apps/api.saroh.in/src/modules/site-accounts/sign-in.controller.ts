@@ -50,19 +50,17 @@ export class SignInController {
      * What the sign-in sheet needs up front: whether a challenge is likely,
      * the widget's public key, and the business's phone for the "couldn't
      * send" line. Every published site takes sign-in; there is no switch.
-     * `whatsapp` offers the WhatsApp code (DEC-196): only while the business
-     * has it on and its balance covers a code.
+     * `ways` are the ways it offers now, in the business's order (DEC-196,
+     * `sign-in-ways.ts`); `whatsapp` says whether WhatsApp is one of them,
+     * for a site built before `ways`.
      */
     @Get("options")
     @Header("Cache-Control", "no-store")
     async options(
         @RelayContext() relay: SiteRelay,
     ): Promise<SignInOptions & { whatsapp: boolean }> {
-        const [options, whatsapp] = await Promise.all([
-            this.codes.options(relay),
-            this.phone.offered(relay),
-        ]);
-        return { ...options, whatsapp };
+        const options = await this.codes.options(relay);
+        return { ...options, whatsapp: options.ways.includes("WHATSAPP") };
     }
 
     /**
@@ -112,9 +110,11 @@ export class SignInController {
     }
 
     /**
-     * Trade a WhatsApp code for a session, or, for a phone no account holds,
-     * `{ emailNeeded, phoneProof }`: the email code that follows takes the
-     * proof and adds the phone. 400 invalid|expired as for email codes.
+     * Trade a WhatsApp code for a session. A phone no account holds signs
+     * up with the phone alone, or, at a business that never chose its ways,
+     * answers `{ emailNeeded, phoneProof }`: the email code that follows
+     * takes the proof and adds the phone. 400 invalid|expired as for email
+     * codes; 503 `unavailable` when the site doesn't offer WhatsApp now.
      */
     @Post("phone-sessions")
     @HttpCode(HttpStatus.CREATED)

@@ -464,11 +464,17 @@ export class MergeService {
                 contactId: { in: [survivor.id, other.id] },
                 status: { in: [...SIGNS_IN] },
             },
-            select: { id: true, email: true, contactId: true },
+            select: { id: true, email: true, phoneE164: true, contactId: true },
         });
         const accountOf = (id: string): MergeAccount | null => {
             const found = accounts.find((x) => x.contactId === id);
-            return found ? { id: found.id, email: found.email } : null;
+            return found
+                ? {
+                      id: found.id,
+                      email: found.email,
+                      phoneE164: found.phoneE164,
+                  }
+                : null;
         };
         return {
             survivor,

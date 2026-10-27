@@ -16,6 +16,7 @@ import { useTestRelease } from "../test-release/context";
 import { SIGN_IN_OFF_TEXT } from "../test-release/words";
 import type {
     CodeRequestResult,
+    SheetWay,
     SignedInCustomer,
     SignInApi,
     SignInOptions,
@@ -27,6 +28,7 @@ import {
     looksLikeEmail,
     looksLikePhone,
     retryText,
+    sheetWays,
     UNAVAILABLE_TEXT,
 } from "./api";
 import { ChallengeWidget } from "./challenge";
@@ -61,11 +63,19 @@ import {
  * makes a contact and sends a real code. The sheet takes the email as
  * usual, then says so instead of asking for a code, and nothing is sent.
  *
- * When the options offer it (DEC-196), "Use WhatsApp instead" asks for a
- * mobile number and sends the code on WhatsApp, through the same code step.
- * Every WhatsApp code costs the business, so the challenge is always shown
- * for it. A number no account holds yet is then asked for an email, whose
- * code finishes signing in and adds the number to that account.
+ * The ways follow the business's choice and order (DEC-196, `sheetWays`):
+ * the first opens, the others are "Use … instead" links in that order.
+ * WhatsApp asks for a mobile number and sends the code on WhatsApp,
+ * through the same code step; every WhatsApp code costs the business, so
+ * the challenge is always shown for it. A number no account holds yet
+ * signs up on its own where the business allows a phone alone, and is
+ * otherwise asked for an email, whose code finishes signing in and adds
+ * the number. When WhatsApp answers that it can't send (the business ran
+ * out of balance since the page was drawn), "Use email instead" is offered
+ * even where email wasn't listed: the server has brought email back.
+ *
+ * Me opens it to change or add the sign-in email ("change-email",
+ * "add-email") and to add a WhatsApp number ("add-phone").
  */
 
 export interface SignInSheetProps {
@@ -78,7 +88,7 @@ export interface SignInSheetProps {
      * Me's change of sign-in email (A5), where the code goes to the new
      * address and `onSignedIn` gets the customer as they now are.
      */
-    purpose?: "book" | "sign-in" | "change-email";
+    purpose?: "book" | "sign-in" | "change-email" | "add-email" | "add-phone";
     onSignedIn: (customer: SignedInCustomer) => void;
 }
 
@@ -122,8 +132,10 @@ export function SignInSheet({
     const opener = useRef<Element | null>(null);
     const testRelease = useTestRelease() !== null;
 
-    // A change of sign-in email is its own errand: nothing of it is kept.
-    const keeps = purpose !== "change-email";
+    // Me's errands (an email or a number to add or change): nothing kept.
+    const changing = purpose === "change-email" || purpose === "add-email";
+    const addingPhone = purpose === "add-phone";
+    const keeps = !changing && !addingPhone;
     // What an earlier load of the page had got to. Nothing is drawn from
     // it until the sheet opens, so the server's blank and the browser's
     // draft can differ.
@@ -134,7 +146,8 @@ export function SignInSheet({
     const [email, setEmail] = useState(kept?.email ?? "");
     // The way the code goes (DEC-196), the number, and the proof a WhatsApp
     // code left when the number needs an email to finish.
-    const [via, setVia] = useState<"email" | "phone">("email");
+    // Null until the customer picks another: then the business's first.
+    const [picked, setPicked] = useState<SheetWay | null>(null);
     const [phone, setPhone] = useState("");
     const [phoneProof, setPhoneProof] = useState<string | null>(null);
     // When the code on its way was sent: what makes a restored "Enter the
@@ -156,6 +169,15 @@ export function SignInSheet({
     // when they say a challenge is likely. Derived, not copied, because the
     // options can land after the sheet opened (`AccountEntry`, #838).
     const [askedKey, setAskedKey] = useState<string | null>(null);
+    const canPhone =
+        api.requestPhoneCode !== undefined && api.verifyPhoneCode !== undefined;
+    // The business's ways, in its order (DEC-196); Me's errands have one.
+    const ways: SheetWay[] = addingPhone
+        ? ["phone"]
+        : changing
+          ? ["email"]
+          : sheetWays(options, canPhone);
+    const via: SheetWay = picked ?? ways[0];
     const byPhone = via === "phone";
     // A WhatsApp code always asks the challenge, when there is one.
     const siteKey =
@@ -163,11 +185,14 @@ export function SignInSheet({
         (options.challenge.required || byPhone
             ? options.challenge.siteKey
             : null);
-    const whatsapp =
-        purpose !== "change-email" &&
-        options.whatsapp === true &&
-        api.requestPhoneCode !== undefined &&
-        api.verifyPhoneCode !== undefined;
+    // WhatsApp couldn't send: email is back on the server, so offer it.
+    const others: SheetWay[] =
+        byPhone &&
+        !addingPhone &&
+        problem?.reason === "unavailable" &&
+        !ways.includes("email")
+            ? ["email"]
+            : ways.filter((way) => way !== via);
 
     // Focus in on open; back to the opener on close.
     useEffect(() => {
@@ -261,7 +286,7 @@ export function SignInSheet({
         if (!result.ok && result.reason === "email-needed") {
             // The number is proved; an email finishes, and takes the number.
             setPhoneProof(result.phoneProof);
-            setVia("email");
+            setPicked("email");
             setCode("");
             setResendAt(null);
             setAskedKey(null);
@@ -275,7 +300,7 @@ export function SignInSheet({
             setCode("");
             setPhone("");
             setPhoneProof(null);
-            setVia("email");
+            setPicked(null);
             setStep("email");
             onSignedIn(result.customer);
             onClose();
@@ -298,9 +323,9 @@ export function SignInSheet({
         setProblem(null);
     }
 
-    /** Email ↔ WhatsApp, from the first step. */
-    function switchWay() {
-        setVia(byPhone ? "email" : "phone");
+    /** Another of the business's ways, from the first step. */
+    function switchWay(way: SheetWay) {
+        setPicked(way);
         setProblem(null);
         setToken(null);
         setAskedKey(null);
@@ -330,15 +355,18 @@ export function SignInSheet({
         }
     }
 
-    const changing = purpose === "change-email";
     const title =
         step === "code"
             ? "Enter the code"
-            : changing
-              ? "Change your sign-in email"
-              : phoneProof
-                ? "Add your email"
-                : `Sign in to ${businessName}`;
+            : purpose === "add-email"
+              ? "Add your email"
+              : changing
+                ? "Change your sign-in email"
+                : addingPhone
+                  ? "Add your WhatsApp number"
+                  : phoneProof
+                    ? "Add your email"
+                    : `Sign in to ${businessName}`;
     const lead =
         step === "code"
             ? byPhone
@@ -346,13 +374,15 @@ export function SignInSheet({
                 : `We sent a 6-digit code to ${email.trim()}.`
             : changing
               ? "We'll send a code to the new address to check it's yours."
-              : phoneProof
-                ? "Your number is confirmed. Add your email to finish. We'll send a code to check it's yours."
-                : purpose === "book"
-                  ? "Last step: confirm it's you, then we'll finish. No password."
-                  : byPhone
-                    ? "No password. We'll send you a one-time code on WhatsApp."
-                    : "No password. We'll send you a one-time code.";
+              : addingPhone
+                ? "You can then sign in with a code on WhatsApp. We'll send one now to check it's yours."
+                : phoneProof
+                  ? "Your number is confirmed. Add your email to finish. We'll send a code to check it's yours."
+                  : purpose === "book"
+                    ? "Last step: confirm it's you, then we'll finish. No password."
+                    : byPhone
+                      ? "No password. We'll send you a one-time code on WhatsApp."
+                      : "No password. We'll send you a one-time code.";
     const expired = problem?.reason === "expired";
     const resendIn = resendWait(resendAt, now);
 
@@ -478,13 +508,14 @@ export function SignInSheet({
                             businessName={businessName}
                             phone={options.phone}
                             via={via}
+                            emailListed={ways.includes("email")}
                         />
                     ) : null}
 
                     {step === "email" &&
-                    !changing &&
-                    !byPhone &&
-                    !phoneProof ? (
+                    keeps &&
+                    !phoneProof &&
+                    (!byPhone || options.phoneOnlySignUp === true) ? (
                         <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                             New here? The same code creates your account.
                         </p>
@@ -508,8 +539,12 @@ export function SignInSheet({
                             : busy
                               ? "Checking…"
                               : changing
-                                ? "Confirm new email"
-                                : "Sign in"}
+                                ? purpose === "add-email"
+                                    ? "Confirm email"
+                                    : "Confirm new email"
+                                : addingPhone
+                                  ? "Confirm number"
+                                  : "Sign in"}
                     </button>
                 </form>
 
@@ -553,15 +588,20 @@ export function SignInSheet({
                               : "Change email"}
                     </button>
                 ) : null}
-                {step === "email" && whatsapp && !phoneProof ? (
-                    <button
-                        type="button"
-                        onClick={switchWay}
-                        className={altButton}
-                    >
-                        {byPhone ? "Use email instead" : "Use WhatsApp instead"}
-                    </button>
-                ) : null}
+                {step === "email" && !phoneProof
+                    ? others.map((way) => (
+                          <button
+                              key={way}
+                              type="button"
+                              onClick={() => switchWay(way)}
+                              className={altButton}
+                          >
+                              {way === "phone"
+                                  ? "Use WhatsApp instead"
+                                  : "Use email instead"}
+                          </button>
+                      ))
+                    : null}
             </div>
         </>
     );
@@ -595,12 +635,15 @@ export function ProblemText({
     businessName,
     phone,
     via = "email",
+    emailListed = true,
 }: {
     problem: Problem;
     businessName: string;
     phone: string | null;
     /** How the code went: a wrong WhatsApp code says WhatsApp. */
     via?: "email" | "phone";
+    /** Whether "Use your email instead" can be said (DEC-196). */
+    emailListed?: boolean;
 }) {
     if (problem.reason === "test-release") {
         // Not a failure: what a test release does here, said plainly.
@@ -653,7 +696,9 @@ export function ProblemText({
             body = "Enter an Indian mobile number, like +91 98450 12345.";
             break;
         case "not-on-whatsapp":
-            body = "This number isn't on WhatsApp. Use your email instead.";
+            body = emailListed
+                ? "This number isn't on WhatsApp. Use your email instead."
+                : "This number isn't on WhatsApp. Try another number.";
             break;
         case "invalid":
             body =
@@ -665,7 +710,10 @@ export function ProblemText({
             body = "That code has expired. Send a new one.";
             break;
         case "merged":
-            body = `This email now signs in as ${problem.signsInAs}. Use that email instead.`;
+            body =
+                via === "phone"
+                    ? `This number now signs in as ${problem.signsInAs}. Use that instead.`
+                    : `This email now signs in as ${problem.signsInAs}. Use that email instead.`;
             break;
         case "blocked":
             body = `You can't sign in here. Please contact ${businessName}.`;

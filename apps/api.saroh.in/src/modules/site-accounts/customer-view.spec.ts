@@ -91,6 +91,7 @@ describe("the account's allow-list", () => {
             name: "Farah Khan",
             email: "farah@example.in",
             phone: "+91 98765 43210",
+            signInPhone: null,
             businessName: "Kavi Dental",
             tabs: [
                 { key: "home", label: "Home" },

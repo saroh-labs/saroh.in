@@ -10,6 +10,7 @@ import type {
 import {
     accountFetch,
     clearSessionCookie,
+    sessionCustomer,
     setSessionCookie,
     siteAccountsFetch,
 } from "@/lib/customer-session";
@@ -154,16 +155,10 @@ export async function verifyPhoneSignInCode(
 async function whoIs(token: string, email: string): Promise<SignedInCustomer> {
     const call = await siteAccountsFetch("session", { session: token });
     if (call.ok && call.res.ok) {
-        const body = (await call.res.json().catch(() => null)) as {
-            email?: unknown;
-            name?: unknown;
-        } | null;
-        if (typeof body?.email === "string") {
-            return {
-                email: body.email,
-                name: typeof body.name === "string" ? body.name : null,
-            };
-        }
+        const customer = sessionCustomer(
+            await call.res.json().catch(() => null),
+        );
+        if (customer) return customer;
     }
     return customerFromEmail(email);
 }

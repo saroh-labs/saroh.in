@@ -800,7 +800,9 @@ export class CommunicationsService {
             orderBy: { linkedAt: "desc" },
             select: { email: true },
         });
-        return account ? { address: account.email, contactId } : null;
+        // A phone-only site account (DEC-196) has no address: none, as for
+        // a contact with no email.
+        return account?.email ? { address: account.email, contactId } : null;
     }
 
     /**

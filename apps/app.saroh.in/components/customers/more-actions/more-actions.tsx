@@ -28,6 +28,7 @@ import type {
 } from "@/lib/customer-workspace/service";
 import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
 import {
+    signsInWith,
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
@@ -112,7 +113,7 @@ export function useMoreActions({
     async function separate(preview: UnlinkPreview): Promise<ConfirmResult> {
         const res = await unlinkAccountAction(d.contact.id);
         if (!res.ok) return { ok: false, error: res.error };
-        showSuccess(unlinkedLine(preview.email));
+        showSuccess(unlinkedLine(signsInWith(preview)));
         router.refresh();
     }
 

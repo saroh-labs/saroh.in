@@ -58,6 +58,9 @@ const REFUSED = [
     "PATCH public/site-accounts/me",
     "POST public/site-accounts/me/email",
     "POST public/site-accounts/me/email/code",
+    // A WhatsApp number to sign in with (DEC-196): it costs the business.
+    "POST public/site-accounts/me/phone",
+    "POST public/site-accounts/me/phone/code",
     "POST public/site-accounts/me/messages",
     "POST public/site-accounts/me/notes",
     // Whether the business may email them, and "Pay now" on an open

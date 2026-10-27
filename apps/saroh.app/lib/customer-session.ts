@@ -233,27 +233,33 @@ export async function accountSitesFetch(
     return call;
 }
 
-function isCustomer(body: unknown): body is SignedInCustomer {
-    if (!body || typeof body !== "object") return false;
+const text = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+
+/**
+ * The API's `session` answer as the site keeps it, or null when it isn't
+ * one. An account has an email or a sign-in phone, at least one (DEC-196).
+ */
+export function sessionCustomer(body: unknown): SignedInCustomer | null {
+    if (!body || typeof body !== "object") return null;
     const b = body as Record<string, unknown>;
-    return (
-        typeof b.email === "string" &&
-        (b.name === null || typeof b.name === "string")
-    );
+    const email = text(b.email);
+    const signInPhone = text(b.signInPhone);
+    if (!email && !signInPhone) return null;
+    if (b.name !== null && typeof b.name !== "string") return null;
+    return {
+        email,
+        signInPhone,
+        name: b.name,
+        // The phone the business has for them: the booking page's optional
+        // "Phone" starts with it. Absent from an older API.
+        phone: text(b.phone),
+    };
 }
 
 /** Who is signed in on this site, or null. */
 export async function getSignedInCustomer(): Promise<SignedInCustomer | null> {
     const call = await accountFetch("session");
     if (!call?.ok || !call.res.ok) return null;
-    const body: unknown = await call.res.json().catch(() => null);
-    if (!isCustomer(body)) return null;
-    // The phone the business has for them: the booking page's optional
-    // "Phone" starts with it. Absent from an older API.
-    const phone = (body as { phone?: unknown }).phone;
-    return {
-        email: body.email,
-        name: body.name,
-        phone: typeof phone === "string" && phone.trim() ? phone.trim() : null,
-    };
+    return sessionCustomer(await call.res.json().catch(() => null));
 }

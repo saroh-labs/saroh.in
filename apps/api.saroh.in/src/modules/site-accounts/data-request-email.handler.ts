@@ -111,7 +111,19 @@ export class DataRequestEmailHandler {
                     },
                 });
                 // No email left: the "done" email already went (review #19).
-                if (!request?.requesterEmail) return null;
+                if (!request?.requesterEmail) {
+                    // A phone-only account (DEC-196) never had one: Saroh
+                    // has no WhatsApp notice for this yet, so it is skipped
+                    // and said so; the business sees the request either way.
+                    if (request && payload.step !== "done") {
+                        structuredLogger.warn("data_request_email_no_address", {
+                            organizationId,
+                            requestId: payload.requestId,
+                            step: payload.step,
+                        });
+                    }
+                    return null;
+                }
                 const stands = STANDS[payload.step];
                 if (stands && request.status !== stands) return null;
                 const org = await tx.organization.findUnique({

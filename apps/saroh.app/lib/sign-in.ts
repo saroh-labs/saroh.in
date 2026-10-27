@@ -2,6 +2,7 @@ import type {
     CodeRequestResult,
     SignedInCustomer,
     SignInOptions,
+    SignInWay,
     VerifyResult,
 } from "@saroh/site-blocks";
 import { isTestReleaseRefusal } from "@saroh/site-blocks";
@@ -19,6 +20,7 @@ import { siteAccountsFetch } from "./customer-session";
  *   POST public/site-accounts/sessions  → 201 token · 400 invalid|expired · 409 merged · 403 blocked|closed
  *   POST public/site-accounts/phone-codes    → as codes, + 400 field phone · 422 not on WhatsApp (DEC-196)
  *   POST public/site-accounts/phone-sessions → as sessions, + 201 emailNeeded with a phoneProof
+ *   (a business that chose its ways signs a new number up on its own: 201 token)
  *
  * Either POST from a test host is a 409 `TEST_RELEASE` (DEC-071, T4): the
  * sheet says signing in is off on a test release (KTD-9).
@@ -182,8 +184,19 @@ export function optionsResult(body: unknown): SignInOptions | null {
                     : null,
         },
         ...(b.whatsapp === true ? { whatsapp: true } : {}),
+        // The business's ways, in its order (DEC-196); unknown ones dropped.
+        ...(Array.isArray(b.ways)
+            ? {
+                  ways: b.ways.filter((w): w is SignInWay =>
+                      (KNOWN_WAYS as readonly unknown[]).includes(w),
+                  ),
+              }
+            : {}),
+        ...(b.phoneOnlySignUp === true ? { phoneOnlySignUp: true } : {}),
     };
 }
+
+const KNOWN_WAYS = ["EMAIL", "WHATSAPP", "SMS"] as const;
 
 /**
  * What the sheet needs up front, for the site this request is on. Null when

@@ -68,8 +68,10 @@ export function isAccountView(v: unknown): v is AccountView {
     if (!isRecord(v) || !isRecord(v.offers)) return false;
     return (
         isNullableString(v.name) &&
-        isString(v.email) &&
+        // Null for an account made by phone alone (DEC-196).
+        isNullableString(v.email) &&
         isNullableString(v.phone) &&
+        (v.signInPhone === undefined || isNullableString(v.signInPhone)) &&
         isString(v.businessName) &&
         Array.isArray(v.tabs) &&
         v.tabs.every(isTab) &&

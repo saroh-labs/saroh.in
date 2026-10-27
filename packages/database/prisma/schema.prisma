@@ -636,6 +636,14 @@ model BusinessProfile {
   // customer writes are untouched.
   accountUpdates Boolean @default(true)
 
+  // The ways the business's customers sign in and sign up on its site, in
+  // its order (DEC-196): EMAIL, WHATSAPP, SMS. The first usable one is the
+  // sign-in sheet's default. Empty means never chosen: EMAIL then WHATSAPP,
+  // which is how every business worked before the choice. What the site
+  // offers is this filtered by what works now (`site-accounts/sign-in-ways.ts`),
+  // and email when nothing is left, so customers are never locked out.
+  customerSignInWays String[] @default([])
+
   // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
   // (the invoice and bank notice go out early so the debit lands on the
   // renewal date), DAY_AFTER_RENEWAL (D13: invoice on the renewal date,
@@ -7634,13 +7642,15 @@ model CustomerAccount {
 
   // The verified sign-in email, lower-cased and trimmed. The contact's own
   // email may be a reserved placeholder (contacts/contact-email.ts) when
-  // another contact already held this one (DEC-049).
-  email           String
-  emailVerifiedAt DateTime
+  // another contact already held this one (DEC-049). Null for an account
+  // made by phone alone (DEC-196).
+  email           String?
+  emailVerifiedAt DateTime?
 
   // A phone proved by a WhatsApp code from Saroh's sender (DEC-196), E.164.
-  // Only ever added to an account whose email was just proved too, so a
-  // phone signs in to an email account and never stands without one.
+  // An account holds a verified email or a verified phone, at least one
+  // (CHECK "CustomerAccount_email_or_phone", migration
+  // 20270109100000_customer_sign_in_ways): a phone alone is enough.
   phoneE164       String?
   phoneVerifiedAt DateTime?
 

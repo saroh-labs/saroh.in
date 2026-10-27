@@ -143,7 +143,7 @@ export default async function AccountLayout({
                             <AccountCard
                                 labelledBy="account-signed-out"
                                 title="Sign in to your account"
-                                lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}. We'll send a one-time code to your email.`}
+                                lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}. We'll send you a one-time code.`}
                                 actions={
                                     <AccountEntry
                                         variant="page"

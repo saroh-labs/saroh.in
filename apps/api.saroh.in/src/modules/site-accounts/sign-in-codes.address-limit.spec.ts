@@ -27,6 +27,7 @@ import type { ChallengeVerifier } from "./challenge";
 import type { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import type { SessionsService } from "./sessions.service";
 import { SignInCodesService } from "./sign-in-codes.service";
+import type { SignInWaysService } from "./sign-in-ways";
 import type { SiteRelay } from "./site-relay";
 
 /**
@@ -53,6 +54,15 @@ describe("SignInCodesService past the address limit, with no challenge configure
             {} as SiteCodeDelivery,
             challenge,
             {} as SiteCodeAlerts,
+            // Email is offered: the ways are sign-in-ways.db.spec.ts.
+            {
+                assertOffered: () => Promise.resolve(),
+                view: () =>
+                    Promise.resolve({
+                        effective: ["EMAIL"],
+                        phoneOnlySignUp: false,
+                    }),
+            } as unknown as SignInWaysService,
             limiter,
             new FixedWindowRateLimiter(1_000, 600_000),
         );

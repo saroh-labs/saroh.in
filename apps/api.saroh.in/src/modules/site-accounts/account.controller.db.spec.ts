@@ -236,6 +236,7 @@ describe("Me", () => {
             name: null,
             email: atClinic.email,
             phone: null,
+            signInPhone: null,
             businessName: "Kavi Dental",
             // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
