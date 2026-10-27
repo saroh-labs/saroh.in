@@ -30,10 +30,8 @@ export function Faq({
             id={id}
             titleId={`${id}-title`}
             title={title}
-            className={cn(
-                "mx-0 grid max-w-[860px] scroll-mt-6 gap-5 pt-[110px]",
-                className,
-            )}
+            width="list"
+            className={cn("mx-0 grid scroll-mt-6 gap-5 pt-[110px]", className)}
         >
             <div className="grid border-t border-border">
                 {items.map((item) => (

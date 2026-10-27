@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { HelpSearch } from "@/components/help/help-search";
+import { Container } from "@/components/shared/layout/container";
 import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Eyebrow } from "@/components/shared/sections/eyebrow";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     groupsWithArticles,
     HELP_EMAIL,
@@ -41,12 +43,14 @@ export default function HelpPage() {
     const groups = groupsWithArticles(articles);
     return (
         <>
-            <header className="grid max-w-[860px] gap-[22px] px-mk-gutter pt-20">
-                <h1 className="m-0 font-display text-[clamp(36px,6vw,60px)] font-bold leading-none tracking-[-0.045em]">
-                    {helpHome.title}
-                </h1>
+            <Container
+                as="header"
+                width="list"
+                className="mx-0 grid gap-[22px] pt-20"
+            >
+                <PageTitle size="page">{helpHome.title}</PageTitle>
                 <HelpSearch articles={articles} />
-            </header>
+            </Container>
             {groups.length > 0 ? (
                 <section aria-labelledby="tasks" className="pt-20">
                     <Eyebrow

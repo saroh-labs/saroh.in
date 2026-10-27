@@ -21,6 +21,8 @@ import {
 import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
 
+import { PageTitle } from "@/components/shared/sections/page-title";
+import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
@@ -102,9 +104,9 @@ export default async function TemplatePage({ params }: Props) {
                         { name: t.name },
                     ]}
                 />
-                <h1 className="m-0 max-w-[22ch] font-display text-[clamp(36px,6vw,56px)] font-bold leading-[1.02] tracking-[-0.045em] [text-wrap:balance]">
+                <PageTitle size="article" className="max-w-[22ch]">
                     {t.name}: {t.idea}.
-                </h1>
+                </PageTitle>
                 <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
                     {t.description}
                 </p>
@@ -171,12 +173,11 @@ export default async function TemplatePage({ params }: Props) {
                     aria-labelledby="related"
                     className="pt-20"
                 >
-                    <h2
+                    <SectionHeading
                         id="related"
-                        className="m-0 font-display text-[clamp(26px,3.5vw,34px)] font-bold tracking-[-0.03em]"
-                    >
-                        {detail.related}
-                    </h2>
+                        title={detail.related}
+                        size="sm"
+                    />
                     <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-6 p-0 pt-8">
                         {related.map((r) => (
                             <li key={r.slug} className="grid min-w-0">

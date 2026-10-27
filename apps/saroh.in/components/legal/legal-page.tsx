@@ -6,6 +6,8 @@ import { LEGAL_PAGES, isLive } from "@/content/resources";
 import { formatDay } from "@/lib/format/day";
 import { parseLegal } from "@/lib/legal-markdown";
 import { resourcesContext } from "@/lib/resources-context";
+import { Container } from "../shared/layout/container";
+import { PageTitle } from "../shared/sections/page-title";
 
 /**
  * A legal page (plan U1, R6): the owner's text, verbatim, in a 720px reading
@@ -48,11 +50,13 @@ export function LegalFrame({
     children: ReactNode;
 }) {
     return (
-        <article className="mx-auto grid w-full max-w-[768px] gap-5 px-6 pt-[72px]">
-            <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
-                {title}
-            </h1>
+        <Container
+            as="article"
+            width="article"
+            className="grid gap-5 pt-[72px]"
+        >
+            <PageTitle size="article">{title}</PageTitle>
             {children}
-        </article>
+        </Container>
     );
 }

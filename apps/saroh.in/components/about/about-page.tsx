@@ -15,6 +15,7 @@ import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
 import { textLinkClasses } from "../shared/links/text-link";
 import { Eyebrow } from "../shared/sections/eyebrow";
+import { Section } from "../shared/sections/section";
 
 /** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */
 const HINDI = "font-[family-name:var(--font-devanagari)]";
@@ -111,17 +112,12 @@ export function AboutPage({
                 </div>
             </Container>
 
-            <Container
-                as="section"
-                aria-labelledby="about-values"
+            <Section
+                titleId="about-values"
+                title={values.title}
+                headingClassName="[&>h2]:max-w-[20ch]"
                 className="grid gap-7 pt-[110px]"
             >
-                <h2
-                    id="about-values"
-                    className="m-0 max-w-[20ch] font-display text-mk-h2-sm font-bold"
-                >
-                    {values.title}
-                </h2>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-4">
                     {drawnIn(values.cards, mode).map((card) => (
                         <div
@@ -139,7 +135,7 @@ export function AboutPage({
                         </div>
                     ))}
                 </div>
-            </Container>
+            </Section>
 
             <Container
                 as="section"

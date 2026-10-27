@@ -33,6 +33,8 @@ const twMerge = extendTailwindMerge({
                         "mk-price-lg",
                         "mk-pricing-hero",
                         "mk-h2-xs",
+                        "mk-page",
+                        "mk-article",
                         "mk-card-lg",
                         "mk-card",
                         "mk-lead",
@@ -47,7 +49,7 @@ const twMerge = extendTailwindMerge({
                     ],
                 },
             ],
-            "max-w": [{ "max-w": ["mk-page"] }],
+            "max-w": [{ "max-w": ["mk-page", "mk-article", "mk-list"] }],
             rounded: [
                 { rounded: ["mk-control", "mk-btn", "mk-card", "mk-band"] },
             ],

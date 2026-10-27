@@ -11,6 +11,8 @@ import { Eyebrow } from "./eyebrow";
  *   parts that know about each other.", "How it works".
  * - `md` — clamp(34px, 4vw, 44px) at −0.035em: "Solutions", "Pricing",
  *   "Questions", "What it does", "Works with".
+ * - `sm` — clamp(28px, 3vw, 34px) at −0.03em: "What it costs to use",
+ *   Contact's "Before you write".
  */
 export function SectionHeading({
     eyebrow,
@@ -23,7 +25,7 @@ export function SectionHeading({
     eyebrow?: ReactNode;
     title: ReactNode;
     lead?: ReactNode;
-    size?: "lg" | "md";
+    size?: "lg" | "md" | "sm";
     id?: string;
     className?: string;
 }) {
@@ -34,7 +36,11 @@ export function SectionHeading({
                 id={id}
                 className={cn(
                     "m-0 font-display font-bold text-foreground [text-wrap:balance]",
-                    size === "lg" ? "text-mk-h2" : "text-mk-h2-sm",
+                    size === "lg"
+                        ? "text-mk-h2"
+                        : size === "md"
+                          ? "text-mk-h2-sm"
+                          : "text-mk-h2-xs",
                 )}
             >
                 {title}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Container } from "@/components/shared/layout/container";
 import { CtaBand } from "@/components/shared/sections/cta-band";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
     earlyAccessOpen,
@@ -45,9 +46,9 @@ export default function TemplatesPage() {
                 as="header"
                 className="grid justify-items-center gap-4 pt-16 text-center"
             >
-                <h1 className="m-0 max-w-[18ch] font-display text-[clamp(36px,6vw,60px)] font-bold leading-[1.02] tracking-[-0.045em] [text-wrap:balance]">
+                <PageTitle size="page" className="max-w-[18ch]">
                     {page.title}
-                </h1>
+                </PageTitle>
                 <p className="m-0 max-w-[58ch] text-mk-band-body text-mk-copy [text-wrap:pretty]">
                     {page.intro(templates)}
                 </p>

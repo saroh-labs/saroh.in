@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
+import { Article, Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -66,7 +68,7 @@ export default async function IntegrationPage({ params }: Props) {
 
     return (
         <>
-            <article className="mx-auto grid max-w-[760px] gap-6 px-6 pt-[72px]">
+            <Article>
                 {/* The trail drawn below, ending on this page. */}
                 <JsonLd
                     data={breadcrumbLd([
@@ -81,9 +83,7 @@ export default async function IntegrationPage({ params }: Props) {
                         { name: fm.category },
                     ]}
                 />
-                <h1 className="m-0 font-display text-[clamp(36px,6vw,60px)] font-bold leading-none tracking-[-0.045em]">
-                    {fm.name}
-                </h1>
+                <PageTitle size="article">{fm.name}</PageTitle>
                 <p className="m-0 text-mk-lead leading-[1.65] text-mk-prose [text-wrap:pretty]">
                     {fm.intro}
                 </p>
@@ -117,17 +117,20 @@ export default async function IntegrationPage({ params }: Props) {
                         }}
                     />
                 </section>
-            </article>
+            </Article>
 
             <section
                 aria-labelledby="steps"
                 className="grid gap-6 px-mk-gutter pt-14"
             >
-                <div className="mx-auto w-full max-w-[760px] border-t border-border px-6 pt-6">
+                <Container
+                    width="article"
+                    className="border-t border-border pt-6"
+                >
                     <h2 id="steps" className={H2}>
                         {stepsTitle}
                     </h2>
-                </div>
+                </Container>
                 <IntegrationSteps
                     steps={fm.steps}
                     panelPath={fm.panelPath}
@@ -135,7 +138,11 @@ export default async function IntegrationPage({ params }: Props) {
                 />
             </section>
 
-            <article className="mx-auto grid max-w-[760px] gap-6 px-6 pt-14">
+            <Container
+                as="article"
+                width="article"
+                className="grid gap-6 pt-14"
+            >
                 <section
                     aria-labelledby="questions"
                     className="grid border-t border-border pt-6"
@@ -173,7 +180,7 @@ export default async function IntegrationPage({ params }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </article>
+            </Container>
         </>
     );
 }

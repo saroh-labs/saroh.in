@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Article } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
@@ -60,7 +62,7 @@ export default async function ChangelogEntryPage({ params }: Props) {
     const path = changelogHref(entry.slug);
 
     return (
-        <article className="mx-auto grid w-full max-w-[720px] gap-6 px-6 pt-[72px]">
+        <Article>
             <JsonLd
                 data={[
                     articleLd({
@@ -89,9 +91,7 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     },
                 ]}
             />
-            <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
-                {entry.title}
-            </h1>
+            <PageTitle size="article">{entry.title}</PageTitle>
             <p className="m-0 text-mk-lead leading-[1.65] text-mk-prose [text-wrap:pretty]">
                 {entry.lead}
             </p>
@@ -122,6 +122,6 @@ export default async function ChangelogEntryPage({ params }: Props) {
             <p className="m-0 text-[15px] text-muted-foreground">
                 {entry.signoff}
             </p>
-        </article>
+        </Article>
     );
 }

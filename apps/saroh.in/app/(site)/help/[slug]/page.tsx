@@ -12,6 +12,7 @@ import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     areasWithArticles,
     HELP_PATH,
@@ -134,9 +135,7 @@ export default async function HelpArticlePage({ params }: Props) {
                         { name: fm.area },
                     ]}
                 />
-                <h1 className="m-0 font-display text-[clamp(36px,6vw,48px)] font-bold leading-[1.02] tracking-[-0.04em] [text-wrap:balance]">
-                    {fm.title}
-                </h1>
+                <PageTitle size="article">{fm.title}</PageTitle>
                 <p className="m-0 text-mk-lead text-mk-copy [text-wrap:pretty]">
                     {fm.intro}
                 </p>

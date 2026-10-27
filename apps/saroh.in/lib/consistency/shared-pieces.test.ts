@@ -140,21 +140,8 @@ const RULES: Rule[] = [
     {
         name: "a section's H2 is SectionHeading / Section (A8)",
         pattern: /<h2\b[^>]*?font-display[^>]*?text-mk-h2/,
-        // Section draws its H2 itself until step 6 (A8) makes it SectionHeading.
-        home: [
-            "components/shared/sections/section-heading.tsx",
-            "components/shared/sections/section.tsx",
-        ],
-        allow: each(
-            "step 6 (A8): its raw H2 becomes Section / SectionHeading",
-            [
-                "app/(site)/page.tsx",
-                "components/about/about-page.tsx",
-                "components/contact/contact-page.tsx",
-                "components/pricing/compare-table.tsx",
-                "components/pricing/usage-table.tsx",
-            ],
-        ),
+        home: ["components/shared/sections/section-heading.tsx"],
+        allow: {},
         files: SITE,
     },
     {
@@ -241,46 +228,24 @@ const RULES: Rule[] = [
         files: SITE,
     },
     {
-        name: "a page title is PageIntro, its size a token (V6, A7)",
+        name: "a page title is PageTitle, its size a token (V6, A7)",
         pattern: /text-\[clamp\(/,
-        home: ["components/shared/sections/page-intro.tsx"],
-        allow: each(
-            'step 6 (A7, V6): its own clamp() H1 becomes PageIntro size="page" | "article"',
-            [
-                "app/(standalone)/waitlist/page.tsx",
-                "app/(site)/changelog/[slug]/page.tsx",
-                "app/(site)/changelog/page.tsx",
-                "app/(site)/help/[slug]/page.tsx",
-                "app/(site)/help/page.tsx",
-                "app/(site)/integrations/[provider]/page.tsx",
-                "app/(site)/integrations/page.tsx",
-                "app/(site)/templates/[slug]/page.tsx",
-                "app/(site)/templates/page.tsx",
-                "app/(site)/tools/link-preview/page.tsx",
-                "app/(site)/tools/qr-code-maker/page.tsx",
-                "components/about/about-page.tsx",
-                "components/legal/legal-page.tsx",
-                "components/tools/link-preview/saroh-share-preview.tsx",
-            ],
-        ),
+        home: ["components/shared/sections/page-title.tsx"],
+        allow: {
+            "app/(standalone)/waitlist/page.tsx":
+                "keep: the waitlist's 68px opening line is a paragraph of its own design, not a page title",
+            "components/about/about-page.tsx":
+                "keep: About's 'Where' H2 (30-40px) is its own; its closing band title waits on V4 (CtaBand), not in step 6's picks",
+            "components/tools/link-preview/saroh-share-preview.tsx":
+                "keep: the 'Share Saroh' card's H2 (30-38px) is a card title, not a page title",
+        },
         files: SITE,
     },
     {
         name: "a reading column is Container width (V7, A23)",
         pattern: /max-w-\[(?:720|760|768|860|900)px\]/,
         home: ["components/shared/layout/container.tsx"],
-        allow: each(
-            'step 6 (V7): its own column width becomes Container width="article" | "list"',
-            [
-                "app/(site)/changelog/[slug]/page.tsx",
-                "app/(site)/changelog/page.tsx",
-                "app/(site)/help/page.tsx",
-                "app/(site)/integrations/[provider]/page.tsx",
-                "components/changelog/changelog-list.tsx",
-                "components/shared/sections/faq.tsx",
-                "components/legal/legal-page.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {

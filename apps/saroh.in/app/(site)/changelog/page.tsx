@@ -6,6 +6,8 @@ import {
     FirstEntrySoon,
 } from "@/components/changelog/changelog-list";
 import { ChangelogSignup } from "@/components/changelog/changelog-signup";
+import { Container } from "@/components/shared/layout/container";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import { CHANGELOG, changelogView } from "@/content/changelog";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
@@ -28,18 +30,22 @@ export default function ChangelogPage() {
     const view = changelogView(resourcesContext());
     return (
         <>
-            <header className="mx-auto grid w-full max-w-[900px] gap-[18px] px-6 pt-20">
-                <h1 className="m-0 font-display text-[clamp(36px,6vw,60px)] font-bold leading-none tracking-[-0.045em]">
-                    {CHANGELOG.title}
-                </h1>
+            <Container
+                as="header"
+                width="list"
+                className="grid gap-[18px] pt-20"
+            >
+                <PageTitle size="page">{CHANGELOG.title}</PageTitle>
                 <p className="m-0 text-mk-intro text-mk-copy">
                     {CHANGELOG.sub}
                 </p>
                 <ChangelogSignup />
-            </header>
-            <section
+            </Container>
+            <Container
+                as="section"
+                width="list"
                 aria-label="Entries"
-                className="mx-auto grid w-full max-w-[900px] px-6 pt-14"
+                className="grid pt-14"
             >
                 {view.state === "entries" ? (
                     view.entries.map((entry) => (
@@ -48,7 +54,7 @@ export default function ChangelogPage() {
                 ) : view.firstDay ? (
                     <FirstEntrySoon day={view.firstDay} />
                 ) : null}
-            </section>
+            </Container>
             <ComingNextList />
         </>
     );

@@ -292,7 +292,7 @@
     | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`          | an `aria-label="Breadcrumb"` list                                             |
     | FAQ                                       | `Faq`, `components/shared/sections/faq.tsx`                                         | a `<details>` list                                                            |
     | Ink closing band                          | `CtaBand` (`template`, `note`, `size`), `components/shared/sections/`               | `rounded-mk-band bg-foreground`                                               |
-    | Section H2, page title                    | `Section` / `SectionHeading`, `PageIntro` (size tokens)                             | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
+    | Section H2, page title                    | `Section` / `SectionHeading`, `PageTitle` (`text-mk-page`, `text-mk-article`)       | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
     | Reading column                            | `Container width="article" \| "list"`                                               | `max-w-[720…900px]`                                                           |
     | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                          | `uppercase tracking-[0.1em]`                                                  |
     | Link card                                 | `CardLink`                                                                          | its own hover shadow                                                          |

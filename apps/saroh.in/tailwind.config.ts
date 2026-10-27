@@ -107,6 +107,17 @@ const config: Config = {
                     "clamp(42px, 5.6vw, 68px)",
                     { lineHeight: "1", letterSpacing: "-0.045em" },
                 ],
+                // Page titles (DEC-195, V6): an index page (Help, Changelog,
+                // Integrations, Templates) and an article (an entry, a help
+                // article, an integration, a template, legal, the tools).
+                "mk-page": [
+                    "clamp(36px, 6vw, 60px)",
+                    { lineHeight: "1.02", letterSpacing: "-0.045em" },
+                ],
+                "mk-article": [
+                    "clamp(34px, 6vw, 48px)",
+                    { lineHeight: "1.02", letterSpacing: "-0.04em" },
+                ],
                 "mk-h2-xs": [
                     "clamp(28px, 3vw, 34px)",
                     { letterSpacing: "-0.03em" },
@@ -131,6 +142,9 @@ const config: Config = {
             },
             maxWidth: {
                 "mk-page": "1280px",
+                // Reading columns (DEC-195, V7), gutter included as mk-page's.
+                "mk-article": "760px",
+                "mk-list": "900px",
             },
             borderRadius: {
                 ...(shared.borderRadius as Record<string, string>),

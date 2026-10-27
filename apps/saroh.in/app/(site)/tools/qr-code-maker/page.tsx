@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import { QrCodeMaker } from "@/components/tools/qr-code-maker/qr-code-maker";
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
@@ -42,9 +43,7 @@ export default function QrCodeMakerPage() {
             />
             <div className="flex flex-col gap-7 px-mk-gutter pb-14 pt-11">
                 <div className="flex flex-wrap items-end justify-between gap-6">
-                    <h1 className="m-0 font-display text-[clamp(34px,6vw,44px)] font-bold leading-[1.02] tracking-[-0.04em]">
-                        {copy.title}
-                    </h1>
+                    <PageTitle size="article">{copy.title}</PageTitle>
                     <span className="text-[15px] text-mk-copy">{copy.sub}</span>
                 </div>
 

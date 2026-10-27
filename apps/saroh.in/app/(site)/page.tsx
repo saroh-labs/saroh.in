@@ -10,6 +10,7 @@ import { PillLink } from "@/components/shared/links/pill";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { Eyebrow } from "@/components/shared/sections/eyebrow";
 import { Faq } from "@/components/shared/sections/faq";
+import { Section } from "@/components/shared/sections/section";
 import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
@@ -107,18 +108,12 @@ export default async function HomePage() {
 
             <TourVideo />
 
-            <Container
-                as="section"
+            <Section
                 id="solutions"
-                aria-labelledby="solutions-title"
+                titleId="solutions-title"
+                title={home.solutionsTitle}
                 className="grid scroll-mt-6 gap-[18px] pt-[110px]"
             >
-                <h2
-                    id="solutions-title"
-                    className="m-0 font-display text-mk-h2-sm font-bold"
-                >
-                    {home.solutionsTitle}
-                </h2>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
                     {solutionList.map((s) => (
                         <CardLink
@@ -132,7 +127,7 @@ export default async function HomePage() {
                         />
                     ))}
                 </div>
-            </Container>
+            </Section>
 
             {/* Plans show once the site's launch switch opens: before
                 that Pricing waits at the waitlist (Gate W), so no page draws

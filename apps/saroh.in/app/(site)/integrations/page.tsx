@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Container } from "@/components/shared/layout/container";
 import { Arrow } from "@/components/shared/links/arrow";
 import { Pill } from "@/components/shared/links/pill";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import { byComingGroup } from "@/content/coming";
 import {
     integrationHref,
@@ -39,9 +40,7 @@ export default function IntegrationsPage() {
                 as="header"
                 className="grid justify-items-center gap-3.5 pt-16 text-center"
             >
-                <h1 className="m-0 font-display text-[clamp(36px,6vw,52px)] font-bold leading-none tracking-[-0.045em]">
-                    {page.title}
-                </h1>
+                <PageTitle size="page">{page.title}</PageTitle>
                 <p className="m-0 max-w-[54ch] text-mk-band-body text-mk-copy">
                     {page.intro}
                 </p>

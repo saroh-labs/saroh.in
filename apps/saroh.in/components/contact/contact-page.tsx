@@ -16,6 +16,7 @@ import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
 import { textLinkClasses } from "../shared/links/text-link";
 import { Eyebrow } from "../shared/sections/eyebrow";
+import { Section } from "../shared/sections/section";
 import { ContactForm } from "./contact-form";
 
 /** The side column's white card. */
@@ -152,17 +153,12 @@ export function ContactPage({
             </Container>
 
             {questions.length > 0 ? (
-                <Container
-                    as="section"
-                    aria-labelledby="contact-before"
+                <Section
+                    titleId="contact-before"
+                    title={before.title}
+                    size="sm"
                     className="grid gap-[18px] pt-24"
                 >
-                    <h2
-                        id="contact-before"
-                        className="m-0 font-display text-mk-h2-xs font-bold"
-                    >
-                        {before.title}
-                    </h2>
                     <div
                         className={cn(
                             "grid gap-3",
@@ -188,7 +184,7 @@ export function ContactPage({
                             </div>
                         ))}
                     </div>
-                </Container>
+                </Section>
             ) : null}
         </>
     );

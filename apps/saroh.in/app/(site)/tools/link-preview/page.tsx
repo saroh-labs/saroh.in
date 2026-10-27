@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Faq } from "@/components/shared/sections/faq";
+import { PageTitle } from "@/components/shared/sections/page-title";
 import { PointGrid } from "@/components/shared/sections/point-grid";
 import { LinkPreviewTool } from "@/components/tools/link-preview/link-preview-tool";
 import { SarohSharePreview } from "@/components/tools/link-preview/saroh-share-preview";
@@ -50,9 +51,7 @@ export default function LinkPreviewPage() {
             />
             <div className="grid gap-[18px] px-mk-gutter pt-12">
                 <div className="flex flex-wrap items-end justify-between gap-8">
-                    <h1 className="m-0 font-display text-[clamp(36px,6vw,44px)] font-bold leading-[1.02] tracking-[-0.04em]">
-                        {copy.title}
-                    </h1>
+                    <PageTitle size="article">{copy.title}</PageTitle>
                     <span className="text-[15px] text-mk-copy">
                         {copy.apps}
                     </span>

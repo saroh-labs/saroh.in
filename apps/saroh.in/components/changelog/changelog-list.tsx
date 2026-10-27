@@ -11,6 +11,7 @@ import {
 import { byComingGroup } from "@/content/coming";
 import { ring } from "@/lib/ring";
 
+import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
 
 /** The design's row: a 140px date column and the text, wrapping on a phone. */
@@ -95,9 +96,11 @@ const WHEN_COL = "flex-[0_0_140px] font-mono text-[13px]";
  */
 export function ComingNextList() {
     return (
-        <section
+        <Container
+            as="section"
+            width="list"
             aria-labelledby="coming-next"
-            className="mx-auto grid w-full max-w-[900px] gap-2 px-6 pt-[72px]"
+            className="grid gap-2 pt-[72px]"
         >
             <h2
                 id="coming-next"
@@ -149,6 +152,6 @@ export function ComingNextList() {
                     </ul>
                 ))}
             </div>
-        </section>
+        </Container>
     );
 }

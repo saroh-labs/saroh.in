@@ -3,8 +3,8 @@ import { Fragment } from "react";
 import { PRICE_NOTE } from "@/content/types";
 import type { CompareRow, PlanCardView } from "@/lib/pricing-model";
 
-import { Container } from "../shared/layout/container";
 import { Pill } from "../shared/links/pill";
+import { Section } from "../shared/sections/section";
 import { PlanTable } from "./plan-table";
 
 /**
@@ -23,17 +23,11 @@ export function CompareTable({
     placeholder: boolean;
 }) {
     return (
-        <Container
-            as="section"
-            aria-labelledby="compare-title"
+        <Section
+            titleId="compare-title"
+            title="Compare the plans"
             className="grid gap-[22px] pt-[110px]"
         >
-            <h2
-                id="compare-title"
-                className="m-0 font-display text-mk-h2-sm font-bold"
-            >
-                Compare the plans
-            </h2>
             <PlanTable
                 label="Plan comparison table"
                 corner="Feature"
@@ -90,6 +84,6 @@ export function CompareTable({
                     </>
                 )}
             />
-        </Container>
+        </Section>
     );
 }

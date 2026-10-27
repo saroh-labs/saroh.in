@@ -4,7 +4,7 @@ import { PRICING_COPY } from "@/content/pricing";
 import type { PlanCardView, UsageView } from "@/lib/pricing-model";
 import { NOT_INCLUDED } from "@/lib/pricing-model";
 
-import { Container } from "../shared/layout/container";
+import { Section } from "../shared/sections/section";
 import { PlanTable } from "./plan-table";
 
 /**
@@ -22,23 +22,14 @@ export function UsageTable({
 }) {
     if (!usage) return null;
     return (
-        <Container
-            as="section"
+        <Section
             id="usage"
-            aria-labelledby="usage-title"
+            titleId="usage-title"
+            title={PRICING_COPY.usageTitle}
+            lead={PRICING_COPY.usageLead}
+            size="sm"
             className="grid scroll-mt-6 gap-[18px] pt-[72px]"
         >
-            <div className="grid gap-1.5">
-                <h2
-                    id="usage-title"
-                    className="m-0 font-display text-mk-h2-xs font-bold"
-                >
-                    {PRICING_COPY.usageTitle}
-                </h2>
-                <p className="m-0 text-base text-mk-copy">
-                    {PRICING_COPY.usageLead}
-                </p>
-            </div>
             <PlanTable
                 label="Usage table"
                 caption={PRICING_COPY.usageTitle}
@@ -74,6 +65,6 @@ export function UsageTable({
                     <li key={n}>{n}</li>
                 ))}
             </ul>
-        </Container>
+        </Section>
     );
 }
