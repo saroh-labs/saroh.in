@@ -3,17 +3,14 @@
 import { useState } from "react";
 
 import type { GalleryTemplate } from "@/content/templates";
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
 
+import { ChoiceChip } from "../shared/fields/choice-chips";
 import { TemplateCard } from "./template-card";
 
 export interface GalleryChip {
     id: string;
     label: string;
 }
-
-const CHIP = `inline-flex h-9 cursor-pointer items-center rounded-full border px-3.5 text-[14px] transition-[background-color,border-color,color,transform] duration-fast ease-out active:scale-[0.97] ${ring()}`;
 
 /**
  * The gallery's kind chips and cards (Templates design). "All" and one chip
@@ -49,20 +46,14 @@ export function TemplatesGallery({
                 {options.map((chip) => {
                     const on = chip.id === kind;
                     return (
-                        <button
+                        <ChoiceChip
                             key={chip.id ?? "all"}
-                            type="button"
                             aria-pressed={on}
+                            on={on}
                             onClick={() => setKind(chip.id)}
-                            className={cn(
-                                CHIP,
-                                on
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-border bg-card text-foreground hover:border-border-strong",
-                            )}
                         >
                             {chip.label}
-                        </button>
+                        </ChoiceChip>
                     );
                 })}
             </div>

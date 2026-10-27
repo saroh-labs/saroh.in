@@ -4,11 +4,11 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 
 import { CHANGELOG } from "@/content/changelog";
-import { cn } from "@/lib/cn";
 import { isEmailShape } from "@/lib/email-shape";
-import { ring } from "@/lib/ring";
-import type { WaitlistResponse } from "@/lib/waitlist";
-import { SEND_FAILED, WAITLIST_MESSAGES } from "@/lib/waitlist";
+import { postWaitlist, SEND_FAILED, WAITLIST_MESSAGES } from "@/lib/waitlist";
+
+import { Button } from "../shared/buttons/button";
+import { fieldClasses } from "../shared/fields/field-classes";
 
 type State =
     | { at: "idle" | "sending" }
@@ -38,39 +38,21 @@ export function ChangelogSignup() {
             return;
         }
         setState({ at: "sending" });
-        try {
-            const res = await fetch("/api/waitlist", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: value, src: "changelog" }),
-            });
-            const body = (await res.json()) as WaitlistResponse;
-            if (body.status === "success") {
-                setState({ at: "done" });
-                return;
-            }
-            const code = body.reason?.code;
-            setState(
-                code === "INVALID"
-                    ? {
-                          at: "error",
-                          message: WAITLIST_MESSAGES.email,
-                          field: true,
-                      }
-                    : {
-                          at: "error",
-                          message:
-                              SEND_FAILED[code ?? ""] ?? SEND_FAILED.default,
-                          field: false,
-                      },
-            );
-        } catch {
-            setState({
-                at: "error",
-                message: SEND_FAILED.default,
-                field: false,
-            });
+        const body = await postWaitlist({ email: value, src: "changelog" });
+        if (body.status === "success") {
+            setState({ at: "done" });
+            return;
         }
+        const code = body.reason?.code;
+        setState(
+            code === "INVALID"
+                ? { at: "error", message: WAITLIST_MESSAGES.email, field: true }
+                : {
+                      at: "error",
+                      message: SEND_FAILED[code ?? ""] ?? SEND_FAILED.default,
+                      field: false,
+                  },
+        );
     };
 
     if (state.at === "done") {
@@ -114,22 +96,21 @@ export function ChangelogSignup() {
                             ? "changelog-email-error changelog-email-note"
                             : "changelog-email-note"
                     }
-                    className={cn(
-                        `h-[46px] min-w-0 flex-[1_1_240px] rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 ${ring()}`,
-                        fieldError
-                            ? "border-destructive"
-                            : "border-border-strong",
-                    )}
+                    className={fieldClasses({
+                        invalid: fieldError,
+                        className: "h-[46px] flex-[1_1_240px]",
+                    })}
                 />
-                <button
+                <Button
                     type="submit"
+                    size="md"
+                    className="w-auto max-w-full px-[18px]"
                     disabled={state.at === "sending"}
-                    className={`min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:scale-[0.98] disabled:cursor-progress`}
                 >
                     {state.at === "sending"
                         ? "Adding you…"
                         : CHANGELOG.signupLabel}
-                </button>
+                </Button>
             </div>
             {state.at === "error" ? (
                 <p

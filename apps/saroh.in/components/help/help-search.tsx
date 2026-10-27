@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import type { HelpSummary } from "@/content/help";
 import { HELP_EMAIL, helpHome, helpHref, searchArticles } from "@/content/help";
 import { ring } from "@/lib/ring";
+import { fieldClasses } from "../shared/fields/field-classes";
 import { textLinkClasses } from "../shared/links/text-link";
 
 /**
@@ -35,7 +36,11 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                     placeholder={helpHome.searchPlaceholder}
                     aria-label={helpHome.searchLabel}
                     aria-controls={resultsId}
-                    className="min-w-0 flex-1 border-none bg-transparent text-[18px] text-foreground outline-none placeholder:text-mk-hint focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                    className={fieldClasses({
+                        bare: true,
+                        className:
+                            "text-[18px] focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+                    })}
                 />
             </label>
             <div id={resultsId} aria-live="polite">

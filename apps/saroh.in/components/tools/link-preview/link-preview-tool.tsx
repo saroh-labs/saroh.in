@@ -18,6 +18,7 @@ import { readAddress } from "@/lib/page-address";
 import { ring } from "@/lib/ring";
 import { useBrowserValue } from "@/lib/use-browser-value";
 
+import { Button } from "../../shared/buttons/button";
 import { LinkInput } from "./link-input";
 import { CardsGrid, ScorePanel } from "./link-results";
 import type { Unlocked } from "./unlock-panel";
@@ -255,24 +256,25 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
                                 : checkedLine(result.checkedAt)}
                         </span>
                         <div className="flex flex-wrap gap-2.5">
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() =>
                                     void check({ scheme, rest }, true)
                                 }
-                                className={`h-[38px] cursor-pointer rounded-[9px] border border-border-strong bg-transparent px-3.5 text-sm font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring()} active:bg-muted`}
+                                variant="secondary"
+                                size="xs"
                             >
                                 {copy.checkAgain}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="button"
                                 onClick={() => void copyLink()}
-                                className={`h-[38px] cursor-pointer rounded-[9px] border-none bg-foreground px-3.5 text-sm font-semibold text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:bg-mk-on-ink-hover`}
+                                size="xs"
                             >
                                 {copied === copy.copied
                                     ? copy.copied
                                     : copy.copyLink}
-                            </button>
+                            </Button>
                         </div>
                         <span
                             role="status"

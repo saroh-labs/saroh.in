@@ -141,6 +141,26 @@ export type WaitlistResponse =
           };
       };
 
+/**
+ * Posts a join to `/api/waitlist` (the waitlist form and the changelog's
+ * one-email sign-up, B14). No network, or an answer that isn't JSON, is a
+ * failure with no code: the caller says "couldn't add you".
+ */
+export async function postWaitlist(
+    body: Partial<WaitlistRequest> & { email: string },
+): Promise<WaitlistResponse> {
+    try {
+        const res = await fetch("/api/waitlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        return (await res.json()) as WaitlistResponse;
+    } catch {
+        return { status: "failure" };
+    }
+}
+
 /** The header's date, as the design writes it: "Tue 5 Mar". */
 export const openingShort = (isoDate: string) =>
     formatDay(isoDate, { weekday: "short", month: "short" });

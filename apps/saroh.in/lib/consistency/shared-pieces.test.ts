@@ -179,19 +179,15 @@ const RULES: Rule[] = [
         pattern: new RegExp(
             `\\bcursor-pointer\\b${RUN}\\bbg-foreground\\b${RUN}\\btext-background\\b|\\bbg-foreground\\b${RUN}\\bcursor-pointer\\b${RUN}\\btext-background\\b|<button\\b[^>]*?className=[^>]*?\\bbg-foreground\\b`,
         ),
-        home: ["components/shared/buttons/button.tsx"],
-        allow: each(
-            "step 6 (A14, V10): its hand-drawn submit becomes <Button> (buttonClasses)",
-            [
-                "components/changelog/changelog-signup.tsx",
-                "components/contact/contact-form.tsx",
-                "components/customers/report-form.tsx",
-                "components/tools/link-preview/link-input.tsx",
-                "components/tools/link-preview/link-preview-tool.tsx",
-                "components/tools/qr-code-maker/qr-maker-gate.tsx",
-                "components/waitlist/waitlist-form.tsx",
-            ],
-        ),
+        // ChoiceChip's chosen state is Ink too.
+        home: [
+            "components/shared/buttons/button.tsx",
+            "components/shared/fields/choice-chips.tsx",
+        ],
+        allow: {
+            "components/tools/qr-code-maker/qr-maker-gate.tsx":
+                "step 6e (A16): the QR maker's gate becomes the package's EmailGate",
+        },
         files: SITE,
     },
     {
@@ -275,14 +271,7 @@ const RULES: Rule[] = [
         name: "a choice chip is ChoiceChip (V9, A13)",
         pattern: both("\\bh-9\\b", "\\brounded-full\\b"),
         home: ["components/shared/fields/choice-chips.tsx"],
-        allow: each(
-            "step 6 (A13, V9): its own chip becomes ChoiceChip (36px, 14px, bg-card)",
-            [
-                "components/templates/template-viewer.tsx",
-                "components/templates/templates-gallery.tsx",
-                "components/waitlist/waitlist-form.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {
@@ -290,17 +279,10 @@ const RULES: Rule[] = [
         pattern: /placeholder:text-/,
         home: ["components/shared/fields/"],
         allow: each(
-            "step 6 (A15, V11): its own field classes become fieldClasses() (16px)",
+            "step 6e (A16): its email gate becomes the package's EmailGate",
             [
-                "components/changelog/changelog-signup.tsx",
-                "components/contact/contact-form.tsx",
-                "components/customers/report-form.tsx",
-                "components/help/help-search.tsx",
-                "components/tools/link-preview/link-input.tsx",
-                "components/tools/qr-code-maker/qr-code-maker.tsx",
-                "components/tools/qr-code-maker/qr-maker-gate.tsx",
                 "components/tools/link-preview/unlock-panel.tsx",
-                "components/waitlist/waitlist-form.tsx",
+                "components/tools/qr-code-maker/qr-maker-gate.tsx",
             ],
         ),
         files: SITE,

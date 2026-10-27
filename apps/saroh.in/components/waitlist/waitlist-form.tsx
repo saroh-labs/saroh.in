@@ -1,42 +1,18 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller } from "react-hook-form";
 
 import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
-import { track } from "@/lib/analytics";
-import { cn } from "@/lib/cn";
-import { readAddress } from "@/lib/page-address";
-import { keptReferral } from "@/lib/referral";
-import { ring } from "@/lib/ring";
-import { fireConversion } from "@/lib/tags";
-import { useBrowserValue } from "@/lib/use-browser-value";
-import type {
-    WaitlistResponse,
-    WaitlistTemplate,
-    WaitlistValues,
-} from "@/lib/waitlist";
-import {
-    EMPTY_WAITLIST,
-    openingDay,
-    referralLink,
-    SEND_FAILED,
-    WAITLIST_MESSAGES,
-    waitlistContext,
-    waitlistSchema,
-} from "@/lib/waitlist";
+import type { WaitlistTemplate } from "@/lib/waitlist";
+import { EMPTY_WAITLIST, openingDay, WAITLIST_MESSAGES } from "@/lib/waitlist";
 
-import type { WaitlistJoined } from "./waitlist-done";
+import { Button } from "../shared/buttons/button";
+import { ChoiceChip } from "../shared/fields/choice-chips";
+import { fieldClasses } from "../shared/fields/field-classes";
+import { textLinkClasses } from "../shared/links/text-link";
+import { useWaitlistForm } from "./use-waitlist-form";
 import { WaitlistDone } from "./waitlist-done";
-
-// `focus:ring-0` takes off the forms plugin's blue focus ring: the design's
-// ring is the Ink outline (ring({ color: "ink" })), and the border keeps its own colour.
-const INPUT = cn(
-    "h-[44px] w-full rounded-mk-control border bg-white px-3 font-sans text-[15px] text-foreground placeholder:text-muted-foreground transition-colors duration-fast ease-out hover:border-border-strong focus:ring-0 focus:ring-offset-0",
-    ring({ color: "ink" }),
-);
 
 /**
  * The waitlist card (Waitlist design, plan U30): business name, kind, email
@@ -67,102 +43,15 @@ export function WaitlistForm({
     content: WaitlistContent;
     templates?: readonly WaitlistTemplate[];
 }) {
-    const [joined, setJoined] = useState<WaitlistJoined | null>(null);
-    // The address is read after hydration: the served page is the same
-    // for every address ("" on the server).
-    const search = useBrowserValue(() => readAddress(), "");
-    const slugs = templates.map((t) => t.slug);
-    const fromAddress = () =>
-        waitlistContext(
-            Object.fromEntries(new URLSearchParams(readAddress())),
-            slugs,
-        );
-    const savedSlug = waitlistContext(
-        Object.fromEntries(new URLSearchParams(search)),
-        slugs,
-    ).template;
-    const saved = templates.find((t) => t.slug === savedSlug) ?? null;
-    const form = useForm<WaitlistValues>({
-        resolver: zodResolver(waitlistSchema),
-        defaultValues: EMPTY_WAITLIST,
-        mode: "onSubmit",
-        reValidateMode: "onSubmit",
-        shouldFocusError: true,
-    });
+    const { joined, setJoined, saved, form, onSubmit } =
+        useWaitlistForm(templates);
     const {
         register,
         control,
-        handleSubmit,
         clearErrors,
-        setError,
         reset,
         formState: { errors, isSubmitting },
     } = form;
-
-    const onSubmit = handleSubmit(async (values) => {
-        const parsed = waitlistSchema.parse(values);
-        const { plan, src, ref: linked, template } = fromAddress();
-        // This page's own `?ref=`, an entrant's id, comes first. With none,
-        // the business's code a visitor arrived on another page with
-        // (DEC-156); the API tells the two apart.
-        const referral = linked ?? keptReferral(document.cookie) ?? undefined;
-        let result: WaitlistResponse;
-        try {
-            const response = await fetch("/api/waitlist", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    business: parsed.business,
-                    kind: parsed.kind,
-                    email: parsed.email,
-                    city: parsed.city || undefined,
-                    plan,
-                    src,
-                    ref: referral,
-                    template,
-                }),
-            });
-            result = (await response.json()) as WaitlistResponse;
-        } catch {
-            result = { status: "failure" };
-        }
-
-        if (result.status === "failure") {
-            if (result.reason?.code === "INVALID") {
-                // The API is stricter about addresses than the design's
-                // check; anything else it refuses the form already checked.
-                setError("email", { message: WAITLIST_MESSAGES.email });
-                return;
-            }
-            setError("root", {
-                message:
-                    SEND_FAILED[result.reason?.code ?? ""] ??
-                    SEND_FAILED.default,
-            });
-            return;
-        }
-
-        track("waitlist_join", {
-            kind: parsed.kind,
-            src,
-            plan,
-            // The page's own link only: a kept code says nothing to GA.
-            ref: linked !== undefined,
-            template,
-        });
-        if (result.created) fireConversion("waitlist_joined");
-        setJoined({
-            business: parsed.business,
-            email: parsed.email,
-            position: result.created ? result.position : undefined,
-            template: templates.find((t) => t.slug === template)?.name,
-            outsideIndia: result.outsideIndia === true,
-            link:
-                result.created && result.ref
-                    ? referralLink(window.location.origin, result.ref)
-                    : undefined,
-        });
-    });
 
     if (joined) {
         return (
@@ -237,12 +126,10 @@ export function WaitlistForm({
                     aria-describedby={
                         errors.business ? "waitlist-business-error" : undefined
                     }
-                    className={cn(
-                        INPUT,
-                        errors.business
-                            ? "border-destructive focus:border-destructive"
-                            : "border-border focus:border-border",
-                    )}
+                    className={fieldClasses({
+                        invalid: Boolean(errors.business),
+                        className: "h-11 w-full",
+                    })}
                 />
                 {errors.business && (
                     <span
@@ -271,32 +158,21 @@ export function WaitlistForm({
                             {WAITLIST_KINDS.map((kind, i) => {
                                 const on = field.value === kind.id;
                                 return (
-                                    <button
+                                    <ChoiceChip
                                         key={kind.id}
-                                        type="button"
                                         // The first chip takes focus when
                                         // the kind is what is missing.
                                         ref={i === 0 ? field.ref : undefined}
                                         aria-pressed={on}
+                                        on={on}
+                                        invalid={Boolean(errors.kind)}
                                         onClick={() => {
                                             field.onChange(kind.id);
                                             clearErrors("kind");
                                         }}
-                                        className={cn(
-                                            "inline-flex h-9 cursor-pointer items-center rounded-full border px-[13px] text-[13px] transition-[background-color,border-color,transform] duration-fast ease-out active:scale-[0.97]",
-                                            ring({ color: "ink" }),
-                                            on
-                                                ? "border-foreground bg-foreground text-background"
-                                                : cn(
-                                                      "bg-white text-foreground hover:border-border-strong",
-                                                      errors.kind
-                                                          ? "border-destructive"
-                                                          : "border-border",
-                                                  ),
-                                        )}
                                     >
                                         {kind.label}
-                                    </button>
+                                    </ChoiceChip>
                                 );
                             })}
                         </div>
@@ -328,12 +204,10 @@ export function WaitlistForm({
                         aria-describedby={
                             errors.email ? "waitlist-email-error" : undefined
                         }
-                        className={cn(
-                            INPUT,
-                            errors.email
-                                ? "border-destructive focus:border-destructive"
-                                : "border-border focus:border-border",
-                        )}
+                        className={fieldClasses({
+                            invalid: Boolean(errors.email),
+                            className: "h-11 w-full",
+                        })}
                     />
                     {errors.email && (
                         <span
@@ -351,24 +225,14 @@ export function WaitlistForm({
                         autoComplete="address-level2"
                         maxLength={80}
                         placeholder="Pune"
-                        className={cn(
-                            INPUT,
-                            "border-border focus:border-border",
-                        )}
+                        className={fieldClasses({ className: "h-11 w-full" })}
                     />
                 </label>
             </div>
 
-            <button
-                type="submit"
-                disabled={isSubmitting}
-                className={cn(
-                    "flex h-[45px] cursor-pointer items-center justify-center rounded-[10px] bg-foreground text-[15px] font-medium text-background transition-[background-color,transform] duration-fast ease-out hover:bg-primary-hover active:scale-[0.98] disabled:cursor-wait disabled:opacity-80",
-                    ring({ color: "ink" }),
-                )}
-            >
+            <Button type="submit" size="md" disabled={isSubmitting}>
                 {isSubmitting ? "Joining…" : "Join the waitlist"}
-            </button>
+            </Button>
             {sendError && (
                 <p
                     role="alert"
@@ -389,10 +253,10 @@ export function WaitlistForm({
                 write to{" "}
                 <a
                     href={`mailto:${WAITLIST_CONTACT}`}
-                    className={cn(
-                        "cursor-pointer rounded-sm text-muted-foreground underline underline-offset-[3px] hover:text-brand-700",
-                        ring({ color: "ink" }),
-                    )}
+                    className={textLinkClasses({
+                        tone: "prose",
+                        className: "text-muted-foreground hover:text-brand-700",
+                    })}
                 >
                     {WAITLIST_CONTACT}
                 </a>

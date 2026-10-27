@@ -1,7 +1,11 @@
 import { cn } from "@/lib/cn";
 import { ring } from "@/lib/ring";
 import Link from "next/link";
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import type {
+    AnchorHTMLAttributes,
+    ButtonHTMLAttributes,
+    ReactNode,
+} from "react";
 
 export type ButtonVariant =
     /** Ink, the page's main action. */
@@ -17,8 +21,9 @@ export type ButtonVariant =
  * - `lg` — 52px, the hero and CTA band buttons.
  * - `md` — 46px, full width, the plan cards.
  * - `sm` — 40px, the nav's start button.
+ * - `xs` — 38px, an action inside a panel ("Copy link", "Check again").
  */
-export type ButtonSize = "lg" | "md" | "sm";
+export type ButtonSize = "lg" | "md" | "sm" | "xs";
 
 const BASE =
     "inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97]";
@@ -34,6 +39,7 @@ const SIZE: Record<ButtonSize, string> = {
     lg: "h-[52px] gap-2.5 rounded-mk-btn px-6 text-base",
     md: "h-[46px] w-full gap-2 rounded-[11px] px-4 text-[15px]",
     sm: "h-10 gap-2 rounded-[10px] px-[18px] text-mk-nav",
+    xs: "h-[38px] gap-1.5 rounded-[9px] px-3.5 text-sm",
 };
 
 /** The class list, for a `<button>` or a link that is not `ButtonLink`. */
@@ -60,7 +66,11 @@ export function buttonClasses({
                 ? "h-[54px] px-[22px]"
                 : size === "md"
                   ? "h-12"
-                  : "h-[42px]"),
+                  : size === "sm"
+                    ? "h-[42px]"
+                    : null),
+        // A button that is busy says so and can't be pressed twice.
+        "disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100",
         className,
     );
 }
@@ -120,5 +130,25 @@ export function ButtonLink({
         <Link href={href} className={classes} {...props}>
             {content}
         </Link>
+    );
+}
+
+/** A `<button>` that looks like the design's buttons (DEC-195, V10). */
+export function Button({
+    variant = "primary",
+    size = "lg",
+    type = "button",
+    className,
+    ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: ButtonVariant;
+    size?: ButtonSize;
+}) {
+    return (
+        <button
+            type={type}
+            className={buttonClasses({ variant, size, className })}
+            {...props}
+        />
     );
 }

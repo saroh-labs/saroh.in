@@ -71,7 +71,7 @@ describe("ContactForm: topics", () => {
         expect(chip(copy.topics[0].label).getAttribute("aria-checked")).toBe(
             "false",
         );
-        expect(chip(copy.topics[0].label).className).toContain("bg-white");
+        expect(chip(copy.topics[0].label).className).toContain("bg-card");
         expect(message().placeholder).toBe(bug.hint);
     });
 

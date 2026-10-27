@@ -23,6 +23,7 @@ import {
 } from "@/lib/qr-code-maker";
 import { ring } from "@/lib/ring";
 
+import { fieldClasses } from "../../shared/fields/field-classes";
 import { readAsDataUrl, saveFile, svgBlob, svgToPng } from "./qr-download";
 import type { QrUnlocked } from "./qr-maker-gate";
 import { QrMakerGate } from "./qr-maker-gate";
@@ -171,7 +172,10 @@ export function QrCodeMaker() {
                                 setRest(next.rest);
                                 setScheme(next.scheme);
                             }}
-                            className="min-w-0 flex-1 border-none bg-transparent px-2 font-mono text-[15px] text-foreground outline-none placeholder:text-mk-hint"
+                            className={fieldClasses({
+                                bare: true,
+                                className: "px-2 font-mono",
+                            })}
                         />
                     </span>
                 </label>
@@ -255,7 +259,7 @@ export function QrCodeMaker() {
                         placeholder={copy.label.placeholder}
                         value={label}
                         onChange={(event) => setLabel(event.target.value)}
-                        className={`h-[46px] rounded-[10px] border border-border-strong bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint ${ring()}`}
+                        className={fieldClasses({ className: "h-[46px]" })}
                     />
                 </label>
             </div>

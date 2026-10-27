@@ -1,39 +1,14 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useRef, useState } from "react";
-
 import { CUSTOMERS } from "@/content/customers";
-import type { ReportField, ReportResult } from "@/lib/business-report";
-import {
-    prefilledSite,
-    REPORT_LIMITS,
-    reportProblem,
-} from "@/lib/business-report";
-import { cn } from "@/lib/cn";
-import { readAddress } from "@/lib/page-address";
-import { ring } from "@/lib/ring";
-import { useBrowserValue } from "@/lib/use-browser-value";
+import { REPORT_LIMITS } from "@/lib/business-report";
 import { PhoneInput } from "@saroh/ui/phone-input";
 
+import { Button } from "../shared/buttons/button";
+import { fieldClasses } from "../shared/fields/field-classes";
+import { useReportForm } from "./use-report-form";
+
 const copy = CUSTOMERS.form;
-
-type Field = ReportField;
-
-type State =
-    | { at: "idle" | "sending" | "done" }
-    | { at: "error"; message: string; field: Field | null };
-
-const FIELD_MESSAGE: Record<Field, string> = {
-    site: copy.badSite,
-    message: copy.shortMessage,
-    email: copy.badEmail,
-    phone: copy.badPhone,
-};
-
-const isField = (failure: string): failure is Field => failure in FIELD_MESSAGE;
-
-const INPUT = `min-w-0 rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 ${ring()}`;
 
 /**
  * Report a business (/customers, Terms rev 46): the site's address, what
@@ -52,66 +27,10 @@ const INPUT = `min-w-0 rounded-[10px] border bg-white px-3.5 font-sans text-[15p
 export function ReportForm() {
     // The link's address until they type their own: read in the browser
     // (the server draws the field empty), so the page stays static.
-    const given = useBrowserValue(() => prefilledSite(readAddress()), "");
-    const [typed, setSite] = useState<string | null>(null);
-    const site = typed ?? given;
-    const [message, setMessage] = useState("");
-    const [email, setEmail] = useState("");
-    const [phone, setPhone] = useState("");
-    const [state, setState] = useState<State>({ at: "idle" });
-    const fields = useRef<
-        Partial<Record<Field, HTMLInputElement | HTMLTextAreaElement | null>>
-    >({});
-
-    /** Says what a field needs and puts the keyboard on it. */
-    const fault = (field: Field) => {
-        setState({ at: "error", message: FIELD_MESSAGE[field], field });
-        fields.current[field]?.focus();
-    };
-
-    const clear = () => {
-        if (state.at === "error") setState({ at: "idle" });
-    };
-
-    const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const problem = reportProblem({ site, message, email, phone });
-        if (problem) {
-            fault(problem);
-            return;
-        }
-        setState({ at: "sending" });
-        try {
-            const res = await fetch("/api/business-reports", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    site: site.trim(),
-                    message: message.trim(),
-                    email: email.trim(),
-                    phone: phone.trim(),
-                }),
-            });
-            const body = (await res.json()) as ReportResult;
-            if (body.sent) {
-                setState({ at: "done" });
-                return;
-            }
-            const failure = body.failure;
-            if (isField(failure)) {
-                fault(failure);
-                return;
-            }
-            setState({
-                at: "error",
-                message:
-                    failure === "rate-limited" ? copy.rateLimited : copy.failed,
-                field: null,
-            });
-        } catch {
-            setState({ at: "error", message: copy.failed, field: null });
-        }
-    };
+    const form = useReportForm();
+    const { site, setSite, message, setMessage, email, setEmail } = form;
+    const { phone, setPhone, state, clear, onSubmit } = form;
+    const { fieldRef, wrong, describedBy } = form;
 
     if (state.at === "done") {
         return (
@@ -123,13 +42,6 @@ export function ReportForm() {
             </p>
         );
     }
-
-    const wrong = (field: Field) =>
-        state.at === "error" && state.field === field;
-    const describedBy = (field: Field, hint?: string) =>
-        [wrong(field) ? "report-error" : null, hint]
-            .filter(Boolean)
-            .join(" ") || undefined;
 
     return (
         <form
@@ -152,9 +64,7 @@ export function ReportForm() {
                     {copy.siteLabel}
                 </label>
                 <input
-                    ref={(el) => {
-                        fields.current.site = el;
-                    }}
+                    ref={fieldRef("site")}
                     id="report-site"
                     name="site"
                     type="text"
@@ -172,13 +82,10 @@ export function ReportForm() {
                     }}
                     aria-invalid={wrong("site") || undefined}
                     aria-describedby={describedBy("site")}
-                    className={cn(
-                        INPUT,
-                        "h-[46px]",
-                        wrong("site")
-                            ? "border-destructive"
-                            : "border-border-strong",
-                    )}
+                    className={fieldClasses({
+                        invalid: wrong("site"),
+                        className: "h-[46px] w-full",
+                    })}
                 />
             </div>
             <div className="grid gap-1.5">
@@ -189,9 +96,7 @@ export function ReportForm() {
                     {copy.messageLabel}
                 </label>
                 <textarea
-                    ref={(el) => {
-                        fields.current.message = el;
-                    }}
+                    ref={fieldRef("message")}
                     id="report-message"
                     name="message"
                     rows={5}
@@ -207,13 +112,10 @@ export function ReportForm() {
                         "message",
                         "report-message-hint",
                     )}
-                    className={cn(
-                        INPUT,
-                        "py-2.5 leading-[1.5]",
-                        wrong("message")
-                            ? "border-destructive"
-                            : "border-border-strong",
-                    )}
+                    className={fieldClasses({
+                        invalid: wrong("message"),
+                        className: "w-full py-2.5 leading-[1.5]",
+                    })}
                 />
                 <p
                     id="report-message-hint"
@@ -230,9 +132,7 @@ export function ReportForm() {
                     {copy.emailLabel}
                 </label>
                 <input
-                    ref={(el) => {
-                        fields.current.email = el;
-                    }}
+                    ref={fieldRef("email")}
                     id="report-email"
                     name="email"
                     type="email"
@@ -247,13 +147,10 @@ export function ReportForm() {
                     }}
                     aria-invalid={wrong("email") || undefined}
                     aria-describedby={describedBy("email", "report-email-hint")}
-                    className={cn(
-                        INPUT,
-                        "h-[46px]",
-                        wrong("email")
-                            ? "border-destructive"
-                            : "border-border-strong",
-                    )}
+                    className={fieldClasses({
+                        invalid: wrong("email"),
+                        className: "h-[46px] w-full",
+                    })}
                 />
                 <p
                     id="report-email-hint"
@@ -270,9 +167,7 @@ export function ReportForm() {
                     {copy.phoneLabel}
                 </label>
                 <PhoneInput
-                    ref={(el) => {
-                        fields.current.phone = el;
-                    }}
+                    ref={fieldRef("phone")}
                     id="report-phone"
                     name="phone"
                     autoComplete="tel-national"
@@ -285,14 +180,12 @@ export function ReportForm() {
                     }}
                     aria-invalid={wrong("phone") || undefined}
                     aria-describedby={describedBy("phone", "report-phone-hint")}
-                    boxClassName={cn(
-                        INPUT,
+                    boxClassName={fieldClasses({
+                        invalid: wrong("phone"),
                         // The page's own focus outline, not the app's ring.
-                        "h-[46px] focus-visible:ring-0 focus-visible:ring-offset-0",
-                        wrong("phone")
-                            ? "border-destructive"
-                            : "border-border-strong",
-                    )}
+                        className:
+                            "h-[46px] focus-visible:ring-0 focus-visible:ring-offset-0",
+                    })}
                 />
                 <p
                     id="report-phone-hint"
@@ -311,13 +204,14 @@ export function ReportForm() {
                 </p>
             ) : null}
             <div>
-                <button
+                <Button
                     type="submit"
+                    size="md"
+                    className="w-auto px-[18px]"
                     disabled={state.at === "sending"}
-                    className={`min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:scale-[0.98] disabled:cursor-progress`}
                 >
                     {state.at === "sending" ? copy.sending : copy.submit}
-                </button>
+                </Button>
             </div>
         </form>
     );

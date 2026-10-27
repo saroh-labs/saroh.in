@@ -1,49 +1,20 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent } from "react";
-import { useEffect, useRef, useState } from "react";
-
 import { SAROH_CONTACT_EMAIL } from "@/content/contact";
-import { CONTACT_PAGE, FIRST_TOPIC } from "@/content/contact-page";
-import { cn } from "@/lib/cn";
-import type {
-    ContactField,
-    ContactKindId,
-    ContactResult,
-    ContactTopicId,
-} from "@/lib/contact-message";
-import {
-    CONTACT_LIMITS,
-    contactProblems,
-    firstName,
-} from "@/lib/contact-message";
-import { ring } from "@/lib/ring";
-import { nextIndex } from "@/lib/roving";
+import { CONTACT_PAGE } from "@/content/contact-page";
+import type { ContactKindId } from "@/lib/contact-message";
+import { CONTACT_LIMITS, firstName } from "@/lib/contact-message";
+
+import { Button } from "../shared/buttons/button";
+import { ChoiceChip } from "../shared/fields/choice-chips";
+import { fieldClasses } from "../shared/fields/field-classes";
 import { textLinkClasses } from "../shared/links/text-link";
+import { useContactForm } from "./use-contact-form";
 
 const copy = CONTACT_PAGE.form;
 const done = CONTACT_PAGE.done;
 
-// `focus:ring-0` takes off the forms plugin's blue ring: the design's ring
-// is the Saffron outline, and the border keeps its own colour.
-const FIELD = cn(
-    "w-full min-w-0 rounded-[11px] border bg-white font-sans text-[16px] font-normal text-foreground placeholder:text-muted-foreground focus:ring-0 focus:ring-offset-0 focus-visible:outline-offset-1",
-    ring({ offset: 0 }),
-);
-
 const LABEL = "text-[14.5px] font-semibold";
-
-/** The border of a field: red once a send was tried and it is at fault. */
-const edge = (wrong: boolean) =>
-    wrong
-        ? "border-destructive focus:border-destructive"
-        : "border-border-strong focus:border-border-strong";
-
-type Send =
-    | { at: "idle" | "sending" }
-    /** The API refused one field the form's own check let through. */
-    | { at: "refused"; field: ContactField }
-    | { at: "failed"; why: "rate-limited" | "unavailable" };
 
 /**
  * /contact's form (design "Contact", DEC-137): what it's about (four chips,
@@ -64,121 +35,11 @@ type Send =
  * back, is marked `data-ph-mask` (DEC-125).
  */
 export function ContactForm() {
-    const [topic, setTopic] = useState<ContactTopicId>(FIRST_TOPIC);
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [kind, setKind] = useState<ContactKindId | "">("");
-    const [message, setMessage] = useState("");
-    const [tried, setTried] = useState(false);
-    const [send, setSend] = useState<Send>({ at: "idle" });
-    const [sent, setSent] = useState(false);
-
-    const chips = useRef<(HTMLButtonElement | null)[]>([]);
-    const fields = useRef<
-        Partial<
-            Record<ContactField, HTMLInputElement | HTMLTextAreaElement | null>
-        >
-    >({});
-    const thanks = useRef<HTMLHeadingElement | null>(null);
-    /**
-     * Where the keyboard goes once the card has changed over: to the thanks
-     * when a message has gone, to the message box when the form comes back.
-     */
-    const focusNext = useRef<"thanks" | "message" | null>(null);
-
-    useEffect(() => {
-        const target = focusNext.current;
-        if (!target) return;
-        focusNext.current = null;
-        if (target === "thanks") thanks.current?.focus();
-        else fields.current.message?.focus();
-    }, [sent]);
-
-    const problems = tried ? contactProblems({ name, email, message }) : [];
-    const refused = send.at === "refused" ? send.field : null;
-    const atFault = (field: ContactField) =>
-        problems.includes(field) || refused === field;
-    /** The one field the line is about: the first at fault. */
-    const first: ContactField | null = problems.at(0) ?? refused;
-    const sending = send.at === "sending";
-
-    /** Typing in a field the API refused clears its refusal. */
-    const edited = (field: ContactField) => {
-        if (send.at === "failed" || refused === field) setSend({ at: "idle" });
-    };
-
-    const onChipKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-        const next = nextIndex(e.key, i, copy.topics.length);
-        if (next === null) return;
-        e.preventDefault();
-        setTopic(copy.topics[next].id);
-        chips.current[next]?.focus();
-    };
-
-    const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (sending) return;
-        const wrong = contactProblems({ name, email, message });
-        if (wrong.length > 0) {
-            setTried(true);
-            setSend({ at: "idle" });
-            // The first field at fault takes the keyboard.
-            const firstWrong = wrong.at(0);
-            if (firstWrong) fields.current[firstWrong]?.focus();
-            return;
-        }
-        setSend({ at: "sending" });
-        let result: ContactResult;
-        try {
-            const res = await fetch("/api/contact", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    topic,
-                    name: name.trim(),
-                    email: email.trim(),
-                    ...(kind ? { kind } : {}),
-                    message: message.trim(),
-                }),
-            });
-            result = (await res.json()) as ContactResult;
-        } catch {
-            result = { sent: false, failure: "unavailable" };
-        }
-        if (result.sent) {
-            setSend({ at: "idle" });
-            setSent(true);
-            focusNext.current = "thanks";
-            return;
-        }
-        const failure = result.failure;
-        if (
-            failure === "name" ||
-            failure === "email" ||
-            failure === "message"
-        ) {
-            setTried(true);
-            setSend({ at: "refused", field: failure });
-            fields.current[failure]?.focus();
-            return;
-        }
-        // Too many, the API out of reach, or an answer this form can't
-        // read: the message did not go, and the form says so.
-        setSend({
-            at: "failed",
-            why: failure === "rate-limited" ? "rate-limited" : "unavailable",
-        });
-    };
-
-    /** "Send another message": the name and the email stay. */
-    const again = () => {
-        setSent(false);
-        setMessage("");
-        setTopic(FIRST_TOPIC);
-        setTried(false);
-        setSend({ at: "idle" });
-        focusNext.current = "message";
-    };
+    const form = useContactForm();
+    const { topic, setTopic, name, setName, email, setEmail } = form;
+    const { kind, setKind, message, setMessage, send, sent } = form;
+    const { sending, first, atFault, edited, describedBy } = form;
+    const { chipRef, fieldRef, thanks, onChipKey, onSubmit, again } = form;
 
     if (sent) {
         return (
@@ -217,22 +78,12 @@ export function ContactForm() {
                     <span className="break-all">{email.trim()}</span>{" "}
                     {done.replyBy}.{done.urgent}
                 </p>
-                <button
-                    type="button"
-                    onClick={again}
-                    className={cn(
-                        "h-11 cursor-pointer rounded-[11px] border border-border-strong bg-transparent px-[18px] font-sans text-[15px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-muted focus-visible:outline-offset-2",
-                        ring({ offset: 0 }),
-                    )}
-                >
+                <Button variant="secondary" size="sm" onClick={again}>
                     {done.again}
-                </button>
+                </Button>
             </div>
         );
     }
-
-    const describedBy = (field: ContactField) =>
-        first === field ? "contact-error" : undefined;
 
     return (
         <form
@@ -265,30 +116,18 @@ export function ContactForm() {
                     {copy.topics.map((t, i) => {
                         const on = t.id === topic;
                         return (
-                            <button
+                            <ChoiceChip
                                 key={t.id}
-                                ref={(el) => {
-                                    chips.current[i] = el;
-                                }}
-                                type="button"
+                                ref={chipRef(i)}
                                 role="radio"
                                 aria-checked={on}
                                 tabIndex={on ? 0 : -1}
+                                on={on}
                                 onClick={() => setTopic(t.id)}
                                 onKeyDown={(e) => onChipKey(e, i)}
-                                className={cn(
-                                    // 40px tall as drawn; on a very narrow phone a long
-                                    // topic wraps inside its chip instead of running
-                                    // past the card.
-                                    "min-h-10 max-w-full cursor-pointer rounded-full border px-[14px] py-1 font-sans text-[14px] font-semibold leading-tight transition-colors duration-fast ease-out focus-visible:outline-offset-2",
-                                    ring({ offset: 0 }),
-                                    on
-                                        ? "border-foreground bg-foreground text-background"
-                                        : "border-border-strong bg-white text-foreground hover:border-foreground",
-                                )}
                             >
                                 {t.label}
-                            </button>
+                            </ChoiceChip>
                         );
                     })}
                 </div>
@@ -301,9 +140,7 @@ export function ContactForm() {
                     </label>
                     <input
                         id="contact-name"
-                        ref={(el) => {
-                            fields.current.name = el;
-                        }}
+                        ref={fieldRef("name")}
                         name="name"
                         type="text"
                         autoComplete="name"
@@ -316,11 +153,10 @@ export function ContactForm() {
                         aria-required
                         aria-invalid={atFault("name") || undefined}
                         aria-describedby={describedBy("name")}
-                        className={cn(
-                            FIELD,
-                            "h-12 px-[14px]",
-                            edge(atFault("name")),
-                        )}
+                        className={fieldClasses({
+                            invalid: atFault("name"),
+                            className: "h-12 w-full",
+                        })}
                     />
                 </div>
                 <div className="grid gap-1.5">
@@ -329,9 +165,7 @@ export function ContactForm() {
                     </label>
                     <input
                         id="contact-email"
-                        ref={(el) => {
-                            fields.current.email = el;
-                        }}
+                        ref={fieldRef("email")}
                         name="email"
                         type="email"
                         inputMode="email"
@@ -347,11 +181,10 @@ export function ContactForm() {
                         aria-required
                         aria-invalid={atFault("email") || undefined}
                         aria-describedby={describedBy("email")}
-                        className={cn(
-                            FIELD,
-                            "h-12 px-[14px]",
-                            edge(atFault("email")),
-                        )}
+                        className={fieldClasses({
+                            invalid: atFault("email"),
+                            className: "h-12 w-full",
+                        })}
                     />
                 </div>
             </div>
@@ -370,7 +203,9 @@ export function ContactForm() {
                     onChange={(e) =>
                         setKind(e.target.value as ContactKindId | "")
                     }
-                    className={cn(FIELD, "h-12 pl-3 pr-10", edge(false))}
+                    className={fieldClasses({
+                        className: "h-12 w-full pl-3 pr-10",
+                    })}
                 >
                     <option value="">{copy.kindNone}</option>
                     {copy.kinds.map((k) => (
@@ -387,9 +222,7 @@ export function ContactForm() {
                 </label>
                 <textarea
                     id="contact-message"
-                    ref={(el) => {
-                        fields.current.message = el;
-                    }}
+                    ref={fieldRef("message")}
                     name="message"
                     rows={5}
                     maxLength={CONTACT_LIMITS.message}
@@ -402,11 +235,10 @@ export function ContactForm() {
                     aria-required
                     aria-invalid={atFault("message") || undefined}
                     aria-describedby={describedBy("message")}
-                    className={cn(
-                        FIELD,
-                        "resize-y px-[14px] py-3 leading-[1.5]",
-                        edge(atFault("message")),
-                    )}
+                    className={fieldClasses({
+                        invalid: atFault("message"),
+                        className: "w-full resize-y py-3 leading-[1.5]",
+                    })}
                 />
             </div>
 
@@ -437,16 +269,9 @@ export function ContactForm() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3">
-                <button
-                    type="submit"
-                    disabled={sending}
-                    className={cn(
-                        "h-[52px] max-w-full cursor-pointer rounded-mk-btn border-none bg-foreground px-[26px] font-sans text-base font-semibold text-background transition-[background-color,transform] duration-fast ease-out hover:bg-mk-ink-hover focus-visible:outline-offset-2 active:scale-[0.98] disabled:cursor-progress",
-                        ring({ offset: 0 }),
-                    )}
-                >
+                <Button type="submit" disabled={sending}>
                     {sending ? copy.sending : copy.submit}
-                </button>
+                </Button>
                 <span className="text-mk-note text-muted-foreground">
                     {copy.orEmail}{" "}
                     <a

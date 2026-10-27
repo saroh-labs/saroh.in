@@ -2,6 +2,8 @@
 
 import { linkPreview as copy } from "@/content/link-preview";
 import { splitScheme } from "@/lib/link-preview";
+import { Button } from "../../shared/buttons/button";
+import { fieldClasses } from "../../shared/fields/field-classes";
 
 /**
  * The address field (design 1b): "https://" drawn before it, so whatever is
@@ -59,15 +61,19 @@ export function LinkInput({
                         scheme: split.scheme ?? scheme,
                     });
                 }}
-                className="min-w-0 flex-1 border-none bg-transparent px-2 font-mono text-base text-foreground outline-none placeholder:text-mk-hint"
+                className={fieldClasses({
+                    bare: true,
+                    className: "px-2 font-mono",
+                })}
             />
-            <button
+            {/* Joined to the box: no radius, as tall as the box. */}
+            <Button
                 type="submit"
                 disabled={busy}
-                className="shrink-0 cursor-pointer border-none bg-foreground px-[30px] text-base font-semibold text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover active:bg-mk-on-ink-hover disabled:cursor-progress max-[420px]:px-4"
+                className="h-auto rounded-none px-[30px] focus-visible:outline-none active:scale-100 max-[420px]:px-4"
             >
                 {copy.submit}
-            </button>
+            </Button>
         </form>
     );
 }

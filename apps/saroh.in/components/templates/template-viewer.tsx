@@ -6,11 +6,10 @@ import type { GalleryTemplate } from "@/content/templates";
 import { cn } from "@/lib/cn";
 import { ring } from "@/lib/ring";
 
+import { ChoiceChip } from "../shared/fields/choice-chips";
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
 import type { PreviewDevice } from "./template-preview";
-
-const TOGGLE = `inline-flex h-9 cursor-pointer items-center rounded-full px-3.5 text-[14px] transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] ${ring()}`;
 
 function Toggle({
     label,
@@ -32,20 +31,15 @@ function Toggle({
             {options.map((o) => {
                 const on = o.id === value;
                 return (
-                    <button
+                    <ChoiceChip
                         key={o.id}
-                        type="button"
+                        look="segment"
                         aria-pressed={on}
+                        on={on}
                         onClick={() => onChange(o.id)}
-                        className={cn(
-                            TOGGLE,
-                            on
-                                ? "bg-foreground text-background"
-                                : "text-mk-copy hover:bg-mk-hover hover:text-foreground",
-                        )}
                     >
                         {o.label}
-                    </button>
+                    </ChoiceChip>
                 );
             })}
         </div>
