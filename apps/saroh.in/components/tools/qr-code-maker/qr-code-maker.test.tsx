@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { GATE_WORDS } from "@saroh/search-pages";
 import { tooLightToScan } from "@saroh/ui/lib/qr-art";
 import {
     cleanup,
@@ -69,7 +70,7 @@ const type = (el: HTMLElement, value: string) =>
     fireEvent.change(el, { target: { value } });
 
 async function unlockWith(email: string) {
-    type(screen.getByLabelText(copy.gate.emailField), email);
+    type(screen.getByLabelText(copy.gate.title), email);
     fireEvent.click(screen.getByRole("button", { name: copy.gate.submit }));
     await screen.findByRole("button", { name: copy.downloads.png });
 }
@@ -215,11 +216,9 @@ describe("the email gate", () => {
         expect(screen.getByText(copy.gate.title)).toBeTruthy();
         // An unverified address can't say yes to news: no tickbox.
         expect(screen.queryByRole("checkbox")).toBeNull();
-        type(screen.getByLabelText(copy.gate.emailField), "owner@shop");
+        type(screen.getByLabelText(copy.gate.title), "owner@shop");
         fireEvent.click(screen.getByRole("button", { name: copy.gate.submit }));
-        expect(screen.getByRole("alert").textContent).toBe(
-            "That email looks incomplete. Check it and try again.",
-        );
+        expect(screen.getByRole("alert").textContent).toBe(GATE_WORDS.noEnding);
         expect(fetchMock).not.toHaveBeenCalled();
         expect(
             screen.queryByRole("button", { name: copy.downloads.png }),
@@ -247,14 +246,14 @@ describe("the email gate", () => {
             screen.getByRole("button", { name: copy.downloads.svgName }),
         ).toBeTruthy();
         expect(screen.getByRole("status").textContent).toBe(
-            copy.downloads.emailed.sent,
+            `✓ ${GATE_WORDS.sentTo("owner@shop.example.com")}`,
         );
-        expect(screen.queryByLabelText(copy.gate.emailField)).toBeNull();
+        expect(screen.queryByLabelText(copy.gate.title)).toBeNull();
     });
 
     it.each([
-        ["limited", copy.downloads.emailed.limited],
-        ["not-sent", copy.downloads.emailed["not-sent"]],
+        ["limited", GATE_WORDS.limited],
+        ["not-sent", GATE_WORDS.notSent],
     ] as const)(
         "still unlocks when no email went (%s), and says so",
         async (emailed, line) => {
@@ -266,17 +265,17 @@ describe("the email gate", () => {
     );
 
     it.each([
-        ["rate-limited", 429, copy.gate.rateLimited],
-        ["unavailable", 502, copy.gate.failed],
-        ["bad-email", 400, copy.gate.badEmail],
+        ["rate-limited", 429, GATE_WORDS.rateLimited],
+        ["unavailable", 502, GATE_WORDS.failed],
+        ["bad-email", 400, GATE_WORDS.badEmail],
     ] as const)(
-        "says %s in the page's words and keeps the code and the email",
+        "says %s in the gate's words and keeps the code and the email",
         async (failure, status, line) => {
             answer({ unlocked: false, failure }, status);
             render(<QrCodeMaker />);
             type(linkField(), "shop.example.com");
             const before = dots();
-            const email = screen.getByLabelText(copy.gate.emailField);
+            const email = screen.getByLabelText(copy.gate.title);
             type(email, "owner@shop.example.com");
             fireEvent.click(
                 screen.getByRole("button", { name: copy.gate.submit }),
@@ -295,10 +294,10 @@ describe("the email gate", () => {
     it("says so when the request never arrives, and the code stays usable", async () => {
         fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
         render(<QrCodeMaker />);
-        type(screen.getByLabelText(copy.gate.emailField), "a@shop.example.com");
+        type(screen.getByLabelText(copy.gate.title), "a@shop.example.com");
         fireEvent.click(screen.getByRole("button", { name: copy.gate.submit }));
         expect((await screen.findByRole("alert")).textContent).toBe(
-            copy.gate.failed,
+            GATE_WORDS.failed,
         );
         type(linkField(), "shop.example.com");
         expect(

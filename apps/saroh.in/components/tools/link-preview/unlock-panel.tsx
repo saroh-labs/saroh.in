@@ -1,37 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useState } from "react";
+import type { GateSubmit } from "@saroh/search-pages";
+import { EmailGate, ToolGateProvider } from "@saroh/search-pages";
 
 import { linkPreview as copy } from "@/content/link-preview";
-import { shapedEmail } from "@/lib/email-shape";
 import type { UnlockResult } from "@/lib/link-preview";
 import { ring } from "@/lib/ring";
 
 export type Unlocked = Extract<UnlockResult, { unlocked: true }>;
 
 /**
- * The dark panel (design 1b, the email version, KTD-5): locked, it asks
- * for an email; unlocked, it lists the fixes from the API's report and the
- * tags to copy. No news tickbox: an address typed into a public tool isn't
+ * The fix-it panel (design 1b, the email version, KTD-5): locked, the
+ * package's email gate every free tool shares; unlocked, the dark list of
+ * fixes from the API's report and the tags to copy. No news tickbox: an address typed into a public tool isn't
  * verified, so it can't say yes to marketing (security review, 5 Oct 2026).
  */
 export function UnlockPanel({
     unlocked,
-    pending,
-    error,
     onUnlock,
 }: {
     unlocked: Unlocked | null;
-    pending: boolean;
-    error: string | null;
-    onUnlock: (input: { email: string }) => void;
+    /** Sends the email for this report; once it's yes, `unlocked` arrives. */
+    onUnlock: GateSubmit;
 }) {
-    const [email, setEmail] = useState("");
-    const [invalid, setInvalid] = useState(false);
-    const errorId = useId();
-    const shown = invalid ? copy.badEmail : error;
-
     if (unlocked) {
         return (
             <section
@@ -77,66 +68,22 @@ export function UnlockPanel({
     }
 
     return (
-        <section
-            aria-labelledby="unlock-title"
-            className="grid gap-3 rounded-2xl bg-foreground p-5 text-background"
-        >
-            <h2 id="unlock-title" className="m-0 text-base font-semibold">
-                {copy.lockedTitle}
-            </h2>
-            <p className="m-0 text-[13.5px] leading-[1.5] text-mk-on-ink">
-                {copy.lockedBody}
-            </p>
-            <form
-                noValidate
-                className="grid gap-2"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    const value = shapedEmail(email);
-                    setInvalid(!value);
-                    if (value) onUnlock({ email: value });
-                }}
-            >
-                <input
-                    type="email"
-                    autoComplete="email"
-                    placeholder={copy.emailPlaceholder}
-                    aria-label="Email"
-                    aria-invalid={shown ? true : undefined}
-                    aria-describedby={shown ? errorId : undefined}
-                    value={email}
-                    onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (invalid) setInvalid(false);
-                    }}
-                    className={`h-11 rounded-[9px] border-none bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint ${ring({ color: "saffron" })}`}
-                />
-                <button
-                    type="submit"
-                    disabled={pending}
-                    className={`h-11 cursor-pointer rounded-[9px] border-none bg-mk-saffron font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-saffron-hover ${ring({ color: "paper" })} active:bg-brand-400 disabled:cursor-progress`}
-                >
-                    {pending ? copy.unlocking : copy.unlock}
-                </button>
-                {shown ? (
-                    <span
-                        id={errorId}
-                        role="alert"
-                        className="text-[12.5px] text-mk-on-ink-accent"
-                    >
-                        {shown}
-                    </span>
-                ) : null}
-            </form>
-            <span className="text-xs text-mk-on-ink-muted">
-                {copy.promise}{" "}
-                <Link
-                    href="/privacy"
-                    className="text-mk-saffron underline underline-offset-2 hover:text-mk-saffron-hover active:text-mk-on-ink"
-                >
-                    {copy.privacy}
-                </Link>
-            </span>
-        </section>
+        // The package's result panel and email gate (DEC-195, A16): dark on
+        // a desk, white on a phone, as every free tool's.
+        <div className="sp tp !bg-transparent">
+            <div className="tp-result">
+                <p className="m-0 text-[13.5px] leading-[1.5]">
+                    {copy.lockedBody}
+                </p>
+                <ToolGateProvider privacy="/privacy">
+                    <EmailGate
+                        label={copy.lockedTitle}
+                        button={copy.unlock}
+                        note={copy.promise}
+                        onSubmit={onUnlock}
+                    />
+                </ToolGateProvider>
+            </div>
+        </div>
     );
 }

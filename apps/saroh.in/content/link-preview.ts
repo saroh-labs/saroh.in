@@ -5,7 +5,7 @@ import type { FaqItem } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-12";
+export const UPDATED = "2026-10-27";
 
 /**
  * The link preview tool's words (resources plan U2; design "Saroh Resources
@@ -52,15 +52,9 @@ export const linkPreview = {
     lockedTitle: "Unlock the fix-it report",
     lockedBody:
         "What's wrong, the right sizes and the tags to copy. Plus Telegram, Discord, iMessage and Pinterest.",
-    emailPlaceholder: "you@yourbusiness.in",
     unlock: "Unlock",
-    unlocking: "Unlocking…",
     promise:
         "We'll show it here and email you a copy. Nothing else unless you ask.",
-    privacy: "Privacy",
-    badEmail: "That email doesn't look right. Check it and try again.",
-    unlockFailed:
-        "We couldn't unlock the report just now. Try again in a minute.",
     fixTitle: (m: number) =>
         m === 0
             ? "Nothing to fix"

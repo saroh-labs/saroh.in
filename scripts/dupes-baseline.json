@@ -407,16 +407,6 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/tools/link-preview/unlock-panel.tsx",
-                "apps/saroh.in/components/tools/qr-code-maker/qr-maker-gate.tsx"
-            ],
-            "windows": [
-                "de0605656ea0"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
                 "apps/saroh.in/content/changelog.ts",
                 "apps/saroh.in/content/integrations.ts"
             ],

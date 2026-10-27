@@ -1,163 +1,96 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useState } from "react";
+import { EmailGate, ToolGateProvider } from "@saroh/search-pages";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
-import { shapedEmail } from "@/lib/email-shape";
-import type { QrUnlockResult } from "@/lib/qr-code-maker";
-import { ring } from "@/lib/ring";
 
-export type QrUnlocked = Extract<QrUnlockResult, { unlocked: true }>;
+import { Button } from "../../shared/buttons/button";
+import { toolGateSubmit } from "../tool-gate";
 
-/** The design's 44px button; each fill below adds its own colours. */
-const BUTTON = `h-11 rounded-[10px] px-[18px] text-[15px] font-semibold transition-colors duration-fast ease-out ${ring()}`;
-const INK_BUTTON = `${BUTTON} cursor-pointer border-none bg-foreground text-background hover:bg-mk-ink-hover active:bg-mk-on-ink-hover`;
-const OUTLINE_BUTTON = `${BUTTON} cursor-pointer border border-border-strong bg-card text-foreground hover:bg-mk-hover active:bg-muted`;
 /** Nothing to download yet: the one disabled treatment, with the reason beside it. */
-const OFF_BUTTON = `${BUTTON} cursor-not-allowed border-none bg-disabled text-disabled-foreground`;
+const OFF =
+    "cursor-not-allowed bg-disabled text-disabled-foreground hover:bg-disabled hover:text-disabled-foreground active:scale-100";
 
 /**
- * Under the code (design 02): the email gate, then the downloads it
- * unlocks. The email is the only thing the page sends to Saroh; the files
- * are made here, in the browser (`qr-download.ts`). No news tickbox: an
- * address typed into a public tool isn't verified, so it can't say yes to
- * marketing.
+ * Under the code (design 02): the email gate every free tool shares (the
+ * package's `EmailGate`, DEC-195 A16), then the downloads it unlocks. The
+ * email is the only thing the page sends to Saroh; the files are made here,
+ * in the browser (`qr-download.ts`). No news tickbox: an address typed into
+ * a public tool isn't verified, so it can't say yes to marketing.
+ *
+ * `sp tp qc-side` puts the gate in the package's light card colours; the
+ * card it sits in is saroh.in's own.
  */
 export function QrMakerGate({
-    unlocked,
-    pending,
-    error,
-    onUnlock,
     blocked,
     pngError,
     onPng,
     onSvg,
 }: {
-    unlocked: QrUnlocked | null;
-    pending: boolean;
-    /** The server's answer, in the page's words, when it wasn't a yes. */
-    error: string | null;
-    onUnlock: (email: string) => void;
     /** Why there is nothing to download yet ("" when the page says so elsewhere), or null. */
     blocked: string | null;
     pngError: string | null;
     onPng: () => void;
     onSvg: () => void;
 }) {
-    const [email, setEmail] = useState("");
-    const [invalid, setInvalid] = useState(false);
-    const errorId = useId();
-    const blockedId = useId();
-    const shown = invalid ? copy.gate.badEmail : error;
-
-    if (unlocked) {
-        const off = blocked !== null;
-        return (
-            <div className="grid w-full justify-items-center gap-2 border-t border-mk-line-row pt-4">
-                <div className="flex flex-wrap justify-center gap-2">
-                    <button
-                        type="button"
-                        aria-disabled={off || undefined}
-                        aria-describedby={blocked ? blockedId : undefined}
-                        onClick={off ? undefined : onPng}
-                        className={off ? OFF_BUTTON : INK_BUTTON}
-                    >
-                        {copy.downloads.png}
-                    </button>
-                    <button
-                        type="button"
-                        aria-label={copy.downloads.svgName}
-                        aria-disabled={off || undefined}
-                        aria-describedby={blocked ? blockedId : undefined}
-                        onClick={off ? undefined : onSvg}
-                        className={off ? OFF_BUTTON : OUTLINE_BUTTON}
-                    >
-                        {copy.downloads.svg}
-                    </button>
-                </div>
-                {blocked ? (
-                    <span
-                        id={blockedId}
-                        className="text-center text-[13px] text-muted-foreground"
-                    >
-                        {blocked}
-                    </span>
-                ) : null}
-                {pngError ? (
-                    <span
-                        role="alert"
-                        className="text-center text-[13px] text-mk-bad"
-                    >
-                        {pngError}
-                    </span>
-                ) : null}
-                <span
-                    role="status"
-                    className="text-center text-[12.5px] text-muted-foreground"
-                >
-                    {copy.downloads.emailed[unlocked.emailed]}
-                </span>
-            </div>
-        );
-    }
-
+    const off = blocked !== null;
     return (
-        <form
-            noValidate
-            aria-labelledby={`${errorId}-title`}
-            className="flex w-full flex-col gap-2 border-t border-mk-line-row pt-4"
-            onSubmit={(event) => {
-                event.preventDefault();
-                const value = shapedEmail(email);
-                setInvalid(!value);
-                if (value) onUnlock(value);
-            }}
-        >
-            <span id={`${errorId}-title`} className="text-sm font-semibold">
-                {copy.gate.title}
-            </span>
-            <div className="flex flex-wrap gap-2">
-                <input
-                    type="email"
-                    autoComplete="email"
-                    placeholder={copy.gate.emailPlaceholder}
-                    aria-label={copy.gate.emailField}
-                    aria-invalid={shown ? true : undefined}
-                    aria-describedby={shown ? errorId : undefined}
-                    value={email}
-                    onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (invalid) setInvalid(false);
-                    }}
-                    className={`h-11 min-w-0 flex-[1_1_180px] rounded-[10px] border border-border-strong bg-card px-3 text-[15px] text-foreground placeholder:text-mk-hint ${ring()}`}
-                />
-                <button
-                    type="submit"
-                    disabled={pending}
-                    className={`${INK_BUTTON} disabled:cursor-progress`}
+        <div className="sp tp qc-side w-full !bg-transparent">
+            <ToolGateProvider privacy="/privacy">
+                <EmailGate
+                    label={copy.gate.title}
+                    button={copy.gate.submit}
+                    // The email, and nothing about the code.
+                    onSubmit={(email) => toolGateSubmit(email)}
                 >
-                    {pending ? copy.gate.submitting : copy.gate.submit}
-                </button>
-            </div>
-            {shown ? (
-                <span
-                    id={errorId}
-                    role="alert"
-                    className="text-[13px] text-mk-bad"
-                >
-                    {shown}
-                </span>
-            ) : null}
-            <span className="text-[12.5px] text-muted-foreground">
-                {copy.gate.note}{" "}
-                <Link
-                    href="/privacy"
-                    className="text-brand-700 underline underline-offset-2 hover:text-foreground active:text-muted-foreground"
-                >
-                    {copy.gate.privacy}
-                </Link>
-            </span>
-        </form>
+                    <div className="grid justify-items-center gap-2">
+                        <div className="flex flex-wrap justify-center gap-2">
+                            <Button
+                                size="sm"
+                                aria-disabled={off || undefined}
+                                aria-describedby={
+                                    blocked ? "qr-blocked" : undefined
+                                }
+                                onClick={off ? undefined : onPng}
+                                className={off ? OFF : undefined}
+                            >
+                                {copy.downloads.png}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                aria-label={copy.downloads.svgName}
+                                aria-disabled={off || undefined}
+                                aria-describedby={
+                                    blocked ? "qr-blocked" : undefined
+                                }
+                                onClick={off ? undefined : onSvg}
+                                className={
+                                    off ? `${OFF} border-none` : undefined
+                                }
+                            >
+                                {copy.downloads.svg}
+                            </Button>
+                        </div>
+                        {blocked ? (
+                            <span
+                                id="qr-blocked"
+                                className="text-center text-[13px] text-muted-foreground"
+                            >
+                                {blocked}
+                            </span>
+                        ) : null}
+                        {pngError ? (
+                            <span
+                                role="alert"
+                                className="text-center text-[13px] text-mk-bad"
+                            >
+                                {pngError}
+                            </span>
+                        ) : null}
+                    </div>
+                </EmailGate>
+            </ToolGateProvider>
+        </div>
     );
 }

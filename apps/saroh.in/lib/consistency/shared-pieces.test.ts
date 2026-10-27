@@ -184,10 +184,7 @@ const RULES: Rule[] = [
             "components/shared/buttons/button.tsx",
             "components/shared/fields/choice-chips.tsx",
         ],
-        allow: {
-            "components/tools/qr-code-maker/qr-maker-gate.tsx":
-                "step 6e (A16): the QR maker's gate becomes the package's EmailGate",
-        },
+        allow: {},
         files: SITE,
     },
     {
@@ -278,13 +275,7 @@ const RULES: Rule[] = [
         name: "a text field is fieldClasses() (V11, A15)",
         pattern: /placeholder:text-/,
         home: ["components/shared/fields/"],
-        allow: each(
-            "step 6e (A16): its email gate becomes the package's EmailGate",
-            [
-                "components/tools/link-preview/unlock-panel.tsx",
-                "components/tools/qr-code-maker/qr-maker-gate.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {

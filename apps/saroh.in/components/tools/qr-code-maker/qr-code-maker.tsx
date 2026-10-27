@@ -8,7 +8,7 @@ import {
     tooLightToScan,
 } from "@saroh/ui/lib/qr-art";
 import { QrArt } from "@saroh/ui/qr-art";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 import {
@@ -19,13 +19,11 @@ import {
     QR_SWATCHES,
     qrLink,
     typedLink,
-    unlockWithEmail,
 } from "@/lib/qr-code-maker";
 import { ring } from "@/lib/ring";
 
 import { fieldClasses } from "../../shared/fields/field-classes";
 import { readAsDataUrl, saveFile, svgBlob, svgToPng } from "./qr-download";
-import type { QrUnlocked } from "./qr-maker-gate";
 import { QrMakerGate } from "./qr-maker-gate";
 
 const FOCUS_WITHIN =
@@ -49,9 +47,6 @@ export function QrCodeMaker() {
     const [label, setLabel] = useState("");
     const [logo, setLogo] = useState<string | null>(null);
     const [logoError, setLogoError] = useState<string | null>(null);
-    const [unlocked, setUnlocked] = useState<QrUnlocked | null>(null);
-    const [pending, setPending] = useState(false);
-    const [gateError, setGateError] = useState<string | null>(null);
     const [pngError, setPngError] = useState<string | null>(null);
     const colourId = useId();
     const logoId = useId();
@@ -74,30 +69,6 @@ export function QrCodeMaker() {
           : tooLight
             ? copy.downloads.needColour
             : null;
-
-    const unlock = useCallback(async (email: string) => {
-        setPending(true);
-        setGateError(null);
-        try {
-            // The email, and nothing about the code.
-            const body = await unlockWithEmail(email);
-            if (body.unlocked) {
-                setUnlocked(body);
-            } else {
-                setGateError(
-                    body.failure === "bad-email"
-                        ? copy.gate.badEmail
-                        : body.failure === "rate-limited"
-                          ? copy.gate.rateLimited
-                          : copy.gate.failed,
-                );
-            }
-        } catch {
-            setGateError(copy.gate.failed);
-        } finally {
-            setPending(false);
-        }
-    }, []);
 
     async function chooseLogo(file: File | undefined) {
         if (!file) return;
@@ -323,10 +294,6 @@ export function QrCodeMaker() {
                 ) : null}
 
                 <QrMakerGate
-                    unlocked={unlocked}
-                    pending={pending}
-                    error={gateError}
-                    onUnlock={(email) => void unlock(email)}
                     blocked={blocked}
                     pngError={pngError}
                     onPng={() => void downloadPng()}

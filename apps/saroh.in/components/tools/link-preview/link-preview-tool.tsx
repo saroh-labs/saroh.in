@@ -17,6 +17,7 @@ import {
 import { readAddress } from "@/lib/page-address";
 import { ring } from "@/lib/ring";
 import { useBrowserValue } from "@/lib/use-browser-value";
+import type { GateResult } from "@saroh/search-pages";
 
 import { Button } from "../../shared/buttons/button";
 import { LinkInput } from "./link-input";
@@ -67,15 +68,14 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
     const [view, setView] = useState<View>({ kind: "empty" });
     const [unlocked, setUnlocked] = useState<Unlocked | null>(null);
     const [email, setEmail] = useState<{ email: string } | null>(null);
-    const [unlockPending, setUnlockPending] = useState(false);
-    const [unlockError, setUnlockError] = useState<string | null>(null);
     const [copied, setCopied] = useState<string | null>(null);
     const run = useRef(0);
 
     const unlock = useCallback(
-        async (address: string, input: { email: string }) => {
-            setUnlockPending(true);
-            setUnlockError(null);
+        async (
+            address: string,
+            input: { email: string },
+        ): Promise<GateResult> => {
             try {
                 const res = await fetch("/api/link-preview/report", {
                     method: "POST",
@@ -86,19 +86,18 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
                 if (body.unlocked) {
                     setEmail(input);
                     setUnlocked(body);
-                } else {
-                    setUnlockError(
-                        body.failure === "bad-email"
-                            ? copy.badEmail
-                            : body.failure === "rate-limited"
-                              ? failureMessage("rate-limited", "")
-                              : copy.unlockFailed,
-                    );
+                    return { ok: true, emailed: body.emailed };
                 }
+                return {
+                    ok: false,
+                    reason:
+                        body.failure === "bad-email" ||
+                        body.failure === "rate-limited"
+                            ? body.failure
+                            : "unavailable",
+                };
             } catch {
-                setUnlockError(copy.unlockFailed);
-            } finally {
-                setUnlockPending(false);
+                return { ok: false, reason: "unavailable" };
             }
         },
         [],
@@ -290,10 +289,8 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
                             <ScorePanel result={result} />
                             <UnlockPanel
                                 unlocked={unlocked}
-                                pending={unlockPending}
-                                error={unlockError}
-                                onUnlock={(input) =>
-                                    void unlock(result.url, input)
+                                onUnlock={(address) =>
+                                    unlock(result.url, { email: address })
                                 }
                             />
                         </aside>

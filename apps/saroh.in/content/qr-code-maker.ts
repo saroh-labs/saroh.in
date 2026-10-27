@@ -3,7 +3,7 @@
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-12";
+export const UPDATED = "2026-10-27";
 
 /**
  * The QR code maker's words (QR codes plan U9; design "Saroh QR Codes",
@@ -75,16 +75,7 @@ export const qrCodeMaker = {
 
     gate: {
         title: "Get your QR code",
-        emailField: "Email",
-        emailPlaceholder: "you@business.in",
         submit: "Get my QR",
-        submitting: "One moment…",
-        note: "We'll email you a link back to this tool. No newsletter unless you ask. Your link and logo stay in your browser.",
-        privacy: "Privacy",
-        badEmail: "That email looks incomplete. Check it and try again.",
-        rateLimited:
-            "That's a lot of tries in a row. Wait a few minutes and try again. Your code is still here.",
-        failed: "We couldn't unlock the downloads just now. Try again in a minute. Your code is still here.",
     },
 
     downloads: {
@@ -95,13 +86,6 @@ export const qrCodeMaker = {
         needLink: "Type your link to download your code.",
         needColour: "Pick a darker colour to download your code.",
         pngFailed: "We couldn't make the PNG in this browser. Try the SVG.",
-        emailed: {
-            sent: "We've emailed you a link back to this tool.",
-            limited:
-                "We've emailed this address a few times today, so there's no email this time.",
-            "not-sent":
-                "We couldn't send the email just now. Your downloads are ready here.",
-        },
     },
 
     band: {

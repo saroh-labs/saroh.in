@@ -175,6 +175,6 @@ describe("free tools (#1253)", () => {
     it("dates a package tool by its own updated, the app tools by their modules", () => {
         const noshow = liveTools(list(true, [NOSHOW]))[0];
         expect(lastModified(NOSHOW)).toBe(`${noshow.updated}T00:00:00+05:30`);
-        expect(lastModified(QR)).toBe("2026-10-12T00:00:00+05:30");
+        expect(lastModified(QR)).toBe("2026-10-27T00:00:00+05:30");
     });
 });

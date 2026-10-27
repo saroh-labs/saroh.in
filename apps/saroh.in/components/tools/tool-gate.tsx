@@ -9,7 +9,8 @@ import { unlockWithEmail } from "@/lib/qr-code-maker";
 /** The unlock route's answer for this tool, as the shared gate reads it. */
 export async function toolGateSubmit(
     email: string,
-    tool: string,
+    /** The package tool's slug; the QR code maker sends none. */
+    tool?: string,
 ): Promise<GateResult> {
     const body = await unlockWithEmail(email, tool);
     return body.unlocked

@@ -301,7 +301,7 @@ describe("LinkPreviewTool", () => {
         expect(field().value).toBe("");
     });
 
-    it("refuses a bad email in the design's words, and unlocks the fixes with a good one", async () => {
+    it("refuses a bad email in the gate's words, and unlocks the fixes with a good one", async () => {
         fetchMock
             .mockReturnValueOnce(reply(RESULT))
             .mockReturnValueOnce(reply(UNLOCKED));
@@ -310,11 +310,11 @@ describe("LinkPreviewTool", () => {
         submit();
         await screen.findByTestId("score-line");
 
-        const email = screen.getByLabelText("Email");
+        const email = screen.getByLabelText("Unlock the fix-it report");
         fireEvent.change(email, { target: { value: "not-an-email" } });
         fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
         expect(screen.getByRole("alert").textContent).toBe(
-            "That email doesn't look right. Check it and try again.",
+            "That email looks incomplete. Check it and try again.",
         );
 
         // No news tickbox: an unverified address can't say yes to news.
