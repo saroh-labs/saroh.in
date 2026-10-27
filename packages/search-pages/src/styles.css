@@ -79,16 +79,6 @@
 .sp summary::-webkit-details-marker {
     display: none;
 }
-.sp summary::after {
-    content: "+";
-    font-size: 20px;
-    font-weight: 400;
-    line-height: 1;
-    color: var(--sp-muted-2);
-}
-.sp details[open] > summary::after {
-    content: "\2212";
-}
 .sp :focus-visible {
     outline: 2px solid var(--sp-amber-text);
     outline-offset: 2px;
@@ -322,18 +312,136 @@
     flex-direction: column;
     gap: 18px;
 }
-.sp-crumb {
+/* ---- the package's own parts (DEC-195, A11; components/page-parts.tsx),
+   at saroh.in's numbers: Breadcrumbs, Faq, CtaBand and the lg button. */
+.sp-crumb,
+.sp-crumb-i {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
-    font-size: 13.5px;
+}
+.sp-crumb {
+    font-size: 14px;
     color: var(--sp-muted-2);
 }
 .sp .sp-crumb a {
     color: var(--sp-muted-2);
 }
-.sp-crumb [aria-current] {
+.sp .sp-crumb a[href]:hover {
+    color: var(--sp-ink);
+}
+.sp-crumb-brand {
     color: var(--sp-amber-text);
     font-weight: 600;
+}
+.sp .sp-btn {
+    height: 52px;
+    padding: 0 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 16px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    text-decoration: none;
+    transition: transform 120ms ease-out;
+}
+.sp .sp-btn:active {
+    transform: scale(0.97);
+}
+.sp .sp-btn-amber {
+    padding: 0 26px;
+    background: var(--sp-amber);
+    color: var(--sp-ink);
+}
+.sp-faq {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 900px;
+}
+.sp-faq-list {
+    border-top: 1px solid var(--sp-line);
+}
+.sp-faq details {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--sp-line);
+}
+.sp-faq summary {
+    cursor: pointer;
+    gap: 16px;
+    padding: 16px 0;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 17px;
+}
+.sp-chev {
+    flex: none;
+    width: 19px;
+    height: 19px;
+    color: var(--sp-muted-2);
+    transition: transform 200ms ease-out;
+}
+.sp-faq details[open] .sp-chev {
+    transform: rotate(180deg);
+}
+.sp-faq details p {
+    margin: 0 0 18px;
+    max-width: 64ch;
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--sp-body);
+    text-wrap: pretty;
+}
+.sp-cta {
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    border-radius: 24px;
+    padding: clamp(36px, 6vw, 72px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+.sp-cta-copy {
+    flex: 1 1 420px;
+    display: grid;
+    gap: 16px;
+}
+.sp-cta-h {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(38px, 5vw, 60px);
+    line-height: 1;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+.sp-cta-line {
+    max-width: 46ch;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--sp-on-ink);
+    text-wrap: pretty;
+}
+.sp-cta-act {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+}
+.sp-cta-note {
+    font-size: 13.5px;
+    color: var(--sp-on-ink-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+    .sp .sp-btn,
+    .sp-chev {
+        transition: none;
+    }
 }
 .sp .sp-h1 {
     font-size: clamp(44px, 4.6vw, 60px);
@@ -353,23 +461,6 @@
     flex-wrap: wrap;
     align-items: center;
     margin-top: 4px;
-}
-.sp .sp-btn {
-    height: 48px;
-    padding: 0 22px;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 15px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--sp-ink);
-    color: var(--sp-paper);
-    text-decoration: none;
-}
-.sp .sp-btn-amber {
-    background: var(--sp-amber);
-    color: var(--sp-ink);
 }
 .sp-demo {
     display: inline-flex;
@@ -541,31 +632,6 @@
     flex-direction: column;
     gap: 14px;
 }
-.sp-faq {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 760px;
-}
-.sp-faq-list {
-    border-top: 1px solid var(--sp-line);
-}
-.sp-faq details {
-    border-bottom: 1px solid var(--sp-line);
-}
-.sp-faq summary {
-    cursor: pointer;
-    padding: 14px 0;
-    font-weight: 600;
-    font-size: 15px;
-}
-.sp-faq details p {
-    margin: 0 0 16px;
-    font-size: 14.5px;
-    line-height: 1.6;
-    color: var(--sp-body);
-    max-width: 640px;
-}
 .sp-related {
     display: flex;
     flex-direction: column;
@@ -591,45 +657,6 @@
     background: var(--sp-sand);
     color: var(--sp-ink);
     text-decoration: none;
-}
-.sp-cta {
-    background: var(--sp-ink);
-    color: var(--sp-paper);
-    border-radius: 22px;
-    padding: 56px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-    align-items: center;
-    justify-content: space-between;
-}
-.sp-cta-copy {
-    flex: 1 1 420px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.sp-cta-h {
-    font-family: var(--sp-display);
-    font-weight: 700;
-    font-size: 48px;
-    line-height: 1.02;
-    letter-spacing: -0.045em;
-}
-.sp-cta-line {
-    font-size: 15.5px;
-    line-height: 1.6;
-    color: var(--sp-on-ink);
-}
-.sp-cta-act {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-.sp-cta-note {
-    font-size: 12.5px;
-    color: var(--sp-on-ink-muted);
 }
 .sp-bar,
 .sp-labs {
@@ -699,12 +726,6 @@
         align-items: stretch;
         gap: 10px;
         margin-top: 8px;
-    }
-    .sp .sp-btn {
-        height: 52px;
-        border-radius: 12px;
-        font-size: 16px;
-        display: flex;
     }
     .sp-demo {
         order: 3;
@@ -899,54 +920,12 @@
     .sp-pricing {
         gap: 20px;
     }
-    .sp-faq {
-        max-width: none;
-    }
-    .sp-faq-list,
-    .sp-faq details {
-        border-color: var(--sp-line-phone);
-    }
-    .sp-faq summary {
-        box-sizing: content-box;
-        min-height: 44px;
-        padding: 18px 0;
-        font-size: 16px;
-        line-height: 1.4;
-    }
-    .sp-faq details p {
-        margin: 0 0 20px;
-        font-size: 15.5px;
-        max-width: none;
-    }
     .sp-related {
         margin-top: 56px;
         gap: 14px;
     }
     .sp-related h2 {
         color: var(--sp-muted);
-    }
-    .sp-cta {
-        border-radius: 24px;
-        padding: 40px 24px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 28px;
-    }
-    .sp-cta-copy {
-        flex: none;
-    }
-    .sp-cta-h {
-        font-size: 30px;
-        line-height: 1.1;
-        letter-spacing: -0.04em;
-    }
-    .sp-cta-act {
-        align-items: stretch;
-        gap: 10px;
-    }
-    .sp-cta-note {
-        font-size: 14px;
-        text-align: center;
     }
     .sp-bar {
         display: block;
@@ -965,7 +944,7 @@
         transform: none;
     }
     .sp .sp-bar .sp-btn {
-        height: 48px;
+        display: flex;
     }
 }
 
@@ -1056,21 +1035,6 @@
 .tp .tp-draft {
     margin: 0 0 4px;
 }
-.tp-crumb {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    font-size: 14.5px;
-    color: var(--sp-muted-2);
-}
-.tp .tp-crumb a {
-    color: var(--sp-muted-2);
-}
-.tp-crumb [aria-current] {
-    color: var(--sp-ink);
-    font-weight: 600;
-}
 .tp-h1 {
     font-family: var(--sp-display);
     font-weight: 700;
@@ -1149,7 +1113,6 @@
 .tp-btn:focus-visible,
 .tp-chip:focus-within,
 .tp-linkbtn:focus-visible,
-.tp-cta-btn:focus-visible,
 .tp-hub-card:focus-visible {
     outline: 2px solid var(--sp-amber);
     outline-offset: 2px;
@@ -1413,78 +1376,6 @@
     font-size: 15.5px;
     line-height: 1.6;
 }
-.tp-faq {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    max-width: 860px;
-}
-.tp-faq-list {
-    border-top: 1px solid var(--sp-line);
-}
-.tp-faq-list details {
-    border-bottom: 1px solid var(--sp-line);
-}
-.tp-faq-list summary {
-    cursor: pointer;
-    padding: 16px 0;
-    font-weight: 600;
-    font-size: 17px;
-}
-.tp-faq-list p {
-    padding: 0 0 16px;
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--sp-body);
-    max-width: 72ch;
-}
-.tp-faq-list p + p {
-    margin-top: -6px;
-}
-.tp-cta {
-    background: var(--sp-ink);
-    color: var(--sp-paper);
-    border-radius: 24px;
-    padding: clamp(36px, 5vw, 56px);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 32px;
-    align-items: center;
-    justify-content: space-between;
-}
-.tp-cta-copy {
-    flex: 1 1 420px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-.tp-cta-h {
-    font-family: var(--sp-display);
-    font-weight: 700;
-    font-size: clamp(32px, 3.8vw, 46px);
-    line-height: 1.02;
-    letter-spacing: -0.045em;
-}
-.tp-cta-line {
-    font-size: 17px;
-    line-height: 1.6;
-    color: var(--sp-on-ink);
-    max-width: 48ch;
-}
-.tp .tp-cta-btn {
-    height: 52px;
-    padding: 0 24px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--sp-amber);
-    color: var(--sp-ink);
-    text-decoration: none;
-}
-
 /* the /tools hub */
 .tp-hub-group {
     display: flex;
@@ -1559,9 +1450,6 @@
     }
     .tp-intro {
         gap: 12px;
-    }
-    .tp-crumb {
-        font-size: 13.5px;
     }
     .tp-h1 {
         font-size: 34px;
@@ -1693,43 +1581,8 @@
         padding-left: 36px;
         font-size: 15px;
     }
-    .tp-faq {
-        gap: 6px;
-    }
-    .tp-faq-list summary {
-        padding: 14px 0;
-        font-size: 15.5px;
-    }
-    .tp-faq-list p {
-        font-size: 15px;
-    }
-    .tp-cta {
-        border-radius: 20px;
-        padding: 28px 22px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-    }
-    .tp-cta-copy {
-        flex: none;
-    }
-    .tp-cta-h {
-        font-size: 28px;
-        line-height: 1.05;
-        letter-spacing: -0.04em;
-    }
-    .tp-cta-line {
-        font-size: 15.5px;
-    }
-    .tp .tp-cta-btn {
-        height: 48px;
-        border-radius: 10px;
-    }
     .tp-hub-grid {
         grid-template-columns: 1fr;
-    }
-    .tp-hub-group + .tp-cta .tp-cta-h {
-        font-size: 22px;
     }
 }
 

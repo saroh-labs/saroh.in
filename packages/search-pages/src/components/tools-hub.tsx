@@ -1,5 +1,6 @@
 import type { ToolPageEntry } from "../schema";
 import { TOOL_GROUPS } from "../tool-schema";
+import { ClosingBand, Crumbs } from "./page-parts";
 
 export interface ToolsHubProps {
     /** The tools to list: on saroh.in those this build has, in admin all of them. */
@@ -37,11 +38,12 @@ export function ToolsHub({
         <div className="sp tp">
             <div className="tp-wrap">
                 <section className="tp-intro">
-                    <nav aria-label="Breadcrumb" className="tp-crumb">
-                        <a href={home}>Home</a>
-                        <span aria-hidden="true">›</span>
-                        <span aria-current="page">Free tools</span>
-                    </nav>
+                    <Crumbs
+                        crumbs={[
+                            { name: "Home", href: home },
+                            { name: "Free tools" },
+                        ]}
+                    />
                     <h1 className="tp-h1 tp-hub-h1">
                         Free tools for small businesses in India
                     </h1>
@@ -83,18 +85,12 @@ export function ToolsHub({
                         </ul>
                     </section>
                 ))}
-                <section className="tp-cta">
-                    <div className="tp-cta-copy">
-                        <h2 className="tp-cta-h">All of it, in one place.</h2>
-                        <p className="tp-cta-line">
-                            Saroh does these for every order and booking,
-                            without you opening a tool.
-                        </p>
-                    </div>
-                    <a className="tp-cta-btn" href={startFree} data-cta="">
-                        {startFreeLabel ?? "Start free"}
-                    </a>
-                </section>
+                <ClosingBand
+                    title="All of it, in one place."
+                    line="Saroh does these for every order and booking, without you opening a tool."
+                    href={startFree}
+                    label={startFreeLabel}
+                />
             </div>
         </div>
     );

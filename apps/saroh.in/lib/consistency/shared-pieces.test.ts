@@ -96,9 +96,6 @@ function stale(rule: Rule) {
     });
 }
 
-const each = (reason: string, files: string[]) =>
-    Object.fromEntries(files.map((f) => [f, reason]));
-
 // One class run: the characters a Tailwind class list can hold, so a
 // pattern stays inside one string.
 const RUN = "[^\"'`]*";
@@ -322,29 +319,15 @@ const RULES: Rule[] = [
     {
         name: 'package: the start button\'s label comes from the site, not "Start free" (A12, B2)',
         pattern: /Start free/,
-        home: [],
-        allow: each(
-            "step 3 (A12, B2): the label comes in with the start link; its default fallback's file becomes this rule's home",
-            [
-                "src/components/search-page.tsx",
-                "src/components/tool-page.tsx",
-                "src/components/tools-hub.tsx",
-            ],
-        ),
+        home: ["src/components/page-parts.tsx"],
+        allow: {},
         files: PACKAGE,
     },
     {
         name: "package: crumbs, questions and the closing band are page-parts.tsx (A11)",
         pattern: /\b(?:sp|tp)-(?:crumb|faq|cta)\b/,
         home: ["src/components/page-parts.tsx"],
-        allow: each(
-            "step 7 (A11): its own crumb, FAQ and band become the package's one set of parts",
-            [
-                "src/components/search-page.tsx",
-                "src/components/tool-page.tsx",
-                "src/components/tools-hub.tsx",
-            ],
-        ),
+        allow: {},
         files: PACKAGE,
     },
     {
