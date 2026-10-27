@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
@@ -46,7 +47,11 @@ let warn: jest.SpyInstance;
 beforeEach(() => {
     fake = new FakeMessagingProvider();
     challenge = new TestChallenge();
-    service = new AccountPhoneService(new MessagingService(fake), challenge);
+    service = new AccountPhoneService(
+        new MessagingService(fake),
+        challenge,
+        new FeatureFlagService(),
+    );
     warn = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
 });
 

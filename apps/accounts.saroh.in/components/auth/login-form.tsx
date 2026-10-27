@@ -17,11 +17,12 @@ import {
 import { codeNext, doneLine } from "@/components/auth/panel-copy";
 import { PhoneSignIn } from "@/components/auth/phone-sign-in";
 import { SocialButtons } from "@/components/auth/social-buttons";
-import { getAppUrl } from "@/lib/app-urls";
+import { getAccountsUrl, getAppUrl } from "@/lib/app-urls";
 import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
 import type { PhoneOptions } from "@/lib/phone-sign-in";
+import { throughPhoneStep } from "@/lib/phone-step";
 import type { CodeClient } from "@/lib/sign-in-code";
 import { sendCode } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
@@ -73,7 +74,12 @@ export function LoginForm({
 } = {}) {
     const router = useRouter();
     const { signIn } = authClient;
-    const destination = returnTo ?? getAppUrl();
+    // While a phone is required, every way in lands on "Add your phone" first.
+    const destination = throughPhoneStep(
+        returnTo ?? getAppUrl(),
+        getAccountsUrl(),
+        phone?.required === true,
+    );
     const [way, setWay] = useState<SignInWay>(startWay);
     const [email, setEmail] = useState(invitedEmail ?? "");
     const [password, setPassword] = useState("");

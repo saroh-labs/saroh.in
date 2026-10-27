@@ -3,7 +3,8 @@
 import { phoneLabel, phoneNumberProblem } from "@saroh/ui/lib/phone";
 import { useState } from "react";
 
-import { authFailureCopy } from "@/lib/auth-error-copy";
+import type { AuthFailure } from "@/lib/auth-error-copy";
+import { authFailureCopy, NETWORK_ERROR } from "@/lib/auth-error-copy";
 import type { OtpSender } from "@/lib/otp-widget";
 import { otpSender } from "@/lib/otp-widget";
 import { startPhone } from "@/lib/phone-sign-in";
@@ -12,6 +13,18 @@ export type PhoneSendStage = "number" | "captcha" | "code";
 
 /** Couldn't open the widget or send through it. */
 export const SEND_FAILED = "Couldn't send the code. Try again.";
+/**
+ * A refusal that says codes can't go out at all just now (the provider or
+ * the API is down), not that this number or this person did something wrong.
+ */
+export function cannotSend(failure: AuthFailure): boolean {
+    return (
+        failure.code === "UNAVAILABLE" ||
+        failure.code === NETWORK_ERROR ||
+        (failure.status ?? 0) >= 500
+    );
+}
+
 export const FINISH_CHECK =
     "Finish the check above, then press Send code again.";
 
@@ -29,6 +42,8 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
     const [stage, setStage] = useState<PhoneSendStage>("number");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // Codes can't go out just now: a required step lets the person go on.
+    const [unavailable, setUnavailable] = useState(false);
     const [sender, setSender] = useState<OtpSender | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
     // A Turnstile token is good once: a new key draws a fresh challenge.
@@ -40,6 +55,7 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
             setStage("code");
         } catch {
             setError(next.captcha ? FINISH_CHECK : SEND_FAILED);
+            if (!next.captcha) setUnavailable(true);
             setStage("captcha");
         }
     }
@@ -68,6 +84,7 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
         if (started.error) {
             setBusy(false);
             setError(authFailureCopy(started.error, SEND_FAILED));
+            if (cannotSend(started.error)) setUnavailable(true);
             return;
         }
         let next: OtpSender;
@@ -76,6 +93,7 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
         } catch {
             setBusy(false);
             setError(SEND_FAILED);
+            setUnavailable(true);
             return;
         }
         setSender(next);
@@ -106,6 +124,7 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
         stage,
         error,
         busy,
+        unavailable,
         sender,
         turnstileSiteKey,
         challengeKey,

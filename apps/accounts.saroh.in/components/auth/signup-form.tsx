@@ -13,9 +13,15 @@ import {
 } from "@/components/auth/field";
 import { codeNext, doneLine, PROMISE } from "@/components/auth/panel-copy";
 import { SocialButtons } from "@/components/auth/social-buttons";
-import { afterSignUp, getAppUrl, getOnboardingUrl } from "@/lib/app-urls";
+import {
+    afterSignUp,
+    getAccountsUrl,
+    getAppUrl,
+    getOnboardingUrl,
+} from "@/lib/app-urls";
 import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
+import { throughPhoneStep } from "@/lib/phone-step";
 import type { CodeClient } from "@/lib/sign-in-code";
 import { sendCode } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
@@ -43,13 +49,18 @@ export function SignupForm({
     invitedEmail,
     providers = [],
     client = codeClient,
+    phoneRequired = false,
 }: {
     returnTo?: string | null;
     invitedEmail?: string;
     /** The social providers with keys set (`lib/sign-in-options.ts`). */
     providers?: SocialProvider[];
     client?: CodeClient;
+    /** `PHONE_REQUIRED_FOR_ACCOUNTS`: "Add your phone" comes next (`lib/phone-step.ts`). */
+    phoneRequired?: boolean;
 }) {
+    const onward = (to: string) =>
+        throughPhoneStep(to, getAccountsUrl(), phoneRequired);
     const [name, setName] = useState("");
     const [email, setEmail] = useState(invitedEmail ?? "");
     const [error, setError] = useState<string | null>(null);
@@ -97,7 +108,9 @@ export function SignupForm({
                     // when that hand-off is on (DEC-127): the code typed
                     // here is the address confirmed, which is the sign-up
                     // that page counts. This page loads no advertising tag.
-                    window.location.href = afterSignUp(returnTo ?? getAppUrl());
+                    window.location.href = afterSignUp(
+                        onward(returnTo ?? getAppUrl()),
+                    );
                 }}
                 client={client}
             />
@@ -161,7 +174,7 @@ export function SignupForm({
                 // Google makes the account in one step, so it goes where
                 // the emailed code would have sent it: setup, unless this
                 // sign-up was on its way somewhere (an invitation, a plan).
-                callbackURL={returnTo ?? getOnboardingUrl()}
+                callbackURL={onward(returnTo ?? getOnboardingUrl())}
                 disabled={isLoading}
             />
 

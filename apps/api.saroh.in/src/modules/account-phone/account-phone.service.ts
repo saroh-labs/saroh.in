@@ -14,6 +14,8 @@ import { prisma } from "@saroh/database";
 import { auth } from "../../common/auth/auth";
 import { hashClientIp } from "../../common/client-ip";
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { ChallengeVerifier } from "../site-accounts/challenge";
@@ -34,6 +36,13 @@ export interface PhoneOptions {
     available: boolean;
     /** Turnstile's public key, or null when no challenge is asked. */
     turnstileSiteKey: string | null;
+    /**
+     * Whether every account must have a verified phone
+     * (`PHONE_REQUIRED_FOR_ACCOUNTS`, platform-wide). Accounts asks for one
+     * after sign-in only while this AND `available` are true, so nobody is
+     * held at a step that can't send a code.
+     */
+    required: boolean;
 }
 
 /** The one answer for a phone with no account, whoever asks. */
@@ -59,14 +68,26 @@ export class AccountPhoneService {
     constructor(
         private readonly messaging: MessagingService,
         private readonly challenge: ChallengeVerifier,
+        private readonly flags: FeatureFlagService,
     ) {}
 
-    options(): PhoneOptions {
+    async options(): Promise<PhoneOptions> {
+        const available =
+            this.messaging.otpStandIn ||
+            this.messaging.otpWidgetConfig() !== null;
+        // No organization: only the flag's global default counts.
+        const required = await this.flags.isEnabled(
+            FlagKey.PHONE_REQUIRED_FOR_ACCOUNTS,
+        );
+        if (required && !available) {
+            this.logger.warn(
+                "account_phone_required_unavailable: phone codes can't be sent, so sign-in lets accounts without a phone through",
+            );
+        }
         return {
-            available:
-                this.messaging.otpStandIn ||
-                this.messaging.otpWidgetConfig() !== null,
+            available,
             turnstileSiteKey: this.challenge.siteKey,
+            required,
         };
     }
 
@@ -104,6 +125,7 @@ export class AccountPhoneService {
               ? { widget }
               : null;
         if (!answer) {
+            this.blocked("start", "unavailable", keys);
             throw new ServiceUnavailableException({
                 message:
                     "Phone sign-in isn't available right now. Use your email.",

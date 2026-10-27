@@ -61,6 +61,21 @@ calls `MessagingService`) and the session half in
    person by their verified phone or saves anything; only then does Better
    Auth make the session, the same way as for an emailed code.
 
+**Requiring a phone** is the platform flag `PHONE_REQUIRED_FOR_ACCOUNTS`,
+off until WhatsApp/SMS is fully rolled out. The owner turns on its **global
+default** in admin › Flags (no deploy; a per-business override means
+nothing, it is read with no business). The API answers it as
+`required` on `GET /account-phone/options`; accounts' sign-in, sign-up and
+verify-email pages read that on the server and send every way in through
+`/add-phone?to=…`, which checks the session's verified phone and stops only
+someone with none (`apps/accounts.saroh.in/lib/phone-step.ts`). Never a
+trap: Saroh's staff pass (`/admin/me`), Sign out is always offered, and
+while codes can't be sent (`otpWidgetConfig()` null, logged as
+`account_phone_required_unavailable`, or a send failing with 5xx) the step
+lets them go on and asks again at the next sign-in. It asks at sign-in
+only: a session already open, or someone typing the workspace's address,
+is not stopped.
+
 **The server limits are a soft gate.** The widget sends codes from the
 browser straight to MSG91, so the API can only refuse to hand out the
 widget's config and refuse to check tokens: a 30-second cooldown and 10

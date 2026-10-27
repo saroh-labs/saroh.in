@@ -22,7 +22,16 @@ export type PhoneStart =
 export interface PhoneOptions {
     available: boolean;
     turnstileSiteKey: string | null;
+    /** `PHONE_REQUIRED_FOR_ACCOUNTS`: every account needs a verified phone (`lib/phone-step.ts`). */
+    required: boolean;
 }
+
+/** What to assume when the API can't be asked: nothing offered, nothing required. */
+const NO_PHONE: PhoneOptions = {
+    available: false,
+    turnstileSiteKey: null,
+    required: false,
+};
 
 export type PhoneAnswer<T> =
     | { data: T; error: null }
@@ -34,10 +43,10 @@ export async function phoneOptions(): Promise<PhoneOptions> {
         const response = await fetch(`${apiBase()}/account-phone/options`, {
             cache: "no-store",
         });
-        if (!response.ok) return { available: false, turnstileSiteKey: null };
-        return (await response.json()) as PhoneOptions;
+        if (!response.ok) return NO_PHONE;
+        return { ...NO_PHONE, ...((await response.json()) as PhoneOptions) };
     } catch {
-        return { available: false, turnstileSiteKey: null };
+        return NO_PHONE;
     }
 }
 

@@ -53,6 +53,8 @@ module.exports = {
         // admin *.db.spec.ts (U11's overrides) run here.
         "<rootDir>/src/modules/admin/(?!.*\\.db\\.spec\\.ts$)",
         "\\.authorization\\.spec\\.ts$",
+        // Phone sign-in's options spec mocks Prisma: unit project only.
+        "<rootDir>/src/modules/account-phone/(?!.*\\.db\\.spec\\.ts$)",
         // #384 customer delete: mocked Prisma, runs in the unit project.
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         // ADR-006 store creation cap: mocked Prisma, runs in the unit project.

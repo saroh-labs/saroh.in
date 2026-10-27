@@ -17,7 +17,7 @@ import { phoneLabel } from "@saroh/ui/lib/phone";
 import { PhoneInput } from "@saroh/ui/phone-input";
 import { useEffect, useState } from "react";
 
-import { usePhoneSend } from "@/components/auth/use-phone-send";
+import { cannotSend, usePhoneSend } from "@/components/auth/use-phone-send";
 import { authFailureCopy } from "@/lib/auth-error-copy";
 import type { OtpSender } from "@/lib/otp-widget";
 import { CAPTCHA_ELEMENT_ID } from "@/lib/otp-widget";
@@ -244,17 +244,30 @@ export function PhoneSection({
     );
 }
 
-/** The new number, its code, then saved. */
-function PhoneChange({
+/**
+ * The new number, its code, then saved. Also the whole of accounts'
+ * "Add your phone" step (`app/(auth)/add-phone`), which has no Cancel and
+ * listens for `onUnavailable` so nobody is held while codes can't be sent.
+ */
+export function PhoneChange({
     turnstileSiteKey,
     onCancel,
     onSaved,
+    onUnavailable,
+    label = "New phone",
 }: {
     turnstileSiteKey: string | null;
-    onCancel: () => void;
+    /** Omitted, there is no Cancel. */
+    onCancel?: () => void;
     onSaved: (saved: Saved) => void;
+    /** Sending or checking failed because codes can't go out just now. */
+    onUnavailable?: () => void;
+    label?: string;
 }) {
     const flow = usePhoneSend(turnstileSiteKey);
+    useEffect(() => {
+        if (flow.unavailable) onUnavailable?.();
+    }, [flow.unavailable, onUnavailable]);
 
     if (flow.stage === "code" && flow.sender) {
         return (
@@ -264,6 +277,7 @@ function PhoneChange({
                 shownPhone={flow.shownPhone}
                 onCancel={onCancel}
                 onSaved={onSaved}
+                onUnavailable={onUnavailable}
                 onNumberRefused={flow.reset}
             />
         );
@@ -285,7 +299,7 @@ function PhoneChange({
                 </p>
             ) : null}
             <div className="grid gap-2">
-                <Label htmlFor="new-phone">New phone</Label>
+                <Label htmlFor="new-phone">{label}</Label>
                 <PhoneInput
                     id="new-phone"
                     autoComplete="tel"
@@ -313,20 +327,22 @@ function PhoneChange({
                 <Button type="submit" disabled={flow.busy}>
                     {flow.busy ? "Sending…" : "Send code"}
                 </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={flow.busy}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
+                {onCancel ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={flow.busy}
+                        onClick={onCancel}
+                    >
+                        Cancel
+                    </Button>
+                ) : null}
             </div>
         </form>
     );
 }
 
-interface Saved {
+export interface Saved {
     phoneE164: string;
     phoneVerifiedAt: string;
 }
@@ -334,6 +350,8 @@ interface Saved {
 interface Box {
     saved: Saved | null;
     refused: string | null;
+    /** The check couldn't be made: the provider or the API is down. */
+    down: boolean;
 }
 
 /** The code for the new number: the API checks it, then saves the phone. */
@@ -343,13 +361,15 @@ function PhoneCode({
     shownPhone,
     onCancel,
     onSaved,
+    onUnavailable,
     onNumberRefused,
 }: {
     sender: OtpSender;
     phone: string;
     shownPhone: string;
-    onCancel: () => void;
+    onCancel?: () => void;
     onSaved: (saved: Saved) => void;
+    onUnavailable?: () => void;
     /** The API refused the number itself (on another account): pick another. */
     onNumberRefused: (why: string) => void;
 }) {
@@ -372,6 +392,7 @@ function PhoneCode({
             const answer = await addPhone({ phone, accessToken });
             box.saved = answer.data;
             box.refused = answer.error?.code ?? null;
+            box.down = answer.error ? cannotSend(answer.error) : false;
             return answer;
         });
     }
@@ -379,13 +400,14 @@ function PhoneCode({
     async function check() {
         setChecking(true);
         setError(null);
-        const box: Box = { saved: null, refused: null };
+        const box: Box = { saved: null, refused: null, down: false };
         const result = await checkCode(client(box), { email: phone, code });
         setChecking(false);
         if (result.ok && box.saved) {
             onSaved(box.saved);
             return;
         }
+        if (box.down) onUnavailable?.();
         if (!result.ok && box.refused === "PHONE_TAKEN") {
             onNumberRefused(result.message);
             return;
@@ -395,9 +417,12 @@ function PhoneCode({
     }
 
     async function resend() {
-        const result = await sendCode(client({ saved: null, refused: null }), {
-            email: phone,
-        });
+        const result = await sendCode(
+            client({ saved: null, refused: null, down: false }),
+            {
+                email: phone,
+            },
+        );
         const at = Date.now();
         setNow(at);
         if (result.ok) {
@@ -451,14 +476,16 @@ function PhoneCode({
                 >
                     {resendLabel(wait)}
                 </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={checking}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
+                {onCancel ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={checking}
+                        onClick={onCancel}
+                    >
+                        Cancel
+                    </Button>
+                ) : null}
             </div>
         </form>
     );

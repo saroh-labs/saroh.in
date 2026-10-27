@@ -128,6 +128,17 @@ export const FlagKey = {
      * and `messaging/verification.service.ts` (`setEnabled`).
      */
     CUSTOMER_PHONE_CODES: "CUSTOMER_PHONE_CODES",
+
+    /**
+     * A verified phone on every Saroh account (DEC-196), once WhatsApp and
+     * SMS are fully rolled out. Platform-wide: read with no organization, so
+     * only the global default counts. Off, the phone stays optional. On,
+     * sign-in and sign-up stop at accounts' "Add your phone" step for an
+     * account with no verified phone; while phone codes can't be sent the
+     * step lets them through and asks again next time. One reader:
+     * `account-phone/account-phone.service.ts` (`options().required`).
+     */
+    PHONE_REQUIRED_FOR_ACCOUNTS: "PHONE_REQUIRED_FOR_ACCOUNTS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -283,6 +294,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "WhatsApp sign-in codes are open to every business on every instance, have needed no kill switch for a release, and the two readers no longer ask it.",
+    },
+    PHONE_REQUIRED_FOR_ACCOUNTS: {
+        shownAs: "Phone required on Saroh accounts",
+        group: "feature",
+        purpose:
+            "Asks every Saroh account with no verified phone to add one before it goes on: after sign-up, and at its next sign-in. Platform-wide: set the global default, not a business. Turn it on once WhatsApp and SMS codes are fully rolled out; off, the phone stays optional. While phone codes can't be sent, nobody is held at the step.",
+        owner: "Platform owner",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "It has been on everywhere for a release and the phone is simply part of sign-up, with the step's one reader asking no flag.",
     },
     WEB_ADDRESS_CHANGE: {
         shownAs: "Change web address",

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { SIGNUP_JOIN_PANEL, SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
 import { isJoining } from "@/lib/joining";
+import { phoneOptions } from "@/lib/phone-sign-in";
 import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
@@ -46,7 +47,10 @@ export default async function SignupPage({
         safeDestination(redirect) ??
         onboardingForInvite(invite) ??
         onboardingForPlan(plan, cycle);
-    const providers = await signInProviders();
+    const [providers, phone] = await Promise.all([
+        signInProviders(),
+        phoneOptions(),
+    ]);
     return (
         <SplitShell
             // An invitee joins a business that exists: no three-step plan.
@@ -62,6 +66,7 @@ export default async function SignupPage({
                 returnTo={returnTo}
                 invitedEmail={typeof email === "string" ? email : undefined}
                 providers={providers}
+                phoneRequired={phone.required}
             />
         </SplitShell>
     );

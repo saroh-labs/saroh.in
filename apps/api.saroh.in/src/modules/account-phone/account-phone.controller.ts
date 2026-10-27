@@ -35,7 +35,7 @@ export class PhoneSignInController {
     /** Whether to offer "Use phone instead", and Turnstile's public key. */
     @Get("options")
     @Header("Cache-Control", "no-store")
-    options(): PhoneOptions {
+    options(): Promise<PhoneOptions> {
         return this.phones.options();
     }
 

@@ -8,8 +8,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CodeStep } from "@/components/auth/code-step";
 import { AuthHeading } from "@/components/auth/field";
 import { codeNext, doneLine } from "@/components/auth/panel-copy";
-import { afterSignUp, getAppUrl } from "@/lib/app-urls";
+import { afterSignUp, getAccountsUrl, getAppUrl } from "@/lib/app-urls";
 import { withCarry } from "@/lib/joining";
+import { throughPhoneStep } from "@/lib/phone-step";
 
 /**
  * A password account confirming its address, opened by a link that names it
@@ -23,8 +24,11 @@ import { withCarry } from "@/lib/joining";
  */
 export function VerifyEmailForm({
     returnTo = null,
+    phoneRequired = false,
 }: {
     returnTo?: string | null;
+    /** `PHONE_REQUIRED_FOR_ACCOUNTS`: "Add your phone" comes next (`lib/phone-step.ts`). */
+    phoneRequired?: boolean;
 } = {}) {
     const router = useRouter();
     const email = useSearchParams().get("email") ?? "";
@@ -62,7 +66,13 @@ export function VerifyEmailForm({
                 // A newly confirmed account. `afterSignUp` routes it through
                 // saroh.in's /welcome when that hand-off is on (DEC-127);
                 // this page itself loads no advertising tag.
-                window.location.href = afterSignUp(returnTo ?? getAppUrl());
+                window.location.href = afterSignUp(
+                    throughPhoneStep(
+                        returnTo ?? getAppUrl(),
+                        getAccountsUrl(),
+                        phoneRequired,
+                    ),
+                );
             }}
         />
     );
