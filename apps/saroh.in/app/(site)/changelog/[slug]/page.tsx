@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
+import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
@@ -77,7 +77,7 @@ export default async function ChangelogEntryPage({ params }: Props) {
                 ]}
             />
             <Breadcrumbs
-                mono
+                current="mono"
                 crumbs={[
                     { name: "Changelog", href: "/changelog" },
                     {

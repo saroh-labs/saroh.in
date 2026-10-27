@@ -2,28 +2,30 @@ import { cn } from "@/lib/cn";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { textLinkClasses } from "../shared/links/text-link";
+import { textLinkClasses } from "../links/text-link";
 
 export interface Crumb {
     name: ReactNode;
-    /** Every crumb but the page itself links; the last never does (no self-link). */
+    /** Every crumb but the page itself links; the last never does (no self-link). A middle crumb without one is plain words. */
     href?: string;
 }
 
 /**
- * The trail above a Resources page's title (plan U1, the Resources
- * designs): "Changelog / 17 Oct 2026", 14px Ink 500 with "/" between. The
- * last crumb is the page itself: not a link, marked `aria-current`.
- * `mono` sets the last one in JetBrains Mono, Saffron 700, as the changelog
- * entry draws its date.
+ * The trail above a page's title (DEC-195, V2): "Changelog / 17 Oct 2026",
+ * 14px Ink 500 with "/" between. The last crumb is the page itself: not a
+ * link, marked `aria-current`.
+ *
+ * - `current="plain"` — the page's crumb as the rest (Help, Integrations).
+ * - `current="brand"` — Saffron 700, 600: a feature or solution hero.
+ * - `current="mono"` — JetBrains Mono, Saffron 700: a changelog entry's date.
  */
 export function Breadcrumbs({
     crumbs,
-    mono = false,
+    current = "plain",
     className,
 }: {
     crumbs: Crumb[];
-    mono?: boolean;
+    current?: "plain" | "brand" | "mono";
     className?: string;
 }) {
     return (
@@ -38,21 +40,25 @@ export function Breadcrumbs({
                                 <span
                                     aria-current="page"
                                     className={cn(
-                                        mono &&
+                                        current === "brand" &&
+                                            "font-semibold text-brand-700",
+                                        current === "mono" &&
                                             "font-mono text-[13.5px] text-brand-700",
                                     )}
                                 >
                                     {crumb.name}
                                 </span>
-                            ) : (
+                            ) : crumb.href ? (
                                 <Link
-                                    href={crumb.href ?? "/"}
+                                    href={crumb.href}
                                     className={textLinkClasses({
                                         tone: "quiet",
                                     })}
                                 >
                                     {crumb.name}
                                 </Link>
+                            ) : (
+                                <span>{crumb.name}</span>
                             )}
                         </li>
                     );

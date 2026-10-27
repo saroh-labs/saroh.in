@@ -5,13 +5,13 @@ import type { ComponentProps } from "react";
 
 import { HelpStep } from "@/components/help/help-step";
 import { HelpVote } from "@/components/help/help-vote";
-import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { OnThisPage } from "@/components/resources/on-this-page";
 import { ResourceShell } from "@/components/resources/resource-shell";
 import { SideNav } from "@/components/resources/side-nav";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
+import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     areasWithArticles,
     HELP_PATH,
@@ -169,6 +169,7 @@ export default async function HelpArticlePage({ params }: Props) {
                                         href={href ?? ""}
                                         className={textLinkClasses({
                                             tone: "prose",
+                                            className: "font-semibold",
                                         })}
                                     >
                                         {children}

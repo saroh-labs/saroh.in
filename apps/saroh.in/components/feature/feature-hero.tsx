@@ -1,7 +1,4 @@
-import Link from "next/link";
-
 import type { Feature } from "@/content/types";
-import { ring } from "@/lib/ring";
 
 import { ProductHero } from "../shared/sections/product-hero";
 
@@ -21,27 +18,8 @@ export function FeatureHero({
 }) {
     return (
         <ProductHero
-            crumb={
-                <nav aria-label="Breadcrumb">
-                    <ol className="m-0 flex list-none items-center gap-2 p-0 text-[14px] text-muted-foreground">
-                        <li>
-                            <Link
-                                href="/#features"
-                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`}
-                            >
-                                Features
-                            </Link>
-                        </li>
-                        <li aria-hidden>/</li>
-                        <li
-                            aria-current="page"
-                            className="font-semibold text-brand-700"
-                        >
-                            {feature.name}
-                        </li>
-                    </ol>
-                </nav>
-            }
+            section={{ name: "Features", href: "/#features" }}
+            name={feature.name}
             headline={feature.headline}
             sub={feature.sub}
             narrow

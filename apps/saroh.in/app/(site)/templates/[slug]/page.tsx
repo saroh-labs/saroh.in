@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { TemplateCard } from "@/components/templates/template-card";
 import { TemplateViewer } from "@/components/templates/template-viewer";

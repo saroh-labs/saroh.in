@@ -1,8 +1,5 @@
-import Link from "next/link";
-
 import type { Solution } from "@/content/types";
 import { demoHref, demoTrade } from "@/lib/demos";
-import { ring } from "@/lib/ring";
 
 import { ProductHero } from "../shared/sections/product-hero";
 
@@ -23,26 +20,8 @@ export function SolutionHero({
     const trade = demoTrade(solution.slug);
     return (
         <ProductHero
-            crumb={
-                <nav
-                    aria-label="Breadcrumb"
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                    <Link
-                        href="/#solutions"
-                        className={`rounded-sm text-muted-foreground no-underline hover:text-foreground ${ring()}`}
-                    >
-                        Solutions
-                    </Link>
-                    <span aria-hidden>/</span>
-                    <span
-                        aria-current="page"
-                        className="font-semibold text-brand-700"
-                    >
-                        {solution.name}
-                    </span>
-                </nav>
-            }
+            section={{ name: "Solutions", href: "/#solutions" }}
+            name={solution.name}
             headline={solution.headline}
             sub={solution.sub}
             actions={{

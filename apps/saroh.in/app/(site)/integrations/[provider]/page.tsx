@@ -7,6 +7,7 @@ import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
+import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -15,7 +16,6 @@ import {
 } from "@/content/integrations";
 import { numberWord } from "@/lib/format/number-words";
 import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
-import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 
@@ -75,20 +75,12 @@ export default async function IntegrationPage({ params }: Props) {
                         { name: fm.name, path: self },
                     ])}
                 />
-                <nav aria-label="Breadcrumb">
-                    <ol className="m-0 flex list-none items-center gap-2 p-0 text-[14px] text-muted-foreground">
-                        <li>
-                            <Link
-                                href={INTEGRATIONS_PATH}
-                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`}
-                            >
-                                Integrations
-                            </Link>
-                        </li>
-                        <li aria-hidden>/</li>
-                        <li>{fm.category}</li>
-                    </ol>
-                </nav>
+                <Breadcrumbs
+                    crumbs={[
+                        { name: "Integrations", href: INTEGRATIONS_PATH },
+                        { name: fm.category },
+                    ]}
+                />
                 <h1 className="m-0 font-display text-[clamp(36px,6vw,60px)] font-bold leading-none tracking-[-0.045em]">
                     {fm.name}
                 </h1>

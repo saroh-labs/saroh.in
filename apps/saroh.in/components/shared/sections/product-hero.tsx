@@ -5,6 +5,8 @@ import type { ShotRef } from "@/content/types";
 import { HeroActions } from "../buttons/hero-actions";
 import { Container } from "../layout/container";
 import { ScreenshotFrame } from "../media/screenshot-frame";
+import type { Crumb } from "../nav/breadcrumbs";
+import { Breadcrumbs } from "../nav/breadcrumbs";
 
 /**
  * A feature or solution page's opening (DEC-195, A5): the breadcrumb, the
@@ -13,7 +15,8 @@ import { ScreenshotFrame } from "../media/screenshot-frame";
  * with no screen captured yet has neither.
  */
 export function ProductHero({
-    crumb,
+    section,
+    name,
     headline,
     sub,
     narrow = false,
@@ -22,7 +25,10 @@ export function ProductHero({
     shot,
     note,
 }: {
-    crumb: ReactNode;
+    /** The crumb before the page's own name: "Features", "Solutions". */
+    section: Crumb & { href: string };
+    /** The page's own name, the last crumb. */
+    name: ReactNode;
     headline: string;
     sub: string;
     /** The feature template's 16ch headline; a solution's is 17ch. */
@@ -39,7 +45,7 @@ export function ProductHero({
                 as="header"
                 className="grid justify-items-start gap-5 pt-[72px]"
             >
-                {crumb}
+                <Breadcrumbs current="brand" crumbs={[section, { name }]} />
                 <h1
                     className={`m-0 ${narrow ? "max-w-[16ch]" : "max-w-[17ch]"} font-display text-mk-display font-bold [text-wrap:balance]`}
                 >

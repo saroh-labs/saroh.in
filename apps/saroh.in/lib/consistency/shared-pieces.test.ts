@@ -123,15 +123,8 @@ const RULES: Rule[] = [
     {
         name: "a breadcrumb is Breadcrumbs (V2, A4)",
         pattern: /aria-label="Breadcrumbs?"/,
-        home: ["components/resources/breadcrumbs.tsx"],
-        allow: each(
-            'step 6 (A4, V2): its own crumb list becomes Breadcrumbs current="brand"',
-            [
-                "app/(site)/integrations/[provider]/page.tsx",
-                "components/feature/feature-hero.tsx",
-                "components/solution/solution-hero.tsx",
-            ],
-        ),
+        home: ["components/shared/nav/breadcrumbs.tsx"],
+        allow: {},
         files: SITE,
     },
     {
@@ -177,16 +170,7 @@ const RULES: Rule[] = [
             `\\btext-muted-foreground\\b${RUN}\\bno-underline\\b${RUN}hover:text-foreground`,
         ),
         home: ["components/shared/links/text-link.tsx"],
-        allow: {
-            ...each(
-                'step 6 (A3): its quiet link becomes TextLink tone="quiet"',
-                [
-                    "app/(site)/integrations/[provider]/page.tsx",
-                    "components/feature/feature-hero.tsx",
-                    "components/solution/solution-hero.tsx",
-                ],
-            ),
-        },
+        allow: {},
         files: SITE,
     },
     {
