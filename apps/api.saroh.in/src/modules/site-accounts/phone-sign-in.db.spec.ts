@@ -193,6 +193,14 @@ async function accountWithPhone(host: string) {
     return { phone, email };
 }
 
+// These exercise the hidden paths for sends on a business's behalf (DEC-197).
+beforeAll(() => {
+    VerificationService.sendsForBusinesses = true;
+});
+afterAll(() => {
+    VerificationService.sendsForBusinesses = false;
+});
+
 describe("site sign-in by WhatsApp code (DEC-196)", () => {
     beforeAll(async () => {
         await prisma.featureFlag.create({

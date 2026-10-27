@@ -2578,3 +2578,18 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Follow-ups (owner, 27 Oct):** with email switched off, a customer whose account has no phone can still sign in by email through a small "Signed up with email?" link, and is asked to add a WhatsApp number once inside, so no duplicate accounts. A phone-only customer's data-removal acknowledgements ("we got your request", "it's done") go by one WhatsApp utility template from Saroh's number, **paid by Saroh**, so a legally needed notice never depends on a business's balance.
 - Consequences:
     - The widget's sends cannot be rate-limited by our server alone; its captcha and per-number limits in MSG91's widget settings are the hard stop, and our server limits verification attempts and checks Turnstile before opening the widget.
+
+## DEC-197 WhatsApp is for Saroh's own users only; Saroh sends nothing on a business's behalf for now
+
+**Status: Accepted — 2026-10-27** · owner: "keep whatsapp updates for only our customers, and no need to send on their behalf for now, They can add their own Whatsapp config later, meanwhile we keep all the logic hidden … No need to delete the code"
+
+- Context:
+    - WhatsApp's rules (enforced from January 2024) allow one WhatsApp business account and number to message for **one** business only. DEC-191 and DEC-196 had Saroh's one number send codes to many businesses' customers, which risks the number being restricted, and with it Saroh's own sign-in codes.
+- Decision:
+    - **WhatsApp from Saroh's number is for Saroh's own users only** (business owners and staff): sign-in codes now (MSG91's widget, DEC-196), daily updates later.
+    - **A business's customers get codes by email from Saroh** (unchanged), and **by SMS from Saroh once Saroh's own DLT registration is in place**. No WhatsApp on a business's behalf.
+    - **Later, a business connects its own WhatsApp** through a flow Saroh builds itself (not the MSG91 channel), and its customers' WhatsApp codes and notices go from the business's own number.
+    - **The built logic stays, hidden**: the customer WhatsApp sign-in, the approval flag `CUSTOMER_PHONE_CODES`, the balance holds and the sign-in ways. `VerificationService.sendsForBusinesses` is `false` in code, so no business can be approved and no customer code is sent, whatever the flag or a business's settings say. The data-removal notice by WhatsApp (DEC-196 follow-ups) is not sent.
+- Consequences:
+    - Supersedes DEC-196's "Saroh's built-in sender" for WhatsApp and its "Saroh pays for data-removal notices on WhatsApp"; a phone-only customer's data-removal acknowledgement is skipped and logged, as before, until SMS or the business's own WhatsApp exists.
+    - Email can't be switched off for a business's customers while no other way works (DEC-196's rule), so every site keeps email sign-in.

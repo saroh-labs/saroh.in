@@ -76,6 +76,14 @@ const ledgerKinds = async (organizationId: string) =>
         })
     ).map((e) => e.kind);
 
+// These exercise the hidden paths for sends on a business's behalf (DEC-197).
+beforeAll(() => {
+    VerificationService.sendsForBusinesses = true;
+});
+afterAll(() => {
+    VerificationService.sendsForBusinesses = false;
+});
+
 describe("VerificationSendService.sendCode", () => {
     beforeAll(async () => {
         // Every business here is approved for phone codes (DEC-196) but the
@@ -331,6 +339,17 @@ describe("VerificationSendService.sendCode", () => {
         });
         expect(transport.sends.length).toBe(sends);
         expect(await wallet.get(orgId)).toMatchObject({ heldPaise: PRICE });
+    });
+});
+
+describe("sends on a business's behalf (DEC-197)", () => {
+    it("are off in code even for an approved business", async () => {
+        VerificationService.sendsForBusinesses = false;
+        try {
+            await expect(verification.approved("any-org")).resolves.toBe(false);
+        } finally {
+            VerificationService.sendsForBusinesses = true;
+        }
     });
 });
 

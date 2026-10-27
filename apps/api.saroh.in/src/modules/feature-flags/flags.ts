@@ -289,7 +289,7 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         shownAs: "WhatsApp sign-in codes",
         group: "feature",
         purpose:
-            "Lets a business's customers sign in on its website with a WhatsApp code that Saroh sends and the business's messaging balance pays for. Turn it on per business the owner approves; off, its website offers email codes only, refuses WhatsApp code requests, and the business can't switch sign-in codes on in Messaging. Email codes are never affected.",
+            "Lets a business's customers sign in on its website with a WhatsApp code that Saroh sends and the business's messaging balance pays for. Does nothing for now: Saroh sends no codes on a business's behalf (DEC-197), whatever this says. Later, turn it on per business the owner approves; off, its website offers email codes only, refuses WhatsApp code requests, and the business can't switch sign-in codes on in Messaging. Email codes are never affected.",
         owner: "Release manager",
         reviewBy: "2027-03-31",
         removeWhen:

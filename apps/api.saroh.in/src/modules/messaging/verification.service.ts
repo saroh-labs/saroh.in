@@ -82,6 +82,17 @@ export function indianPhoneE164(raw: string): string {
 
 @Injectable()
 export class VerificationService {
+    /**
+     * Saroh sends NO phone codes on a business's behalf for now (owner,
+     * 27 Oct, DEC-197): WhatsApp's one-business-per-account rule forbids one
+     * Saroh number sending for many businesses. The approval flag, the
+     * balance and every send path stay built, hidden behind this.
+     * shortcut: a code switch, not a setting; flip it (and DEC-197) when
+     * businesses send from their own WhatsApp or Saroh's SMS (DLT) is in.
+     * Specs that exercise the hidden paths set it to true.
+     */
+    static sendsForBusinesses = false;
+
     constructor(
         @Optional()
         private readonly flags: FeatureFlagService = new FeatureFlagService(),
@@ -92,7 +103,8 @@ export class VerificationService {
      * the owner approves each business (`CUSTOMER_PHONE_CODES`) until the
      * full rollout (DEC-196). Every module's switch and send asks it.
      */
-    approved(organizationId: string): Promise<boolean> {
+    async approved(organizationId: string): Promise<boolean> {
+        if (!VerificationService.sendsForBusinesses) return false;
         return this.flags.isEnabled(
             FlagKey.CUSTOMER_PHONE_CODES,
             organizationId,
