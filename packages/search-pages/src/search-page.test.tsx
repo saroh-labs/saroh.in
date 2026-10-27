@@ -167,11 +167,13 @@ describe("styles.css", () => {
             .replace(/\/\*[\s\S]*?\*\//g, "")
             .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "");
         let depth = 0;
+        let lowest = 0;
         for (const ch of css) {
             if (ch === "{") depth++;
             if (ch === "}") depth--;
-            expect(depth).toBeGreaterThanOrEqual(0);
+            lowest = Math.min(lowest, depth);
         }
-        expect(depth).toBe(0);
+        // One assertion, not one per character: CI timed out on 100k.
+        expect({ lowest, end: depth }).toEqual({ lowest: 0, end: 0 });
     });
 });

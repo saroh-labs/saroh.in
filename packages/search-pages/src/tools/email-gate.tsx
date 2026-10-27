@@ -54,7 +54,9 @@ export function ToolGateProvider({
 }
 
 /** An email worth sending: something@something.something (as the QR code maker's). */
-export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Domain labels exclude "." so no two parts can match the same dots
+// (CodeQL js/polynomial-redos).
+export const EMAIL_SHAPE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 export const GATE_WORDS = {
     placeholder: "you@business.in",

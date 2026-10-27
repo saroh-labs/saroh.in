@@ -227,3 +227,15 @@ describe("<ToolsHub>", () => {
         expect(unknownClasses(container)).toEqual([]);
     });
 });
+
+describe("the gate's email shape", () => {
+    it("takes a normal address and refuses broken ones, fast", () => {
+        expect(emailProblem("riya@example.com")).toBeNull();
+        expect(emailProblem("riya@mail.example.co.in")).toBeNull();
+        expect(emailProblem("riya@example")).not.toBeNull();
+        expect(emailProblem("riya@example..com")).not.toBeNull();
+        const t0 = Date.now();
+        expect(emailProblem(`!@!${".!".repeat(20000)}.`)).not.toBeNull();
+        expect(Date.now() - t0).toBeLessThan(500);
+    });
+});
