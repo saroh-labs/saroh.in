@@ -16,8 +16,8 @@ export type SearchPageAction = (typeof SEARCH_PAGE_ACTIONS)[number];
 
 export type SearchPageStatus = "LIVE" | "UNPUBLISHED" | "ARCHIVED" | "DRAFT";
 
-/** `/for/<slug>`; other kinds join this when they get pages. */
-export const SEARCH_PAGE_PATH = /^\/for\/[a-z0-9-]+$/;
+/** `/for/<slug>` (trade pages) or `/tools/<slug>` (free tools, #1253). */
+export const SEARCH_PAGE_PATH = /^\/(for|tools)\/[a-z0-9-]+$/;
 
 /** At most this many paths in one action. */
 export const MAX_PATHS_PER_ACTION = 100;

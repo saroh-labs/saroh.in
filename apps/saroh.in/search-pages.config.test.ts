@@ -4,6 +4,7 @@ import {
     familyOf,
     parseAnswer,
     readPublishList,
+    toolExists,
 } from "./search-pages.config.js";
 
 /** A fetch that answers `body` (or throws `body` when it is an Error). */
@@ -147,6 +148,21 @@ describe("parseAnswer", () => {
             parseAnswer({ live: ["/solutions/salons"], takenOff: [] }),
         ).toThrow();
         expect(() => parseAnswer(null)).toThrow();
+        // Free tools are publish-controlled too (#1253).
+        expect(
+            parseAnswer({ live: ["/tools/qr-code-maker"], takenOff: [] }),
+        ).toEqual({ live: ["/tools/qr-code-maker"], takenOff: [] });
+        expect(() =>
+            parseAnswer({ live: ["/tools/a/b"], takenOff: [] }),
+        ).toThrow();
+    });
+});
+
+describe("toolExists", () => {
+    it("finds a tool's content file, the app's own tools included", () => {
+        expect(toolExists("no-show-cost-calculator")).toBe(true);
+        expect(toolExists("qr-code-maker")).toBe(true);
+        expect(toolExists("no-such-tool")).toBe(false);
     });
 });
 

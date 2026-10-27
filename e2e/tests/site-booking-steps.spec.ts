@@ -247,7 +247,11 @@ test.describe("the booking step in the address", () => {
         const openDays = page.getByRole("radio", { name: /times? free/ });
         await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
         const count = await openDays.count();
-        await openDays.nth(count - (phone ? 5 : 1)).click();
+        // A day no other spec books the walkthrough on (booking-looks takes
+        // the last 3 on desk and 5th–7th from the end on a phone): when two
+        // specs race for one time, the loser's retry goes back through
+        // "when", and Back from pay then lands there, not on details.
+        await openDays.nth(Math.max(0, count - (phone ? 9 : 4))).click();
         const time = timeRadios(page).last();
         await expect(time).toBeVisible({ timeout: 15_000 });
         await time.click();

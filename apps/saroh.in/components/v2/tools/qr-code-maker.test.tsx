@@ -235,7 +235,7 @@ describe("the email gate", () => {
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-        expect(path).toBe("/api/qr-code-maker/unlock");
+        expect(path).toBe("/api/tools/unlock");
         expect(init.method).toBe("POST");
         expect(JSON.parse(init.body as string)).toEqual({
             email: "owner@shop.example.com",

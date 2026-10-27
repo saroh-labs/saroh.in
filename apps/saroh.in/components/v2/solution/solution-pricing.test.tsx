@@ -1,46 +1,45 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { solutions } from "@/content/solutions";
-import { solutionPlanTeasers } from "@/lib/plan-teasers";
+import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
+import { fakeCatalog } from "@/lib/pricing.fixture";
 
 import { SolutionPricing } from "./solution-pricing";
 
 afterEach(cleanup);
 
-/** A currency sign (written as an escape: no sign in the repo) or a digit. */
-const NO_PRICE = new RegExp("\\u20B9|\\d");
-
-/** The Solutions design's pricing block (plan U23), with no catalogue. */
+/** A solution page's Pricing: the Pricing page's own cards (`PricingCards`). */
 describe("SolutionPricing", () => {
-    it("gyms: Grow featured with its fit line, Free second, no price", () => {
+    it("draws every plan the Pricing page draws, then Compare every plan", () => {
+        const model = pricingPageModel(fakeCatalog());
         const { container } = render(
             <SolutionPricing
                 title="Pricing for gyms and studios"
-                plans={solutionPlanTeasers(null, solutions.gyms.pricing)}
-                footnote={null}
+                model={model}
                 src="solutions-gyms-pricing"
             />,
         );
         const cards = Array.from(
             container.querySelectorAll<HTMLElement>("[data-plan]"),
         );
-        expect(cards.map((c) => c.getAttribute("data-plan"))).toEqual([
-            "grow",
-            "free",
-        ]);
-        const grow = within(cards[0]);
-        expect(grow.getByText(solutions.gyms.pricing.fit)).toBeTruthy();
-        expect(grow.getByRole("link").getAttribute("href")).toContain(
-            "plan=grow",
+        expect(cards.map((c) => c.getAttribute("data-plan"))).toEqual(
+            Object.values(model.views)[0]?.plans.map((p) => p.id),
         );
+        expect(cards.length).toBe(3);
         expect(
-            within(cards[1]).queryByText(solutions.gyms.pricing.fit),
-        ).toBeNull();
-        expect(container.textContent).not.toMatch(NO_PRICE);
-        expect(
-            screen.getByRole("link", { name: "Compare every plan" }),
+            screen.getByRole("link", { name: /Compare every plan/ }),
         ).toBeTruthy();
+    });
+
+    it("with no catalogue, the placeholder cards", () => {
+        const { container } = render(
+            <SolutionPricing
+                title="Pricing for gyms and studios"
+                model={placeholderPricingModel()}
+                src="solutions-gyms-pricing"
+            />,
+        );
+        expect(container.querySelectorAll("[data-plan]").length).toBe(3);
     });
 });

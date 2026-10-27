@@ -5,18 +5,16 @@ import { loadSearchPage, SearchPage } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CtaClickArea } from "@/components/v2/cta-click-area";
 import { JsonLd } from "@/components/v2/json-ld";
-import { PlanTeaserGrid } from "@/components/v2/solution/solution-pricing";
+import { PricingCards } from "@/components/v2/pricing/pricing-cards";
 import type { DemoTrade } from "@/content/demos";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { demoHref } from "@/lib/demos";
 import { cta, LAUNCH_MODE } from "@/lib/links";
-import {
-    freePlanLine,
-    homePlanTeasers,
-    planTeaserFootnote,
-} from "@/lib/plan-teasers";
+import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { pricingPageModel } from "@/lib/pricing-view";
 import { builtSearchPages, FOR_HUB, publishList } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
@@ -80,6 +78,7 @@ export default async function ForPage({ params }: Props) {
     const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
     const free = catalog ? freePlanLine(catalog) : null;
 
+    const start = cta({ src: `for-${slug}` });
     return (
         <>
             <JsonLd
@@ -93,29 +92,34 @@ export default async function ForPage({ params }: Props) {
                     ),
                 ]}
             />
-            <SearchPage
-                // No button for a demo that isn't on: the words go too.
-                page={demo ? p : { ...p, demo: undefined }}
-                draft={!isLive(p.path)}
-                links={{
-                    startFree: cta({ src: `for-${slug}` }).href,
-                    demo: demo ?? undefined,
-                    hub: FOR_HUB.path,
-                    page: (s) => (built.has(s) ? `/for/${s}` : undefined),
-                }}
-                freeLine={
-                    free && free !== FREE_PLAN_LINE.fallback ? free : undefined
-                }
-                pricing={
-                    catalog ? (
-                        <PlanTeaserGrid
-                            plans={homePlanTeasers(catalog)}
-                            footnote={planTeaserFootnote(catalog)}
-                            src={`for-${slug}-pricing`}
-                        />
-                    ) : undefined
-                }
-            />
+            <CtaClickArea src={`for-${slug}`} mode={start.mode}>
+                <SearchPage
+                    // No button for a demo that isn't on: the words go too.
+                    page={demo ? p : { ...p, demo: undefined }}
+                    draft={!isLive(p.path)}
+                    links={{
+                        startFree: start.href,
+                        startFreeLabel: start.label,
+                        demo: demo ?? undefined,
+                        hub: FOR_HUB.path,
+                        page: (s) => (built.has(s) ? `/for/${s}` : undefined),
+                    }}
+                    freeLine={
+                        free && free !== FREE_PLAN_LINE.fallback
+                            ? free
+                            : undefined
+                    }
+                    pricing={
+                        catalog ? (
+                            <PricingCards
+                                model={pricingPageModel(catalog)}
+                                src={`for-${slug}-pricing`}
+                                compare
+                            />
+                        ) : undefined
+                    }
+                />
+            </CtaClickArea>
         </>
     );
 }

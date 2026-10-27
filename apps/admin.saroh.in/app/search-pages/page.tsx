@@ -9,17 +9,23 @@ import { RebuildBanner } from "@/components/search-pages/rebuild-banner";
 import { SearchPagesTable } from "@/components/search-pages/search-pages-table";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { rebuildWords } from "@/lib/search-page-words";
+import { kindOf, rebuildWords } from "@/lib/search-page-words";
 import { readSearchPages, searchPagesGate, siteInfo } from "@/lib/search-pages";
 
 export const metadata = { title: "Search pages" };
 
 /**
- * Search pages (DEC-193): every /for/ page in the code, with whether it is
- * live on this console's site. Publishing rebuilds the site; only
- * `search-pages:publish` acts, anyone who reads the console sees it.
+ * Search pages (DEC-193): every /for/ page or free tool (`?kind=tools`,
+ * #1253) in the code, with whether it is live on this console's site.
+ * Publishing rebuilds the site; only `search-pages:publish` acts, anyone
+ * who reads the console sees it.
  */
-export default async function SearchPagesPage() {
+export default async function SearchPagesPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ kind?: string }>;
+}) {
+    const kind = kindOf((await searchParams).kind);
     const gate = await searchPagesGate();
     if (!gate.ok) return gate.screen;
     const { staff } = gate;
@@ -35,7 +41,7 @@ export default async function SearchPagesPage() {
                 <PageHeader
                     breadcrumb={["Product", "Search pages"]}
                     title="Search pages"
-                    description={`Pages written for people who search Google for software for their trade. A page is on ${site.host} only after you publish it here. Only published pages go in the sitemap.${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
+                    description={`Pages written for people who search Google: software for their trade, or a free tool. A page is on ${site.host} only after you publish it here. Only published pages go in the sitemap.${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
                     meta={
                         <Badge
                             dot
@@ -74,7 +80,17 @@ export default async function SearchPagesPage() {
                                 }
                             />
                             <SearchPagesTable
-                                rows={data.rows}
+                                key={kind}
+                                kind={kind}
+                                kindCounts={{
+                                    for: data.rows.filter(
+                                        (r) => r.kind === "for",
+                                    ).length,
+                                    tools: data.rows.filter(
+                                        (r) => r.kind === "tools",
+                                    ).length,
+                                }}
+                                rows={data.rows.filter((r) => r.kind === kind)}
                                 site={site.host}
                                 reviewSite={site.reviewHost}
                                 reviewUrl={site.reviewUrl}

@@ -3,8 +3,8 @@ import { Segmented } from "@saroh/ui/segmented";
 
 import { Panel } from "@/components/panel";
 import { PreviewFrame } from "@/components/search-pages/preview-frame";
-import { wordBlocks } from "@/lib/search-page-content";
-import { searchPageForTab } from "@/lib/search-pages";
+import { toolWordBlocks, wordBlocks } from "@/lib/search-page-content";
+import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
 type View = "desk" | "phone" | "words";
 
@@ -14,7 +14,9 @@ export async function generateMetadata({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    return { title: `/for/${slug} · Content · Search pages` };
+    return {
+        title: `${loadPage(slug)?.page.path ?? slug} · Content · Search pages`,
+    };
 }
 
 /**
@@ -31,10 +33,22 @@ export default async function SearchPageContent({
 }) {
     const { slug } = await params;
     const { view: asked } = await searchParams;
-    const view: View = asked === "phone" || asked === "words" ? asked : "desk";
     const data = await searchPageForTab(slug);
     if (!data) return null;
-    const { page, site } = data;
+    const { site, row } = data;
+    const page = data.page.page;
+    // A tool with its own page in saroh.in has no preview here (#1253).
+    const inApp = row.inApp;
+    const view: View =
+        inApp || asked === "words"
+            ? "words"
+            : asked === "phone"
+              ? "phone"
+              : "desk";
+    const blocks =
+        data.page.kind === "tools"
+            ? toolWordBlocks(data.page.page)
+            : wordBlocks(data.page.page);
     const base = `/search-pages/${slug}/content`;
     const caption = `${site.host}${page.path} · preview, not public`;
 
@@ -42,27 +56,47 @@ export default async function SearchPageContent({
         <div className="grid gap-4">
             <div className="flex flex-wrap items-center gap-3 rounded-[11px] border bg-card px-4 py-3">
                 <p className="flex-[1_1_360px] text-sm text-muted-foreground">
-                    The page as it will look on {site.host}, drawn from the code
-                    this console runs.
+                    {inApp ? (
+                        <>
+                            This tool has its own page in saroh.in, so it
+                            can&apos;t be drawn here. Its words from the code
+                            are below.{" "}
+                            <a
+                                href={`${site.reviewUrl}${page.path}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-foreground underline underline-offset-2"
+                            >
+                                Read on {site.reviewHost} ↗
+                            </a>
+                        </>
+                    ) : (
+                        <>
+                            The page as it will look on {site.host}, drawn from
+                            the code this console runs.
+                        </>
+                    )}
                 </p>
-                <Segmented<View>
-                    label="View"
-                    size="sm"
-                    value={view}
-                    options={[
-                        { value: "desk", label: "Desk", href: base },
-                        {
-                            value: "phone",
-                            label: "Phone",
-                            href: `${base}?view=phone`,
-                        },
-                        {
-                            value: "words",
-                            label: "Words only",
-                            href: `${base}?view=words`,
-                        },
-                    ]}
-                />
+                {!inApp && (
+                    <Segmented<View>
+                        label="View"
+                        size="sm"
+                        value={view}
+                        options={[
+                            { value: "desk", label: "Desk", href: base },
+                            {
+                                value: "phone",
+                                label: "Phone",
+                                href: `${base}?view=phone`,
+                            },
+                            {
+                                value: "words",
+                                label: "Words only",
+                                href: `${base}?view=words`,
+                            },
+                        ]}
+                    />
+                )}
             </div>
 
             {view === "desk" && (
@@ -84,7 +118,7 @@ export default async function SearchPageContent({
                 </div>
             )}
             {view === "words" &&
-                wordBlocks(page).map((block) => (
+                blocks.map((block) => (
                     <Panel key={block.label} title={block.label}>
                         {() => (
                             <dl className="grid">

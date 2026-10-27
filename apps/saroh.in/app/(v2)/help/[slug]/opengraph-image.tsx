@@ -1,5 +1,5 @@
-import { helpArticles } from "@/lib/help-docs";
 import { OG_CONTENT_TYPE, OG_SIZE, ogCard } from "@/lib/og-card";
+import { HELP_CARDS } from "@/lib/og-cards.gen";
 
 /** Each Help article's share card: "Help · Products" and its title. */
 export const size = OG_SIZE;
@@ -11,7 +11,7 @@ export async function generateImageMetadata({
     params: { slug: string } | Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const article = helpArticles().find((a) => a.slug === slug);
+    const article = HELP_CARDS[slug];
     return [
         {
             id: "card",
@@ -28,7 +28,7 @@ export default async function Image({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const article = helpArticles().find((a) => a.slug === slug);
+    const article = HELP_CARDS[slug];
     if (!article) return ogCard({ eyebrow: "Help", title: "Saroh" });
     return ogCard({ eyebrow: `Help · ${article.area}`, title: article.title });
 }

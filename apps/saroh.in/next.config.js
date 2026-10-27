@@ -4,7 +4,11 @@ const {
     launched,
     searchRedirects,
 } = require("./redirects");
-const { familyOf, loadPublishList } = require("./search-pages.config");
+const {
+    familyOf,
+    loadPublishList,
+    toolExists,
+} = require("./search-pages.config");
 const { builtRoutes } = require("./routes.config");
 
 // A production deployment without API_URL drops every waitlist join, and
@@ -36,7 +40,7 @@ if (missing.length > 0) {
     );
 }
 
-// Which /for/ pages are live, as `search-pages.config.js` read them just
+// Which /for/ pages and free tools are live, as `search-pages.config.js` read them just
 // before this build (null under `next dev` or a test: nothing live).
 const searchPages = loadPublishList();
 
@@ -109,7 +113,7 @@ const nextConfig = {
     async redirects() {
         return [
             ...REDIRECTS,
-            ...searchRedirects(searchPages, familyOf),
+            ...searchRedirects(searchPages, familyOf, toolExists),
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
             ...launched(
                 process.env.NEXT_PUBLIC_LAUNCH_MODE,

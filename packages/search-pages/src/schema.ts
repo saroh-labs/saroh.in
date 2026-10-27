@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { ToolGroup } from "./tool-schema";
+
 /**
  * A /for/ page's frontmatter (`content/for/<slug>.mdx`): its words at the
  * top, the sample business its drawings show under `scene`. The questions
@@ -291,16 +293,35 @@ export interface SearchPageData extends Frontmatter {
     questions: Question[];
 }
 
-/** One row of `listSearchPages()`: what the site's lists, sitemap and the admin need. */
-export interface SearchPageEntry {
-    path: `/for/${string}`;
+/** What every row of `listSearchPages()` has, whatever its kind. */
+interface EntryBase {
     slug: string;
-    kind: "for";
     name: string;
-    family: Family;
-    familySlug: string;
     search: string;
     title: string;
     description: string;
     updated: string;
 }
+
+/** A /for/ row of `listSearchPages()`: what the site's lists, sitemap and the admin need. */
+export interface ForPageEntry extends EntryBase {
+    path: `/for/${string}`;
+    kind: "for";
+    family: Family;
+    familySlug: string;
+}
+
+/** A /tools/ row of `listSearchPages()` (#1253). */
+export interface ToolPageEntry extends EntryBase {
+    path: `/tools/${string}`;
+    kind: "tools";
+    group: ToolGroup;
+    /** The hub card's and the menus' line. */
+    line: string;
+    /** It has its own page in apps/saroh.in, not a component in this package. */
+    inApp: boolean;
+}
+
+/** One row of the manifest: every page in the code, of either kind. */
+export type SearchPageEntry = ForPageEntry | ToolPageEntry;
+export type SearchPageKind = SearchPageEntry["kind"];

@@ -17,13 +17,9 @@ import { home } from "@/content/home";
 import { solutionList } from "@/content/solutions";
 import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
-import {
-    faqWithPlans,
-    freePlanLine,
-    homePlanTeasers,
-    planTeaserFootnote,
-} from "@/lib/plan-teasers";
+import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { solutionLink } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import {
@@ -143,8 +139,11 @@ export default async function HomePage() {
                 a plan or links to it. */}
             {LAUNCH_MODE === "open" ? (
                 <HomePricing
-                    plans={homePlanTeasers(catalog)}
-                    footnote={planTeaserFootnote(catalog)}
+                    model={
+                        catalog
+                            ? pricingPageModel(catalog)
+                            : placeholderPricingModel()
+                    }
                 />
             ) : null}
 

@@ -138,30 +138,38 @@ const FAMILY_PAGE = {
  *
  * - `/solutions/<x>` → 301 `/for/<x>` once `/for/<x>` is live; until then
  *   the solution page keeps serving.
- * - A page taken off → 302 (it may come back) to its family page when that
- *   is live, else Home. Not in a preview build, which still builds it as a
- *   draft.
+ * - A /for/ page taken off → 302 (it may come back) to its family page
+ *   when that is live, else Home.
+ * - A free tool taken off (#1253) → 302 to the /tools hub while any tool
+ *   is live, else Home.
  *
- * Only pages in this commit's code count as live (`familyOf` finds their
- * file), so nothing lands on a page the build doesn't have, and every
- * destination is live or Home: never another rule's source.
+ * Taken-off rules are not made in a preview build, which still builds
+ * those pages as drafts. Only pages in this commit's code count as live
+ * (`familyOf` finds a /for/ page's file, `toolExists` a tool's), so
+ * nothing lands on a page the build doesn't have, and every destination is
+ * live or Home: never another rule's source.
  *
  * @param {{ preview: boolean; live: string[]; takenOff: { path: string }[] } | null} list
  * @param {(slug: string) => string | null} familyOf
+ * @param {(slug: string) => boolean} [toolExists]
  * @returns {Redirect[]}
  */
-const searchRedirects = (list, familyOf) => {
+const searchRedirects = (list, familyOf, toolExists = () => false) => {
     if (!list) return [];
-    const slugOf = (/** @type {string} */ p) => p.slice("/for/".length);
+    const FOR = "/for/";
+    const TOOLS = "/tools/";
+    const slugOf = (/** @type {string} */ p) => p.slice(FOR.length);
     const live = new Set(
-        list.live.filter((p) => familyOf(slugOf(p)) !== null).map(slugOf),
+        list.live
+            .filter((p) => p.startsWith(FOR) && familyOf(slugOf(p)) !== null)
+            .map(slugOf),
     );
     const solutions = SOLUTION_SLUGS.filter((s) => live.has(s)).map((s) =>
         moved(`/solutions/${s}`, `/for/${s}`),
     );
     if (list.preview) return solutions;
     const takenOff = list.takenOff
-        .filter((t) => !live.has(slugOf(t.path)))
+        .filter((t) => t.path.startsWith(FOR) && !live.has(slugOf(t.path)))
         .map((t) => {
             const page = FAMILY_PAGE[familyOf(slugOf(t.path)) ?? ""];
             return {
@@ -170,7 +178,18 @@ const searchRedirects = (list, familyOf) => {
                 statusCode: /** @type {const} */ (302),
             };
         });
-    return [...solutions, ...takenOff];
+    const toolSlug = (/** @type {string} */ p) => p.slice(TOOLS.length);
+    const liveTools = list.live.filter(
+        (p) => p.startsWith(TOOLS) && toolExists(toolSlug(p)),
+    );
+    const toolsOff = list.takenOff
+        .filter((t) => t.path.startsWith(TOOLS) && !list.live.includes(t.path))
+        .map((t) => ({
+            source: t.path,
+            destination: liveTools.length > 0 ? "/tools" : "/",
+            statusCode: /** @type {const} */ (302),
+        }));
+    return [...solutions, ...takenOff, ...toolsOff];
 };
 
 module.exports = {

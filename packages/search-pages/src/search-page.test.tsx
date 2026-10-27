@@ -124,7 +124,7 @@ describe("<SearchPage>", () => {
 
 describe("<ForHub>", () => {
     it("lists every page under its family", () => {
-        render(<ForHub pages={listSearchPages()} />);
+        render(<ForHub pages={listSearchPages({ kind: "for" })} />);
         const beauty = screen
             .getByRole("heading", { name: "Beauty" })
             .closest("section");
@@ -157,4 +157,23 @@ describe("class names", () => {
             expect([...unknown]).toEqual([]);
         },
     );
+});
+
+// A hand-merged stylesheet once lost a closing brace and failed the site's
+// build, though every test here passed (26 Oct): it must still parse.
+describe("styles.css", () => {
+    it("closes every block it opens", () => {
+        const css = readFileSync(join(__dirname, "styles.css"), "utf8")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "");
+        let depth = 0;
+        let lowest = 0;
+        for (const ch of css) {
+            if (ch === "{") depth++;
+            if (ch === "}") depth--;
+            lowest = Math.min(lowest, depth);
+        }
+        // One assertion, not one per character: CI timed out on 100k.
+        expect({ lowest, end: depth }).toEqual({ lowest: 0, end: 0 });
+    });
 });

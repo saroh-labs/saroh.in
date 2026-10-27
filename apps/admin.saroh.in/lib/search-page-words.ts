@@ -49,11 +49,17 @@ export type RowState =
     | "unpublished"
     | "archived";
 
+export type PageKind = "for" | "tools";
+
 export interface PageRow {
     path: string;
     slug: string;
+    kind: PageKind;
     name: string;
+    /** A /for/ page's family, or a tool's section on the /tools hub. */
     family: string;
+    /** A tool with its own page in saroh.in (no preview here). */
+    inApp: boolean;
     search: string;
     updated: string;
     state: RowState;
@@ -127,8 +133,10 @@ export function mergePages(
         return {
             path: entry.path,
             slug: entry.slug,
+            kind: entry.kind,
             name: entry.name,
-            family: entry.family,
+            family: entry.kind === "for" ? entry.family : entry.group,
+            inApp: entry.kind === "tools" && entry.inApp,
             search: entry.search,
             updated: entry.updated,
             record,
@@ -298,7 +306,24 @@ export interface DialogPage {
     slug: string;
     family: string;
     state: RowState;
+    /** Free tools (#1253) go to the /tools list, and back to it when taken off. */
+    kind?: PageKind;
 }
+
+/** The kinds the list chooses between (`?kind=`), with their words. */
+export const KINDS: { kind: PageKind; label: string; path: string }[] = [
+    { kind: "for", label: "Trade pages", path: "/for/" },
+    { kind: "tools", label: "Free tools", path: "/tools/" },
+];
+
+export const kindOf = (asked: string | undefined): PageKind =>
+    asked === "tools" ? "tools" : "for";
+
+/** Where a page of this kind is listed on the site. */
+const LIST_WORDS: Record<PageKind, string> = {
+    for: "the /for/ list and the footer",
+    tools: "the /tools list, the Tools menu and the footer",
+};
 
 export interface DialogWords {
     title: string;
@@ -326,6 +351,8 @@ export function dialogWords(
     const what = one && first ? first.name : `${n} pages`;
     const these = one ? "this page" : "these pages";
     const count = one ? "page" : `${n} pages`;
+    const tools = pages.length > 0 && pages.every((p) => p.kind === "tools");
+    const listed = LIST_WORDS[tools ? "tools" : "for"];
     switch (action) {
         case "publish":
             return {
@@ -333,7 +360,7 @@ export function dialogWords(
                 confirm: `Publish ${count}`,
                 points: [
                     `${site} rebuilds with ${these}. It takes a few minutes.`,
-                    `${one ? "It goes" : "They go"} into the sitemap, the /for/ list and the footer, so Google can find ${one ? "it" : "them"}.`,
+                    `${one ? "It goes" : "They go"} into the sitemap, ${listed}, so Google can find ${one ? "it" : "them"}.`,
                     checks > 0
                         ? `${checks === 1 ? "One check needs" : `${checks} checks need`} you: see "Checked before you publish".`
                         : "Later changes to the words go out with each release. You don't publish again.",
@@ -343,15 +370,19 @@ export function dialogWords(
             };
         case "unpublish": {
             const to =
-                one && first ? familyPage(first.family, first.slug) : null;
+                one && first && !tools
+                    ? familyPage(first.family, first.slug)
+                    : null;
             return {
                 title: `Take ${what} off ${site}?`,
                 confirm: `Unpublish ${count}`,
                 points: [
-                    `${site} rebuilds without ${one ? "it" : "them"}, and ${one ? "it leaves" : "they leave"} the sitemap and the /for/ list.`,
-                    one
-                        ? `Anyone opening the old link is sent to ${to ? `${to} (or Home while that isn't live)` : "Home"}, not an error.`
-                        : "Anyone opening an old link is sent to its family page (Beauty, Health…), not an error.",
+                    `${site} rebuilds without ${one ? "it" : "them"}, and ${one ? "it leaves" : "they leave"} the sitemap and ${tools ? "the /tools list" : "the /for/ list"}.`,
+                    tools
+                        ? `Anyone opening ${one ? "the old link" : "an old link"} is sent to /tools (or Home while no tool is live), not an error.`
+                        : one
+                          ? `Anyone opening the old link is sent to ${to ? `${to} (or Home while that isn't live)` : "Home"}, not an error.`
+                          : "Anyone opening an old link is sent to its family page (Beauty, Health…), not an error.",
                     `Google drops ${one ? "it" : "them"} over the next few weeks. You can publish ${one ? "it" : "them"} again any time.`,
                 ],
                 tick: null,
@@ -452,6 +483,7 @@ export function rebuildWords(rows: readonly PageRow[]): string {
 export function whereItShows(
     state: RowState,
     site: string,
+    kind: PageKind = "for",
 ): { label: string; on: boolean; value: string }[] {
     const live = isLive(state);
     return [
@@ -466,7 +498,10 @@ export function whereItShows(
         },
         { label: "Sitemap", on: live, value: live ? "Listed" : "Not listed" },
         {
-            label: "The /for/ list and the footer",
+            label:
+                kind === "tools"
+                    ? "The /tools list, the menu and the footer"
+                    : "The /for/ list and the footer",
             on: live,
             value: live ? "Linked" : "Not linked",
         },
@@ -490,6 +525,14 @@ export function historyWords(
     event: SearchPageEvent,
     site: string,
 ): { when: string; what: string; detail: string } {
+    // The two app tools' records, made by a migration (#1253).
+    if (event.action === "seeded") {
+        return {
+            when: formatDateTime(event.at),
+            what: "Live before publish control",
+            detail: `It was on ${site} before pages were published from here, so it started live.`,
+        };
+    }
     const who =
         event.by?.name ?? (event.by ? "someone" : "a former staff member");
     const verb =

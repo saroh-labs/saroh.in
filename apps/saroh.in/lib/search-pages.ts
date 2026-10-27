@@ -1,12 +1,14 @@
-import type { SearchPageEntry } from "@saroh/search-pages";
+import type { ForPageEntry, ToolPageEntry } from "@saroh/search-pages";
 import { listSearchPages } from "@saroh/search-pages";
 
+import type { PublishContext } from "@/content/resources";
+import { routeExists, shownTools } from "@/content/resources";
 import { solutionHref } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 import { env } from "@/env";
 
 /**
- * The /for/ pages this build has (DEC-193). `search-pages.config.js` reads
+ * The /for/ pages and free tools this build has (DEC-193, #1253). `search-pages.config.js` reads
  * `GET /public/search-pages` before `next build` and `next.config.js`
  * inlines it as `SAROH_SEARCH_PAGES`; this module is what every page,
  * the sitemap, `/llms.txt`, the menus and the footer ask. Server only.
@@ -56,20 +58,43 @@ export function publishList(): PublishList {
     return parsePublishList(env.SAROH_SEARCH_PAGES, env.VERCEL_ENV);
 }
 
-/** The pages this build draws: every page on a preview, the live ones otherwise. */
+/** The /for/ pages this build draws: every page on a preview, the live ones otherwise. */
 export function builtSearchPages(
     list: PublishList = publishList(),
-): SearchPageEntry[] {
+): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages().filter((p) => list.preview || live.has(p.path));
+    return listSearchPages({ kind: "for" }).filter(
+        (p) => list.preview || live.has(p.path),
+    );
 }
 
-/** The live pages in the code: the sitemap's, `/llms.txt`'s and the hub's on production. */
+/** The live /for/ pages in the code: the sitemap's, `/llms.txt`'s and the hub's on production. */
 export function liveSearchPages(
     list: PublishList = publishList(),
-): SearchPageEntry[] {
+): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages().filter((p) => live.has(p.path));
+    return listSearchPages({ kind: "for" }).filter((p) => live.has(p.path));
+}
+
+/** The /tools hub: the menus' "Free tools" and every tool's breadcrumb. */
+export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
+
+/**
+ * The free tools this build has (#1253): every tool on a preview, the live
+ * ones otherwise; the two app tools (`inApp`) included, whose own routes
+ * obey the same list (`content/resources.ts`).
+ */
+export function builtTools(list: PublishList = publishList()): ToolPageEntry[] {
+    const live = new Set(list.live);
+    return listSearchPages({ kind: "tools" }).filter(
+        (p) => list.preview || live.has(p.path),
+    );
+}
+
+/** The live tools in the code: the menus', the sitemap's and `/llms.txt`'s. */
+export function liveTools(list: PublishList = publishList()): ToolPageEntry[] {
+    const live = new Set(list.live);
+    return listSearchPages({ kind: "tools" }).filter((p) => live.has(p.path));
 }
 
 /**
@@ -84,4 +109,33 @@ export function solutionLink(
     return liveSearchPages(list).some((p) => p.path === page)
         ? page
         : solutionHref(slug);
+}
+
+/** A tool as the menus, the footer and `/llms.txt` list it. */
+export interface ToolLink {
+    name: string;
+    line: string;
+    href: string;
+}
+
+/**
+ * The Tools menu, the footer's Tools column and `/llms.txt`'s Tools
+ * (#1253): the app's own tools shown at `ctx` (`content/resources.ts`,
+ * which asks the publish list), then the package's live tools whose route
+ * this build has. A draft tool is never listed, on a preview either.
+ */
+export function shownToolLinks(
+    ctx: PublishContext,
+    list: PublishList = publishList(),
+): ToolLink[] {
+    return [
+        ...shownTools(ctx).map((p) => ({
+            name: p.name,
+            line: p.line,
+            href: p.href,
+        })),
+        ...liveTools(list)
+            .filter((t) => !t.inApp && routeExists(t.path, ctx.routes))
+            .map((t) => ({ name: t.name, line: t.line, href: t.path })),
+    ];
 }

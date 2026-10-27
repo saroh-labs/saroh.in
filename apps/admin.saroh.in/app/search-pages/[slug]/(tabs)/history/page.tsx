@@ -1,7 +1,11 @@
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { historyWords } from "@/lib/search-page-words";
-import { readSearchPageHistory, searchPageForTab } from "@/lib/search-pages";
+import {
+    loadPage,
+    readSearchPageHistory,
+    searchPageForTab,
+} from "@/lib/search-pages";
 
 export async function generateMetadata({
     params,
@@ -9,7 +13,9 @@ export async function generateMetadata({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    return { title: `/for/${slug} · History · Search pages` };
+    return {
+        title: `${loadPage(slug)?.page.path ?? slug} · History · Search pages`,
+    };
 }
 
 /** Every publish, unpublish, archive and restore of the page, newest first. */

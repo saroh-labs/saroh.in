@@ -349,6 +349,10 @@ real and the Orders tile is back, #867 and #919 — see IN13.)
 `content/solutions.ts`, `app/(v2)/solutions/[slug]`. Segment rows that
 repeat a feature claim point to it.
 
+The pricing "fit" lines (SO6, SO11, SO17 and the salons one) are no longer
+shown: since 27 Oct every page draws the Pricing page's own plan cards
+(`components/v2/pricing/pricing-cards.tsx`), with no per-trade line.
+
 | ID   | Claim · page                                                                                                                                                                  | Backed by                                             | Status | What's missing                                                                                           | Proposed copy                                                                                                |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | SO1  | Shops headline: "Sell at the counter and online, from one place."                                                                                                             | `new-order.ts`, `public-checkout.service.ts`          | Partly | Online waits for `SITE_SHOP`                                                                             | Keep once the shop ships; until then lead with the counter, orders and stock                                 |
@@ -461,7 +465,7 @@ Product facts only; which plan names which is kept outside the repo.
 ## 6b. QR code maker (`/tools/qr-code-maker`)
 
 `content/qr-code-maker.ts`, `components/v2/tools/qr-code-maker.tsx`,
-`qr-maker-gate.tsx`, `qr-download.ts`, `app/api/qr-code-maker/unlock/route.ts`,
+`qr-maker-gate.tsx`, `qr-download.ts`, `app/api/tools/unlock/route.ts`,
 `tools/` (API). QR codes plan U9; design "Saroh QR Codes", screen 02, read
 10 Oct 2026. Published 17 Oct (`content/resources.ts`). The page names no
 plan and no price (`lib/qr-code-maker.test.ts`).
@@ -476,6 +480,24 @@ plan and no price (`lib/qr-code-maker.test.ts`).
 | QR6 | Privacy (the page links it): the email is kept "12 months after you last used it"                                                                                                                       | `waitlist-retention.handler.ts` `sweepLinkReports`: a `qr-maker` entry goes 12 months after its last use (`checkedAt`); an address already on the waitlist is left as it was                                                                                                                                                             | Backed                         | The Privacy line is a minimal addition awaiting the owner's own wording (`content/privacy.ts`)                                                | —                                                                                                                                                                                                                                                        |
 | QR7 | Band: "Give your code a page to open" · "Saroh puts your site, bookings, orders and GST invoices in one place. Point your code at your Saroh page and people can book from it."                         | H3 (`sites/`, `bookings/`, `orders/`, `invoices/gst.ts`); a published site's booking page (`saroh.app/app/[domain]/book`, BK rows). The code is the visitor's own link, so pointing it at a Saroh page is theirs to do                                                                                                                   | Backed                         | Booking online needs the Bookings module on. The start button's words and address are `cta()`'s (waitlist until the launch switch opens)      | —                                                                                                                                                                                                                                                        |
 | QR8 | Design's band, NOT on the site: "A printed QR you can change later" · "In Saroh, each code … counts its scans and bookings, and can point somewhere new without reprinting. Early access opens 17 Oct." | Not on `development`: QR codes inside Saroh are being built on a local branch (QR codes plan U2–U8), unreleased (CN2). No scan count, no redirect a merchant can re-point                                                                                                                                                                | Not backed (kept off the page) | Everything. When in-app QR codes are released this row and QR7 are rewritten together, with CN2                                               | Replaced by QR7, which claims nothing about QR codes inside Saroh. The date is dropped: the button knows the launch mode                                                                                                                                 |
+
+## 6c. Free tools in `@saroh/search-pages` (`/tools/<slug>`, #1253)
+
+The WhatsApp, policy and print tools (`packages/search-pages/content/tools/*.mdx`,
+`src/tools/<slug>/`). Each is browser-only: nothing typed leaves the page
+but the gate's email (QR5's gate, shared). The policy generators say they
+aren't legal advice beside the text. Only the closing bands claim Saroh
+features. Added 26 Oct 2026.
+
+| ID  | Claim                                                                                                                                                                 | Backed by                   | Status | Note                                                                                               |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| TL1 | WhatsApp link generator: "A Saroh booking page shows only free times, so nobody has to ask."                                                                          | BK2                         | Backed | —                                                                                                  |
+| TL2 | WhatsApp message templates: "…and each customer's bookings sit on their own page."                                                                                    | BK2, CU1                    | Backed | The templates are sent by the owner from their own WhatsApp; Saroh sends no WhatsApp               |
+| TL3 | Refund policy generator: "Add it as a page on your Saroh website, beside your services and booking page."                                                             | W1 (text typed into a page) | Backed | Products show on the site only once the shop ships (PR6)                                           |
+| TL4 | Cancellation policy generator: "Saroh's booking page can take a deposit when you have online payments set up, and each customer's page shows the visits they missed." | BK8, BK10                   | Backed | Deposits need Payments and a provider. Design's "refunds cancels made in time on its own" not used |
+| TL5 | Salon rate card maker: "…the same services and prices go on your booking page, which shows only real free times from your team's hours."                              | BK2, W1                     | Backed | Design's "a reminder before each visit" not used: no booking reminder exists (BK2)                 |
+| TL6 | Gift voucher maker: "Saroh keeps every customer and their bookings in one place."                                                                                     | CU1                         | Backed | Vouchers themselves aren't in Saroh: the tool says the code is checked in your own register        |
+| TL7 | Loyalty stamp card maker: "Each customer's page in Saroh shows their bookings and orders…"                                                                            | CU1                         | Backed | An order reaches a customer's page once linked (CU1)                                               |
 
 ## 7. Wording-rule fixes (claim true, words off)
 

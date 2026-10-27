@@ -15,19 +15,26 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { ListToolbar } from "@saroh/ui/list-toolbar";
+import { Segmented } from "@saroh/ui/segmented";
 import { MoreHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { formatDate } from "@/lib/format";
-import type { Filter, PageAction, PageRow } from "@/lib/search-page-words";
+import type {
+    Filter,
+    PageAction,
+    PageKind,
+    PageRow,
+} from "@/lib/search-page-words";
 import {
     countBy,
     eligible,
     FILTER_LABEL,
     inFilter,
     isLive,
+    KINDS,
     matchesQuery,
     rowActions,
     statCards,
@@ -56,12 +63,18 @@ interface Opened {
  * actions; each opens one confirm. Anyone else reads.
  */
 export function SearchPagesTable({
+    kind = "for",
+    kindCounts,
     rows,
     site,
     reviewSite,
     reviewUrl,
     canPublish,
 }: {
+    /** Which kind the rows are (`?kind=`): trade pages or free tools. */
+    kind?: PageKind;
+    /** How many pages of each kind, for the Kind choice; none hides it. */
+    kindCounts?: Record<PageKind, number>;
     rows: PageRow[];
     site: string;
     reviewSite: string;
@@ -156,9 +169,23 @@ export function SearchPagesTable({
                                 </span>
                             </Chip>
                         ))}
-                        <span className="text-[13px] text-muted-foreground md:ml-auto">
-                            Kind: Trade pages · /for/ · {rows.length}
-                        </span>
+                        {kindCounts && (
+                            <span className="md:ml-auto">
+                                <Segmented<PageKind>
+                                    label="Kind"
+                                    size="sm"
+                                    value={kind}
+                                    options={KINDS.map((k) => ({
+                                        value: k.kind,
+                                        label: `${k.label} · ${k.path} · ${kindCounts[k.kind]}`,
+                                        href:
+                                            k.kind === "for"
+                                                ? "/search-pages"
+                                                : "/search-pages?kind=tools",
+                                    }))}
+                                />
+                            </span>
+                        )}
                     </div>
                 }
                 onClear={filter !== "all" || query ? clear : undefined}
@@ -206,7 +233,7 @@ export function SearchPagesTable({
                         </span>
                         <span>Page</span>
                         <span>Target search</span>
-                        <span>Family</span>
+                        <span>{kind === "tools" ? "Section" : "Family"}</span>
                         <span>Status</span>
                         <span>Content changed</span>
                         <span className="sr-only">Actions</span>

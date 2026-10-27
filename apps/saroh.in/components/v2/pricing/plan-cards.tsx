@@ -11,11 +11,18 @@ import { CtaLink } from "../cta-link";
  * `lib/pricing-view.ts`; the button's label and address from the one CTA
  * builder (KTD-16).
  */
-export function PlanCards({ plans }: { plans: PlanCardView[] }) {
+export function PlanCards({
+    plans,
+    src = "pricing-plans",
+}: {
+    plans: PlanCardView[];
+    /** Where a sign-up came from (`?src=`): the pricing page, or a /for/ page. */
+    src?: string;
+}) {
     return (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] items-stretch gap-4">
             {plans.map((p) => (
-                <PlanCard key={p.id} plan={p} />
+                <PlanCard key={p.id} plan={p} src={src} />
             ))}
         </div>
     );
@@ -28,7 +35,7 @@ function Changed() {
     return <span className="sr-only"> (changed)</span>;
 }
 
-function PlanCard({ plan: p }: { plan: PlanCardView }) {
+function PlanCard({ plan: p, src }: { plan: PlanCardView; src: string }) {
     const f = p.featured;
     const muted = f ? "text-mk-on-ink-muted" : "text-muted-foreground";
     const ch = p.changed;
@@ -77,7 +84,7 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
                 <span className={cn("text-mk-note", muted)}>{p.sub}</span>
             </div>
             <CtaLink
-                src="pricing-plans"
+                src={src}
                 plan={p.cta.plan}
                 planName={p.cta.planName}
                 paid={p.cta.paid}

@@ -5,7 +5,7 @@
 # `public-headers.test.ts` reads this file.
 
 # The same four next.config sends with every page (SECURITY_HEADERS). This
-# site is public: never an X-Robots-Tag here.
+# site is public: never an X-Robots-Tag on it, but for /_build/ below.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Frame-Options: SAMEORIGIN
@@ -23,3 +23,8 @@
 # the new one.
 /shots/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# What the last production build read from the API (build-state.config.js): the
+# next build's fallback when the API is down. Data, not a page.
+/_build/*
+  X-Robots-Tag: noindex

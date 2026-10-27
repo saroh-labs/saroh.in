@@ -5989,8 +5989,33 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
 - **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
 
+## A hand-merged stylesheet broke the site build while every test passed (26 Oct 2026)
+
+- **Symptom:** saroh.in's build failed "CssSyntaxError … Unclosed block" in `packages/search-pages/src/styles.css` after four tool branches were merged; the package's 475 tests were green.
+- **Cause:** each branch appended its own CSS; resolving the conflicts by keeping "both sides" of each hunk dropped a closing brace the hunks shared. No test loads the stylesheet.
+- **Fix:** rebuilt the file as the base plus each branch's appended part; `search-page.test.tsx` now fails when the stylesheet's blocks don't close. When several branches append to one file, rebuild it from base + each branch's suffix rather than hand-resolving hunks.
+
 ## CodeQL flagged regexes in build-time content checks (26 Oct 2026)
 
 - **Symptom:** PR #1252's CodeQL check failed with four warnings in `packages/search-pages`: polynomial ReDoS on `<[^>]+>`, `[\w.-]+@[\w.-]+` and an unanchored `[^?.]*[?.]`, and double unescaping (`&amp;` replaced before `&lt;`). `pnpm prepush --all` had passed; it doesn't run CodeQL.
 - **Fix:** `[^<>]*` in the tag match, email words found by splitting on spaces first (`emailsIn`), `indexOf` for the first sentence, `&amp;` unescaped last; tests pin each.
 - **Rule:** in any matcher run on text, never put an unbounded class that can match the next token's first character in front of it (`[\w.-]+@`, `<[^>]+>`), and never unescape `&amp;` before the other entities.
+
+## An API outage blocked every website deploy (26 Oct 2026)
+
+- **Symptom:** a production build of saroh.in reads the /for/ publish list (DEC-193) and the published pricing from the API, and fails when it can't, after a minute of retries. So with the API down, no saroh.in deploy could go out, not even an urgent fix unrelated to either list.
+- **Fix:** every production build writes what it read to `public/_build/state.json` (served at `https://www.saroh.in/_build/state.json`, robots-disallowed, `noindex`). When the API can't be read, the prebuild (`search-pages.config.js`, `build-state.config.js`) fetches the live site's copy once, validates it with the same checks, builds from it for both lists and prints a `::warning` annotation with when that snapshot was built. Pricing is read once, in the prebuild, and `lib/pricing.ts` reads it back from `.build-pricing.json` in a production build. Neither answering, the build fails as before. Previews are unchanged.
+- **Rule:** a build that depends on a live service has a last-known-good fallback that is itself public and versioned with the site; it warns loudly and never invents data. Pattern: `docs/patterns/frontend-app-structure.md` (saroh.in, "What a build reads from the API"); tests: `apps/saroh.in/build-state.test.ts`.
+
+## Every Help and Integrations share card was a 500 on saroh.in (27 Oct 2026)
+
+- **Symptom:** og:image for every `/help/<slug>` and `/integrations/<provider>` page answered 500 ("Image failed to load" in link previews); the hub pages' cards were fine.
+- **Cause:** those `opengraph-image.tsx` files read the article's .mdx through `lib/help-docs.ts` / `lib/integration-docs.ts` (`readdirSync`). Cards under a dynamic segment with `generateImageMetadata` are drawn on request by the Worker, which has no `content/` on disk; `generateStaticParams` doesn't make Next pre-draw them. The Solutions and Features cards work because their words are TS modules.
+- **Fix:** `og-cards.config.js` writes `lib/og-cards.gen.ts` (each article's title/area, each integration's name/intro); the cards import that. `lib/og-cards.test.ts` fails when the file is behind the articles, and when any `opengraph-image` imports an .mdx reader or `node:fs`. Checked with `opennextjs-cloudflare preview` (a plain `next start` reads files and hides it).
+- **Also 27 Oct:** `@saroh/search-pages` tests timed out on CI (lazily loaded tools; 5s test / 1s findBy defaults) — the package now sets testTimeout 30s and asyncUtilTimeout 10s.
+
+## site-booking-steps "a pay-now hold survives a step back" failed in full runs (27 Oct 2026)
+
+- **Symptom:** failed twice in a row in 2 of 5 `prepush --all` runs (desk or phone): Back from pay landed on "when", not "details"; passed alone and on re-runs.
+- **Cause:** it booked the Warehouse walkthrough on the same day and last time as site-booking-looks (`count - (phone ? 5 : 1)`). When both ran together one lost the time; `bookUntilOurs`'s retry goes back through "when", so the history behind pay was different.
+- **Fix:** the spec books 4th from the end on desk, 9th on a phone, days no other spec books this service on. Rule: a spec that asserts history or a specific time picks a day/time no other spec uses for the same service (`saroh-browser-tests`: a spec owns its data).

@@ -124,7 +124,7 @@ describe("open mode (U27)", () => {
         expect(
             screen.getByRole("heading", { name: "Pricing for salons" }),
         ).toBeTruthy();
-        expect(container.querySelectorAll("[data-plan]").length).toBe(2);
+        expect(container.querySelectorAll("[data-plan]").length).toBe(3);
         expect(container.querySelectorAll("[data-shot]")).toHaveLength(0);
         expect(container.textContent).not.toMatch(/template/i);
     });

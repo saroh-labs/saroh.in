@@ -23,6 +23,8 @@ import {
 export interface SearchPageLinks {
     /** Start free (the hero, the closing band and the phone's bar). */
     startFree?: string;
+    /** Its words, from the site's one CTA builder ("Start free", or the waitlist's). */
+    startFreeLabel?: string;
     /** The live demo, shown only when the page has demo words. */
     demo?: string;
     /** The breadcrumb's "Solutions". */
@@ -122,8 +124,12 @@ export function SearchPage({
                             <Both desk={p.lead} phone={p.phoneLead} />
                         </p>
                         <div className="sp-actions">
-                            <a className="sp-btn" href={links.startFree}>
-                                Start free
+                            <a
+                                className="sp-btn"
+                                href={links.startFree}
+                                data-cta=""
+                            >
+                                {links.startFreeLabel ?? "Start free"}
                             </a>
                             {p.demo ? (
                                 <a className="sp-demo" href={links.demo}>
@@ -351,8 +357,9 @@ export function SearchPage({
                         <a
                             className="sp-btn sp-btn-amber"
                             href={links.startFree}
+                            data-cta=""
                         >
-                            Start free
+                            {links.startFreeLabel ?? "Start free"}
                         </a>
                         <span className="sp-cta-note">
                             No card needed to start.
@@ -361,8 +368,8 @@ export function SearchPage({
                 </section>
 
                 <StartBar>
-                    <a className="sp-btn" href={links.startFree}>
-                        Start free
+                    <a className="sp-btn" href={links.startFree} data-cta="">
+                        {links.startFreeLabel ?? "Start free"}
                     </a>
                 </StartBar>
             </div>

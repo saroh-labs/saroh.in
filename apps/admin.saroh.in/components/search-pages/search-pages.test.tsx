@@ -38,6 +38,8 @@ import { SearchPagesTable } from "./search-pages-table";
 const row = (slug: string, state: PageRow["state"]): PageRow => ({
     path: `/for/${slug}`,
     slug,
+    kind: "for",
+    inApp: false,
     name: slug.charAt(0).toUpperCase() + slug.slice(1),
     family: "Beauty",
     search: `${slug} software`,
@@ -62,6 +64,31 @@ const table = (canPublish: boolean) =>
     );
 
 describe("SearchPagesTable (DEC-193)", () => {
+    it("chooses between trade pages and free tools by address, with a count each (#1253)", () => {
+        render(
+            <SearchPagesTable
+                kind="tools"
+                kindCounts={{ for: 34, tools: 3 }}
+                rows={[{ ...row("no-show", "draft"), kind: "tools" }]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish={false}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: /Free tools · \/tools\/ · 3/ })
+                .getAttribute("href"),
+        ).toBe("/search-pages?kind=tools");
+        expect(
+            screen
+                .getByRole("link", { name: /Trade pages · \/for\/ · 34/ })
+                .getAttribute("href"),
+        ).toBe("/search-pages");
+        expect(screen.getByText("Section")).toBeTruthy();
+    });
+
     it("lists every page that isn't archived, with its status", () => {
         table(false);
         expect(screen.getByRole("link", { name: /Salons/ })).toBeTruthy();

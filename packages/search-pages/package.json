@@ -25,6 +25,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "uqr": "^0.1.3",
         "yaml": "^2.9.0",
         "zod": "catalog:"
     },
@@ -41,6 +42,7 @@
         "@types/react-dom": "catalog:react19",
         "eslint": "catalog:",
         "jsdom": "^25.0.1",
+        "jsqr": "^1.4.0",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "typescript": "catalog:",

@@ -1,11 +1,11 @@
-import type { SearchPageEntry } from "../schema";
+import type { ForPageEntry } from "../schema";
 import { FAMILIES } from "../schema";
 
 export interface ForHubProps {
     /** The pages to list: on saroh.in the live ones, in admin all of them. */
-    pages: SearchPageEntry[];
+    pages: ForPageEntry[];
     /** A page's address; undefined draws the row without one (the admin preview). */
-    href?: (page: SearchPageEntry) => string | undefined;
+    href?: (page: ForPageEntry) => string | undefined;
 }
 
 /**

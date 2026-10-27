@@ -247,12 +247,33 @@ accounts and the operator console. `pnpm run check:titles` and
   `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
   apps' `--font-sans`/`--font-display`); links come in as props, so the
   package reads no env.
+- **A free tool is a file and a component in `@saroh/search-pages`**
+  (#1253, publish-controlled as DEC-193): `content/tools/<slug>.mdx`
+  (name, group, line, search, title, description, updated, h1, lead,
+  phoneLead, how/howPhone, ctaTitle/ctaLine, then the questions) and a
+  default-exported client component in `src/tools/<slug>/index.tsx`,
+  one line in `src/tools/registry.ts`. Build it from `src/tools/parts.tsx`
+  and put the file behind the one `<EmailGate>` (the email is all that
+  leaves the browser; saroh.in sends it to the QR code maker's unlock
+  route through `SiteToolGate`). `toolChecks` must pass. saroh.in draws it
+  at `/tools/<slug>` with `<ToolPage>`; the two app tools (`inApp: true`)
+  keep their own routes and obey the same publish list
+  (`PublishContext.live`). Copy `no-show-cost-calculator` for a new one.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;
   `pnpm check:content-dates` fails a batch that doesn't. /pricing is the
   live catalogue version's `goLiveAt`. Never the build's date
   (`lib/site-pages.ts` `lastModified`).
+- **What a build reads from the API, it reads once, before `next build`**
+  (`search-pages.config.js` + `build-state.config.js`): the /for/ publish
+  list and, once early access is open, `GET /public/pricing`. A production
+  build's `readLivePricing` reads that answer from `.build-pricing.json`,
+  never the API, and writes both answers to `/_build/state.json`. When the
+  API can't be read after the retries, a production build reuses the live
+  site's own `/_build/state.json` and prints a GitHub warning; it fails
+  only when neither answers. A new build-time read joins that file and
+  the snapshot; it never fetches on its own during `next build`.
 - **The site is built at deploy time and nothing deploys on a schedule.** A
   page dated for a day (`publishOn`) appears with the first deploy made on
   or after it. Anything that answers per request about a dated page asks

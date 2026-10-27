@@ -108,9 +108,10 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         // price lock (DEC-161). Privacy's moved to 17 Oct with Razorpay
         // registering each business at sign-up (DEC-165), and to 19 Oct
         // with the account manager's link cookie (DEC-169), and to 21 Oct with
-        // Saroh's own cookieless visit counting (DEC-181).
+        // Saroh's own cookieless visit counting (DEC-181), and to 26 Oct with
+        // the free tools' emails (DEC-194).
         const termsBefore = at("2026-10-08T18:31:00Z");
-        const privacyAfter = at("2026-10-20T18:31:00Z");
+        const privacyAfter = at("2026-10-25T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);

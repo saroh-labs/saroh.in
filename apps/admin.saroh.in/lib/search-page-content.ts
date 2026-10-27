@@ -1,4 +1,4 @@
-import type { SearchPageData } from "@saroh/search-pages";
+import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
 import { PRESETS, smallKeys, starterWords } from "@saroh/search-pages";
 
 /**
@@ -141,5 +141,73 @@ export function pageSections(p: SearchPageData): { k: string; v: string }[] {
         },
         { k: "Also in Saroh", v: s.also.map((a) => a.title).join(", ") },
         { k: "Related pages", v: p.related.map((r) => r.name).join(", ") },
+    ];
+}
+
+/** A free tool's words (#1253), top to bottom; the tool's own words are its component's. */
+export function toolWordBlocks(p: ToolPageData): WordBlock[] {
+    const blocks: WordBlock[] = [
+        {
+            label: "Top of the page",
+            items: [
+                { k: "Breadcrumb", v: `Free tools › ${p.name}` },
+                { k: "Headline", v: p.h1, look: "headline" },
+                { k: "Under it (desk)", v: p.lead },
+                ...(p.phoneLead
+                    ? [{ k: "Under it (phone)", v: p.phoneLead }]
+                    : []),
+            ],
+        },
+        {
+            label: "On the /tools list and in the menus",
+            items: [
+                { k: "Name", v: p.name, look: "title" },
+                { k: "Line", v: p.line },
+                { k: "Section", v: p.group },
+            ],
+        },
+    ];
+    if (p.how?.length) {
+        blocks.push({
+            label: p.howTitle,
+            items: p.how.map((v, i) => ({ k: `${i + 1}`, v })),
+        });
+    }
+    if (p.questions.length) {
+        blocks.push({
+            label: "Questions",
+            items: p.questions.map((q, i) => ({
+                k: `Q${i + 1}`,
+                v: q.question,
+                sub: q.answer.join(" "),
+                look: "title" as const,
+            })),
+        });
+    }
+    if (p.ctaTitle) {
+        blocks.push({
+            label: "Bottom of the page",
+            items: [
+                { k: "Closing line", v: p.ctaTitle, look: "headline" },
+                ...(p.ctaLine ? [{ k: "Under it", v: p.ctaLine }] : []),
+                { k: "Button", v: "Start free", look: "title" as const },
+            ],
+        });
+    }
+    return blocks;
+}
+
+/** The Overview's facts about what a tool page holds. */
+export function toolSections(p: ToolPageData): { k: string; v: string }[] {
+    const first = p.questions[0]?.question;
+    return [
+        { k: "Headline", v: p.h1 },
+        { k: "On the /tools list", v: `${p.group}: ${p.line}` },
+        ...(p.how?.length ? [{ k: p.howTitle, v: p.how.join(" · ") }] : []),
+        {
+            k: "Questions answered",
+            v: `${p.questions.length}${first ? `, starting with “${first}”` : ""}`,
+        },
+        ...(p.ctaTitle ? [{ k: "Closing line", v: p.ctaTitle }] : []),
     ];
 }
