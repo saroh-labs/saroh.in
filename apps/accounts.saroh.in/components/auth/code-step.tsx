@@ -18,6 +18,8 @@ import {
     CODE_WORDS,
     codeDigits,
     codeLead,
+    PHONE_CODE_WORDS,
+    phoneCodeLead,
     resendLabel,
     resendWait,
     sendCode,
@@ -99,6 +101,9 @@ export function CodeStep({
     const failed = useRef<string | null>(null);
 
     const wait = resendWait(resendAt, now);
+    // A phone's code (DEC-196) is the same step with its own few words.
+    const phone = client.channel === "phone";
+    const words = phone ? { ...CODE_WORDS, ...PHONE_CODE_WORDS } : CODE_WORDS;
 
     // This step exists to take six digits, so it starts in the field.
     useEffect(() => {
@@ -204,10 +209,10 @@ export function CodeStep({
     return (
         <div>
             <AuthHeading
-                title={CODE_WORDS.title}
+                title={words.title}
                 blurb={
                     <>
-                        {codeLead(email)}
+                        {phone ? phoneCodeLead(email) : codeLead(email)}
                         {next ? ` ${next}` : null}
                     </>
                 }
@@ -243,7 +248,7 @@ export function CodeStep({
                     onChange={(e) => onCode(e.target.value)}
                     disabled={checking}
                     aria-invalid={error ? true : undefined}
-                    note={CODE_WORDS.spam}
+                    note={words.spam}
                     className="coarse:text-[17px] font-mono text-[17px] tracking-[0.4em]"
                 />
                 <AuthSubmit disabled={checking}>
@@ -267,7 +272,7 @@ export function CodeStep({
                 disabled={checking}
                 className="mt-0"
             >
-                {CODE_WORDS.changeEmail}
+                {words.changeEmail}
             </AuthAlt>
         </div>
     );

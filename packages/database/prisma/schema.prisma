@@ -46,6 +46,13 @@ model User {
   // recorded before it has been.
   usageNoticeSeenAt DateTime?
 
+  // A phone added to the account (messaging brief, 27 Oct; DEC-196): a second
+  // way to sign in, never instead of the email. E.164 ("+919876543210").
+  // Written only after the server checked the OTP widget's token for this
+  // number (`account-phone/`); a client's "verified" is never trusted.
+  phoneE164       String?   @unique
+  phoneVerifiedAt DateTime?
+
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
@@ -9061,6 +9068,35 @@ model MessagingUsage {
   updatedAt DateTime              @updatedAt
 
   @@id([month, channel])
+}
+
+// Phone sign-in for Saroh accounts (DEC-196): each widget start, failed
+// verify, phone sign-in and phone added or removed, by number HMAC and
+// address HMAC, never the number. The start and failure rows are what the
+// abuse limits count (`account-phone/phone-limits.ts`); the rest is the
+// person's trail. No relation to User, so the trail outlives the account,
+// as AuditEvent's does. Platform-level, not a business.
+enum AccountPhoneEventKind {
+  START
+  VERIFY_FAILED
+  SIGNED_IN
+  PHONE_ADDED
+  PHONE_REMOVED
+}
+
+model AccountPhoneEvent {
+  id        String                @id @default(cuid())
+  kind      AccountPhoneEventKind
+  phoneHash String?
+  ipHash    String?
+  userId    String?
+  // Why a verify failed ("invalid_token", "unknown_phone", …).
+  reason    String?
+  createdAt DateTime              @default(now())
+
+  @@index([phoneHash, kind, createdAt])
+  @@index([ipHash, kind, createdAt])
+  @@index([userId, createdAt])
 }
 
 // Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { LOGIN_PANEL } from "@/components/auth/panel-copy";
+import { phoneOptions } from "@/lib/phone-sign-in";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 
@@ -58,16 +59,20 @@ export default async function LoginPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { redirect, email, with: way } = await searchParams;
-    const providers = await signInProviders();
+    const [providers, phone] = await Promise.all([
+        signInProviders(),
+        phoneOptions(),
+    ]);
     return (
         <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
             <LoginForm
                 returnTo={safeDestination(redirect)}
                 invitedEmail={typeof email === "string" ? email : undefined}
                 providers={providers}
+                phone={phone}
                 // A code is the main way. `?with=password` opens the
                 // password form, for a link that knows it is wanted.
-                way={way === "password" ? "password" : "code"}
+                way={way === "password" || way === "phone" ? way : "code"}
             />
         </SplitShell>
     );

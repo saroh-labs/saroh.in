@@ -3,6 +3,7 @@
 import { ChangeEmailForm } from "@/components/account/change-email-form";
 import { DeleteAccount } from "@/components/account/delete-account";
 import { PasswordSection } from "@/components/account/password-section";
+import { PhoneRow } from "@/components/account/phone-section";
 import { ProfileForm } from "@/components/account/profile-form";
 import { SessionsList } from "@/components/account/sessions-list";
 import { AuthHeading, AuthNote } from "@/components/auth/field";
@@ -113,6 +114,10 @@ export default function AccountPage() {
             <div className="mt-[22px] grid gap-5">
                 <ProfileForm initialName={user.name} />
                 <ChangeEmailForm currentEmail={user.email} />
+                <PhoneRow
+                    phoneE164={user.phoneE164 ?? null}
+                    phoneVerifiedAt={user.phoneVerifiedAt ?? null}
+                />
                 <PasswordSection email={user.email} />
                 <SessionsList currentToken={session.session.token} />
                 <DeleteAccount />

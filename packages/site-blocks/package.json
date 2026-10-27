@@ -11,6 +11,7 @@
     ],
     "exports": {
         ".": "./src/index.ts",
+        "./challenge": "./src/account/challenge.tsx",
         "./image-sizes": "./src/lib/image-sizes.ts",
         "./showcase": "./src/showcase/index.ts",
         "./site-icon": "./src/site-icon.ts",

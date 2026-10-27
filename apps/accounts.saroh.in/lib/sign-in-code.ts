@@ -39,6 +39,21 @@ export const CODE_WORDS = {
     signedIn: "You're signed in",
 } as const;
 
+/**
+ * The same step for a code sent to a phone (DEC-196): the widget sends it,
+ * so its lifetime is the widget's and is not promised here.
+ */
+export const PHONE_CODE_WORDS = {
+    title: "Check your phone",
+    changeEmail: "Change number",
+    spam: "Not there? Wait a moment, then resend.",
+} as const;
+
+/** "We sent a 6-digit code to +91 98450 12345." */
+export function phoneCodeLead(phone: string): string {
+    return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code to ${phone}.`;
+}
+
 /** "We sent a 6-digit code to asha@example.com. It lasts 10 minutes." */
 export function codeLead(email: string): string {
     return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code to ${email}. It lasts ${CODE_MINUTES} minutes.`;
@@ -95,6 +110,8 @@ export type CodeKind = "sign-in" | "email-verification";
 
 /** The auth client, as far as these steps use it. */
 export interface CodeClient {
+    /** A phone's code (DEC-196): the address is a number, not an email. */
+    channel?: "phone";
     send: (input: { email: string; kind: CodeKind }) => Promise<Answer>;
     check: (input: {
         email: string;
@@ -119,7 +136,7 @@ export async function sendCode(
     input: { email: string; kind?: CodeKind },
 ): Promise<CodeSent> {
     const email = input.email.trim();
-    if (!looksLikeEmail(email)) {
+    if (client.channel !== "phone" && !looksLikeEmail(email)) {
         return {
             ok: false,
             message: authFailureCopy({ code: "INVALID_EMAIL" }),
@@ -133,6 +150,14 @@ export async function sendCode(
     const retryAfter = "retryAfter" in answer ? answer.retryAfter : null;
     if (!error) return { ok: true, resendAfterSeconds: CODE_RESEND_SECONDS };
     const limited = authErrorCode(error) === "TOO_MANY_REQUESTS";
+    // The API's own sentence (phone): it already says when to try again.
+    if (error.words) {
+        return {
+            ok: false,
+            message: error.words,
+            resendAfterSeconds: limited ? waitFromServer(retryAfter) : null,
+        };
+    }
     return {
         ok: false,
         message: limited

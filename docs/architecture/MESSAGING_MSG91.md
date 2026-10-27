@@ -39,6 +39,43 @@ All optional; set on the API. Values never go in the repo.
   browser; the API only checks the access token it returns
   (`POST https://control.msg91.com/api/v5/widget/verifyAccessToken`).
 
+## Phone sign-in for Saroh accounts (DEC-196)
+
+Owners and staff can add a verified phone on accounts.saroh.in (Account ›
+Phone) and then sign in with it as well as their email. Code:
+`apps/api.saroh.in/src/modules/account-phone/` (no provider named there; it
+calls `MessagingService`) and the session half in
+`packages/auth/src/phone-sign-in.ts`.
+
+1. `POST /account-phone/start` checks Turnstile (when its keys are set) and
+   the start limits, then answers the widget's config (`otpWidgetConfig()`,
+   with the script URL) for the browser to open. Under the fake provider it
+   answers a stand-in token instead, and the screen shows a stand-in code
+   step (any six digits).
+2. The browser runs the widget with `exposeMethods: true`: our own code
+   step calls `sendOtp`, `retryOtp` and `verifyOtp`, and MSG91's captcha
+   renders in the step (`captchaRenderId`).
+3. `POST /account-phone/sign-in` (or `POST /account/phone` to add one,
+   signed in) sends the widget's access token. The API checks it with
+   MSG91 (`verifyOtp`, with the number expected) before it finds the
+   person by their verified phone or saves anything; only then does Better
+   Auth make the session, the same way as for an emailed code.
+
+**The server limits are a soft gate.** The widget sends codes from the
+browser straight to MSG91, so the API can only refuse to hand out the
+widget's config and refuse to check tokens: a 30-second cooldown and 10
+starts a day per number, 20 starts an hour per address, and 10 failed
+verifies a day per number and 20 per address (`phone-limits.ts`, counted
+from `AccountPhoneEvent`). Every refusal is logged with its reason and
+hashes only.
+
+**The hard stop on sends is in MSG91's dashboard (OTP > Widget). Turn on:**
+
+- the widget's **captcha** (on by default; keep it on for web);
+- the widget's **per-number and per-IP send limits** and its resend wait;
+- an **OTP length of 6**, which is what the code step takes;
+- only the channels Saroh pays for (SMS, WhatsApp).
+
 ## Webhook
 
 - URL: `https://api.saroh.in/public/webhooks/msg91` (development:

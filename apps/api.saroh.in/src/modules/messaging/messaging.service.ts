@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, MessagingSendStatus } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
@@ -12,6 +14,7 @@ import {
     openRequest,
     sealRequest,
 } from "./messaging-records";
+import { FakeMessagingProvider } from "./providers/fake-messaging-provider";
 import type {
     MessagingProvider,
     SendResult,
@@ -22,6 +25,9 @@ import { MESSAGING_PROVIDER } from "./providers/messaging-provider.port";
 
 /** Retries a send whose provider answered with a temporary failure. */
 export const MESSAGING_SEND_TYPE = "messaging.send";
+
+/** The OTP widget's script, as the provider documents it. */
+const OTP_WIDGET_SCRIPT = "https://verify.msg91.com/otp-provider.js";
 
 /** Tries in all, the first (inline) one included. */
 const MAX_ATTEMPTS = 6;
@@ -116,11 +122,43 @@ export class MessagingService {
         return result;
     }
 
-    /** What the browser loads the OTP widget with; null until configured. */
-    otpWidgetConfig(): { widgetId: string; tokenAuth: string } | null {
+    /**
+     * What the browser loads the OTP widget with; null until configured.
+     * `scriptUrl` is the provider's documented script, named here so no
+     * other app has to name the provider.
+     */
+    otpWidgetConfig(): {
+        widgetId: string;
+        tokenAuth: string;
+        scriptUrl: string;
+    } | null {
         const { MSG91_WIDGET_ID: widgetId, MSG91_WIDGET_TOKEN: tokenAuth } =
             env;
-        return widgetId && tokenAuth ? { widgetId, tokenAuth } : null;
+        return widgetId && tokenAuth
+            ? { widgetId, tokenAuth, scriptUrl: OTP_WIDGET_SCRIPT }
+            : null;
+    }
+
+    /** Whether OTP tokens come from the fake's stand-in, not a widget. */
+    get otpStandIn(): boolean {
+        return this.provider instanceof FakeMessagingProvider;
+    }
+
+    /**
+     * Development and test only: with the fake provider there is no widget,
+     * so the fake hands out a token for this number, which the browser's
+     * stand-in step sends back and {@link verifyOtp} then checks like a real
+     * one. Null with a real provider (the factory never uses the fake
+     * outside development and test).
+     */
+    standInOtpToken(phoneE164: string): string | null {
+        if (!this.otpStandIn) return null;
+        const token = `stand-in-${randomUUID()}`;
+        (this.provider as FakeMessagingProvider).issueWidgetToken(
+            token,
+            phoneE164,
+        );
+        return token;
     }
 
     sendWhatsAppTemplate(input: {

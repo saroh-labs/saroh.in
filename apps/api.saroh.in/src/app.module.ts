@@ -58,6 +58,7 @@ import { SitesModule } from "./modules/sites/sites.module";
 import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 // "Tell me when it's back" (DEC-174 U23).
+import { AccountPhoneModule } from "./modules/account-phone/account-phone.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { StockWatchModule } from "./modules/stock/stock-watch.module";
 import { StoresModule } from "./modules/stores/stores.module";
@@ -92,6 +93,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         }),
         HealthModule,
         SignInOptionsModule,
+        // Phone sign-in for Saroh accounts (DEC-196).
+        AccountPhoneModule,
         FeatureFlagModule,
         AdminModule,
         PricingModule,

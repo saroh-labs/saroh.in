@@ -167,6 +167,9 @@ importers:
       '@saroh/error-tracking':
         specifier: workspace:*
         version: link:../../packages/error-tracking
+      '@saroh/site-blocks':
+        specifier: workspace:*
+        version: link:../../packages/site-blocks
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui

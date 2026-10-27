@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import Link from "next/link";
 import * as React from "react";
 
@@ -103,6 +104,60 @@ export const AuthField = React.forwardRef<HTMLInputElement, AuthFieldProps>(
     },
 );
 AuthField.displayName = "AuthField";
+
+/**
+ * {@link AuthField}'s look for a phone (DEC-196): the shared `PhoneInput`
+ * (country picker, India first, value E.164) with this file's field box.
+ */
+export function AuthPhoneField({
+    label,
+    note,
+    id = "phone",
+    value,
+    onValueChange,
+    disabled,
+    invalid,
+}: {
+    label: string;
+    note?: string;
+    id?: string;
+    value: string;
+    onValueChange: (value: string) => void;
+    disabled?: boolean;
+    invalid?: boolean;
+}) {
+    const noteId = note ? `${id}-note` : undefined;
+    return (
+        <div className="sa-rise mb-3.5">
+            <div className="mb-1.5 flex items-baseline gap-3">
+                <label htmlFor={id} className="text-[12.5px] font-medium">
+                    {label}
+                </label>
+            </div>
+            <PhoneInput
+                id={id}
+                name="phone"
+                autoComplete="tel"
+                defaultCountry="IN"
+                countryLabel="Country code"
+                value={value}
+                onValueChange={onValueChange}
+                disabled={disabled}
+                aria-describedby={noteId}
+                aria-invalid={invalid ? true : undefined}
+                boxClassName={cn("sa-input", FIELD)}
+            />
+            {note ? (
+                <p
+                    id={noteId}
+                    className="text-muted-foreground mt-[5px] text-pretty text-[11.5px] leading-[1.45]"
+                >
+                    {note}
+                </p>
+            ) : null}
+        </div>
+    );
+}
 
 /** The page's one primary action: full width, 40px, Ink. */
 export function AuthSubmit({

@@ -17,6 +17,7 @@ import {
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
 import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import { phoneSignIn } from "./phone-sign-in";
 import type { OnAuthServerError } from "./server-errors";
 import { serverErrorHook } from "./server-errors";
 
@@ -33,6 +34,7 @@ export {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+export { startPhoneSession } from "./phone-sign-in";
 export type { AuthServerFault, OnAuthServerError } from "./server-errors";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -259,8 +261,8 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
         // `InternalAPIError extends Error`. But it exposes APIError as a const
         // with a construct signature rather than a class, so only-throw-error
         // cannot see the inheritance and its `allow` option has no named class
-        // to match. Scoped to this one throw — it is the only APIError throw in
-        // the repo. reportUnusedDisableDirectives is on, so this line will be
+        // to match. Scoped to this one throw (`phone-sign-in.ts` disables it the
+        // same way). reportUnusedDisableDirectives is on, so this line will be
         // flagged as unnecessary once better-auth ships types the rule accepts.
         // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
         throw new APIError("BAD_REQUEST", {
@@ -575,6 +577,18 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             // code the verify screen is built to accept.
         },
         user: {
+            // A verified phone (DEC-196), read on the session so the account
+            // page can show it. `input: false`: never set through
+            // `/update-user`; only the API writes it, after checking the
+            // OTP widget's token on the server (`account-phone/`).
+            additionalFields: {
+                phoneE164: { type: "string", required: false, input: false },
+                phoneVerifiedAt: {
+                    type: "date",
+                    required: false,
+                    input: false,
+                },
+            },
             changeEmail: {
                 enabled: true,
                 // Approval goes to the CURRENT address. `updateEmailWithoutVerification`
@@ -644,6 +658,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                 : { enabled: false },
         },
         plugins: [
+            // Sign-in by a verified phone: a server-only endpoint the API
+            // calls after its own check (`phone-sign-in.ts`).
+            phoneSignIn(),
             emailOTP({
                 // Replace the built-in verification LINK with a code. The link
                 // flow could not work here: it is sent by the api, so its

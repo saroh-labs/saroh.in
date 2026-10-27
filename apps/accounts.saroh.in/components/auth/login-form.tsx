@@ -15,17 +15,22 @@ import {
     AuthSubmit,
 } from "@/components/auth/field";
 import { codeNext, doneLine } from "@/components/auth/panel-copy";
+import { PhoneSignIn } from "@/components/auth/phone-sign-in";
 import { SocialButtons } from "@/components/auth/social-buttons";
 import { getAppUrl } from "@/lib/app-urls";
 import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
+import type { PhoneOptions } from "@/lib/phone-sign-in";
 import type { CodeClient } from "@/lib/sign-in-code";
 import { sendCode } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
-/** The two ways to sign in with an address. A code is the main one. */
-export type SignInWay = "code" | "password";
+/**
+ * The ways to sign in. An emailed code is the main one; a phone is a second
+ * way in for an account that added one (DEC-196).
+ */
+export type SignInWay = "code" | "password" | "phone";
 
 /**
  * Signing in. "Email me a code" is the main way (owner, 10 Oct 2026): it
@@ -55,6 +60,7 @@ export function LoginForm({
     providers = [],
     way: startWay = "code",
     client = codeClient,
+    phone,
 }: {
     returnTo?: string | null;
     invitedEmail?: string;
@@ -62,6 +68,8 @@ export function LoginForm({
     providers?: SocialProvider[];
     way?: SignInWay;
     client?: CodeClient;
+    /** Whether phone sign-in is offered (`lib/phone-sign-in.ts`). */
+    phone?: PhoneOptions;
 } = {}) {
     const router = useRouter();
     const { signIn } = authClient;
@@ -148,6 +156,23 @@ export function LoginForm({
         );
     }
 
+    if (way === "phone" && phone?.available) {
+        return (
+            <PhoneSignIn
+                turnstileSiteKey={phone.turnstileSiteKey}
+                next={codeNext(returnTo, "sign-in")}
+                doneLine={doneLine(returnTo, "sign-in")}
+                onDone={() => {
+                    window.location.href = destination;
+                }}
+                onUseEmail={() => {
+                    setError(null);
+                    setWay("code");
+                }}
+            />
+        );
+    }
+
     return (
         <div>
             {/* The heading names the act, as the design does on every page.
@@ -223,6 +248,18 @@ export function LoginForm({
                     ? "Use a password instead"
                     : "Email me a code instead"}
             </AuthAlt>
+            {phone?.available && !joining ? (
+                <AuthAlt
+                    disabled={isLoading}
+                    className="mt-0"
+                    onClick={() => {
+                        setError(null);
+                        setWay("phone");
+                    }}
+                >
+                    Use phone instead
+                </AuthAlt>
+            ) : null}
 
             <SocialButtons
                 providers={providers}

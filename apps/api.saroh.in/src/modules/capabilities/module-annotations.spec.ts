@@ -321,6 +321,9 @@ const NEVER: Record<string, string> = {
         "someone reads an invitation before they have an account, let alone a module",
     "sign-in-options/sign-in-options.controller.ts":
         "the sign-in pages ask which providers to draw before anyone is signed in",
+    // DEC-196: a Saroh account's own phone and phone sign-in; a person, not a business.
+    "account-phone/account-phone.controller.ts":
+        "signing in to Saroh and a person's own phone, before or across any business",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "messaging/msg91-webhook.controller.ts":
         "Saroh's own MSG91 delivery reports, across businesses",
