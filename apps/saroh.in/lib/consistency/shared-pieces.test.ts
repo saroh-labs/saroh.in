@@ -168,22 +168,7 @@ const RULES: Rule[] = [
         name: "a Saffron text link is TextLink (V1, A2)",
         pattern: both("\\btext-brand-700\\b", "\\bno-underline\\b"),
         home: ["components/shared/links/text-link.tsx"],
-        allow: each(
-            "step 6 (A2, V1): its link class becomes TextLink (underline on hover, stays Saffron)",
-            [
-                "app/(preview)/pricing/draft/page.tsx",
-                "app/(standalone)/waitlist/page.tsx",
-                "app/(site)/help/[slug]/page.tsx",
-                "app/(site)/help/page.tsx",
-                "app/(site)/integrations/[provider]/page.tsx",
-                "components/about/about-page.tsx",
-                "components/contact/contact-form.tsx",
-                "components/contact/contact-page.tsx",
-                "components/feature/feature-steps.tsx",
-                "components/pricing/pricing-cards.tsx",
-                "components/solution/solution-segment.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {
@@ -196,15 +181,11 @@ const RULES: Rule[] = [
             ...each(
                 'step 6 (A3): its quiet link becomes TextLink tone="quiet"',
                 [
-                    "app/(standalone)/waitlist/page.tsx",
                     "app/(site)/integrations/[provider]/page.tsx",
                     "components/feature/feature-hero.tsx",
-                    "components/shared/nav/site-footer.tsx",
                     "components/solution/solution-hero.tsx",
                 ],
             ),
-            "components/resources/styles.ts":
-                "step 6 (A3): QUIET_LINK, the file is deleted",
         },
         files: SITE,
     },

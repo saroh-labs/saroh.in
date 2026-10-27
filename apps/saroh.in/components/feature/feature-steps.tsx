@@ -4,10 +4,10 @@ import { cn } from "@/lib/cn";
 
 import type { FeatureHelpLink } from "@/content/feature-help";
 import type { Feature } from "@/content/types";
-import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
+import { textLinkClasses } from "../shared/links/text-link";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
 import { SectionHeading } from "../shared/sections/section-heading";
 
@@ -80,7 +80,9 @@ export function FeatureSteps({
                         <Link
                             key={link.href}
                             href={link.href}
-                            className={`rounded-sm text-[15px] font-semibold text-brand-700 no-underline hover:text-foreground ${ring()}`}
+                            className={textLinkClasses({
+                                className: "text-[15px] font-semibold",
+                            })}
                         >
                             {link.label}
                             <Arrow />

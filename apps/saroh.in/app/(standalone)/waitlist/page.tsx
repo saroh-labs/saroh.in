@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import Link from "next/link";
 
 import { Arrow } from "@/components/shared/links/arrow";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
@@ -152,7 +153,10 @@ export default async function WaitlistPage() {
                                 {" "}
                                 <Link
                                     href={WAITLIST_MONEY.link.href}
-                                    className={`cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground ${ring({ color: "ink" })}`}
+                                    className={textLinkClasses({
+                                        className:
+                                            "whitespace-nowrap font-semibold",
+                                    })}
                                 >
                                     {WAITLIST_MONEY.link.label}
                                     <Arrow />
@@ -191,7 +195,7 @@ export default async function WaitlistPage() {
                                 href={link.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors hover:text-foreground ${ring({ color: "ink" })}`}
+                                className={textLinkClasses({ tone: "quiet" })}
                             >
                                 {link.label}
                             </a>

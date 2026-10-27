@@ -9,17 +9,15 @@ import { drawnIn } from "@/content/launch-words";
 import type { PublishContext } from "@/content/resources";
 import { linkShown } from "@/content/resources";
 import type { LaunchMode } from "@/lib/links";
-import { ring } from "@/lib/ring";
 
 import { CtaLink } from "../shared/buttons/cta-link";
 import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
+import { textLinkClasses } from "../shared/links/text-link";
 import { Eyebrow } from "../shared/sections/eyebrow";
 
 /** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */
 const HINDI = "font-[family-name:var(--font-devanagari)]";
-
-const TEXT_LINK = `cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 /**
  * /about (design "About", DEC-137): the opening, what the name means on an
@@ -165,7 +163,7 @@ export function AboutPage({
                                 <Link
                                     key={link.href}
                                     href={link.href}
-                                    className={TEXT_LINK}
+                                    className={textLinkClasses()}
                                 >
                                     {link.label}
                                     <Arrow />
@@ -225,7 +223,10 @@ export function AboutPage({
                         </CompanyFact>
                     ) : null}
                     <CompanyFact label={ABOUT.company.contactLabel}>
-                        <Link href={CONTACT_PAGE.href} className={TEXT_LINK}>
+                        <Link
+                            href={CONTACT_PAGE.href}
+                            className={textLinkClasses()}
+                        >
                             {ABOUT.company.contactLink}
                         </Link>
                     </CompanyFact>

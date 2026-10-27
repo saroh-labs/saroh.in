@@ -7,6 +7,7 @@ import { PreviewControls } from "@/components/pricing/preview/preview-controls";
 import { PricingPage } from "@/components/pricing/pricing-page";
 import { Container } from "@/components/shared/layout/container";
 import { SiteChrome } from "@/components/shared/layout/site-chrome";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import { LAUNCH_MODE } from "@/lib/links";
 import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
 import { markChanges } from "@/lib/pricing-marks";
@@ -16,7 +17,6 @@ import {
     previewViewFrom,
 } from "@/lib/pricing-preview";
 import { pricingPageModel } from "@/lib/pricing-view";
-import { ring } from "@/lib/ring";
 
 /**
  * `/pricing/draft` — the shared draft of the pricing catalogue, for a staff
@@ -82,10 +82,7 @@ export default async function PricingDraftRoute({
                     {/* Published pricing exists once the launch switch opens;
                         before that /pricing waits at the waitlist (Gate W). */}
                     {LAUNCH_MODE === "open" ? (
-                        <Link
-                            href="/pricing"
-                            className={`rounded-sm text-brand-700 no-underline hover:text-foreground ${ring()}`}
-                        >
+                        <Link href="/pricing" className={textLinkClasses()}>
                             See the published pricing
                         </Link>
                     ) : null}

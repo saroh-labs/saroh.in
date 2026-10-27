@@ -2,7 +2,7 @@ import { cn } from "@/lib/cn";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { QUIET_LINK } from "./styles";
+import { textLinkClasses } from "../shared/links/text-link";
 
 export interface Crumb {
     name: ReactNode;
@@ -47,7 +47,9 @@ export function Breadcrumbs({
                             ) : (
                                 <Link
                                     href={crumb.href ?? "/"}
-                                    className={QUIET_LINK}
+                                    className={textLinkClasses({
+                                        tone: "quiet",
+                                    })}
                                 >
                                     {crumb.name}
                                 </Link>

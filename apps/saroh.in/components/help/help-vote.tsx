@@ -7,6 +7,7 @@ import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { readConsent, subscribeConsent } from "@/lib/consent";
 import { ring } from "@/lib/ring";
+import { textLinkClasses } from "../shared/links/text-link";
 
 /**
  * "Did this help?" (design 2a), drawn only where the answer is really
@@ -27,7 +28,10 @@ export function HelpVote({ slug }: { slug: string }) {
     const email = (
         <a
             href={`mailto:${HELP_EMAIL}`}
-            className={`cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
+            className={textLinkClasses({
+                tone: "prose",
+                className: "font-semibold",
+            })}
         >
             {HELP_EMAIL}
         </a>

@@ -11,13 +11,18 @@ import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 import { ring } from "@/lib/ring";
 
+import { textLinkClasses } from "../links/text-link";
 import { CookieChoicesButton } from "./cookie-choices-button";
 import type { NavItem } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 
-const LINK = `w-fit cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
+const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
 
-const SOCIAL_LINK = `grid size-9 cursor-pointer place-items-center rounded-md text-muted-foreground no-underline transition-colors duration-fast ease-out hover:bg-foreground/5 hover:text-foreground ${ring()} [@media(pointer:coarse)]:size-11`;
+const SOCIAL_LINK = textLinkClasses({
+    tone: "quiet",
+    className:
+        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
+});
 
 /**
  * The marks of Saroh's own accounts, by the label in `content/social.ts`.

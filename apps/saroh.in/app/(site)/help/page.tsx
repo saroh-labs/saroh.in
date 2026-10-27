@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { HelpSearch } from "@/components/help/help-search";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Eyebrow } from "@/components/shared/sections/eyebrow";
 import {
     groupsWithArticles,
@@ -16,7 +17,6 @@ import {
 import { helpArticles } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
-import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -25,8 +25,6 @@ export const metadata: Metadata = pageMetadata({
     description: helpHome.seo.description,
     path: HELP_PATH,
 });
-
-const LINK = `w-fit cursor-pointer rounded-sm text-mk-copy no-underline transition-colors duration-fast ease-out hover:text-brand-700 active:text-foreground ${ring()}`;
 
 /**
  * Help's home (Resources plan U5, design 1a): the title, a search over the
@@ -73,7 +71,10 @@ export default function HelpPage() {
                                         <li key={a.slug}>
                                             <Link
                                                 href={helpHref(a.slug)}
-                                                className={LINK}
+                                                className={textLinkClasses({
+                                                    tone: "copy",
+                                                    className: "w-fit",
+                                                })}
                                             >
                                                 {a.title}
                                             </Link>
@@ -94,7 +95,7 @@ export default function HelpPage() {
                         Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}
-                            className={`cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
+                            className={textLinkClasses()}
                         >
                             {HELP_EMAIL}
                         </a>
@@ -105,10 +106,7 @@ export default function HelpPage() {
                             Something new?
                         </strong>{" "}
                         See what&apos;s changed in the{" "}
-                        <Link
-                            href="/changelog"
-                            className={`cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
-                        >
+                        <Link href="/changelog" className={textLinkClasses()}>
                             changelog
                         </Link>
                         .

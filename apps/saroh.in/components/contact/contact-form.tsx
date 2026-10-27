@@ -19,6 +19,7 @@ import {
 } from "@/lib/contact-message";
 import { ring } from "@/lib/ring";
 import { nextIndex } from "@/lib/roving";
+import { textLinkClasses } from "../shared/links/text-link";
 
 const copy = CONTACT_PAGE.form;
 const done = CONTACT_PAGE.done;
@@ -450,10 +451,7 @@ export function ContactForm() {
                     {copy.orEmail}{" "}
                     <a
                         href={`mailto:${SAROH_CONTACT_EMAIL}`}
-                        className={cn(
-                            "rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-offset-2",
-                            ring({ offset: 0 }),
-                        )}
+                        className={textLinkClasses()}
                     >
                         {SAROH_CONTACT_EMAIL}
                     </a>

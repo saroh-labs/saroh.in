@@ -6,6 +6,7 @@ import { IntegrationSteps } from "@/components/integrations/integration-steps";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -54,8 +55,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const H2 =
     "m-0 font-display text-[26px] font-bold tracking-[-0.02em] [text-wrap:balance]";
-
-const LINK = `cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 export default async function IntegrationPage({ params }: Props) {
     const { provider } = await params;
@@ -171,7 +170,11 @@ export default async function IntegrationPage({ params }: Props) {
                 {links.length > 0 ? (
                     <div className="flex flex-wrap gap-5 text-[15px]">
                         {links.map((l) => (
-                            <Link key={l.href} href={l.href} className={LINK}>
+                            <Link
+                                key={l.href}
+                                href={l.href}
+                                className={textLinkClasses()}
+                            >
                                 {l.label}
                                 <Arrow />
                             </Link>

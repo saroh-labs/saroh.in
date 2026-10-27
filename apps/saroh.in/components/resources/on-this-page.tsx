@@ -1,4 +1,4 @@
-import { QUIET_LINK } from "./styles";
+import { textLinkClasses } from "../shared/links/text-link";
 
 export interface PageHeading {
     /** The heading's `id`, which its link jumps to. */
@@ -25,7 +25,10 @@ export function OnThisPage({ headings }: { headings: PageHeading[] }) {
                 <ul className="m-0 grid list-none gap-1.5 border-l border-border p-0 pl-3.5 text-[13.5px] leading-[1.4]">
                     {headings.map((h) => (
                         <li key={h.id}>
-                            <a href={`#${h.id}`} className={QUIET_LINK}>
+                            <a
+                                href={`#${h.id}`}
+                                className={textLinkClasses({ tone: "quiet" })}
+                            >
                                 {h.text}
                             </a>
                         </li>

@@ -11,6 +11,7 @@ import { ResourceShell } from "@/components/resources/resource-shell";
 import { SideNav } from "@/components/resources/side-nav";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import {
     areasWithArticles,
     HELP_PATH,
@@ -26,7 +27,6 @@ import { CAPTURED } from "@/content/shots.captured";
 import { helpArticles, loadHelpArticle } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
-import { ring } from "@/lib/ring";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
 import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
 
@@ -72,10 +72,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         },
     };
 }
-
-const NEXT_LINK = `w-fit cursor-pointer rounded-sm text-mk-faq font-semibold text-brand-700 no-underline underline-offset-[3px] transition-colors duration-fast ease-out hover:underline active:text-foreground ${ring()}`;
-
-const PROSE_LINK = `rounded-sm font-semibold text-brand-700 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 export default async function HelpArticlePage({ params }: Props) {
     const { slug } = await params;
@@ -171,7 +167,9 @@ export default async function HelpArticlePage({ params }: Props) {
                                 }: ComponentProps<"a">) => (
                                     <Link
                                         href={href ?? ""}
-                                        className={PROSE_LINK}
+                                        className={textLinkClasses({
+                                            tone: "prose",
+                                        })}
                                     >
                                         {children}
                                     </Link>
@@ -196,7 +194,10 @@ export default async function HelpArticlePage({ params }: Props) {
                             <Link
                                 key={a.slug}
                                 href={helpHref(a.slug)}
-                                className={NEXT_LINK}
+                                className={textLinkClasses({
+                                    className:
+                                        "w-fit text-mk-faq font-semibold",
+                                })}
                             >
                                 {a.title}
                                 <Arrow />

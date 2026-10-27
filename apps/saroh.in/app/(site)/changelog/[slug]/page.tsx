@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
@@ -12,7 +13,6 @@ import {
 } from "@/content/changelog";
 import { linkShown, liveBySlug } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
-import { ring } from "@/lib/ring";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
 
@@ -109,7 +109,9 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     {section.link && linkShown(section.link.href, ctx) ? (
                         <Link
                             href={section.link.href}
-                            className={`w-fit cursor-pointer rounded-sm text-[14.5px] font-semibold text-brand-700 underline-offset-[3px] hover:text-brand-700 hover:underline ${ring()} active:text-foreground`}
+                            className={textLinkClasses({
+                                className: "w-fit text-[14.5px] font-semibold",
+                            })}
                         >
                             {section.link.label}
                             <Arrow />

@@ -3,9 +3,9 @@ import Link from "next/link";
 
 import { featureHref } from "@/content/features";
 import type { SegmentView } from "@/content/solutions";
-import { ring } from "@/lib/ring";
 
 import { Arrow } from "../shared/links/arrow";
+import { textLinkClasses } from "../shared/links/text-link";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
 
 /**
@@ -52,7 +52,10 @@ export function SolutionSegment({
                 {segment.seeLink ? (
                     <Link
                         href={featureHref(segment.feature)}
-                        className={`justify-self-start rounded-sm text-[15px] font-semibold text-brand-700 no-underline hover:text-foreground ${ring()}`}
+                        className={textLinkClasses({
+                            className:
+                                "justify-self-start text-[15px] font-semibold",
+                        })}
                     >
                         See {segment.featureName}
                         <Arrow />

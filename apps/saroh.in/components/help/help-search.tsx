@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import type { HelpSummary } from "@/content/help";
 import { HELP_EMAIL, helpHome, helpHref, searchArticles } from "@/content/help";
 import { ring } from "@/lib/ring";
+import { textLinkClasses } from "../shared/links/text-link";
 
 /**
  * The Help home's search (design 1a): in the browser, over the published
@@ -67,7 +68,9 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                         Nothing matches that yet. Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}
-                            className={`cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
+                            className={textLinkClasses({
+                                className: "font-semibold",
+                            })}
                         >
                             {HELP_EMAIL}
                         </a>{" "}

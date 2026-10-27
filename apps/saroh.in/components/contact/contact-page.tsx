@@ -14,13 +14,9 @@ import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
+import { textLinkClasses } from "../shared/links/text-link";
 import { Eyebrow } from "../shared/sections/eyebrow";
 import { ContactForm } from "./contact-form";
-
-const TEXT_LINK = cn(
-    "cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground",
-    ring(),
-);
 
 /** The side column's white card. */
 const SIDE_CARD =
@@ -103,7 +99,7 @@ export function ContactPage({
                             <Way label={ways.email}>
                                 <a
                                     href={`mailto:${SAROH_CONTACT_EMAIL}`}
-                                    className={TEXT_LINK}
+                                    className={textLinkClasses()}
                                 >
                                     {SAROH_CONTACT_EMAIL}
                                 </a>
@@ -112,7 +108,7 @@ export function ContactPage({
                                 <Way label={ways.phone}>
                                     <a
                                         href={`tel:${company.phone.dial}`}
-                                        className={TEXT_LINK}
+                                        className={textLinkClasses()}
                                     >
                                         {company.phone.display}
                                     </a>
@@ -127,7 +123,7 @@ export function ContactPage({
                                         href={link.href}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className={TEXT_LINK}
+                                        className={textLinkClasses()}
                                     >
                                         {socialText(link.href)}
                                     </a>
