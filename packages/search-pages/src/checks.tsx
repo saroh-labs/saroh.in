@@ -114,12 +114,23 @@ const TITLE_MAX = 60;
 const DESCRIPTION_MAX = 150;
 const BRAND = " · Saroh";
 
+/** A word without the punctuation around it, by index rather than an
+ * end-anchored regex (CodeQL js/polynomial-redos). */
+function trimToWord(w: string): string {
+    const isWord = (c: string | undefined) => !!c && /\w/.test(c);
+    let a = 0;
+    let b = w.length;
+    while (a < b && !isWord(w[a])) a++;
+    while (b > a && !isWord(w[b - 1])) b--;
+    return w.slice(a, b);
+}
+
 /** Every email-looking word, split on spaces first so no regex backtracks
  * over a long run of dots or dashes (CodeQL js/polynomial-redos). */
 export function emailsIn(text: string): string[] {
     return text
         .split(/\s+/)
-        .map((w) => w.replace(/^[^\w]+|[^\w]+$/g, ""))
+        .map(trimToWord)
         .filter((w) => /^[\w.-]+@[\w.-]+$/.test(w));
 }
 
