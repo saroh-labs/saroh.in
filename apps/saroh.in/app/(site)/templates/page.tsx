@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Container } from "@/components/shared/layout/container";
-import { TemplatesBand } from "@/components/templates/templates-band";
+import { CtaBand } from "@/components/shared/sections/cta-band";
 import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
     earlyAccessOpen,
@@ -65,10 +65,11 @@ export default function TemplatesPage() {
                 </p>
             </Container>
 
-            <TemplatesBand
+            <CtaBand
                 title={open ? page.band.after : page.band.before}
                 body={page.band.body}
                 src="templates-band"
+                note={null}
             />
         </>
     );

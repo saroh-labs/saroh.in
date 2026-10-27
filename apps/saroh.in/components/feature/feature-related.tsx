@@ -8,6 +8,7 @@ import { Container } from "../shared/layout/container";
 import { CardLink } from "../shared/links/card-link";
 import { PillLink } from "../shared/links/pill";
 import { Eyebrow } from "../shared/sections/eyebrow";
+import { PointGrid } from "../shared/sections/point-grid";
 import { SectionHeading } from "../shared/sections/section-heading";
 
 /**
@@ -29,24 +30,15 @@ export function FeaturePoints({
             className="grid gap-9 pt-[130px]"
         >
             <SectionHeading id="what-it-does" title="What it does" size="md" />
-            <ul className="m-0 grid list-none gap-x-10 gap-y-8 p-0 [grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))]">
-                {feature.points.map((point) => (
-                    <li
-                        key={point.title}
-                        className="grid content-start gap-1.5 border-t border-border pt-4"
-                    >
-                        <span className="text-[16.5px] font-semibold">
-                            {point.title}
-                        </span>
-                        <span className="text-mk-card-body text-mk-copy [text-wrap:pretty]">
-                            {point.body}
-                            {mode === "open" && point.openNote
-                                ? ` ${point.openNote}`
-                                : null}
-                        </span>
-                    </li>
-                ))}
-            </ul>
+            <PointGrid
+                points={feature.points.map((point) => ({
+                    title: point.title,
+                    body:
+                        mode === "open" && point.openNote
+                            ? `${point.body} ${point.openNote}`
+                            : point.body,
+                }))}
+            />
         </Container>
     );
 }

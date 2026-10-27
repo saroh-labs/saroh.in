@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import { HomeHero } from "@/components/home/home-hero";
-import { HomePricing } from "@/components/home/home-pricing";
 import { TourVideo } from "@/components/home/tour-video";
+import { PricingSection } from "@/components/pricing/pricing-section";
 import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CardLink } from "@/components/shared/links/card-link";
@@ -138,7 +138,11 @@ export default async function HomePage() {
                 that Pricing waits at the waitlist (Gate W), so no page draws
                 a plan or links to it. */}
             {LAUNCH_MODE === "open" ? (
-                <HomePricing
+                <PricingSection
+                    id="pricing"
+                    className="scroll-mt-6 pt-[110px]"
+                    title={home.pricingTitle}
+                    src="home-pricing"
                     model={
                         catalog
                             ? pricingPageModel(catalog)

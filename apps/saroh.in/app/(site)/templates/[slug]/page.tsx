@@ -5,9 +5,9 @@ import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { CtaBand } from "@/components/shared/sections/cta-band";
 import { TemplateCard } from "@/components/templates/template-card";
 import { TemplateViewer } from "@/components/templates/template-viewer";
-import { TemplatesBand } from "@/components/templates/templates-band";
 import type { GalleryTemplate } from "@/content/templates";
 import {
     templateDetail as detail,
@@ -191,7 +191,7 @@ export default async function TemplatePage({ params }: Props) {
                 </Container>
             ) : null}
 
-            <TemplatesBand
+            <CtaBand
                 title={
                     open
                         ? detail.band.after(t.name)
@@ -200,6 +200,7 @@ export default async function TemplatePage({ params }: Props) {
                 body={templatesPage.band.body}
                 src={`templates-${t.slug}-band`}
                 template={save}
+                note={null}
             />
         </>
     );

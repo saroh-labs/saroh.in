@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { LegalText } from "@/components/legal/legal-text";
 import { LEGAL_PAGES, isLive } from "@/content/resources";
@@ -23,10 +24,7 @@ export function LegalPage({
     const page = LEGAL_PAGES.find((p) => p.id === id);
     if (!page || !isLive(page, resourcesContext())) notFound();
     return (
-        <article className="mx-auto grid w-full max-w-[768px] gap-5 px-6 pt-[72px]">
-            <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
-                {title}
-            </h1>
+        <LegalFrame title={title}>
             <p className="m-0 text-[14px] text-muted-foreground">
                 Last updated{" "}
                 <time dateTime={page.publishOn}>
@@ -34,6 +32,27 @@ export function LegalPage({
                 </time>
             </p>
             <LegalText blocks={parseLegal(body)} />
+        </LegalFrame>
+    );
+}
+
+/**
+ * The legal pages' reading column and title, which /customers shares
+ * (DEC-195, A23).
+ */
+export function LegalFrame({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <article className="mx-auto grid w-full max-w-[768px] gap-5 px-6 pt-[72px]">
+            <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
+                {title}
+            </h1>
+            {children}
         </article>
     );
 }

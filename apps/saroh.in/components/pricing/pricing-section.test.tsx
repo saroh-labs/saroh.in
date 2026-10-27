@@ -5,16 +5,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { fakeCatalog } from "@/lib/pricing.fixture";
 
-import { SolutionPricing } from "./solution-pricing";
+import { PricingSection } from "./pricing-section";
 
 afterEach(cleanup);
 
-/** A solution page's Pricing: the Pricing page's own cards (`PricingCards`). */
-describe("SolutionPricing", () => {
+/** Home's and a solution page's Pricing: the Pricing page's own cards (`PricingCards`). */
+describe("PricingSection", () => {
     it("draws every plan the Pricing page draws, then Compare every plan", () => {
         const model = pricingPageModel(fakeCatalog());
         const { container } = render(
-            <SolutionPricing
+            <PricingSection
                 title="Pricing for gyms and studios"
                 model={model}
                 src="solutions-gyms-pricing"
@@ -34,7 +34,7 @@ describe("SolutionPricing", () => {
 
     it("with no catalogue, the placeholder cards", () => {
         const { container } = render(
-            <SolutionPricing
+            <PricingSection
                 title="Pricing for gyms and studios"
                 model={placeholderPricingModel()}
                 src="solutions-gyms-pricing"

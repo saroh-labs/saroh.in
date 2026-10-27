@@ -286,6 +286,7 @@
     | Piece                                     | The one                                                                             | Don't hand-draw                                                               |
     | ----------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
     | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                                 | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
+    | A page's pricing section, plan tables     | `PricingSection`, `PlanTable` (`components/pricing/`)                               | its own title + `PricingCards` block, its own table frame                     |
     | Focus ring                                | `ring()`, `lib/ring.ts`                                                             | the `focus-visible:outline-…` string                                          |
     | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `components/shared/links/text-link.tsx`               | `text-brand-700 no-underline` or a muted `no-underline` link class            |
     | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`          | an `aria-label="Breadcrumb"` list                                             |
@@ -299,6 +300,7 @@
     | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `components/shared/buttons/`             | an Ink `<button>` with `bg-foreground text-background`                        |
     | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`         | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
     | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                              | the label typed in a component                                                |
+    | Feature / solution hero, ruled points     | `ProductHero`, `PointGrid` (`components/shared/sections/`)                          | its own crumb–H1–sub–buttons–shot header, a `border-t pt-4` point list        |
     | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()` | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
     | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)             | `navigator.clipboard`, `URL.createObjectURL`                                  |
     | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                               | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Faq } from "@/components/shared/sections/faq";
+import { PointGrid } from "@/components/shared/sections/point-grid";
 import { LinkPreviewTool } from "@/components/tools/link-preview/link-preview-tool";
 import { SarohSharePreview } from "@/components/tools/link-preview/saroh-share-preview";
 import { linkPreview as copy } from "@/content/link-preview";
@@ -63,21 +64,15 @@ export default function LinkPreviewPage() {
 
             <LinkPreviewTool />
 
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-8 px-mk-gutter pt-16">
-                {copy.notes.map((note) => (
-                    <div
-                        key={note.t}
-                        className="grid content-start gap-1.5 border-t border-border pt-4"
-                    >
-                        <h2 className="m-0 text-base font-semibold">
-                            {note.t}
-                        </h2>
-                        <p className="m-0 text-[14.5px] leading-[1.55] text-mk-copy">
-                            {note.b}
-                        </p>
-                    </div>
-                ))}
-            </div>
+            <PointGrid
+                points={copy.notes.map((note) => ({
+                    title: note.t,
+                    body: note.b,
+                }))}
+                size="sm"
+                titleAs="h2"
+                className="px-mk-gutter pt-16"
+            />
 
             <SarohSharePreview />
 

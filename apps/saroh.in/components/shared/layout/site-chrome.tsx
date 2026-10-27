@@ -23,7 +23,29 @@ import { whatsappNumber } from "@/lib/whatsapp";
  * out here, on the server, from `content/resources.ts` (plan U1): only
  * pages that are published and built.
  */
-export function SiteChrome({ children }: { children: React.ReactNode }) {
+export function SiteChrome({
+    children,
+    banner,
+    preview = false,
+}: {
+    children: React.ReactNode;
+    /** A bar above the nav: the staff pricing preview's (DEC-195, A22). */
+    banner?: React.ReactNode;
+    /**
+     * The staff preview (`/pricing/draft`): the nav and footer bare, with no
+     * menus, legal links or WhatsApp, and nothing read for them.
+     */
+    preview?: boolean;
+}) {
+    if (preview) {
+        return (
+            <Shell banner={banner}>
+                <SiteNav />
+                <main id="main">{children}</main>
+                <SiteFooter />
+            </Shell>
+        );
+    }
     const ctx = resourcesContext();
     const resources = resourceItems(shownResources(ctx));
     // A solution goes to its /for/ page once that is live (DEC-193).
@@ -35,29 +57,52 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     // an advertising tag (DEC-127) or the recorder (DEC-125).
     const analytics = asksConsent(siteTagConfig());
     return (
+        <Shell
+            banner={banner}
+            after={
+                <WhatsAppChat
+                    number={whatsappNumber(
+                        env.NEXT_PUBLIC_WHATSAPP_CHAT,
+                        env.NEXT_PUBLIC_WHATSAPP_NUMBER,
+                    )}
+                    asksConsent={analytics}
+                />
+            }
+        >
+            <SiteNav
+                resources={resources}
+                tools={tools}
+                solutions={solutions}
+            />
+            <main id="main">{children}</main>
+            <SiteFooter
+                resources={resources}
+                tools={tools}
+                solutions={solutions}
+                legal={shownLegal(ctx)}
+                cookieChoices={analytics}
+            />
+        </Shell>
+    );
+}
+
+/** Paper, the 1280px page, and what sits outside it (the WhatsApp button). */
+function Shell({
+    banner,
+    after,
+    children,
+}: {
+    banner?: React.ReactNode;
+    after?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
         <div className="min-h-screen bg-background text-foreground [line-height:normal]">
             <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
-                <SiteNav
-                    resources={resources}
-                    tools={tools}
-                    solutions={solutions}
-                />
-                <main id="main">{children}</main>
-                <SiteFooter
-                    resources={resources}
-                    tools={tools}
-                    solutions={solutions}
-                    legal={shownLegal(ctx)}
-                    cookieChoices={analytics}
-                />
+                {banner}
+                {children}
             </div>
-            <WhatsAppChat
-                number={whatsappNumber(
-                    env.NEXT_PUBLIC_WHATSAPP_CHAT,
-                    env.NEXT_PUBLIC_WHATSAPP_NUMBER,
-                )}
-                asksConsent={analytics}
-            />
+            {after}
         </div>
     );
 }

@@ -140,27 +140,26 @@ const RULES: Rule[] = [
         home: ["components/shared/sections/cta-band.tsx"],
         allow: {
             "components/about/about-page.tsx":
-                "step 4 (A10): About's closing band becomes CtaBand (title only)",
-            "components/templates/templates-band.tsx":
-                "step 4 (A10): the file goes, Templates uses CtaBand template",
+                "step 6 (V4): About's closing band (its 56px title, no body) becomes CtaBand; its सह name band is its own Ink block and stays",
         },
         files: SITE,
     },
     {
         name: "a section's H2 is SectionHeading / Section (A8)",
         pattern: /<h2\b[^>]*?font-display[^>]*?text-mk-h2/,
-        home: ["components/shared/sections/section-heading.tsx"],
+        // Section draws its H2 itself until step 6 (A8) makes it SectionHeading.
+        home: [
+            "components/shared/sections/section-heading.tsx",
+            "components/shared/sections/section.tsx",
+        ],
         allow: each(
             "step 6 (A8): its raw H2 becomes Section / SectionHeading",
             [
                 "app/(site)/page.tsx",
                 "components/about/about-page.tsx",
                 "components/contact/contact-page.tsx",
-                "components/shared/sections/faq.tsx",
-                "components/home/home-pricing.tsx",
                 "components/pricing/compare-table.tsx",
                 "components/pricing/usage-table.tsx",
-                "components/solution/solution-pricing.tsx",
             ],
         ),
         files: SITE,
@@ -268,8 +267,7 @@ const RULES: Rule[] = [
             'step 6 (V12): its own small caps become Eyebrow tone="muted" size="sm"',
             [
                 "app/(standalone)/waitlist/page.tsx",
-                "components/pricing/compare-table.tsx",
-                "components/pricing/usage-table.tsx",
+                "components/pricing/plan-table.tsx",
                 "components/resources/on-this-page.tsx",
                 "components/resources/side-nav.tsx",
                 "components/solution/solution-segment.tsx",
@@ -287,7 +285,6 @@ const RULES: Rule[] = [
                 "app/(standalone)/waitlist/page.tsx",
                 "app/(site)/changelog/[slug]/page.tsx",
                 "app/(site)/changelog/page.tsx",
-                "app/(site)/customers/page.tsx",
                 "app/(site)/help/[slug]/page.tsx",
                 "app/(site)/help/page.tsx",
                 "app/(site)/integrations/[provider]/page.tsx",
@@ -312,7 +309,6 @@ const RULES: Rule[] = [
             [
                 "app/(site)/changelog/[slug]/page.tsx",
                 "app/(site)/changelog/page.tsx",
-                "app/(site)/customers/page.tsx",
                 "app/(site)/help/page.tsx",
                 "app/(site)/integrations/[provider]/page.tsx",
                 "components/changelog/changelog-list.tsx",
@@ -340,10 +336,8 @@ const RULES: Rule[] = [
         pattern: /\bbg-mk-soon\b/,
         home: ["components/shared/links/pill.tsx"],
         allow: {
-            "components/pricing/compare-table.tsx":
-                'step 4 (A19): its "Coming soon" badge becomes Pill tone="soon"',
             "components/pricing/plan-cards.tsx":
-                "keep: the staff preview's changed-part highlight, not a badge (check at step 4, A19)",
+                "keep: the staff preview's changed-part highlight, not a badge",
         },
         files: SITE,
     },
@@ -385,15 +379,7 @@ const RULES: Rule[] = [
         name: '"See it in action" is written in content/ only (A6)',
         pattern: /See it in action/,
         home: ["content/"],
-        allow: each(
-            "step 4 (A6): the words move to content/home.ts, the row becomes HeroActions",
-            [
-                "components/shared/sections/cta-band.tsx",
-                "components/feature/feature-hero.tsx",
-                "components/home/home-hero.tsx",
-                "components/solution/solution-hero.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {

@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import type { FaqItem } from "@/content/types";
 import { ring } from "@/lib/ring";
 
-import { Container } from "../layout/container";
+import { Section } from "./section";
 
 /**
  * "Questions": each a native `<details>`, so it opens with the keyboard and
@@ -26,21 +26,15 @@ export function Faq({
     className?: string;
 }) {
     return (
-        <Container
-            as="section"
+        <Section
             id={id}
-            aria-labelledby={`${id}-title`}
+            titleId={`${id}-title`}
+            title={title}
             className={cn(
                 "mx-0 grid max-w-[860px] scroll-mt-6 gap-5 pt-[110px]",
                 className,
             )}
         >
-            <h2
-                id={`${id}-title`}
-                className="m-0 font-display text-mk-h2-sm font-bold"
-            >
-                {title}
-            </h2>
             <div className="grid border-t border-border">
                 {items.map((item) => (
                     <details
@@ -64,6 +58,6 @@ export function Faq({
                     </details>
                 ))}
             </div>
-        </Container>
+        </Section>
     );
 }

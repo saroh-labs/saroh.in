@@ -48,25 +48,6 @@
             ]
         },
         {
-            "lines": 15,
-            "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "c0b4db41a5a5",
-                "8a7b07454aa4",
-                "3ee4d4d0eaba",
-                "8c3a811ee4a5",
-                "56020077fe50",
-                "c1157f782526",
-                "36198df5885d",
-                "e1475ba019cc",
-                "fe76e450d755",
-                "53be0c6ee17b"
-            ]
-        },
-        {
             "lines": 13,
             "files": [
                 "packages/search-pages/src/checks.tsx",
@@ -81,22 +62,6 @@
                 "d7f0efde512d",
                 "9507725c37b0",
                 "4ee18816f1ab"
-            ]
-        },
-        {
-            "lines": 12,
-            "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "66642909ee09",
-                "1520b846218d",
-                "4d55bcae83a0",
-                "7610d46a86da",
-                "ca64ddeac95e",
-                "d063327d0729",
-                "f3b1d7f6aba6"
             ]
         },
         {
@@ -236,18 +201,6 @@
                 "44bbe61846cf",
                 "425f1d545025",
                 "bf27310421b3"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "824d4b5b77cd",
-                "cd20b5533014",
-                "778982bbddca"
             ]
         },
         {
@@ -397,17 +350,6 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "92413d53f193",
-                "e07aaccc9d3f"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
                 "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
                 "apps/saroh.in/components/shared/nav/site-nav.tsx"
             ],
@@ -455,31 +397,11 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "4b61bd1ec544"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
                 "apps/saroh.in/components/resources/resource-shell.tsx",
                 "apps/saroh.in/components/templates/browser-frame.tsx"
             ],
             "windows": [
                 "aa3aee2be7e0"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/saroh.in/components/shared/sections/cta-band.tsx",
-                "apps/saroh.in/components/templates/templates-band.tsx"
-            ],
-            "windows": [
-                "39891e2d9897"
             ]
         },
         {

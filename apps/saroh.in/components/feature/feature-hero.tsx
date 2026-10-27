@@ -1,22 +1,15 @@
 import Link from "next/link";
 
-import { TOUR_VIDEO } from "@/content/home";
 import type { Feature } from "@/content/types";
 import { ring } from "@/lib/ring";
 
-import { ButtonLink } from "../shared/buttons/button";
-import { CtaLink } from "../shared/buttons/cta-link";
-import { Container } from "../shared/layout/container";
-import { ScreenshotFrame } from "../shared/media/screenshot-frame";
+import { ProductHero } from "../shared/sections/product-hero";
 
 /**
- * A feature page's opening (Features template): the "Features / {name}"
- * breadcrumb, the headline, the sub, the start button, the free-plan line,
- * then the page's screenshot, which enlarges on click.
- *
- * "See it in action · 2 min" shows only once a tour video is configured
- * (KTD-12, deviation D-3). The free-plan line comes from the pricing
- * catalogue, the placeholder line without one (the public-repo rule).
+ * A feature page's opening (Features template), drawn by `ProductHero`: the
+ * "Features / {name}" breadcrumb, then the feature's words and screenshot.
+ * The free-plan line comes from the pricing catalogue, the placeholder line
+ * without one (the public-repo rule).
  */
 export function FeatureHero({
     feature,
@@ -27,11 +20,8 @@ export function FeatureHero({
     freeLine: string;
 }) {
     return (
-        <>
-            <Container
-                as="header"
-                className="grid justify-items-start gap-5 pt-[72px]"
-            >
+        <ProductHero
+            crumb={
                 <nav aria-label="Breadcrumb">
                     <ol className="m-0 flex list-none items-center gap-2 p-0 text-[14px] text-muted-foreground">
                         <li>
@@ -51,34 +41,13 @@ export function FeatureHero({
                         </li>
                     </ol>
                 </nav>
-                <h1 className="m-0 max-w-[16ch] font-display text-mk-display font-bold [text-wrap:balance]">
-                    {feature.headline}
-                </h1>
-                <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
-                    {feature.sub}
-                </p>
-                <div className="flex flex-wrap gap-3">
-                    <CtaLink src={`feature-${feature.slug}`} />
-                    {TOUR_VIDEO ? (
-                        <ButtonLink href="/#video" variant="secondary" play>
-                            See it in action · 2 min
-                        </ButtonLink>
-                    ) : null}
-                </div>
-                <div className="text-mk-note text-muted-foreground">
-                    {freeLine}
-                </div>
-            </Container>
-            <Container className="pt-14">
-                <ScreenshotFrame
-                    shot={feature.hero.shot}
-                    alt={feature.hero.alt}
-                    variant="hero"
-                    zoomable
-                    priority
-                    sizes="(min-width: 1280px) 1168px, 100vw"
-                />
-            </Container>
-        </>
+            }
+            headline={feature.headline}
+            sub={feature.sub}
+            narrow
+            actions={{ src: `feature-${feature.slug}` }}
+            freeLine={freeLine}
+            shot={feature.hero}
+        />
     );
 }

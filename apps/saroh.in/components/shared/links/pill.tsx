@@ -5,20 +5,28 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import { Arrow } from "./arrow";
 
+const TONE = {
+    plain: "inline-flex items-center rounded-full border border-border bg-card px-[11px] py-[5px] text-[13px] font-semibold text-foreground",
+    soon: "whitespace-nowrap rounded-full bg-mk-soon px-2 py-0.5 text-[11.5px] font-semibold text-brand-700",
+    ok: "rounded-full bg-mk-ok-tint px-[9px] py-[3px] text-[12px] font-semibold text-mk-ok",
+    outline:
+        "rounded-full border border-border-strong px-[9px] py-[3px] text-[12.5px] font-semibold",
+} as const;
+
 /**
- * A chip that only says something: the hero's "UPI Autopay", "GST
- * invoices"… (13px Geist 600 on white, a hairline border).
+ * A chip that only says something (DEC-195, A19):
+ * - `plain` — the hero's "UPI Autopay", "GST invoices"… (13px Geist 600 on
+ *   white, a hairline border).
+ * - `soon` — "Coming soon" beside a plan table's row.
+ * - `ok` — an integration's "Available".
+ * - `outline` — "Not available yet".
  */
-export function Pill({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-    return (
-        <span
-            className={cn(
-                "inline-flex items-center rounded-full border border-border bg-card px-[11px] py-[5px] text-[13px] font-semibold text-foreground",
-                className,
-            )}
-            {...props}
-        />
-    );
+export function Pill({
+    tone = "plain",
+    className,
+    ...props
+}: HTMLAttributes<HTMLSpanElement> & { tone?: keyof typeof TONE }) {
+    return <span className={cn(TONE[tone], className)} {...props} />;
 }
 
 /**

@@ -1,9 +1,7 @@
-import { home, TOUR_VIDEO } from "@/content/home";
+import { home } from "@/content/home";
 import { demoHref } from "@/lib/demos";
 
-import { ButtonLink } from "../shared/buttons/button";
-import { CtaLink } from "../shared/buttons/cta-link";
-import { DemoLink } from "../shared/buttons/demo-link";
+import { HeroActions } from "../shared/buttons/hero-actions";
 import { Container } from "../shared/layout/container";
 import { Pill } from "../shared/links/pill";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
@@ -41,19 +39,15 @@ export function HomeHero({ freeLine }: { freeLine: string }) {
                 <p className="m-0 max-w-[50ch] text-mk-intro text-mk-copy [text-wrap:pretty]">
                     {home.sub}
                 </p>
-                <div className="flex flex-wrap gap-3">
-                    <CtaLink src="home-hero" />
-                    <DemoLink
-                        href={demoHref("salon")}
-                        page="home"
-                        trade="salon"
-                    />
-                    {TOUR_VIDEO ? (
-                        <ButtonLink href="#video" variant="secondary" play>
-                            See it in action · 2 min
-                        </ButtonLink>
-                    ) : null}
-                </div>
+                <HeroActions
+                    src="home-hero"
+                    demo={{
+                        href: demoHref("salon"),
+                        page: "home",
+                        trade: "salon",
+                    }}
+                    tourHref="#video"
+                />
                 <div className="grid gap-3">
                     <p className="m-0 text-mk-note text-muted-foreground">
                         {freeLine}

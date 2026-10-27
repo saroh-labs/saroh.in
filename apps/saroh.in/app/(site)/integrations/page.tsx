@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Container } from "@/components/shared/layout/container";
 import { Arrow } from "@/components/shared/links/arrow";
+import { Pill } from "@/components/shared/links/pill";
 import { byComingGroup } from "@/content/coming";
 import {
     integrationHref,
@@ -64,9 +65,9 @@ export default function IntegrationsPage() {
                                             {item.category}
                                         </span>
                                     </span>
-                                    <span className="ml-auto rounded-full bg-mk-ok-tint px-[9px] py-[3px] text-[12px] font-semibold text-mk-ok">
+                                    <Pill tone="ok" className="ml-auto">
                                         Available
-                                    </span>
+                                    </Pill>
                                 </span>
                                 <span className="text-[14.5px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
                                     {item.line}
@@ -126,9 +127,7 @@ export default function IntegrationsPage() {
                                     <span className="flex-[1_1_340px] text-[15px] leading-[1.55]">
                                         {item.line}
                                     </span>
-                                    <span className="rounded-full border border-border-strong px-[9px] py-[3px] text-[12.5px] font-semibold">
-                                        {page.notYet}
-                                    </span>
+                                    <Pill tone="outline">{page.notYet}</Pill>
                                 </li>
                             ))}
                         </ul>

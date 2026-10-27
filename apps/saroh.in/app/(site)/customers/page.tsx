@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ReportForm } from "@/components/customers/report-form";
+import { LegalFrame } from "@/components/legal/legal-page";
 import { LegalText } from "@/components/legal/legal-text";
 import { CUSTOMERS } from "@/content/customers";
 import { parseLegal } from "@/lib/legal-markdown";
@@ -21,14 +22,11 @@ export const metadata: Metadata = pageMetadata({
  */
 export default function CustomersPage() {
     return (
-        <article className="mx-auto grid w-full max-w-[768px] gap-5 px-6 pt-[72px]">
-            <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
-                {CUSTOMERS.title}
-            </h1>
+        <LegalFrame title={CUSTOMERS.title}>
             <LegalText blocks={parseLegal(CUSTOMERS.body)} />
             <div className="pb-10 pt-2">
                 <ReportForm />
             </div>
-        </article>
+        </LegalFrame>
     );
 }

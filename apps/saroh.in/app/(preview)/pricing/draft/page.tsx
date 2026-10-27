@@ -6,8 +6,7 @@ import { PreviewBanner } from "@/components/pricing/preview/preview-banner";
 import { PreviewControls } from "@/components/pricing/preview/preview-controls";
 import { PricingPage } from "@/components/pricing/pricing-page";
 import { Container } from "@/components/shared/layout/container";
-import { SiteFooter } from "@/components/shared/nav/site-footer";
-import { SiteNav } from "@/components/shared/nav/site-nav";
+import { SiteChrome } from "@/components/shared/layout/site-chrome";
 import { LAUNCH_MODE } from "@/lib/links";
 import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
 import { markChanges } from "@/lib/pricing-marks";
@@ -27,7 +26,7 @@ import { ring } from "@/lib/ring";
  * (`app/site-tags.tsx`); `next.config.js` sets the same as headers.
  *
  * Outside the `(site)` group so the amber bar sits above the nav, as the
- * design draws it; it brings the V2 chrome itself.
+ * design draws it; it brings the V2 chrome itself (`SiteChrome preview`).
  *
  * The bar holds the preview's controls (admin redesign U13, R24): the draft
  * or what is live now, desktop or phone width, and Show what changed, which
@@ -56,7 +55,8 @@ export default async function PricingDraftRoute({
 
     if (!read.ok) {
         return (
-            <Chrome
+            <SiteChrome
+                preview
                 banner={
                     <PreviewBanner>
                         {read.reason === "expired"
@@ -90,7 +90,7 @@ export default async function PricingDraftRoute({
                         </Link>
                     ) : null}
                 </Container>
-            </Chrome>
+            </SiteChrome>
         );
     }
 
@@ -106,9 +106,9 @@ export default async function PricingDraftRoute({
 
     if (view.frame) {
         return (
-            <Chrome banner={null}>
+            <SiteChrome preview>
                 <PricingPage model={model} />
-            </Chrome>
+            </SiteChrome>
         );
     }
 
@@ -144,28 +144,8 @@ export default async function PricingDraftRoute({
     }
 
     return (
-        <Chrome banner={banner}>
+        <SiteChrome preview banner={banner}>
             <PricingPage model={model} />
-        </Chrome>
-    );
-}
-
-/** The `(site)` layout's chrome, with the preview bar above the nav. */
-function Chrome({
-    banner,
-    children,
-}: {
-    banner: React.ReactNode;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="min-h-screen bg-background text-foreground [line-height:normal]">
-            <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
-                {banner}
-                <SiteNav />
-                <main id="main">{children}</main>
-                <SiteFooter />
-            </div>
-        </div>
+        </SiteChrome>
     );
 }

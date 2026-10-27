@@ -1,21 +1,16 @@
 import Link from "next/link";
 
-import { TOUR_VIDEO } from "@/content/home";
 import type { Solution } from "@/content/types";
 import { demoHref, demoTrade } from "@/lib/demos";
 import { ring } from "@/lib/ring";
 
-import { ButtonLink } from "../shared/buttons/button";
-import { CtaLink } from "../shared/buttons/cta-link";
-import { DemoLink } from "../shared/buttons/demo-link";
-import { Container } from "../shared/layout/container";
-import { ScreenshotFrame } from "../shared/media/screenshot-frame";
+import { ProductHero } from "../shared/sections/product-hero";
 
 /**
- * The top of a solution page: "Solutions / Gyms & studios", the headline,
- * the sub, the start button (and "See it in action" once a video is set,
- * deviation D-3), the free-plan line, then the hero shot and its note. A
- * page with no screen of its trade captured yet has neither (`Solution.hero`).
+ * The top of a solution page, drawn by `ProductHero`: "Solutions / Gyms &
+ * studios", then the trade's words, its live demo, the hero shot and its
+ * note. A page with no screen of its trade captured yet has neither
+ * (`Solution.hero`).
  */
 export function SolutionHero({
     solution,
@@ -27,11 +22,8 @@ export function SolutionHero({
 }) {
     const trade = demoTrade(solution.slug);
     return (
-        <>
-            <Container
-                as="header"
-                className="grid justify-items-start gap-5 pt-[72px]"
-            >
+        <ProductHero
+            crumb={
                 <nav
                     aria-label="Breadcrumb"
                     className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -50,46 +42,20 @@ export function SolutionHero({
                         {solution.name}
                     </span>
                 </nav>
-                <h1 className="m-0 max-w-[17ch] font-display text-mk-display font-bold [text-wrap:balance]">
-                    {solution.headline}
-                </h1>
-                <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
-                    {solution.sub}
-                </p>
-                <div className="flex flex-wrap gap-3">
-                    <CtaLink src={`solutions-${solution.slug}-hero`} />
-                    <DemoLink
-                        href={demoHref(trade)}
-                        page={`solutions-${solution.slug}`}
-                        trade={trade}
-                    />
-                    {TOUR_VIDEO ? (
-                        <ButtonLink href="/#video" variant="secondary" play>
-                            See it in action · 2 min
-                        </ButtonLink>
-                    ) : null}
-                </div>
-                <p className="m-0 text-mk-note text-muted-foreground">
-                    {freeLine}
-                </p>
-            </Container>
-            {solution.hero ? (
-                <Container className="pt-14">
-                    <ScreenshotFrame
-                        shot={solution.hero.shot}
-                        alt={solution.hero.alt}
-                        variant="hero"
-                        zoomable
-                        priority
-                        sizes="(min-width: 1280px) 1168px, 100vw"
-                    />
-                    {solution.heroNote ? (
-                        <p className="m-0 mt-3.5 text-sm text-muted-foreground">
-                            {solution.heroNote}
-                        </p>
-                    ) : null}
-                </Container>
-            ) : null}
-        </>
+            }
+            headline={solution.headline}
+            sub={solution.sub}
+            actions={{
+                src: `solutions-${solution.slug}-hero`,
+                demo: {
+                    href: demoHref(trade),
+                    page: `solutions-${solution.slug}`,
+                    trade,
+                },
+            }}
+            freeLine={freeLine}
+            shot={solution.hero}
+            note={solution.heroNote}
+        />
     );
 }

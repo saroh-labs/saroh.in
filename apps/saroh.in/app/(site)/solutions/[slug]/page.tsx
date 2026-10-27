@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PricingSection } from "@/components/pricing/pricing-section";
 import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { Faq } from "@/components/shared/sections/faq";
 import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { SolutionHero } from "@/components/solution/solution-hero";
-import { SolutionPricing } from "@/components/solution/solution-pricing";
 import { SolutionSegment } from "@/components/solution/solution-segment";
 import { solutionFaq } from "@/content/faq";
 import { features } from "@/content/features";
@@ -111,7 +111,8 @@ export default async function SolutionPage({ params }: Props) {
 
             {/* Plans show once the launch switch opens (Gate W). */}
             {LAUNCH_MODE === "open" ? (
-                <SolutionPricing
+                <PricingSection
+                    className="pt-[130px]"
                     title={s.pricing.title}
                     model={
                         catalog
