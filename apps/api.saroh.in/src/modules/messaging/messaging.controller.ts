@@ -162,6 +162,14 @@ export class PublicVerificationsController {
         @RelayContext() relay: SiteRelay,
         @Body() dto: StartVerificationDto,
     ): Promise<{ verificationId: string; expiresAt: Date }> {
+        // Sign-in codes go through site sign-in, which asks the challenge
+        // and opens the session (DEC-196); a bare ACCOUNT code proves nothing.
+        if (dto.module === "ACCOUNT") {
+            throw new BadRequestException({
+                message: "Sign-in codes are asked for through sign-in.",
+                details: { field: "module" },
+            });
+        }
         const site = await resolveSiteHost(relay.host);
         await assertOrganizationOpen(site.organizationId);
         return this.send.sendCode({

@@ -8,7 +8,9 @@ import type {
 import { modulePageTopOf, PageSections, reachOf } from "@saroh/site-blocks";
 
 import {
+    requestPhoneSignInCode,
     requestSignInCode,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
 import { sendMessage } from "@/app/[domain]/account/messages/actions";
@@ -171,6 +173,8 @@ async function pricesActions(
         signIn: {
             requestCode: requestSignInCode,
             verifyCode: verifySignInCode,
+            requestPhoneCode: requestPhoneSignInCode,
+            verifyPhoneCode: verifyPhoneSignInCode,
         },
         join: {
             join: joinPlan,

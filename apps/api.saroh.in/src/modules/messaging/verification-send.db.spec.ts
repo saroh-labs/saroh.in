@@ -78,6 +78,11 @@ const ledgerKinds = async (organizationId: string) =>
 
 describe("VerificationSendService.sendCode", () => {
     beforeAll(async () => {
+        // Every business here is approved for phone codes (DEC-196) but the
+        // one a test refuses with its own override.
+        await prisma.featureFlag.create({
+            data: { key: "CUSTOMER_PHONE_CODES", enabledByDefault: true },
+        });
         await publishPrices((c) => {
             c.messagePrices = { whatsapp: PRICE };
         });
@@ -85,6 +90,40 @@ describe("VerificationSendService.sendCode", () => {
 
     afterAll(async () => {
         await prisma.$disconnect();
+    });
+
+    it("refuses a business the owner hasn't approved, whatever its switch and balance", async () => {
+        const orgId = await business();
+        await prisma.featureFlagOverride.create({
+            data: {
+                flagKey: "CUSTOMER_PHONE_CODES",
+                organizationId: orgId,
+                enabled: false,
+            },
+        });
+        const sends = transport.sends.length;
+        await expect(
+            send.sendCode({
+                organizationId: orgId,
+                module: "BOOKING",
+                phoneE164: nextPhone(),
+            }),
+        ).rejects.toMatchObject({
+            status: 403,
+            response: { details: { code: "PHONE_CODES_NOT_APPROVED" } },
+        });
+        expect(transport.sends.length).toBe(sends);
+        expect(await send.canSend(orgId, "BOOKING")).toBe(false);
+        await expect(
+            verification.setEnabled(orgId, "ACCOUNT", true),
+        ).rejects.toMatchObject({
+            status: 403,
+            response: { details: { code: "PHONE_CODES_NOT_APPROVED" } },
+        });
+        // Turning a module off is never refused.
+        await expect(
+            verification.setEnabled(orgId, "BOOKING", false),
+        ).resolves.toContainEqual({ module: "BOOKING", enabled: false });
     });
 
     it("refuses a module that is off: no session, no hold, no send", async () => {
@@ -392,6 +431,20 @@ describe("the messaging controllers", () => {
             verified: 1,
             rate: 0.5,
         });
+    });
+
+    it("lets the owner switch site sign-in codes (ACCOUNT) on and off, which is what offers them", async () => {
+        const orgId = await business({ on: false });
+        const me = ctx(orgId, "OWNER");
+        expect(await send.canSend(orgId, "ACCOUNT")).toBe(false);
+        await expect(
+            owner.setSetting(me, { module: "ACCOUNT", enabled: true }),
+        ).resolves.toContainEqual({ module: "ACCOUNT", enabled: true });
+        expect(await send.canSend(orgId, "ACCOUNT")).toBe(true);
+        await expect(
+            owner.setSetting(me, { module: "ACCOUNT", enabled: false }),
+        ).resolves.toContainEqual({ module: "ACCOUNT", enabled: false });
+        expect(await send.canSend(orgId, "ACCOUNT")).toBe(false);
     });
 
     it("starts and checks a code on the site, never answering with the code", async () => {

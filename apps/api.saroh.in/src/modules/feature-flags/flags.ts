@@ -117,6 +117,17 @@ export const FlagKey = {
      * `looksAvailable`. The renderer never reads it.
      */
     SITE_LOOKS: "SITE_LOOKS",
+
+    /**
+     * WhatsApp sign-in codes for a business's customers (DEC-196), sent by
+     * Saroh and paid from the business's messaging balance. Off for everyone
+     * until the full rollout; the owner turns it on per business in admin's
+     * Flags. Off, site sign-in never offers it and refuses its requests and
+     * checks, and the business can't switch its ACCOUNT codes on. Email
+     * codes never ask it. Readers: `site-accounts/phone-sign-in.service.ts`
+     * and `messaging/verification.service.ts` (`setEnabled`).
+     */
+    CUSTOMER_PHONE_CODES: "CUSTOMER_PHONE_CODES",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -262,6 +273,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Every site has chosen a look or Classic is retired, the looks have been on for every business on every instance for a release, and the three readers in site-looks.ts no longer ask it.",
+    },
+    CUSTOMER_PHONE_CODES: {
+        shownAs: "WhatsApp sign-in codes",
+        group: "feature",
+        purpose:
+            "Lets a business's customers sign in on its website with a WhatsApp code that Saroh sends and the business's messaging balance pays for. Turn it on per business the owner approves; off, its website offers email codes only, refuses WhatsApp code requests, and the business can't switch sign-in codes on in Messaging. Email codes are never affected.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "WhatsApp sign-in codes are open to every business on every instance, have needed no kill switch for a release, and the two readers no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
         shownAs: "Change web address",

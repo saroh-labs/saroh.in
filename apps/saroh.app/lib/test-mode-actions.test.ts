@@ -100,6 +100,10 @@ const WRITES: Record<string, () => Promise<unknown>> = {
     requestSignInCode: () => account.requestSignInCode("asha@example.in"),
     verifySignInCode: () =>
         account.verifySignInCode("asha@example.in", "123456"),
+    requestPhoneSignInCode: () =>
+        account.requestPhoneSignInCode("+91 98450 12345"),
+    verifyPhoneSignInCode: () =>
+        account.verifyPhoneSignInCode("+91 98450 12345", "123456"),
     signOut: () => account.signOut(),
     signOutEverywhere: () => account.signOutEverywhere(),
     moveBooking: () => bookings.moveBooking("bkg_1", AT),

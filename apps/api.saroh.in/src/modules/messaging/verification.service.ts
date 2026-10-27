@@ -2,9 +2,11 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import {
     BadRequestException,
+    ForbiddenException,
     HttpException,
     HttpStatus,
     Injectable,
+    Optional,
 } from "@nestjs/common";
 import type {
     MessagingChannel,
@@ -16,6 +18,8 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import { normalisePhoneNumber } from "@saroh/block-contract";
 
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import { siteCodeSecret } from "../site-accounts/site-secrets";
 import { checkAbuse } from "./abuse-guard";
 import { VERIFICATION_MODULES } from "./dto";
@@ -77,6 +81,23 @@ export function indianPhoneE164(raw: string): string {
 
 @Injectable()
 export class VerificationService {
+    constructor(
+        @Optional()
+        private readonly flags: FeatureFlagService = new FeatureFlagService(),
+    ) {}
+
+    /**
+     * Whether Saroh may send this business's customers phone codes at all:
+     * the owner approves each business (`CUSTOMER_PHONE_CODES`) until the
+     * full rollout (DEC-196). Every module's switch and send asks it.
+     */
+    approved(organizationId: string): Promise<boolean> {
+        return this.flags.isEnabled(
+            FlagKey.CUSTOMER_PHONE_CODES,
+            organizationId,
+        );
+    }
+
     async start(input: {
         organizationId: string;
         module: VerificationModule;
@@ -261,6 +282,13 @@ export class VerificationService {
         module: VerificationModule,
         enabled: boolean,
     ): Promise<{ module: VerificationModule; enabled: boolean }[]> {
+        if (enabled && !(await this.approved(organizationId))) {
+            throw new ForbiddenException({
+                message:
+                    "WhatsApp codes for your customers aren't open to your business yet. Ask Saroh to turn them on.",
+                details: { code: "PHONE_CODES_NOT_APPROVED" },
+            });
+        }
         await runInOrgContext(organizationId, () =>
             prisma.messagingVerificationSetting.upsert({
                 where: { organizationId_module: { organizationId, module } },

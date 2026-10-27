@@ -24,6 +24,7 @@ import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { NEW_BUSINESS_CEILINGS } from "./code-limits";
 import { CustomerAccountRepository } from "./customer-account.repository";
 import { RequestCodeDto, VerifyCodeDto } from "./dto";
+import type { PhoneSignInService } from "./phone-sign-in.service";
 import { hashSessionToken, SessionsService } from "./sessions.service";
 import {
     destinationHashFor,
@@ -83,7 +84,10 @@ function build(options: { addressLimit?: number; verifyLimit?: number } = {}) {
         new FixedWindowRateLimiter(options.verifyLimit ?? 1_000, 600_000),
     );
     return {
-        api: new SignInController(service),
+        // The WhatsApp way is phone-sign-in.db.spec.ts; here it is never offered.
+        api: new SignInController(service, {
+            offered: () => Promise.resolve(false),
+        } as unknown as PhoneSignInService),
         sent,
         sender,
         alerts,
@@ -736,6 +740,7 @@ describe("site sign-in: when the code can't be sent", () => {
             businessName: "Kavi Dental",
             phone: null,
             challenge: { required: false, siteKey: "site-key" },
+            whatsapp: false,
         });
     });
 
@@ -752,6 +757,7 @@ describe("site sign-in: when the code can't be sent", () => {
             businessName: "Kavi Dental",
             phone: "+918040001234",
             challenge: { required: false, siteKey: "site-key" },
+            whatsapp: false,
         });
     });
 

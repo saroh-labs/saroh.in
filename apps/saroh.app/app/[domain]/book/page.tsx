@@ -40,8 +40,10 @@ import { bookDescription, canonical } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 import {
+    requestPhoneSignInCode,
     requestSignInCode,
     signOut,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "../account/actions";
 import { moveBooking } from "../account/bookings/actions";
@@ -311,6 +313,8 @@ export default async function BookPage({
                     signIn: {
                         requestCode: requestSignInCode,
                         verifyCode: verifySignInCode,
+                        requestPhoneCode: requestPhoneSignInCode,
+                        verifyPhoneCode: verifyPhoneSignInCode,
                     },
                     book: bookSignedIn,
                     credit: creditFor,

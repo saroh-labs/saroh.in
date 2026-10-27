@@ -29,6 +29,7 @@ import {
 } from "./code-limits";
 import { normaliseAccountEmail } from "./customer-account.repository";
 import type { RequestCodeDto, VerifyCodeDto } from "./dto";
+import { readPhoneProof } from "./phone-proof";
 import { cleanBusinessName } from "./sender-name";
 import type { SessionIssued } from "./sessions.service";
 import { SessionsService } from "./sessions.service";
@@ -136,7 +137,7 @@ function sameHash(a: string, b: string): boolean {
     return x.length === y.length && timingSafeEqual(x, y);
 }
 
-function limited(
+export function limited(
     reason: "limit" | "wait",
     retryAfterSeconds: number,
 ): HttpException {
@@ -355,11 +356,16 @@ export class SignInCodesService {
                 dto.code,
                 now,
             );
-            return this.openSession(site, email, now);
+            // A phone just proved by WhatsApp joins this email's account
+            // (DEC-196). A stale or forged proof only means no phone is added.
+            const phone = dto.phoneProof
+                ? readPhoneProof(site.organizationId, dto.phoneProof, now)
+                : null;
+            return this.openSession(site, email, now, phone);
         });
     }
 
-    private async passChallenge(
+    async passChallenge(
         site: SiteHost,
         relay: SiteRelay,
         token: string | undefined,
@@ -500,10 +506,11 @@ export class SignInCodesService {
     }
 
     /** Sign in (or up), and hand back a new session's token once. */
-    private async openSession(
+    async openSession(
         site: SiteHost,
         email: string,
         now: Date,
+        addPhoneE164?: string | null,
     ): Promise<SessionIssued> {
         const run = () =>
             prisma.$transaction(async (tx) => {
@@ -528,6 +535,15 @@ export class SignInCodesService {
                             "You can't sign in here. Please contact the business.",
                         details: { reason: "blocked" },
                     });
+                }
+                if (addPhoneE164) {
+                    await this.linking.addPhone(
+                        tx,
+                        site.organizationId,
+                        identity.account.id,
+                        addPhoneE164,
+                        now,
+                    );
                 }
                 return this.sessions.create(tx, {
                     organizationId: site.organizationId,

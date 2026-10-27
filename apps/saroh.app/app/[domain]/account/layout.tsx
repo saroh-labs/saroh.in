@@ -23,8 +23,10 @@ import { getSignInOptions } from "@/lib/sign-in";
 
 import {
     loadSignInOptions,
+    requestPhoneSignInCode,
     requestSignInCode,
     signOut,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "./actions";
 
@@ -150,6 +152,10 @@ export default async function AccountLayout({
                                         api={{
                                             requestCode: requestSignInCode,
                                             verifyCode: verifySignInCode,
+                                            requestPhoneCode:
+                                                requestPhoneSignInCode,
+                                            verifyPhoneCode:
+                                                verifyPhoneSignInCode,
                                         }}
                                         loadOptions={loadSignInOptions}
                                     />
@@ -238,6 +244,8 @@ async function LookAccount({
                         api={{
                             requestCode: requestSignInCode,
                             verifyCode: verifySignInCode,
+                            requestPhoneCode: requestPhoneSignInCode,
+                            verifyPhoneCode: verifyPhoneSignInCode,
                         }}
                         lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}.`}
                     />

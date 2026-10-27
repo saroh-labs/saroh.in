@@ -42,6 +42,12 @@ export class VerificationSendService {
         ipHash?: string;
     }): Promise<{ verificationId: string; expiresAt: Date }> {
         const { organizationId } = input;
+        if (!(await this.verification.approved(organizationId))) {
+            throw new ForbiddenException({
+                message: "This business doesn't send codes yet.",
+                details: { code: "PHONE_CODES_NOT_APPROVED" },
+            });
+        }
         if (
             !(await this.verification.isEnabled(organizationId, input.module))
         ) {
@@ -117,6 +123,34 @@ export class VerificationSendService {
             message: "We couldn't send the code. Try again in a minute.",
             details: { code: "SEND_FAILED" },
         });
+    }
+
+    /**
+     * Whether `sendCode` for `module` would send now: switched on, priced,
+     * and the balance covers a code. For hiding a way in before anyone types
+     * (DEC-196); any failure to tell is a no.
+     */
+    async canSend(
+        organizationId: string,
+        module: VerificationModule,
+    ): Promise<boolean> {
+        try {
+            if (
+                !(await this.verification.approved(organizationId)) ||
+                !(await this.verification.isEnabled(organizationId, module))
+            ) {
+                return false;
+            }
+            const live = await this.catalogue.live(new Date());
+            const price = live?.catalog.messagePrices?.whatsapp;
+            if (price === undefined) return false;
+            const wallet = await this.wallet.get(organizationId);
+            const lapsed =
+                wallet.expiresAt !== null && wallet.expiresAt <= new Date();
+            return !lapsed && wallet.availablePaise >= price;
+        } catch {
+            return false;
+        }
     }
 
     /** The live catalogue's WhatsApp price; none published refuses the send. */

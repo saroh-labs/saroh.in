@@ -29,6 +29,10 @@ const ASKS: Record<string, How> = {
     "POST public/site-accounts/codes": "site-accounts/sign-in-codes.service.ts",
     "POST public/site-accounts/sessions":
         "site-accounts/sign-in-codes.service.ts",
+    "POST public/site-accounts/phone-codes":
+        "site-accounts/phone-sign-in.service.ts",
+    "POST public/site-accounts/phone-sessions":
+        "site-accounts/phone-sign-in.service.ts",
     // Saroh-sent verification codes (DEC-191): neither sent nor checked on a demo.
     "POST public/site-accounts/verifications":
         "messaging/messaging.controller.ts",

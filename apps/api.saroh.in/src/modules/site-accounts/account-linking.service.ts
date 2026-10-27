@@ -7,6 +7,7 @@ import { reservedAccountEmail } from "../contacts/contact-email";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import {
     CustomerAccountRepository,
+    LIVE_ACCOUNT_STATUSES,
     normaliseAccountEmail,
 } from "./customer-account.repository";
 
@@ -146,6 +147,34 @@ export class AccountLinkingService {
             data: { email: reservedAccountEmail(separate.id) },
         });
         return this.open(tx, organizationId, separate.id, email, now);
+    }
+
+    /**
+     * Put a just-proved phone on an account whose email was just proved
+     * (DEC-196). A phone another live account holds stays where it is:
+     * moving it is staff's call (a recycled number), not a sign-in's.
+     */
+    async addPhone(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+        accountId: string,
+        phoneE164: string,
+        now: Date,
+    ): Promise<void> {
+        const holder = await tx.customerAccount.findFirst({
+            where: {
+                organizationId,
+                phoneE164,
+                status: { in: [...LIVE_ACCOUNT_STATUSES] },
+                id: { not: accountId },
+            },
+            select: { id: true },
+        });
+        if (holder) return;
+        await tx.customerAccount.updateMany({
+            where: { id: accountId, organizationId },
+            data: { phoneE164, phoneVerifiedAt: now },
+        });
     }
 
     private async open(

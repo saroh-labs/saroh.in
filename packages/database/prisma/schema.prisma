@@ -7631,6 +7631,12 @@ model CustomerAccount {
   email           String
   emailVerifiedAt DateTime
 
+  // A phone proved by a WhatsApp code from Saroh's sender (DEC-196), E.164.
+  // Only ever added to an account whose email was just proved too, so a
+  // phone signs in to an email account and never stands without one.
+  phoneE164       String?
+  phoneVerifiedAt DateTime?
+
   status CustomerAccountStatus @default(ACTIVE)
 
   // The survivor's account, when a merge retired this one (MERGED).
@@ -7676,6 +7682,8 @@ model CustomerAccount {
   @@unique([organizationId, email], map: "CustomerAccount_one_live_per_email", where: raw("status <> 'REMOVED'"))
   // One live account per contact.
   @@unique([contactId], map: "CustomerAccount_one_live_per_contact", where: raw("status <> 'REMOVED'"))
+  // One live account per phone per business, as for email.
+  @@unique([organizationId, phoneE164], map: "CustomerAccount_one_live_per_phone", where: raw("status <> 'REMOVED'"))
   // The target of (accountId, organizationId) and merge foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])

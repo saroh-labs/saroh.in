@@ -8,18 +8,15 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
 import { PricingModule } from "../pricing/pricing.module";
+import { MessagingCoreModule } from "./messaging-core.module";
 import {
     MessagingController,
     PublicVerificationsController,
 } from "./messaging.controller";
 import { MESSAGING_SEND_TYPE, MessagingService } from "./messaging.service";
 import { Msg91WebhookController } from "./msg91-webhook.controller";
-import { messagingProviderProvider } from "./providers/messaging-provider.factory";
 import { TopupService } from "./topup.service";
-import { VerificationSendService } from "./verification-send.service";
-import { VerificationService } from "./verification.service";
 import { WALLET_SWEEP_TYPE, WalletSweepHandler } from "./wallet-sweep.handler";
-import { WalletService } from "./wallet.service";
 
 /** How often a stopped wallet sweep chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
@@ -35,6 +32,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         JobsModule,
         OrganizationContextModule,
         PricingModule,
+        MessagingCoreModule,
     ],
     controllers: [
         MessagingController,
@@ -42,21 +40,11 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         Msg91WebhookController,
     ],
     providers: [
-        messagingProviderProvider,
-        MessagingService,
         billingProviderFactoryProvider,
         TopupService,
-        VerificationService,
-        VerificationSendService,
-        WalletService,
         WalletSweepHandler,
     ],
-    exports: [
-        MessagingService,
-        VerificationService,
-        VerificationSendService,
-        WalletService,
-    ],
+    exports: [MessagingCoreModule],
 })
 export class MessagingModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;
