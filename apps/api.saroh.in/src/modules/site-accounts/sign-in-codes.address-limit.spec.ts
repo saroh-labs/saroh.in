@@ -57,6 +57,7 @@ describe("SignInCodesService past the address limit, with no challenge configure
             // Email is offered: the ways are sign-in-ways.db.spec.ts.
             {
                 assertOffered: () => Promise.resolve(),
+                emailAllowed: () => Promise.resolve(true),
                 view: () =>
                     Promise.resolve({
                         effective: ["EMAIL"],

@@ -127,4 +127,28 @@ describe("the sign-in sheet's ways (DEC-196)", () => {
         expect(requestPhoneCode).toHaveBeenCalled();
         expect(alternates()).toEqual(["Use email instead"]);
     });
+
+    it('with email off, still lets an email account in by "Signed up with email?"', () => {
+        setup({ ways: ["WHATSAPP"], phoneOnlySignUp: true });
+        expect(alternates()).toEqual([]);
+        fireEvent.click(
+            screen.getByRole("button", { name: "Signed up with email?" }),
+        );
+        expect(screen.getByLabelText("Email")).toBeTruthy();
+        // Nobody new signs up by email here.
+        expect(
+            screen.queryByText("New here? The same code creates your account."),
+        ).toBeNull();
+        expect(alternates()).toEqual(["Use WhatsApp instead"]);
+        expect(
+            screen.queryByRole("button", { name: "Signed up with email?" }),
+        ).toBeNull();
+    });
+
+    it('draws no "Signed up with email?" while email is a way', () => {
+        setup({ ways: ["WHATSAPP", "EMAIL"], phoneOnlySignUp: true });
+        expect(
+            screen.queryByRole("button", { name: "Signed up with email?" }),
+        ).toBeNull();
+    });
 });

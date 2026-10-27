@@ -84,6 +84,7 @@ function build(options: { addressLimit?: number; verifyLimit?: number } = {}) {
         // Email only: the ways themselves are sign-in-ways.db.spec.ts.
         {
             assertOffered: () => Promise.resolve(),
+            emailAllowed: () => Promise.resolve(true),
             view: () =>
                 Promise.resolve({
                     effective: ["EMAIL"],

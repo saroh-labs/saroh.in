@@ -73,6 +73,9 @@ import {
  * the number. When WhatsApp answers that it can't send (the business ran
  * out of balance since the page was drawn), "Use email instead" is offered
  * even where email wasn't listed: the server has brought email back.
+ * Where email isn't listed at all, "Signed up with email?" still opens
+ * the email code (DEC-196, Follow-ups): the server sends it only to an
+ * account made by email that has no phone, and answers everyone alike.
  *
  * Me opens it to change or add the sign-in email ("change-email",
  * "add-email") and to add a WhatsApp number ("add-phone").
@@ -186,6 +189,8 @@ export function SignInSheet({
             ? options.challenge.siteKey
             : null);
     // WhatsApp couldn't send: email is back on the server, so offer it.
+    // Email off: an account made by email still signs in with it.
+    const emailFallback = keeps && !ways.includes("email");
     const others: SheetWay[] =
         byPhone &&
         !addingPhone &&
@@ -515,6 +520,7 @@ export function SignInSheet({
                     {step === "email" &&
                     keeps &&
                     !phoneProof &&
+                    !(emailFallback && !byPhone) &&
                     (!byPhone || options.phoneOnlySignUp === true) ? (
                         <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                             New here? The same code creates your account.
@@ -602,6 +608,19 @@ export function SignInSheet({
                           </button>
                       ))
                     : null}
+                {step === "email" &&
+                !phoneProof &&
+                emailFallback &&
+                byPhone &&
+                !others.includes("email") ? (
+                    <button
+                        type="button"
+                        onClick={() => switchWay("email")}
+                        className={cn(altButton, "font-normal")}
+                    >
+                        Signed up with email?
+                    </button>
+                ) : null}
             </div>
         </>
     );

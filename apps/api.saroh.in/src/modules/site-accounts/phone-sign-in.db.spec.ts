@@ -677,14 +677,12 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
             expect((await api.options(relay(site.host))).ways).toEqual([
                 "WHATSAPP",
             ]);
-            expect(
-                await refusal(
-                    api.requestCode(relay(site.host), { email: nextEmail() }),
-                ),
-            ).toMatchObject({
-                status: 503,
-                details: { reason: "unavailable" },
-            });
+            // Email off: a new email gets the usual answer, and no code.
+            const sentBefore = emails.length;
+            await expect(
+                api.requestCode(relay(site.host), { email: nextEmail() }),
+            ).resolves.toMatchObject({ sent: true });
+            expect(emails.length).toBe(sentBefore);
 
             await prisma.featureFlagOverride.updateMany({
                 where: {
@@ -752,9 +750,89 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
                         code: "123456",
                     }),
                 ),
-            ).toMatchObject({
-                status: 503,
-                details: { reason: "unavailable" },
+            ).toMatchObject({ status: 400, details: { reason: "expired" } });
+        });
+
+        describe("with email off, an email-only account keeps email (DEC-196, Follow-ups)", () => {
+            /** An account made by email while email was on, then email off. */
+            async function emailOnlyAccount() {
+                const site = await business();
+                await ways.set(site.organizationId, ["EMAIL", "WHATSAPP"]);
+                const email = nextEmail();
+                await api.requestCode(relay(site.host), { email });
+                await api.verify(relay(site.host), {
+                    email,
+                    code: emails.at(-1)?.code ?? "",
+                });
+                await ways.set(site.organizationId, ["WHATSAPP"]);
+                return { site, email };
+            }
+
+            it("signs in an email-only account by email", async () => {
+                const { site, email } = await emailOnlyAccount();
+                const sentBefore = emails.length;
+                await expect(
+                    api.requestCode(relay(site.host), { email }),
+                ).resolves.toMatchObject({ sent: true });
+                expect(emails.length).toBe(sentBefore + 1);
+                const session = await api.verify(relay(site.host), {
+                    email,
+                    code: emails.at(-1)?.code ?? "",
+                });
+                expect(session.token).toBeTruthy();
+            });
+
+            it("refuses a new email: the same answer, no code, no account", async () => {
+                const { site } = await emailOnlyAccount();
+                const email = nextEmail();
+                const sentBefore = emails.length;
+                await expect(
+                    api.requestCode(relay(site.host), { email }),
+                ).resolves.toEqual({
+                    sent: true,
+                    expiresInSeconds: expect.any(Number),
+                    resendAfterSeconds: expect.any(Number),
+                });
+                expect(emails.length).toBe(sentBefore);
+                expect(
+                    await refusal(
+                        api.verify(relay(site.host), {
+                            email,
+                            code: "123456",
+                        }),
+                    ),
+                ).toMatchObject({
+                    status: 400,
+                    details: { reason: "expired" },
+                });
+                expect(
+                    await prisma.customerAccount.count({
+                        where: { organizationId: site.organizationId, email },
+                    }),
+                ).toBe(0);
+            });
+
+            it("refuses an account that has a phone, even with a code from before", async () => {
+                const site = await business();
+                // Never chose: a new phone is asked for an email.
+                const { email } = await accountWithPhone(site.host);
+                // A code asked for while email was still on.
+                await api.requestCode(relay(site.host), { email });
+                const code = emails.at(-1)?.code ?? "";
+                await ways.set(site.organizationId, ["WHATSAPP"]);
+                const sentBefore = emails.length;
+                await expect(
+                    api.requestCode(relay(site.host), { email }),
+                ).resolves.toMatchObject({ sent: true });
+                expect(emails.length).toBe(sentBefore);
+                expect(
+                    await refusal(
+                        api.verify(relay(site.host), { email, code }),
+                    ),
+                ).toMatchObject({
+                    status: 400,
+                    details: { reason: "expired" },
+                });
             });
         });
 

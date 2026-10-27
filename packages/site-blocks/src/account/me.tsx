@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { focusRing } from "../booking-flow/styles";
@@ -110,6 +110,20 @@ export interface MeProps {
 
 type Open = "details" | "email" | "phone" | "note" | null;
 
+/** Where "Not now" on the WhatsApp ask is kept, in this browser. */
+export const PHONE_ASK_DISMISSED_KEY = "saroh:phone-ask-dismissed";
+
+// Nothing to listen to: only this page writes it.
+const noStore = () => () => undefined;
+
+function readAskDismissed(): boolean {
+    try {
+        return window.localStorage.getItem(PHONE_ASK_DISMISSED_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
 export function Me({
     account: initial,
     receipts,
@@ -149,6 +163,29 @@ export function Me({
     const phoneAdd = api.phoneAdd;
     const canAddPhone =
         phoneAdd !== undefined && (options.ways ?? []).includes("WHATSAPP");
+    // Email is off and they signed in with it ("Signed up with email?",
+    // DEC-196): asked once to add a number, so they never sign up twice.
+    // Drawn on the server as dismissed; the browser reads its own "Not now".
+    const dismissedBefore = useSyncExternalStore(
+        noStore,
+        readAskDismissed,
+        () => true,
+    );
+    const [dismissedNow, setDismissedNow] = useState(false);
+    const askPhone =
+        canAddPhone &&
+        !dismissedBefore &&
+        !dismissedNow &&
+        !account.signInPhone &&
+        !(options.ways ?? []).includes("EMAIL");
+    function dismissAsk() {
+        setDismissedNow(true);
+        try {
+            window.localStorage.setItem(PHONE_ASK_DISMISSED_KEY, "1");
+        } catch {
+            // Asked again next visit: no harm.
+        }
+    }
 
     async function signOut(everywhere: boolean) {
         if (signingOut) return;
@@ -180,6 +217,35 @@ export function Me({
                 <p role="status" className="text-site-body text-[15px]">
                     {said}
                 </p>
+            ) : null}
+
+            {askPhone ? (
+                <AccountCard
+                    labelledBy="me-phone-ask"
+                    title="Add your WhatsApp number"
+                    lead={`${account.businessName} now signs you in with a code on WhatsApp.`}
+                    actions={
+                        <>
+                            <button
+                                type="button"
+                                className={buttonClasses(true)}
+                                onClick={() => {
+                                    dismissAsk();
+                                    setOpen("phone");
+                                }}
+                            >
+                                Add WhatsApp number
+                            </button>
+                            <button
+                                type="button"
+                                className={quietButton}
+                                onClick={dismissAsk}
+                            >
+                                Not now
+                            </button>
+                        </>
+                    }
+                />
             ) : null}
 
             <AccountCard labelledBy="me-details" title="Name and contact">

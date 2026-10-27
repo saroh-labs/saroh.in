@@ -8,7 +8,12 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
-import { enqueueDataRequestEmail } from "../site-accounts/data-request-email.handler";
+import {
+    dataRequestEventKey,
+    dataRequestNotSentKey,
+    enqueueDataRequestEmail,
+} from "../site-accounts/data-request-email.handler";
+import type { DataRequestEmailStep } from "../site-accounts/data-request-emails";
 import { requireCustomerPower } from "./customer-access";
 import type { DataRequestFilter } from "./data-requests.dto";
 import { fullName } from "./merge-plan";
@@ -50,6 +55,78 @@ export interface DataRequestRow {
      * request is kept as the record, and the business needs it no more.
      */
     email: string | null;
+    /**
+     * The WhatsApp number a customer without an email asked from (DEC-196),
+     * to find them by. Null once done, or when they have an email.
+     */
+    phone: string | null;
+    /**
+     * Whether Saroh told them where the request stands now (received, done
+     * or closed): "not-sent" when it couldn't (no email, and no WhatsApp
+     * from Saroh), so the business tells them itself.
+     */
+    customerTold: CustomerTold;
+}
+
+export type CustomerTold = "sent" | "not-sent" | "pending";
+
+const STEP_OF: Record<CustomerDataRequestStatus, DataRequestEmailStep> = {
+    OPEN: "received",
+    DONE: "done",
+    CLOSED_WITHOUT_REMOVAL: "closed",
+};
+
+/** Each request's {@link CustomerTold}, from the notices recorded for it. */
+async function toldOf(
+    db: Pick<Prisma.TransactionClient, "customerNotice" | "messagingMessage">,
+    organizationId: string,
+    rows: { id: string; status: CustomerDataRequestStatus }[],
+): Promise<Map<string, CustomerTold>> {
+    const keys = rows.flatMap((r) => [
+        dataRequestEventKey(r.id, STEP_OF[r.status]),
+        dataRequestNotSentKey(r.id, STEP_OF[r.status]),
+    ]);
+    const notices = await db.customerNotice.findMany({
+        where: { organizationId, eventKey: { in: keys } },
+        select: { eventKey: true, messageId: true },
+    });
+    // A WhatsApp send that failed for good after its retries.
+    const failed = new Set(
+        (
+            await db.messagingMessage.findMany({
+                where: {
+                    id: {
+                        in: notices.flatMap((n) =>
+                            n.messageId ? [n.messageId] : [],
+                        ),
+                    },
+                    status: "FAILED",
+                },
+                select: { id: true },
+            })
+        ).map((m) => m.id),
+    );
+    const byKey = new Map(notices.map((n) => [n.eventKey, n]));
+    return new Map(
+        rows.map((r): [string, CustomerTold] => {
+            const step = STEP_OF[r.status];
+            const sent = byKey.get(dataRequestEventKey(r.id, step));
+            if (sent) {
+                return [
+                    r.id,
+                    sent.messageId && failed.has(sent.messageId)
+                        ? "not-sent"
+                        : "sent",
+                ];
+            }
+            return [
+                r.id,
+                byKey.has(dataRequestNotSentKey(r.id, step))
+                    ? "not-sent"
+                    : "pending",
+            ];
+        }),
+    );
 }
 
 /** The newest first, at most this many: requests are rare. */
@@ -74,6 +151,7 @@ const ROW_SELECT = {
     contactId: true,
     requesterName: true,
     requesterEmail: true,
+    requesterPhoneE164: true,
     contact: {
         select: { firstName: true, lastName: true, removedAt: true },
     },
@@ -83,7 +161,10 @@ type Selected = Prisma.CustomerDataRequestGetPayload<{
     select: typeof ROW_SELECT;
 }>;
 
-export function dataRequestRow(row: Selected): DataRequestRow {
+export function dataRequestRow(
+    row: Selected,
+    customerTold: CustomerTold = "pending",
+): DataRequestRow {
     const live = row.contact && !row.contact.removedAt ? row.contact : null;
     const done = row.status === "DONE";
     const name = done
@@ -99,6 +180,8 @@ export function dataRequestRow(row: Selected): DataRequestRow {
         contactId: live ? row.contactId : null,
         name,
         email: done ? null : row.requesterEmail,
+        phone: done ? null : row.requesterPhoneE164,
+        customerTold,
     };
 }
 
@@ -118,7 +201,10 @@ export class DataRequestsService {
             take: DATA_REQUESTS_LIMIT,
             select: ROW_SELECT,
         });
-        return { requests: rows.map(dataRequestRow) };
+        const told = await toldOf(prisma, ctx.organizationId, rows);
+        return {
+            requests: rows.map((row) => dataRequestRow(row, told.get(row.id))),
+        };
     }
 
     /** Close an open request without removal, with a reason. */

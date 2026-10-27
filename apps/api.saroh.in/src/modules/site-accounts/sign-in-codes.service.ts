@@ -63,6 +63,12 @@ export interface CodeRequested {
     resendAfterSeconds: number;
 }
 
+const CODE_REQUESTED: CodeRequested = {
+    sent: true,
+    expiresInSeconds: CODE_TTL_MS / 1000,
+    resendAfterSeconds: OWN_RESEND_MS / 1000,
+};
+
 export type { SessionIssued } from "./sessions.service";
 
 /** What the sign-in sheet needs before anything is typed. */
@@ -230,8 +236,6 @@ export class SignInCodesService {
             // Signing in to see, pay or cancel what they already have
             // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
-            // Only while the business offers email sign-in (DEC-196).
-            await this.ways.assertOffered(site.organizationId, "EMAIL");
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
@@ -243,6 +247,12 @@ export class SignInCodesService {
             // the one hard stop on one address asking this business for
             // code after code (A-2).
             const addressBusy = this.takeAddress(site, relay, now);
+
+            // Email off (DEC-196): only an email-only account gets a code;
+            // anyone else gets the same answer and nothing is sent.
+            if (!(await this.ways.emailAllowed(site.organizationId, email))) {
+                return CODE_REQUESTED;
+            }
 
             const returning = await prisma.customerAccount.count({
                 where: {
@@ -359,7 +369,6 @@ export class SignInCodesService {
             // Signing in to see, pay or cancel what they already have
             // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
-            await this.ways.assertOffered(site.organizationId, "EMAIL");
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
@@ -367,6 +376,11 @@ export class SignInCodesService {
                 email,
             );
             this.takeVerifyTry(site, relay, destinationHash, now);
+            // Email off and not an email-only account: as if no code was
+            // sent, which none was (DEC-196).
+            if (!(await this.ways.emailAllowed(site.organizationId, email))) {
+                throw wrongCode("expired");
+            }
             await this.consumeCode(
                 site.organizationId,
                 destinationHash,
@@ -459,11 +473,7 @@ export class SignInCodesService {
             data: { retiredAt: now },
         });
 
-        return {
-            sent: true,
-            expiresInSeconds: CODE_TTL_MS / 1000,
-            resendAfterSeconds: OWN_RESEND_MS / 1000,
-        };
+        return CODE_REQUESTED;
     }
 
     /**

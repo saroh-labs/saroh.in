@@ -138,6 +138,35 @@ export class SignInWaysService {
     }
 
     /**
+     * Whether an email code may go to, and sign in, `email` now (DEC-196,
+     * Follow-ups): always while the site offers email. With email off, only
+     * for a live account with a verified email and no verified phone, so a
+     * customer who signed up by email keeps a way in ("Signed up with
+     * email?") and nobody new signs up by email. The caller answers a
+     * refusal as it answers any email, so it never says who has an account.
+     */
+    async emailAllowed(
+        organizationId: string,
+        email: string,
+    ): Promise<boolean> {
+        if ((await this.effective(organizationId)).includes("EMAIL")) {
+            return true;
+        }
+        const emailOnly = await runInOrgContext(organizationId, () =>
+            prisma.customerAccount.count({
+                where: {
+                    organizationId,
+                    email,
+                    status: "ACTIVE",
+                    emailVerifiedAt: { not: null },
+                    phoneVerifiedAt: null,
+                },
+            }),
+        );
+        return emailOnly > 0;
+    }
+
+    /**
      * Refuse a way the site doesn't offer now (503 `unavailable`, as a
      * code that couldn't be sent): a sheet drawn before the change, or a
      * hand-made request, never gets through.
