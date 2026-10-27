@@ -1,0 +1,887 @@
+{
+    "note": "Clone groups that already exist (DEC-195). Only ever shrinks: node scripts/check-dupes.mjs --update after removing one.",
+    "minLines": 6,
+    "groups": [
+        {
+            "lines": 21,
+            "files": [
+                "packages/search-pages/src/checks.tsx",
+                "packages/search-pages/src/tool-checks.ts"
+            ],
+            "windows": [
+                "54b646584aba",
+                "8592829c6fe0",
+                "135ad765ad22",
+                "bd3ac33b5ef8",
+                "fc52b22997ce",
+                "76b51570d8d9",
+                "333a2661d2bf",
+                "a63fe32d0478",
+                "1d4922d5942f",
+                "0f374b0af1bb",
+                "10ee8c701c03",
+                "53cfb8f32bf0",
+                "32f218bcb761",
+                "508931421cd0",
+                "c707a9ce8a58",
+                "bc92fb03a1c4"
+            ]
+        },
+        {
+            "lines": 16,
+            "files": [
+                "apps/saroh.in/content/changelog.ts",
+                "apps/saroh.in/content/integrations.ts"
+            ],
+            "windows": [
+                "39990154bbdd",
+                "a5cafd63a011",
+                "fa035f933899",
+                "df54864f93e4",
+                "11a663006736",
+                "e93c0f0334b3",
+                "57f7d66d41b5",
+                "27a267fa5f3e",
+                "6e7d0c8122f9",
+                "5d018175d75b",
+                "a5a94e8455c0"
+            ]
+        },
+        {
+            "lines": 15,
+            "files": [
+                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
+                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+            ],
+            "windows": [
+                "c0b4db41a5a5",
+                "8a7b07454aa4",
+                "3ee4d4d0eaba",
+                "8c3a811ee4a5",
+                "56020077fe50",
+                "c1157f782526",
+                "36198df5885d",
+                "e1475ba019cc",
+                "fe76e450d755",
+                "53be0c6ee17b"
+            ]
+        },
+        {
+            "lines": 13,
+            "files": [
+                "packages/search-pages/src/checks.tsx",
+                "packages/search-pages/src/tool-checks.ts"
+            ],
+            "windows": [
+                "41ac2c164bae",
+                "7a41982f9247",
+                "e0b062c85b7a",
+                "1489262146ee",
+                "0ab18f24cd70",
+                "d7f0efde512d",
+                "9507725c37b0",
+                "4ee18816f1ab"
+            ]
+        },
+        {
+            "lines": 12,
+            "files": [
+                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
+                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+            ],
+            "windows": [
+                "66642909ee09",
+                "1520b846218d",
+                "4d55bcae83a0",
+                "7610d46a86da",
+                "ca64ddeac95e",
+                "d063327d0729",
+                "f3b1d7f6aba6"
+            ]
+        },
+        {
+            "lines": 11,
+            "files": [
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx",
+                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
+            ],
+            "windows": [
+                "85943d9e35a9",
+                "d1bb626e7cb5",
+                "8a8976ebf356",
+                "16c63b345934",
+                "b74045cef25b",
+                "954df55d9078"
+            ]
+        },
+        {
+            "lines": 11,
+            "files": [
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx",
+                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
+            ],
+            "windows": [
+                "85943d9e35a9",
+                "d1bb626e7cb5",
+                "8a8976ebf356",
+                "16c63b345934",
+                "b74045cef25b",
+                "0a0127c877c3"
+            ]
+        },
+        {
+            "lines": 10,
+            "files": [
+                "apps/saroh.in/components/v2/tools/qr-download.ts",
+                "packages/search-pages/src/tools/qr.tsx"
+            ],
+            "windows": [
+                "9bf7e550de6d",
+                "9e3ebf91be16",
+                "0004e27f37c8",
+                "f86855772dff",
+                "0937d47bbc9f"
+            ]
+        },
+        {
+            "lines": 10,
+            "files": [
+                "packages/search-pages/src/tools/business-card-qr-generator/index.tsx",
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "fe3973989094",
+                "04abcb9e2977",
+                "05d0a940f88a",
+                "0b5a10e49a40",
+                "cbf4ec0de15a"
+            ]
+        },
+        {
+            "lines": 10,
+            "files": [
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/receipt-maker/index.tsx"
+            ],
+            "windows": [
+                "2ebc0e5c4353",
+                "15a100950b52",
+                "fce481b58908",
+                "eb2f1ac2ccc4",
+                "c687e56d23e2"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "apps/saroh.in/app/api/link-preview/report/route.ts",
+                "apps/saroh.in/app/api/link-preview/route.ts",
+                "apps/saroh.in/app/api/tools/unlock/route.ts"
+            ],
+            "windows": [
+                "f74792215071",
+                "a59ce88ed521",
+                "5dd2cc2171ca",
+                "da0f45626018"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "apps/saroh.in/components/v2/tools/link-input.tsx",
+                "apps/saroh.in/components/v2/tools/qr-code-maker.tsx"
+            ],
+            "windows": [
+                "4e607c6030ee",
+                "076c172950a4",
+                "b88f8ffabdd1",
+                "53c543297633"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx"
+            ],
+            "windows": [
+                "5d65441bc943",
+                "f4e04fbb5814",
+                "d52615d7f4af",
+                "71c002f859b7"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx"
+            ],
+            "windows": [
+                "0d9b67e37399",
+                "632ca0de5a09",
+                "28456f60cdaa",
+                "67e60d98656a"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "cce7dc3924b2",
+                "e6afcf257a4c",
+                "525035b870b2",
+                "7c10d76466bd"
+            ]
+        },
+        {
+            "lines": 9,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "e6e9c51d8d98",
+                "6550ea50bb65",
+                "99f05fae5964",
+                "74182f0fd5c3"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "apps/saroh.in/components/v2/about/about-page.tsx",
+                "apps/saroh.in/components/v2/contact/contact-page.tsx"
+            ],
+            "windows": [
+                "44bbe61846cf",
+                "425f1d545025",
+                "bf27310421b3"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "apps/saroh.in/components/v2/contact/contact-form.tsx",
+                "apps/saroh.in/components/v2/pricing/billing-toggle.tsx"
+            ],
+            "windows": [
+                "aff91dbd94db",
+                "a2e3a5c2f95c",
+                "1f532c6120fd"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "apps/saroh.in/components/v2/cta-link.tsx",
+                "apps/saroh.in/lib/links.ts"
+            ],
+            "windows": [
+                "8a7361009d07",
+                "7d4197a6d07f",
+                "ff2b615e3263"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
+                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+            ],
+            "windows": [
+                "824d4b5b77cd",
+                "cd20b5533014",
+                "778982bbddca"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "apps/saroh.in/components/v2/tools/qr-download.ts",
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx"
+            ],
+            "windows": [
+                "f6417b681f24",
+                "e95b48229920",
+                "457f0a5fc2d6"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx",
+                "packages/search-pages/src/tools/receipt-maker/index.tsx"
+            ],
+            "windows": [
+                "d29e3263d6d0",
+                "9e6c269fe120",
+                "88cc5cd8d8a5"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/business-card-qr-generator/index.tsx",
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "bed34f7c0b17",
+                "77c0c09fa77b",
+                "58ead418c518"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/cancellation-policy-generator/index.tsx",
+                "packages/search-pages/src/tools/whatsapp-link-generator/index.tsx"
+            ],
+            "windows": [
+                "2753c767d318",
+                "ba840d0db691",
+                "dadae23fbf68"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/hsn-sac-code-finder/index.tsx",
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx",
+                "packages/search-pages/src/tools/td-parts.tsx",
+                "packages/search-pages/src/tools/whatsapp-message-templates/index.tsx"
+            ],
+            "windows": [
+                "8a705de55954",
+                "5e834618bb96",
+                "5e8a59e3976c"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "88051d2f1ada",
+                "b6542e37d70c",
+                "32c4f1fa5da2"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "8f80b9fe21a7",
+                "5ca79dd834b3",
+                "ee2a13c34366"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/(v2)/error.tsx",
+                "apps/saroh.in/app/error.tsx"
+            ],
+            "windows": [
+                "26e06a642a80",
+                "6bf56b49b46f"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/(v2)/error.tsx",
+                "apps/saroh.in/app/error.tsx",
+                "apps/saroh.in/app/global-error.tsx"
+            ],
+            "windows": [
+                "dea5978c7175",
+                "8aee1cfe5afc"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/(v2)/tools/link-preview/page.tsx",
+                "apps/saroh.in/app/(v2)/tools/qr-code-maker/page.tsx"
+            ],
+            "windows": [
+                "371ffb67fdc7",
+                "1607ba569f92"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/api/business-reports/route.ts",
+                "apps/saroh.in/app/api/contact/route.ts"
+            ],
+            "windows": [
+                "ca1bf28c6f9c",
+                "77766c41805d"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/api/link-preview/report/route.ts",
+                "apps/saroh.in/app/api/link-preview/route.ts",
+                "apps/saroh.in/app/api/tools/unlock/route.ts"
+            ],
+            "windows": [
+                "7e3b45c11018",
+                "0e76aee884b7"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/app/api/link-preview/report/route.ts",
+                "apps/saroh.in/app/api/tools/unlock/route.ts"
+            ],
+            "windows": [
+                "2205d416dec6",
+                "f5e01538f5c3"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/components/v2/about/about-page.tsx",
+                "apps/saroh.in/components/v2/contact/contact-page.tsx"
+            ],
+            "windows": [
+                "a94505d6473d",
+                "9428981335e3"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/components/v2/mobile-menu.tsx",
+                "apps/saroh.in/components/v2/site-nav.tsx"
+            ],
+            "windows": [
+                "2a0e92cc0e6b",
+                "91b52972c5b3"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
+                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+            ],
+            "windows": [
+                "92413d53f193",
+                "e07aaccc9d3f"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx",
+                "packages/search-pages/src/tools/receipt-maker/index.tsx"
+            ],
+            "windows": [
+                "a0d99a9b7e74",
+                "7774d8a44b72"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "cfb0d9df7664",
+                "69f3f7a4001c"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx",
+                "packages/search-pages/src/tools/receipt-maker/index.tsx"
+            ],
+            "windows": [
+                "8ec5851177f3",
+                "ce7438518928"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/break-even-calculator/index.tsx",
+                "packages/search-pages/src/tools/gst-calculator/index.tsx",
+                "packages/search-pages/src/tools/gstin-checker/index.tsx",
+                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
+                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx",
+                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
+            ],
+            "windows": [
+                "1ad9dff83ea9",
+                "72d8de60ccd4"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/break-even-calculator/index.tsx",
+                "packages/search-pages/src/tools/gstin-checker/index.tsx",
+                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
+                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx",
+                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
+            ],
+            "windows": [
+                "615af54a8588",
+                "ab149ba33af0"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/break-even-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx"
+            ],
+            "windows": [
+                "5641529dbeb0",
+                "d5de8ae8acfc"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "packages/search-pages/src/tools/gst-calculator/index.tsx",
+                "packages/search-pages/src/tools/gstin-checker/index.tsx",
+                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
+                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx",
+                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
+            ],
+            "windows": [
+                "be9cff5710a5",
+                "08cc7d46fb0a"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/app/api/link-preview/report/route.ts",
+                "apps/saroh.in/app/api/link-preview/route.ts"
+            ],
+            "windows": [
+                "1b4ed8a5d352"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/app/site-tags.tsx",
+                "apps/saroh.in/components/v2/whatsapp-chat.tsx"
+            ],
+            "windows": [
+                "a56a96e66bb8"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/components/v2/cta-band.tsx",
+                "apps/saroh.in/components/v2/templates/templates-band.tsx"
+            ],
+            "windows": [
+                "39891e2d9897"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
+                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+            ],
+            "windows": [
+                "4b61bd1ec544"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/components/v2/resources/resource-shell.tsx",
+                "apps/saroh.in/components/v2/templates/browser-frame.tsx"
+            ],
+            "windows": [
+                "aa3aee2be7e0"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/components/v2/tools/qr-maker-gate.tsx",
+                "apps/saroh.in/components/v2/tools/unlock-panel.tsx"
+            ],
+            "windows": [
+                "de0605656ea0"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/content/changelog.ts",
+                "apps/saroh.in/content/integrations.ts"
+            ],
+            "windows": [
+                "b4c6d61fbd6e"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx"
+            ],
+            "windows": [
+                "e7290941b843"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "eed9fa11169a"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/logic.ts",
+                "packages/search-pages/src/tools/gst-invoice-generator/logic.ts"
+            ],
+            "windows": [
+                "12916b631c18"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/bill-of-supply-generator/logic.ts",
+                "packages/search-pages/src/tools/receipt-maker/logic.ts"
+            ],
+            "windows": [
+                "32feb7c57504"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/cancellation-policy-generator/index.tsx",
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx"
+            ],
+            "windows": [
+                "079d01bab721"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/cancellation-policy-generator/index.tsx",
+                "packages/search-pages/src/tools/refund-policy-generator/index.tsx"
+            ],
+            "windows": [
+                "da8b3a9fe73b"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gift-voucher-maker/index.tsx",
+                "packages/search-pages/src/tools/loyalty-card-maker/index.tsx"
+            ],
+            "windows": [
+                "1086e59d8815"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "570d53a3ccdd"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "a23886631316"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
+                "packages/search-pages/src/tools/quotation-maker/index.tsx"
+            ],
+            "windows": [
+                "91d4409be8e0"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gst-invoice-generator/logic.ts",
+                "packages/search-pages/src/tools/quotation-maker/logic.ts"
+            ],
+            "windows": [
+                "30890dff8fa9"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gstin-checker/index.tsx",
+                "packages/search-pages/src/tools/hsn-sac-code-finder/index.tsx"
+            ],
+            "windows": [
+                "b95c489c8e3e"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gstin-checker/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx"
+            ],
+            "windows": [
+                "3320414cf910"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
+                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx"
+            ],
+            "windows": [
+                "3af72b798ad1"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/hsn-sac-code-finder/index.tsx",
+                "packages/search-pages/src/tools/refund-policy-generator/index.tsx"
+            ],
+            "windows": [
+                "aaf40f91a3bc"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx",
+                "packages/search-pages/src/tools/whatsapp-message-templates/index.tsx"
+            ],
+            "windows": [
+                "7647de043df8"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx",
+                "packages/search-pages/src/tools/whatsapp-message-templates/index.tsx"
+            ],
+            "windows": [
+                "d5c3ee7975c3"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "3ebee89ca999"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "69c30954476f"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "2a528c597244"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
+                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
+            ],
+            "windows": [
+                "ba3da5a3b32f"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
+                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx"
+            ],
+            "windows": [
+                "489dbad5277d"
+            ]
+        }
+    ]
+}
