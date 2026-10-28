@@ -19,9 +19,6 @@ const config = {
 const auth = (toE164: string, code: string) => ({
     toE164,
     code,
-    appName: "Saroh",
-    minutes: 10,
-    callNumber: "+91 90000 00002",
 });
 
 function reply(status: number, body: unknown): Response {
@@ -69,12 +66,6 @@ describe("Msg91Provider", () => {
                             to: ["919812345678"],
                             components: {
                                 body_1: { type: "text", value: "482913" },
-                                body_2: { type: "text", value: "Saroh" },
-                                body_3: { type: "text", value: "10 minutes" },
-                                body_4: {
-                                    type: "text",
-                                    value: "+91 90000 00002",
-                                },
                                 button_1: {
                                     subtype: "url",
                                     type: "text",

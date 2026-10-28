@@ -450,8 +450,6 @@ export class AccountPhoneService {
             const result = await this.messaging.sendOtp({
                 toE164: input.phoneE164,
                 code,
-                appName: "Saroh",
-                minutes: CODE_MINUTES,
             });
             reason =
                 result.outcome === "accepted"

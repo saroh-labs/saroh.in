@@ -4,8 +4,6 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, MessagingSendStatus } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
-import { phoneLabel } from "@saroh/block-contract";
-
 import type { EncryptedSecret } from "../../common/crypto";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { env } from "../../env";
@@ -101,16 +99,8 @@ export class MessagingService {
     ) {}
 
     /** A server-made code on WhatsApp. Throws on a network error, as the provider does. */
-    async sendOtp(
-        input: Omit<WhatsappAuthInput, "callNumber">,
-    ): Promise<SendResult> {
-        const callNumber = phoneLabel(
-            env.MESSAGING_SUPPORT_PHONE ?? env.MSG91_WHATSAPP_NUMBER ?? "",
-        );
-        const result = await this.provider.sendWhatsappAuth({
-            ...input,
-            callNumber,
-        });
+    async sendOtp(input: WhatsappAuthInput): Promise<SendResult> {
+        const result = await this.provider.sendWhatsappAuth(input);
         if (result.outcome === "accepted") await countUsage("WHATSAPP");
         return result;
     }

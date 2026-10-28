@@ -456,14 +456,6 @@ describe("the limits", () => {
 });
 
 describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
-    const supportBefore = env.MESSAGING_SUPPORT_PHONE;
-    beforeEach(() => {
-        env.MESSAGING_SUPPORT_PHONE = "9000000002";
-    });
-    afterAll(() => {
-        env.MESSAGING_SUPPORT_PHONE = supportBefore;
-    });
-
     const startWa = (
         p: string,
         extra: {
@@ -497,7 +489,7 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
             select: { codeHash: true, attempts: true, usedAt: true },
         });
 
-    it("sends the template's four values from Saroh, and keeps only a hash", async () => {
+    it("sends the code from Saroh, and keeps only a hash", async () => {
         const p = phone();
         await expect(startWa(p)).resolves.toEqual({
             whatsapp: { resendAfterSeconds: 30 },
@@ -506,9 +498,6 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         expect(sent).toEqual({
             toE164: p,
             code: expect.stringMatching(/^\d{6}$/),
-            appName: "Saroh",
-            minutes: 10,
-            callNumber: "+91 90000 00002",
         });
         const [row] = await codes(p);
         expect(row?.codeHash).not.toContain(sent?.code ?? "x");

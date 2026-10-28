@@ -45,18 +45,13 @@ export type WidgetVerifyResult =
 export interface WhatsappAuthInput {
     toE164: string;
     code: string;
-    /** "Saroh", or a business's name. */
-    appName: string;
-    /** The code's lifetime, shown as "10 minutes". */
-    minutes: number;
-    /** The number to call if you didn't ask, as read: "+91 98450 12345". */
-    callNumber: string;
 }
 
 export interface MessagingProvider {
     /**
-     * A code in the approved WhatsApp authentication template: the code,
-     * who it is for (`appName`), how long it lasts, and Saroh's number.
+     * A code in the approved WhatsApp authentication template: Meta's fixed
+     * text with the code and a copy-code button (28 Oct: a template with more
+     * variables was refused on every API send; `saroh_login_code` delivers).
      */
     sendWhatsappAuth(input: WhatsappAuthInput): Promise<SendResult>;
 

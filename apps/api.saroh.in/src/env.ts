@@ -201,10 +201,6 @@ const envSchema = z.object({
     MSG91_AUTH_KEY: z.string().optional(),
     MSG91_WHATSAPP_NUMBER: z.string().optional(),
     MSG91_WHATSAPP_TEMPLATE: z.string().optional(),
-    // The number a sign-in code's message says to call if you didn't ask
-    // for it (the template's {{4}}): Saroh's support line. Unset, the
-    // WhatsApp number above is shown instead.
-    MESSAGING_SUPPORT_PHONE: z.string().optional(),
     // Approved WhatsApp utility templates: `key=msg91_name` pairs, comma
     // separated. Callers name the key; an unknown key is refused.
     MSG91_WHATSAPP_UTILITY_TEMPLATES: z.string().optional(),
