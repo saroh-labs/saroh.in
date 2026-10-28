@@ -371,6 +371,8 @@ export interface OverlayFootProps {
     doneOnly?: boolean;
     /** With `doneOnly`: "Close" where the overlay can only be read. */
     doneLabel?: string;
+    /** With `doneOnly`: an outline button, where it only backs out ("Cancel"). */
+    doneQuiet?: boolean;
     /** For a draft drawn under the frame: what the button does. */
     onSubmit?: OverlaySubmit;
     /** For a draft drawn under the frame that holds the save itself. */
@@ -415,6 +417,7 @@ export function OverlayFoot({
     extra,
     doneOnly = false,
     doneLabel = "Done",
+    doneQuiet = false,
     onSubmit,
     pending: ownPending = false,
     className,
@@ -455,7 +458,11 @@ export function OverlayFoot({
                     </div>
                 ) : null}
                 {doneOnly ? (
-                    <Button type="button" onClick={close}>
+                    <Button
+                        type="button"
+                        variant={doneQuiet ? "outline" : "default"}
+                        onClick={close}
+                    >
                         {doneLabel}
                     </Button>
                 ) : (

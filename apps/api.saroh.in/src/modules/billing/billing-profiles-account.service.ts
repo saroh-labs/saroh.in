@@ -59,6 +59,8 @@ export interface ProfileBusiness {
     name: string;
     /** The caller owns it, so may move it. */
     owner: boolean;
+    /** Who owns it now, when the caller doesn't (DEC-167: the bill stays). */
+    ownerName: string | null;
     /** Null when it has no plan yet. */
     plan: { name: string; cycle: string } | null;
     /** Charged through the provider, so a move waits for the renewal. */
@@ -402,9 +404,14 @@ export class BillingProfilesAccountService {
                     id: true,
                     name: true,
                     billingProfileId: true,
+                    // The caller's membership, and the owner's, to name them.
                     memberships: {
-                        where: { userId },
-                        select: { role: true },
+                        where: { OR: [{ userId }, { role: "OWNER" }] },
+                        select: {
+                            role: true,
+                            userId: true,
+                            user: { select: { name: true } },
+                        },
                     },
                     subscription: { include: { plan: true } },
                 },
@@ -414,6 +421,9 @@ export class BillingProfilesAccountService {
         return Promise.all(
             rows.map(async (row) => {
                 const sub = row.subscription;
+                const owner = row.memberships.some(
+                    (m) => m.userId === userId && m.role === "OWNER",
+                );
                 const paid = Boolean(
                     sub && billedByProvider(sub) && !sub.cancelAtPeriodEnd,
                 );
@@ -425,7 +435,11 @@ export class BillingProfilesAccountService {
                     id: row.id,
                     name: row.name,
                     billingProfileId: row.billingProfileId,
-                    owner: row.memberships.some((m) => m.role === "OWNER"),
+                    owner,
+                    ownerName: owner
+                        ? null
+                        : (row.memberships.find((m) => m.role === "OWNER")?.user
+                              .name ?? null),
                     plan: sub
                         ? { name: sub.plan.name, cycle: sub.billingCycle }
                         : null,

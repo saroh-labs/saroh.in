@@ -57,6 +57,7 @@ export function PhoneSheet({
                 }}
                 doneOnly
                 doneLabel="Cancel"
+                doneQuiet
                 extra={
                     hasPhone ? (
                         <Button
