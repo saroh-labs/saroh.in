@@ -634,20 +634,7 @@ export async function reserveInTx(
                 },
                 by.source,
             )
-          : await tx.contact.upsert({
-                where: {
-                    organizationId_email: { organizationId, email },
-                },
-                update: contactUpdate(input),
-                create: {
-                    organizationId,
-                    email,
-                    firstName: splitName(input.bookerName).first ?? null,
-                    lastName: splitName(input.bookerName).last ?? null,
-                    phone: input.bookerPhone ?? null,
-                    source: by.source,
-                },
-            });
+          : await emailContactInTx(tx, organizationId, email, input, by);
 
     const booking = await tx.booking.create({
         data: {
@@ -926,14 +913,60 @@ async function accountContactInTx(
         select: { id: true, firstName: true, lastName: true, phone: true },
     });
     if (!contact) throw new NotFoundException("Sign in to continue.");
+    await fillEmptyInTx(tx, contact, input);
+    return { id: contact.id };
+}
+
+/**
+ * The contact by the booker's email, made if new. The team's own booking
+ * updates what it typed; a guest's, keyed only on an email anyone can
+ * type, fills only what is empty (UX-049, DEC-198), and the phone they
+ * typed stays on the booking.
+ */
+async function emailContactInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    email: string,
+    input: BookInput,
+    by: ReserveBy,
+): Promise<{ id: string }> {
+    const contact = await tx.contact.upsert({
+        where: { organizationId_email: { organizationId, email } },
+        update: by.actorUserId ? contactUpdate(input) : {},
+        create: {
+            organizationId,
+            email,
+            firstName: splitName(input.bookerName).first ?? null,
+            lastName: splitName(input.bookerName).last ?? null,
+            phone: input.bookerPhone ?? null,
+            source: by.source,
+        },
+    });
+    if (!by.actorUserId) await fillEmptyInTx(tx, contact, input);
+    return contact;
+}
+
+/**
+ * A name and a phone the booker gave fill their contact where it has none
+ * (UX-049); what the business already has is never replaced from the
+ * booking page.
+ */
+async function fillEmptyInTx(
+    tx: Prisma.TransactionClient,
+    contact: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        phone: string | null;
+    },
+    input: BookInput,
+): Promise<void> {
     const { first, last } = splitName(input.bookerName);
     const data: Prisma.ContactUpdateInput = {};
     if (!contact.firstName?.trim() && !contact.lastName?.trim() && first) {
         data.firstName = first;
         data.lastName = last ?? null;
     }
-    // A phone they gave on the booking page fills a record that has none
-    // (UX-049); one the business already has is never replaced from here.
     const phone = phoneToFill(input.bookerPhone, contact.phone);
     if (phone) data.phone = phone;
     if (Object.keys(data).length > 0) {
@@ -943,7 +976,6 @@ async function accountContactInTx(
             select: { id: true },
         });
     }
-    return { id: contact.id };
 }
 
 /**

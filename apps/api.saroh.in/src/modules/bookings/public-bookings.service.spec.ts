@@ -29,7 +29,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn(),
         },
-        contact: { upsert: jest.fn(), findUnique: jest.fn() },
+        contact: {
+            upsert: jest.fn(),
+            findUnique: jest.fn(),
+            update: jest.fn(),
+        },
         // A booking-page note's suggestion (C12).
         contactAttention: {
             findFirst: jest.fn().mockResolvedValue(null),

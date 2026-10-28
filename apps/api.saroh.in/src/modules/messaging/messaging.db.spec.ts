@@ -111,7 +111,10 @@ describe("OTP widget token, against a stub MSG91", () => {
     it("a wrong token is invalid_token and counts nothing", async () => {
         const otp = await usage("OTP");
         await expect(
-            service.verifyOtp({ accessToken: "wrong" }),
+            service.verifyOtp({
+                accessToken: "wrong",
+                expectedE164: "+919812345678",
+            }),
         ).resolves.toEqual({ ok: false, reason: "invalid_token" });
         expect(await usage("OTP")).toBe(otp);
     });
@@ -125,9 +128,21 @@ describe("OTP widget token, against a stub MSG91", () => {
         ).resolves.toEqual({ ok: false, reason: "mismatch" });
     });
 
+    it("a token is taken once: the second use is refused (DEC-198)", async () => {
+        await expect(
+            service.verifyOtp({
+                accessToken: "good",
+                expectedE164: "+919812345678",
+            }),
+        ).resolves.toEqual({ ok: false, reason: "used" });
+    });
+
     it("no answer in time is unavailable", async () => {
         await expect(
-            service.verifyOtp({ accessToken: "slow" }),
+            service.verifyOtp({
+                accessToken: "slow",
+                expectedE164: "+919812345678",
+            }),
         ).resolves.toEqual({ ok: false, reason: "unavailable" });
     });
 });
@@ -403,6 +418,21 @@ describe("the webhook for every send", () => {
             where: { numberHash: numberHash(to) },
         });
         expect(JSON.stringify(window)).not.toContain(to.slice(1));
+    });
+
+    it("an inbound number without 91 opens the same window (review 28 Oct)", async () => {
+        const to = phone();
+        await controller.handle(SECRET, {
+            requestId: "",
+            uuid: `wamid.bare-${to}`,
+            eventName: "delivered",
+            customerNumber: to.slice(3),
+            contentType: "text",
+            text: "Hi",
+        });
+        await expect(
+            service.sendWhatsAppText({ toE164: to, text: "x" }),
+        ).resolves.toMatchObject({ outcome: "accepted" });
     });
 
     it("a message older than 24 hours doesn't open it, and never moves it back", async () => {

@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, MessagingSendStatus } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { EncryptedSecret } from "../../common/crypto";
+import { prismaErrorCode } from "../../common/prisma-errors";
 import { env } from "../../env";
 import { nextBackoff } from "../jobs/job-queue.port";
 import {
@@ -22,10 +23,7 @@ import type {
     WhatsappAuthInput,
     WhatsAppTemplateCategory,
 } from "./providers/messaging-provider.port";
-import {
-    MESSAGING_PROVIDER,
-    readableNumber,
-} from "./providers/messaging-provider.port";
+import { MESSAGING_PROVIDER } from "./providers/messaging-provider.port";
 
 /** Retries a send whose provider answered with a temporary failure. */
 export const MESSAGING_SEND_TYPE = "messaging.send";
@@ -63,7 +61,12 @@ export type OtpVerifyOutcome =
     | { ok: true; phoneE164: string }
     | {
           ok: false;
-          reason: "invalid_token" | "not_a_phone" | "unavailable" | "mismatch";
+          reason:
+              | "invalid_token"
+              | "not_a_phone"
+              | "unavailable"
+              | "mismatch"
+              | "used";
       };
 
 type Attempt =
@@ -96,27 +99,20 @@ export class MessagingService {
     ) {}
 
     /** A server-made code on WhatsApp. Throws on a network error, as the provider does. */
-    async sendOtp(
-        input: Omit<WhatsappAuthInput, "callNumber">,
-    ): Promise<SendResult> {
-        const callNumber = readableNumber(
-            env.MESSAGING_SUPPORT_PHONE ?? env.MSG91_WHATSAPP_NUMBER ?? "",
-        );
-        const result = await this.provider.sendWhatsappAuth({
-            ...input,
-            callNumber,
-        });
+    async sendOtp(input: WhatsappAuthInput): Promise<SendResult> {
+        const result = await this.provider.sendWhatsappAuth(input);
         if (result.outcome === "accepted") await countUsage("WHATSAPP");
         return result;
     }
 
     /**
-     * Check the OTP widget's access token. With `expectedE164`, a token
-     * verified for any other number is a `mismatch`.
+     * Check the OTP widget's access token: a token verified for any number
+     * but `expectedE164` is a `mismatch`, and one already taken here is
+     * `used` (DEC-198), whatever the provider says of it now.
      */
     async verifyOtp(input: {
         accessToken: string;
-        expectedE164?: string;
+        expectedE164: string;
     }): Promise<OtpVerifyOutcome> {
         const result = await this.provider.verifyOtpWidgetToken(
             input.accessToken,
@@ -124,11 +120,11 @@ export class MessagingService {
         if (!result.ok) return result;
         // MSG91 bills the OTP whoever asked for it.
         await countUsage("OTP");
-        if (
-            input.expectedE164 &&
-            digits(input.expectedE164) !== digits(result.phoneE164)
-        ) {
+        if (digits(input.expectedE164) !== digits(result.phoneE164)) {
             return { ok: false, reason: "mismatch" };
+        }
+        if (!(await claimWidgetToken(input.accessToken))) {
+            return { ok: false, reason: "used" };
         }
         return result;
     }
@@ -349,4 +345,33 @@ export class MessagingService {
 
 function digits(e164: string): string {
     return e164.replace(/\D/g, "");
+}
+
+/** How long a used widget token is remembered: well past its own life. */
+const TOKEN_MEMORY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Take a widget token once (DEC-198): its sha256 into a unique key. False
+ * when it was taken before. Expired rows are pruned on the way.
+ */
+async function claimWidgetToken(accessToken: string): Promise<boolean> {
+    const now = new Date();
+    await prisma.otpWidgetTokenUse.deleteMany({
+        where: { expiresAt: { lt: now } },
+    });
+    try {
+        await prisma.otpWidgetTokenUse.create({
+            data: {
+                tokenHash: createHash("sha256")
+                    .update(accessToken)
+                    .digest("hex"),
+                expiresAt: new Date(now.getTime() + TOKEN_MEMORY_MS),
+            },
+            select: { tokenHash: true },
+        });
+        return true;
+    } catch (error) {
+        if (prismaErrorCode(error) === "P2002") return false;
+        throw error;
+    }
 }

@@ -80,18 +80,27 @@ export function normaliseEmail(
 /**
  * The phone as it is compared: digits only, with India's prefixes dropped
  * the way the shared phone rule reads them (`@saroh/block-contract`
- * phone.ts, #1036): 0091 in front of fourteen digits, 91 in front of
- * twelve, a trunk 0 in front of eleven. "+91 98450 12345", "098450 12345"
- * and "0091 98450 12345" are all "9845012345". Null for no phone or fewer
- * than seven digits. `walk-in-customer.ts` `phoneOf` is the same in SQL.
+ * phone.ts, #1036): +91 or 00 91 in front, 91 in front of twelve digits, a
+ * trunk 0 in front of eleven. "+91 98450 12345", "098450 12345" and
+ * "0091 98450 12345" are all "9845012345". A number written with another
+ * country's code (+ or 00 in front) keeps it, as "+9845012345", so a
+ * foreign number never matches an Indian one of the same ten digits
+ * (review 28 Oct). Null for no phone or fewer than seven digits.
+ * `walk-in-customer.ts` `phoneOf` is the same in SQL.
  */
 export function normalisePhone(
     phone: string | null | undefined,
 ): string | null {
     if (!phone) return null;
+    const plus = phone.trim().startsWith("+");
     let digits = phone.replace(/\D/g, "");
-    if (digits.length === 14 && digits.startsWith("0091")) {
-        digits = digits.slice(4);
+    const zeros = !plus && /^00[1-9]/.test(digits);
+    if (plus || zeros) {
+        const coded = zeros ? digits.slice(2) : digits;
+        if (!coded.startsWith("91")) {
+            return coded.length >= MIN_PHONE_DIGITS ? `+${coded}` : null;
+        }
+        digits = coded.slice(2);
     } else if (digits.length === 12 && digits.startsWith("91")) {
         digits = digits.slice(2);
     } else if (digits.length === 11 && digits.startsWith("0")) {

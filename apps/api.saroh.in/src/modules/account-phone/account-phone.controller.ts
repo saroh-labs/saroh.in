@@ -24,7 +24,7 @@ import type {
     PhoneProof,
     PhoneStart,
 } from "./account-phone.service";
-import { AccountPhoneService } from "./account-phone.service";
+import { AccountPhoneService, placeOf } from "./account-phone.service";
 import { StartPhoneDto, VerifyPhoneDto } from "./dto";
 
 /**
@@ -68,13 +68,15 @@ export class PhoneSignInController {
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response,
     ): Promise<{ signedIn: true }> {
-        const headers = await this.phones.signIn({
+        const headers = fromNodeHeaders(req.headers);
+        const cookies = await this.phones.signIn({
             phoneE164: dto.phone,
             proof: proofOf(dto),
             ip,
-            headers: fromNodeHeaders(req.headers),
+            headers,
+            place: placeOf(headers),
         });
-        res.setHeader("Set-Cookie", headers.getSetCookie());
+        res.setHeader("Set-Cookie", cookies.getSetCookie());
         return { signedIn: true };
     }
 }
@@ -112,19 +114,29 @@ export class AccountPhoneController {
         @CurrentUser() user: AuthUser,
         @Body() dto: VerifyPhoneDto,
         @Ip() ip: string,
+        @Req() req: Request,
     ): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
         return this.phones.add({
             userId: user.id,
             phoneE164: dto.phone,
             proof: proofOf(dto),
             ip,
+            place: placeOf(fromNodeHeaders(req.headers)),
         });
     }
 
     @Delete()
     @HttpCode(HttpStatus.NO_CONTENT)
-    remove(@CurrentUser() user: AuthUser, @Ip() ip: string): Promise<void> {
-        return this.phones.remove({ userId: user.id, ip });
+    remove(
+        @CurrentUser() user: AuthUser,
+        @Ip() ip: string,
+        @Req() req: Request,
+    ): Promise<void> {
+        return this.phones.remove({
+            userId: user.id,
+            ip,
+            place: placeOf(fromNodeHeaders(req.headers)),
+        });
     }
 }
 

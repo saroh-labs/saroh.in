@@ -50,6 +50,9 @@ model User {
   // way to sign in, never instead of the email. E.164 ("+919876543210").
   // Written only after the server checked the OTP widget's token for this
   // number (`account-phone/`); a client's "verified" is never trusted.
+  // `phoneVerifiedAt` is renewed by every sign-in with an email code: a
+  // phone not vouched for by a code or a phone sign-in in 12 months no
+  // longer signs in (DEC-198).
   phoneE164       String?   @unique
   phoneVerifiedAt DateTime?
 
@@ -9137,6 +9140,18 @@ model AccountPhoneCode {
   createdAt DateTime                @default(now())
 
   @@index([phoneHash, purpose, createdAt])
+}
+
+// An SMS widget access token already used to sign in or add a phone
+// (DEC-198): sha256 of the token only, so a token seen once is never taken
+// again, whatever the provider says. Rows past `expiresAt` are pruned as new
+// ones arrive. Platform-level, not a business.
+model OtpWidgetTokenUse {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 // Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The

@@ -8,16 +8,11 @@ import {
     UnprocessableEntityException,
 } from "@nestjs/common";
 import type { VerificationModule } from "@saroh/database";
-import { prisma } from "@saroh/database";
 
 import { CatalogueService } from "../pricing/catalogue.service";
 import { MessagingService } from "./messaging.service";
 import type { OtpSendResult } from "./providers/messaging-provider.port";
-import {
-    indianPhoneE164,
-    VERIFICATION_TTL_MS,
-    VerificationService,
-} from "./verification.service";
+import { indianPhoneE164, VerificationService } from "./verification.service";
 import { WalletService } from "./wallet.service";
 
 /**
@@ -63,11 +58,6 @@ export class VerificationSendService {
         }
         // Priced before the session, so an unpriced channel leaves nothing behind.
         const pricePaise = await this.whatsappPrice();
-        // The template names who the code is for: the business.
-        const business = await prisma.organization.findUniqueOrThrow({
-            where: { id: organizationId },
-            select: { name: true },
-        });
         const phoneE164 = indianPhoneE164(input.phoneE164);
         const { verificationId, code, expiresAt } =
             await this.verification.start({ ...input, phoneE164 });
@@ -98,8 +88,6 @@ export class VerificationSendService {
             result = await this.messaging.sendOtp({
                 toE164: phoneE164,
                 code,
-                appName: business.name,
-                minutes: VERIFICATION_TTL_MS / 60_000,
             });
         } catch (error) {
             this.logger.warn(

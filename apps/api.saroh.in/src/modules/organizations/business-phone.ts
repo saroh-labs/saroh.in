@@ -1,8 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { PhoneResult } from "@saroh/block-contract";
 import {
     E164,
+    INDIAN_E164,
     normalisePhoneNumber,
     PHONE_EXAMPLE,
 } from "@saroh/block-contract";
@@ -31,12 +33,28 @@ export { E164, PHONE_EXAMPLE };
  */
 export const normalisePublicPhone = normalisePhoneNumber;
 
+/** Why a foreign number is refused as a business's or a payer's phone. */
+export const INDIAN_PHONE_ONLY = `Use an Indian number: +91 and then 10 digits, like ${PHONE_EXAMPLE}.`;
+
+/**
+ * A business's own phone, or the phone Saroh bills a payer at (DEC-198):
+ * India only, +91 and ten digits, a landline as good as a mobile. Its
+ * customers' phones are any country (`normalisePublicPhone`).
+ */
+export function normaliseIndianPhone(raw: string): PhoneResult {
+    const result = normalisePublicPhone(raw);
+    if ("phone" in result && result.phone && !INDIAN_E164.test(result.phone)) {
+        return { problem: INDIAN_PHONE_ONLY };
+    }
+    return result;
+}
+
 /** The settings save's write: absent leaves it, "" clears it, else E.164. */
 export function phoneWrite(raw: string | undefined): {
     phone?: string | null;
 } {
     if (raw === undefined) return {};
-    const result = normalisePublicPhone(raw);
+    const result = normaliseIndianPhone(raw);
     if ("problem" in result) {
         throw new BadRequestException({
             message: result.problem,

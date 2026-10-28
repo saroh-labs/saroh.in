@@ -6065,3 +6065,19 @@ writing another. A DB spec fires 20 at once and expects 1.
 **Rule**: a limit that guards money or sends is checked and recorded in one
 locked step; never "count now, write later".
 **Category**: security · rate limits
+
+## A WhatsApp authentication template with extra variables is refused on API sends
+
+**Symptom**: 28 Oct, saroh.io: every server-sent sign-in code with
+`saroh_merchant_login` (code, app name, validity, number to call, plus a
+copy-code button) came back FAILED from WhatsApp within a second: six tries,
+with and without the template namespace, with the number as digits or
+"+91 …". The same template sent by hand from MSG91's dashboard was delivered.
+**Cause**: not found in detail (MSG91 showed no reason); Meta's authentication
+category is built for its fixed text with one variable, the code.
+**Fix**: `saroh_login_code`, Meta's standard authentication template (the code
+and a copy-code button), delivered on the first try. `sendWhatsappAuth` sends
+only `body_1` and `button_1`; `MESSAGING_SUPPORT_PHONE` is gone.
+**Rule**: sign-in codes use the code-and-button authentication shape only. Before
+spending more test sends on a failing template, get WhatsApp's error code.
+**Category**: integrations · messaging

@@ -261,7 +261,7 @@ describe("a business's contact details on its site (real database)", () => {
         const b = await business("Has None");
         await settings.update(a.ctx, {
             socialLinks: { instagram: "@haslinks" },
-            profile: { phone: "+441134960000" },
+            profile: { phone: "+911134960000" },
             siteShowsRegisteredAddress: true,
         });
         await location(a.ctx.organizationId, "A shop", "SHOP", "1 A Street");

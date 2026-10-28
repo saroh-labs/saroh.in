@@ -31,6 +31,16 @@ jest.mock("@saroh/auth", () => ({
     },
 }));
 
+// The notice emails (DEC-198), caught here: nothing is sent.
+const mockNotice = jest.fn();
+jest.mock("../../common/email", () => ({
+    ...jest.requireActual<typeof import("../../common/email")>(
+        "../../common/email",
+    ),
+    sendAccountPhoneNotice: (...args: unknown[]) =>
+        mockNotice(...args) as unknown,
+}));
+
 import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -40,7 +50,8 @@ import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
 import { ChallengeVerifier } from "../site-accounts/challenge";
-import { AccountPhoneService } from "./account-phone.service";
+import { AccountPhoneService, PHONE_STALE } from "./account-phone.service";
+import { renewPhoneOnEmailSignIn } from "./phone-freshness";
 import {
     FAILS_PER_ADDRESS_PER_DAY,
     FAILS_PER_PHONE_PER_DAY,
@@ -87,6 +98,7 @@ beforeEach(() => {
         new FeatureFlagService(),
     );
     warn = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
+    mockNotice.mockReset().mockResolvedValue("sent");
 });
 
 afterEach(() => warn.mockRestore());
@@ -444,14 +456,6 @@ describe("the limits", () => {
 });
 
 describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
-    const supportBefore = env.MESSAGING_SUPPORT_PHONE;
-    beforeEach(() => {
-        env.MESSAGING_SUPPORT_PHONE = "9000000002";
-    });
-    afterAll(() => {
-        env.MESSAGING_SUPPORT_PHONE = supportBefore;
-    });
-
     const startWa = (
         p: string,
         extra: {
@@ -485,7 +489,7 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
             select: { codeHash: true, attempts: true, usedAt: true },
         });
 
-    it("sends the template's four values from Saroh, and keeps only a hash", async () => {
+    it("sends the code from Saroh, and keeps only a hash", async () => {
         const p = phone();
         await expect(startWa(p)).resolves.toEqual({
             whatsapp: { resendAfterSeconds: 30 },
@@ -494,9 +498,6 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         expect(sent).toEqual({
             toE164: p,
             code: expect.stringMatching(/^\d{6}$/),
-            appName: "Saroh",
-            minutes: 10,
-            callNumber: "+91 90000 00002",
         });
         const [row] = await codes(p);
         expect(row?.codeHash).not.toContain(sent?.code ?? "x");
@@ -658,3 +659,190 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         await expect(sessions(user.id)).resolves.toBe(1);
     });
 });
+
+describe("phone rules (DEC-198)", () => {
+    const notices = () =>
+        mockNotice.mock.calls.map(
+            ([to, n]) =>
+                [
+                    to,
+                    (n as { kind: string }).kind,
+                    (n as { lastFour: string }).lastFour,
+                ] as const,
+        );
+
+    it("refuses a landline, a 0-5 start or a +91 0 for sign-in, before anything is counted", async () => {
+        for (const p of [
+            "+91 22 4567 8901",
+            "+91 12345 67890",
+            "+91 55555 12345",
+            "+910987654321",
+            "4155550100",
+        ]) {
+            await expect(
+                service.start({
+                    phoneE164: p,
+                    ip: IP,
+                    channel: "sms",
+                    purpose: "sign-in",
+                }),
+            ).rejects.toMatchObject({ status: 400 });
+            await expect(signIn(p, token(p))).rejects.toMatchObject({
+                status: 400,
+            });
+        }
+        await expect(events("START", "+912245678901")).resolves.toBe(0);
+    });
+
+    it("takes a widget token once: the same token again is refused", async () => {
+        const p = phone();
+        const user = await person(p);
+        const t = token(p);
+        await signIn(p, t);
+        await expect(signIn(p, t)).rejects.toMatchObject({
+            response: { details: { code: "NOT_VERIFIED" } },
+        });
+        await expect(sessions(user.id)).resolves.toBe(1);
+        expect(lastWarning(p)).toContain("reason=used");
+    });
+
+    it("emails the account on a phone added, changed, removed and signed in with", async () => {
+        const user = await person();
+        const { email } = await prisma.user.findUniqueOrThrow({
+            where: { id: user.id },
+            select: { email: true },
+        });
+        const first = phone();
+        const second = phone();
+        await service.add({
+            userId: user.id,
+            phoneE164: first,
+            proof: { accessToken: token(first) },
+            ip: IP,
+        });
+        await service.add({
+            userId: user.id,
+            phoneE164: second,
+            proof: { accessToken: token(second) },
+            ip: IP,
+            place: "Bengaluru, IN",
+        });
+        await signIn(second, token(second));
+        await service.remove({ userId: user.id, ip: IP });
+        expect(notices()).toEqual([
+            [email, "added", first.slice(-4)],
+            [email, "changed", second.slice(-4)],
+            [email, "signed-in", second.slice(-4)],
+            [email, "removed", second.slice(-4)],
+        ]);
+        expect(mockNotice.mock.calls[1]?.[1]).toMatchObject({
+            place: "Bengaluru, IN",
+        });
+    });
+
+    it("a notice that fails is logged without the address, and the change stands", async () => {
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => {});
+        mockNotice.mockResolvedValue("failed");
+        const user = await person();
+        const p = phone();
+        await service.add({
+            userId: user.id,
+            phoneE164: p,
+            proof: { accessToken: token(p) },
+            ip: IP,
+        });
+        const line = String(error.mock.calls.at(-1)?.[0] ?? "");
+        error.mockRestore();
+        expect(line).toContain("account_phone_notice_failed kind=added");
+        expect(line).not.toContain("@");
+        await expect(
+            prisma.user.findUniqueOrThrow({
+                where: { id: user.id },
+                select: { phoneE164: true },
+            }),
+        ).resolves.toEqual({ phoneE164: p });
+    });
+
+    it("Saroh staff never sign in by phone, and hear what a phone with no account hears", async () => {
+        const granted = phone();
+        const staff = await person(granted);
+        await prisma.platformAdmin.create({ data: { userId: staff.id } });
+        const listed = phone();
+        const breakGlass = await person(listed);
+        const allowBefore = env.ADMIN_ALLOWLIST;
+        env.ADMIN_ALLOWLIST = (
+            await prisma.user.findUniqueOrThrow({
+                where: { id: breakGlass.id },
+                select: { email: true },
+            })
+        ).email;
+        try {
+            for (const p of [granted, listed]) {
+                await expect(signIn(p, token(p))).rejects.toMatchObject({
+                    response: {
+                        message: NO_ACCOUNT_FOR,
+                        details: { code: "NO_ACCOUNT" },
+                    },
+                });
+            }
+        } finally {
+            env.ADMIN_ALLOWLIST = allowBefore;
+        }
+        await expect(sessions(staff.id)).resolves.toBe(0);
+        await expect(sessions(breakGlass.id)).resolves.toBe(0);
+        expect(mockNotice).not.toHaveBeenCalled();
+        // They can still keep a phone on the account.
+        const next = phone();
+        await expect(
+            service.add({
+                userId: staff.id,
+                phoneE164: next,
+                proof: { accessToken: token(next) },
+                ip: IP,
+            }),
+        ).resolves.toMatchObject({ phoneE164: next });
+    });
+
+    it("a phone neither vouched for nor used in 12 months is sent to the email, and an email sign-in renews it", async () => {
+        const p = phone();
+        const user = await person(p);
+        const old = new Date();
+        old.setMonth(old.getMonth() - 13);
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { phoneVerifiedAt: old },
+        });
+        await expect(signIn(p, token(p))).rejects.toMatchObject({
+            response: {
+                message: PHONE_STALE,
+                details: { code: "PHONE_STALE" },
+            },
+        });
+        await expect(sessions(user.id)).resolves.toBe(0);
+
+        await renewPhoneOnEmailSignIn(user.id);
+        await signIn(p, token(p));
+        await expect(sessions(user.id)).resolves.toBe(1);
+    });
+
+    it("a phone verified long ago but signed in with lately still signs in", async () => {
+        const p = phone();
+        const user = await person(p);
+        const old = new Date();
+        old.setMonth(old.getMonth() - 13);
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { phoneVerifiedAt: old },
+        });
+        await prisma.accountPhoneEvent.create({
+            data: { kind: "SIGNED_IN", userId: user.id },
+        });
+        await signIn(p, token(p));
+        await expect(sessions(user.id)).resolves.toBe(1);
+    });
+});
+
+const NO_ACCOUNT_FOR =
+    "Use your email to sign in, then add this phone in your account.";

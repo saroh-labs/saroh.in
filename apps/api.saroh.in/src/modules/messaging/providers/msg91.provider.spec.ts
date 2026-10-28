@@ -1,9 +1,10 @@
+import { phoneLabel } from "@saroh/block-contract";
+
 import { FakeMessagingProvider } from "./fake-messaging-provider";
 import {
     createMessagingProvider,
     parseTemplateList,
 } from "./messaging-provider.factory";
-import { readableNumber } from "./messaging-provider.port";
 import { Msg91Provider } from "./msg91.provider";
 
 // #1237: the MSG91 WhatsApp auth-template send. `fetch` is stubbed: no network.
@@ -18,9 +19,6 @@ const config = {
 const auth = (toE164: string, code: string) => ({
     toE164,
     code,
-    appName: "Saroh",
-    minutes: 10,
-    callNumber: "+91 90000 00002",
 });
 
 function reply(status: number, body: unknown): Response {
@@ -68,12 +66,6 @@ describe("Msg91Provider", () => {
                             to: ["919812345678"],
                             components: {
                                 body_1: { type: "text", value: "482913" },
-                                body_2: { type: "text", value: "Saroh" },
-                                body_3: { type: "text", value: "10 minutes" },
-                                body_4: {
-                                    type: "text",
-                                    value: "+91 90000 00002",
-                                },
                                 button_1: {
                                     subtype: "url",
                                     type: "text",
@@ -352,12 +344,13 @@ describe("Msg91Provider beyond codes", () => {
     });
 });
 
-describe("readableNumber (the template's number to call)", () => {
+describe("the template's number to call is phoneLabel's (review 28 Oct)", () => {
     it("reads 10 digits or 91 + 10 digits as +91 XXXXX XXXXX", () => {
-        expect(readableNumber("9000000002")).toBe("+91 90000 00002");
-        expect(readableNumber("919000000002")).toBe("+91 90000 00002");
-        expect(readableNumber("+91 90000-00002")).toBe("+91 90000 00002");
-        expect(readableNumber("4420000000")).toBe("+91 44200 00000");
-        expect(readableNumber("+1 555 0100")).toBe("+1 555 0100");
+        expect(phoneLabel("9000000002")).toBe("+91 90000 00002");
+        expect(phoneLabel("919000000002")).toBe("+91 90000 00002");
+        expect(phoneLabel("+91 90000-00002")).toBe("+91 90000 00002");
+        expect(phoneLabel("4420000000")).toBe("+91 44200 00000");
+        expect(phoneLabel("+1 555 0100")).toBe("+1 555 0100");
+        expect(phoneLabel("+91 09000000002")).toBe("+91 09000000002");
     });
 });

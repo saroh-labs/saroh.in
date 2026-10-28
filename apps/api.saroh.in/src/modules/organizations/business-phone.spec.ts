@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { joinPhone, PHONE_CASES, splitPhone } from "@saroh/block-contract";
 
 import {
+    INDIAN_PHONE_ONLY,
     normalisePublicPhone,
     phoneWrite,
     publicPhone,
@@ -89,6 +90,31 @@ describe("the business's public phone (DEC-053, F20)", () => {
             expect((caught as BadRequestException).getResponse()).toEqual(
                 expect.objectContaining({ details: { field: "phone" } }),
             );
+        });
+    });
+
+    describe("India only (DEC-198)", () => {
+        it("refuses a foreign business phone on the phone field", () => {
+            expect(() => phoneWrite("+44 20 7946 0958")).toThrow(
+                BadRequestException,
+            );
+            try {
+                phoneWrite("+1 415 555 0100");
+            } catch (e) {
+                expect((e as BadRequestException).getResponse()).toEqual({
+                    message: INDIAN_PHONE_ONLY,
+                    details: { field: "phone" },
+                });
+            }
+        });
+
+        it("takes a landline as well as a mobile", () => {
+            expect(phoneWrite("+91 22 4567 8901")).toEqual({
+                phone: "+912245678901",
+            });
+            expect(phoneWrite("98450 12345")).toEqual({
+                phone: "+919845012345",
+            });
         });
     });
 

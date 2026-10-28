@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     countryFlag,
     countryMatches,
+    INDIAN_MOBILE_E164,
     joinPhone,
     normalisePhoneNumber,
     PHONE_CASES,
@@ -121,6 +122,35 @@ describe("a saved number, shown", () => {
         ["", ""],
     ])("%j reads %j", (stored, shown) => {
         expect(phoneLabel(stored)).toBe(shown);
+    });
+});
+
+describe("DEC-198", () => {
+    it("refuses a 0 after +91", () => {
+        expect(phoneNumberProblem("+91 0987654321")).toMatch(/without a 0/);
+    });
+
+    it("takes only mobiles as sign-in phones", () => {
+        for (const m of ["+919845012345", "+916123456789"]) {
+            expect(INDIAN_MOBILE_E164.test(m)).toBe(true);
+        }
+        for (const n of [
+            "+912245678901",
+            "+911234567890",
+            "+915555512345",
+            "+910987654321",
+            "+914155550100",
+        ]) {
+            expect(INDIAN_MOBILE_E164.test(n)).toBe(false);
+        }
+    });
+
+    it("keeps the typed grouping only for + and digits", () => {
+        expect(phoneLabel("+91 98765 43210")).toBe("+91 98765 43210");
+        // Stored before the +91 rule tightened (sample businesses): still grouped.
+        expect(phoneLabel("+910000000005")).toBe("+91 00000 00005");
+        expect(phoneLabel("+(91) 98765 43210")).toBe("+91 98765 43210");
+        expect(phoneLabel("+91-98765 43210")).toBe("+91 98765 43210");
     });
 });
 

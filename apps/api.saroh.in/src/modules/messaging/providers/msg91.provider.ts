@@ -43,17 +43,13 @@ export class Msg91Provider implements MessagingProvider {
     ) {}
 
     /**
-     * `saroh_merchant_login` (en_US, approved 27 Oct): "OTP Code: {{1}}. This
-     * is your OTP for {{2}}. The OTP is valid for {{3}}. Call {{4}} if you
-     * did not perform this request." plus a copy-code button. Meta refuses
-     * a send that leaves any of the four empty.
+     * Meta's authentication shape, `saroh_login_code` (en_US): the code and
+     * a copy-code button carrying the same code. A template with more
+     * variables was refused on every send (28 Oct, DEV_LEARNINGS).
      */
     async sendWhatsappAuth({
         toE164,
         code,
-        appName,
-        minutes,
-        callNumber,
     }: WhatsappAuthInput): Promise<SendResult> {
         required(this.config.authKey, "MSG91_AUTH_KEY");
         const template = required(
@@ -62,9 +58,6 @@ export class Msg91Provider implements MessagingProvider {
         );
         return this.sendTemplate(toE164, template, {
             body_1: { type: "text", value: code },
-            body_2: { type: "text", value: appName },
-            body_3: { type: "text", value: `${minutes} minutes` },
-            body_4: { type: "text", value: callNumber },
             // Meta sends the copy-code button as a url sub-type.
             button_1: { subtype: "url", type: "text", value: code },
         });

@@ -16,7 +16,10 @@ import type {
 } from "@saroh/database";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
-import { normalisePhoneNumber } from "@saroh/block-contract";
+import {
+    INDIAN_MOBILE_E164,
+    normalisePhoneNumber,
+} from "@saroh/block-contract";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
@@ -68,11 +71,16 @@ function sameHash(a: string, b: string): boolean {
     return x.length === y.length && timingSafeEqual(x, y);
 }
 
-/** An Indian number as E.164, or a 400 (DEC-190: India only). */
+/**
+ * An Indian MOBILE as E.164, or a 400 (DEC-190: India only; DEC-198: a
+ * phone that signs in, or that Saroh pays to message, is a mobile, +91 and
+ * ten digits starting 6 to 9).
+ */
 export function indianPhoneE164(raw: string): string {
     const result = normalisePhoneNumber(raw);
-    if ("phone" in result && result.phone?.startsWith("+91")) {
-        return result.phone;
+    const phone = "phone" in result ? result.phone : null;
+    if (phone && INDIAN_MOBILE_E164.test(phone)) {
+        return phone;
     }
     throw new BadRequestException({
         message: "Enter an Indian mobile number, like +91 98450 12345.",

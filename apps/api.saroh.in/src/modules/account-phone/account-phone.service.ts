@@ -14,6 +14,9 @@ import { prisma } from "@saroh/database";
 
 import { auth } from "../../common/auth/auth";
 import { hashClientIp } from "../../common/client-ip";
+import type { PhoneNoticeKind } from "../../common/email";
+import { sendAccountPhoneNotice } from "../../common/email";
+import { isBootstrapAdmin } from "../../common/guards/platform-admin.guard";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
@@ -23,6 +26,7 @@ import { indianPhoneE164 } from "../messaging/verification.service";
 import { ChallengeVerifier } from "../site-accounts/challenge";
 import type { CodeCheck } from "./phone-codes";
 import { checkCode, CODE_MINUTES, newCode, saveCode } from "./phone-codes";
+import { phoneFresh } from "./phone-freshness";
 import type { LimitVerdict } from "./phone-limits";
 import {
     checkFailures,
@@ -73,6 +77,9 @@ export interface PhoneOptions {
 /** The one answer for a phone with no account, whoever asks. */
 export const NO_ACCOUNT_FOR_PHONE =
     "Use your email to sign in, then add this phone in your account.";
+
+/** The answer for a phone neither vouched for nor used in 12 months (DEC-198). */
+export const PHONE_STALE = "Sign in with your email to keep using this phone.";
 
 /**
  * Phone sign-in for Saroh accounts (DEC-196): owners and staff on
@@ -130,6 +137,13 @@ export class AccountPhoneService {
      * send it from here. SMS: hand back the widget, which sends from the
      * browser. The answer is the same whether or not the phone has an
      * account.
+     *
+     * These limits are NOT the cost stop for SMS: the widget's id and token
+     * are static and public once handed out, so anyone can drive the widget
+     * for any number without coming back here. The stop is the provider's
+     * own widget settings (India only, captcha, per-number, per-address and
+     * daily caps, a spend alert; see the messaging doc in docs/architecture).
+     * Here we only refuse to sign in or save a number we didn't verify.
      */
     async start(input: {
         phoneE164: string;
@@ -189,6 +203,8 @@ export class AccountPhoneService {
         proof: PhoneProof;
         ip?: string;
         headers: Headers;
+        /** A rough place for the notice email, when the request said one. */
+        place?: string | null;
     }): Promise<Headers> {
         // India only here too: the SMS widget has its own country picker.
         input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
@@ -196,13 +212,23 @@ export class AccountPhoneService {
         const phone = await this.verified(input, "SIGN_IN", keys);
         const user = await prisma.user.findFirst({
             where: { phoneE164: phone, phoneVerifiedAt: { not: null } },
-            select: { id: true },
+            select: { id: true, email: true, phoneVerifiedAt: true },
         });
-        if (!user) {
-            await this.fail(keys, "unknown_phone");
+        // Saroh staff never sign in by phone (DEC-198), and are told so in
+        // the words a phone with no account gets: nothing says it has one.
+        const staff = user ? await isSarohStaff(user) : false;
+        if (!user || staff) {
+            await this.fail(keys, staff ? "staff" : "unknown_phone");
             throw new BadRequestException({
                 message: NO_ACCOUNT_FOR_PHONE,
                 details: { code: "NO_ACCOUNT" },
+            });
+        }
+        if (!(await phoneFresh(user.id, user.phoneVerifiedAt))) {
+            await this.fail(keys, "stale_phone");
+            throw new BadRequestException({
+                message: PHONE_STALE,
+                details: { code: "PHONE_STALE" },
             });
         }
         let headers: Headers;
@@ -227,6 +253,7 @@ export class AccountPhoneService {
             throw error;
         }
         await record("SIGNED_IN", keys, { userId: user.id });
+        await this.notify(user.id, "signed-in", phone, input.place);
         return headers;
     }
 
@@ -236,6 +263,7 @@ export class AccountPhoneService {
         phoneE164: string;
         proof: PhoneProof;
         ip?: string;
+        place?: string | null;
     }): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
         // India only: a widget token for a foreign number never saves it.
         input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
@@ -261,15 +289,21 @@ export class AccountPhoneService {
             if (prismaErrorCode(error) === "P2002") throw phoneTaken();
             throw error;
         }
+        const kind = before?.phoneE164 ? "changed" : "added";
         await record("PHONE_ADDED", keys, {
             userId: input.userId,
-            reason: before?.phoneE164 ? "changed" : "added",
+            reason: kind,
         });
+        await this.notify(input.userId, kind, phone, input.place);
         return { phoneE164: phone, phoneVerifiedAt };
     }
 
     /** Remove the signed-in person's phone. Their email still signs them in. */
-    async remove(input: { userId: string; ip?: string }): Promise<void> {
+    async remove(input: {
+        userId: string;
+        ip?: string;
+        place?: string | null;
+    }): Promise<void> {
         const before = await prisma.user.findUnique({
             where: { id: input.userId },
             select: { phoneE164: true },
@@ -282,6 +316,41 @@ export class AccountPhoneService {
         await record("PHONE_REMOVED", this.keys(before.phoneE164, input.ip), {
             userId: input.userId,
         });
+        await this.notify(
+            input.userId,
+            "removed",
+            before.phoneE164,
+            input.place,
+        );
+    }
+
+    /**
+     * The account's email is told of every phone change and phone sign-in
+     * (DEC-198). Awaited; a failure is logged, without the address, and
+     * never undoes what was done.
+     */
+    private async notify(
+        userId: string,
+        kind: PhoneNoticeKind,
+        phoneE164: string,
+        place: string | null | undefined,
+    ): Promise<void> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true },
+        });
+        if (!user) return;
+        const outcome = await sendAccountPhoneNotice(user.email, {
+            kind,
+            lastFour: phoneE164.slice(-4),
+            at: new Date(),
+            place: place ?? null,
+        }).catch(() => "failed" as const);
+        if (outcome !== "sent") {
+            this.logger.error(
+                `account_phone_notice_${outcome} kind=${kind} user=${userId}`,
+            );
+        }
     }
 
     /**
@@ -381,8 +450,6 @@ export class AccountPhoneService {
             const result = await this.messaging.sendOtp({
                 toE164: input.phoneE164,
                 code,
-                appName: "Saroh",
-                minutes: CODE_MINUTES,
             });
             reason =
                 result.outcome === "accepted"
@@ -507,4 +574,34 @@ function tooMany(
         },
         HttpStatus.TOO_MANY_REQUESTS,
     );
+}
+
+/**
+ * Saroh staff (DEC-198): a `PlatformAdmin` grant not revoked, or the
+ * break-glass `ADMIN_ALLOWLIST`, as `PlatformAdminGuard` decides. Stricter
+ * than the guard: a grant with no live role still counts.
+ */
+async function isSarohStaff(user: {
+    id: string;
+    email: string;
+}): Promise<boolean> {
+    if (isBootstrapAdmin(user.email)) return true;
+    const grant = await prisma.platformAdmin.findUnique({
+        where: { userId: user.id },
+        select: { revokedAt: true },
+    });
+    return grant !== null && grant.revokedAt === null;
+}
+
+/**
+ * A rough place for a notice, from Cloudflare's visitor-location headers
+ * when they are on: "Bengaluru, IN", or null.
+ */
+export function placeOf(headers: Headers): string | null {
+    const country = headers.get("cf-ipcountry");
+    const parts = [
+        headers.get("cf-ipcity"),
+        country && !["XX", "T1"].includes(country) ? country : null,
+    ].filter((p): p is string => Boolean(p?.trim()));
+    return parts.length > 0 ? parts.join(", ").slice(0, 80) : null;
 }
