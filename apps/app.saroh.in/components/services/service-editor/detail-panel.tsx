@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type {
     ServiceDraft,
     ServiceField,
@@ -16,6 +15,7 @@ import {
     PANEL_SAYS,
     PANEL_TITLE,
 } from "@/lib/services/service-panels";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import type { PanelSetup } from "@/components/services/service-fields/panel-fields";
 import { PanelFields } from "@/components/services/service-fields/panel-fields";

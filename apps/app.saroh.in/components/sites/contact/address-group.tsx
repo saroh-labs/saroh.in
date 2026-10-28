@@ -4,14 +4,9 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import {
-    Absent,
-    Group,
-    Row,
-    Section,
-} from "@/components/shared/page/settings-rows";
 import { CopyValue } from "@/components/sites/search-tracking/parts";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import { Absent, Group, Row, Section } from "@saroh/ui/settings-rows";
 
 /**
  * "rye.saroh.app" with a break opportunity after each dot and hyphen, so a

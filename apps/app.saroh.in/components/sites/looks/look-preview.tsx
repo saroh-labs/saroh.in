@@ -25,7 +25,6 @@ import { useId, useState } from "react";
 
 import { DeviceFrame } from "@/components/sites/canvas/device-frame";
 import { DEVICE_WIDTH } from "@/components/sites/editor/editor-constants";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { SitePage } from "@/lib/sites/service";
 import {
     STARTER_FILL_HINT,
@@ -34,6 +33,7 @@ import {
     starterConfirmText,
     starterPlanFor,
 } from "@/lib/sites/starter-content";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { LookShowcase } from "./look-showcase";
 import { PaidRefusal } from "./paid-refusal";
 import type { StarterContentActions } from "./starter-content-actions";

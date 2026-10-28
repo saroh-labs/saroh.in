@@ -11,9 +11,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Row } from "@/components/shared/page/settings-rows";
 import { noteShared } from "@/components/shared/share-link/note-shared";
 import { runAction } from "@/lib/api/run-action";
 import type { BookingLinkView } from "@/lib/services/booking-link";
@@ -30,6 +28,8 @@ import {
     makeBookingPage,
     publishBookingPage,
 } from "@/lib/services/booking-link-actions";
+import { FormSheet } from "@saroh/ui/form-sheet";
+import { Row } from "@saroh/ui/settings-rows";
 
 /**
  * "Your booking page" on Bookings › Services (DEC-175, #1158): read first,

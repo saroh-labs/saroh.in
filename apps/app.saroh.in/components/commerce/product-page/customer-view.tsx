@@ -5,7 +5,6 @@ import type { ProductPageData, StockWord } from "@saroh/site-blocks";
 import { ProductPage, SiteThemeScope } from "@saroh/site-blocks";
 import { useState } from "react";
 
-import { SwitchRow } from "@/components/shared/fields/check-row";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
@@ -21,6 +20,7 @@ import {
 } from "@/lib/products/overview-words";
 import { untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
+import { SwitchRow } from "@saroh/ui/check-row";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";

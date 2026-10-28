@@ -7,8 +7,6 @@ import { showError } from "@saroh/ui/toast";
 import { useId, useOptimistic, useTransition } from "react";
 
 import { useSettingsUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { SwitchRow } from "@/components/shared/fields/check-row";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import type {
@@ -33,6 +31,8 @@ import {
     setCustomerEmail,
     setOverdueTiming,
 } from "@/lib/communications/customer-emails-actions";
+import { SwitchRow } from "@saroh/ui/check-row";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /** What the screen shows before a save lands: a switch, or the timing. */
 type Shown = { kind: string; on: boolean } | { timing: OverdueTiming };

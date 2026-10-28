@@ -29,7 +29,7 @@ import type {
     SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
 
-import { FailedRead, PartialRead } from "./failed-read";
+import { FailedRead, PartialRead } from "@saroh/ui/failed-read";
 
 let root: Root;
 let host: HTMLDivElement;

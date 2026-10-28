@@ -17,8 +17,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useTakingBookings } from "@/components/services/list/use-taking-bookings";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { PriceHistoryList } from "@/components/shared/price-history/price-history";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { runAction } from "@/lib/api/run-action";
@@ -58,6 +56,8 @@ import { hoursFromRules } from "@/lib/services/service-hours-draft";
 import type { PanelKey } from "@/lib/services/service-panels";
 import { editCards } from "@/lib/services/service-panels";
 import { zoneShortName } from "@/lib/services/time-picker";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { AtAGlance } from "./at-a-glance";
 import { DetailPanel } from "./detail-panel";

@@ -2,10 +2,10 @@
 
 import { EditorLoading } from "@/components/sites/rich-text/editor-loading";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
-import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -16,11 +16,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
-import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { runAction } from "@/lib/api/run-action";
 import { pausedWords } from "@/lib/billing/paused";
@@ -32,7 +29,10 @@ import {
     updatePost,
 } from "@/lib/content/actions";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
    used: the editor is heavy, and it is created in the browser. */

@@ -7,7 +7,6 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { TextLink } from "@saroh/ui/text-link";
 import { useEffect, useId, useState } from "react";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import type { LocalDate } from "@/lib/services/diary";
@@ -15,6 +14,7 @@ import { localMinuteOf } from "@/lib/services/diary";
 import { readOffered } from "@/lib/staff/actions";
 import { pickOfferedDay } from "@/lib/staff/offered";
 import type { OfferedRead } from "@/lib/staff/types";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /**
  * "What customers see" on Hours and time off (U17, More › What customers

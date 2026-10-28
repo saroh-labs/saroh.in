@@ -1,8 +1,8 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";

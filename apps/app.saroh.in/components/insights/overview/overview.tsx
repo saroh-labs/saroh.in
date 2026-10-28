@@ -5,7 +5,6 @@ import { ChevronRight, IndianRupee, Info } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { AnalyticsSummary } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
@@ -31,6 +30,7 @@ import {
     overviewSourcesAnswer,
 } from "@/lib/insights/sources-words";
 import { newOrderHref } from "@/lib/orders/links";
+import { PartialRead } from "@saroh/ui/failed-read";
 
 import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
 

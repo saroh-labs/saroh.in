@@ -13,8 +13,8 @@ import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { FieldHelp } from "@/components/commerce/product-editor-v2/fields";
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { Chip } from "@/components/shared/lists/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
 

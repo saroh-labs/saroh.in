@@ -5,7 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronRight, Store as StoreIcon } from "lucide-react";
 import Link from "next/link";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 interface ChooserStore {
     id: string;

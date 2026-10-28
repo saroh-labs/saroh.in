@@ -8,7 +8,6 @@ import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { useHold } from "@/components/shared/undo/use-hold";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { runAction } from "@/lib/api/run-action";
@@ -30,6 +29,7 @@ import {
 import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
 import type { ShareLink } from "@/lib/sites/share-links";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /**
  * Insights' "What to do next" (DEC-171, plan U11, #1091): one suggestion at

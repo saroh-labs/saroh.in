@@ -1,10 +1,11 @@
 "use client";
 
-import { phoneLabel, phoneNumberProblem } from "@saroh/ui/lib/phone";
+import { phoneLabel } from "@saroh/ui/lib/phone";
 import { useState } from "react";
 
 import type { AuthFailure } from "@/lib/auth-error-copy";
 import { authFailureCopy, NETWORK_ERROR } from "@/lib/auth-error-copy";
+import { signInPhoneProblem } from "@/lib/indian-phone";
 import type { OtpSender } from "@/lib/otp-widget";
 import { otpSender } from "@/lib/otp-widget";
 import type { PhoneChannel, PhonePurpose } from "@/lib/phone-sign-in";
@@ -77,7 +78,9 @@ export function usePhoneSend(
             setBusy(false);
             return;
         }
-        const problem = phoneNumberProblem(phone);
+        // India only (DEC-199): said before the Turnstile check or a code
+        // is spent on a number the API would refuse.
+        const problem = signInPhoneProblem(phone);
         if (problem) {
             setError(problem);
             return;

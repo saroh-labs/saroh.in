@@ -1,10 +1,10 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 

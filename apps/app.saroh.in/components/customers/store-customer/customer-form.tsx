@@ -13,10 +13,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
-import {
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
+import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

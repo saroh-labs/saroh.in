@@ -7,9 +7,9 @@ import { useState } from "react";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { QuickLook, QuickLookCard } from "@/components/shared/forms/quick-look";
 import { listTable } from "@/components/shared/lists/list-toolbar";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 

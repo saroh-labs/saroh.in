@@ -1,7 +1,5 @@
 "use client";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import {
     setMemberExtraActions,
@@ -11,6 +9,8 @@ import type { OrganizationMember } from "@/lib/organizations/members";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, Info } from "lucide-react";

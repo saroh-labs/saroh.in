@@ -1,5 +1,5 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { count } from "@/lib/format/plural";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 

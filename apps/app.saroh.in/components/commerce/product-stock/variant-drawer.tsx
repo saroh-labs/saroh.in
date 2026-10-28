@@ -12,7 +12,6 @@ import {
 import type { ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
@@ -23,6 +22,7 @@ import {
 import { optionNoun } from "@/lib/products/overview-words";
 import { untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { DrawerAddStock } from "./drawer-add-stock";

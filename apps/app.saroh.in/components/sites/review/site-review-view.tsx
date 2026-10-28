@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { createApproval } from "@/lib/sites/actions";
 import {
@@ -27,6 +26,7 @@ import type {
     SiteDetail,
 } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Notice } from "@saroh/ui/notice";
 import { SectionReview } from "./section-review";
 import { VerdictControls } from "./verdict-controls";

@@ -42,7 +42,7 @@ import { FACT_DOT, joinFacts } from "@/lib/format/join";
 import { readOrdersQuery } from "@/lib/orders/list-query";
 import { readListQuery as readProductsQuery } from "@/lib/products/list-query";
 import type { StockLevels } from "@/lib/stock/service";
-import { ListCard, ListRow } from "./list-card";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { listTable } from "./list-toolbar";
 
 /**

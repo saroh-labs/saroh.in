@@ -1,12 +1,5 @@
 import { ShareCards } from "@saroh/ui/share-cards";
 
-import {
-    Absent,
-    Group,
-    InUse,
-    Row,
-    Section,
-} from "@/components/shared/page/settings-rows";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import type { SiteContactView } from "@/lib/organizations/settings-service";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
@@ -26,6 +19,7 @@ import {
     SITE_ICON_ANCHOR,
     siteIconOf,
 } from "@/lib/sites/site-icon";
+import { Absent, Group, InUse, Row, Section } from "@saroh/ui/settings-rows";
 import { SellsFromRow } from "./sells-from-row";
 
 import { AddressGroup } from "@/components/sites/contact/address-group";

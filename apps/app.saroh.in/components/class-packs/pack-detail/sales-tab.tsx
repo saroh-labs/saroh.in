@@ -1,12 +1,12 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { AbsentOr } from "@saroh/ui/absent-value";
 import {
     EmptyState,
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { isAbsentText } from "@saroh/ui/lib/absent";
 import Link from "next/link";
 

@@ -2,8 +2,8 @@
 
 import type { VariantCap } from "@/lib/billing/variant-cap";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
-import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
+import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEdgeFade } from "@saroh/ui/scroll-x";
@@ -15,7 +15,6 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
@@ -37,6 +36,7 @@ import type {
 import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
+import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { VariantsSection } from "@/components/commerce/product-variants/variants-section";

@@ -9,13 +9,13 @@ import {
     useState,
 } from "react";
 
-import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { count } from "@/lib/format/plural";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
+import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 const LABEL: Record<SettingsTab, string> = {
     categories: "Categories",

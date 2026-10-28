@@ -1,8 +1,8 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import type { PosthogRegion, TrackerKind } from "@saroh/block-contract";
 import { POSTHOG_REGIONS } from "@saroh/block-contract";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId, useState, useTransition } from "react";
@@ -15,8 +15,8 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
-import { RadioCards } from "@/components/shared/fields/choice-group";
 import { runAction } from "@/lib/api/run-action";
+import { RadioCards } from "@saroh/ui/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 import type { SaveOutcome } from "./parts";
 

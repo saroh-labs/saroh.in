@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 /**
- * Account › Phone (DEC-196): the row with and without a phone, adding one
- * with a code the API checks, and removing it.
+ * The phone flow (DEC-196, DEC-199): Account › Phone's sheet and the add
+ * phone step. India only, checked before anything is sent; a code the API
+ * checks; the number refused when another account has it.
  */
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NOT_A_MOBILE } from "@/lib/indian-phone";
 import {
     button,
     draw,
@@ -17,7 +19,8 @@ import {
     text,
     type,
 } from "../billing-profiles/test-kit";
-import { PHONE_WORDS, PhoneSection } from "./phone-section";
+
+import { PHONE_WORDS, PhoneChange } from "./phone-section";
 
 const api = vi.hoisted(() => ({
     startPhone: vi.fn(),
@@ -43,22 +46,30 @@ beforeEach(() => {
         },
         error: null,
     });
-    api.removePhone.mockResolvedValue({ data: null, error: null });
 });
 afterEach(() => {
     tearDown();
     vi.clearAllMocks();
 });
 
-function drawIt(phoneE164: string | null) {
+const saved = vi.fn();
+function drawIt() {
     draw(
-        <PhoneSection
-            phoneE164={phoneE164}
-            phoneVerifiedAt={phoneE164 ? "2026-10-27T06:00:00.000Z" : null}
+        <PhoneChange
             turnstileSiteKey={null}
+            onSaved={saved}
+            onCancel={() => undefined}
         />,
     );
 }
+const phoneBox = () =>
+    must(host.querySelector<HTMLInputElement>("input[type=tel]"));
+const codeBox = () =>
+    must(
+        host.querySelector<HTMLInputElement>(
+            "input[autocomplete=one-time-code]",
+        ),
+    );
 
 async function submitForm() {
     await act(async () => {
@@ -67,29 +78,33 @@ async function submitForm() {
     });
 }
 
-describe("the Phone row", () => {
-    it("with no phone: says so and offers Add phone", () => {
-        drawIt(null);
-        expect(text(host)).toContain(PHONE_WORDS.none);
-        expect(button(PHONE_WORDS.add, host)).toBeTruthy();
-        expect(text(host)).not.toContain(PHONE_WORDS.remove);
+describe("the phone flow", () => {
+    it("is India only: a fixed +91, no country picker", () => {
+        drawIt();
+        expect(text(host)).toContain("+91");
+        expect(host.querySelector("[data-slot=phone-country]")?.tagName).toBe(
+            "SPAN",
+        );
+        expect(text(host)).toContain(PHONE_WORDS.hint);
     });
 
-    it("with a verified phone: shows it, its verified day, Change and Remove", () => {
-        drawIt("+919845012345");
-        expect(text(host)).toContain("+91 98450 12345");
-        expect(text(host)).toContain("Verified 27 Oct 2026");
-        expect(button(PHONE_WORDS.change, host)).toBeTruthy();
-        expect(button(PHONE_WORDS.remove, host)).toBeTruthy();
+    it("refuses a number that isn't an Indian mobile before anything is sent, under the field", async () => {
+        drawIt();
+        type(phoneBox(), "22 4567 8901");
+        await submitForm();
+        expect(api.startPhone).not.toHaveBeenCalled();
+        const box = phoneBox();
+        expect(box.getAttribute("aria-invalid")).toBe("true");
+        const said = (box.getAttribute("aria-describedby") ?? "")
+            .split(" ")
+            .map((id) => document.getElementById(id)?.textContent)
+            .join(" ");
+        expect(said).toContain(NOT_A_MOBILE);
     });
 
     it("adds a phone with a WhatsApp code, only after the API took it", async () => {
-        drawIt(null);
-        await press(button(PHONE_WORDS.add, host));
-        type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
-            "9845012345",
-        );
+        drawIt();
+        type(phoneBox(), "9845012345");
         await submitForm();
         expect(api.startPhone).toHaveBeenCalledWith({
             phone: "+919845012345",
@@ -98,19 +113,17 @@ describe("the Phone row", () => {
             turnstileToken: null,
         });
         expect(text(host)).toContain(
-            "We sent a 6-digit code on WhatsApp to +91",
+            "We sent a 6-digit code on WhatsApp to +91 98450 12345",
         );
-        type(
-            must(host.querySelector<HTMLInputElement>("#phone-code")),
-            "123456",
-        );
+        type(codeBox(), "123456");
         await submitForm();
         expect(api.addPhone).toHaveBeenCalledWith({
             phone: "+919845012345",
             code: "123456",
         });
-        expect(text(host)).toContain(PHONE_WORDS.added);
-        expect(text(host)).toContain("+91 98450 12345");
+        expect(saved).toHaveBeenCalledWith(
+            expect.objectContaining({ phoneE164: "+919845012345" }),
+        );
     });
 
     it("gets the code by SMS through the widget after the link", async () => {
@@ -118,22 +131,14 @@ describe("the Phone row", () => {
             data: { standIn: { token: "stand-in-2" } },
             error: null,
         });
-        drawIt(null);
-        await press(button(PHONE_WORDS.add, host));
-        expect(text(host)).toContain("on WhatsApp");
+        drawIt();
         await press(button("Get the code by SMS instead", host));
-        type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
-            "9845012345",
-        );
+        type(phoneBox(), "9845012345");
         await submitForm();
         expect(api.startPhone).toHaveBeenCalledWith(
             expect.objectContaining({ channel: "sms", purpose: "add" }),
         );
-        type(
-            must(host.querySelector<HTMLInputElement>("#phone-code")),
-            "123456",
-        );
+        type(codeBox(), "123456");
         await submitForm();
         expect(api.addPhone).toHaveBeenCalledWith({
             phone: "+919845012345",
@@ -141,7 +146,7 @@ describe("the Phone row", () => {
         });
     });
 
-    it("keeps the old phone and says why when the API refuses the new one", async () => {
+    it("goes back to the number, saying why, when another account has it", async () => {
         api.addPhone.mockResolvedValue({
             data: null,
             error: {
@@ -150,34 +155,22 @@ describe("the Phone row", () => {
             },
             retryAfter: null,
         });
-        drawIt("+919800000001");
-        await press(button(PHONE_WORDS.change, host));
-        type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
-            "9845012345",
-        );
+        drawIt();
+        type(phoneBox(), "9845012345");
         await submitForm();
-        type(
-            must(host.querySelector<HTMLInputElement>("#phone-code")),
-            "123456",
-        );
+        type(codeBox(), "123456");
         await submitForm();
         expect(text(host)).toContain(
             "That phone is already on another Saroh account. Use a different one.",
         );
-        // Back on the number, to pick another.
-        expect(host.querySelector("#new-phone")).not.toBeNull();
-        await press(button("Cancel", host));
-        expect(text(host)).toContain("+91 98000 00001");
+        expect(host.querySelector("input[type=tel]")).not.toBeNull();
     });
 
-    it("removes the phone after asking in words", async () => {
-        drawIt("+919845012345");
-        await press(button(PHONE_WORDS.remove, host));
-        expect(text(host)).toContain(PHONE_WORDS.removeAsk);
-        await press(button(PHONE_WORDS.remove, host));
-        expect(api.removePhone).toHaveBeenCalled();
-        expect(text(host)).toContain(PHONE_WORDS.removed);
-        expect(text(host)).toContain(PHONE_WORDS.none);
+    it("can change the number from the code step", async () => {
+        drawIt();
+        type(phoneBox(), "9845012345");
+        await submitForm();
+        await press(button(PHONE_WORDS.changeNumber, host));
+        expect(host.querySelector("input[type=tel]")).not.toBeNull();
     });
 });

@@ -68,6 +68,7 @@ const page = (p = detail(PULSE), showAll = false) =>
     draw(
         <ProfilePage
             profile={p}
+            businesses={[]}
             profiles={PROFILES}
             appUrl="https://app.saroh.localhost"
             showAll={showAll}
@@ -78,7 +79,8 @@ describe("the page", () => {
     it("says what it pays for, its details, and why it can't be removed", () => {
         page();
         const t = text(host);
-        expect(t).toContain("Billing profiles › Pulse Fitness LLP");
+        expect(t).toContain("Billing profiles");
+        expect(t).toContain("Pulse Fitness LLP");
         expect(t).toContain("Linked at Razorpay");
         expect(t).toContain("GSTIN 06AAAAA0000A1Z5 · pays for 2 businesses");
         expect(t).toContain("Pays for");
@@ -150,7 +152,7 @@ describe("the page", () => {
         expect(text(d)).toContain(
             "Invoices Saroh already sent to it stay in your records and keep these details.",
         );
-        expect(button("Keep it", d)).toBeTruthy();
+        expect(button("Keep profile", d)).toBeTruthy();
         actions.removeProfileAction.mockResolvedValue({
             ok: true,
             data: { removed: true },
@@ -189,9 +191,9 @@ describe("the page", () => {
 describe("Edit details", () => {
     it("names the businesses it changes and says Save for 2 businesses", async () => {
         page();
-        await press(button("Edit details", host));
+        await press(button("Edit", host));
         const d = dialog();
-        expect(text(d)).toContain("‹ Pulse Fitness LLP");
+        expect(text(d)).toContain("Pulse Fitness LLPEdit details");
         expect(text(d)).toContain(
             "Saroh's next invoice for Pulse Fitness Rohtak and Pulse Fitness Gurugram uses these details. Invoices already sent keep theirs. Razorpay gets the change in the background.",
         );
@@ -200,7 +202,7 @@ describe("Edit details", () => {
 
     it("says a GSTIN of another state under it, and sends nothing", async () => {
         page();
-        await press(button("Edit details", host));
+        await press(button("Edit", host));
         type(field("GSTIN"), "07AAAAA0000A1Z5");
         await submit();
         expect(text(dialog())).toContain(
@@ -212,7 +214,7 @@ describe("Edit details", () => {
 
     it("sends only what changed, and refreshes", async () => {
         page();
-        await press(button("Edit details", host));
+        await press(button("Edit", host));
         type(field("City"), "Hisar");
         actions.updateProfileAction.mockResolvedValue({
             ok: true,
@@ -230,7 +232,7 @@ describe("Edit details", () => {
 
     it("puts the API's refusal under the field it names", async () => {
         page();
-        await press(button("Edit details", host));
+        await press(button("Edit", host));
         type(field("Billing email"), "new@example.com");
         actions.updateProfileAction.mockResolvedValue({
             ok: false,

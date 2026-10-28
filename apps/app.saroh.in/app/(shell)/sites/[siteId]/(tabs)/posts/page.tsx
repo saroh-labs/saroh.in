@@ -8,7 +8,6 @@ import { notFound } from "next/navigation";
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { activeCut, pausedListWords, postPaused } from "@/lib/billing/paused";
 import type { Post } from "@/lib/content/service";
 import { listPosts } from "@/lib/content/service";
@@ -16,6 +15,7 @@ import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 import { postUpdatedIso } from "@/lib/sites/updated";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 export const metadata = { title: "Posts · Website" };
 

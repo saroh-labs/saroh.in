@@ -13,7 +13,6 @@ import type { ReactNode } from "react";
 import { shortNumber } from "@/components/invoices/list/invoice-row";
 import { MessagePreview } from "@/components/invoices/share/share-sheet";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { CONNECT_EMAIL_HREF } from "@/lib/communications/email-setup";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
@@ -30,6 +29,7 @@ import {
     tallyLines,
     waysHead,
 } from "@/lib/invoices/remind-many";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /*
  * The three steps of Remind many (DEC-173, U12 #1124, INVBulkSend and

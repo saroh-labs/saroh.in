@@ -10,11 +10,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { OpenTask } from "@/lib/leads/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 /**
  * Every follow-up still to do, soonest first, with the lead it belongs to and

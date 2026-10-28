@@ -5,8 +5,6 @@ import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { deleteContact } from "@/lib/contacts/actions";
 import {
     deletedLine,
@@ -32,6 +30,8 @@ import {
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { EditSheet } from "./edit-sheet";
 import { IdentityLinkDialog } from "./identity-link-dialog";

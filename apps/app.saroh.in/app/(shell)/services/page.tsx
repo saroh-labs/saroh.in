@@ -1,5 +1,5 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ServicesScreen } from "@/components/services/list/services-screen";

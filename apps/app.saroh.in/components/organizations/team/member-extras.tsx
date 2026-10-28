@@ -4,7 +4,6 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
-import { SwitchRow } from "@/components/shared/fields/check-row";
 import { useUpgradePromptShown } from "@/lib/billing/upgrade-prompts";
 import type { ExtraGroup } from "@/lib/organizations/extras";
 import {
@@ -16,6 +15,7 @@ import {
     sameExtras,
 } from "@/lib/organizations/extras";
 import type { RoleCatalogue } from "@/lib/organizations/roles";
+import { SwitchRow } from "@saroh/ui/check-row";
 import { couldntLoadLine } from "@saroh/ui/lib/state-copy";
 
 /**

@@ -61,6 +61,13 @@ export interface PhoneInputProps extends Omit<
     defaultCountry?: string | null;
     /** The picker's name for a screen reader. */
     countryLabel?: string;
+    /**
+     * One country only (ISO, "IN"): a fixed "🇮🇳 +91" in front of the
+     * number instead of the picker, for a phone Saroh signs someone in with
+     * (DEC-199). A pasted or typed number with another country's code
+     * stays in the box as typed, so the caller's check refuses it.
+     */
+    lockCountry?: string;
     /** Placed on the field as a whole (its margin, its width). */
     className?: string;
     /**
@@ -80,6 +87,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             onValueChange,
             defaultCountry,
             countryLabel = "Country code",
+            lockCountry,
             disabled,
             readOnly,
             className,
@@ -91,8 +99,19 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         },
         ref,
     ) => {
+        const home = lockCountry ?? defaultCountry ?? undefined;
+        // Locked: the number keeps its country; another country's code stays
+        // in the box as typed rather than switching the country.
+        const split = React.useCallback(
+            (text: string, fallback: string | undefined): PhoneParts => {
+                const next = splitPhone(text, fallback);
+                if (!lockCountry || next.country === lockCountry) return next;
+                return { country: lockCountry, national: text };
+            },
+            [lockCountry],
+        );
         const [parts, setParts] = React.useState<PhoneParts>(() =>
-            splitPhone(value, defaultCountry ?? undefined),
+            split(value, home),
         );
         // The value last seen, and the one this field last sent: a value
         // from outside that is neither (a reset, a saved record arriving) is
@@ -102,7 +121,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         if (value !== seen) {
             setSeen(value);
             if (value !== own) {
-                setParts(splitPhone(value, parts.country));
+                setParts(split(value, parts.country));
                 // Adopted: the same value sent again later is read again too.
                 setOwn(value);
             }
@@ -138,105 +157,127 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                 className={cn("flex min-w-0", className)}
                 data-slot="phone-input"
             >
-                <Popover
-                    open={open}
-                    onOpenChange={(next) => {
-                        setOpen(next);
-                        if (!next) setQuery("");
-                    }}
-                >
-                    <PopoverTrigger asChild>
-                        <button
-                            type="button"
-                            disabled={off}
-                            aria-label={`${countryLabel}: ${country.name} +${country.dial}`}
-                            data-slot="phone-country"
-                            className={cn(
-                                "flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-l-md rounded-r-none border border-r-0 border-input bg-field pl-2.5 pr-2 text-sm tabular-nums coarse:h-11 coarse:text-base",
-                                fieldFocus,
-                                fieldStates,
-                                boxClassName,
-                                "rounded-r-none border-r-0 px-2.5 focus-visible:z-10",
-                            )}
-                        >
-                            <span
-                                aria-hidden
-                                className="text-base leading-none"
-                            >
-                                {countryFlag(country.code)}
-                            </span>
-                            <span>+{country.dial}</span>
-                            <ChevronDown
-                                aria-hidden
-                                className="size-3.5 text-muted-foreground"
-                            />
-                        </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                        align="start"
-                        className="w-72 p-0"
-                        // Enter picks a country here; it must not also reach
-                        // a form or a group that saves on Enter.
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") e.stopPropagation();
+                {lockCountry ? (
+                    <span
+                        data-slot="phone-country"
+                        className={cn(
+                            "flex h-[38px] shrink-0 items-center gap-1 rounded-l-md rounded-r-none border border-r-0 border-input bg-muted px-2.5 text-sm tabular-nums text-muted-foreground coarse:h-11 coarse:text-base",
+                            boxClassName,
+                            "rounded-r-none border-r-0",
+                        )}
+                    >
+                        <span aria-hidden className="text-base leading-none">
+                            {countryFlag(country.code)}
+                        </span>
+                        <span aria-hidden>+{country.dial}</span>
+                        <span className="sr-only">
+                            {`${countryLabel}: ${country.name} +${country.dial}`}
+                        </span>
+                    </span>
+                ) : (
+                    <Popover
+                        open={open}
+                        onOpenChange={(next) => {
+                            setOpen(next);
+                            if (!next) setQuery("");
                         }}
                     >
-                        <Command
-                            shouldFilter={false}
-                            label="Search country or code"
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                disabled={off}
+                                aria-label={`${countryLabel}: ${country.name} +${country.dial}`}
+                                data-slot="phone-country"
+                                className={cn(
+                                    "flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-l-md rounded-r-none border border-r-0 border-input bg-field pl-2.5 pr-2 text-sm tabular-nums coarse:h-11 coarse:text-base",
+                                    fieldFocus,
+                                    fieldStates,
+                                    boxClassName,
+                                    "rounded-r-none border-r-0 px-2.5 focus-visible:z-10",
+                                )}
+                            >
+                                <span
+                                    aria-hidden
+                                    className="text-base leading-none"
+                                >
+                                    {countryFlag(country.code)}
+                                </span>
+                                <span>+{country.dial}</span>
+                                <ChevronDown
+                                    aria-hidden
+                                    className="size-3.5 text-muted-foreground"
+                                />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="start"
+                            className="w-72 p-0"
+                            // Enter picks a country here; it must not also reach
+                            // a form or a group that saves on Enter.
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") e.stopPropagation();
+                            }}
                         >
-                            <CommandInput
-                                value={query}
-                                onValueChange={setQuery}
-                                placeholder="Search country or code"
-                                aria-label="Search country or code"
-                            />
-                            <CommandList>
-                                <CommandEmpty>No country matches.</CommandEmpty>
-                                <CommandGroup>
-                                    {found.map((c) => (
-                                        <CommandItem
-                                            key={c.code}
-                                            value={c.code}
-                                            onSelect={() => {
-                                                change({
-                                                    country: c.code,
-                                                    national: parts.national,
-                                                });
-                                                setOpen(false);
-                                                setQuery("");
-                                                numberRef.current?.focus();
-                                            }}
-                                            className="gap-2"
-                                        >
-                                            <span
-                                                aria-hidden
-                                                className="text-base leading-none"
+                            <Command
+                                shouldFilter={false}
+                                label="Search country or code"
+                            >
+                                <CommandInput
+                                    value={query}
+                                    onValueChange={setQuery}
+                                    placeholder="Search country or code"
+                                    aria-label="Search country or code"
+                                />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        No country matches.
+                                    </CommandEmpty>
+                                    <CommandGroup>
+                                        {found.map((c) => (
+                                            <CommandItem
+                                                key={c.code}
+                                                value={c.code}
+                                                onSelect={() => {
+                                                    change({
+                                                        country: c.code,
+                                                        national:
+                                                            parts.national,
+                                                    });
+                                                    setOpen(false);
+                                                    setQuery("");
+                                                    numberRef.current?.focus();
+                                                }}
+                                                className="gap-2"
                                             >
-                                                {countryFlag(c.code)}
-                                            </span>
-                                            <span className="min-w-0 flex-1 truncate">
-                                                {c.name}
-                                            </span>
-                                            <span className="tabular-nums text-muted-foreground">
-                                                +{c.dial}
-                                            </span>
-                                            <Check
-                                                aria-hidden
-                                                className={cn(
-                                                    "size-4",
-                                                    c.code === country.code
-                                                        ? "opacity-100"
-                                                        : "opacity-0",
-                                                )}
-                                            />
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
+                                                <span
+                                                    aria-hidden
+                                                    className="text-base leading-none"
+                                                >
+                                                    {countryFlag(c.code)}
+                                                </span>
+                                                <span className="min-w-0 flex-1 truncate">
+                                                    {c.name}
+                                                </span>
+                                                <span className="tabular-nums text-muted-foreground">
+                                                    +{c.dial}
+                                                </span>
+                                                <Check
+                                                    aria-hidden
+                                                    className={cn(
+                                                        "size-4",
+                                                        c.code === country.code
+                                                            ? "opacity-100"
+                                                            : "opacity-0",
+                                                    )}
+                                                />
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                )}
                 <Input
                     {...props}
                     ref={numberBox}
@@ -263,7 +304,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                         if (!whole) return;
                         e.preventDefault();
                         change(
-                            splitPhone(
+                            split(
                                 e.clipboardData.getData("text"),
                                 parts.country,
                             ),
@@ -273,7 +314,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                         // "+44 20 7946 0958" typed in the box: its code moves
                         // to the picker once the box is left.
                         if (HAS_CODE.test(parts.national)) {
-                            change(splitPhone(parts.national, parts.country));
+                            change(split(parts.national, parts.country));
                         }
                         onBlur?.(e);
                     }}

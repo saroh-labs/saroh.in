@@ -1,7 +1,7 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { EmptyState, ProviderDisconnectedState } from "@saroh/ui/data-state";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { useId } from "react";
 
 import type { ProvidersView } from "@/lib/providers/rows";

@@ -1,10 +1,10 @@
 "use client";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { count } from "@/lib/format/plural";
 import { removeMember } from "@/lib/organizations/member-actions";
 import type { OrganizationMember } from "@/lib/organizations/members";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { nameOf } from "./role-book";

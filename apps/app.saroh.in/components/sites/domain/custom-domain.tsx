@@ -10,7 +10,6 @@ import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { UpgradePromptSeen } from "@/components/billing/upgrade-prompt-link";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
@@ -33,6 +32,7 @@ import {
 import type { SiteDomain } from "@/lib/domains/service";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddDomainDialog } from "./add-domain-dialog";
 import { BareDomainPart } from "./bare-domain-step";

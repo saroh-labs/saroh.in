@@ -5,8 +5,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pressOutside } from "@/components/shared/forms/press-outside.test-kit";
 import type { OrderRead, OrderReadLine } from "@/lib/orders/read";
+import { pressOutside } from "@saroh/ui/lib/press-outside.test-kit";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 

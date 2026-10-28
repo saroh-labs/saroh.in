@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
+import { CheckRow } from "@saroh/ui/check-row";
 import { cn } from "@saroh/ui/lib/utils";
 import { Globe } from "lucide-react";
 import { useId } from "react";

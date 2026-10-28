@@ -6,7 +6,6 @@ import { CalendarX2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
@@ -17,6 +16,7 @@ import {
 import type { CancelOffer } from "@/lib/saroh-billing/plan-view";
 import type { CancelWords } from "@/lib/saroh-billing/quote-words";
 import { cancelWords } from "@/lib/saroh-billing/quote-words";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /** Said when the API answered with something that isn't a move to Free. */
 const NOT_CANCELLED = "Your plan couldn't be cancelled. Nothing changed.";

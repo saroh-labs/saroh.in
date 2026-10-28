@@ -2614,3 +2614,23 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - No CHECK constraint was added: rows saved before may not meet the new rules, and a CHECK would block any update of such a row. The counts are an owner to-do before one is added.
     - A bare ten digits still means India, whatever country was meant (the shared rule, #1036).
     - `6-9` is the mobile rule the owner chose; a few landline area codes (79, 80, …) also start 6 to 9 after +91, so a landline there passes the shape check and simply never receives a code.
+
+## DEC-199 accounts.saroh.in uses the app's settings pieces from @saroh/ui, and its account area is one read-first frame
+
+**Status: Accepted — 2026-10-28** · owner, on the 28 Oct accounts UX audit (`~/.saroh-design-drafts/accounts-audit/`, 5.3/10: "the layout is not consistent")
+
+- Context:
+    - The account area drew three layouts: Billing profiles was read-first rows with sheets, Profile and sign-in was six open form cards, and Your businesses and /apps were the sign-in layout and a centred card. The app's settings pieces (FormSheet, Section/Row, ConfirmDialog, ChoiceGroup, the leave guard, FailedRead) lived in `apps/app.saroh.in/components/shared/`, where accounts couldn't import them, so accounts redrew them; DEC-195's scan didn't cover accounts.
+- Decision:
+    1. **Shared pieces first**: Section/Row/Absent (`@saroh/ui/settings-rows`), FormSheet, FormDialog and the overlay form, `useLeaveGuard` and `useDraftChanged`, ConfirmDialog, RadioCards/ChoiceGroup/ChipGroup, CheckRow, SectionList, ListCard and FailedRead move into `@saroh/ui`, with their APIs and looks. app.saroh.in imports them from there with no visual change. accounts.saroh.in joins DEC-195: its own shared-pieces scan (`apps/accounts.saroh.in/lib/consistency/shared-pieces.test.ts`) and `scripts/check-dupes.mjs`; the allow-lists and the baseline only shrink.
+    2. **Profile and sign-in is read-first rows** (Name, Email, Phone, Password, Devices, Delete account); each opens a FormDialog, a FormSheet or the one ConfirmDialog, as Billing profiles and the app's Settings do. Every capability stays (00-universal §15).
+    3. **One frame**: Profile and sign-in, Billing profiles and Your businesses (unparked, in the menu) share `app/(area)`'s frame: the app's SectionList at a desk and its TabStrip on a phone, a loading state inside the frame, and "Couldn't reach Saroh" with Try again when the API is down, never the sign-in page.
+    4. **/apps (staff only) moves to admin.saroh.in** as Saroh's apps (`/apps`); accounts' old address redirects there.
+    5. **India-only phones everywhere in accounts**, the billing profile included: `PhoneInput` takes `lockCountry` (a fixed +91, no picker). The browser checks an Indian mobile (`+91[6-9]` and nine digits) for sign-in and add, and an Indian number (`+91[1-9]` and nine digits) for the billing phone, before any request, so the Turnstile check isn't spent; the error is under its field. The server's rules are DEC-198.
+    6. **Cuts**: the duplicate "Edit details" button, the ⋯ › Remove entry (Remove stays once), the initial-letter avatars. Sessions and Delete account are rows that open a sheet or a dialog.
+- Consequences:
+    - Delete account works for an account with no password: the emailed link is its proof (Better Auth's delete with no password, a verification email configured).
+    - Your businesses no longer sends someone with one business straight into it: a menu place stays put.
+    - The leave guard in accounts also asks on Escape, the × and Cancel (`components/account/use-sheet-guard.tsx`); the app's sheets still drop an untouched draft and hold a typed one only against a press outside.
+    - A business the reader pays for but no longer owns names its owner once the API sends `ownerName` on a billing profile's business; until then it says "its new owner".
+- Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces"; `docs/patterns/frontend-forms.md`; `apps/accounts.saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.

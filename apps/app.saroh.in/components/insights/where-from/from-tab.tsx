@@ -3,7 +3,6 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { Route } from "lucide-react";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
-import { PartialRead } from "@/components/shared/states/failed-read";
 import type { AnalyticsSummary, AnalyticsView } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { beforePeriod } from "@/lib/insights/compare-words";
@@ -12,6 +11,7 @@ import type { InsightsPeriod, PeriodWindow } from "@/lib/insights/period";
 import { PERIOD_LABEL } from "@/lib/insights/period";
 import type { SourcesRead } from "@/lib/insights/reads";
 import { countedFromLine } from "@/lib/insights/sources-words";
+import { PartialRead } from "@saroh/ui/failed-read";
 
 import { HowCounted } from "@/components/insights/overview/overview";
 import type { LinkSite } from "./site-links";

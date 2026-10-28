@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { Row } from "@/components/shared/page/settings-rows";
 import { saveSiteIcon } from "@/lib/sites/actions";
 import type { SiteDetail, SiteIconSaved } from "@/lib/sites/service";
 import {
@@ -10,6 +9,7 @@ import {
     SITE_ICON_ANCHOR,
     siteIconOf,
 } from "@/lib/sites/site-icon";
+import { Row } from "@saroh/ui/settings-rows";
 
 import { EditAction } from "@/components/sites/settings/edit-actions";
 import type { SettingsSave } from "@/components/sites/settings/use-settings-save";

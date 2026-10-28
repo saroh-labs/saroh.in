@@ -6,7 +6,6 @@ import { Label } from "@saroh/ui/label";
 import { RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { providerName } from "@/lib/payments/providers";
 import type {
     PaymentProviderName,
@@ -14,6 +13,7 @@ import type {
 } from "@/lib/providers/service";
 import { generateWebhookSecret, WEBHOOK_PLACE } from "@/lib/providers/webhook";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /*
  * The payment setup dialog's webhook steps (DEC-063): tell the provider

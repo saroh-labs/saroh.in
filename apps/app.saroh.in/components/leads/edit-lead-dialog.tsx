@@ -9,9 +9,9 @@ import { PenLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { updateLead } from "@/lib/leads/actions";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * Change what a lead is called and what it could be worth, in the side

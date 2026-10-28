@@ -1,9 +1,9 @@
 "use client";
 
-import { FormSheetBody } from "@/components/shared/forms/form-sheet";
-import { useToastsAboveFoot } from "@/components/shared/forms/overlay-form";
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
+import { useToastsAboveFoot } from "@saroh/ui/overlay-form";
 import { showError } from "@saroh/ui/toast";
 import { Check, Copy, MessageCircle, MessageSquareText } from "lucide-react";
 import Link from "next/link";

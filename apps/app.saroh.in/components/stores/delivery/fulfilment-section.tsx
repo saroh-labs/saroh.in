@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import { Row, Section as Rows } from "@/components/shared/page/settings-rows";
 import { waySummary } from "@/lib/stores/delivery-summary";
 import { STOREFRONT_FULFILMENT_TYPES } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";
@@ -13,6 +12,7 @@ import {
     LOCATION_SECTIONS,
 } from "@/lib/stores/location-readiness";
 import type { StorefrontFulfilmentType } from "@/lib/stores/storefronts";
+import { Row, Section as Rows } from "@saroh/ui/settings-rows";
 
 import type { SectionProps } from "@/components/stores/locations/location-save";
 import { jumpTo } from "@/components/stores/locations/location-save";

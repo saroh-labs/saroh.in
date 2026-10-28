@@ -5,6 +5,8 @@
  */
 export {
     E164,
+    INDIAN_E164,
+    INDIAN_MOBILE_E164,
     PHONE_EXAMPLE,
     joinPhone,
     normalisePhoneNumber,

@@ -7,15 +7,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { QuickLook } from "@/components/shared/forms/quick-look";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import { count } from "@/lib/format/plural";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import { ordersHref, PAID_INVOICES_HREF } from "@/lib/insights/links";
 import type { SheetRead, WeekOrderRow } from "@/lib/insights/money-actions";
 import { readWeekOrders } from "@/lib/insights/money-actions";
 import { weekBills, weekSheetWords } from "@/lib/insights/money-words";
 import type { MoneyRead, MoneyWeekRead } from "@/lib/insights/reads";
+import { FailedRead } from "@saroh/ui/failed-read";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 /**
  * A week's orders (DEC-171, plan U12, #1093; `IBWeekD` beside the page,

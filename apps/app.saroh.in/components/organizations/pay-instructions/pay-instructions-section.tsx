@@ -7,7 +7,6 @@ import {
     rowActions,
 } from "@/components/organizations/business-settings/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { Absent, Row } from "@/components/shared/page/settings-rows";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import {
@@ -16,6 +15,7 @@ import {
     payValuesOf,
 } from "@/lib/organizations/pay-instructions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { Absent, Row } from "@saroh/ui/settings-rows";
 import { PayInstructionsSheet } from "./pay-instructions-sheet";
 import { PayPreview } from "./pay-preview";
 

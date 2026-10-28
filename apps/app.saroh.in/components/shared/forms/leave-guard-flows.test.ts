@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Every create and edit flow asks through the one guard
- * (`components/shared/forms/use-leave-guard.tsx`). A flow added later belongs in
+ * (`@saroh/ui/use-leave-guard`). A flow added later belongs in
  * this list; one that drops the guard, or grows a question of its own,
  * fails here.
  */
@@ -40,9 +40,7 @@ const FLOWS: [flow: string, file: string][] = [
 describe("the leave guard is mounted in every create and edit flow", () => {
     it.each(FLOWS)("%s", (_flow, file) => {
         const src = read(file);
-        expect(src).toContain(
-            'from "@/components/shared/forms/use-leave-guard"',
-        );
+        expect(src).toContain('from "@saroh/ui/use-leave-guard"');
         expect(src).toMatch(/useLeaveGuard\(\{/);
         // Says what would be lost, and tells the guard when.
         expect(src).toMatch(/\bdirty\b/);

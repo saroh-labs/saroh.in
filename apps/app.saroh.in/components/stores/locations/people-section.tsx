@@ -11,9 +11,6 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { Section as Rows } from "@/components/shared/page/settings-rows";
 import { useHold } from "@/components/shared/undo/use-hold";
 import {
     removeMember,
@@ -32,8 +29,11 @@ import {
     roleLabel,
     shownInvitations,
 } from "@/lib/stores/people";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { Section as Rows } from "@saroh/ui/settings-rows";
 
 import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";

@@ -1,9 +1,9 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";

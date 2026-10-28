@@ -5,9 +5,9 @@ import { Inbox } from "lucide-react";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { listForms } from "@/lib/forms/service";
 import { requireSession } from "@/lib/session";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 export const metadata = { title: "Forms · Website" };
 

@@ -12,7 +12,7 @@ import { X } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { useNarrow } from "@/lib/hooks/use-narrow";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 const CLOSE =
     "grid shrink-0 cursor-pointer place-items-center rounded-[8px] text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active";

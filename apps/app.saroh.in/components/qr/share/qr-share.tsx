@@ -5,12 +5,12 @@ import { Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { retireQrCode } from "@/lib/qr/actions";
 import type { QrScreen } from "@/lib/qr/screen";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords, placeWords } from "@/lib/qr/words";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { NotPublishedNotice } from "@saroh/ui/data-state";
 
 import type { DownloadEnv } from "@/components/qr/link-qr/qr-download";

@@ -28,11 +28,11 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+import { CheckRow } from "@saroh/ui/check-row";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field } from "@saroh/ui/field";
 import { CategoryDefaultsSheet, LOW_HINT } from "./category-defaults-sheet";
 import { DefaultsReviewSheet } from "./defaults-review-sheet";

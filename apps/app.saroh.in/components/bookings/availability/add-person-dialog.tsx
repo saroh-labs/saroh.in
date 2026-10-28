@@ -7,11 +7,11 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { firstName } from "@/lib/names";
 import { addPerson } from "@/lib/staff/actions";
 import { defaultWeek, weekLines } from "@/lib/staff/starting-week";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 /** The default week in words: "Monday to Saturday, 9:00 am to 6:00 pm". */
 const DEFAULT_WORDS = weekLines(defaultWeek())

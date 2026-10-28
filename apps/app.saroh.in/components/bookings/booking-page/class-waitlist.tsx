@@ -1,7 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import {
@@ -10,6 +9,7 @@ import {
     WAITLIST_NOTE,
 } from "@/lib/services/class-waitlist-words";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /**
  * A class's waitlist on its booking (round-2 A12; the Course Detail

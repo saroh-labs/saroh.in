@@ -1,6 +1,6 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { Home } from "lucide-react";
 import Link from "next/link";
 

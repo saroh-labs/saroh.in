@@ -5,12 +5,12 @@ import { useState } from "react";
 
 import type { LogoValue } from "@/components/shared/fields/logo-upload";
 import { LogoUpload } from "@/components/shared/fields/logo-upload";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * The business's logo, edited in its row's sheet: upload or replace it, or

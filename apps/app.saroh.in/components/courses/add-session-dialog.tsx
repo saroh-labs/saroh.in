@@ -9,11 +9,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { addSession } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 /** A week after the last session, at the same time; 18:30 with none yet. */
 function nextSession(course: CourseDetail): { day?: Date; time: string } {

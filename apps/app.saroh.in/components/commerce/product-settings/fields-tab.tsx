@@ -11,8 +11,8 @@ import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
 import { SettingsReadOnly, TabIntro } from "./product-settings";
 

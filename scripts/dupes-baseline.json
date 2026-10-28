@@ -3,6 +3,49 @@
     "minLines": 6,
     "groups": [
         {
+            "lines": 39,
+            "files": [
+                "apps/accounts.saroh.in/lib/gst-states.ts",
+                "packages/search-pages/src/tools/gstin-checker/logic.ts"
+            ],
+            "windows": [
+                "867aaf2e1edd",
+                "5afe5755238d",
+                "c9dc19cf41da",
+                "5f67d4a66a69",
+                "388ead731d5b",
+                "715293ff3066",
+                "ca665ddbb00f",
+                "ff92f7b33854",
+                "2663d8c4fd43",
+                "74fa0c01a90c",
+                "475c41061aeb",
+                "997c45aab455",
+                "d19caafea923",
+                "4ab069013b35",
+                "b681216d62fe",
+                "2b0d35176de2",
+                "aed0a8c137ad",
+                "fd84f1dfd1fd",
+                "69fcd042ad5f",
+                "cf81c00c371b",
+                "6f4980c85c19",
+                "756059814656",
+                "7621fa45baf3",
+                "321040f638a8",
+                "980f55c02703",
+                "b977c17b193e",
+                "bc7742510d28",
+                "f1993460ee13",
+                "b4a5a93defd1",
+                "58091d784294",
+                "d4669115f27c",
+                "f45f39731e8a",
+                "273068c4d9ab",
+                "9c8dc80d9a02"
+            ]
+        },
+        {
             "lines": 21,
             "files": [
                 "packages/search-pages/src/checks.tsx",
@@ -25,6 +68,28 @@
                 "508931421cd0",
                 "c707a9ce8a58",
                 "bc92fb03a1c4"
+            ]
+        },
+        {
+            "lines": 18,
+            "files": [
+                "apps/accounts.saroh.in/app/layout.tsx",
+                "apps/saroh.in/app/layout.tsx"
+            ],
+            "windows": [
+                "35de12d1b14f",
+                "669f32671b54",
+                "fd0fdbd77789",
+                "fe5f6147d9aa",
+                "2ae2e1729171",
+                "7052ef59c495",
+                "c0d0c78201ca",
+                "489fff4c0289",
+                "6d6779b58e6d",
+                "01620477203b",
+                "731e63654259",
+                "b328254eed38",
+                "2a0746ace843"
             ]
         },
         {
@@ -174,6 +239,18 @@
         {
             "lines": 8,
             "files": [
+                "apps/accounts.saroh.in/components/auth/login-form.tsx",
+                "apps/accounts.saroh.in/components/auth/signup-form.tsx"
+            ],
+            "windows": [
+                "d3d55003f6e7",
+                "1efa38466796",
+                "0ced5e7beb0f"
+            ]
+        },
+        {
+            "lines": 8,
+            "files": [
                 "apps/saroh.in/components/about/about-page.tsx",
                 "apps/saroh.in/components/contact/contact-page.tsx"
             ],
@@ -262,6 +339,21 @@
         {
             "lines": 7,
             "files": [
+                "apps/accounts.saroh.in/app/error.tsx",
+                "apps/accounts.saroh.in/app/global-error.tsx",
+                "apps/saroh.in/app/(site)/error.tsx",
+                "apps/saroh.in/app/error.tsx",
+                "apps/saroh.in/app/global-error.tsx"
+            ],
+            "windows": [
+                "dea5978c7175",
+                "8aee1cfe5afc"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/accounts.saroh.in/app/error.tsx",
                 "apps/saroh.in/app/(site)/error.tsx",
                 "apps/saroh.in/app/error.tsx"
             ],
@@ -273,13 +365,12 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(site)/error.tsx",
-                "apps/saroh.in/app/error.tsx",
+                "apps/accounts.saroh.in/app/global-error.tsx",
                 "apps/saroh.in/app/global-error.tsx"
             ],
             "windows": [
-                "dea5978c7175",
-                "8aee1cfe5afc"
+                "e1f6a6a8e3c6",
+                "6e76627e5c7e"
             ]
         },
         {
@@ -362,6 +453,76 @@
             "windows": [
                 "5641529dbeb0",
                 "d5de8ae8acfc"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/components/auth/forgot-password-form.tsx",
+                "apps/accounts.saroh.in/components/auth/login-form.tsx"
+            ],
+            "windows": [
+                "9d6c2cdea5a6"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/components/auth/login-form.tsx",
+                "apps/accounts.saroh.in/components/auth/signup-form.tsx"
+            ],
+            "windows": [
+                "7b65054ce49c"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/components/auth/login-form.tsx",
+                "apps/accounts.saroh.in/components/auth/signup-form.tsx"
+            ],
+            "windows": [
+                "72ed8aa605af"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/components/billing-profiles/move-dialog.tsx",
+                "apps/accounts.saroh.in/components/billing-profiles/profile-sheet.tsx"
+            ],
+            "windows": [
+                "ca9de0c4e5f8"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/lib/api.ts",
+                "apps/accounts.saroh.in/lib/sign-in-options.ts"
+            ],
+            "windows": [
+                "7aadae6cee77"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/lib/error-tracking-browser.ts",
+                "apps/saroh.in/lib/error-tracking-browser.ts"
+            ],
+            "windows": [
+                "9439cfee04b6"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/accounts.saroh.in/lib/error-tracking.ts",
+                "apps/saroh.in/lib/error-tracking.ts"
+            ],
+            "windows": [
+                "ca18f31d8006"
             ]
         },
         {

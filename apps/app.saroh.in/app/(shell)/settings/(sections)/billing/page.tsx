@@ -1,7 +1,7 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { autopayCharges, formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { NOTHING_CHANGED, planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";

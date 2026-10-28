@@ -5,9 +5,9 @@ import { Button } from "@saroh/ui/button";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Absent, Section } from "@/components/shared/page/settings-rows";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import { businessEditId } from "@/lib/organizations/business-rows";
+import { Absent, Section } from "@saroh/ui/settings-rows";
 
 import type { BusinessSheets } from "./use-business-sheets";
 

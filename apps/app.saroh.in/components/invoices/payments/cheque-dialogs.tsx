@@ -6,14 +6,14 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { chequeBounced, chequeCleared } from "@/lib/invoices/actions";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
 import { SHARE_RECEIPT_ON_WHATSAPP } from "@/lib/invoices/words";
+import { CheckRow } from "@saroh/ui/check-row";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 import { openWhatsAppShare } from "@/components/invoices/share/whatsapp-share";
 

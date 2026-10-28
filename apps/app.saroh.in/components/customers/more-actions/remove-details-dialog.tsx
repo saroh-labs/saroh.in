@@ -1,8 +1,8 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { Refusal } from "@/components/shared/states/refusal";
 import { Button } from "@saroh/ui/button";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useState } from "react";
 

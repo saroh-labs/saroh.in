@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { PhoneInput } from "@saroh/ui/phone-input";
@@ -116,7 +117,7 @@ export function AuthPhoneField({
     value,
     onValueChange,
     disabled,
-    invalid,
+    error,
 }: {
     label: string;
     note?: string;
@@ -124,9 +125,12 @@ export function AuthPhoneField({
     value: string;
     onValueChange: (value: string) => void;
     disabled?: boolean;
-    invalid?: boolean;
+    /** What is wrong with the number, said under it (DEC-199). */
+    error?: string | null;
 }) {
     const noteId = note ? `${id}-note` : undefined;
+    const errorId = error ? `${id}-error` : undefined;
+    const describedBy = [errorId, noteId].filter(Boolean).join(" ");
     return (
         <div className="sa-rise mb-3.5">
             <div className="mb-1.5 flex items-baseline gap-3">
@@ -138,15 +142,18 @@ export function AuthPhoneField({
                 id={id}
                 name="phone"
                 autoComplete="tel"
-                defaultCountry="IN"
+                lockCountry="IN"
                 countryLabel="Country code"
                 value={value}
                 onValueChange={onValueChange}
                 disabled={disabled}
-                aria-describedby={noteId}
-                aria-invalid={invalid ? true : undefined}
+                aria-describedby={describedBy || undefined}
+                aria-invalid={error ? true : undefined}
                 boxClassName={cn("sa-input", FIELD)}
             />
+            <FieldError id={errorId} className="mt-[5px]">
+                {error}
+            </FieldError>
             {note ? (
                 <p
                     id={noteId}

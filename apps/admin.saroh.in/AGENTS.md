@@ -359,6 +359,12 @@ recorded grant (the API refuses it otherwise).
   uses react-dom/server, which Next refuses in Server Components and route
   handlers. The site and its environment come from `marketingSiteUrl()` and
   `NEXT_PUBLIC_VERCEL_ENV` (`lib/search-pages.ts`).
+- **Saroh's apps (`/apps`, DEC-199)** is the launcher of Saroh's own
+  hosts that was accounts.saroh.in's staff-only `/apps`; accounts' old
+  address redirects here. Any staff member may open it (`requireStaff()`,
+  no permission: it only holds links); its menu row shows for
+  `platform:read`. Local hosts on a `.localhost` console, production ones
+  otherwise (`lib/saroh-apps.ts`).
 - **Home (`/`, admin plan U10, R14)** is "Needs you" and a few counts,
   from `GET /admin/home` (`platform:read`; counts and dates only, each kind
   only for staff whose permissions reach its fix, `lib/home-words.ts` says

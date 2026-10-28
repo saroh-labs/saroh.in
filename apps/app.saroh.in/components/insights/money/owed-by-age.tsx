@@ -6,11 +6,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { QuickLook } from "@/components/shared/forms/quick-look";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { formatMoney } from "@/lib/format/money";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { SheetRead } from "@/lib/insights/money-actions";
 import { readOwedBills } from "@/lib/insights/money-actions";
 import type { OwedRowView } from "@/lib/insights/money-words";
@@ -18,6 +16,8 @@ import type { OwedBillRow } from "@/lib/insights/owed-bills";
 import type { OwedAge } from "@/lib/insights/reads";
 import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
+import { FailedRead } from "@saroh/ui/failed-read";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import {
     AnswerCard,

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { Group } from "@/components/shared/page/settings-rows";
 import { CustomDomain } from "@/components/sites/domain/custom-domain";
 import type {
     OrganizationSettings,
@@ -18,6 +17,7 @@ import {
 } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
+import { Group } from "@saroh/ui/settings-rows";
 import { PublishApprovalSection } from "./publish-approval-row";
 import { SellsFromRow } from "./sells-from-row";
 

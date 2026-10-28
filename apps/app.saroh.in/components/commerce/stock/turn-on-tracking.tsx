@@ -6,8 +6,8 @@ import { PackageCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * Turn Track stock on for the whole business (`store:write`, #515). It

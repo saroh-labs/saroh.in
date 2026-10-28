@@ -8,8 +8,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { roleDeniedSentence } from "@/lib/api/role-denied";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { Refusal } from "./refusal";
 
 let root: Root;

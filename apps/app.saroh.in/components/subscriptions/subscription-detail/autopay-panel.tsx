@@ -9,10 +9,6 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { UNREACHED } from "@/lib/api/unreached";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";
@@ -26,7 +22,11 @@ import type {
     AutopayLink,
     AutopayMethod,
 } from "@/lib/subscriptions/service";
+import { RadioCards } from "@saroh/ui/choice-group";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { ShareLink } from "@saroh/ui/copy-button";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { Notice } from "@saroh/ui/notice";
 /**
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,

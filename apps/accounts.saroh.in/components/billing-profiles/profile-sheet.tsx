@@ -1,22 +1,17 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field, focusFirstError } from "@saroh/ui/field";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { PhoneInput } from "@saroh/ui/phone-input";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
+
+import { useSheetGuard } from "@/components/account/use-sheet-guard";
 
 import {
     createProfileAction,
@@ -58,12 +53,15 @@ const STATE_OPTIONS = [...GST_STATES]
 
 function useProfileForm(initial: ProfileValues) {
     const [values, setValues] = useState(initial);
+    const dirty = (Object.keys(initial) as ProfileField[]).some(
+        (k) => values[k] !== initial[k],
+    );
     const [errors, setErrors] = useState<Errors>({});
     const set = (field: ProfileField) => (value: string) => {
         setValues((v) => ({ ...v, [field]: value }));
         setErrors((e) => ({ ...e, [field]: undefined }));
     };
-    return { values, setValues, errors, setErrors, set };
+    return { values, setValues, errors, setErrors, set, dirty };
 }
 
 function ProfileFields({
@@ -77,7 +75,6 @@ function ProfileFields({
     set: (field: ProfileField) => (value: string) => void;
     emailHint: string;
 }) {
-    const gstName = useId();
     return (
         <>
             <Field
@@ -91,33 +88,23 @@ function ProfileFields({
                 />
             </Field>
             <Field label="GST" group>
-                <RadioGroup
-                    aria-label="GST"
-                    name={gstName}
+                <ChipGroup
+                    label="GST"
                     value={values.registered}
-                    onValueChange={(v) => set("registered")(v)}
-                    className="flex gap-2"
-                >
-                    {(
-                        [
-                            ["yes", "Registered"],
-                            ["no", "Not registered"],
-                        ] as const
-                    ).map(([value, label]) => (
-                        <label
-                            key={value}
-                            className={cn(
-                                "duration-fast coarse:h-11 flex h-[38px] flex-1 cursor-pointer items-center gap-2 rounded-[9px] border px-[11px] text-[13px] transition-colors",
-                                values.registered === value
-                                    ? "border-foreground"
-                                    : "border-border hover:border-border-strong",
-                            )}
-                        >
-                            <RadioGroupItem value={value} />
-                            {label}
-                        </label>
-                    ))}
-                </RadioGroup>
+                    onChange={(v) => set("registered")(v)}
+                    choices={[
+                        {
+                            value: "yes",
+                            label: "Registered",
+                            data: { "data-value": "yes" },
+                        },
+                        {
+                            value: "no",
+                            label: "Not registered",
+                            data: { "data-value": "no" },
+                        },
+                    ]}
+                />
             </Field>
             {values.registered === "yes" ? (
                 <Field
@@ -180,14 +167,26 @@ function ProfileFields({
                     autoComplete="email"
                 />
             </Field>
-            <Field label="Phone" optional error={errors.phone}>
-                <PhoneInput value={values.phone} onValueChange={set("phone")} />
+            <Field
+                label="Phone"
+                optional
+                hint="An Indian number."
+                error={errors.phone}
+            >
+                <PhoneInput
+                    lockCountry="IN"
+                    value={values.phone}
+                    onValueChange={set("phone")}
+                />
             </Field>
         </>
     );
 }
 
-/** The panel's frame: header, a scrolling form, and the foot's buttons. */
+/**
+ * The app's one sheet (FormSheet) with the leave guard: typed details are
+ * never thrown away by Escape, the ×, Cancel or a link without asking.
+ */
 function Panel({
     open,
     onClose,
@@ -197,75 +196,49 @@ function Panel({
     children,
     saveLabel,
     busy,
+    dirty,
     onSubmit,
     formRef,
 }: {
     open: boolean;
     onClose: () => void;
     title: string;
-    /** "‹ Pulse Fitness LLP": back to the page it was opened from. */
+    /** The profile it was opened from, over the title. */
     back?: string;
     description?: string;
     children: ReactNode;
     saveLabel: string;
     busy: boolean;
+    dirty: boolean;
     onSubmit: () => void;
     formRef: React.RefObject<HTMLFormElement | null>;
 }) {
-    const formId = useId();
+    const guard = useSheetGuard(
+        dirty,
+        "What you typed won't be saved.",
+        onClose,
+    );
     return (
-        <Sheet open={open} onOpenChange={(o) => (o ? null : onClose())}>
-            <SheetContent
-                side="right"
-                className="flex w-full flex-col gap-0 p-0 sm:max-w-[520px]"
-                aria-describedby={undefined}
+        <>
+            <FormSheet
+                open={open}
+                eyebrow={back}
+                title={title}
+                description={description ?? ""}
+                pending={busy}
+                dirty={dirty}
+                wide
+                onClose={guard.onClose}
+                onSubmit={(e) => {
+                    formRef.current = e.currentTarget;
+                    onSubmit();
+                }}
+                saveLabel={saveLabel}
             >
-                <div className="flex items-start gap-2.5 border-b px-[22px] pb-3.5 pr-14 pt-[18px]">
-                    <div className="min-w-0 flex-1">
-                        {back ? (
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="text-muted-foreground duration-fast hover:text-foreground focus-visible:ring-ring mb-1 inline-block rounded-sm text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2"
-                            >
-                                ‹ {back}
-                            </button>
-                        ) : null}
-                        <SheetTitle className="text-[19px]">{title}</SheetTitle>
-                        {description ? (
-                            <SheetDescription className="mt-1 text-[12.5px]">
-                                {description}
-                            </SheetDescription>
-                        ) : null}
-                    </div>
-                </div>
-                <form
-                    id={formId}
-                    ref={formRef}
-                    noValidate
-                    className="flex flex-1 flex-col gap-3.5 overflow-auto px-[22px] py-4"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        onSubmit();
-                    }}
-                >
-                    {children}
-                </form>
-                <div className="flex justify-end gap-2 border-t px-[22px] pb-[18px] pt-3">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="submit"
-                        form={formId}
-                        busy={busy}
-                        busyLabel="Saving…"
-                    >
-                        {saveLabel}
-                    </Button>
-                </div>
-            </SheetContent>
-        </Sheet>
+                {children}
+            </FormSheet>
+            {guard.dialog}
+        </>
     );
 }
 
@@ -345,6 +318,7 @@ export function EditProfileSheet({
             title="Edit details"
             saveLabel={says.save}
             busy={busy}
+            dirty={form.dirty}
             onSubmit={() => void save()}
             formRef={ref}
         >
@@ -472,6 +446,7 @@ export function AddProfileSheet({
             description={ADD_DESCRIPTION}
             saveLabel="Add profile"
             busy={busy}
+            dirty={form.dirty}
             onSubmit={() => void save()}
             formRef={ref}
         >

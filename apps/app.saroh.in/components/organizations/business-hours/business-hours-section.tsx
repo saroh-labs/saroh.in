@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
@@ -11,7 +11,6 @@ import {
     EditRow,
 } from "@/components/organizations/business-settings/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { Absent, Row } from "@/components/shared/page/settings-rows";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sameWeek } from "@/lib/organizations/opening-hours";
 import { newStorefrontHref } from "@/lib/stores/links";
@@ -20,6 +19,7 @@ import type {
     StorefrontHours,
     StorefrontHoursRead,
 } from "@/lib/stores/storefronts";
+import { Absent, Row } from "@saroh/ui/settings-rows";
 import { BusinessHoursSheet } from "./business-hours-sheet";
 
 import type { BusinessSheets } from "@/components/organizations/business-settings/use-business-sheets";

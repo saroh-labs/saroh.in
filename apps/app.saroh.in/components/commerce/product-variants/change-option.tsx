@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { count, plural } from "@/lib/format/plural";
 import { optionPlural } from "@/lib/products/editor-sections";
 import { productSettingsHref } from "@/lib/products/links";
+import { RadioCards } from "@saroh/ui/choice-group";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**

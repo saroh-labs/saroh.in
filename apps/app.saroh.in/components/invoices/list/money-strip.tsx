@@ -3,7 +3,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { ScrollX } from "@saroh/ui/scroll-x";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import type { ListQuery } from "@/lib/invoices/list-view";
 import { figureOn } from "@/lib/invoices/list-view";
 import type {
@@ -12,6 +11,7 @@ import type {
     SummaryFilter,
 } from "@/lib/invoices/summary";
 import { stripFigures } from "@/lib/invoices/summary";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /**
  * The Invoices money strip (DEC-173, U8 #1120, INVListAC): Owed to you,

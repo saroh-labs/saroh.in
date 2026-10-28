@@ -1,5 +1,5 @@
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { plural } from "@/lib/format/plural";
+import { FailedRead } from "@saroh/ui/failed-read";
 import Link from "next/link";
 import type { ReactNode } from "react";
 

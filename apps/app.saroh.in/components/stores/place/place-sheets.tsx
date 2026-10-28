@@ -6,7 +6,6 @@ import { Label } from "@saroh/ui/label";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     addressDraftOf,
     addressPatch,
@@ -26,6 +25,7 @@ import type {
     StorefrontKind,
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import type { Saver } from "@/components/stores/locations/location-save";
 import { Note } from "@/components/stores/locations/storefront-section";
@@ -38,7 +38,7 @@ const PROBLEM =
 
 /**
  * The frame every Edit sheet in The place shares: the settings rows' own
- * (`components/shared/forms/form-sheet.tsx`, which says how it saves,
+ * (`@saroh/ui/form-sheet`, which says how it saves,
  * closes and hands the keyboard back), named by the row it edits.
  */
 export function PlaceSheetFrame({

@@ -7,8 +7,6 @@ import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
 import { deletePage } from "@/lib/sites/actions";
 import {
@@ -18,6 +16,8 @@ import {
     unseenBecause,
 } from "@/lib/sites/page-menu";
 import type { Flag, ModulePageKind, SitePage } from "@/lib/sites/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { AddPagePanel, MENU_ROW } from "./add-page-panel";
 import { PageSettings } from "./page-settings";
 

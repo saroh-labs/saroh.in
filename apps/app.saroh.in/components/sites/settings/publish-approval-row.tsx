@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { Row, Section } from "@/components/shared/page/settings-rows";
 import { runAction } from "@/lib/api/run-action";
 import { setPublishNeedsApproval } from "@/lib/sites/actions";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
@@ -14,6 +13,7 @@ import {
     PUBLISH_APPROVAL_RULE,
     publishApprovalLine,
 } from "@/lib/sites/publish-approval";
+import { Row, Section } from "@saroh/ui/settings-rows";
 
 /**
  * "Publishing needs approval" (DEC-071, T13), on the site's settings.

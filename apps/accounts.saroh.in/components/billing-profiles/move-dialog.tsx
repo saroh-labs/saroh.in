@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { RadioCards } from "@saroh/ui/choice-group";
 import {
     Dialog,
     DialogContent,
@@ -9,11 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { cn } from "@saroh/ui/lib/utils";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
-import { textLinkClass } from "@saroh/ui/text-link";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -25,8 +22,8 @@ import {
     moveConfirm,
     moveNote,
     moveTarget,
-    shortDate,
 } from "@/lib/billing-profiles";
+import { day } from "@/lib/day";
 
 /**
  * Move a business to another of the owner's profiles (F5). A free business
@@ -43,7 +40,10 @@ export function MoveDialog({
     appUrl,
     open,
     onClose,
+    onNewProfile,
 }: {
+    /** "+ A new billing profile": Add opens on this page, this business picked. */
+    onNewProfile: () => void;
     business: ProfileBusiness;
     /** The profile it is billed to now. */
     from: BillingProfile;
@@ -115,16 +115,16 @@ export function MoveDialog({
                                 Authorise the payment
                             </DialogTitle>
                             <DialogDescription className="text-[13px] leading-normal">
-                                From {shortDate(started.at)}, Saroh bills{" "}
+                                From {day(started.at)}, Saroh bills{" "}
                                 {started.legalName}. Authorise the payment to
                                 finish.
                             </DialogDescription>
                         </DialogHeader>
                         <p className="text-muted-foreground text-[13px] leading-[1.55]">
                             Razorpay sets up the autopay for {started.legalName}
-                            . Until {shortDate(started.at)}, {business.name}{" "}
-                            stays billed as it is now. If you don&apos;t
-                            authorise it within a day, nothing changes.
+                            . Until {day(started.at)}, {business.name} stays
+                            billed as it is now. If you don&apos;t authorise it
+                            within a day, nothing changes.
                         </p>
                         <DialogFooter className="mt-1">
                             <Button
@@ -153,7 +153,7 @@ export function MoveDialog({
                     <>
                         <DialogHeader className="px-[22px] pb-1 pt-5">
                             <DialogTitle id={titleId} className="text-lg">
-                                Move {business.name}
+                                Move {business.name} (business)
                             </DialogTitle>
                             <DialogDescription className="text-[13px] leading-normal">
                                 {moveBusinessLine(business, from.legalName)}
@@ -163,53 +163,32 @@ export function MoveDialog({
                             <legend className="mb-0.5 text-[12.5px] font-medium">
                                 Bill it to
                             </legend>
-                            <RadioGroup
-                                value={target}
-                                onValueChange={(v) => {
+                            <RadioCards
+                                label="Bill it to"
+                                value={target || null}
+                                onChange={(v) => {
                                     setTarget(v);
                                     setRefusal(null);
                                 }}
-                                aria-label="Bill it to"
-                                className="flex flex-col gap-2"
-                            >
-                                {choices.map(({ profile, line, disabled }) => (
-                                    <label
-                                        key={profile.id}
-                                        className={cn(
-                                            "duration-fast flex items-start gap-2.5 rounded-[9px] border px-[13px] py-[11px] transition-colors",
-                                            disabled
-                                                ? "bg-muted/60 text-muted-foreground cursor-default"
-                                                : "bg-card hover:border-border-strong cursor-pointer",
-                                            profile.id === target
-                                                ? "border-foreground"
-                                                : "border-border",
-                                        )}
-                                    >
-                                        <RadioGroupItem
-                                            value={profile.id}
-                                            disabled={disabled}
-                                            className="mt-0.5"
-                                        />
-                                        <span className="flex min-w-0 flex-col gap-px">
-                                            <span className="text-[13.5px] font-medium [overflow-wrap:anywhere]">
-                                                {profile.legalName}
-                                            </span>
-                                            <span className="text-muted-foreground text-[11.5px]">
-                                                {line}
-                                            </span>
-                                        </span>
-                                    </label>
-                                ))}
-                            </RadioGroup>
-                            <Link
-                                href={`/account/billing-profiles?add=1&bill=${encodeURIComponent(business.id)}`}
-                                className={cn(
-                                    textLinkClass(),
-                                    "w-fit py-1.5 text-[12.5px]",
+                                options={choices.map(
+                                    ({ profile, line, disabled }) => ({
+                                        value: profile.id,
+                                        // Legal name and email: a business
+                                        // and its profile often share a name.
+                                        label: `${profile.legalName} (${profile.billingEmail})`,
+                                        note: line,
+                                        disabled,
+                                    }),
                                 )}
+                            />
+                            <Button
+                                type="button"
+                                variant="link"
+                                className="h-auto w-fit p-0 py-1.5 text-[12.5px]"
+                                onClick={onNewProfile}
                             >
                                 + A new billing profile
-                            </Link>
+                            </Button>
                             {!first ? (
                                 <p className="text-muted-foreground text-[12.5px]">
                                     None of your other profiles can take it yet.

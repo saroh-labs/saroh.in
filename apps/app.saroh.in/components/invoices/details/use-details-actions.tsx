@@ -25,11 +25,6 @@ import { useInvoiceSend } from "@/components/invoices/share/send-dialog";
 import { NewLinkConfirm } from "@/components/invoices/share/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import {
-    ConfirmDialog,
-    sayRefusal,
-} from "@/components/shared/confirm/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceActions } from "@/lib/invoices/detail-actions";
@@ -48,6 +43,8 @@ import { canSend, paysOnline } from "@/lib/invoices/send";
 import type { InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
 import { invoiceZone } from "@/lib/invoices/zone";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog, sayRefusal } from "@saroh/ui/confirm-dialog";
 import type { InvoiceRef } from "./invoice-actions";
 import { DeleteDraftDialog, IssueDialog } from "./invoice-actions";
 

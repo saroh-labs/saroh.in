@@ -1,6 +1,6 @@
 import { ListFilter } from "@/components/shared/lists/list-toolbar";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 
 /** The design's white card: border-first, 12px corners, 14px by 16px. */

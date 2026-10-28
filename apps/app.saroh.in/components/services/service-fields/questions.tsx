@@ -12,12 +12,12 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { Face } from "@/components/bookings/availability/face";
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
 import type { ServiceKind } from "@/lib/services/service-editor";
 import { sameNameLine } from "@/lib/services/service-form";
 import type { StaffView } from "@/lib/staff/types";
+import { CheckRow } from "@saroh/ui/check-row";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 import type { Edit } from "@/components/services/service-editor/fields";
 import { HELP, LABEL } from "@/components/services/service-editor/fields";

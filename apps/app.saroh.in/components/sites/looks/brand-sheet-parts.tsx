@@ -6,7 +6,7 @@ import { MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { ChipGroup } from "@saroh/ui/choice-group";
 
 /*
  * The Brand tab's own pieces beside the panel (`style-panel.tsx`): Reset

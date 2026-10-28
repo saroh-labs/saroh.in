@@ -15,8 +15,6 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/fields/choice-group";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import {
     readInvoice,
@@ -44,6 +42,8 @@ import {
 } from "@/lib/invoices/record-payment";
 import type { Invoice, InvoicePaymentMethod } from "@/lib/invoices/service";
 import { RECORD_PAYMENT } from "@/lib/invoices/words";
+import { ChipGroup } from "@saroh/ui/choice-group";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { offerWhatsAppReceipt } from "@/components/invoices/share/whatsapp-share";
 
