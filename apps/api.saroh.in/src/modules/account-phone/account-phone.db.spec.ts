@@ -281,6 +281,25 @@ describe("a person's own phone", () => {
 });
 
 describe("the limits", () => {
+    it("never signs in or saves a foreign number, even with a valid widget token (review 28 Oct)", async () => {
+        const foreign = "+14155550101";
+        const user = await person(phone());
+        await expect(
+            service.add({
+                userId: user.id,
+                phoneE164: foreign,
+                proof: { accessToken: token(foreign) },
+                ip: IP,
+            }),
+        ).rejects.toMatchObject({ status: 400 });
+        await expect(signIn(foreign, token(foreign))).rejects.toMatchObject({
+            status: 400,
+        });
+        await expect(
+            prisma.user.count({ where: { phoneE164: foreign } }),
+        ).resolves.toBe(0);
+    });
+
     it("lets one of twenty simultaneous starts through, not nineteen (pentest 28 Oct, H1)", async () => {
         const p = phone();
         const results = await Promise.allSettled(

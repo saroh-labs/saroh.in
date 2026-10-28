@@ -190,6 +190,8 @@ export class AccountPhoneService {
         ip?: string;
         headers: Headers;
     }): Promise<Headers> {
+        // India only here too: the SMS widget has its own country picker.
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
         const phone = await this.verified(input, "SIGN_IN", keys);
         const user = await prisma.user.findFirst({
@@ -235,6 +237,8 @@ export class AccountPhoneService {
         proof: PhoneProof;
         ip?: string;
     }): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
+        // India only: a widget token for a foreign number never saves it.
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
         const phone = await this.verified(input, "ADD", keys);
         const taken = await prisma.user.findFirst({
