@@ -49,7 +49,7 @@ export interface WhatsappAuthInput {
     appName: string;
     /** The code's lifetime, shown as "10 minutes". */
     minutes: number;
-    /** The number to call if you didn't ask, as read: "+91 96535 58717". */
+    /** The number to call if you didn't ask, as read: "+91 98450 12345". */
     callNumber: string;
 }
 
@@ -95,8 +95,8 @@ export interface MessagingProvider {
 export const MESSAGING_PROVIDER = Symbol("MESSAGING_PROVIDER");
 
 /**
- * An Indian number as people read it: "9653558717" or "919653558717" →
- * "+91 96535 58717". Anything else is shown as it was given.
+ * An Indian number as people read it: "9845012345" or "919845012345" →
+ * "+91 98450 12345". Anything else is shown as it was given.
  */
 export function readableNumber(raw: string): string {
     const d = raw.replace(/\D/g, "");
