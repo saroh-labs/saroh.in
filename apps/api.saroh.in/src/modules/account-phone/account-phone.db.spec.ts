@@ -281,6 +281,26 @@ describe("a person's own phone", () => {
 });
 
 describe("the limits", () => {
+    it("lets one of twenty simultaneous starts through, not nineteen (pentest 28 Oct, H1)", async () => {
+        const p = phone();
+        const results = await Promise.allSettled(
+            Array.from({ length: 20 }, () =>
+                service.start({
+                    phoneE164: p,
+                    ip: IP,
+                    channel: "sms",
+                    purpose: "sign-in",
+                }),
+            ),
+        );
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        await expect(
+            prisma.accountPhoneEvent.count({
+                where: { kind: "START", phoneHash: numberHash(p) },
+            }),
+        ).resolves.toBe(1);
+    });
+
     it("refuses a number outside India before anything is sent or counted (pentest 28 Oct)", async () => {
         for (const channel of ["sms", "whatsapp"] as const) {
             await expect(

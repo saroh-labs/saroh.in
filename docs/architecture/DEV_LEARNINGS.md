@@ -6049,3 +6049,19 @@ answered 500, and the `unhandled_exception` line carried
 **Rule**: a new header that proves who is calling goes into
 `SENSITIVE_HEADERS` in the same commit (`common/logging/redact.ts`).
 **Category**: security · logging
+
+## A limit checked and recorded apart lets a burst through
+
+**Symptom**: local pentest (28 Oct): 20 simultaneous `POST /account-phone/start`
+for one number sent 19 WhatsApp codes; the 30-second cooldown and daily caps
+were meant to allow 1.
+**Cause**: `phone-limits.ts` counted rows, then the service wrote the START row
+later; every request in the burst counted before any wrote. Its own `shortcut:`
+comment named the gap.
+**Fix**: `claimStart` checks and writes the START row in one transaction under
+`pg_advisory_xact_lock` per phone, then per address (fixed order), as
+`messaging/abuse-guard.ts` already did; a failed send marks the row instead of
+writing another. A DB spec fires 20 at once and expects 1.
+**Rule**: a limit that guards money or sends is checked and recorded in one
+locked step; never "count now, write later".
+**Category**: security · rate limits

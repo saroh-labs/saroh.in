@@ -12,7 +12,10 @@ import { prisma } from "@saroh/database";
  *
  * Counted from `AccountPhoneEvent` rows, as `messaging/abuse-guard.ts`
  * counts its rows, so a limit holds across API instances and restarts.
- * shortcut: two requests at a limit in the same instant can both pass (no advisory lock, unlike abuse-guard); lock per key if a burst ever gets through.
+ * A start is checked and recorded in one step under per-key advisory locks
+ * (`claimStart`), as abuse-guard does: pentest 28 Oct sent 20 at once and
+ * 19 got through when the check and the record were apart.
+ * shortcut: failed verifies are checked before and recorded after, so a burst can record more than the cap (each code still allows 5 tries, atomically); lock them too if that ever matters.
  */
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -103,12 +106,18 @@ function failureRules({ phoneHash, ipHash }: LimitKeys): Rule[] {
     ];
 }
 
-async function judge(rules: Rule[], now: Date): Promise<LimitVerdict> {
+type Db = Pick<Prisma.TransactionClient, "accountPhoneEvent">;
+
+async function judge(
+    rules: Rule[],
+    now: Date,
+    db: Db = prisma,
+): Promise<LimitVerdict> {
     for (const rule of rules) {
         const since = new Date(now.getTime() - rule.windowSeconds * 1000);
         // The `max`th newest row in the window: if it exists the window is
         // full, and its ageing out is when one more fits.
-        const full = await prisma.accountPhoneEvent.findFirst({
+        const full = await db.accountPhoneEvent.findFirst({
             where: { ...rule.where, createdAt: { gt: since } },
             orderBy: { createdAt: "desc" },
             skip: rule.max - 1,
@@ -129,12 +138,38 @@ async function judge(rules: Rule[], now: Date): Promise<LimitVerdict> {
     return { allowed: true };
 }
 
-/** May this number (and address) open the widget now? */
-export function checkStart(
+/**
+ * May this number (and address) start now? If so, the START row is written
+ * in the same locked transaction, so a burst can't pass together. Phone
+ * before address, always, so two starts never wait on each other in a loop.
+ */
+export function claimStart(
     keys: LimitKeys,
     now = new Date(),
-): Promise<LimitVerdict> {
-    return judge(startRules(keys), now);
+): Promise<
+    | { allowed: true; eventId: string }
+    | Extract<LimitVerdict, { allowed: false }>
+> {
+    return prisma.$transaction(async (tx) => {
+        const locks = [
+            `account-phone:${keys.phoneHash}`,
+            ...(keys.ipHash ? [`account-phone-ip:${keys.ipHash}`] : []),
+        ];
+        for (const key of locks) {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+        }
+        const verdict = await judge(startRules(keys), now, tx);
+        if (!verdict.allowed) return verdict;
+        const row = await tx.accountPhoneEvent.create({
+            data: {
+                kind: "START",
+                phoneHash: keys.phoneHash,
+                ipHash: keys.ipHash ?? null,
+            },
+            select: { id: true },
+        });
+        return { allowed: true, eventId: row.id };
+    });
 }
 
 /** May this number (and address) try another token now? */

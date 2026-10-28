@@ -26,7 +26,7 @@ import { checkCode, CODE_MINUTES, newCode, saveCode } from "./phone-codes";
 import type { LimitVerdict } from "./phone-limits";
 import {
     checkFailures,
-    checkStart,
+    claimStart,
     START_COOLDOWN_SECONDS,
 } from "./phone-limits";
 
@@ -150,12 +150,16 @@ export class AccountPhoneService {
                 details: { code: "CHALLENGE" },
             });
         }
-        const verdict = await checkStart(keys);
+        // Checked and recorded in one locked step (pentest 28 Oct, H1).
+        const verdict = await claimStart(keys);
         if (!verdict.allowed) {
             this.blocked("start", verdict.reason, keys);
             throw tooMany(verdict);
         }
-        if (input.channel === "whatsapp") return this.sendWhatsapp(input, keys);
+        const { eventId } = verdict;
+        if (input.channel === "whatsapp") {
+            return this.sendWhatsapp(input, keys, eventId);
+        }
 
         const token = this.messaging.standInOtpToken(input.phoneE164);
         const widget = this.messaging.otpWidgetConfig();
@@ -166,13 +170,13 @@ export class AccountPhoneService {
               : null;
         if (!answer) {
             this.blocked("start", "unavailable", keys);
+            await releaseStart(eventId, "unavailable");
             throw new ServiceUnavailableException({
                 message:
                     "Phone sign-in isn't available right now. Use your email.",
                 details: { code: "UNAVAILABLE" },
             });
         }
-        await record("START", keys);
         return answer;
     }
 
@@ -330,7 +334,17 @@ export class AccountPhoneService {
         input: { turnstileToken?: string; ip?: string },
         keys: Keys,
     ): Promise<boolean> {
-        if (!this.challenge.configured) return true;
+        if (!this.challenge.configured) {
+            // Turnstile is the only defence against sends spread over many
+            // addresses: say so loudly, once an hour (pentest 28 Oct, M2).
+            if (Date.now() - challengeWarnedAt > 3_600_000) {
+                challengeWarnedAt = Date.now();
+                this.logger.error(
+                    "account_phone_challenge_not_configured: phone codes are sent with no bot check; set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY",
+                );
+            }
+            return true;
+        }
         if (input.turnstileToken) {
             return this.challenge.verify(input.turnstileToken, input.ip ?? "");
         }
@@ -355,6 +369,7 @@ export class AccountPhoneService {
     private async sendWhatsapp(
         input: { phoneE164: string; purpose: PhonePurpose; userId?: string },
         keys: Keys,
+        eventId: string,
     ): Promise<PhoneStart> {
         const code = newCode();
         let reason: string;
@@ -376,7 +391,8 @@ export class AccountPhoneService {
         }
         if (reason) {
             this.blocked("start", `whatsapp_${reason}`, keys);
-            await record("START", keys, { reason: `whatsapp_${reason}` });
+            // Our own failure doesn't hold the cooldown; it still counts.
+            await releaseStart(eventId, `whatsapp_${reason}`);
             throw new UnprocessableEntityException({
                 message: "Couldn't send on WhatsApp. Try SMS instead.",
                 details: { code: "WHATSAPP_FAILED" },
@@ -388,7 +404,6 @@ export class AccountPhoneService {
             purpose: input.purpose === "add" ? "ADD" : "SIGN_IN",
             userId: input.purpose === "add" ? input.userId : undefined,
         });
-        await record("START", keys);
         return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
     }
 
@@ -408,9 +423,20 @@ export class AccountPhoneService {
     }
 }
 
+let challengeWarnedAt = 0;
+
 interface Keys {
     phoneHash: string;
     ipHash?: string;
+}
+
+/** A claimed start that sent nothing: noted, so it doesn't hold the cooldown. */
+function releaseStart(eventId: string, reason: string) {
+    return prisma.accountPhoneEvent.update({
+        where: { id: eventId },
+        data: { reason },
+        select: { id: true },
+    });
 }
 
 function record(
