@@ -23,6 +23,8 @@ import {
     resendLabel,
     resendWait,
     sendCode,
+    WHATSAPP_CODE_WORDS,
+    whatsappCodeLead,
 } from "@/lib/sign-in-code";
 
 /* Success choreography. The order matters: the mark has to COMPLETE before the
@@ -102,8 +104,18 @@ export function CodeStep({
 
     const wait = resendWait(resendAt, now);
     // A phone's code (DEC-196) is the same step with its own few words.
-    const phone = client.channel === "phone";
-    const words = phone ? { ...CODE_WORDS, ...PHONE_CODE_WORDS } : CODE_WORDS;
+    const phone = Boolean(client.channel);
+    const whatsapp = client.channel === "whatsapp";
+    const words = whatsapp
+        ? { ...CODE_WORDS, ...PHONE_CODE_WORDS, ...WHATSAPP_CODE_WORDS }
+        : phone
+          ? { ...CODE_WORDS, ...PHONE_CODE_WORDS }
+          : CODE_WORDS;
+    const lead = whatsapp
+        ? whatsappCodeLead(email)
+        : phone
+          ? phoneCodeLead(email)
+          : codeLead(email);
 
     // This step exists to take six digits, so it starts in the field.
     useEffect(() => {
@@ -212,7 +224,7 @@ export function CodeStep({
                 title={words.title}
                 blurb={
                     <>
-                        {phone ? phoneCodeLead(email) : codeLead(email)}
+                        {lead}
                         {next ? ` ${next}` : null}
                     </>
                 }

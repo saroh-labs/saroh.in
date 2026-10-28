@@ -9113,6 +9113,32 @@ model AccountPhoneEvent {
   @@index([userId, createdAt])
 }
 
+// A WhatsApp sign-in code for a Saroh account, made and sent by the server
+// from Saroh's own number (owner, 28 Oct 2026: "widget is for SMS"). Only
+// HMACs: of the number and of the code, never either one. A code lives 10
+// minutes and allows 5 tries; the newest unused one for a number and purpose
+// is the one checked. `userId` is the signed-in person an ADD code was sent
+// for. No relation to User, as AccountPhoneEvent. Platform-level, not a
+// business.
+enum AccountPhoneCodePurpose {
+  SIGN_IN
+  ADD
+}
+
+model AccountPhoneCode {
+  id        String                  @id @default(cuid())
+  phoneHash String
+  codeHash  String
+  purpose   AccountPhoneCodePurpose
+  userId    String?
+  expiresAt DateTime
+  attempts  Int                     @default(0)
+  usedAt    DateTime?
+  createdAt DateTime                @default(now())
+
+  @@index([phoneHash, purpose, createdAt])
+}
+
 // Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The
 // words live in `@saroh/search-pages`; this is the one publish record per
 // page path, set by staff in the admin console (search-pages:publish). A

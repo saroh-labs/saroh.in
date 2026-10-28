@@ -6030,3 +6030,9 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Symptom:** failed twice in a row in 2 of 5 `prepush --all` runs (desk or phone): Back from pay landed on "when", not "details"; passed alone and on re-runs.
 - **Cause:** it booked the Warehouse walkthrough on the same day and last time as site-booking-looks (`count - (phone ? 5 : 1)`). When both ran together one lost the time; `bookUntilOurs`'s retry goes back through "when", so the history behind pay was different.
 - **Fix:** the spec books 4th from the end on desk, 9th on a phone, days no other spec books this service on. Rule: a spec that asserts history or a specific time picks a day/time no other spec uses for the same service (`saroh-browser-tests`: a spec owns its data).
+
+## Every WhatsApp sign-in code from MSG91's widget was refused by Meta (27–28 Oct 2026)
+
+- **Symptom:** on saroh.io, phone sign-in on WhatsApp never arrived; MSG91's log showed Meta refusing each send. The same template sent by hand from MSG91's dashboard with all its values was delivered.
+- **Cause:** Saroh's approved authentication template `saroh_merchant_login` (en_US) has four body variables (code, app name, validity, number to call) plus a copy-code button. MSG91's OTP widget fills only `body_1`, `body_2` and the button, so Meta rejected every send for missing parameters.
+- **Fix (owner, 28 Oct: "widget is for SMS"):** WhatsApp codes for Saroh accounts are made, sent and checked by the API (`account-phone/phone-codes.ts`, `AccountPhoneCode`), with all four variables in en_US (`Msg91Provider.sendWhatsappAuth`). The widget does SMS only. Rule: a WhatsApp template with more than two body variables is server-sent, never through the widget; `msg91.provider.spec.ts` pins the four variables and the language (`docs/architecture/MESSAGING_MSG91.md`).

@@ -3,6 +3,7 @@ import {
     createMessagingProvider,
     parseTemplateList,
 } from "./messaging-provider.factory";
+import { readableNumber } from "./messaging-provider.port";
 import { Msg91Provider } from "./msg91.provider";
 
 // #1237: the MSG91 WhatsApp auth-template send. `fetch` is stubbed: no network.
@@ -13,6 +14,14 @@ const config = {
     whatsappTemplate: "saroh_code",
     baseUrl: "https://msg91.test/",
 };
+
+const auth = (toE164: string, code: string) => ({
+    toE164,
+    code,
+    appName: "Saroh",
+    minutes: 10,
+    callNumber: "+91 90000 00002",
+});
 
 function reply(status: number, body: unknown): Response {
     return new Response(JSON.stringify(body), { status });
@@ -30,7 +39,7 @@ describe("Msg91Provider", () => {
         const t = new Msg91Provider(config, fetchFn);
 
         await expect(
-            t.sendWhatsappAuth({ toE164: "+919812345678", code: "482913" }),
+            t.sendWhatsappAuth(auth("+919812345678", "482913")),
         ).resolves.toEqual({
             outcome: "accepted",
             providerMessageId: "m-1",
@@ -53,12 +62,18 @@ describe("Msg91Provider", () => {
                 type: "template",
                 template: {
                     name: "saroh_code",
-                    language: { code: "en", policy: "deterministic" },
+                    language: { code: "en_US", policy: "deterministic" },
                     to_and_components: [
                         {
                             to: ["919812345678"],
                             components: {
                                 body_1: { type: "text", value: "482913" },
+                                body_2: { type: "text", value: "Saroh" },
+                                body_3: { type: "text", value: "10 minutes" },
+                                body_4: {
+                                    type: "text",
+                                    value: "+91 90000 00002",
+                                },
                                 button_1: {
                                     subtype: "url",
                                     type: "text",
@@ -81,7 +96,7 @@ describe("Msg91Provider", () => {
         );
         const t = new Msg91Provider(config, fetchFn);
         await expect(
-            t.sendWhatsappAuth({ toE164: "+919812345678", code: "1" }),
+            t.sendWhatsappAuth(auth("+919812345678", "1")),
         ).resolves.toEqual({
             outcome: "ineligible",
         });
@@ -95,10 +110,9 @@ describe("Msg91Provider", () => {
             }),
         );
         const t = new Msg91Provider(config, fetchFn);
-        const result = await t.sendWhatsappAuth({
-            toE164: "+919812345678",
-            code: "482913",
-        });
+        const result = await t.sendWhatsappAuth(
+            auth("+919812345678", "482913"),
+        );
         expect(result).toEqual({ outcome: "rejected", reason: "unauthorized" });
         expect(JSON.stringify(result)).not.toContain(KEY);
     });
@@ -110,9 +124,7 @@ describe("Msg91Provider", () => {
                 reply(200, { hasError: true, errors: "template not found" }),
             );
         const t = new Msg91Provider(config, fetchFn);
-        await expect(
-            t.sendWhatsappAuth({ toE164: "+91981", code: "1" }),
-        ).resolves.toEqual({
+        await expect(t.sendWhatsappAuth(auth("+91981", "1"))).resolves.toEqual({
             outcome: "rejected",
             reason: "provider_error",
         });
@@ -124,7 +136,7 @@ describe("Msg91Provider", () => {
             .mockRejectedValue(new Error(`timeout with ${KEY}`));
         const t = new Msg91Provider(config, fetchFn);
         const err = await t
-            .sendWhatsappAuth({ toE164: "+91981", code: "482913" })
+            .sendWhatsappAuth(auth("+91981", "482913"))
             .catch((e: Error) => e);
         expect(err).toBeInstanceOf(Error);
         expect((err as Error).message).not.toContain(KEY);
@@ -134,9 +146,9 @@ describe("Msg91Provider", () => {
     it("fails naming the missing variable when unconfigured", async () => {
         const fetchFn = jest.fn();
         const t = new Msg91Provider({}, fetchFn);
-        await expect(
-            t.sendWhatsappAuth({ toE164: "+91981", code: "1" }),
-        ).rejects.toThrow("MSG91_AUTH_KEY");
+        await expect(t.sendWhatsappAuth(auth("+91981", "1"))).rejects.toThrow(
+            "MSG91_AUTH_KEY",
+        );
         expect(fetchFn).not.toHaveBeenCalled();
     });
 });
@@ -146,21 +158,23 @@ describe("FakeMessagingProvider", () => {
         const fake = new FakeMessagingProvider();
         fake.markIneligible("+911");
         fake.reject("+912", "rate_limited");
-        await expect(
-            fake.sendWhatsappAuth({ toE164: "+910", code: "1" }),
-        ).resolves.toEqual({
-            outcome: "accepted",
-            providerMessageId: expect.stringMatching(/^fake_whatsapp_\w+_1$/),
-        });
-        await expect(
-            fake.sendWhatsappAuth({ toE164: "+911", code: "2" }),
-        ).resolves.toEqual({ outcome: "ineligible" });
-        await expect(
-            fake.sendWhatsappAuth({ toE164: "+912", code: "3" }),
-        ).resolves.toEqual({
-            outcome: "rejected",
-            reason: "rate_limited",
-        });
+        await expect(fake.sendWhatsappAuth(auth("+910", "1"))).resolves.toEqual(
+            {
+                outcome: "accepted",
+                providerMessageId: expect.stringMatching(
+                    /^fake_whatsapp_\w+_1$/,
+                ),
+            },
+        );
+        await expect(fake.sendWhatsappAuth(auth("+911", "2"))).resolves.toEqual(
+            { outcome: "ineligible" },
+        );
+        await expect(fake.sendWhatsappAuth(auth("+912", "3"))).resolves.toEqual(
+            {
+                outcome: "rejected",
+                reason: "rate_limited",
+            },
+        );
         expect(fake.sends.map((s) => s.code)).toEqual(["1", "2", "3"]);
     });
 });
@@ -335,5 +349,15 @@ describe("Msg91Provider beyond codes", () => {
             ok: false,
             reason: "unavailable",
         });
+    });
+});
+
+describe("readableNumber (the template's number to call)", () => {
+    it("reads 10 digits or 91 + 10 digits as +91 XXXXX XXXXX", () => {
+        expect(readableNumber("9000000002")).toBe("+91 90000 00002");
+        expect(readableNumber("919000000002")).toBe("+91 90000 00002");
+        expect(readableNumber("+91 90000-00002")).toBe("+91 90000 00002");
+        expect(readableNumber("4420000000")).toBe("+91 44200 00000");
+        expect(readableNumber("+1 555 0100")).toBe("+1 555 0100");
     });
 });

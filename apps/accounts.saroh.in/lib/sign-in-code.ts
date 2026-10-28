@@ -49,6 +49,16 @@ export const PHONE_CODE_WORDS = {
     spam: "Not there? Wait a moment, then resend.",
 } as const;
 
+/** The same step for a code Saroh sent on WhatsApp (owner, 28 Oct). */
+export const WHATSAPP_CODE_WORDS = {
+    title: "Check your WhatsApp",
+} as const;
+
+/** "We sent a 6-digit code on WhatsApp to +91 98450 12345. It lasts 10 minutes." */
+export function whatsappCodeLead(phone: string): string {
+    return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code on WhatsApp to ${phone}. It lasts 10 minutes.`;
+}
+
 /** "We sent a 6-digit code to +91 98450 12345." */
 export function phoneCodeLead(phone: string): string {
     return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code to ${phone}.`;
@@ -111,7 +121,7 @@ export type CodeKind = "sign-in" | "email-verification";
 /** The auth client, as far as these steps use it. */
 export interface CodeClient {
     /** A phone's code (DEC-196): the address is a number, not an email. */
-    channel?: "phone";
+    channel?: "phone" | "whatsapp";
     send: (input: { email: string; kind: CodeKind }) => Promise<Answer>;
     check: (input: {
         email: string;
@@ -136,7 +146,7 @@ export async function sendCode(
     input: { email: string; kind?: CodeKind },
 ): Promise<CodeSent> {
     const email = input.email.trim();
-    if (client.channel !== "phone" && !looksLikeEmail(email)) {
+    if (!client.channel && !looksLikeEmail(email)) {
         return {
             ok: false,
             message: authFailureCopy({ code: "INVALID_EMAIL" }),

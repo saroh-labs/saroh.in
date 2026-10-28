@@ -19,9 +19,13 @@ import type {
     MessagingProvider,
     SendResult,
     SmsSendResult,
+    WhatsappAuthInput,
     WhatsAppTemplateCategory,
 } from "./providers/messaging-provider.port";
-import { MESSAGING_PROVIDER } from "./providers/messaging-provider.port";
+import {
+    MESSAGING_PROVIDER,
+    readableNumber,
+} from "./providers/messaging-provider.port";
 
 /** Retries a send whose provider answered with a temporary failure. */
 export const MESSAGING_SEND_TYPE = "messaging.send";
@@ -78,7 +82,9 @@ type Attempt =
  * customer's browser (no DLT of our own yet), so the server side is
  * verify-only: {@link verifyOtp} checks the widget's access token.
  * {@link sendOtp} is the server-made code over WhatsApp's authentication
- * template (`VerificationSendService` keeps the code and the wallet).
+ * template: Saroh accounts' sign-in codes (`AccountPhoneService`, owner
+ * 28 Oct: "widget is for SMS") and the hidden business path
+ * (`VerificationSendService`, DEC-197).
  */
 @Injectable()
 export class MessagingService {
@@ -90,11 +96,16 @@ export class MessagingService {
     ) {}
 
     /** A server-made code on WhatsApp. Throws on a network error, as the provider does. */
-    async sendOtp(input: {
-        toE164: string;
-        code: string;
-    }): Promise<SendResult> {
-        const result = await this.provider.sendWhatsappAuth(input);
+    async sendOtp(
+        input: Omit<WhatsappAuthInput, "callNumber">,
+    ): Promise<SendResult> {
+        const callNumber = readableNumber(
+            env.MESSAGING_SUPPORT_PHONE ?? env.MSG91_WHATSAPP_NUMBER ?? "",
+        );
+        const result = await this.provider.sendWhatsappAuth({
+            ...input,
+            callNumber,
+        });
         if (result.outcome === "accepted") await countUsage("WHATSAPP");
         return result;
     }
@@ -137,6 +148,21 @@ export class MessagingService {
         return widgetId && tokenAuth
             ? { widgetId, tokenAuth, scriptUrl: OTP_WIDGET_SCRIPT }
             : null;
+    }
+
+    /**
+     * Whether {@link sendOtp} can send: the fake, or Saroh's MSG91 sender
+     * with its key, number and authentication template all set.
+     */
+    get whatsappOtpReady(): boolean {
+        return (
+            this.otpStandIn ||
+            Boolean(
+                env.MSG91_AUTH_KEY &&
+                env.MSG91_WHATSAPP_NUMBER &&
+                env.MSG91_WHATSAPP_TEMPLATE,
+            )
+        );
     }
 
     /** Whether OTP tokens come from the fake's stand-in, not a widget. */

@@ -17,6 +17,7 @@ import { phoneLabel } from "@saroh/ui/lib/phone";
 import { PhoneInput } from "@saroh/ui/phone-input";
 import { useEffect, useState } from "react";
 
+import { PHONE_SEND_WORDS } from "@/components/auth/phone-sign-in";
 import { cannotSend, usePhoneSend } from "@/components/auth/use-phone-send";
 import { authFailureCopy } from "@/lib/auth-error-copy";
 import type { OtpSender } from "@/lib/otp-widget";
@@ -81,6 +82,8 @@ export function PhoneRow(props: {
         <PhoneSection
             {...props}
             canAdd={options.available}
+            whatsapp={options.whatsapp}
+            sms={options.sms}
             turnstileSiteKey={options.turnstileSiteKey}
         />
     );
@@ -98,9 +101,13 @@ export function PhoneSection({
     phoneVerifiedAt,
     turnstileSiteKey,
     canAdd = true,
+    whatsapp = true,
+    sms = true,
 }: {
     /** False while phones can't be verified here: Remove stays. */
     canAdd?: boolean;
+    whatsapp?: boolean;
+    sms?: boolean;
     phoneE164: string | null;
     phoneVerifiedAt: Date | string | null;
     turnstileSiteKey: string | null;
@@ -148,6 +155,8 @@ export function PhoneSection({
 
                 {mode === "edit" ? (
                     <PhoneChange
+                        whatsapp={whatsapp}
+                        sms={sms}
                         turnstileSiteKey={turnstileSiteKey}
                         onCancel={() => setMode("view")}
                         onSaved={(saved) => {
@@ -248,14 +257,22 @@ export function PhoneSection({
  * The new number, its code, then saved. Also the whole of accounts'
  * "Add your phone" step (`app/(auth)/add-phone`), which has no Cancel and
  * listens for `onUnavailable` so nobody is held while codes can't be sent.
+ * The code comes on WhatsApp (owner, 28 Oct), or by SMS through the widget
+ * after "Get the code by SMS instead".
  */
 export function PhoneChange({
+    whatsapp = true,
+    sms = true,
     turnstileSiteKey,
     onCancel,
     onSaved,
     onUnavailable,
     label = "New phone",
 }: {
+    /** Saroh can send on WhatsApp: the default way. */
+    whatsapp?: boolean;
+    /** The SMS widget is set up: the link under it. */
+    sms?: boolean;
     turnstileSiteKey: string | null;
     /** Omitted, there is no Cancel. */
     onCancel?: () => void;
@@ -264,7 +281,8 @@ export function PhoneChange({
     onUnavailable?: () => void;
     label?: string;
 }) {
-    const flow = usePhoneSend(turnstileSiteKey);
+    const flow = usePhoneSend(turnstileSiteKey, { purpose: "add", whatsapp });
+    const onWhatsapp = flow.channel === "whatsapp";
     useEffect(() => {
         if (flow.unavailable) onUnavailable?.();
     }, [flow.unavailable, onUnavailable]);
@@ -275,6 +293,7 @@ export function PhoneChange({
                 sender={flow.sender}
                 phone={flow.phone}
                 shownPhone={flow.shownPhone}
+                whatsapp={flow.sender.channel === "whatsapp"}
                 onCancel={onCancel}
                 onSaved={onSaved}
                 onUnavailable={onUnavailable}
@@ -311,8 +330,9 @@ export function PhoneChange({
                     aria-invalid={flow.error && !captcha ? true : undefined}
                 />
                 <p className="text-muted-foreground text-xs">
-                    We send a one-time code to it. It is saved once you enter
-                    the code.
+                    We send a one-time code to it
+                    {onWhatsapp ? " on WhatsApp" : " by SMS"}. It is saved once
+                    you enter the code.
                 </p>
             </div>
             {turnstileSiteKey && !captcha ? (
@@ -325,7 +345,11 @@ export function PhoneChange({
             <div id={CAPTCHA_ELEMENT_ID} />
             <div className="flex gap-2">
                 <Button type="submit" disabled={flow.busy}>
-                    {flow.busy ? "Sending…" : "Send code"}
+                    {flow.busy
+                        ? "Sending…"
+                        : onWhatsapp && !captcha
+                          ? PHONE_SEND_WORDS.whatsapp
+                          : "Send code"}
                 </Button>
                 {onCancel ? (
                     <Button
@@ -338,6 +362,17 @@ export function PhoneChange({
                     </Button>
                 ) : null}
             </div>
+            {onWhatsapp && sms ? (
+                <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto w-fit p-0"
+                    disabled={flow.busy}
+                    onClick={flow.toSms}
+                >
+                    {PHONE_SEND_WORDS.toSms}
+                </Button>
+            ) : null}
         </form>
     );
 }
@@ -359,6 +394,7 @@ function PhoneCode({
     sender,
     phone,
     shownPhone,
+    whatsapp,
     onCancel,
     onSaved,
     onUnavailable,
@@ -367,6 +403,8 @@ function PhoneCode({
     sender: OtpSender;
     phone: string;
     shownPhone: string;
+    /** The code came on WhatsApp, not by SMS. */
+    whatsapp: boolean;
     onCancel?: () => void;
     onSaved: (saved: Saved) => void;
     onUnavailable?: () => void;
@@ -388,8 +426,8 @@ function PhoneCode({
 
     // Built per call: the API's answer is kept for after the check.
     function client(box: Box) {
-        return phoneCodeClient(sender, async (accessToken) => {
-            const answer = await addPhone({ phone, accessToken });
+        return phoneCodeClient(sender, async (proof) => {
+            const answer = await addPhone({ phone, ...proof });
             box.saved = answer.data;
             box.refused = answer.error?.code ?? null;
             box.down = answer.error ? cannotSend(answer.error) : false;
@@ -443,7 +481,8 @@ function PhoneCode({
             noValidate
         >
             <p className="text-muted-foreground text-sm">
-                We sent a {VERIFICATION_OTP_LENGTH}-digit code to {shownPhone}.
+                We sent a {VERIFICATION_OTP_LENGTH}-digit code
+                {whatsapp ? " on WhatsApp" : ""} to {shownPhone}.
             </p>
             {error ? (
                 <p role="alert" className="text-destructive text-sm">

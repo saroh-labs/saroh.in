@@ -2578,6 +2578,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Follow-ups (owner, 27 Oct):** with email switched off, a customer whose account has no phone can still sign in by email through a small "Signed up with email?" link, and is asked to add a WhatsApp number once inside, so no duplicate accounts. A phone-only customer's data-removal acknowledgements ("we got your request", "it's done") go by one WhatsApp utility template from Saroh's number, **paid by Saroh**, so a legally needed notice never depends on a business's balance.
 - Consequences:
     - The widget's sends cannot be rate-limited by our server alone; its captcha and per-number limits in MSG91's widget settings are the hard stop, and our server limits verification attempts and checks Turnstile before opening the widget.
+- **Amended 2026-10-28** (owner: "we dont want to use widget for Whatsapp, widget is for SMS"): WhatsApp codes for Saroh accounts are made, sent and checked by Saroh's server from Saroh's own number (template `saroh_merchant_login`, four body variables, en_US), and WhatsApp is the default way; MSG91's widget is used for SMS only ("Get the code by SMS instead"). The widget couldn't fill the template's four variables, so Meta refused every send (DEV_LEARNINGS, 28 Oct).
 
 ## DEC-197 WhatsApp is for Saroh's own users only; Saroh sends nothing on a business's behalf for now
 

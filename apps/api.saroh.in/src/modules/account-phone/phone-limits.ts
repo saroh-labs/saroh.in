@@ -2,12 +2,13 @@ import type { AccountPhoneEventKind, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 /**
- * The server's limits on phone sign-in for Saroh accounts (DEC-196). The
- * OTP widget sends its code from the browser straight to the provider, so
- * these are the soft gate: they decide whether the browser is handed the
- * widget, and how many tokens a phone or an address may try. The hard stop
- * on sends is the widget's own captcha and limits in the provider's
- * dashboard (docs/architecture/, the messaging page).
+ * The server's limits on phone sign-in for Saroh accounts (DEC-196). A
+ * WhatsApp code is sent by the server, so for it these are the hard stop on
+ * sends. The SMS widget sends from the browser straight to the provider, so
+ * for SMS they are the soft gate: they decide whether the browser is handed
+ * the widget, and the hard stop is the widget's own captcha and limits in
+ * the provider's dashboard (docs/architecture/, the messaging page). Failed
+ * checks of either kind count toward the same failure caps.
  *
  * Counted from `AccountPhoneEvent` rows, as `messaging/abuse-guard.ts`
  * counts its rows, so a limit holds across API instances and restarts.
@@ -17,11 +18,11 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** Between two widget starts for one number. */
+/** Between two starts (a WhatsApp send or the SMS widget) for one number. */
 export const START_COOLDOWN_SECONDS = 30;
-/** Widget starts for one number in a day. */
+/** Starts for one number in a day. */
 export const STARTS_PER_PHONE_PER_DAY = 10;
-/** Widget starts from one address in an hour. */
+/** Starts from one address in an hour. */
 export const STARTS_PER_ADDRESS_PER_HOUR = 20;
 /** Failed verifies for one number in a day. */
 export const FAILS_PER_PHONE_PER_DAY = 10;
@@ -58,7 +59,8 @@ function startRules({ phoneHash, ipHash }: LimitKeys): Rule[] {
             reason: "phone_cooldown",
             max: 1,
             windowSeconds: START_COOLDOWN_SECONDS,
-            where: { kind, phoneHash },
+            // A WhatsApp send that failed on our side doesn't hold the cooldown.
+            where: { kind, phoneHash, reason: null },
         },
         {
             reason: "phone_daily",

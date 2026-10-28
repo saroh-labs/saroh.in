@@ -67,6 +67,8 @@ export default async function AddPhonePage({
             <AddPhoneStep
                 destination={onward}
                 turnstileSiteKey={options.turnstileSiteKey}
+                whatsapp={options.whatsapp}
+                sms={options.sms}
             />
         </SplitShell>
     );

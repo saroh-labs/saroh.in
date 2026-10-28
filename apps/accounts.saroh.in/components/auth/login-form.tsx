@@ -165,6 +165,8 @@ export function LoginForm({
     if (way === "phone" && phone?.available) {
         return (
             <PhoneSignIn
+                whatsapp={phone.whatsapp}
+                sms={phone.sms}
                 turnstileSiteKey={phone.turnstileSiteKey}
                 next={codeNext(returnTo, "sign-in")}
                 doneLine={doneLine(returnTo, "sign-in")}

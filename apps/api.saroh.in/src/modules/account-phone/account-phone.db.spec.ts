@@ -34,6 +34,7 @@ jest.mock("@saroh/auth", () => ({
 import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
@@ -115,7 +116,7 @@ function token(forPhone: string): string {
 function signIn(p: string, accessToken: string, ip = IP) {
     return service.signIn({
         phoneE164: p,
-        accessToken,
+        proof: { accessToken },
         ip,
         headers: new Headers({ "user-agent": "jest" }),
     });
@@ -200,7 +201,7 @@ describe("a person's own phone", () => {
         const added = await service.add({
             userId: user.id,
             phoneE164: first,
-            accessToken: token(first),
+            proof: { accessToken: token(first) },
             ip: IP,
         });
         expect(added.phoneE164).toBe(first);
@@ -209,7 +210,7 @@ describe("a person's own phone", () => {
         await service.add({
             userId: user.id,
             phoneE164: second,
-            accessToken: token(second),
+            proof: { accessToken: token(second) },
             ip: IP,
         });
         const row = await prisma.user.findUniqueOrThrow({
@@ -247,7 +248,7 @@ describe("a person's own phone", () => {
             service.add({
                 userId: me.id,
                 phoneE164: p,
-                accessToken: token(p),
+                proof: { accessToken: token(p) },
                 ip: IP,
             }),
         ).rejects.toMatchObject({
@@ -266,7 +267,7 @@ describe("a person's own phone", () => {
             service.add({
                 userId: me.id,
                 phoneE164: p,
-                accessToken: "client-says-verified",
+                proof: { accessToken: "client-says-verified" },
                 ip: IP,
             }),
         ).rejects.toMatchObject({ status: 400 });
@@ -282,10 +283,20 @@ describe("a person's own phone", () => {
 describe("the limits", () => {
     it("hands out the stand-in under the fake, then holds a 30s cooldown per phone", async () => {
         const p = phone();
-        const first = await service.start({ phoneE164: p, ip: IP });
+        const first = await service.start({
+            phoneE164: p,
+            ip: IP,
+            channel: "sms",
+            purpose: "sign-in",
+        });
         expect(first).toEqual({ standIn: { token: expect.any(String) } });
         await expect(
-            service.start({ phoneE164: p, ip: IP }),
+            service.start({
+                phoneE164: p,
+                ip: IP,
+                channel: "sms",
+                purpose: "sign-in",
+            }),
         ).rejects.toMatchObject({
             status: 429,
             response: { details: { code: "TOO_MANY" } },
@@ -305,7 +316,12 @@ describe("the limits", () => {
             })),
         });
         await expect(
-            service.start({ phoneE164: p, ip: IP }),
+            service.start({
+                phoneE164: p,
+                ip: IP,
+                channel: "sms",
+                purpose: "sign-in",
+            }),
         ).rejects.toMatchObject({
             status: 429,
         });
@@ -317,7 +333,12 @@ describe("the limits", () => {
         challenge.pass = false;
         const p = phone();
         await expect(
-            service.start({ phoneE164: p, ip: IP }),
+            service.start({
+                phoneE164: p,
+                ip: IP,
+                channel: "sms",
+                purpose: "sign-in",
+            }),
         ).rejects.toMatchObject({
             response: { details: { code: "CHALLENGE" } },
         });
@@ -325,7 +346,13 @@ describe("the limits", () => {
         expect(lastWarning(p)).toContain("reason=challenge");
         challenge.pass = true;
         await expect(
-            service.start({ phoneE164: p, ip: IP, turnstileToken: "ok" }),
+            service.start({
+                phoneE164: p,
+                ip: IP,
+                turnstileToken: "ok",
+                channel: "sms",
+                purpose: "sign-in",
+            }),
         ).resolves.toHaveProperty("standIn");
     });
 
@@ -361,5 +388,221 @@ describe("the limits", () => {
             status: 429,
         });
         expect(lastWarning(p)).toContain("reason=address_failures");
+    });
+});
+
+describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
+    const supportBefore = env.MESSAGING_SUPPORT_PHONE;
+    beforeEach(() => {
+        env.MESSAGING_SUPPORT_PHONE = "9000000002";
+    });
+    afterAll(() => {
+        env.MESSAGING_SUPPORT_PHONE = supportBefore;
+    });
+
+    const startWa = (
+        p: string,
+        extra: {
+            purpose?: "sign-in" | "add";
+            userId?: string;
+            ip?: string;
+            turnstileToken?: string;
+        } = {},
+    ) =>
+        service.start({
+            phoneE164: p,
+            channel: "whatsapp",
+            purpose: extra.purpose ?? "sign-in",
+            userId: extra.userId,
+            turnstileToken: extra.turnstileToken,
+            ip: extra.ip ?? IP,
+        });
+    const sentCode = (p: string) =>
+        fake.sends.filter((x) => x.toE164 === p).at(-1)?.code ?? "";
+    const withCode = (p: string, code: string, ip = IP) =>
+        service.signIn({
+            phoneE164: p,
+            proof: { code },
+            ip,
+            headers: new Headers({ "user-agent": "jest" }),
+        });
+    const wrong = (code: string) => (code === "000000" ? "111111" : "000000");
+    const codes = (p: string) =>
+        prisma.accountPhoneCode.findMany({
+            where: { phoneHash: numberHash(p) },
+            select: { codeHash: true, attempts: true, usedAt: true },
+        });
+
+    it("sends the template's four values from Saroh, and keeps only a hash", async () => {
+        const p = phone();
+        await expect(startWa(p)).resolves.toEqual({
+            whatsapp: { resendAfterSeconds: 30 },
+        });
+        const sent = fake.sends.at(-1);
+        expect(sent).toEqual({
+            toE164: p,
+            code: expect.stringMatching(/^\d{6}$/),
+            appName: "Saroh",
+            minutes: 10,
+            callNumber: "+91 90000 00002",
+        });
+        const [row] = await codes(p);
+        expect(row?.codeHash).not.toContain(sent?.code ?? "x");
+        await expect(events("START", p)).resolves.toBe(1);
+    });
+
+    it("answers the same whether or not the phone has an account", async () => {
+        const known = phone();
+        await person(known);
+        const unknown = phone();
+        await expect(startWa(known)).resolves.toEqual(await startWa(unknown));
+    });
+
+    it("signs in with the right code, once", async () => {
+        const p = phone();
+        const user = await person(p);
+        await startWa(p);
+        const code = sentCode(p);
+        const headers = await withCode(p, code);
+        expect(headers.getSetCookie().join(";")).toMatch(/session_token=/);
+        await expect(sessions(user.id)).resolves.toBe(1);
+        await expect(withCode(p, code)).rejects.toMatchObject({
+            response: { details: { code: "OTP_EXPIRED" } },
+        });
+        await expect(sessions(user.id)).resolves.toBe(1);
+    });
+
+    it("counts each wrong code, and the fifth kills it", async () => {
+        const p = phone();
+        const user = await person(p);
+        await startWa(p);
+        const code = sentCode(p);
+        for (let i = 0; i < 4; i++) {
+            await expect(withCode(p, wrong(code))).rejects.toMatchObject({
+                status: 400,
+                response: { details: { code: "NOT_VERIFIED" } },
+            });
+        }
+        await expect(withCode(p, wrong(code))).rejects.toMatchObject({
+            response: { details: { code: "TOO_MANY_ATTEMPTS" } },
+        });
+        await expect(withCode(p, code)).rejects.toMatchObject({
+            response: { details: { code: "TOO_MANY_ATTEMPTS" } },
+        });
+        await expect(sessions(user.id)).resolves.toBe(0);
+        await expect(events("VERIFY_FAILED", p)).resolves.toBe(6);
+        expect(lastWarning(p)).toContain("reason=too_many_attempts");
+    });
+
+    it("refuses an expired code", async () => {
+        const p = phone();
+        const user = await person(p);
+        await startWa(p);
+        await prisma.accountPhoneCode.updateMany({
+            where: { phoneHash: numberHash(p) },
+            data: { expiresAt: new Date(Date.now() - 1000) },
+        });
+        await expect(withCode(p, sentCode(p))).rejects.toMatchObject({
+            response: { details: { code: "OTP_EXPIRED" } },
+        });
+        await expect(sessions(user.id)).resolves.toBe(0);
+    });
+
+    it("never signs in on a code nobody sent", async () => {
+        const p = phone();
+        const user = await person(p);
+        await expect(withCode(p, "123456")).rejects.toMatchObject({
+            status: 400,
+        });
+        await expect(sessions(user.id)).resolves.toBe(0);
+        await expect(events("VERIFY_FAILED", p)).resolves.toBe(1);
+    });
+
+    it("adds a phone with a code sent for this person only", async () => {
+        const me = await person();
+        const other = await person();
+        const p = phone();
+        await startWa(p, { purpose: "add", userId: me.id });
+        const code = sentCode(p);
+        // A sign-in code or another person's can't add it.
+        await expect(
+            service.add({
+                userId: other.id,
+                phoneE164: p,
+                proof: { code },
+                ip: IP,
+            }),
+        ).rejects.toMatchObject({ status: 400 });
+        await expect(
+            service.add({
+                userId: me.id,
+                phoneE164: p,
+                proof: { code },
+                ip: IP,
+            }),
+        ).resolves.toMatchObject({ phoneE164: p });
+    });
+
+    it("a failed send says try SMS, doesn't hold the cooldown, and still counts toward the day", async () => {
+        const p = phone();
+        fake.failNext("template_paused");
+        await expect(startWa(p)).rejects.toMatchObject({
+            status: 422,
+            response: {
+                message: "Couldn't send on WhatsApp. Try SMS instead.",
+                details: { code: "WHATSAPP_FAILED" },
+            },
+        });
+        expect(lastWarning(p)).toContain("reason=whatsapp_template_paused");
+        await expect(codes(p)).resolves.toEqual([]);
+        await expect(startWa(p)).resolves.toHaveProperty("whatsapp");
+        await expect(events("START", p)).resolves.toBe(2);
+    });
+
+    it("holds the 30s cooldown across both channels", async () => {
+        const p = phone();
+        await startWa(p);
+        await expect(
+            service.start({
+                phoneE164: p,
+                channel: "sms",
+                purpose: "sign-in",
+                ip: IP,
+            }),
+        ).rejects.toMatchObject({ status: 429 });
+        await expect(startWa(p)).rejects.toMatchObject({ status: 429 });
+    });
+
+    it("lets a resend skip Turnstile only from the same address that passed it", async () => {
+        challenge.on = true;
+        const p = phone();
+        await expect(startWa(p)).rejects.toMatchObject({
+            response: { details: { code: "CHALLENGE" } },
+        });
+        await startWa(p, { turnstileToken: "ok" });
+        // Past the cooldown.
+        await prisma.accountPhoneEvent.updateMany({
+            where: { phoneHash: numberHash(p) },
+            data: { createdAt: new Date(Date.now() - 60_000) },
+        });
+        await expect(startWa(p, { ip: "198.51.100.4" })).rejects.toMatchObject({
+            response: { details: { code: "CHALLENGE" } },
+        });
+        await expect(startWa(p)).resolves.toHaveProperty("whatsapp");
+    });
+
+    it("the SMS widget's token still signs in", async () => {
+        const p = phone();
+        const user = await person(p);
+        await expect(
+            service.start({
+                phoneE164: p,
+                channel: "sms",
+                purpose: "sign-in",
+                ip: IP,
+            }),
+        ).resolves.toHaveProperty("standIn");
+        await signIn(p, token(p));
+        await expect(sessions(user.id)).resolves.toBe(1);
     });
 });

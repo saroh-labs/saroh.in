@@ -15,10 +15,15 @@ import { AccountPhoneService } from "./account-phone.service";
  * (`PHONE_REQUIRED_FOR_ACCOUNTS`, DEC-196) that accounts reads on its
  * server to decide whether sign-in stops at "Add your phone".
  */
-function service(input: { flagOn: boolean; widget: boolean }) {
+function service(input: {
+    flagOn: boolean;
+    widget: boolean;
+    whatsapp?: boolean;
+}) {
     const isEnabled = jest.fn().mockResolvedValue(input.flagOn);
     const messaging = {
         otpStandIn: false,
+        whatsappOtpReady: input.whatsapp ?? false,
         otpWidgetConfig: () =>
             input.widget
                 ? { widgetId: "w", tokenAuth: "t", scriptUrl: "s" }
@@ -45,6 +50,8 @@ describe("AccountPhoneService.options", () => {
         const { phones, isEnabled } = service({ flagOn: false, widget: true });
         expect(await phones.options()).toEqual({
             available: true,
+            whatsapp: false,
+            sms: true,
             turnstileSiteKey: null,
             required: false,
         });
@@ -60,6 +67,19 @@ describe("AccountPhoneService.options", () => {
         expect(await phones.options()).toMatchObject({
             available: true,
             required: true,
+        });
+    });
+
+    it("WhatsApp alone makes phones available, with SMS off", async () => {
+        const { phones } = service({
+            flagOn: false,
+            widget: false,
+            whatsapp: true,
+        });
+        expect(await phones.options()).toMatchObject({
+            available: true,
+            whatsapp: true,
+            sms: false,
         });
     });
 

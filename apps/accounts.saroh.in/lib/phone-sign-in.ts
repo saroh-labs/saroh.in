@@ -12,15 +12,31 @@ import { apiBase } from "./sign-in-options";
  * sentence (`words`), which the screens show as it is.
  */
 
-/** What the browser opens after a start: the widget, or (dev/test) a stand-in. */
+/**
+ * What the browser does after a start: type the code Saroh sent on
+ * WhatsApp, or open the SMS widget (dev/test: a stand-in for it).
+ */
 export type PhoneStart =
+    | { whatsapp: { resendAfterSeconds: number } }
     | {
           widget: { widgetId: string; tokenAuth: string; scriptUrl: string };
       }
     | { standIn: { token: string } };
 
+/** How the code reaches the phone. WhatsApp first (owner, 28 Oct). */
+export type PhoneChannel = "whatsapp" | "sms";
+/** Signing in, or the signed-in person adding a phone. */
+export type PhonePurpose = "sign-in" | "add";
+/** What the API checks: the WhatsApp code, or the SMS widget's token. */
+export type PhoneProof = { code: string } | { accessToken: string };
+
 export interface PhoneOptions {
+    /** Either channel below works. */
     available: boolean;
+    /** Saroh can send a code on WhatsApp. */
+    whatsapp: boolean;
+    /** The SMS widget is set up. */
+    sms: boolean;
     turnstileSiteKey: string | null;
     /** `PHONE_REQUIRED_FOR_ACCOUNTS`: every account needs a verified phone (`lib/phone-step.ts`). */
     required: boolean;
@@ -29,6 +45,8 @@ export interface PhoneOptions {
 /** What to assume when the API can't be asked: nothing offered, nothing required. */
 const NO_PHONE: PhoneOptions = {
     available: false,
+    whatsapp: false,
+    sms: false,
     turnstileSiteKey: null,
     required: false,
 };
@@ -50,30 +68,36 @@ export async function phoneOptions(): Promise<PhoneOptions> {
     }
 }
 
+/** A WhatsApp code sent now, or the SMS widget's config. */
 export function startPhone(input: {
     phone: string;
+    channel: PhoneChannel;
+    purpose: PhonePurpose;
     turnstileToken?: string | null;
 }): Promise<PhoneAnswer<PhoneStart>> {
-    return call("POST", "/account-phone/start", {
+    const path =
+        input.purpose === "add"
+            ? "/account/phone/start"
+            : "/account-phone/start";
+    return call("POST", path, {
         phone: input.phone,
+        channel: input.channel,
         ...(input.turnstileToken
             ? { turnstileToken: input.turnstileToken }
             : {}),
     });
 }
 
-/** The widget's token, checked by the API; the answer sets the session cookie. */
-export function signInWithPhone(input: {
-    phone: string;
-    accessToken: string;
-}): Promise<PhoneAnswer<{ signedIn: true }>> {
+/** The code or the widget's token, checked by the API; the answer sets the session cookie. */
+export function signInWithPhone(
+    input: { phone: string } & PhoneProof,
+): Promise<PhoneAnswer<{ signedIn: true }>> {
     return call("POST", "/account-phone/sign-in", input);
 }
 
-export function addPhone(input: {
-    phone: string;
-    accessToken: string;
-}): Promise<PhoneAnswer<{ phoneE164: string; phoneVerifiedAt: string }>> {
+export function addPhone(
+    input: { phone: string } & PhoneProof,
+): Promise<PhoneAnswer<{ phoneE164: string; phoneVerifiedAt: string }>> {
     return call("POST", "/account/phone", input);
 }
 

@@ -73,6 +73,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "Saroh's own sender's monthly message counts per channel (messaging core); platform-level, not a business.",
     AccountPhoneEvent:
         "Phone sign-in attempts and phone changes for Saroh accounts (DEC-196); a person spans businesses, so no organization.",
+    AccountPhoneCode:
+        "WhatsApp sign-in codes for Saroh accounts (DEC-196, 28 Oct); a person spans businesses, so no organization.",
 };
 
 const databaseDir = path.resolve(__dirname, "..");

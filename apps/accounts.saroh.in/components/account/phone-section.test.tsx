@@ -33,7 +33,7 @@ vi.mock("@saroh/site-blocks/challenge", () => ({
 beforeEach(() => {
     setUp();
     api.startPhone.mockResolvedValue({
-        data: { standIn: { token: "stand-in-2" } },
+        data: { whatsapp: { resendAfterSeconds: 30 } },
         error: null,
     });
     api.addPhone.mockResolvedValue({
@@ -83,7 +83,7 @@ describe("the Phone row", () => {
         expect(button(PHONE_WORDS.remove, host)).toBeTruthy();
     });
 
-    it("adds a phone only after the API took the code", async () => {
+    it("adds a phone with a WhatsApp code, only after the API took it", async () => {
         drawIt(null);
         await press(button(PHONE_WORDS.add, host));
         type(
@@ -93,9 +93,43 @@ describe("the Phone row", () => {
         await submitForm();
         expect(api.startPhone).toHaveBeenCalledWith({
             phone: "+919845012345",
+            channel: "whatsapp",
+            purpose: "add",
             turnstileToken: null,
         });
-        expect(text(host)).toContain("We sent a 6-digit code to +91");
+        expect(text(host)).toContain(
+            "We sent a 6-digit code on WhatsApp to +91",
+        );
+        type(
+            must(host.querySelector<HTMLInputElement>("#phone-code")),
+            "123456",
+        );
+        await submitForm();
+        expect(api.addPhone).toHaveBeenCalledWith({
+            phone: "+919845012345",
+            code: "123456",
+        });
+        expect(text(host)).toContain(PHONE_WORDS.added);
+        expect(text(host)).toContain("+91 98450 12345");
+    });
+
+    it("gets the code by SMS through the widget after the link", async () => {
+        api.startPhone.mockResolvedValue({
+            data: { standIn: { token: "stand-in-2" } },
+            error: null,
+        });
+        drawIt(null);
+        await press(button(PHONE_WORDS.add, host));
+        expect(text(host)).toContain("on WhatsApp");
+        await press(button("Get the code by SMS instead", host));
+        type(
+            must(host.querySelector<HTMLInputElement>("#new-phone")),
+            "9845012345",
+        );
+        await submitForm();
+        expect(api.startPhone).toHaveBeenCalledWith(
+            expect.objectContaining({ channel: "sms", purpose: "add" }),
+        );
         type(
             must(host.querySelector<HTMLInputElement>("#phone-code")),
             "123456",
@@ -105,8 +139,6 @@ describe("the Phone row", () => {
             phone: "+919845012345",
             accessToken: "stand-in-2",
         });
-        expect(text(host)).toContain(PHONE_WORDS.added);
-        expect(text(host)).toContain("+91 98450 12345");
     });
 
     it("keeps the old phone and says why when the API refuses the new one", async () => {

@@ -4,6 +4,7 @@ import type {
     MessagingProvider,
     SendResult,
     SmsSendResult,
+    WhatsappAuthInput,
     WhatsAppTemplateCategory,
     WidgetVerifyResult,
 } from "./messaging-provider.port";
@@ -41,13 +42,19 @@ export class Msg91Provider implements MessagingProvider {
             fetch(input, init),
     ) {}
 
+    /**
+     * `saroh_merchant_login` (en_US, approved 27 Oct): "OTP Code: {{1}}. This
+     * is your OTP for {{2}}. The OTP is valid for {{3}}. Call {{4}} if you
+     * did not perform this request." plus a copy-code button. Meta refuses
+     * a send that leaves any of the four empty.
+     */
     async sendWhatsappAuth({
         toE164,
         code,
-    }: {
-        toE164: string;
-        code: string;
-    }): Promise<SendResult> {
+        appName,
+        minutes,
+        callNumber,
+    }: WhatsappAuthInput): Promise<SendResult> {
         required(this.config.authKey, "MSG91_AUTH_KEY");
         const template = required(
             this.config.whatsappTemplate,
@@ -55,6 +62,9 @@ export class Msg91Provider implements MessagingProvider {
         );
         return this.sendTemplate(toE164, template, {
             body_1: { type: "text", value: code },
+            body_2: { type: "text", value: appName },
+            body_3: { type: "text", value: `${minutes} minutes` },
+            body_4: { type: "text", value: callNumber },
             // Meta sends the copy-code button as a url sub-type.
             button_1: { subtype: "url", type: "text", value: code },
         });
@@ -186,7 +196,7 @@ export class Msg91Provider implements MessagingProvider {
             "MSG91_WHATSAPP_NUMBER",
         );
         // Body shape: https://msg91.com/help/whatsapp/whatsapp-otp
-        // shortcut: language "en" and no namespace; confirm against the live account's approved template.
+        // Saroh's approved templates are en_US (checked on the live account, 28 Oct).
         return this.post(
             `${this.base(OWN_API)}/api/v5/whatsapp/whatsapp-outbound-message/bulk/`,
             {
@@ -197,7 +207,7 @@ export class Msg91Provider implements MessagingProvider {
                     type: "template",
                     template: {
                         name: template,
-                        language: { code: "en", policy: "deterministic" },
+                        language: { code: "en_US", policy: "deterministic" },
                         to_and_components: [
                             { to: [digits(toE164)], components },
                         ],

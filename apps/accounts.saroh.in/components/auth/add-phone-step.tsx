@@ -29,7 +29,13 @@ export const ADD_PHONE_WORDS = {
 export function AddPhoneStep({
     destination,
     turnstileSiteKey,
+    whatsapp = true,
+    sms = true,
 }: {
+    /** Saroh can send on WhatsApp: the default way. */
+    whatsapp?: boolean;
+    /** The SMS widget is set up: the link under it. */
+    sms?: boolean;
     /** Where the sign-in was going, already vetted on the server. */
     destination: string;
     turnstileSiteKey: string | null;
@@ -54,6 +60,8 @@ export function AddPhoneStep({
                 </AuthNote>
             ) : null}
             <PhoneChange
+                whatsapp={whatsapp}
+                sms={sms}
                 label={ADD_PHONE_WORDS.label}
                 turnstileSiteKey={turnstileSiteKey}
                 onSaved={goOn}
