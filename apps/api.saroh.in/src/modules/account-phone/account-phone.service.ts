@@ -6,6 +6,7 @@ import {
     Injectable,
     Logger,
     ServiceUnavailableException,
+    UnprocessableEntityException,
 } from "@nestjs/common";
 import { startPhoneSession } from "@saroh/auth";
 import type { AccountPhoneEventKind } from "@saroh/database";
@@ -18,13 +19,33 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
+import { indianPhoneE164 } from "../messaging/verification.service";
 import { ChallengeVerifier } from "../site-accounts/challenge";
+import type { CodeCheck } from "./phone-codes";
+import { checkCode, CODE_MINUTES, newCode, saveCode } from "./phone-codes";
 import type { LimitVerdict } from "./phone-limits";
-import { checkFailures, checkStart } from "./phone-limits";
+import {
+    checkFailures,
+    claimStart,
+    START_COOLDOWN_SECONDS,
+} from "./phone-limits";
 
-/** What the browser opens once a start is allowed. */
+/** How the code reaches the phone. WhatsApp is the default (owner, 28 Oct). */
+export type PhoneChannel = "whatsapp" | "sms";
+/** Who a code is for: signing in, or the signed-in person adding a phone. */
+export type PhonePurpose = "sign-in" | "add";
+
+/**
+ * What proves the person holds the phone, checked on the server: a
+ * WhatsApp code Saroh sent, or the SMS widget's access token.
+ */
+export type PhoneProof = { code: string } | { accessToken: string };
+
+/** What the browser does once a start is allowed. */
 export type PhoneStart =
-    /** The provider's OTP widget, loaded from `scriptUrl`. */
+    /** Saroh sent a code on WhatsApp; the person types it. */
+    | { whatsapp: { resendAfterSeconds: number } }
+    /** The provider's OTP widget (SMS only), loaded from `scriptUrl`. */
     | {
           widget: { widgetId: string; tokenAuth: string; scriptUrl: string };
       }
@@ -32,8 +53,12 @@ export type PhoneStart =
     | { standIn: { token: string } };
 
 export interface PhoneOptions {
-    /** Whether phone sign-in can be offered at all. */
+    /** Whether phone sign-in can be offered at all: either channel below. */
     available: boolean;
+    /** Whether Saroh can send a code on WhatsApp. */
+    whatsapp: boolean;
+    /** Whether the SMS widget (or its stand-in) is set up. */
+    sms: boolean;
     /** Turnstile's public key, or null when no challenge is asked. */
     turnstileSiteKey: string | null;
     /**
@@ -54,10 +79,15 @@ export const NO_ACCOUNT_FOR_PHONE =
  * accounts.saroh.in. A phone is added to an email account, never instead
  * of one, and once verified it is a second way in.
  *
+ * Two ways to get the code (owner, 28 Oct: "widget is for SMS"): WhatsApp,
+ * made, sent and checked here from Saroh's own number (`phone-codes.ts`),
+ * and SMS through the provider's widget.
+ *
  * Nothing here trusts the browser: every sign-in and every saved phone
- * starts with {@link MessagingService.verifyOtp}, the server's own check of
- * the widget's token with the provider. The session is Better Auth's own
- * (`startPhoneSession`, `packages/auth/src/phone-sign-in.ts`).
+ * starts with a server check, of the WhatsApp code against its stored hash
+ * or of the widget's token with the provider ({@link MessagingService.verifyOtp}).
+ * The session is Better Auth's own (`startPhoneSession`,
+ * `packages/auth/src/phone-sign-in.ts`).
  *
  * Logs name the reason and hashes only, never a number.
  */
@@ -72,9 +102,11 @@ export class AccountPhoneService {
     ) {}
 
     async options(): Promise<PhoneOptions> {
-        const available =
+        const whatsapp = this.messaging.whatsappOtpReady;
+        const sms =
             this.messaging.otpStandIn ||
             this.messaging.otpWidgetConfig() !== null;
+        const available = whatsapp || sms;
         // No organization: only the flag's global default counts.
         const required = await this.flags.isEnabled(
             FlagKey.PHONE_REQUIRED_FOR_ACCOUNTS,
@@ -86,35 +118,47 @@ export class AccountPhoneService {
         }
         return {
             available,
+            whatsapp,
+            sms,
             turnstileSiteKey: this.challenge.siteKey,
             required,
         };
     }
 
     /**
-     * The soft gate before the widget: the bot challenge, then the start
-     * limits. The widget itself sends the code from the browser.
+     * The bot challenge, then the start limits. WhatsApp: make the code and
+     * send it from here. SMS: hand back the widget, which sends from the
+     * browser. The answer is the same whether or not the phone has an
+     * account.
      */
     async start(input: {
         phoneE164: string;
+        channel: PhoneChannel;
+        purpose: PhonePurpose;
+        /** The signed-in person, for `add`. */
+        userId?: string;
         turnstileToken?: string;
         ip?: string;
     }): Promise<PhoneStart> {
+        // India only, before anything is sent or counted (pentest 28 Oct, L2).
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
-        if (
-            this.challenge.configured &&
-            !(await this.challenge.verify(input.turnstileToken, input.ip ?? ""))
-        ) {
+        if (!(await this.challenged(input, keys))) {
             this.blocked("start", "challenge", keys);
             throw new BadRequestException({
                 message: "Confirm you're not a robot, then try again.",
                 details: { code: "CHALLENGE" },
             });
         }
-        const verdict = await checkStart(keys);
+        // Checked and recorded in one locked step (pentest 28 Oct, H1).
+        const verdict = await claimStart(keys);
         if (!verdict.allowed) {
             this.blocked("start", verdict.reason, keys);
             throw tooMany(verdict);
+        }
+        const { eventId } = verdict;
+        if (input.channel === "whatsapp") {
+            return this.sendWhatsapp(input, keys, eventId);
         }
 
         const token = this.messaging.standInOtpToken(input.phoneE164);
@@ -126,13 +170,13 @@ export class AccountPhoneService {
               : null;
         if (!answer) {
             this.blocked("start", "unavailable", keys);
+            await releaseStart(eventId, "unavailable");
             throw new ServiceUnavailableException({
                 message:
                     "Phone sign-in isn't available right now. Use your email.",
                 details: { code: "UNAVAILABLE" },
             });
         }
-        await record("START", keys);
         return answer;
     }
 
@@ -142,12 +186,14 @@ export class AccountPhoneService {
      */
     async signIn(input: {
         phoneE164: string;
-        accessToken: string;
+        proof: PhoneProof;
         ip?: string;
         headers: Headers;
     }): Promise<Headers> {
+        // India only here too: the SMS widget has its own country picker.
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
-        const phone = await this.verified(input, keys);
+        const phone = await this.verified(input, "SIGN_IN", keys);
         const user = await prisma.user.findFirst({
             where: { phoneE164: phone, phoneVerifiedAt: { not: null } },
             select: { id: true },
@@ -188,11 +234,13 @@ export class AccountPhoneService {
     async add(input: {
         userId: string;
         phoneE164: string;
-        accessToken: string;
+        proof: PhoneProof;
         ip?: string;
     }): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
+        // India only: a widget token for a foreign number never saves it.
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
-        const phone = await this.verified(input, keys);
+        const phone = await this.verified(input, "ADD", keys);
         const taken = await prisma.user.findFirst({
             where: { phoneE164: phone, id: { not: input.userId } },
             select: { id: true },
@@ -237,11 +285,13 @@ export class AccountPhoneService {
     }
 
     /**
-     * The failure caps, then the server's own check of the widget's token
-     * for this number. Every failed check is a row the caps count.
+     * The failure caps, then the server's own check: the WhatsApp code
+     * against its stored hash, or the widget's token with the provider.
+     * Every failed check, of either kind, is a row the caps count.
      */
     private async verified(
-        input: { phoneE164: string; accessToken: string },
+        input: { phoneE164: string; proof: PhoneProof; userId?: string },
+        purpose: "SIGN_IN" | "ADD",
         keys: Keys,
     ): Promise<string> {
         const verdict = await checkFailures(keys);
@@ -249,8 +299,19 @@ export class AccountPhoneService {
             this.blocked("verify", verdict.reason, keys);
             throw tooMany(verdict);
         }
+        if ("code" in input.proof) {
+            const outcome = await checkCode({
+                phoneHash: keys.phoneHash,
+                code: input.proof.code,
+                purpose,
+                userId: purpose === "ADD" ? input.userId : undefined,
+            });
+            if (outcome === "ok") return input.phoneE164;
+            await this.fail(keys, outcome);
+            throw codeRefused(outcome);
+        }
         const result = await this.messaging.verifyOtp({
-            accessToken: input.accessToken,
+            accessToken: input.proof.accessToken,
             expectedE164: input.phoneE164,
         });
         if (result.ok) return input.phoneE164;
@@ -266,6 +327,88 @@ export class AccountPhoneService {
             message: "That code couldn't be confirmed. Send a new one.",
             details: { code: "NOT_VERIFIED" },
         });
+    }
+
+    /**
+     * Turnstile, when it is on. A resend from the code step carries no
+     * token: it passes when this number, from this address, passed the
+     * challenge within the code's lifetime. The start limits still apply.
+     */
+    private async challenged(
+        input: { turnstileToken?: string; ip?: string },
+        keys: Keys,
+    ): Promise<boolean> {
+        if (!this.challenge.configured) {
+            // Turnstile is the only defence against sends spread over many
+            // addresses: say so loudly, once an hour (pentest 28 Oct, M2).
+            if (Date.now() - challengeWarnedAt > 3_600_000) {
+                challengeWarnedAt = Date.now();
+                this.logger.error(
+                    "account_phone_challenge_not_configured: phone codes are sent with no bot check; set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY",
+                );
+            }
+            return true;
+        }
+        if (input.turnstileToken) {
+            return this.challenge.verify(input.turnstileToken, input.ip ?? "");
+        }
+        if (!keys.ipHash) return false;
+        const recent = await prisma.accountPhoneEvent.findFirst({
+            where: {
+                kind: "START",
+                phoneHash: keys.phoneHash,
+                ipHash: keys.ipHash,
+                createdAt: { gt: new Date(Date.now() - CODE_MINUTES * 60_000) },
+            },
+            select: { id: true },
+        });
+        return recent !== null;
+    }
+
+    /**
+     * Make a code, send it from Saroh's number, keep its hash. A send that
+     * fails is still a start for the daily and address caps, but not for
+     * the 30-second cooldown: it was our failure, not the person's.
+     */
+    private async sendWhatsapp(
+        input: { phoneE164: string; purpose: PhonePurpose; userId?: string },
+        keys: Keys,
+        eventId: string,
+    ): Promise<PhoneStart> {
+        const code = newCode();
+        let reason: string;
+        try {
+            const result = await this.messaging.sendOtp({
+                toE164: input.phoneE164,
+                code,
+                appName: "Saroh",
+                minutes: CODE_MINUTES,
+            });
+            reason =
+                result.outcome === "accepted"
+                    ? ""
+                    : result.outcome === "ineligible"
+                      ? "not_on_whatsapp"
+                      : result.reason;
+        } catch {
+            reason = "transport_error";
+        }
+        if (reason) {
+            this.blocked("start", `whatsapp_${reason}`, keys);
+            // Our own failure doesn't hold the cooldown; it still counts.
+            await releaseStart(eventId, `whatsapp_${reason}`);
+            throw new UnprocessableEntityException({
+                message: "Couldn't send on WhatsApp. Try SMS instead.",
+                details: { code: "WHATSAPP_FAILED" },
+            });
+        }
+        await saveCode({
+            phoneHash: keys.phoneHash,
+            code,
+            purpose: input.purpose === "add" ? "ADD" : "SIGN_IN",
+            userId: input.purpose === "add" ? input.userId : undefined,
+        });
+        return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
     }
 
     private async fail(keys: Keys, reason: string): Promise<void> {
@@ -284,9 +427,20 @@ export class AccountPhoneService {
     }
 }
 
+let challengeWarnedAt = 0;
+
 interface Keys {
     phoneHash: string;
     ipHash?: string;
+}
+
+/** A claimed start that sent nothing: noted, so it doesn't hold the cooldown. */
+function releaseStart(eventId: string, reason: string) {
+    return prisma.accountPhoneEvent.update({
+        where: { id: eventId },
+        data: { reason },
+        select: { id: true },
+    });
 }
 
 function record(
@@ -303,6 +457,28 @@ function record(
         },
         select: { id: true },
     });
+}
+
+/** A WhatsApp code that didn't check out, in the code step's words. */
+function codeRefused(outcome: Exclude<CodeCheck, "ok">): BadRequestException {
+    if (outcome === "wrong_code") {
+        return new BadRequestException({
+            message: "That code isn't right. Check the message and try again.",
+            details: { code: "NOT_VERIFIED" },
+        });
+    }
+    // The code step words these two itself and offers "Send a new code".
+    return new BadRequestException(
+        outcome === "too_many_attempts"
+            ? {
+                  message: "Too many wrong codes. Send a new one.",
+                  details: { code: "TOO_MANY_ATTEMPTS" },
+              }
+            : {
+                  message: "That code has expired. Send a new one.",
+                  details: { code: "OTP_EXPIRED" },
+              },
+    );
 }
 
 function phoneTaken(): ConflictException {

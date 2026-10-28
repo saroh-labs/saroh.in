@@ -414,6 +414,20 @@ ships. The site editor redesign (#334) dropped Tablet and zoom, the whole-site
 review panel, status details, block previews and settled notes, and #347 had to
 put every one back.
 
+## 16. Check the plan against what was already decided
+
+**Current** — Before building anything the user asked for, and again before
+showing it as done, read what was already decided for that area: the user's
+brief in the conversation (every point, not the first that fits), the `DEC-`
+entries and ADRs that touch it (`DECISIONS.md`, `docs/architecture/adr/`), and
+the issue body's "Decided (owner, date)" lines. Then say back, in a line or two,
+which decisions the plan follows and where it departs from any of them. Where
+two of them read differently, or the plan departs from one, **ask before
+building**; never pick one silently. A brief handed to a subagent names the
+decisions it must follow. (27 Oct: a brief said "SMS through MSG91's widget,
+WhatsApp authentication through the API"; one point was read as "every code
+through the widget", WhatsApp was wired to the widget, and every send failed.)
+
 ## Before calling anything done
 
 Run the commands in AGENTS.md → Before you finish.

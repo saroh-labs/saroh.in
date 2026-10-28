@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { OtpSender } from "./otp-widget";
-import { tokenOf } from "./otp-widget";
+import { otpSender, tokenOf } from "./otp-widget";
 import {
     phoneCodeClient,
     RESEND_FAILED,
@@ -17,10 +17,11 @@ import { checkCode, sendCode } from "./sign-in-code";
 
 function sender(over: Partial<OtpSender> = {}): OtpSender {
     return {
+        channel: "sms",
         captcha: false,
         send: vi.fn().mockResolvedValue(undefined),
         retry: vi.fn().mockResolvedValue(undefined),
-        verify: vi.fn().mockResolvedValue("widget-token"),
+        verify: vi.fn().mockResolvedValue({ accessToken: "widget-token" }),
         ...over,
     };
 }
@@ -28,14 +29,16 @@ function sender(over: Partial<OtpSender> = {}): OtpSender {
 describe("the phone code client", () => {
     it("hands the widget's token to the API and is done only when the API says so", async () => {
         const confirm = vi.fn().mockResolvedValue({ data: {}, error: null });
-        const verify = vi.fn().mockResolvedValue("widget-token");
+        const verify = vi
+            .fn()
+            .mockResolvedValue({ accessToken: "widget-token" });
         const s = sender({ verify });
         const result = await checkCode(phoneCodeClient(s, confirm), {
             email: "+919845012345",
             code: "123456",
         });
         expect(verify).toHaveBeenCalledWith("123456");
-        expect(confirm).toHaveBeenCalledWith("widget-token");
+        expect(confirm).toHaveBeenCalledWith({ accessToken: "widget-token" });
         expect(result).toEqual({ ok: true });
     });
 
@@ -126,5 +129,45 @@ describe("reading the widget's and the API's answers", () => {
             ),
         );
         expect(broken.error.words).toBeUndefined();
+    });
+});
+
+describe("a code Saroh sent on WhatsApp (owner, 28 Oct)", () => {
+    it("hands the typed code to the API as it is, and resends through the API", async () => {
+        const again = vi
+            .fn()
+            .mockResolvedValue({ data: { whatsapp: {} }, error: null });
+        const s = await otpSender(
+            { whatsapp: { resendAfterSeconds: 30 } },
+            "+919845012345",
+            again,
+        );
+        expect(s).toMatchObject({ channel: "whatsapp", captcha: false });
+        const confirm = vi.fn().mockResolvedValue({ data: {}, error: null });
+        const client = phoneCodeClient(s, confirm);
+        expect(client.channel).toBe("whatsapp");
+        await expect(
+            checkCode(client, { email: "+919845012345", code: "123456" }),
+        ).resolves.toEqual({ ok: true });
+        expect(confirm).toHaveBeenCalledWith({ code: "123456" });
+        await expect(
+            sendCode(client, { email: "+919845012345" }),
+        ).resolves.toMatchObject({ ok: true });
+        expect(again).toHaveBeenCalledTimes(1);
+    });
+
+    it("says a refused resend in plain words", async () => {
+        const s = await otpSender(
+            { whatsapp: { resendAfterSeconds: 30 } },
+            "+919845012345",
+            vi.fn().mockResolvedValue({
+                data: null,
+                error: { code: "TOO_MANY_REQUESTS" },
+                retryAfter: 20,
+            }),
+        );
+        await expect(
+            sendCode(phoneCodeClient(s, vi.fn()), { email: "+919845012345" }),
+        ).resolves.toMatchObject({ ok: false, message: RESEND_FAILED });
     });
 });

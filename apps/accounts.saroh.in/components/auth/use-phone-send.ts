@@ -7,6 +7,7 @@ import type { AuthFailure } from "@/lib/auth-error-copy";
 import { authFailureCopy, NETWORK_ERROR } from "@/lib/auth-error-copy";
 import type { OtpSender } from "@/lib/otp-widget";
 import { otpSender } from "@/lib/otp-widget";
+import type { PhoneChannel, PhonePurpose } from "@/lib/phone-sign-in";
 import { startPhone } from "@/lib/phone-sign-in";
 
 export type PhoneSendStage = "number" | "captcha" | "code";
@@ -30,14 +31,22 @@ export const FINISH_CHECK =
 
 /**
  * Getting a code to a phone (DEC-196), for sign-in and for Profile alike:
- * the number, the bot challenge, the API's start (its limits), then the
- * widget, whose own captcha may need solving before it sends. Under the
- * fake provider the widget is a stand-in and nothing is sent.
+ * the number, the bot challenge, then the API's start (its limits).
+ * WhatsApp, the default (owner, 28 Oct): the API sends the code itself and
+ * the code step follows. SMS ("Get the code by SMS instead"): the widget,
+ * whose own captcha may need solving before it sends. Under the fake
+ * provider the widget is a stand-in and nothing is sent.
  *
  * The screen renders `CAPTCHA_ELEMENT_ID`'s element while this is in the
  * number or captcha stage, so the widget has somewhere to draw.
  */
-export function usePhoneSend(turnstileSiteKey: string | null) {
+export function usePhoneSend(
+    turnstileSiteKey: string | null,
+    { purpose, whatsapp }: { purpose: PhonePurpose; whatsapp: boolean },
+) {
+    const [channel, setChannel] = useState<PhoneChannel>(
+        whatsapp ? "whatsapp" : "sms",
+    );
     const [phone, setPhone] = useState("");
     const [stage, setStage] = useState<PhoneSendStage>("number");
     const [error, setError] = useState<string | null>(null);
@@ -78,7 +87,12 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
             return;
         }
         setBusy(true);
-        const started = await startPhone({ phone, turnstileToken });
+        const started = await startPhone({
+            phone,
+            channel,
+            purpose,
+            turnstileToken,
+        });
         setTurnstileToken(null);
         setChallengeKey((k) => k + 1);
         if (started.error) {
@@ -89,7 +103,9 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
         }
         let next: OtpSender;
         try {
-            next = await otpSender(started.data, phone);
+            next = await otpSender(started.data, phone, () =>
+                startPhone({ phone, channel, purpose }),
+            );
         } catch {
             setBusy(false);
             setError(SEND_FAILED);
@@ -114,6 +130,12 @@ export function usePhoneSend(turnstileSiteKey: string | null) {
     }
 
     return {
+        channel,
+        /** "Get the code by SMS instead": the widget, from the number step. */
+        toSms: () => {
+            setChannel("sms");
+            reset();
+        },
         phone,
         setPhone: (value: string) => {
             setPhone(value);

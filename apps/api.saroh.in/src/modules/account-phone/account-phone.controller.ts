@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -18,7 +19,11 @@ import type { Request, Response } from "express";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
-import type { PhoneOptions, PhoneStart } from "./account-phone.service";
+import type {
+    PhoneOptions,
+    PhoneProof,
+    PhoneStart,
+} from "./account-phone.service";
 import { AccountPhoneService } from "./account-phone.service";
 import { StartPhoneDto, VerifyPhoneDto } from "./dto";
 
@@ -39,19 +44,21 @@ export class PhoneSignInController {
         return this.phones.options();
     }
 
-    /** The soft gate: Turnstile and the limits, then the widget's config. */
+    /** Turnstile and the limits, then a WhatsApp code sent, or the SMS widget's config. */
     @Post("start")
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
     start(@Body() dto: StartPhoneDto, @Ip() ip: string): Promise<PhoneStart> {
         return this.phones.start({
             phoneE164: dto.phone,
+            channel: dto.channel ?? "whatsapp",
+            purpose: "sign-in",
             turnstileToken: dto.turnstileToken,
             ip,
         });
     }
 
-    /** The widget's token, checked on the server, for Better Auth's session. */
+    /** The WhatsApp code or the widget's token, checked on the server, for Better Auth's session. */
     @Post("sign-in")
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
@@ -63,7 +70,7 @@ export class PhoneSignInController {
     ): Promise<{ signedIn: true }> {
         const headers = await this.phones.signIn({
             phoneE164: dto.phone,
-            accessToken: dto.accessToken,
+            proof: proofOf(dto),
             ip,
             headers: fromNodeHeaders(req.headers),
         });
@@ -78,6 +85,25 @@ export class PhoneSignInController {
 export class AccountPhoneController {
     constructor(private readonly phones: AccountPhoneService) {}
 
+    /** A code for the new number, bound to this person. */
+    @Post("start")
+    @HttpCode(HttpStatus.OK)
+    @Header("Cache-Control", "no-store")
+    start(
+        @CurrentUser() user: AuthUser,
+        @Body() dto: StartPhoneDto,
+        @Ip() ip: string,
+    ): Promise<PhoneStart> {
+        return this.phones.start({
+            phoneE164: dto.phone,
+            channel: dto.channel ?? "whatsapp",
+            purpose: "add",
+            userId: user.id,
+            turnstileToken: dto.turnstileToken,
+            ip,
+        });
+    }
+
     /** Add or change: always a fresh verify of the new number. */
     @Post()
     @HttpCode(HttpStatus.OK)
@@ -90,7 +116,7 @@ export class AccountPhoneController {
         return this.phones.add({
             userId: user.id,
             phoneE164: dto.phone,
-            accessToken: dto.accessToken,
+            proof: proofOf(dto),
             ip,
         });
     }
@@ -100,4 +126,18 @@ export class AccountPhoneController {
     remove(@CurrentUser() user: AuthUser, @Ip() ip: string): Promise<void> {
         return this.phones.remove({ userId: user.id, ip });
     }
+}
+
+/** Exactly one of the WhatsApp code or the widget's token. */
+function proofOf(dto: VerifyPhoneDto): PhoneProof {
+    if (dto.code !== undefined && dto.accessToken === undefined) {
+        return { code: dto.code };
+    }
+    if (dto.accessToken !== undefined && dto.code === undefined) {
+        return { accessToken: dto.accessToken };
+    }
+    throw new BadRequestException({
+        message: "Send the code or the widget's token, not both or neither.",
+        details: { code: "PROOF" },
+    });
 }

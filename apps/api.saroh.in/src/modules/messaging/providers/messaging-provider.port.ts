@@ -42,12 +42,23 @@ export type WidgetVerifyResult =
           reason: "invalid_token" | "not_a_phone" | "unavailable";
       };
 
+export interface WhatsappAuthInput {
+    toE164: string;
+    code: string;
+    /** "Saroh", or a business's name. */
+    appName: string;
+    /** The code's lifetime, shown as "10 minutes". */
+    minutes: number;
+    /** The number to call if you didn't ask, as read: "+91 98450 12345". */
+    callNumber: string;
+}
+
 export interface MessagingProvider {
-    /** A code in the approved WhatsApp authentication template. */
-    sendWhatsappAuth(input: {
-        toE164: string;
-        code: string;
-    }): Promise<SendResult>;
+    /**
+     * A code in the approved WhatsApp authentication template: the code,
+     * who it is for (`appName`), how long it lasts, and Saroh's number.
+     */
+    sendWhatsappAuth(input: WhatsappAuthInput): Promise<SendResult>;
 
     /**
      * An approved WhatsApp template. `template` is Saroh's key for it; the
@@ -82,3 +93,18 @@ export interface MessagingProvider {
 
 /** Nest token for the {@link MessagingProvider}. */
 export const MESSAGING_PROVIDER = Symbol("MESSAGING_PROVIDER");
+
+/**
+ * An Indian number as people read it: "9845012345" or "919845012345" →
+ * "+91 98450 12345". Anything else is shown as it was given.
+ */
+export function readableNumber(raw: string): string {
+    const d = raw.replace(/\D/g, "");
+    const local =
+        d.length === 10
+            ? d
+            : d.length === 12 && d.startsWith("91")
+              ? d.slice(2)
+              : null;
+    return local ? `+91 ${local.slice(0, 5)} ${local.slice(5)}` : raw.trim();
+}

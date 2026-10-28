@@ -1,4 +1,4 @@
-import type { PhoneStart } from "./phone-sign-in";
+import type { PhoneAnswer, PhoneProof, PhoneStart } from "./phone-sign-in";
 
 /**
  * The OTP widget, driven by our own code step (DEC-196). The API names the
@@ -17,12 +17,14 @@ import type { PhoneStart } from "./phone-sign-in";
  * API then checks the stand-in token exactly as it checks a real one.
  */
 export interface OtpSender {
+    /** Where the code went: Saroh's WhatsApp, or the SMS widget. */
+    channel: "whatsapp" | "sms";
     /** Whether the provider's captcha has to be solved before a send. */
     captcha: boolean;
     send(): Promise<void>;
     retry(): Promise<void>;
-    /** The access token for the API to check. */
-    verify(code: string): Promise<string>;
+    /** What the API checks for this code. */
+    verify(code: string): Promise<PhoneProof>;
 }
 
 /** The element the widget's captcha is drawn in. */
@@ -64,20 +66,39 @@ export function tokenOf(data: unknown): string | null {
     return null;
 }
 
-/** Ready the widget (or the stand-in) for one number, E.164. */
+/**
+ * Ready the code step for one number, E.164. WhatsApp: the API has sent
+ * the code already, the typed code goes to the API as it is, and a resend
+ * asks the API again (`again`). SMS: the widget (or the stand-in).
+ */
 export async function otpSender(
     start: PhoneStart,
     phoneE164: string,
+    again: () => Promise<PhoneAnswer<PhoneStart>> = () =>
+        Promise.reject(new Error("no resend")),
 ): Promise<OtpSender> {
+    if ("whatsapp" in start) {
+        return {
+            channel: "whatsapp",
+            captcha: false,
+            send: () => Promise.resolve(),
+            retry: async () => {
+                const answer = await again();
+                if (answer.error) throw new Error("resend refused");
+            },
+            verify: (code) => Promise.resolve({ code }),
+        };
+    }
     if ("standIn" in start) {
         const { token } = start.standIn;
         return {
+            channel: "sms",
             captcha: false,
             send: () => Promise.resolve(),
             retry: () => Promise.resolve(),
             verify: (code) =>
                 /^\d{6}$/.test(code)
-                    ? Promise.resolve(token)
+                    ? Promise.resolve({ accessToken: token })
                     : Promise.reject(new Error("not six digits")),
         };
     }
@@ -103,6 +124,7 @@ export async function otpSender(
             ? new Promise((resolve, reject) => run(resolve, reject))
             : Promise.reject(new Error("widget method missing"));
     return {
+        channel: "sms",
         captcha: true,
         // Read off `window` at each call: the script may add them after init.
         send: async () => {
@@ -124,7 +146,7 @@ export async function otpSender(
             );
             const token = tokenOf(data);
             if (!token) throw new Error("no token in the widget's answer");
-            return token;
+            return { accessToken: token };
         },
     };
 }

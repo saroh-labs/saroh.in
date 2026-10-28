@@ -2,6 +2,7 @@
 /**
  * "Use phone instead" on Sign in (DEC-196): the number, then the shared
  * code step in its phone words, and the API's sentence when it refuses.
+ * WhatsApp first (owner, 28 Oct); SMS through the widget after the link.
  * Under the stand-in (the fake provider) nothing is sent.
  */
 import { act } from "react";
@@ -46,9 +47,10 @@ afterEach(() => {
 });
 
 const onUseEmail = vi.fn();
-function drawIt() {
+function drawIt(channels: { sms?: boolean } = {}) {
     draw(
         <PhoneSignIn
+            {...channels}
             turnstileSiteKey={null}
             doneLine="Taking you to Saroh…"
             onDone={vi.fn()}
@@ -79,11 +81,70 @@ describe("signing in with a phone", () => {
         expect(onUseEmail).toHaveBeenCalled();
     });
 
-    it("sends for the number as E.164, then shows the code step in phone words", async () => {
+    it("sends on WhatsApp first, and hands the API the typed code", async () => {
+        api.startPhone.mockResolvedValue({
+            data: { whatsapp: { resendAfterSeconds: 30 } },
+            error: null,
+        });
         drawIt();
+        expect(button("Send code on WhatsApp", host)).toBeTruthy();
         await sendFor("98450 12345");
         expect(api.startPhone).toHaveBeenCalledWith({
             phone: "+919845012345",
+            channel: "whatsapp",
+            purpose: "sign-in",
+            turnstileToken: null,
+        });
+        expect(text(host)).toContain("Check your WhatsApp");
+        expect(text(host)).toContain(
+            "We sent a 6-digit code on WhatsApp to +91",
+        );
+        const code = must(
+            host.querySelector<HTMLInputElement>("input[name=code]"),
+        );
+        await act(async () => {
+            type(code, "654321");
+            await new Promise((r) => setTimeout(r, 30));
+        });
+        expect(api.signInWithPhone).toHaveBeenCalledWith({
+            phone: "+919845012345",
+            code: "654321",
+        });
+        expect(text(host)).toContain("You're signed in");
+    });
+
+    it("says a failed WhatsApp send in the API's words, and offers SMS", async () => {
+        api.startPhone.mockResolvedValue({
+            data: null,
+            error: {
+                code: "WHATSAPP_FAILED",
+                status: 422,
+                words: "Couldn't send on WhatsApp. Try SMS instead.",
+            },
+            retryAfter: null,
+        });
+        drawIt();
+        await sendFor("9845012345");
+        expect(text(host)).toContain(
+            "Couldn't send on WhatsApp. Try SMS instead.",
+        );
+        expect(button("Get the code by SMS instead", host)).toBeTruthy();
+    });
+
+    it("hides the SMS link when the widget isn't set up", () => {
+        drawIt({ sms: false });
+        expect(text(host)).not.toContain("Get the code by SMS instead");
+    });
+
+    it("by SMS: sends for the number as E.164, then shows the code step in phone words", async () => {
+        drawIt();
+        await press(button("Get the code by SMS instead", host));
+        expect(button("Send me a code", host)).toBeTruthy();
+        await sendFor("98450 12345");
+        expect(api.startPhone).toHaveBeenCalledWith({
+            phone: "+919845012345",
+            channel: "sms",
+            purpose: "sign-in",
             turnstileToken: null,
         });
         expect(text(host)).toContain("Check your phone");
@@ -91,8 +152,9 @@ describe("signing in with a phone", () => {
         expect(text(host)).toContain("Change number");
     });
 
-    it("hands the token to the API with the number, and signs in only on its yes", async () => {
+    it("by SMS: hands the token to the API with the number, and signs in only on its yes", async () => {
         drawIt();
+        await press(button("Get the code by SMS instead", host));
         await sendFor("9845012345");
         const code = must(
             host.querySelector<HTMLInputElement>("input[name=code]"),

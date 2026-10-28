@@ -43,7 +43,7 @@
     "devDependencies": {
         "@saroh/pricing-catalog": "workspace:*",
         "@types/pg": "^8.21.0",
-        "better-auth": "^1.6.26",
+        "better-auth": "^1.7.10",
         "config": "^4.4.2",
         "eslint": "catalog:",
         "prisma": "catalog:prisma",

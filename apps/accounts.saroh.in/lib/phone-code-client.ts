@@ -1,5 +1,5 @@
 import type { OtpSender } from "./otp-widget";
-import type { PhoneAnswer } from "./phone-sign-in";
+import type { PhoneAnswer, PhoneProof } from "./phone-sign-in";
 import type { CodeClient } from "./sign-in-code";
 
 /** A code the widget would not confirm: in the words of the email step. */
@@ -9,18 +9,19 @@ export const RESEND_FAILED = "Couldn't send a new code. Try again.";
 
 /**
  * The code step's two calls for a phone (DEC-196), so the same `CodeStep`
- * takes a texted code. Resend asks the widget again (its own limits and
- * captcha apply); a check gets the widget's token for the code, then hands
- * it to the API (`confirm`), which checks it with the provider before it
- * makes a session or saves the phone. Nothing here decides the code is
- * right.
+ * takes a phone's code. WhatsApp: resend asks the API to send again, and
+ * the typed code goes to the API (`confirm`) as it is. SMS: resend asks
+ * the widget again (its own limits and captcha apply), and a check gets the
+ * widget's token for the code, which the API checks with the provider.
+ * Either way the API checks before it makes a session or saves the phone;
+ * nothing here decides the code is right.
  */
 export function phoneCodeClient(
     sender: OtpSender,
-    confirm: (accessToken: string) => Promise<PhoneAnswer<unknown>>,
+    confirm: (proof: PhoneProof) => Promise<PhoneAnswer<unknown>>,
 ): CodeClient {
     return {
-        channel: "phone",
+        channel: sender.channel === "whatsapp" ? "whatsapp" : "phone",
         async send() {
             try {
                 await sender.retry();
@@ -30,13 +31,13 @@ export function phoneCodeClient(
             }
         },
         async check({ code }) {
-            let token: string;
+            let proof: PhoneProof;
             try {
-                token = await sender.verify(code);
+                proof = await sender.verify(code);
             } catch {
                 return { error: { words: WRONG_PHONE_CODE } };
             }
-            const answer = await confirm(token);
+            const answer = await confirm(proof);
             return answer.error ? { error: answer.error } : { error: null };
         },
     };

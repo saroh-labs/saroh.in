@@ -1,5 +1,10 @@
 import type { ArgumentsHost, ExceptionFilter } from "@nestjs/common";
-import { Catch, HttpException, HttpStatus } from "@nestjs/common";
+import {
+    Catch,
+    HttpException,
+    HttpStatus,
+    PayloadTooLargeException,
+} from "@nestjs/common";
 import type { Request, Response } from "express";
 
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
@@ -122,7 +127,12 @@ function isDeliberateUnavailable(exception: unknown): boolean {
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-    catch(exception: unknown, host: ArgumentsHost): void {
+    catch(thrown: unknown, host: ArgumentsHost): void {
+        // Express's body parser refuses an oversized body before Nest sees it:
+        // a 413 for the client, not a 500 that logs the request (pentest 28 Oct).
+        const exception = isTooLarge(thrown)
+            ? new PayloadTooLargeException("That request is too large.")
+            : thrown;
         const ctx = host.switchToHttp();
         const req = ctx.getRequest<MaybeCorrelated>();
         const res = ctx.getResponse<Response>();
@@ -181,4 +191,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
             res.status(statusCode).json(envelope);
         }
     }
+}
+
+/** body-parser's "entity.too.large" error (a plain Error with type and status 413). */
+function isTooLarge(exception: unknown): boolean {
+    return (
+        typeof exception === "object" &&
+        exception !== null &&
+        (exception as { type?: unknown }).type === "entity.too.large"
+    );
 }

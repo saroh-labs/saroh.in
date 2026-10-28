@@ -6,6 +6,7 @@ import type {
     MessagingProvider,
     SendResult,
     SmsSendResult,
+    WhatsappAuthInput,
     WhatsAppTemplateCategory,
     WidgetVerifyResult,
 } from "./messaging-provider.port";
@@ -18,8 +19,8 @@ import type {
  */
 @Injectable()
 export class FakeMessagingProvider implements MessagingProvider {
-    /** Verification codes, as before. */
-    readonly sends: { toE164: string; code: string }[] = [];
+    /** Authentication-template codes, with all four of the template's values. */
+    readonly sends: WhatsappAuthInput[] = [];
     /** Every other WhatsApp send, in order. */
     readonly messages: (
         | {
@@ -58,10 +59,7 @@ export class FakeMessagingProvider implements MessagingProvider {
         this.widgetTokens.set(token, phoneE164);
     }
 
-    sendWhatsappAuth(input: {
-        toE164: string;
-        code: string;
-    }): Promise<SendResult> {
+    sendWhatsappAuth(input: WhatsappAuthInput): Promise<SendResult> {
         this.sends.push(input);
         return this.result(input.toE164);
     }

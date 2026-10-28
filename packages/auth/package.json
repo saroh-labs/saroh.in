@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@saroh/database": "workspace:*",
-    "better-auth": "^1.6.26",
+    "better-auth": "^1.7.10",
     "react": "catalog:react19"
   },
   "peerDependencies": {
