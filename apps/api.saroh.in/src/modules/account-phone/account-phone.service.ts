@@ -19,6 +19,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
+import { indianPhoneE164 } from "../messaging/verification.service";
 import { ChallengeVerifier } from "../site-accounts/challenge";
 import type { CodeCheck } from "./phone-codes";
 import { checkCode, CODE_MINUTES, newCode, saveCode } from "./phone-codes";
@@ -139,6 +140,8 @@ export class AccountPhoneService {
         turnstileToken?: string;
         ip?: string;
     }): Promise<PhoneStart> {
+        // India only, before anything is sent or counted (pentest 28 Oct, L2).
+        input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
         const keys = this.keys(input.phoneE164, input.ip);
         if (!(await this.challenged(input, keys))) {
             this.blocked("start", "challenge", keys);

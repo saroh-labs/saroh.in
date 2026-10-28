@@ -236,6 +236,17 @@ describe("AllExceptionsFilter", () => {
         expect(envelope(res).correlationId).toBe("unknown");
     });
 
+    it("answers an oversized body 413, not a 500 that logs the request", () => {
+        const res = makeResponse();
+        const tooLarge = Object.assign(new Error("request entity too large"), {
+            type: "entity.too.large",
+            status: 413,
+        });
+        filter.catch(tooLarge, makeHost(res));
+        expect(res.status).toHaveBeenCalledWith(413);
+        expect(envelope(res).message).toBe("That request is too large.");
+    });
+
     it("does not write when the response was already sent", () => {
         const res = makeResponse();
         res.headersSent = true;

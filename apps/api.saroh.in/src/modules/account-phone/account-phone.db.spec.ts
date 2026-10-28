@@ -281,6 +281,19 @@ describe("a person's own phone", () => {
 });
 
 describe("the limits", () => {
+    it("refuses a number outside India before anything is sent or counted (pentest 28 Oct)", async () => {
+        for (const channel of ["sms", "whatsapp"] as const) {
+            await expect(
+                service.start({
+                    phoneE164: "+14155550100",
+                    ip: IP,
+                    channel,
+                    purpose: "sign-in",
+                }),
+            ).rejects.toMatchObject({ status: 400 });
+        }
+    });
+
     it("hands out the stand-in under the fake, then holds a 30s cooldown per phone", async () => {
         const p = phone();
         const first = await service.start({

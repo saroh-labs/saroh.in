@@ -29,6 +29,11 @@ describe("redactHeaders", () => {
         const out = redactHeaders({ "X-Saroh-Test-Token": "secret" });
         expect(out["X-Saroh-Test-Token"]).toBe(REDACTED);
     });
+
+    it("redacts the MSG91 webhook's secret (pentest 28 Oct)", () => {
+        const out = redactHeaders({ "X-Saroh-Webhook-Secret": "s".repeat(64) });
+        expect(out["X-Saroh-Webhook-Secret"]).toBe(REDACTED);
+    });
 });
 
 describe("redactObject", () => {
