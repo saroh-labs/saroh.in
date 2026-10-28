@@ -75,6 +75,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "Phone sign-in attempts and phone changes for Saroh accounts (DEC-196); a person spans businesses, so no organization.",
     AccountPhoneCode:
         "WhatsApp sign-in codes for Saroh accounts (DEC-196, 28 Oct); a person spans businesses, so no organization.",
+    OtpWidgetTokenUse:
+        "SMS widget tokens already used (DEC-198); Saroh's own sign-in, not a business.",
 };
 
 const databaseDir = path.resolve(__dirname, "..");

@@ -17,7 +17,7 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn().mockResolvedValue(0),
         },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), update: jest.fn() },
         bookingEvent: { create: jest.fn().mockResolvedValue({ id: "ev_1" }) },
         job: { create: jest.fn() },
         invoice: {

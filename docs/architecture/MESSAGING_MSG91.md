@@ -111,12 +111,32 @@ verifies a day per number and 20 per address (`phone-limits.ts`, counted
 from `AccountPhoneEvent`). Every refusal is logged with its reason and
 hashes only.
 
-**The hard stop on sends is in MSG91's dashboard (OTP > Widget). Turn on:**
+**The hard stop on SMS sends, and on what they cost, is in MSG91's
+dashboard.** The widget's id and token are static and public once the API
+hands them out, so anyone can drive the widget for any number without
+coming back to the API (review 28 Oct). The API's limits only stop a number
+it didn't verify from signing in or being saved.
 
-- the widget's **captcha** (on by default; keep it on for web);
-- the widget's **per-number and per-IP send limits** and its resend wait;
-- an **OTP length of 6**, which is what the code step takes;
-- **SMS only** as its channel: WhatsApp off (the API sends WhatsApp codes).
+### MSG91 dashboard: required settings
+
+Check each one after any change to the widget or the account, and before a
+release that touches phone sign-in (DEC-198):
+
+- [ ] **India only**: the widget's country list is India (+91) alone.
+- [ ] **Captcha enforced** on the widget, for every request (on by default;
+      keep it on for web).
+- [ ] **3 to 5 wrong attempts per OTP** at most, then the OTP is dead.
+- [ ] **Per-number and per-IP daily send limits**, and the resend wait.
+- [ ] **International SMS off** on the account, not only on the widget.
+- [ ] **A spend alert**: a low daily OTP spend that emails the owner.
+- [ ] **OTP length 6**, which is what the code step takes.
+- [ ] **SMS only** as the widget's channel: WhatsApp off (the API sends
+      WhatsApp codes).
+
+**A token is taken once on Saroh's side** (DEC-198): after the provider
+says a widget token is good for the expected number, its sha256 goes into
+`OtpWidgetTokenUse` (unique, remembered 24 hours), and the same token again
+is refused, whatever MSG91 says of it.
 
 ## Webhook
 

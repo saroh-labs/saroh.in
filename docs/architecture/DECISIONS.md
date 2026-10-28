@@ -2594,3 +2594,23 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences:
     - Supersedes DEC-196's "Saroh's built-in sender" for WhatsApp and its "Saroh pays for data-removal notices on WhatsApp"; a phone-only customer's data-removal acknowledgement is skipped and logged, as before, until SMS or the business's own WhatsApp exists.
     - Email can't be switched off for a business's customers while no other way works (DEC-196's rule), so every site keeps email sign-in.
+
+## DEC-198 Phone number rules
+
+**Status: Accepted — 2026-10-28** · owner, on the 28 Oct phone code review
+
+- Context:
+    - The 28 Oct review of phone sign-in (DEC-196) found that any +91 number signed in (landlines, a leading 0), a widget token could be used twice, a phone could be added, changed or used with no word to the account's email, staff could sign in by phone, a recycled number opened its old holder's account, a guest booking overwrote a known customer's phone and name, and business and billing phones took any country.
+- Decision:
+    1. **A phone that signs in to Saroh, or that Saroh pays to message, is an Indian mobile**: `+91` and ten digits starting 6 to 9 (`INDIAN_MOBILE_E164`, applied in `indianPhoneE164`). Every other number is read by the shared rule, where an Indian number is `+91` and ten digits not starting with 0 (`INDIAN_E164`); "+91 0…" is refused, never kept as +910….
+    2. **An SMS widget token is used once on Saroh's side**: after the provider says it is good for the expected number, its sha256 is kept (`OtpWidgetTokenUse`, unique, 24 hours) and the same token again is refused. `verifyOtp` always names the expected number.
+    3. **The account's email is told** when its phone is added, changed or removed, and on every phone sign-in: the last four digits, the time and a rough place when known, and "If this wasn't you, sign in with your email and remove the phone". The send is awaited; a failure is logged without the address and undoes nothing.
+    4. **Saroh staff never sign in by phone** (a `PlatformAdmin` grant not revoked, or `ADMIN_ALLOWLIST`). They get the same answer as a phone with no account, and may still keep a phone on the account. **For everyone else, a phone neither verified nor used to sign in for 12 months is refused** with "Sign in with your email to keep using this phone."; an email-code sign-in renews `phoneVerifiedAt`, as does adding the phone again.
+    5. **A guest's booking never overwrites a customer's details**: keyed on a typed email, it fills only an empty phone or name (UX-049); the typed phone stays on `Booking.bookerPhone`. Public checkout and enquiries already fill only.
+    6. **A business's own phone** (Settings' public phone, and the business phone copied into a billing profile) **is Indian**: `+91` and ten digits, a landline allowed, refused on the field otherwise. **Customers' phones are any country**; where phones are matched, a number written with another country's code keeps it (`+…`), so a foreign number never matches an Indian one with the same ten digits.
+    7. **A billing profile's phone is Indian** (owner, 28 Oct), on the profile and at checkout.
+    8. **MSG91's dashboard is the cost stop for widget SMS**, not the API's limits: India only, captcha, 3 to 5 wrong attempts per OTP, per-number and per-IP daily limits, international SMS off, a spend alert (`MESSAGING_MSG91.md` → MSG91 dashboard: required settings).
+- Consequences:
+    - No CHECK constraint was added: rows saved before may not meet the new rules, and a CHECK would block any update of such a row. The counts are an owner to-do before one is added.
+    - A bare ten digits still means India, whatever country was meant (the shared rule, #1036).
+    - `6-9` is the mobile rule the owner chose; a few landline area codes (79, 80, …) also start 6 to 9 after +91, so a landline there passes the shape check and simply never receives a code.

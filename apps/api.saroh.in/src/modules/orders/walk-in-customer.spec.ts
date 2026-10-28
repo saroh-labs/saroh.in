@@ -22,8 +22,8 @@ describe("walkInPhoneKey", () => {
         expect(walkInPhoneKey(typed)).toBe("9845000002");
     });
 
-    it("keeps a number that isn't India's as typed, digits only", () => {
-        expect(walkInPhoneKey("+44 20 7946 0958")).toBe("442079460958");
+    it("keeps a number that isn't India's with its +, so it never matches an Indian one", () => {
+        expect(walkInPhoneKey("+44 20 7946 0958")).toBe("+442079460958");
     });
 
     it("drops India's trunk 0 and 0091, as the shared phone rule reads them", () => {

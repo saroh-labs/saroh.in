@@ -29,7 +29,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn(),
         },
-        contact: { upsert: jest.fn(), findUnique: jest.fn() },
+        contact: {
+            upsert: jest.fn(),
+            findUnique: jest.fn(),
+            update: jest.fn(),
+        },
         customerSubscription: { findFirst: jest.fn() },
         invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         // Money paid online for a booking (E8): none unless a test says so.

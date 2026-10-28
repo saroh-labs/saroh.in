@@ -272,6 +272,16 @@ describe("checkoutDetails", () => {
                 checkoutDetails(party(), { phone: "98450" }, NO_STATE),
             )?.field,
         ).toBe("phone");
+        // India only (DEC-198).
+        expect(
+            refusal(() =>
+                checkoutDetails(
+                    party(),
+                    { phone: "+44 20 7946 0958" },
+                    NO_STATE,
+                ),
+            )?.field,
+        ).toBe("phone");
         expect(
             checkoutDetails(
                 withProfile({ phone: "+919800000000" }),

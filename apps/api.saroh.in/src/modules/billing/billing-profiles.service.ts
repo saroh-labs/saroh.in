@@ -10,7 +10,7 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { gstinProblem, stateCode } from "../invoices/gst-states";
-import { normalisePublicPhone } from "../organizations/business-phone";
+import { normaliseIndianPhone } from "../organizations/business-phone";
 import { nonEmpty } from "./billing-details";
 import { enqueueBillingProfileSync } from "./billing-profile-sync";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
@@ -190,7 +190,7 @@ function profileWrite(
         out.postalCode = pin;
     }
     if (input.phone !== undefined) {
-        const result = normalisePublicPhone(input.phone ?? "");
+        const result = normaliseIndianPhone(input.phone ?? "");
         if ("problem" in result) refuse(result.problem, "phone");
         out.phone = result.phone;
     }
@@ -344,7 +344,8 @@ export async function firstBillingProfileInTx(
             city: nonEmpty(business?.city),
             postalCode: nonEmpty(business?.postalCode),
             billingEmail,
-            phone: nonEmpty(business?.phone),
+            // India only (DEC-198): a business phone saved before is dropped.
+            phone: indianOrNull(business?.phone),
             provider: CATALOGUE_BILLING_PROVIDER,
         },
         select: { id: true },
@@ -534,4 +535,10 @@ function notFound(): NotFoundException {
 /** A save that lost the race to the unique index: the same 409 as asked. */
 function raceAsTaken(error: unknown): unknown {
     return prismaErrorCode(error) === "P2002" ? emailTaken() : error;
+}
+
+/** A stored phone as an Indian E.164 number, or null. */
+function indianOrNull(stored: string | null | undefined): string | null {
+    const result = normaliseIndianPhone(stored ?? "");
+    return "phone" in result ? result.phone : null;
 }

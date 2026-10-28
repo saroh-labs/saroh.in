@@ -93,18 +93,3 @@ export interface MessagingProvider {
 
 /** Nest token for the {@link MessagingProvider}. */
 export const MESSAGING_PROVIDER = Symbol("MESSAGING_PROVIDER");
-
-/**
- * An Indian number as people read it: "9845012345" or "919845012345" →
- * "+91 98450 12345". Anything else is shown as it was given.
- */
-export function readableNumber(raw: string): string {
-    const d = raw.replace(/\D/g, "");
-    const local =
-        d.length === 10
-            ? d
-            : d.length === 12 && d.startsWith("91")
-              ? d.slice(2)
-              : null;
-    return local ? `+91 ${local.slice(0, 5)} ${local.slice(5)}` : raw.trim();
-}

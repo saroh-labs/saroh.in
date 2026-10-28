@@ -53,6 +53,15 @@ describe("normalisePhone", () => {
         expect(normalisePhone("0091 98765 43210")).toBe(ten);
     });
 
+    it("never keys a foreign ten-digit number as an Indian one (review 28 Oct)", () => {
+        expect(normalisePhone("+98 4501 2345")).toBe("+9845012345");
+        expect(normalisePhone("0098 4501 2345")).toBe("+9845012345");
+        expect(normalisePhone("+91 98450 12345")).toBe("9845012345");
+        expect(normalisePhone("+98 4501 2345")).not.toBe(
+            normalisePhone("+91 98450 12345"),
+        );
+    });
+
     it("agrees with the shared phone rule on every Indian case it keeps", () => {
         for (const c of PHONE_CASES) {
             if (c.country !== "IN" || !c.stored) continue;

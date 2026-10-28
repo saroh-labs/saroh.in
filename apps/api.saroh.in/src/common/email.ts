@@ -14,7 +14,7 @@ import {
     writeSiteCodeOutbox,
     writeStaffInviteOutbox,
 } from "./site-code-outbox";
-import { dayWords } from "./words-format";
+import { dayWords, whenWords } from "./words-format";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -729,6 +729,81 @@ export function launchInviteEmail(
   <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
   <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
   <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
+</div>`;
+}
+
+/** What happened to an account's phone (DEC-198). */
+export type PhoneNoticeKind = "added" | "changed" | "removed" | "signed-in";
+
+export interface PhoneNotice {
+    kind: PhoneNoticeKind;
+    /** The phone's last four digits: the notice never carries the number. */
+    lastFour: string;
+    at: Date;
+    /** A rough place ("Bengaluru, IN"), when the request said one. */
+    place: string | null;
+}
+
+export const PHONE_NOTICE_SUBJECTS: Record<PhoneNoticeKind, string> = {
+    added: "Your Saroh account's phone was added",
+    changed: "Your Saroh account's phone was changed",
+    removed: "Your Saroh account's phone was removed",
+    "signed-in": "Someone signed in to your Saroh account with your phone",
+};
+
+/**
+ * Tell the account's email that its phone was added, changed or removed,
+ * or signed in with (DEC-198): a stolen session that adds a phone, or a
+ * recycled number, is seen by the mailbox's owner. Awaited, and it says
+ * how it went; the caller logs a failure. With no SMTP, where the fake
+ * transport is allowed (never production), it logs that one was sent and
+ * counts it sent; `fail` fails it.
+ */
+export async function sendAccountPhoneNotice(
+    to: string,
+    notice: PhoneNotice,
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(`[Phone notice] (no SMTP) ${notice.kind}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: PHONE_NOTICE_SUBJECTS[notice.kind],
+            html: accountPhoneNoticeEmail(notice),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** The notice's body; every value in it is escaped. */
+export function accountPhoneNoticeEmail(notice: PhoneNotice): string {
+    const four = esc(notice.lastFour);
+    const what: Record<PhoneNoticeKind, string> = {
+        added: `A phone ending in ${four} was added to your Saroh account. It can now sign you in.`,
+        changed: `Your Saroh account's phone was changed to one ending in ${four}. It now signs you in, and the old one doesn't.`,
+        removed: `The phone ending in ${four} was removed from your Saroh account. It can't sign you in any more.`,
+        "signed-in": `Someone signed in to your Saroh account with your phone ending in ${four}.`,
+    };
+    const when = `${whenWords(notice.at, "Asia/Kolkata", { year: true })} (India time)`;
+    const where = notice.place ? ` Near ${esc(notice.place)}.` : "";
+    const ifNot =
+        notice.kind === "removed"
+            ? "If this wasn't you, sign in with your email and add your phone again."
+            : "If this wasn't you, sign in with your email and remove the phone.";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(PHONE_NOTICE_SUBJECTS[notice.kind])}</h2>
+  <p>${what[notice.kind]}</p>
+  <p>When: ${esc(when)}.${where}</p>
+  <p>${ifNot}</p>
 </div>`;
 }
 

@@ -193,12 +193,12 @@ describe("the business's public phone (real database)", () => {
     it("never shows one business's number on another's site", async () => {
         const a = await business("Has A Phone");
         const b = await business("Has None");
-        await settings.update(a.ctx, { profile: { phone: "+441134960000" } });
+        await settings.update(a.ctx, { profile: { phone: "+911134960000" } });
         expect(
             (await visits.read(b.siteId, undefined, "visitor")).phone,
         ).toBeNull();
         expect(await signInPhone(b.host)).toBeNull();
-        expect(await signInPhone(a.host)).toBe("+441134960000");
+        expect(await signInPhone(a.host)).toBe("+911134960000");
     });
 
     it("never serves a stored value that isn't E.164", async () => {

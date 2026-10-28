@@ -11,6 +11,8 @@ import {
 import type { MessagingSendStatus } from "@saroh/database";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
+import { phoneE164 } from "@saroh/block-contract";
+
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { env } from "../../env";
 import { noteInbound, numberHash } from "./messaging-records";
@@ -92,7 +94,8 @@ export class Msg91WebhookController {
         if (isInbound(r)) {
             const number = text(r.customerNumber);
             if (!uuid || !number || (await this.seen(uuid, "INBOUND"))) return;
-            await noteInbound(numberHash(number), inboundAt(r.ts));
+            // As our sends hash it: "9845012345" and "919845012345" are one number.
+            await noteInbound(numberHash(phoneE164(number)), inboundAt(r.ts));
             await this.record(uuid, "INBOUND");
             return;
         }
