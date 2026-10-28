@@ -1,4 +1,4 @@
-import { getIp } from "better-auth/api";
+import { getIP } from "better-auth/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authOptions } from "./server";
@@ -7,7 +7,7 @@ import { authOptions } from "./server";
 const PROXIES = ["172.64.0.0/13", "10.0.0.0/8"];
 
 const clientOf = (forwardedFor: string, trustedProxies?: string[]) =>
-    getIp(
+    getIP(
         new Headers({ "x-forwarded-for": forwardedFor }),
         authOptions({ trustedProxies }),
     );
