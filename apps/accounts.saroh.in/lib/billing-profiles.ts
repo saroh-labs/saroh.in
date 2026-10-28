@@ -1,4 +1,7 @@
-import { phoneLabel, phoneNumberProblem } from "@saroh/ui/lib/phone";
+import { phoneLabel } from "@saroh/ui/lib/phone";
+
+import { day } from "./day";
+import { billingPhoneProblem } from "./indian-phone";
 
 import { GSTIN_SHAPE, stateName } from "./gst-states";
 
@@ -24,6 +27,11 @@ export interface ProfileBusiness {
     name: string;
     /** The reader owns it, so may move it. */
     owner: boolean;
+    /**
+     * Who owns it now, when that isn't the reader (UX audit, 28 Oct). Not
+     * sent by the API yet: the row says "its new owner" until it is.
+     */
+    ownerName?: string | null;
     plan: { name: string; cycle: string } | null;
     /** Charged through Razorpay: a move waits for the renewal. */
     paid: boolean;
@@ -88,6 +96,9 @@ export type ProfileField = keyof ProfileValues;
 
 export const LIST_TITLE = "Billing profiles";
 export const LIST_INTRO = "Who Saroh bills for each business you own.";
+/** The lead for someone who pays for nothing (UX audit, 28 Oct). */
+export const TEAMMATE_INTRO =
+    "Who Saroh bills. You don't pay for any business yet.";
 export const LIST_INTRO_MORE =
     "Open one to see it, change its details or move a business.";
 export const LIST_FOOT =
@@ -120,17 +131,18 @@ export function gstLine(p: Pick<BillingProfile, "gstin">): string {
     return p.gstin ? `GSTIN ${p.gstin}` : "Not GST-registered";
 }
 
-/** A profile's first letter, for its square. */
-export function initial(name: string): string {
-    return name.trim().charAt(0).toUpperCase() || "?";
-}
-
-/** The chips under a profile on the list. */
-export function chips(p: Pick<BillingProfile, "payingFor">): string[] {
-    if (p.payingFor.length === 0) return [NOTHING_YET];
-    return p.payingFor.map((b) =>
-        b.pendingMove ? `${b.name} · moving` : b.name,
-    );
+/**
+ * The chips under a profile on the list, by business id: two businesses
+ * may share a name (a duplicate React key dropped one, UX audit 28 Oct).
+ */
+export function chips(
+    p: Pick<BillingProfile, "payingFor">,
+): { id: string; name: string }[] {
+    if (p.payingFor.length === 0) return [{ id: "none", name: NOTHING_YET }];
+    return p.payingFor.map((b) => ({
+        id: b.id,
+        name: b.pendingMove ? `${b.name} · moving` : b.name,
+    }));
 }
 
 /** The phone list's one line for what a profile pays for. */
@@ -165,26 +177,24 @@ export function planName(b: Pick<ProfileBusiness, "plan">): string {
     return b.plan?.name ?? "No plan yet";
 }
 
-/** "21 Nov": a day in India, where Saroh bills. */
-export function shortDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        timeZone: "Asia/Kolkata",
-    });
+/** Under a business the reader pays for but no longer owns. */
+export function notOwnerLine(b: Pick<ProfileBusiness, "ownerName">): string {
+    return b.ownerName
+        ? `${b.ownerName} owns it now. Ask them to move it to their own billing profile.`
+        : "You no longer own it. Ask its new owner to move it to their own billing profile.";
 }
 
 /** The column beside a business: its next charge, or why there is none. */
 export function nextLine(
     b: Pick<ProfileBusiness, "nextChargeAt" | "paid">,
 ): string {
-    if (b.nextChargeAt) return `Next charge ${shortDate(b.nextChargeAt)}`;
+    if (b.nextChargeAt) return `Next charge ${day(b.nextChargeAt)}`;
     return b.paid ? "No charge due" : "Nothing to charge";
 }
 
 /** A pending move, in words. */
 export function pendingLine(m: PendingMove): string {
-    const on = m.at ? ` on ${shortDate(m.at)}` : "";
+    const on = m.at ? ` on ${day(m.at)}` : "";
     return m.authorised
         ? `Moves to ${m.toLegalName}${on}.`
         : `Moves to ${m.toLegalName}${on}, once its payment is authorised.`;
@@ -313,7 +323,7 @@ export function profileProblems(
         const taken = emailTakenBy(email, others);
         if (taken) out.push(["billingEmail", taken]);
     }
-    const phone = phoneNumberProblem(v.phone);
+    const phone = billingPhoneProblem(v.phone);
     if (phone) out.push(["phone", phone]);
     return out;
 }
@@ -395,7 +405,7 @@ export function fieldOf(field: string | undefined): ProfileField | null {
 export function moveBusinessLine(b: ProfileBusiness, billedTo: string): string {
     if (b.paid) {
         const next = b.nextChargeAt
-            ? ` · next charge ${shortDate(b.nextChargeAt)}`
+            ? ` · next charge ${day(b.nextChargeAt)}`
             : "";
         return `${planName(b)}${next} · billed to ${billedTo}`;
     }
@@ -431,7 +441,7 @@ export function moveNote(
     target: string,
 ): { strong: string; rest: string } {
     if (b.paid) {
-        const on = b.nextChargeAt ? shortDate(b.nextChargeAt) : null;
+        const on = b.nextChargeAt ? day(b.nextChargeAt) : null;
         return {
             strong: on
                 ? `It moves at its next renewal, on ${on}.`
@@ -456,7 +466,7 @@ export function billNowOption(b: OwnedBusiness): {
     hint?: string;
 } {
     if (b.paid) {
-        const on = b.nextChargeAt ? `, ${shortDate(b.nextChargeAt)}` : "";
+        const on = b.nextChargeAt ? `, ${day(b.nextChargeAt)}` : "";
         return {
             label: `${b.name} · moves at its renewal${on}`,
             disabled: true,

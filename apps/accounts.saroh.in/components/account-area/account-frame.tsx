@@ -2,10 +2,12 @@
 
 import { avatarInitials } from "@saroh/ui/avatar";
 import { cn } from "@saroh/ui/lib/utils";
+import type { SectionItem } from "@saroh/ui/section-list";
+import { SectionList } from "@saroh/ui/section-list";
 import { Toaster } from "@saroh/ui/sonner";
+import { TabStrip } from "@saroh/ui/tabs";
 import { textLinkClass } from "@saroh/ui/text-link";
 import { SarohSymbol } from "@saroh/ui/wordmark";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -15,8 +17,8 @@ import { NAV_NOTE } from "@/lib/billing-profiles";
  * The account area's frame (DEC-167 step 2, the "Billing profiles" design):
  * a top bar with the Saroh mark, "· Your account", Back to Saroh and the
  * person, and a menu of what is theirs rather than any business's —
- * Profile and sign-in, Billing profiles and Your businesses. On a phone the
- * menu is a row of tabs under the bar.
+ * Profile and sign-in, Billing profiles and Your businesses. At a desk the
+ * menu is the app's SectionList; on a phone, its TabStrip (DEC-199).
  *
  * Billing profiles is in the menu only for someone who owns a business or
  * a profile (`showBilling`); a teammate who opens its address reads why
@@ -24,6 +26,7 @@ import { NAV_NOTE } from "@/lib/billing-profiles";
  */
 export interface AccountFrameProps {
     name: string | null;
+    /** Empty while the session can't be read: the person isn't drawn. */
     email: string;
     /** Saroh itself, for Back to Saroh. */
     appUrl: string;
@@ -31,47 +34,39 @@ export interface AccountFrameProps {
     children: ReactNode;
 }
 
-interface NavItem {
-    href: string;
-    label: string;
-    /** The paths that count as this item. */
-    match: (path: string) => boolean;
-}
-
 export const PROFILE_AND_SIGN_IN = "Profile and sign-in";
 export const BILLING_PROFILES = "Billing profiles";
 export const YOUR_BUSINESSES = "Your businesses";
 
-export function navItems(showBilling: boolean): NavItem[] {
+/**
+ * The menu. Billing profiles is in it for someone who owns a business or
+ * a profile, and always while its page is open, so a teammate who opens
+ * its address still sees where they are.
+ */
+export function navItems(showBilling: boolean, path = ""): SectionItem[] {
+    const billing = path.startsWith("/account/billing-profiles");
     return [
-        {
-            href: "/account",
-            label: PROFILE_AND_SIGN_IN,
-            match: (p) => p === "/account",
-        },
-        ...(showBilling
+        { value: "account", href: "/account", label: PROFILE_AND_SIGN_IN },
+        ...(showBilling || billing
             ? [
                   {
+                      value: "billing",
                       href: "/account/billing-profiles",
                       label: BILLING_PROFILES,
-                      match: (p: string) =>
-                          p.startsWith("/account/billing-profiles"),
                   },
               ]
             : []),
-        {
-            href: "/businesses",
-            label: YOUR_BUSINESSES,
-            match: (p) => p.startsWith("/businesses"),
-        },
+        { value: "businesses", href: "/businesses", label: YOUR_BUSINESSES },
     ];
 }
 
-const itemBase =
-    "rounded-[9px] border px-3 py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-const itemOn = "border-border bg-card font-semibold text-foreground";
-const itemOff =
-    "border-transparent text-neutral-700 hover:bg-card/60 hover:text-foreground dark:text-muted-foreground";
+/** Which item the path is on. */
+export function navValue(path: string): string | null {
+    if (path === "/account") return "account";
+    if (path.startsWith("/account/billing-profiles")) return "billing";
+    if (path.startsWith("/businesses")) return "businesses";
+    return null;
+}
 
 export function AccountFrame({
     name,
@@ -81,7 +76,8 @@ export function AccountFrame({
     children,
 }: AccountFrameProps) {
     const path = usePathname();
-    const items = navItems(showBilling);
+    const items = navItems(showBilling, path);
+    const value = navValue(path);
     const displayName = name?.trim() ?? "";
     const firstName = displayName.split(/\s+/)[0] || email;
     const onList = path === "/account/billing-profiles";
@@ -105,52 +101,52 @@ export function AccountFrame({
                 >
                     Back to Saroh
                 </a>
-                <span
-                    className="dark:text-muted-foreground flex items-center gap-2 text-[12.5px] text-neutral-700"
-                    data-ph-mask=""
-                >
+                {email ? (
                     <span
-                        aria-hidden
-                        className="bg-muted text-foreground flex size-[30px] items-center justify-center rounded-full text-[11px] font-semibold md:size-[26px]"
+                        className="dark:text-muted-foreground flex items-center gap-2 text-[12.5px] text-neutral-700"
+                        data-ph-mask=""
                     >
-                        {avatarInitials(displayName, email)}
+                        <span
+                            aria-hidden
+                            className="bg-muted text-foreground flex size-[30px] items-center justify-center rounded-full text-[11px] font-semibold md:size-[26px]"
+                        >
+                            {avatarInitials(displayName, email)}
+                        </span>
+                        <span className="hidden max-w-[8rem] truncate md:inline">
+                            {firstName}
+                        </span>
+                        <span className="sr-only md:hidden">{firstName}</span>
                     </span>
-                    <span className="hidden max-w-[8rem] truncate md:inline">
-                        {firstName}
-                    </span>
-                    <span className="sr-only md:hidden">{firstName}</span>
-                </span>
+                ) : null}
             </header>
 
-            <div className="flex flex-1 flex-col md:flex-row">
-                <nav
-                    aria-label="Your account"
-                    className="flex gap-1 overflow-x-auto border-b px-4 py-2.5 md:w-[240px] md:shrink-0 md:flex-col md:gap-0.5 md:overflow-visible md:border-b-0 md:px-3.5 md:py-[22px]"
-                >
-                    {items.map((item) => {
-                        const on = item.match(path);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                aria-current={on ? "page" : undefined}
-                                className={cn(
-                                    itemBase,
-                                    "flex min-h-11 flex-none items-center text-[13px] md:min-h-0 md:text-[13.5px]",
-                                    on ? itemOn : itemOff,
-                                )}
-                            >
-                                {item.label}
-                            </Link>
-                        );
-                    })}
+            <div className="flex flex-1 flex-col min-[760px]:flex-row">
+                {/* Phone: the app's tab look (TabStrip, one line in
+                    ScrollX). Desk: the app's SectionList. */}
+                <div className="border-b px-4 min-[760px]:hidden">
+                    <TabStrip
+                        label="Your account"
+                        value={value ?? ""}
+                        tabs={items.map((i) => ({
+                            value: i.value,
+                            label: i.label,
+                            href: i.href,
+                        }))}
+                    />
+                </div>
+                <div className="hidden w-[240px] shrink-0 px-3.5 py-[22px] min-[760px]:block">
+                    <SectionList
+                        label="Your account"
+                        items={items}
+                        value={value}
+                    />
                     {onList ? (
-                        <span className="text-muted-foreground mt-3.5 hidden px-3 text-xs leading-normal md:block">
+                        <p className="text-muted-foreground mt-3.5 px-3 text-xs leading-normal">
                             {NAV_NOTE}
-                        </span>
+                        </p>
                     ) : null}
-                </nav>
-                <main className="min-w-0 flex-1 px-4 pb-10 pt-4 md:px-[30px] md:pb-10 md:pt-[26px]">
+                </div>
+                <main className="min-w-0 flex-1 px-4 pb-10 pt-4 min-[760px]:px-[30px] min-[760px]:pt-[26px]">
                     {children}
                 </main>
             </div>

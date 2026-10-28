@@ -192,16 +192,10 @@ export const RAW_ALLOWED = {
     "components/shared/navigation/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
     "components/shared/shell/app-sidebar.tsx": ["button"],
-    // button: the one hand-drawn radio, shared by every choice group
-    "components/shared/fields/choice-group.tsx": ["button"],
-    // button: a control styled by its screen's own helper
-    "components/shared/states/failed-read.tsx": ["button"],
     // button: Other rate, a chip-shaped disclosure (aria-expanded) beside the rates (DEC-176)
     "components/shared/fields/gst-rate-picker.tsx": ["button"],
     // input: a file picker
     "components/shared/fields/logo-upload.tsx": ["input"],
-    // button: a tab
-    "components/shared/page/section-list.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/shared/shell/tab-bar.tsx": ["button"],
     // button: a chip

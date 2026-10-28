@@ -76,6 +76,7 @@ describe("navFor", () => {
                     "Webhooks",
                     "Providers",
                     "Deployments",
+                    "Saroh's apps",
                     "Team",
                     "Audit trail",
                 ],
@@ -135,7 +136,7 @@ describe("navFor", () => {
             ["Home", ["Home"]],
             ["Help customers", ["Businesses", "Reports"]],
             ["Product", ["Releases", "Search pages", "Usage"]],
-            ["Keep it running", ["Health"]],
+            ["Keep it running", ["Health", "Saroh's apps"]],
         ]);
         // An Account manager reaches Home, their own leads board and their
         // own page on the Team (U22).

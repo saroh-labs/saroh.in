@@ -7,13 +7,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import {
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { callName } from "@/lib/services/call-name";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 import {
@@ -40,6 +34,9 @@ import {
 import type { PanelKey } from "@/lib/services/service-panels";
 import { detailRows, PANEL_FIELDS } from "@/lib/services/service-panels";
 import { zoneShortName } from "@/lib/services/time-picker";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
+import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { FiveQuestions } from "@/components/services/service-fields/questions";
 import { DetailPanel } from "./detail-panel";

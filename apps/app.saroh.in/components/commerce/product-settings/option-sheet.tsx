@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useRef, useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { count } from "@/lib/format/plural";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
@@ -22,6 +21,7 @@ import {
     renameOptionValue,
     reorderOptionValues,
 } from "@/lib/products/settings-actions";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { PROBLEM } from "./product-settings";
 

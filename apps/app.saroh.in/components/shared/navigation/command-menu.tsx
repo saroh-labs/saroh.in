@@ -36,11 +36,11 @@ import {
     helpHomeUrl,
     helpUrl,
 } from "@/lib/help/links";
-import { mayNavigate } from "@/lib/nav/leave-request";
 import type { Recent } from "@/lib/search/recents";
 import { readRecents, rememberRecent } from "@/lib/search/recents";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
+import { mayNavigate } from "@saroh/ui/lib/leave-request";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 import type { NavRole } from "./nav-items";

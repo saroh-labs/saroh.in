@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Input } from "@saroh/ui/input";
 
 import { Chip } from "@/components/shared/lists/chip";

@@ -10,13 +10,13 @@ import {
     rowActions,
     Saved,
 } from "@/components/organizations/business-settings/business-row-parts";
-import { Row } from "@/components/shared/page/settings-rows";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
 import { lookWords } from "@/lib/invoices/paper-look";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { Row } from "@saroh/ui/settings-rows";
 
 import type { BusinessSheets } from "@/components/organizations/business-settings/use-business-sheets";
 import { savedPaper } from "@/components/organizations/invoice-paper/invoice-paper-sheet";

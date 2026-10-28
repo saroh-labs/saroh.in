@@ -1,7 +1,6 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -16,6 +15,7 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -23,11 +23,6 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    lostChanges,
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
@@ -46,6 +41,7 @@ import type {
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { Segmented } from "@saroh/ui/segmented";
+import { lostChanges, lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 import type { MultiOption } from "./multi-select";
 import { MultiSelect } from "./multi-select";
 

@@ -29,11 +29,11 @@ import {
 } from "@/lib/class-packs/pack-editor-words";
 
 import { GstFields } from "@/components/services/service-editor/gst-fields";
-import { CheckRow } from "@/components/shared/fields/check-row";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
 import { itemModeInput, itemModeValue } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
+import { CheckRow } from "@saroh/ui/check-row";
 import { HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 

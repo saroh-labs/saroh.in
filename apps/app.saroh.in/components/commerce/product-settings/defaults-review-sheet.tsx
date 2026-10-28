@@ -3,10 +3,10 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { DefaultsSuggestion } from "@/lib/products/settings";
 import { suggestionText } from "@/lib/products/settings-rules";
+import { CheckRow } from "@saroh/ui/check-row";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 const keyOf = (s: DefaultsSuggestion) => `${s.key}:${s.field}`;
 

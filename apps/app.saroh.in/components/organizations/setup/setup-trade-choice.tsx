@@ -2,9 +2,9 @@
 
 import { useId } from "react";
 
-import { ChipGroup } from "@/components/shared/fields/choice-group";
 import type { SetupTrade } from "@/lib/organizations/setup-steps";
 import { TRADE_CHOICES, tradeLine } from "@/lib/organizations/setup-steps";
+import { ChipGroup } from "@saroh/ui/choice-group";
 
 /**
  * Bookings' trade at setup (#1193, DEC-189), under the goals when Bookings

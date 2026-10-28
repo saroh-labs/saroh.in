@@ -13,8 +13,6 @@ import { MoreHorizontal, PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import { productHref } from "@/lib/products/links";
@@ -25,6 +23,8 @@ import {
     TRACKING_ON_SAID,
     TRACKING_STILL_ON,
 } from "@/lib/products/tracking";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { STOCK_SHEET_PARAM } from "./stock-sheet";
 
 /**

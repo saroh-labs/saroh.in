@@ -5,8 +5,6 @@ import { Field } from "@saroh/ui/field";
 import { Textarea } from "@saroh/ui/textarea";
 import { Fragment, useState } from "react";
 
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatDateTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
 import type { PersonRuleKey } from "@/lib/staff/person-rules";
@@ -23,6 +21,8 @@ import {
     SAME,
 } from "@/lib/staff/person-rules";
 import type { RuleRequest, StaffView } from "@/lib/staff/types";
+import { RadioCards } from "@saroh/ui/choice-group";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 import { HoursPanel } from "@/components/bookings/availability/hours-panel";
 import { ROW as CHOICE_ROW } from "@/components/bookings/availability/whose-hours";

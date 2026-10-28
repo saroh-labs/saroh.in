@@ -1,11 +1,8 @@
 "use client";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { Refusal } from "@/components/shared/states/refusal";
 import { Badge } from "@saroh/ui/badge";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";

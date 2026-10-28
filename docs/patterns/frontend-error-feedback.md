@@ -274,7 +274,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   has been changed.", and **Try again** reads again (`retry`, a refetch or
   `router.refresh()`), never "reload the page" and never "Retry". A part of
   a page that couldn't be read is `FailedRead`
-  (`components/shared/states/failed-read.tsx`), and a page that is drawn without
+  (`@saroh/ui/failed-read`), and a page that is drawn without
   it says so above with `PartialRead`: "Couldn't load {things}.", one
   sentence on what that leaves unsaid (`so`), and Try again. Both take
   `onRetry` for a read the component made itself (a preview, a picker's

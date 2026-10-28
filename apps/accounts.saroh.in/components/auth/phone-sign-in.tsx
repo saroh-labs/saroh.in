@@ -1,6 +1,6 @@
 "use client";
 
-import { ChallengeWidget } from "@saroh/site-blocks/challenge";
+import { useState } from "react";
 
 import { CodeStep } from "@/components/auth/code-step";
 import {
@@ -10,12 +10,21 @@ import {
     AuthPhoneField,
     AuthSubmit,
 } from "@/components/auth/field";
+import { PhoneChallenge } from "@/components/auth/phone-challenge";
 import { usePhoneSend } from "@/components/auth/use-phone-send";
-import { CAPTCHA_ELEMENT_ID } from "@/lib/otp-widget";
 import { phoneCodeClient } from "@/lib/phone-code-client";
 import { signInWithPhone } from "@/lib/phone-sign-in";
 
 /** The words that change with the channel, in one place for the test. */
+/** The API's code for a phone not proved in 12 months (DEC-198). */
+export const PHONE_STALE = "PHONE_STALE";
+
+export const STALE_WORDS = {
+    title: "Sign in with your email this time",
+    body: "This phone hasn't been used to sign in for a year. Sign in with your email once and the phone works again.",
+    action: "Sign in with email",
+} as const;
+
 export const PHONE_SEND_WORDS = {
     whatsapp: "Send code on WhatsApp",
     sms: "Send me a code",
@@ -55,11 +64,32 @@ export function PhoneSignIn({
         whatsapp,
     });
     const onWhatsapp = flow.channel === "whatsapp";
+    // The phone is right but stale (DEC-198): only email signs in now.
+    const [stale, setStale] = useState(false);
+
+    if (stale) {
+        return (
+            <div>
+                <AuthHeading
+                    title={STALE_WORDS.title}
+                    blurb={STALE_WORDS.body}
+                />
+                <AuthSubmit type="button" onClick={onUseEmail}>
+                    {STALE_WORDS.action}
+                </AuthSubmit>
+            </div>
+        );
+    }
 
     if (flow.stage === "code" && flow.sender) {
-        const client = phoneCodeClient(flow.sender, (proof) =>
-            signInWithPhone({ phone: flow.phone, ...proof }),
-        );
+        const client = phoneCodeClient(flow.sender, async (proof) => {
+            const answer = await signInWithPhone({
+                phone: flow.phone,
+                ...proof,
+            });
+            if (answer.error?.code === PHONE_STALE) setStale(true);
+            return answer;
+        });
         return (
             <CodeStep
                 email={flow.shownPhone}
@@ -91,24 +121,18 @@ export function PhoneSignIn({
                 }}
                 noValidate
             >
-                {flow.error ? <AuthError>{flow.error}</AuthError> : null}
+                {flow.error && flow.stage === "captcha" ? (
+                    <AuthError>{flow.error}</AuthError>
+                ) : null}
                 <AuthPhoneField
-                    label="Phone"
+                    label="Indian mobile number"
                     note="No phone on your account yet? Sign in with your email, then add one in Account."
                     value={flow.phone}
                     onValueChange={flow.setPhone}
                     disabled={flow.busy || captcha}
-                    invalid={Boolean(flow.error) && !captcha}
+                    error={captcha ? null : flow.error}
                 />
-                {turnstileSiteKey && !captcha ? (
-                    <ChallengeWidget
-                        key={flow.challengeKey}
-                        siteKey={turnstileSiteKey}
-                        onToken={flow.setTurnstileToken}
-                    />
-                ) : null}
-                {/* The widget's own captcha draws here once it has loaded. */}
-                <div id={CAPTCHA_ELEMENT_ID} className="mb-3.5" />
+                <PhoneChallenge flow={flow} className="mb-3.5" />
                 <AuthSubmit disabled={flow.busy}>
                     {flow.busy
                         ? "Sending…"

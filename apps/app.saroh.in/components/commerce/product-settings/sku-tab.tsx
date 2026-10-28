@@ -1,9 +1,9 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -16,10 +16,10 @@ import {
 } from "@/lib/products/settings-actions";
 import { patternProblem } from "@/lib/products/sku-pattern";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+import { CheckRow } from "@saroh/ui/check-row";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Tip } from "@saroh/ui/tooltip";

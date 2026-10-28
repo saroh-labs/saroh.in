@@ -1,7 +1,7 @@
 // One copy of each block (DEC-195): a line-window clone check.
 //
 // Every run of MIN non-trivial lines that appears in two or more files of
-// saroh.in or @saroh/search-pages is a clone. Today's clones are recorded in
+// saroh.in, @saroh/search-pages or accounts.saroh.in (DEC-199) is a clone. Today's clones are recorded in
 // scripts/dupes-baseline.json; the check fails on a new one, or on a known one
 // that has reached another file, so the baseline only shrinks. When clones go,
 // it says so: `--update` rewrites the baseline.
@@ -32,6 +32,10 @@ export const SCOPE = [
     "apps/saroh.in/lib",
     "apps/saroh.in/content",
     "packages/search-pages/src",
+    // accounts.saroh.in joined the scan with DEC-199.
+    "apps/accounts.saroh.in/app",
+    "apps/accounts.saroh.in/components",
+    "apps/accounts.saroh.in/lib",
 ];
 
 const SKIP_DIRS = new Set(["node_modules", ".next", ".turbo", ".open-next"]);

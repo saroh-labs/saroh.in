@@ -5,7 +5,6 @@ import { Input } from "@saroh/ui/input";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useState } from "react";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -22,6 +21,7 @@ import type {
 } from "@/lib/invoices/service";
 import { leftCents } from "@/lib/invoices/status";
 import { paymentWay, toCollect } from "@/lib/invoices/words";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 /**
  * "Remove this payment" (DEC-173, U9 #1121): a payment recorded by mistake

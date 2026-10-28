@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -9,8 +9,6 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
     addAttentionAction,
@@ -37,6 +35,8 @@ import {
     picksAllergen,
     toInput,
 } from "@/lib/customer-workspace/attention";
+import { CheckRow } from "@saroh/ui/check-row";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 
 interface Choice {

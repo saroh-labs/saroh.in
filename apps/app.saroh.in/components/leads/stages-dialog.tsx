@@ -1,8 +1,8 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";

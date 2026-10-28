@@ -3,7 +3,7 @@
 import { TextLink } from "@saroh/ui/text-link";
 import type { ReactNode } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * A quick edit over the product page: one section's fields, saved on their

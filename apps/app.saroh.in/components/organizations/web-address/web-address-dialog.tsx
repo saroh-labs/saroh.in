@@ -1,9 +1,5 @@
 "use client";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -14,6 +10,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@saroh/ui/form";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";

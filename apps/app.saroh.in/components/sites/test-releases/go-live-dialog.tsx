@@ -7,10 +7,6 @@ import { showError } from "@saroh/ui/toast";
 import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import type {
     GoLiveGate,
@@ -28,6 +24,7 @@ import {
     goLiveWithRelease,
     scheduleGoLive,
 } from "@/lib/sites/test-releases-actions";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
 import type { GoLiveTarget } from "./use-test-releases";

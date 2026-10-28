@@ -8,7 +8,6 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
 import { extendHolder } from "@/lib/class-packs/actions";
@@ -23,6 +22,7 @@ import {
     extendedTo,
     extendedToast,
 } from "@/lib/class-packs/pack-holders";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 /** Who is being given days, as the dialog needs them. */
 export interface ExtendTarget {

@@ -8,7 +8,6 @@ import { DeleteCustomerMenu } from "@/components/customers/store-customer/delete
 import { EditStoreCustomer } from "@/components/customers/store-customer/edit-store-customer";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
@@ -21,6 +20,7 @@ import { phoneLabel } from "@/lib/organizations/business-phone";
 import { requireSession } from "@/lib/session";
 import type { BusinessStore as Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 // "Customer", never their name: a tab's title shows in a screen share, in
 // history and in bookmarks (`lib/page-title.ts`).

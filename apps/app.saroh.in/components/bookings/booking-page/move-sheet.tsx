@@ -11,11 +11,6 @@ import {
     movedToldText,
 } from "@/components/bookings/quick-look/quick-look-state";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { formatDateTime, formatTime } from "@/lib/format/datetime";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
@@ -23,6 +18,7 @@ import { firstName } from "@/lib/names";
 import { rescheduleBooking } from "@/lib/services/actions";
 import { deadlineText } from "@/lib/services/booking-money";
 import { localDateOf } from "@/lib/services/diary";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /** The booking being moved, as the page knows it. */
 export interface MoveTarget {

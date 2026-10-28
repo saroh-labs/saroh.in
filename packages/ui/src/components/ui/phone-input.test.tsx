@@ -254,3 +254,38 @@ describe("PhoneInput (#1036)", { timeout: 15_000 }, () => {
         expect(box()).toHaveValue("98765 43210");
     });
 });
+
+describe("PhoneInput locked to one country", () => {
+    function Locked({ onValue }: { onValue: (v: string) => void }) {
+        const [value, setValue] = React.useState("");
+        return (
+            <PhoneInput
+                aria-label="Phone"
+                lockCountry="IN"
+                value={value}
+                onValueChange={(v) => {
+                    setValue(v);
+                    onValue(v);
+                }}
+            />
+        );
+    }
+
+    it("draws a fixed +91, not a picker", () => {
+        render(<Locked onValue={() => undefined} />);
+        expect(screen.queryByRole("button")).toBe(null);
+        expect(screen.getByText("+91")).toBeTruthy();
+    });
+
+    it("keeps an Indian number Indian, and another country's code as typed", () => {
+        const seen: string[] = [];
+        render(<Locked onValue={(v) => seen.push(v)} />);
+        const box = screen.getByLabelText("Phone");
+        fireEvent.change(box, { target: { value: "98450 12345" } });
+        expect(seen.at(-1)).toBe("+919845012345");
+        fireEvent.change(box, { target: { value: "+44 20 7946 0958" } });
+        fireEvent.blur(box);
+        expect(seen.at(-1)).toBe("+442079460958");
+        expect((box as HTMLInputElement).value).toBe("+44 20 7946 0958");
+    });
+});

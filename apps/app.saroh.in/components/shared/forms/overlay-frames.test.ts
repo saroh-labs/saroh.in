@@ -43,12 +43,8 @@ const FRAMES =
  * keeps a frame of its own. Adding to this list is a decision: say why.
  */
 const NOT_FORMS: Record<string, string> = {
-    // The frames themselves.
-    "components/shared/forms/form-sheet.tsx": "the one sheet",
-    "components/shared/forms/form-dialog.tsx": "the one dialog",
-    "components/shared/confirm/confirm-dialog.tsx": "the one confirm",
-    "components/shared/forms/use-leave-guard.tsx":
-        "the one leave guard: Stay, Leave, and Save and leave",
+    // The frames themselves (FormSheet, FormDialog, ConfirmDialog and the
+    // leave guard) live in @saroh/ui, outside this scan.
     // Read-only quick looks, with their own header as their design draws.
     "components/shared/forms/quick-look.tsx": "a read-only quick look",
     "components/sites/looks/look-preview.tsx":
@@ -158,14 +154,12 @@ describe("every sheet and dialog file draws the one frame", () => {
 });
 
 describe("no frame is drawn by hand", () => {
-    it("only the confirm and the leave guard write an AlertDialog", () => {
+    it("only the confirm and the leave guard (in @saroh/ui) write an AlertDialog", () => {
         const users = FILES.filter((f) =>
             read(f).includes("@saroh/ui/alert-dialog"),
         ).map(rel);
-        expect(users.sort()).toEqual([
-            "components/shared/confirm/confirm-dialog.tsx",
-            "components/shared/forms/use-leave-guard.tsx",
-        ]);
+        // Both live in @saroh/ui now (`confirm-dialog`, `use-leave-guard`).
+        expect(users.sort()).toEqual([]);
     });
 
     it("a raw SheetContent or DialogContent is on the list of things that are not forms", () => {

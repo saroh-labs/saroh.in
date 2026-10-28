@@ -14,8 +14,8 @@ import {
 import { QrCode } from "lucide-react";
 import { useState } from "react";
 
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { QrLink, QrPanelRead } from "@/lib/qr/panel";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import type { DownloadEnv } from "./qr-download";
 import { hasCode, QrPanel } from "./qr-panel";

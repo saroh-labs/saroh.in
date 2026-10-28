@@ -10,9 +10,6 @@ import { useState } from "react";
 
 import { ROW as CHOICE_ROW } from "@/components/bookings/availability/whose-hours";
 
-import { SwitchRow } from "@/components/shared/fields/check-row";
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import type { RuleKey, RuleRow } from "@/lib/services/availability-rules";
 import {
@@ -25,6 +22,9 @@ import {
 import { updateBookingRules } from "@/lib/staff/actions";
 import type { PersonRuleKey, PersonRuleRow } from "@/lib/staff/person-rules";
 import type { BookingRules, OnlineBlocker } from "@/lib/staff/types";
+import { SwitchRow } from "@saroh/ui/check-row";
+import { RadioCards } from "@saroh/ui/choice-group";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 const NONE = "none";
 

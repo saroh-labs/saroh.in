@@ -12,7 +12,6 @@ import {
 import { useState } from "react";
 
 import { viewerTimeZone } from "@/lib/format/datetime";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import {
     FILL_DETAILS_LABEL,
     ROLLBACK_CONFIRM,
@@ -20,6 +19,7 @@ import {
     versionTitle,
     versionWhen,
 } from "@/lib/sites/starter-content";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import type { StarterContentActions } from "./starter-content-actions";
 import { useDraftVersions } from "./use-draft-versions";
 

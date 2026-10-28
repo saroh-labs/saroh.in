@@ -11,7 +11,6 @@ import {
     NewProfileFields,
     SetupBillingStep,
 } from "@/components/organizations/setup/setup-billing-step";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import type {
     BusinessBillingProfile,
@@ -41,6 +40,7 @@ import {
     updateBillingProfileAction,
 } from "@/lib/saroh-billing/billing-actions";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * Plan & billing's two sheets for who Saroh bills (DEC-167, R8, R9, U5),

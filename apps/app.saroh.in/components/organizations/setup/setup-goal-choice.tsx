@@ -3,9 +3,9 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { GOAL_LATER } from "@/lib/modules/goals";
 import type { SetupGoal } from "@/lib/organizations/setup-plan";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 
 /**
  * "What will you do first?", setup's last step (UX audit, 10 Oct): the

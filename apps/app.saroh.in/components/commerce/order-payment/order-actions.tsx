@@ -11,8 +11,6 @@ import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import { updateOrder } from "@/lib/orders/actions";
 import { handRefundDone } from "@/lib/orders/hand-refund";
@@ -22,6 +20,8 @@ import {
     PAYMENT_TRANSITIONS,
 } from "@/lib/orders/lifecycle";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { IconButton } from "@saroh/ui/icon-button";
 import { RecordPaidDialog } from "./record-paid-dialog";

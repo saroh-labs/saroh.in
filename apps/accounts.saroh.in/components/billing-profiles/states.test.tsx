@@ -28,8 +28,8 @@ afterEach(tearDown);
 describe("states", () => {
     it("loading is a status, named for a screen reader", () => {
         draw(<LoadingProfiles />);
-        const status = host.querySelector("[role=status]");
-        expect(status?.getAttribute("aria-busy")).toBe("true");
+        const status = host.querySelector("[aria-busy=true]");
+        expect(status).toBeTruthy();
         expect(text(status)).toContain("Loading your billing profiles");
     });
 

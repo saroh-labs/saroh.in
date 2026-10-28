@@ -1,8 +1,8 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Textarea } from "@saroh/ui/textarea";
@@ -27,7 +27,6 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import {
     descriptionFootnote,
     markupCount,
@@ -35,6 +34,7 @@ import {
 } from "@/lib/products/editor-labels";
 import { LIMITS, stripHtml } from "@/lib/products/editor-sections";
 import { editorKey } from "@/lib/tiptap/editor-key";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Label } from "@saroh/ui/label";
 
 /**

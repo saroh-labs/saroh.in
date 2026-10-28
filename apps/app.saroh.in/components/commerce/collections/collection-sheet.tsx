@@ -5,9 +5,6 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { PickableProduct } from "@/lib/collections/actions";
 import {
     loadCollection,
@@ -23,6 +20,9 @@ import {
     websiteLine,
 } from "@/lib/collections/rules";
 import type { CollectionDetail } from "@/lib/collections/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { runAction } from "@/lib/api/run-action";
 import {

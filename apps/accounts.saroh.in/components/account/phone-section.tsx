@@ -1,30 +1,19 @@
 "use client";
 
 import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
-import { ChallengeWidget } from "@saroh/site-blocks/challenge";
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
-import { phoneLabel } from "@saroh/ui/lib/phone";
 import { PhoneInput } from "@saroh/ui/phone-input";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import { PhoneChallenge } from "@/components/auth/phone-challenge";
 import { PHONE_SEND_WORDS } from "@/components/auth/phone-sign-in";
 import { cannotSend, usePhoneSend } from "@/components/auth/use-phone-send";
-import { authFailureCopy } from "@/lib/auth-error-copy";
 import type { OtpSender } from "@/lib/otp-widget";
-import { CAPTCHA_ELEMENT_ID } from "@/lib/otp-widget";
 import { phoneCodeClient } from "@/lib/phone-code-client";
-import type { PhoneOptions } from "@/lib/phone-sign-in";
-import { addPhone, phoneOptions, removePhone } from "@/lib/phone-sign-in";
+import { addPhone } from "@/lib/phone-sign-in";
 import {
     checkCode,
     codeDigits,
@@ -33,232 +22,90 @@ import {
     sendCode,
 } from "@/lib/sign-in-code";
 
-/** The words of the Phone card, in one place for its test. */
+/** The words of the phone flow, in one place for its tests. */
 export const PHONE_WORDS = {
     title: "Phone",
     blurb: "A second way to sign in. Your email always works too.",
-    none: "No phone added.",
+    none: "Not added",
     verified: "Verified",
     add: "Add phone",
     change: "Change",
-    remove: "Remove",
-    removeAsk: "Remove this phone? You can still sign in with your email.",
-    keep: "Keep it",
-    added: "Phone added. You can sign in with it now.",
+    remove: "Remove phone",
+    removeTitle: "Remove your phone?",
+    removeAsk:
+        "You won't be able to sign in with it. You can still sign in with your email.",
+    keep: "Keep phone",
+    added: "Phone saved. You can sign in with it now.",
     removed: "Phone removed.",
     removeFailed: "Couldn't remove the phone. Try again.",
     saveFailed: "Couldn't add the phone. Try again.",
+    label: "Indian mobile number",
+    hint: "Indian mobile numbers only for now.",
+    changeNumber: "Use a different number",
 } as const;
 
-/** "Verified 27 Oct 2026". */
-function verifiedOn(at: Date | string | null | undefined): string {
-    if (!at) return PHONE_WORDS.verified;
-    const day = new Date(at).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
-    return `${PHONE_WORDS.verified} ${day}`;
+/** "We'll send a code on WhatsApp. The number is saved when you enter it." */
+function sendHint(onWhatsapp: boolean): string {
+    return `${PHONE_WORDS.hint} We'll send a code ${
+        onWhatsapp ? "on WhatsApp" : "by SMS"
+    }. The number is saved when you enter it.`;
 }
 
 /**
- * {@link PhoneSection} once the API has said whether phones are offered
- * here. Not offered and no phone saved: no card at all.
+ * A form, or (inside a sheet, which is a form of its own) a group whose
+ * Enter sends: forms can't nest.
  */
-export function PhoneRow(props: {
-    phoneE164: string | null;
-    phoneVerifiedAt: Date | string | null;
-}) {
-    const [options, setOptions] = useState<PhoneOptions | null>(null);
-    useEffect(() => {
-        let live = true;
-        void phoneOptions().then((o) => live && setOptions(o));
-        return () => {
-            live = false;
-        };
-    }, []);
-    if (!options || (!options.available && !props.phoneE164)) return null;
-    return (
-        <PhoneSection
-            {...props}
-            canAdd={options.available}
-            whatsapp={options.whatsapp}
-            sms={options.sms}
-            turnstileSiteKey={options.turnstileSiteKey}
-        />
-    );
-}
-
-/**
- * Account › Phone (DEC-196): add, change or remove the phone that signs
- * this account in. Adding and changing both need a fresh code to the new
- * number, which the API checks with the provider before saving; the
- * browser's word that it is verified is never enough. Removing needs no
- * code: the email still signs the person in.
- */
-export function PhoneSection({
-    phoneE164,
-    phoneVerifiedAt,
-    turnstileSiteKey,
-    canAdd = true,
-    whatsapp = true,
-    sms = true,
+function Frame({
+    bare,
+    onSend,
+    children,
 }: {
-    /** False while phones can't be verified here: Remove stays. */
-    canAdd?: boolean;
-    whatsapp?: boolean;
-    sms?: boolean;
-    phoneE164: string | null;
-    phoneVerifiedAt: Date | string | null;
-    turnstileSiteKey: string | null;
+    bare: boolean;
+    onSend: () => void;
+    children: ReactNode;
 }) {
-    const [current, setCurrent] = useState({
-        phone: phoneE164,
-        at: phoneVerifiedAt,
-    });
-    const [mode, setMode] = useState<"view" | "edit" | "remove">("view");
-    const [notice, setNotice] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState(false);
-
-    async function remove() {
-        setBusy(true);
-        setError(null);
-        const answer = await removePhone();
-        setBusy(false);
-        if (answer.error) {
-            setError(authFailureCopy(answer.error, PHONE_WORDS.removeFailed));
-            return;
-        }
-        setCurrent({ phone: null, at: null });
-        setMode("view");
-        setNotice(PHONE_WORDS.removed);
+    if (bare) {
+        return (
+            <div
+                className="grid gap-4"
+                onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                    if (
+                        e.key === "Enter" &&
+                        e.target instanceof HTMLInputElement
+                    ) {
+                        e.preventDefault();
+                        onSend();
+                    }
+                }}
+            >
+                {children}
+            </div>
+        );
     }
-
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{PHONE_WORDS.title}</CardTitle>
-                <CardDescription>{PHONE_WORDS.blurb}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid max-w-sm gap-4">
-                {notice && mode === "view" ? (
-                    <p role="status" className="text-success text-sm">
-                        {notice}
-                    </p>
-                ) : null}
-                {error ? (
-                    <p role="alert" className="text-destructive text-sm">
-                        {error}
-                    </p>
-                ) : null}
-
-                {mode === "edit" ? (
-                    <PhoneChange
-                        whatsapp={whatsapp}
-                        sms={sms}
-                        turnstileSiteKey={turnstileSiteKey}
-                        onCancel={() => setMode("view")}
-                        onSaved={(saved) => {
-                            setCurrent({
-                                phone: saved.phoneE164,
-                                at: saved.phoneVerifiedAt,
-                            });
-                            setMode("view");
-                            setNotice(PHONE_WORDS.added);
-                        }}
-                    />
-                ) : (
-                    <>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {current.phone ? (
-                                <>
-                                    <span className="text-sm font-medium">
-                                        {phoneLabel(current.phone)}
-                                    </span>
-                                    <Badge variant="success" size="sm">
-                                        {verifiedOn(current.at)}
-                                    </Badge>
-                                </>
-                            ) : (
-                                <span className="text-muted-foreground text-sm">
-                                    {PHONE_WORDS.none}
-                                </span>
-                            )}
-                        </div>
-                        {mode === "remove" ? (
-                            <div className="grid gap-3">
-                                <p className="text-sm">
-                                    {PHONE_WORDS.removeAsk}
-                                </p>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="destructive"
-                                        disabled={busy}
-                                        onClick={() => void remove()}
-                                    >
-                                        {busy
-                                            ? "Removing…"
-                                            : PHONE_WORDS.remove}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        disabled={busy}
-                                        onClick={() => setMode("view")}
-                                    >
-                                        {PHONE_WORDS.keep}
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                {canAdd ? (
-                                    <Button
-                                        variant={
-                                            current.phone
-                                                ? "outline"
-                                                : "default"
-                                        }
-                                        className="w-fit"
-                                        onClick={() => {
-                                            setNotice(null);
-                                            setError(null);
-                                            setMode("edit");
-                                        }}
-                                    >
-                                        {current.phone
-                                            ? PHONE_WORDS.change
-                                            : PHONE_WORDS.add}
-                                    </Button>
-                                ) : null}
-                                {current.phone ? (
-                                    <Button
-                                        variant="ghost"
-                                        className="w-fit"
-                                        onClick={() => {
-                                            setNotice(null);
-                                            setError(null);
-                                            setMode("remove");
-                                        }}
-                                    >
-                                        {PHONE_WORDS.remove}
-                                    </Button>
-                                ) : null}
-                            </div>
-                        )}
-                    </>
-                )}
-            </CardContent>
-        </Card>
+        <form
+            className="grid gap-4"
+            onSubmit={(e) => {
+                e.preventDefault();
+                onSend();
+            }}
+            noValidate
+        >
+            {children}
+        </form>
     );
 }
 
 /**
- * The new number, its code, then saved. Also the whole of accounts'
- * "Add your phone" step (`app/(auth)/add-phone`), which has no Cancel and
- * listens for `onUnavailable` so nobody is held while codes can't be sent.
- * The code comes on WhatsApp (owner, 28 Oct), or by SMS through the widget
- * after "Get the code by SMS instead".
+ * The new number, its code, then saved (DEC-196, DEC-199): Account ›
+ * Phone's sheet, and the whole of accounts' "Add your phone" step
+ * (`app/(auth)/add-phone`), which has no Cancel and listens for
+ * `onUnavailable` so nobody is held while codes can't be sent.
+ *
+ * India only: a fixed +91, and the number is checked in the browser
+ * before the Turnstile check or a code is spent. What is wrong is said
+ * under the field. The code comes on WhatsApp (owner, 28 Oct), or by SMS
+ * through the widget after "Get the code by SMS instead".
  */
 export function PhoneChange({
     whatsapp = true,
@@ -267,7 +114,8 @@ export function PhoneChange({
     onCancel,
     onSaved,
     onUnavailable,
-    label = "New phone",
+    label = PHONE_WORDS.label,
+    bare = false,
 }: {
     /** Saroh can send on WhatsApp: the default way. */
     whatsapp?: boolean;
@@ -280,6 +128,8 @@ export function PhoneChange({
     /** Sending or checking failed because codes can't go out just now. */
     onUnavailable?: () => void;
     label?: string;
+    /** Inside a sheet's own form: no form of its own. */
+    bare?: boolean;
 }) {
     const flow = usePhoneSend(turnstileSiteKey, { purpose: "add", whatsapp });
     const onWhatsapp = flow.channel === "whatsapp";
@@ -290,71 +140,72 @@ export function PhoneChange({
     if (flow.stage === "code" && flow.sender) {
         return (
             <PhoneCode
+                bare={bare}
                 sender={flow.sender}
                 phone={flow.phone}
                 shownPhone={flow.shownPhone}
                 whatsapp={flow.sender.channel === "whatsapp"}
+                sms={sms}
                 onCancel={onCancel}
                 onSaved={onSaved}
                 onUnavailable={onUnavailable}
                 onNumberRefused={flow.reset}
+                onChangeNumber={() => flow.reset()}
+                onSms={flow.toSms}
             />
         );
     }
 
     const captcha = flow.stage === "captcha";
     return (
-        <form
-            className="grid gap-4"
-            onSubmit={(e) => {
-                e.preventDefault();
-                void flow.submit();
-            }}
-            noValidate
-        >
-            {flow.error ? (
-                <p role="alert" className="text-destructive text-sm">
-                    {flow.error}
-                </p>
-            ) : null}
-            <div className="grid gap-2">
-                <Label htmlFor="new-phone">{label}</Label>
+        <Frame bare={bare} onSend={() => void flow.submit()}>
+            <Field
+                label={label}
+                hint={sendHint(onWhatsapp)}
+                error={captcha ? null : flow.error}
+            >
                 <PhoneInput
-                    id="new-phone"
+                    lockCountry="IN"
                     autoComplete="tel"
-                    defaultCountry="IN"
                     countryLabel="Country code"
                     value={flow.phone}
                     onValueChange={flow.setPhone}
                     disabled={flow.busy || captcha}
-                    aria-invalid={flow.error && !captcha ? true : undefined}
                 />
-                <p className="text-muted-foreground text-xs">
-                    We send a one-time code to it
-                    {onWhatsapp ? " on WhatsApp" : " by SMS"}. It is saved once
-                    you enter the code.
+            </Field>
+            {captcha && flow.error ? (
+                <p role="alert" className="text-destructive text-[12.5px]">
+                    {flow.error}
                 </p>
-            </div>
-            {turnstileSiteKey && !captcha ? (
-                <ChallengeWidget
-                    key={flow.challengeKey}
-                    siteKey={turnstileSiteKey}
-                    onToken={flow.setTurnstileToken}
-                />
             ) : null}
-            <div id={CAPTCHA_ELEMENT_ID} />
-            <div className="flex gap-2">
-                <Button type="submit" disabled={flow.busy}>
-                    {flow.busy
-                        ? "Sending…"
-                        : onWhatsapp && !captcha
-                          ? PHONE_SEND_WORDS.whatsapp
-                          : "Send code"}
+            <PhoneChallenge flow={flow} />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Button
+                    type={bare ? "button" : "submit"}
+                    onClick={bare ? () => void flow.submit() : undefined}
+                    busy={flow.busy}
+                    busyLabel="Sending…"
+                >
+                    {onWhatsapp && !captcha
+                        ? PHONE_SEND_WORDS.whatsapp
+                        : "Send code"}
                 </Button>
+                {onWhatsapp && sms ? (
+                    <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0"
+                        disabled={flow.busy}
+                        onClick={flow.toSms}
+                    >
+                        {PHONE_SEND_WORDS.toSms}
+                    </Button>
+                ) : null}
                 {onCancel ? (
                     <Button
                         type="button"
-                        variant="ghost"
+                        variant="link"
+                        className="h-auto p-0"
                         disabled={flow.busy}
                         onClick={onCancel}
                     >
@@ -362,18 +213,7 @@ export function PhoneChange({
                     </Button>
                 ) : null}
             </div>
-            {onWhatsapp && sms ? (
-                <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto w-fit p-0"
-                    disabled={flow.busy}
-                    onClick={flow.toSms}
-                >
-                    {PHONE_SEND_WORDS.toSms}
-                </Button>
-            ) : null}
-        </form>
+        </Frame>
     );
 }
 
@@ -391,25 +231,33 @@ interface Box {
 
 /** The code for the new number: the API checks it, then saves the phone. */
 function PhoneCode({
+    bare,
     sender,
     phone,
     shownPhone,
     whatsapp,
+    sms,
     onCancel,
     onSaved,
     onUnavailable,
     onNumberRefused,
+    onChangeNumber,
+    onSms,
 }: {
+    bare: boolean;
     sender: OtpSender;
     phone: string;
     shownPhone: string;
     /** The code came on WhatsApp, not by SMS. */
     whatsapp: boolean;
+    sms: boolean;
     onCancel?: () => void;
     onSaved: (saved: Saved) => void;
     onUnavailable?: () => void;
     /** The API refused the number itself (on another account): pick another. */
     onNumberRefused: (why: string) => void;
+    onChangeNumber: () => void;
+    onSms: () => void;
 }) {
     const [code, setCode] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -457,9 +305,7 @@ function PhoneCode({
     async function resend() {
         const result = await sendCode(
             client({ saved: null, refused: null, down: false }),
-            {
-                email: phone,
-            },
+            { email: phone },
         );
         const at = Date.now();
         setNow(at);
@@ -471,41 +317,36 @@ function PhoneCode({
         }
     }
 
+    const link = "h-auto p-0";
     return (
-        <form
-            className="grid gap-4"
-            onSubmit={(e) => {
-                e.preventDefault();
-                void check();
-            }}
-            noValidate
-        >
+        <Frame bare={bare} onSend={() => void check()}>
             <p className="text-muted-foreground text-sm">
                 We sent a {VERIFICATION_OTP_LENGTH}-digit code
-                {whatsapp ? " on WhatsApp" : ""} to {shownPhone}.
+                {whatsapp ? " on WhatsApp" : ""} to{" "}
+                <span className="text-foreground whitespace-nowrap font-medium">
+                    {shownPhone}
+                </span>
+                .
             </p>
-            {error ? (
-                <p role="alert" className="text-destructive text-sm">
-                    {error}
-                </p>
-            ) : null}
-            <div className="grid gap-2">
-                <Label htmlFor="phone-code">Code</Label>
+            <Field label="Code" error={error}>
                 <Input
-                    id="phone-code"
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={VERIFICATION_OTP_LENGTH}
                     value={code}
                     onChange={(e) => setCode(codeDigits(e.target.value))}
                     disabled={checking}
-                    aria-invalid={error ? true : undefined}
                     className="font-mono tracking-[0.4em]"
                 />
-            </div>
-            <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={checking}>
-                    {checking ? "Checking…" : "Save phone"}
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button
+                    type={bare ? "button" : "submit"}
+                    onClick={bare ? () => void check() : undefined}
+                    busy={checking}
+                    busyLabel="Checking…"
+                >
+                    Save phone
                 </Button>
                 <Button
                     type="button"
@@ -515,10 +356,33 @@ function PhoneCode({
                 >
                     {resendLabel(wait)}
                 </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Button
+                    type="button"
+                    variant="link"
+                    className={link}
+                    disabled={checking}
+                    onClick={onChangeNumber}
+                >
+                    {PHONE_WORDS.changeNumber}
+                </Button>
+                {whatsapp && sms ? (
+                    <Button
+                        type="button"
+                        variant="link"
+                        className={link}
+                        disabled={checking}
+                        onClick={onSms}
+                    >
+                        {PHONE_SEND_WORDS.toSms}
+                    </Button>
+                ) : null}
                 {onCancel ? (
                     <Button
                         type="button"
-                        variant="ghost"
+                        variant="link"
+                        className={link}
                         disabled={checking}
                         onClick={onCancel}
                     >
@@ -526,6 +390,6 @@ function PhoneCode({
                     </Button>
                 ) : null}
             </div>
-        </form>
+        </Frame>
     );
 }

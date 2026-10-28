@@ -14,13 +14,13 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Row, Section as Rows } from "@/components/shared/page/settings-rows";
 import { providerName } from "@/lib/payments/providers";
 import {
     LOCATION_SECTIONS,
     PROVIDERS_HREF,
 } from "@/lib/stores/location-readiness";
 import { taxRateSays } from "@/lib/stores/tax-rate";
+import { Row, Section as Rows } from "@saroh/ui/settings-rows";
 
 import type { SectionProps } from "@/components/stores/locations/location-save";
 import {

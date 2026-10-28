@@ -1,7 +1,7 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { formatDay, timeZoneName } from "@/lib/format/datetime";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";

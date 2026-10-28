@@ -1,8 +1,8 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronRight } from "lucide-react";

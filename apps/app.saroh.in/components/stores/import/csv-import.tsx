@@ -21,7 +21,6 @@ import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { PlanWay } from "@/components/billing/plan-way";
-import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
@@ -48,6 +47,7 @@ import type {
     PreviewResult,
     RowIssue,
 } from "@/lib/imports/service";
+import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 /**
  * CSV import (#175) — pick a file, check the mapping, see what will happen,

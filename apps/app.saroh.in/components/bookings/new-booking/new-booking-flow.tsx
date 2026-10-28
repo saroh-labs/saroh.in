@@ -12,11 +12,6 @@ import {
     useCustomerFinder,
 } from "@/components/bookings/sheets/customer-step";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import {
-    useOverlayDirty,
-    useOverlaySubmit,
-    useToastsAboveFoot,
-} from "@/components/shared/forms/overlay-form";
 import { runAction } from "@/lib/api/run-action";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { CustomerPick } from "@/lib/customers/picker";
@@ -54,6 +49,11 @@ import {
     whenWords,
     withWords,
 } from "@/lib/services/new-booking";
+import {
+    useOverlayDirty,
+    useOverlaySubmit,
+    useToastsAboveFoot,
+} from "@saroh/ui/overlay-form";
 
 import { bookedOf, endWords } from "./booked";
 import { CheckStep } from "./check-step";

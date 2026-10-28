@@ -8,6 +8,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NOT_A_MOBILE } from "@/lib/indian-phone";
 import {
     button,
     draw,
@@ -19,7 +20,8 @@ import {
     text,
     type,
 } from "../billing-profiles/test-kit";
-import { PhoneSignIn } from "./phone-sign-in";
+
+import { PhoneSignIn, STALE_WORDS } from "./phone-sign-in";
 
 const api = vi.hoisted(() => ({
     startPhone: vi.fn(),
@@ -216,5 +218,43 @@ describe("signing in with a phone", () => {
             "Too many tries for now. Try again in 20 seconds.",
         );
         expect(text(host)).toContain("Sign in with your phone");
+    });
+
+    it("refuses a number that isn't an Indian mobile before anything is sent", async () => {
+        drawIt();
+        await sendFor("22 4567 8901");
+        expect(api.startPhone).not.toHaveBeenCalled();
+        expect(numberBox().getAttribute("aria-invalid")).toBe("true");
+        expect(numberBox().getAttribute("aria-describedby")).toContain(
+            "phone-error",
+        );
+        expect(text(host)).toContain(NOT_A_MOBILE);
+    });
+
+    it("sends a stale phone to email sign-in, plainly (DEC-198)", async () => {
+        api.startPhone.mockResolvedValue({
+            data: { whatsapp: { resendAfterSeconds: 30 } },
+            error: null,
+        });
+        api.signInWithPhone.mockResolvedValue({
+            data: null,
+            error: {
+                code: "PHONE_STALE",
+                words: "Sign in with your email to keep using this phone.",
+            },
+            retryAfter: null,
+        });
+        drawIt();
+        await sendFor("98450 12345");
+        await act(async () => {
+            type(
+                must(host.querySelector<HTMLInputElement>("input[name=code]")),
+                "654321",
+            );
+            await new Promise((r) => setTimeout(r, 30));
+        });
+        expect(text(host)).toContain(STALE_WORDS.title);
+        await press(button(STALE_WORDS.action, host));
+        expect(onUseEmail).toHaveBeenCalled();
     });
 });

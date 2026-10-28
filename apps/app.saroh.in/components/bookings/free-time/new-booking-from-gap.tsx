@@ -1,7 +1,7 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { formatClock } from "@/lib/format/datetime";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { useState } from "react";
 
 import type { BookingPeople } from "@/lib/services/booking-pay";
@@ -14,8 +14,8 @@ import {
 } from "@/lib/services/free-time";
 import type { Service } from "@/lib/services/service";
 
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import { firstName } from "@/lib/names";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { GapForm } from "./gap-form";
 import type { GapHead, GapTarget } from "./gap-types";
 

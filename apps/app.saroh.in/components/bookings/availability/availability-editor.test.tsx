@@ -41,7 +41,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/lib/staff/actions", () => actions);
 vi.mock("@saroh/ui/toast", () => toast);
 
-import { mayNavigate } from "@/lib/nav/leave-request";
+import { mayNavigate } from "@saroh/ui/lib/leave-request";
 
 import type { EditorProps } from "./hours.test-kit";
 import {

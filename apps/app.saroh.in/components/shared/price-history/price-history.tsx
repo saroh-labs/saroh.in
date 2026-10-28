@@ -5,13 +5,13 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { count } from "@/lib/format/plural";
 import type { PriceHistoryPage } from "@/lib/price-history/words";
 import {
     PRICE_HISTORY_SHORT,
     priceHistoryRows,
 } from "@/lib/price-history/words";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 /**
  * Price history (owner, 12 Oct 2026): what an item has cost, each change

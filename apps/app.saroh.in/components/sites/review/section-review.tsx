@@ -2,9 +2,9 @@
 
 import { formatDate } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";

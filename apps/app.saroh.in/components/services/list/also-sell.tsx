@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
-import { CheckRow } from "@/components/shared/fields/check-row";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";
@@ -13,6 +12,7 @@ import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { alsoSellToast } from "@/lib/services/also-sell";
+import { CheckRow } from "@saroh/ui/check-row";
 
 /**
  * "Also sell" (E12, the "Saroh Bookings" design): Courses and Class packs,

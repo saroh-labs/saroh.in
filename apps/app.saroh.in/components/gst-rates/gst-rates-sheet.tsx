@@ -9,12 +9,6 @@ import {
     GstRatePicker,
     pickerWiring,
 } from "@/components/shared/fields/gst-rate-picker";
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-    useFormSheetDirty,
-} from "@/components/shared/forms/form-sheet";
 import { Refusal } from "@/components/shared/states/refusal";
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { runAction } from "@/lib/api/run-action";
@@ -31,6 +25,12 @@ import {
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import { GST_RATE_NEEDED } from "@/lib/invoices/gst";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+    useFormSheetDirty,
+} from "@saroh/ui/form-sheet";
 
 /** How a save went: nothing more to say, or why it didn't go through. */
 export type RatesSaved = { ok: true } | { ok: false; error: string };

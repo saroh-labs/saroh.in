@@ -5,7 +5,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { callName } from "@/lib/services/call-name";
@@ -32,6 +31,7 @@ import {
 } from "@/lib/services/service-form";
 import type { PanelKey } from "@/lib/services/service-panels";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { TimezoneSelect } from "./timezone-select";
 
 import type { Edit } from "@/components/services/service-editor/fields";

@@ -11,10 +11,10 @@ import {
     reportFailure,
 } from "@/components/billing/plan-refusal";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { makeOrderPayLink } from "@/lib/orders/actions";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
 import { runAction } from "@/lib/api/run-action";

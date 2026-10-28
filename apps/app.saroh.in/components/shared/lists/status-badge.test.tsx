@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 import { OrderStatusFilter } from "@/components/commerce/orders/order-tabs";
 import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
-import { SectionList } from "@/components/shared/page/section-list";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { readOrdersQuery } from "@/lib/orders/list-query";
 import type { Thing } from "@/lib/status/vocabulary";
 import { publication, PUBLICATION_WORD } from "@/lib/status/vocabulary";
+import { SectionList } from "@saroh/ui/section-list";
 import { Chip, chipClass } from "./chip";
 import { StatusBadge } from "./status-badge";
 

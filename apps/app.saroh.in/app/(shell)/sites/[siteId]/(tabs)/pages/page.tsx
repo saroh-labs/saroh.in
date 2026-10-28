@@ -6,7 +6,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { requireSession } from "@/lib/session";
 import {
     describePendingChanges,
@@ -15,6 +14,7 @@ import {
 import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
 import { pageUpdatedIso } from "@/lib/sites/updated";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { Notice } from "@saroh/ui/notice";
 
 export const metadata = { title: "Pages · Website" };

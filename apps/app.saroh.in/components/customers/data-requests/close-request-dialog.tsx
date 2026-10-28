@@ -13,14 +13,11 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { Refusal } from "@/components/shared/states/refusal";
 import { closeDataRequestAction } from "@/lib/customer-workspace/data-request-actions";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import { MAX_CLOSE_REASON } from "@/lib/customer-workspace/data-requests-view";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { useState } from "react";
 
 // The API's rule (`CloseDataRequestDto`), said before it refuses.

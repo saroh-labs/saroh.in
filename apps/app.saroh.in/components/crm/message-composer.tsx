@@ -7,16 +7,13 @@ import { showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import {
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import { sendFailureWords } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
+import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { ComposerNotice } from "./composer-notice";

@@ -81,7 +81,7 @@ describe("Add your phone", () => {
     it("asks for a phone with no Cancel and no way to skip, and offers Sign out", () => {
         drawIt();
         expect(text(host)).toContain(ADD_PHONE_WORDS.title);
-        expect(host.querySelector("#new-phone")).not.toBeNull();
+        expect(host.querySelector("input[type=tel]")).not.toBeNull();
         expect(text(host)).not.toContain("Cancel");
         expect(text(host)).not.toContain(ADD_PHONE_WORDS.goOn);
         expect(button(ADD_PHONE_WORDS.signOut, host)).toBeTruthy();
@@ -90,12 +90,16 @@ describe("Add your phone", () => {
     it("goes on to where sign-in was going once the API saved the phone", async () => {
         drawIt();
         type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
+            must(host.querySelector<HTMLInputElement>("input[type=tel]")),
             "9845012345",
         );
         await submitForm();
         type(
-            must(host.querySelector<HTMLInputElement>("#phone-code")),
+            must(
+                host.querySelector<HTMLInputElement>(
+                    "input[autocomplete=one-time-code]",
+                ),
+            ),
             "123456",
         );
         await submitForm();
@@ -114,12 +118,16 @@ describe("Add your phone", () => {
         });
         drawIt();
         type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
+            must(host.querySelector<HTMLInputElement>("input[type=tel]")),
             "9845012345",
         );
         await submitForm();
         type(
-            must(host.querySelector<HTMLInputElement>("#phone-code")),
+            must(
+                host.querySelector<HTMLInputElement>(
+                    "input[autocomplete=one-time-code]",
+                ),
+            ),
             "123456",
         );
         await submitForm();
@@ -135,7 +143,7 @@ describe("Add your phone", () => {
         });
         drawIt();
         type(
-            must(host.querySelector<HTMLInputElement>("#new-phone")),
+            must(host.querySelector<HTMLInputElement>("input[type=tel]")),
             "9845012345",
         );
         await submitForm();

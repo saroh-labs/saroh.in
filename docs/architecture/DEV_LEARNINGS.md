@@ -6081,3 +6081,15 @@ only `body_1` and `button_1`; `MESSAGING_SUPPORT_PHONE` is gone.
 **Rule**: sign-in codes use the code-and-button authentication shape only. Before
 spending more test sends on a failing template, get WhatsApp's error code.
 **Category**: integrations · messaging
+## Moving files under a running `next dev` 500s every page
+
+**Symptom**: after `git mv`-ing app.saroh.in's settings pieces into
+`@saroh/ui` (DEC-199), every page of the running dev server answered 500 with
+`ENOENT … components/shared/forms/form-sheet.test.tsx` from Tailwind's
+`resolveChangedFiles`; restarting the server alone didn't help.
+**Cause**: Turbopack's persistent cache under `.next/` kept Tailwind's list of
+content files, including the moved ones.
+**Fix**: stop the app, delete its `.next/`, start it again.
+**Rule**: after moving or deleting source files a dev server scans, clear that
+app's `.next/` before trusting a 500.
+**Category**: tooling · local dev

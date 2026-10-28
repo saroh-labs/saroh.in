@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";

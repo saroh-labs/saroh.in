@@ -6,8 +6,6 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { NameDialog } from "@/components/shared/forms/name-dialog";
 import {
     createPostCategory,
@@ -16,6 +14,8 @@ import {
 } from "@/lib/content/actions";
 import { CATEGORIES_PARAM } from "@/lib/content/categories-href";
 import type { PostCategory } from "@/lib/content/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { CategoryRow } from "./category-row";
 

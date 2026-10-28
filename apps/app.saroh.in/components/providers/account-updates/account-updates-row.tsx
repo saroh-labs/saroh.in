@@ -6,10 +6,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Row } from "@/components/shared/page/settings-rows";
 import { runAction } from "@/lib/api/run-action";
 import type {
     AccountUpdates,
@@ -24,6 +21,9 @@ import {
     accountUpdatesSaved,
 } from "@/lib/communications/account-updates";
 import { setAccountUpdates } from "@/lib/communications/account-updates-actions";
+import { RadioCards } from "@saroh/ui/choice-group";
+import { FormSheet } from "@saroh/ui/form-sheet";
+import { Row } from "@saroh/ui/settings-rows";
 
 /** The row the sheet is opened from; its Edit takes the keyboard back. */
 export const ACCOUNT_UPDATES_ROW_ID = "account-updates";

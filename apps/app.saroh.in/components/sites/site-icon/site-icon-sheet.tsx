@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { SiteDetail, SiteIconSaved } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
 import {
@@ -15,6 +14,7 @@ import {
     siteIconFileProblem,
     siteIconShapeNote,
 } from "@/lib/sites/site-icon";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { NOTE } from "@/components/sites/settings/settings-sheet";
 import { SiteIconImage } from "./site-icon-summary";

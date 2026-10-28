@@ -9,14 +9,14 @@ import { useState } from "react";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { InvoiceRef } from "@/components/invoices/details/invoice-actions";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import type { HeldResult } from "@/components/shared/undo/use-hold";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { issueInvoice, setInvoiceLineRates } from "@/lib/invoices/actions";
 import { remindWithLink, sendWithLink } from "@/lib/invoices/link-actions";
 import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
 import type { InvoiceSend } from "@/lib/invoices/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * Sending an invoice with its payment link, or a reminder (D17).

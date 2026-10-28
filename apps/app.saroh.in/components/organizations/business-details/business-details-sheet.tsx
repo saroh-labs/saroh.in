@@ -17,11 +17,6 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { GstinGuide } from "@/components/organizations/tax/gstin-guide";
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { Refusal } from "@/components/shared/states/refusal";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
@@ -40,6 +35,7 @@ import {
     readBusinessDetails,
     saveOrganizationSettings,
 } from "@/lib/organizations/settings-actions";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { RegisteredAddressFields } from "./registered-address-fields";
 import { registeredAddressShape } from "./registered-address-shape";
 

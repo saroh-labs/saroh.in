@@ -1,5 +1,5 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { rememberedPageSize } from "@/lib/paging/remembered";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { redirect } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";

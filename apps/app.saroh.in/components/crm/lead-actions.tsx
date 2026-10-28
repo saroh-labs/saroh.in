@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { ActivityComposer } from "./activity-composer";
 import { ComposerNotice } from "./composer-notice";

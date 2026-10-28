@@ -6,13 +6,13 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { heldStock } from "@/lib/stores/closing";
 import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import {
     closeStorefront,
     updateStorefront,
 } from "@/lib/stores/storefront-actions";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { runAction } from "@/lib/api/run-action";
 import type { SectionProps } from "./location-save";

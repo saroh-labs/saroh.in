@@ -8,7 +8,7 @@ import type { LocationType } from "@/lib/services/service";
 import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
 import { HELP } from "@/components/services/service-editor/fields";
-import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field } from "@saroh/ui/field";
 
 const WHERE: [LocationType, string][] = [

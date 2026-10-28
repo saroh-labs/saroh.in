@@ -6,8 +6,6 @@ import { PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import type { TrackingControl } from "@/lib/products/tracking";
@@ -18,6 +16,8 @@ import {
     TRACKING_ON_SAID,
     TRACKING_STILL_ON,
 } from "@/lib/products/tracking";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * The Stock section's Track stock switch (#515), after the Editor design:

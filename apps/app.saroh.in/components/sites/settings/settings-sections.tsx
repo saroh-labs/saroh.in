@@ -22,8 +22,8 @@ import {
 } from "@/lib/sites/settings-page";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { SectionList } from "@/components/shared/page/section-list";
 import { Label } from "@saroh/ui/label";
+import { SectionList } from "@saroh/ui/section-list";
 import { ShareChecklist } from "./share-checklist";
 
 /**

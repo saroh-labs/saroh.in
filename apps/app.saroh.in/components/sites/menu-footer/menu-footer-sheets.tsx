@@ -8,13 +8,13 @@ import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type {
     SiteFooter,
     SiteNavigationItem,
     SitePage,
 } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { NOTE } from "@/components/sites/settings/settings-sheet";
 import { Segmented } from "@saroh/ui/segmented";

@@ -1,5 +1,5 @@
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { Card } from "@saroh/ui/card";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 

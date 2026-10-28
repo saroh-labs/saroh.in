@@ -1,8 +1,8 @@
 "use client";
 
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";

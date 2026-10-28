@@ -4,8 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import {
     AFTER_LEAVING_URL,
     LEAVE_FAILED,
@@ -14,6 +12,8 @@ import {
     onlyOwnerLine,
 } from "@/lib/organizations/leave-business";
 import { leaveBusiness } from "@/lib/organizations/member-actions";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * "Leave {business}" (UX audit, 10 Oct 2026): the way out of a business,

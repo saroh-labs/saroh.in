@@ -4,12 +4,6 @@ import { plural } from "@/lib/format/plural";
 import { useState } from "react";
 
 import {
-    Absent,
-    Group,
-    Row,
-    Section,
-} from "@/components/shared/page/settings-rows";
-import {
     updateSiteFooter,
     updateSiteNavigation,
     updateSiteSettings,
@@ -22,6 +16,7 @@ import type {
 import { SETTINGS_ROW_ID } from "@/lib/sites/settings-edit";
 import { automaticMenu } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import { Absent, Group, Row, Section } from "@saroh/ui/settings-rows";
 
 import { EditAction } from "@/components/sites/settings/edit-actions";
 import type { SettingsSave } from "@/components/sites/settings/use-settings-save";

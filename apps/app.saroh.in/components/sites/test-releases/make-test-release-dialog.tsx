@@ -16,10 +16,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { LinkBox } from "@/components/sites/test-releases/link-box";
 import type {
     CreatedTestReleaseLink,
@@ -30,6 +26,7 @@ import {
     LIVE_OUTSIDE_RELEASE,
 } from "@/lib/sites/test-releases";
 import { createTestRelease } from "@/lib/sites/test-releases-actions";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 
 // The API's limits (`CreateTestReleaseDto`), said before it refuses.
 const schema = z.object({

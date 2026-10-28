@@ -7,7 +7,6 @@ import { useState } from "react";
 
 import { RemoveDetailsDialog } from "@/components/customers/more-actions/remove-details-dialog";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
@@ -16,6 +15,7 @@ import {
     requesterLabel,
     STATUS_WORDS,
 } from "@/lib/customer-workspace/data-requests-view";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { CloseRequestDialog } from "./close-request-dialog";
 

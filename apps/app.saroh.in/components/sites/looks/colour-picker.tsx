@@ -4,8 +4,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { StyleSwatch } from "@/lib/sites/style";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { BrandPicker, PickerFoot, PickerHeader } from "./brand-picker";
 
 /**

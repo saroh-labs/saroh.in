@@ -1,10 +1,10 @@
 "use client";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { TextLink } from "@saroh/ui/text-link";
 import { Lock, Plus } from "lucide-react";
 import { useMemo, useState } from "react";

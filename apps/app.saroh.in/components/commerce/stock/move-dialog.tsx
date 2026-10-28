@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";

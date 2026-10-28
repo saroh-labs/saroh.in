@@ -1,5 +1,5 @@
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Badge } from "@saroh/ui/badge";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
 import Link from "next/link";

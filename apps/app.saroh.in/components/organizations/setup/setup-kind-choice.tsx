@@ -3,9 +3,9 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 
 /**
  * "What are you setting up?" (DEC-070): three full-width radio cards, one

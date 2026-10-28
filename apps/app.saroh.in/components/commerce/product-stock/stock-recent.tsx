@@ -1,8 +1,8 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatDateTime, viewerTimeZone } from "@/lib/format/datetime";
 import { Card } from "@saroh/ui/card";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";

@@ -23,7 +23,6 @@ import { mayChangeWho } from "@/components/bookings/sheets/change-who";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { formatClockRange, formatDay } from "@/lib/format/datetime";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import { readBookingPerson } from "@/lib/services/actions";
 import type { Block, DiaryState } from "@/lib/services/diary";
 import {
@@ -34,6 +33,7 @@ import {
     whoFor,
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import { STATE_TONE } from "@/components/bookings/calendar/parts";
 import { ChooseStep, MoveStep } from "./quick-look-change";

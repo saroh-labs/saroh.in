@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { withoutArrival } from "@/lib/customers/prefill";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { LauncherContext, useNewBookingLauncher } from "./launcher";
 import { NewBookingFlow } from "./new-booking-flow";

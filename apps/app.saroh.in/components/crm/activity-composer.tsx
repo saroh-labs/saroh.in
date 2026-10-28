@@ -6,12 +6,9 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import {
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
+import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /**
  * Note composer for a lead (S3-007), drawn inside the lead's "Add note"

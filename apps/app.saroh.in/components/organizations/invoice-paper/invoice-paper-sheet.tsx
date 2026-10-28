@@ -4,7 +4,6 @@ import { paperColourOf, paperStyleOf } from "@saroh/block-contract";
 import { useState } from "react";
 
 import { PaperLookFields } from "@/components/invoices/paper-editor/paper-look-fields";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { Refusal } from "@/components/shared/states/refusal";
 import { runAction } from "@/lib/api/run-action";
 import type { PaperDefault } from "@/lib/invoices/paper-look";
@@ -12,6 +11,7 @@ import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /** The business's default look as saved: Classic in ink until chosen. */
 export function savedPaper(settings: OrganizationSettings): PaperDefault {

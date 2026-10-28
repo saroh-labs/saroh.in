@@ -9,8 +9,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { InvoiceRef } from "@/components/invoices/details/invoice-actions";
-import { RadioCards } from "@/components/shared/fields/choice-group";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
@@ -31,6 +29,8 @@ import {
     CANCEL_OR_CORRECT,
     PAID_IN_PART_NO_CANCEL,
 } from "@/lib/invoices/words";
+import { RadioCards } from "@saroh/ui/choice-group";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * The four ways out of an issued invoice. A GST-registered business never

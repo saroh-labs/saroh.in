@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
@@ -26,6 +25,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<

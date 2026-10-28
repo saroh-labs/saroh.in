@@ -7,10 +7,6 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import {
-    ChoiceGroup,
-    RadioCards,
-} from "@/components/shared/fields/choice-group";
 import type { PaperDefault } from "@/lib/invoices/paper-look";
 import {
     colourMoved,
@@ -19,6 +15,7 @@ import {
     swatchName,
     typedColour,
 } from "@/lib/invoices/paper-look";
+import { ChoiceGroup, RadioCards } from "@saroh/ui/choice-group";
 
 /**
  * Style and colour (DEC-173): Classic, Band or Compact, the board's

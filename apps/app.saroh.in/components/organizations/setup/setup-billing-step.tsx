@@ -15,7 +15,6 @@ import { Check } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type {
     BillingField,
@@ -23,6 +22,7 @@ import type {
 } from "@/lib/organizations/setup-billing";
 import { NEW_PROFILE } from "@/lib/organizations/setup-billing";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 
 const STATES = [{ value: "", label: "Not set" }, ...GST_STATES];
 

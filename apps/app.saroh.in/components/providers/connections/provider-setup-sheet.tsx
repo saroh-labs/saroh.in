@@ -15,13 +15,6 @@ import {
     reportFailure,
 } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import {
     connectCommsProvider,
     connectPaymentProvider,
@@ -42,7 +35,10 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { EmptyState } from "@saroh/ui/data-state";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { runAction } from "@/lib/api/run-action";

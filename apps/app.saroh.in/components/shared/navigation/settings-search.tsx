@@ -12,9 +12,9 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
+import { mayNavigate } from "@saroh/ui/lib/leave-request";
 import { Tip } from "@saroh/ui/tooltip";
 
 /**

@@ -1,7 +1,6 @@
 "use client";
 
 import { plural } from "@/lib/format/plural";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -17,6 +16,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
@@ -29,11 +29,6 @@ import type { Resolver } from "react-hook-form";
 import { useForm } from "react-hook-form";
 
 import { GstFields } from "@/components/services/service-editor/gst-fields";
-import {
-    lostChanges,
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseFormValues } from "@/lib/courses/course-form";
@@ -50,6 +45,7 @@ import type { GstAsk } from "@/lib/gst/item-words";
 import { addedGst, addedGstWords, NOT_ASKED } from "@/lib/gst/item-words";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { lostChanges, lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 type Values = CourseFormValues;
 
