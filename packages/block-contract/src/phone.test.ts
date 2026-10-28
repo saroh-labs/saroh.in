@@ -147,6 +147,8 @@ describe("DEC-198", () => {
 
     it("keeps the typed grouping only for + and digits", () => {
         expect(phoneLabel("+91 98765 43210")).toBe("+91 98765 43210");
+        // Stored before the +91 rule tightened (sample businesses): still grouped.
+        expect(phoneLabel("+910000000005")).toBe("+91 00000 00005");
         expect(phoneLabel("+(91) 98765 43210")).toBe("+91 98765 43210");
         expect(phoneLabel("+91-98765 43210")).toBe("+91 98765 43210");
     });

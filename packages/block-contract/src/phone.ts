@@ -517,6 +517,10 @@ export function phoneLabel(stored: string | null | undefined): string {
     const typed = stored.trim();
     const result = normalisePhoneNumber(typed);
     const e164 = "phone" in result ? result.phone : null;
+    // A stored +91 number the rule now refuses (+910…) still reads grouped.
+    if (!e164 && /^\+91\d{10}$/.test(typed)) {
+        return `+91 ${typed.slice(3, 8)} ${typed.slice(8)}`;
+    }
     if (!e164) return typed;
     // The typed grouping, only when it is a + and digits in groups.
     if (/^\+[\d ]+$/.test(typed) && typed.includes(" ")) return typed;
