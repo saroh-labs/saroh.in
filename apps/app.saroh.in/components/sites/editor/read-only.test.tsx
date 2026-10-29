@@ -18,6 +18,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as actions from "@/lib/sites/actions";
 import * as prefs from "@/lib/sites/editor-prefs";
 import type {
     ReviewState,
@@ -71,6 +72,8 @@ vi.mock("@/lib/sites/actions", () => ({
     ),
     listComments: vi.fn(() => Promise.resolve([])),
     listPreviewLinks: vi.fn(() => Promise.resolve([])),
+    // Reading a page is what a Reviewer does (DEC-200, U9): not a write.
+    recordPageView: vi.fn(() => Promise.resolve({ ok: false })),
 }));
 vi.mock("@/lib/sites/test-releases-actions", () => ({
     ...releaseWrites,
@@ -281,9 +284,14 @@ const ALLOWED: RegExp[] = [
     /^Go to section$/,
     /^(Show|Hide) settled$/,
     /^(Show|Hide) \d+ settled notes?$/,
-    // Writing a note is the Reviewer's job (`site:comment`).
-    /^(Add a note|Reply)$/,
-    /^Add a note on this block$/,
+    // Writing a note is the Reviewer's job (`site:comment`), and changing
+    // their own (DEC-200, U3).
+    /^Add a note on .+$/,
+    /^(Edit|Delete) your note$/,
+    // The verdict, in the top bar (`site:approve`, DEC-200 U4); the spy
+    // below proves none of these is pressed by the scenes here.
+    /^(Ask for changes|Approve|Change your review)$/,
+    /^(See the notes|Show all|Try again)$/,
     // Test releases: the list, and each one's own review page (a link).
     /^Test releases( · )?\d*$/,
     /^Show (all \d+|fewer)$/,
@@ -510,6 +518,8 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
     it("the selected block's settings, readable, with a way to note it", () => {
         render();
         click(button("Our story"));
+        // A Reviewer opens on Feedback (DEC-200, U4); Block is a tab away.
+        click(button("Block"));
         expectReadOnly("desk, Block tab, hidden block selected");
         expect($("aside[aria-label=Inspector]")?.textContent ?? "").toContain(
             "Hidden when published",
@@ -533,8 +543,10 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         expect(has("Mark settled")).toBe(false);
         click(button(/^Whole site/));
         expectReadOnly("desk, Feedback, whole site");
-        expect(has(/^Approve/)).toBe(false);
-        expect(has(/^Ask for changes/)).toBe(false);
+        // The verdict is the top bar's alone (U4), never in the panel.
+        const panel = $("aside[aria-label=Inspector]")?.textContent ?? "";
+        expect(panel).not.toMatch(/Approve|Ask for changes/);
+        expect(has("Approve")).toBe(true);
         expect(has(/preview link/i)).toBe(false);
         click(button("Show settled"));
         expectReadOnly("desk, Feedback, whole site, settled shown");
@@ -643,6 +655,149 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
     });
 });
 
+describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
+    const flush = () =>
+        act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+    const inspector = () => $("aside[aria-label=Inspector]")?.textContent ?? "";
+
+    it("opens on Feedback, the tag and the verdict in the bar, and reads the page once", async () => {
+        render();
+        await flush();
+        expect(button(/^Feedback/).getAttribute("aria-selected")).toBe("true");
+        expect($("[data-reviewing]")?.textContent).toBe(
+            "Reviewing · you can’t change anything",
+        );
+        expect(has("Ask for changes")).toBe(true);
+        expect(has("Approve")).toBe(true);
+        expect(actions.recordPageView).toHaveBeenCalledTimes(1);
+        expect(actions.recordPageView).toHaveBeenCalledWith(
+            expect.stringMatching(/^site-/),
+            "p-home",
+        );
+        // The composer names the block.
+        expect(document.querySelector("label")?.textContent).toBeDefined();
+        expect(document.body.textContent).toContain("Add a note on Hero");
+    });
+
+    it("the request line, from the review state", () => {
+        render({
+            initialReview: {
+                ...REVIEW,
+                request: { by: "Asha Example", at: "2026-10-28T09:00:00.000Z" },
+            },
+        });
+        expect(inspector()).toContain("Asha Example asked you to review");
+    });
+
+    it("your own open note: Edit and Delete, and You; locked after an approval", () => {
+        render({
+            initialComments: [
+                { ...NOTE, mine: true, editable: true },
+                {
+                    ...NOTE,
+                    id: "c3",
+                    body: "Before the approval.",
+                    mine: true,
+                    editable: false,
+                },
+            ] as SiteCommentView[],
+        });
+        expect(has("Edit your note")).toBe(true);
+        expect(has("Delete your note")).toBe(true);
+        expect(
+            Array.from(document.querySelectorAll("button")).filter(
+                (b) => b.getAttribute("aria-label") === "Edit your note",
+            ),
+        ).toHaveLength(1);
+        expect(inspector()).toContain("Kept with the approved review");
+        expect(inspector()).toContain("You");
+        expectReadOnly("desk, own notes");
+    });
+
+    it("a note in Whole site selects its block, with its notes", () => {
+        render();
+        click(button("Our story"));
+        click(button(/^Whole site/));
+        click(button("Go to section"));
+        // Back on This block, with the first block's note (it is on s1).
+        expect(inspector()).toContain("Say the Saturday cut-off too.");
+        expect(inspector()).not.toContain("Nothing said about this");
+        expect(inspector()).toContain("Pinned to this block");
+    });
+
+    it("a note on another page opens that page with its block selected", () => {
+        const onAbout = { ...NOTE, pageId: "p-about", pageTitle: "About" };
+        const first = render({ initialComments: [onAbout] });
+        click(button(/^Whole site/));
+        click(button("Go to section"));
+        // The router takes us there; the About page's editor then opens,
+        // a new mount (the page keys it on the page).
+        act(() => root.unmount());
+        root = createRoot(host);
+        render({
+            siteId: first.siteId,
+            pageId: "p-about",
+            initialComments: [onAbout],
+            initialSections: [SECTIONS[1], { ...SECTIONS[0], key: "s1" }],
+        });
+        expect(inspector()).toContain("Say the Saturday cut-off too.");
+        expect(inspector()).toContain("Pinned to this block");
+    });
+
+    it("See the notes opens Whole site, settled only", () => {
+        render({
+            initialReview: {
+                ...REVIEW,
+                settledForYou: { count: 1, at: "2026-10-28T12:00:00.000Z" },
+            },
+        });
+        click(button("See the notes"));
+        expect(inspector()).toContain("Settled notes");
+        expect(inspector()).toContain("Fixed the phone number.");
+        expect(inspector()).not.toContain("Say the Saturday cut-off too.");
+        click(button("Show all"));
+        expect(inspector()).toContain("Say the Saturday cut-off too.");
+    });
+
+    it("couldn't load keeps an unsent note through Try again", async () => {
+        // Opening the page records it and re-reads; the re-read fails.
+        vi.mocked(actions.recordPageView).mockResolvedValueOnce({
+            ok: true,
+            data: { recorded: true },
+        });
+        vi.mocked(actions.getReviewState).mockRejectedValueOnce(
+            new Error("offline"),
+        );
+        render();
+        await flush();
+        expect(inspector()).toContain("The draft couldn't be loaded.");
+        const field = document.querySelector<HTMLTextAreaElement>(
+            "#block-feedback-reply",
+        );
+        if (!field) throw new Error("no composer");
+        act(() => {
+            Reflect.set(
+                HTMLTextAreaElement.prototype,
+                "value",
+                "Unsent words",
+                field,
+            );
+            field.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        click(button("Try again"));
+        await flush();
+        expect(inspector()).not.toContain("couldn't be loaded");
+        expect(
+            document.querySelector<HTMLTextAreaElement>("#block-feedback-reply")
+                ?.value,
+        ).toBe("Unsent words");
+    });
+});
+
 describe("the same editor, editable (owner regression)", () => {
     it("keeps every write control", () => {
         render({ readOnly: false, canUpdateSite: true, canPublish: true });
@@ -658,6 +813,11 @@ describe("the same editor, editable (owner regression)", () => {
         expect($("[draggable=true]")).not.toBeNull();
         // The guard sees them: this is what fails if one leaks.
         expect(writeControls().length).toBeGreaterThan(0);
+        // No reviewer's tag or verdict for the owner (DEC-200, U4).
+        expect($("[data-reviewing]")).toBeNull();
+        expect(has("Approve")).toBe(false);
+        expect(has("Ask for changes")).toBe(false);
+        expect(actions.recordPageView).not.toHaveBeenCalled();
     });
 });
 

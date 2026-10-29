@@ -3,8 +3,9 @@
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -102,6 +103,7 @@ export function EditorTopBar({
     sheet = null,
     setSheet,
     sheetHost = null,
+    reviewerVerdict,
 }: {
     siteId: string;
     siteName: string;
@@ -160,6 +162,8 @@ export function EditorTopBar({
     setSheet?: (next: SheetName) => void;
     /** The editor's body, where a phone's sheets are laid. */
     sheetHost?: HTMLElement | null;
+    /** A Reviewer's Ask for changes and Approve (DEC-200), desk and narrow. */
+    reviewerVerdict?: ReactNode;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const zone = useBusinessZone();
@@ -451,10 +455,22 @@ export function EditorTopBar({
                     </PopoverContent>
                 </Popover>
                 {readout}
+                {readOnly ? (
+                    <Badge
+                        variant="info"
+                        size="sm"
+                        data-reviewing=""
+                        className="ml-1 shrink-0 gap-1.5"
+                    >
+                        <Eye aria-hidden className="size-3" />
+                        Reviewing · you can&rsquo;t change anything
+                    </Badge>
+                ) : null}
             </nav>
 
             <TopBarActions
                 {...actions}
+                verdict={reviewerVerdict}
                 // Tablet width (UX-035): the secondary actions fold into
                 // "More" so Publish never runs off the bar.
                 compact={layout === "narrow"}

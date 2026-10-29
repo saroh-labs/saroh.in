@@ -93,8 +93,11 @@ export interface TestReleaseActions {
  */
 export function TopBarActions({
     compact = false,
+    verdict,
     ...p
 }: TopBarActionProps & {
+    /** A Reviewer's verdict (DEC-200) where Share and Publish would be. */
+    verdict?: ReactNode;
     /**
      * Narrow (UX-035): Preview, Feedback and Test release fold into "More",
      * so Publish stays on screen at tablet width.
@@ -174,7 +177,7 @@ export function TopBarActions({
              */}
             {readOnly ? null : <ShareControl {...p} />}
 
-            {readOnly ? null : <PublishButton {...p} />}
+            {readOnly ? verdict : <PublishButton {...p} />}
         </div>
     );
 }

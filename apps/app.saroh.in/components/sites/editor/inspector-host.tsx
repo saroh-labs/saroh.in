@@ -14,6 +14,7 @@ import type {
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
 import { ReviewPanel } from "@/components/sites/review/review-panel";
+import { ReviewerStatus } from "@/components/sites/review/reviewer-status";
 import type {
     Flag,
     ReviewState,
@@ -53,6 +54,7 @@ export function InspectorHost({
     openNotes,
     notesByKey,
     refreshReview,
+    loadFailed = false,
     jumpToNote,
     style,
     styleOptions,
@@ -82,6 +84,8 @@ export function InspectorHost({
     openNotes: number;
     notesByKey: Map<string, number>;
     refreshReview: () => Promise<void>;
+    /** The last re-read of notes and verdict failed (RVD4). */
+    loadFailed?: boolean;
     jumpToNote: (pageId: string, sectionKey: string) => void;
     style: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -102,10 +106,26 @@ export function InspectorHost({
     const services = useServicesForPicker();
     /*
      * Read-only (DEC-200): no settling, no verdict and no preview links in
-     * the panel. The verdict is the top bar's (U4); `readOnly` is the hook
-     * for it.
+     * the panel; the verdict is the top bar's (U4). Above the notes, where
+     * the review stands for this Reviewer.
      */
     const readOnly = useEditorReadOnly();
+    /** "See the notes": the whole site, settled notes only (RVD4). */
+    const [settledOnly, setSettledOnly] = useState(false);
+    const status =
+        readOnly && inspector === "feedback" ? (
+            <div className="px-4 pt-4">
+                <ReviewerStatus
+                    review={review}
+                    loadFailed={loadFailed}
+                    onRetry={() => void refreshReview()}
+                    onSeeSettled={() => {
+                        setSettledOnly(true);
+                        setFeedbackScope("site");
+                    }}
+                />
+            </div>
+        ) : null;
 
     return (
         <aside aria-label="Inspector" className="flex min-h-0 flex-col">
@@ -155,6 +175,7 @@ export function InspectorHost({
                         />
                     </div>
                 ) : null}
+                {status}
                 {inspector === "feedback" &&
                 active &&
                 feedbackScope === "block" ? (
@@ -169,6 +190,7 @@ export function InspectorHost({
                         comments={comments}
                         onChanged={refreshReview}
                         canSettle={!readOnly}
+                        reviewer={readOnly}
                     />
                 ) : inspector === "feedback" ? (
                     <ReviewPanel
@@ -177,13 +199,19 @@ export function InspectorHost({
                         comments={comments}
                         review={review}
                         {...(readOnly
-                            ? { can: READ_ONLY_REVIEW, previewLinks: false }
+                            ? {
+                                  can: READ_ONLY_REVIEW,
+                                  previewLinks: false,
+                                  settledOnly,
+                                  onShowAll: () => setSettledOnly(false),
+                              }
                             : {})}
                         onChanged={() => void refreshReview()}
                         onJump={(jumpPageId, sectionKey) => {
                             jumpToNote(jumpPageId, sectionKey);
                             // Arrived at the block: show its notes.
                             setFeedbackScope("block");
+                            setSettledOnly(false);
                         }}
                     />
                 ) : selectedChrome ? (

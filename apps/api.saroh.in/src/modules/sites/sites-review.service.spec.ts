@@ -1050,3 +1050,72 @@ describe("pages read (DEC-200, U9)", () => {
         expect(viewCount.mock.calls[0][0].where).not.toHaveProperty("viewedAt");
     });
 });
+
+describe("SitesService.getReviewState — the reviewer's own side (DEC-200, U4)", () => {
+    const asked = new Date("2026-10-28T09:00:00Z");
+    const spoke = new Date("2026-10-28T12:00:00Z");
+    const noted = new Date("2026-10-28T11:00:00Z");
+    const settledAt = new Date("2026-10-30T09:00:00Z");
+
+    beforeEach(() => {
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "REQUESTED", byUserId: "owner" }),
+        );
+        commentCount.mockResolvedValue(0);
+        approvalFindFirst.mockImplementation(
+            ({ where }: { where: { outcome?: unknown; byUserId?: string } }) =>
+                Promise.resolve(
+                    where.outcome === "REQUESTED"
+                        ? {
+                              byUserId: "owner",
+                              createdAt: asked,
+                              by: {
+                                  name: "Asha Example",
+                                  email: "a@example.com",
+                              },
+                          }
+                        : where.byUserId === "reviewer"
+                          ? { outcome: "CHANGES_REQUESTED", createdAt: spoke }
+                          : null,
+                ),
+        );
+        commentFindFirst.mockResolvedValue({ createdAt: noted });
+        commentFindMany.mockResolvedValue([
+            { resolvedAt: settledAt },
+            { resolvedAt: new Date("2026-10-29T09:00:00Z") },
+        ]);
+    });
+
+    it("says who asked, the reviewer's verdict, and notes settled since they last spoke", async () => {
+        const state = await service.getReviewState(
+            ctx({ userId: "reviewer", role: "REVIEWER" }),
+            "site_1",
+        );
+        expect(state.request).toEqual({ by: "Asha Example", at: asked });
+        expect(state.yourVerdict).toEqual({
+            outcome: "CHANGES_REQUESTED",
+            at: spoke,
+        });
+        expect(state.settledForYou).toEqual({ count: 2, at: settledAt });
+        // "Since they last spoke": the later of their newest note and verdict.
+        const where = commentFindMany.mock.calls[0][0].where;
+        expect(where.resolvedAt).toEqual({ gt: spoke });
+        expect(where.authorUserId).toBe("reviewer");
+    });
+
+    it("tells the owner nothing about settled notes: they settle them", async () => {
+        const state = await service.getReviewState(ctx(), "site_1");
+        expect(state.settledForYou).toBeNull();
+        expect(commentFindMany).not.toHaveBeenCalled();
+    });
+
+    it("has no request when nobody ever asked", async () => {
+        approvalFindFirst.mockResolvedValue(null);
+        const state = await service.getReviewState(
+            ctx({ userId: "reviewer", role: "REVIEWER" }),
+            "site_1",
+        );
+        expect(state.request).toBeNull();
+        expect(state.yourVerdict).toBeNull();
+    });
+});

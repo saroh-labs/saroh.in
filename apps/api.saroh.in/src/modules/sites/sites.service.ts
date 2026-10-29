@@ -191,6 +191,8 @@ export interface CommentView {
      * after the latest approval of its target, on a release still open.
      */
     editable: boolean;
+    /** The caller wrote it (DEC-200, U4): "You", and the locked line. */
+    mine: boolean;
 }
 
 /** Why a note can't be changed, worded for the person trying (R13). */
@@ -248,6 +250,19 @@ export interface ReviewState {
      * read 3 of 4 pages". Null on a test release's review.
      */
     pagesRead: { read: number; total: number } | null;
+    /**
+     * The newest request for a review, open or not (DEC-200, U4): who asked
+     * and when, for "Asha asked you to review". Null when nobody ever has.
+     */
+    request: { by: string; at: Date } | null;
+    /** The caller's own latest verdict on the draft; null on a release. */
+    yourVerdict: { outcome: string; at: Date } | null;
+    /**
+     * The caller's notes settled since they last spoke (their newest note
+     * or verdict), for a Reviewer coming back. Null when none, on a
+     * release, or for someone who settles notes themselves.
+     */
+    settledForYou: { count: number; at: Date } | null;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -2527,6 +2542,7 @@ export class SitesService {
                 c.author.id === ctx.userId &&
                 c.resolvedAt === null &&
                 (!approvedAt || c.createdAt > approvedAt),
+            mine: c.author.id === ctx.userId,
         }));
     }
 
@@ -2984,7 +3000,7 @@ export class SitesService {
                   ],
               }
             : { testReleaseId: null };
-        const [latest, standing, openNotes, newestAsk, pagesRead] =
+        const [latest, standing, openNotes, newestAsk, reader] =
             await Promise.all([
                 prisma.siteApproval.findFirst({
                     where: {
@@ -3039,10 +3055,14 @@ export class SitesService {
                         ...scope,
                     },
                     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                    select: { byUserId: true },
+                    select: {
+                        byUserId: true,
+                        createdAt: true,
+                        by: { select: { name: true, email: true } },
+                    },
                 }),
                 // Last, so the reads above keep their order.
-                release ? null : this.pagesReadSinceVerdict(ctx, siteId),
+                release ? null : this.readerState(ctx, siteId),
             ]);
         const pending =
             standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
@@ -3058,7 +3078,15 @@ export class SitesService {
             pending,
             askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
-            pagesRead,
+            pagesRead: reader?.pagesRead ?? null,
+            request: newestAsk
+                ? {
+                      by: newestAsk.by.name ?? newestAsk.by.email,
+                      at: newestAsk.createdAt,
+                  }
+                : null,
+            yourVerdict: reader?.yourVerdict ?? null,
+            settledForYou: reader?.settledForYou ?? null,
             latestApproval:
                 latest === null
                     ? null
@@ -3072,16 +3100,23 @@ export class SitesService {
     }
 
     /**
-     * The caller's pages read on the draft (DEC-200, U9): pages they opened
-     * after their own latest verdict, against the pages the site has now. A
-     * deleted page takes its views with it, so it drops out of both numbers.
+     * The caller as a reader of the draft (DEC-200, U9, U4). Pages read: pages
+     * they opened after their own latest verdict, against the pages the site
+     * has now; a deleted page takes its views with it, so it drops out of
+     * both numbers. Their latest verdict. And, for someone who doesn't settle
+     * notes, how many of theirs were settled after they last spoke (their
+     * newest note or verdict).
      */
-    private async pagesReadSinceVerdict(
+    private async readerState(
         ctx: OrganizationContext,
         siteId: string,
-    ): Promise<{ read: number; total: number }> {
+    ): Promise<{
+        pagesRead: { read: number; total: number };
+        yourVerdict: { outcome: string; at: Date } | null;
+        settledForYou: { count: number; at: Date } | null;
+    }> {
         const scope = { siteId, organizationId: ctx.organizationId };
-        const [verdict, total] = await Promise.all([
+        const [verdict, total, lastNote] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: {
                     ...scope,
@@ -3090,18 +3125,58 @@ export class SitesService {
                     outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
                 },
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: { createdAt: true },
+                select: { outcome: true, createdAt: true },
             }),
             prisma.page.count({ where: scope }),
+            allows(ctx, "section:write")
+                ? null
+                : prisma.siteComment.findFirst({
+                      where: {
+                          ...scope,
+                          authorUserId: ctx.userId,
+                          testReleaseId: null,
+                      },
+                      orderBy: { createdAt: "desc" },
+                      select: { createdAt: true },
+                  }),
         ]);
-        const read = await prisma.siteReviewPageView.count({
-            where: {
-                ...scope,
-                userId: ctx.userId,
-                ...(verdict ? { viewedAt: { gt: verdict.createdAt } } : {}),
-            },
-        });
-        return { read, total };
+        const [read, settled] = await Promise.all([
+            prisma.siteReviewPageView.count({
+                where: {
+                    ...scope,
+                    userId: ctx.userId,
+                    ...(verdict ? { viewedAt: { gt: verdict.createdAt } } : {}),
+                },
+            }),
+            lastNote
+                ? prisma.siteComment.findMany({
+                      where: {
+                          ...scope,
+                          authorUserId: ctx.userId,
+                          testReleaseId: null,
+                          resolvedAt: {
+                              gt:
+                                  verdict &&
+                                  verdict.createdAt > lastNote.createdAt
+                                      ? verdict.createdAt
+                                      : lastNote.createdAt,
+                          },
+                      },
+                      orderBy: { resolvedAt: "desc" },
+                      select: { resolvedAt: true },
+                  })
+                : [],
+        ]);
+        const newest = settled[0]?.resolvedAt;
+        return {
+            pagesRead: { read, total },
+            yourVerdict: verdict
+                ? { outcome: verdict.outcome, at: verdict.createdAt }
+                : null,
+            settledForYou: newest
+                ? { count: settled.length, at: newest }
+                : null,
+        };
     }
 
     /**

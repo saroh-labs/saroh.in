@@ -14,6 +14,11 @@ import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
 import {
+    reviewOwner,
+    TopBarVerdict,
+    youApproved,
+} from "@/components/sites/review/verdict-controls";
+import {
     testReleaseActions,
     TestReleaseSheets,
 } from "@/components/sites/test-releases/test-release-sheets";
@@ -35,7 +40,7 @@ import { InspectorHost } from "./inspector-host";
 import { EditorReadOnly } from "./read-only";
 import type { SiteEditorProps } from "./site-editor-props";
 import { useEditorDraft } from "./use-editor-draft";
-import { useEditorJumps } from "./use-editor-jumps";
+import { takePendingNote, useEditorJumps } from "./use-editor-jumps";
 import { useEditorLayout, useEditorSheets } from "./use-editor-layout";
 import { useEditorLeave } from "./use-editor-leave";
 import { useEditorReview } from "./use-editor-review";
@@ -98,6 +103,7 @@ export function SiteEditor({
         pageId,
         initialComments,
         initialReview,
+        readOnly,
     });
     // The site's test releases (DEC-071, T11); hidden while they're off.
     /*
@@ -232,6 +238,25 @@ export function SiteEditor({
         closeCheck: () => publish.setChecking(false),
     });
 
+    /*
+     * On opening a page: the block a note on it was jumped to from another
+     * page, with its notes; otherwise, for a Reviewer, Feedback rather than
+     * Block (DEC-200), since notes are what they came to write. Once per
+     * page, as the editor is keyed on it.
+     */
+    useEffect(() => {
+        const key = takePendingNote(pageId);
+        const index =
+            key === null ? -1 : initialSections.findIndex((s) => s.key === key);
+        if (index !== -1) {
+            setSelectedIndex(index);
+            setInspector("feedback");
+        } else if (readOnly) {
+            placed.setInspector("feedback");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page open
+    }, [pageId]);
+
     const active = activeSection(selection.selectedIndex, sections);
     /**
      * Bring a block to the top of the canvas, after the render that moves
@@ -350,6 +375,42 @@ export function SiteEditor({
                     sheet={sheets.sheet}
                     setSheet={sheets.setSheet}
                     sheetHost={body}
+                    reviewerVerdict={
+                        readOnly ? (
+                            <TopBarVerdict
+                                owner={reviewOwner(review.review)}
+                                approved={youApproved(review.review)}
+                                pagesRead={review.review.pagesRead}
+                                recording={review.recording}
+                                onRecord={review.record}
+                                openNotes={review.comments
+                                    .filter(
+                                        (c) =>
+                                            c.editable && c.resolvedAt === null,
+                                    )
+                                    .map((c) => {
+                                        const type =
+                                            c.pageId === pageId
+                                                ? sections.find(
+                                                      (s) =>
+                                                          s.key ===
+                                                          c.sectionKey,
+                                                  )?.type
+                                                : undefined;
+                                        return {
+                                            id: c.id,
+                                            where: [
+                                                c.pageTitle ?? "Removed page",
+                                                type && SECTION_LABELS[type],
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" · "),
+                                            body: c.body,
+                                        };
+                                    })}
+                            />
+                        ) : undefined
+                    }
                 />
 
                 <EditorPanels

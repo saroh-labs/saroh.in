@@ -69,6 +69,8 @@ export function ReviewPanel({
     release = null,
     can = EVERYTHING,
     previewLinks = true,
+    settledOnly = false,
+    onShowAll,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -83,6 +85,12 @@ export function ReviewPanel({
     can?: ReviewPanelAbilities;
     /** The draft's preview links; off for a Reviewer (DEC-200). */
     previewLinks?: boolean;
+    /**
+     * Settled notes only (DEC-200, RVD4): where a Reviewer's "See the notes"
+     * lands. `onShowAll` goes back to the whole list.
+     */
+    settledOnly?: boolean;
+    onShowAll?: () => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -240,7 +248,11 @@ export function ReviewPanel({
     );
 
     const open = comments.filter((c) => c.resolvedAt === null);
-    const shown = showResolved ? comments : open;
+    const shown = settledOnly
+        ? comments.filter((c) => c.resolvedAt !== null)
+        : showResolved
+          ? comments
+          : open;
 
     async function toggle(comment: SiteCommentView) {
         const res = await runAction(
@@ -283,7 +295,10 @@ export function ReviewPanel({
                 <p className="p-4 text-xs leading-relaxed text-muted-foreground">
                     {release
                         ? "No notes on this test release yet. Select a section to leave a note on it, and say here whether it's good to go live."
-                        : "No notes on this site yet. Share a preview above so people can read the draft. Select a section to leave a note on it, and say here whether the site is good to go."}
+                        : !can.approve && !can.settle
+                          ? // A Reviewer (DEC-200): the verdict is the top bar's.
+                            "No notes on this site yet. Select a block to leave a note on it."
+                          : "No notes on this site yet. Share a preview above so people can read the draft. Select a section to leave a note on it, and say here whether the site is good to go."}
                 </p>
             </div>
         );
@@ -327,13 +342,25 @@ export function ReviewPanel({
             {askForReview}
             <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
-                    {open.length === 0
-                        ? "Nothing open"
-                        : open.length === 1
-                          ? "1 note open"
-                          : `${open.length} notes open`}
+                    {settledOnly
+                        ? "Settled notes"
+                        : open.length === 0
+                          ? "Nothing open"
+                          : open.length === 1
+                            ? "1 note open"
+                            : `${open.length} notes open`}
                 </span>
-                {comments.length > open.length ? (
+                {settledOnly && onShowAll ? (
+                    <Button
+                        variant="link"
+                        size="inline"
+                        type="button"
+                        onClick={onShowAll}
+                        className="text-muted-foreground"
+                    >
+                        Show all
+                    </Button>
+                ) : comments.length > open.length ? (
                     <Button
                         variant="link"
                         size="inline"

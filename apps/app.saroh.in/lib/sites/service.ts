@@ -1678,6 +1678,8 @@ export interface SiteCommentView {
      * the latest approval of its target. The api decides; draw from this.
      */
     editable: boolean;
+    /** You wrote it (DEC-200, U4). Absent from an older API: not yours. */
+    mine?: boolean;
 }
 
 /**
@@ -1736,6 +1738,15 @@ export interface ReviewState {
      * Null on a test release's review, or from an API that doesn't send it.
      */
     pagesRead?: PagesRead | null;
+    /**
+     * The newest request for a review, open or not (DEC-200, U4): "Asha
+     * asked you to review · 28 Oct". Null when nobody ever has.
+     */
+    request?: { by: string; at: string } | null;
+    /** Your own latest verdict on the draft. */
+    yourVerdict?: { outcome: ApprovalOutcome; at: string } | null;
+    /** Your notes settled since you last wrote a note or a verdict. */
+    settledForYou?: { count: number; at: string } | null;
 }
 
 export interface PagesRead {
@@ -1811,6 +1822,9 @@ export async function getReviewState(
         approvalIsStale: data.approvalIsStale === true,
         askedByYou: data.askedByYou === true,
         pagesRead: data.pagesRead ?? null,
+        request: data.request ?? null,
+        yourVerdict: data.yourVerdict ?? null,
+        settledForYou: data.settledForYou ?? null,
     };
 }
 
