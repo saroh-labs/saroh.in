@@ -61,6 +61,7 @@ export function SiteEditor({
     initialComments,
     initialReview,
     neverPublished: initialNeverPublished,
+    publishedAt = null,
     unreadableSections,
     initialPendingChanges,
     initialPendingSiteChanges,
@@ -318,6 +319,7 @@ export function SiteEditor({
             <div className="flex h-dvh flex-col bg-background text-foreground">
                 <EditorTopBar
                     {...{ siteId, address, pages, pageId, layout }}
+                    publishedAt={publishedAt}
                     siteName={chrome.displayName}
                     {...draft}
                     // Site settings saved on their own clock: the look, the name

@@ -337,8 +337,8 @@ describe("what each role is offered", () => {
         expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
         expect(offered).not.toContain("/sites/new");
-        expect(offered).not.toContain("/sites/site_1");
-        expect(offered).toContain("/sites/site_1/review");
+        // Review opens the editor, read-only (DEC-200).
+        expect(offered).toContain("/sites/site_1");
     });
 
     it("offers a member the diary and its people, not leads or money", () => {
@@ -367,7 +367,7 @@ describe("what each role is offered", () => {
         expect(offered).toEqual([
             "/",
             "/sites",
-            "/sites/site_1/review",
+            "/sites/site_1",
             "/sites/site_1/posts",
         ]);
     });
@@ -443,11 +443,10 @@ describe("the site tree", () => {
                 sites: [SITES[0]],
             }),
         );
-        // `/sites/:id` is the editor and redirects them here anyway, so "Pages"
-        // was a label for a screen they never saw. Settings is left out for the
-        // opposite reason: it opens, and then says they may change nothing.
-        expect(offered).toContain("/sites/site_1/review");
-        expect(offered).not.toContain("/sites/site_1");
+        // Review is the editor, read-only (DEC-200); no "Pages". Settings is
+        // left out: it opens, and then says they may change nothing.
+        expect(offered).toContain("/sites/site_1");
+        expect(offered).not.toContain("/sites/site_1/pages");
         expect(offered).not.toContain("/sites/site_1/settings");
     });
 

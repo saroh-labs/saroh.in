@@ -661,6 +661,37 @@ describe("the same editor, editable (owner regression)", () => {
     });
 });
 
+describe("the top bar's status for a Reviewer (U6)", () => {
+    const status = () =>
+        Array.from(document.querySelectorAll('[role="status"]'))
+            .map((el) => el.textContent)
+            .join(" | ");
+
+    it("says live and since when, never what publishing would change", () => {
+        render({
+            publishedAt: "2026-10-17T06:00:00.000Z",
+            initialPendingChanges: 3,
+        });
+        expect(status()).toMatch(/Live · published 17 Oct/);
+        expect(status()).not.toMatch(/look at|Not published ·|change/i);
+    });
+
+    it("says Not published yet for a site never published", () => {
+        render({ neverPublished: true, publishedAt: null });
+        expect(status()).toContain("Not published yet");
+    });
+
+    it("leaves the owner's readout alone", () => {
+        render({
+            readOnly: false,
+            canUpdateSite: true,
+            canPublish: true,
+            publishedAt: "2026-10-17T06:00:00.000Z",
+        });
+        expect(status()).not.toContain("published 17 Oct");
+    });
+});
+
 describe("the draft hook in no-save mode", () => {
     it("never saves, even when its sections change", async () => {
         const probe: { draft?: ReturnType<typeof useEditorDraft> } = {};

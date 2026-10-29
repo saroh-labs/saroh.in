@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { pendingChangeCount } from "@/lib/sites/pending";
 import type { SiteSummary } from "@/lib/sites/service";
@@ -22,11 +23,23 @@ export function siteState(
      * or member who can't was shown "domain pending" in a warning colour
      * about a record only an owner or admin can add; they read "Live".
      */
-    { domainState = true }: { domainState?: boolean } = {},
+    {
+        domainState = true,
+        reader,
+    }: {
+        domainState?: boolean;
+        /**
+         * Someone who reads the site and can't change it (DEC-200, U6): they
+         * are told whether it is live and since when, never the owner's
+         * "things to look at" or unpublished changes. The business's zone.
+         */
+        reader?: { timeZone: string };
+    } = {},
 ): {
     label: string;
     tone: SiteStateTone;
 } {
+    if (reader) return readerSiteState(site, reader.timeZone);
     if (!site.currentPublicationId) {
         return { label: "Never published", tone: "draft" };
     }
@@ -57,6 +70,24 @@ export function siteState(
         return { label: "Live · unpublished changes", tone: "attention" };
     }
     return { label: "Live", tone: "live" };
+}
+
+/**
+ * "Live · published 17 Oct" or "Not published yet": the whole status for
+ * someone who can't edit — the shell header and the editor's top bar.
+ */
+export function readerSiteState(
+    site: Pick<SiteSummary, "currentPublicationId" | "currentPublication">,
+    timeZone: string,
+): { label: string; tone: SiteStateTone } {
+    const at = site.currentPublication?.publishedAt;
+    if (!site.currentPublicationId && !at) {
+        return { label: "Not published yet", tone: "draft" };
+    }
+    return {
+        label: at ? `Live · published ${formatDate(at, timeZone)}` : "Live",
+        tone: "live",
+    };
 }
 
 export type PageState = "live" | "unpublished" | "hidden";

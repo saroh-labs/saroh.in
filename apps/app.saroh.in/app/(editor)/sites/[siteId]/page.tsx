@@ -131,6 +131,7 @@ export default async function SiteEditorPage({
             initialComments={comments}
             initialReview={review}
             neverPublished={site.currentPublicationId === null}
+            publishedAt={site.currentPublication?.publishedAt ?? null}
             // Which edit of the draft these sections are (#285); the editor
             // sends it back on every save.
             initialRevision={draft?.revision ?? 0}

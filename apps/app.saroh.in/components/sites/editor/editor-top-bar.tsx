@@ -36,6 +36,7 @@ import type {
     SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
+import { readerSiteState } from "@/lib/sites/site-state";
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
 import { EditorSheet } from "./editor-sheet";
@@ -76,6 +77,7 @@ export function EditorTopBar({
     askForReview,
     withdrawReview,
     neverPublished,
+    publishedAt = null,
     pendingSummary,
     pendingShort,
     pendingKnown,
@@ -121,6 +123,8 @@ export function EditorTopBar({
     /** Take the open review request back (UX-068). */
     withdrawReview: () => Promise<void>;
     neverPublished: boolean;
+    /** When the site last went live, for a Reviewer's status (U6). */
+    publishedAt?: string | null;
     pendingSummary: string | null;
     pendingShort: string | null;
     pendingKnown: boolean;
@@ -163,11 +167,7 @@ export function EditorTopBar({
     const [pagesOpen, setPagesOpen] = useState(false);
 
     const activePage = pages.find((page) => page.id === pageId);
-    const {
-        status,
-        detail: statusDetail,
-        line: statusLine,
-    } = statusReadout({
+    const ownerReadout = statusReadout({
         saving,
         styleSaving,
         saveError,
@@ -185,6 +185,31 @@ export function EditorTopBar({
         scheduled,
         zone,
     });
+    // A Reviewer reads live-and-since-when, never pending changes (U6).
+    const reader = readerSiteState(
+        {
+            currentPublicationId: neverPublished ? null : "live",
+            currentPublication: publishedAt ? { publishedAt } : null,
+        },
+        zone,
+    );
+    const {
+        status,
+        detail: statusDetail,
+        line: statusLine,
+    } = readOnly
+        ? {
+              status: {
+                  label: reader.label,
+                  tone:
+                      reader.tone === "live"
+                          ? ("done" as const)
+                          : ("quiet" as const),
+              },
+              detail: "",
+              line: "",
+          }
+        : ownerReadout;
     const publishHint = publishTitle({
         publishing,
         dirty: dirty || saving || styleDirty,

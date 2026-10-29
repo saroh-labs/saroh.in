@@ -48,6 +48,8 @@ export interface SiteEditorProps {
      * state rather than reading the prop directly.
      */
     neverPublished: boolean;
+    /** When the site last went live: a Reviewer's status says it (U6). */
+    publishedAt?: string | null;
     /**
      * Keys of sections whose stored content no longer matches their contract
      * (#275). Shown, not hidden: it is the merchant's work, and a section
