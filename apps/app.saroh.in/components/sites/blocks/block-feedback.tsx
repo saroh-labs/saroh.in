@@ -38,6 +38,7 @@ export function BlockFeedback({
     label,
     comments,
     onChanged,
+    canSettle = true,
 }: {
     siteId: string;
     pageId: string;
@@ -48,6 +49,8 @@ export function BlockFeedback({
     /** Every note on the site; this component picks the block's own. */
     comments: SiteCommentView[];
     onChanged: () => Promise<void>;
+    /** `section:write`: settle and reopen. Off for a Reviewer (DEC-200). */
+    canSettle?: boolean;
 }) {
     const zone = useBusinessZone();
     const [reply, setReply] = useState("");
@@ -146,15 +149,17 @@ export function BlockFeedback({
                             >
                                 {formatDate(c.createdAt, zone)}
                             </p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={busy.has(c.id)}
-                                onClick={() => void setSettled(c, true)}
-                            >
-                                Mark settled
-                            </Button>
+                            {canSettle ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy.has(c.id)}
+                                    onClick={() => void setSettled(c, true)}
+                                >
+                                    Mark settled
+                                </Button>
+                            ) : null}
                         </li>
                     ))}
                 </ul>
@@ -201,17 +206,19 @@ export function BlockFeedback({
                                     <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">
                                         {c.body}
                                     </p>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={busy.has(c.id)}
-                                        onClick={() =>
-                                            void setSettled(c, false)
-                                        }
-                                    >
-                                        Reopen
-                                    </Button>
+                                    {canSettle ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={busy.has(c.id)}
+                                            onClick={() =>
+                                                void setSettled(c, false)
+                                            }
+                                        >
+                                            Reopen
+                                        </Button>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>

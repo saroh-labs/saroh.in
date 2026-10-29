@@ -2634,3 +2634,26 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The leave guard in accounts also asks on Escape, the × and Cancel (`components/account/use-sheet-guard.tsx`); the app's sheets still drop an untouched draft and hold a typed one only against a press outside.
     - A business the reader pays for but no longer owns names its owner once the API sends `ownerName` on a billing profile's business; until then it says "its new owner".
 - Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces"; `docs/patterns/frontend-forms.md`; `apps/accounts.saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.
+
+## DEC-200 A Reviewer reviews in the site editor itself, read-only
+
+**Status: Accepted — 2026-10-29** · owner, on the 29 Oct reviewer audit (variant D, "it shows the same thing") · supersedes #275's separate review screen · epic #1263
+
+- Context:
+    - Since #275 (12 Sep) a Reviewer read the site on its own screen, `/sites/:id/review`, so that no editor change had to answer "what does a Reviewer see". The 29 Oct audit (5.1/10) found that screen reads the draft but fails the reviewer's job: it never says who asked or what for, puts the verdict under the last section of one page, can't take notes on a phone, scatters notes, shows owner-only checks and can't review posts.
+- Decision:
+    1. **A Reviewer opens the site editor itself, read-only**, instead of the separate review screen. `/sites/:id` loads the page through `…/pages/:pageId/read` (`site:read`, writes nothing) for anyone without `section:write`, never `…/draft`; `/sites/:id/review` and the Pages tab redirect there, keeping `?page=`.
+    2. **Read-only means see everything, change nothing.** Every page, the block list, the Brand tab, the selected block's settings, Desk/Phone and Preview are visible. Nothing is changeable: no add, drag, edit, hide or remove, no Brand change, no page add, rename or delete, no publish, share, test release, preview links or request review, no undo, no autosave, no draft created.
+    3. **Approve and Ask for changes sit where Publish is**; the Feedback tab carries the notes.
+    4. **One tested read-only switch guards every write control** (`readOnly`, decided on the server page and read from one editor context), with a structural test that renders the editor read-only and fails on any enabled write control, so a future editor control can't leak to Reviewers — the risk #275 named. The API stays the guard; no permission widens.
+    5. **Notes** are editable and deletable by their author until an approval is recorded on that target; notes written before an approval are history (no edit, no delete). Settled notes stay locked.
+    6. **Pages read are saved on the server**, so "You've read 3 of 4 pages" follows the Reviewer to any browser or phone.
+    7. **Posts** open in the post editor, read-only, with notes.
+- Unchanged:
+    - Reviewers see only the sites they were invited to (DEC-006, correction #276).
+    - Test releases are reviewed on their own page (DEC-071, KTD-10).
+    - Ask for changes needs a reason (UX-043).
+- Consequences:
+    - The owner-only reads (flags, the web address) are not made for a Reviewer, and owner-only props are sent empty; trimming them from the API's `getSite` response is a follow-up.
+    - `site-review-view.tsx` is retired once the editor covers everything it did (00-universal §15); `section-review.tsx` and `review-panel.tsx` stay for the test-release review page.
+- Rules: `docs/patterns/backend-auth-and-access.md` → "A reviewer reads in the editor, read-only"; plan `docs/plans/2026-10-29-001-feat-reviewer-sees-editor-plan.md` (local); `apps/app.saroh.in/components/sites/editor/read-only.test.tsx`.

@@ -9,6 +9,7 @@ import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import type { FixedPart } from "@/components/sites/editor/use-editor-selection";
 import type { Flag, Section } from "@/lib/sites/service";
 import { SECTION_LABELS, sectionTitle } from "./editor-constants";
+import { useEditorReadOnly } from "./read-only";
 
 /**
  * "Blocks on {Page}" (DEC-185): a phone's block list, every block in
@@ -39,6 +40,8 @@ export function PhoneBlocks({
     notedKeys: Set<string>;
 }) {
     const list = useRef<HTMLUListElement>(null);
+    // Read-only (DEC-200): a block is chosen here, never moved.
+    const readOnly = useEditorReadOnly();
     const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
 
     /** The block row whose middle is nearest a point on the screen. */
@@ -161,14 +164,19 @@ export function PhoneBlocks({
                                 />
                             ) : null}
                         </button>
-                        <button
-                            type="button"
-                            aria-label={`Move ${label}: drag, or press Up or Down`}
-                            {...grip(index)}
-                            className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
-                        >
-                            <GripVertical aria-hidden className="size-[18px]" />
-                        </button>
+                        {readOnly ? null : (
+                            <button
+                                type="button"
+                                aria-label={`Move ${label}: drag, or press Up or Down`}
+                                {...grip(index)}
+                                className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+                            >
+                                <GripVertical
+                                    aria-hidden
+                                    className="size-[18px]"
+                                />
+                            </button>
+                        )}
                     </li>
                 );
             })}

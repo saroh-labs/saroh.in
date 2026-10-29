@@ -32,6 +32,7 @@ import { EditorPanels } from "./editor-panels";
 import { EditorRail } from "./editor-rail";
 import { EditorTopBar } from "./editor-top-bar";
 import { InspectorHost } from "./inspector-host";
+import { EditorReadOnly } from "./read-only";
 import type { SiteEditorProps } from "./site-editor-props";
 import { useEditorDraft } from "./use-editor-draft";
 import { useEditorJumps } from "./use-editor-jumps";
@@ -55,6 +56,7 @@ export function SiteEditor({
     siteId,
     pageId,
     pages,
+    readOnly = false,
     initialFlags,
     initialComments,
     initialReview,
@@ -67,7 +69,7 @@ export function SiteEditor({
     siteName,
     navigation,
     footerPreview,
-    canUpdateSite,
+    canUpdateSite: canUpdateSiteProp,
     address,
     initialStyle,
     styleOptions,
@@ -79,7 +81,7 @@ export function SiteEditor({
     packsOpen = false,
     addablePageKinds,
     initialTestReleases = { state: "off" },
-    canPublish = false,
+    canPublish: canPublishProp = false,
     publishNeedsApproval = false,
     canOverride = false,
     livePublishedAt = null,
@@ -87,6 +89,9 @@ export function SiteEditor({
     initialSheet = null,
     webAddressFix = null,
 }: SiteEditorProps) {
+    // Read-only (DEC-200) takes the owner's powers away whatever was sent.
+    const canUpdateSite = canUpdateSiteProp && !readOnly;
+    const canPublish = canPublishProp && !readOnly;
     const review = useEditorReview({
         siteId,
         pageId,
@@ -167,6 +172,7 @@ export function SiteEditor({
         siteName,
         initialSections,
         initialRevision,
+        readOnly,
         publishing: publish.publishing,
         recordSaved: publish.recordSaved,
         refreshFlags: publish.refreshFlags,
@@ -184,7 +190,12 @@ export function SiteEditor({
         savedLookRef.current = siteStyle.savedLook;
     }, [siteStyle.savedLook]);
     // Remove, move, hide and reset act at once and offer Undo (G3).
-    const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
+    const edits = useUndo({
+        ...draft,
+        ...siteStyle,
+        setSelectedIndex,
+        readOnly,
+    });
     /*
      * Anything not saved yet: the page, the look, the name or the footer.
      * Opening another page drops it, and publishing would miss it (G-1, G-3).
@@ -248,7 +259,7 @@ export function SiteEditor({
         });
     // A tapped block's toolbar on a phone (DEC-185): each with Undo.
     const blockTools =
-        layout === "phone"
+        layout === "phone" && !readOnly
             ? (index: number) => (
                   <BlockToolbar
                       index={index}
@@ -303,232 +314,236 @@ export function SiteEditor({
 
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
-        <div className="flex h-dvh flex-col bg-background text-foreground">
-            <EditorTopBar
-                {...{ siteId, address, pages, pageId, layout }}
-                siteName={chrome.displayName}
-                {...draft}
-                // Site settings saved on their own clock: the look, the name
-                // and the footer. Publish waits for all three.
-                styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
-                styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
-                saveError={draft.saveError || chrome.chromeFailed}
-                {...review}
-                {...publish}
-                openCheck={(ready) => {
-                    // An Undo pressed behind the check would change the
-                    // draft being published (G-1).
-                    if (!ready.dirty) edits.settleUndo();
-                    return publish.openCheck(ready);
-                }}
-                {...viewport}
-                openFeedback={() => setInspector("feedback")}
-                openSitePreview={() => {
-                    // The whole site's Feedback, where a preview link is
-                    // made, not a block's (UX-068).
-                    setSelectedIndex(null);
-                    setInspector("feedback");
-                }}
-                canUpdateSite={canUpdateSite}
-                addablePageKinds={addablePageKinds}
-                scheduled={releases.scheduled}
-                testRelease={testReleaseActions(releases)}
-                sheet={sheets.sheet}
-                setSheet={sheets.setSheet}
-                sheetHost={body}
-            />
+        <EditorReadOnly.Provider value={readOnly}>
+            <div className="flex h-dvh flex-col bg-background text-foreground">
+                <EditorTopBar
+                    {...{ siteId, address, pages, pageId, layout }}
+                    siteName={chrome.displayName}
+                    {...draft}
+                    // Site settings saved on their own clock: the look, the name
+                    // and the footer. Publish waits for all three.
+                    styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
+                    styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
+                    saveError={draft.saveError || chrome.chromeFailed}
+                    {...review}
+                    {...publish}
+                    openCheck={(ready) => {
+                        // An Undo pressed behind the check would change the
+                        // draft being published (G-1).
+                        if (!ready.dirty) edits.settleUndo();
+                        return publish.openCheck(ready);
+                    }}
+                    {...viewport}
+                    openFeedback={() => setInspector("feedback")}
+                    openSitePreview={() => {
+                        // The whole site's Feedback, where a preview link is
+                        // made, not a block's (UX-068).
+                        setSelectedIndex(null);
+                        setInspector("feedback");
+                    }}
+                    canUpdateSite={canUpdateSite}
+                    addablePageKinds={addablePageKinds}
+                    scheduled={releases.scheduled}
+                    testRelease={testReleaseActions(releases)}
+                    sheet={sheets.sheet}
+                    setSheet={sheets.setSheet}
+                    sheetHost={body}
+                />
 
-            <EditorPanels
-                {...{ layout, viewport, sheets, selection }}
-                {...add}
-                dialogOpen={lookFor !== null || browsing}
-                hasSubject={
-                    active !== null || selection.selectedChrome !== null
-                }
-                inspectorTitle={
-                    selection.selectedChrome === "header"
-                        ? "Header"
-                        : selection.selectedChrome === "footer"
-                          ? "Footer"
-                          : selection.inspector === "feedback" || !active
-                            ? "Feedback"
-                            : SECTION_LABELS[active.section.type]
-                }
-                pageTitle={
-                    pages.find((p) => p.id === pageId)?.title ?? "this page"
-                }
-                overlayOpen={publish.checking}
-                brandActions={
-                    <BrandSheetActions
-                        saving={siteStyle.styleSaving}
-                        dirty={siteStyle.styleDirty}
-                        onReset={() => edits.resetStyle()}
-                    />
-                }
-                body={body}
-                setBody={setBody}
-                rail={
-                    <EditorRail
-                        phone={layout === "phone"}
-                        onPicked={scrollToBlock}
-                        {...selection}
-                        {...siteStyle}
-                        {...draft}
-                        {...edits}
-                        styleOptions={styleOptions}
-                        {...add}
-                        flagsBySection={flagsBySection}
-                        notedKeys={review.notedKeys}
-                        shopOpen={shopOpen}
-                        packsOpen={packsOpen}
-                        looks={{
-                            available: looksAvailable,
-                            liveLook,
-                            published: !publish.neverPublished,
-                            templateId,
-                            error: siteStyle.lookError,
-                            onChoose: siteStyle.chooseLook,
-                            // Each look's Preview draws its showcase
-                            // template, and offers its starter content to
-                            // whoever may change the site (DEC-182).
-                            preview: {
-                                pages,
-                                ...(canUpdateSite && starter
-                                    ? { starter }
-                                    : {}),
-                            },
-                        }}
-                        styleRules={styleRules}
-                    />
-                }
-                canvas={
-                    <EditorCanvas
-                        {...viewport}
-                        {...selection}
-                        {...draft}
-                        {...{
-                            siteId,
-                            pageId,
-                            address,
-                            pages,
-                            styleOptions,
-                        }}
-                        blockTools={blockTools}
-                        // A typeface being tried draws on the page unsaved.
-                        style={siteStyle.trying ?? style}
-                        trying={triedFace(siteStyle.trying, styleOptions)}
-                        // Holds a page switch back (G-3).
-                        dirty={unsaved}
-                        neverPublished={publish.neverPublished}
-                        canvasChrome={canvasChrome}
-                        notesByKey={review.notesByKey}
-                    />
-                }
-                inspector={
-                    <InspectorHost
-                        {...{ siteId, pageId, pages, styleOptions }}
-                        {...selection}
-                        {...draft}
-                        {...edits}
-                        {...review}
-                        style={style}
-                        active={active}
-                        fixedText={chrome}
-                        jumpToNote={jumpToNote}
-                        activeFlags={activeFlags}
-                        unreadableSections={unreadableSections}
-                    />
-                }
-                releases={
-                    releases.available
-                        ? {
-                              open: releases.panelOpen,
-                              onClose: () => releases.setPanelOpen(false),
-                              content: (
-                                  <TestReleasesPanel
-                                      siteId={siteId}
-                                      releases={releases}
-                                  />
-                              ),
-                          }
-                        : undefined
-                }
-            />
-
-            <TestReleaseSheets
-                siteId={siteId}
-                releases={releases}
-                // A release freezes what the server holds (the rule Publish
-                // keeps): unsaved work on screen would not be in it.
-                unsaved={unsaved}
-                recordWentLive={publish.recordWentLive}
-            />
-
-            {/*
-             * Publish (below) is a sheet over the editor rather than its own
-             * route, so nothing is torn down and rebuilt behind it: the
-             * merchant goes back to exactly the editing state they left
-             * (DEC-185).
-             */}
-            {/*
-             * Choosing a look before the block goes in (#267). Keyed on the
-             * block so each opening starts on that block's looks.
-             */}
-            <AddSectionDialog
-                key={lookFor ?? (browsing ? "browse" : "none")}
-                open={lookFor !== null || browsing}
-                startType={lookFor}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setLookFor(null);
-                        setBrowsing(false);
+                <EditorPanels
+                    {...{ layout, viewport, sheets, selection }}
+                    {...add}
+                    dialogOpen={lookFor !== null || browsing}
+                    hasSubject={
+                        active !== null || selection.selectedChrome !== null
                     }
-                }}
-                variables={resolveStyleVariables(style, styleOptions)}
-                look={style.look}
-                onAdd={(type, variant) => addSection(type, variant)}
-                shopOpen={shopOpen}
-                packsOpen={packsOpen}
-            />
+                    inspectorTitle={
+                        selection.selectedChrome === "header"
+                            ? "Header"
+                            : selection.selectedChrome === "footer"
+                              ? "Footer"
+                              : selection.inspector === "feedback" || !active
+                                ? "Feedback"
+                                : SECTION_LABELS[active.section.type]
+                    }
+                    pageTitle={
+                        pages.find((p) => p.id === pageId)?.title ?? "this page"
+                    }
+                    overlayOpen={publish.checking}
+                    brandActions={
+                        readOnly ? undefined : (
+                            <BrandSheetActions
+                                saving={siteStyle.styleSaving}
+                                dirty={siteStyle.styleDirty}
+                                onReset={() => edits.resetStyle()}
+                            />
+                        )
+                    }
+                    body={body}
+                    setBody={setBody}
+                    rail={
+                        <EditorRail
+                            phone={layout === "phone"}
+                            onPicked={scrollToBlock}
+                            {...selection}
+                            {...siteStyle}
+                            {...draft}
+                            {...edits}
+                            styleOptions={styleOptions}
+                            {...add}
+                            flagsBySection={flagsBySection}
+                            notedKeys={review.notedKeys}
+                            shopOpen={shopOpen}
+                            packsOpen={packsOpen}
+                            looks={{
+                                available: looksAvailable,
+                                liveLook,
+                                published: !publish.neverPublished,
+                                templateId,
+                                error: siteStyle.lookError,
+                                onChoose: siteStyle.chooseLook,
+                                // Each look's Preview draws its showcase
+                                // template, and offers its starter content to
+                                // whoever may change the site (DEC-182).
+                                preview: {
+                                    pages,
+                                    ...(canUpdateSite && starter
+                                        ? { starter }
+                                        : {}),
+                                },
+                            }}
+                            styleRules={styleRules}
+                        />
+                    }
+                    canvas={
+                        <EditorCanvas
+                            {...viewport}
+                            {...selection}
+                            {...draft}
+                            {...{
+                                siteId,
+                                pageId,
+                                address,
+                                pages,
+                                styleOptions,
+                            }}
+                            blockTools={blockTools}
+                            // A typeface being tried draws on the page unsaved.
+                            style={siteStyle.trying ?? style}
+                            trying={triedFace(siteStyle.trying, styleOptions)}
+                            // Holds a page switch back (G-3).
+                            dirty={unsaved}
+                            neverPublished={publish.neverPublished}
+                            canvasChrome={canvasChrome}
+                            notesByKey={review.notesByKey}
+                        />
+                    }
+                    inspector={
+                        <InspectorHost
+                            {...{ siteId, pageId, pages, styleOptions }}
+                            {...selection}
+                            {...draft}
+                            {...edits}
+                            {...review}
+                            style={style}
+                            active={active}
+                            fixedText={chrome}
+                            jumpToNote={jumpToNote}
+                            activeFlags={activeFlags}
+                            unreadableSections={unreadableSections}
+                        />
+                    }
+                    releases={
+                        releases.available
+                            ? {
+                                  open: releases.panelOpen,
+                                  onClose: () => releases.setPanelOpen(false),
+                                  content: (
+                                      <TestReleasesPanel
+                                          siteId={siteId}
+                                          releases={releases}
+                                      />
+                                  ),
+                              }
+                            : undefined
+                    }
+                />
 
-            <PublishSheet
-                open={publish.checking}
-                phone={layout === "phone"}
-                pages={pages}
-                flags={publish.siteFlags.flags}
-                awaitingNavigation={publish.siteFlags.awaitingNavigation}
-                publishing={publish.publishing}
-                unsaved={unsaved}
-                neverPublished={publish.neverPublished}
-                pendingSummary={publish.pendingSummary}
-                pendingKnown={publish.pendingKnown}
-                pendingChanges={publish.pendingChanges}
-                pendingSiteChanges={publish.pendingSiteChanges}
-                review={review.review}
-                needsApproval={publish.needsApproval}
-                canOverride={publish.canOverride}
-                // KTD-14: a scheduled go-live won't run over this.
-                scheduledWarning={
-                    releases.scheduledRelease
-                        ? publishOverScheduleWarning(
-                              releases.scheduledRelease,
-                              releases.zone,
-                          )
-                        : null
-                }
-                wentLive={publish.wentLive}
-                error={publish.publishError}
-                addressFix={webAddressFix}
-                onAddressSaved={(host) => {
-                    publish.setSiteAddress(host);
-                    void publish.refreshFlags();
-                }}
-                onPublish={() => void publish.onPublish(chrome.displayName)}
-                onClose={publish.closeCheck}
-                onJump={jumpToFlag}
-            />
-            {leaveGuard.dialog}
-        </div>
+                <TestReleaseSheets
+                    siteId={siteId}
+                    releases={releases}
+                    // A release freezes what the server holds (the rule Publish
+                    // keeps): unsaved work on screen would not be in it.
+                    unsaved={unsaved}
+                    recordWentLive={publish.recordWentLive}
+                />
+
+                {/*
+                 * Publish (below) is a sheet over the editor rather than its own
+                 * route, so nothing is torn down and rebuilt behind it: the
+                 * merchant goes back to exactly the editing state they left
+                 * (DEC-185).
+                 */}
+                {/*
+                 * Choosing a look before the block goes in (#267). Keyed on the
+                 * block so each opening starts on that block's looks.
+                 */}
+                <AddSectionDialog
+                    key={lookFor ?? (browsing ? "browse" : "none")}
+                    open={lookFor !== null || browsing}
+                    startType={lookFor}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setLookFor(null);
+                            setBrowsing(false);
+                        }
+                    }}
+                    variables={resolveStyleVariables(style, styleOptions)}
+                    look={style.look}
+                    onAdd={(type, variant) => addSection(type, variant)}
+                    shopOpen={shopOpen}
+                    packsOpen={packsOpen}
+                />
+
+                <PublishSheet
+                    open={publish.checking}
+                    phone={layout === "phone"}
+                    pages={pages}
+                    flags={publish.siteFlags.flags}
+                    awaitingNavigation={publish.siteFlags.awaitingNavigation}
+                    publishing={publish.publishing}
+                    unsaved={unsaved}
+                    neverPublished={publish.neverPublished}
+                    pendingSummary={publish.pendingSummary}
+                    pendingKnown={publish.pendingKnown}
+                    pendingChanges={publish.pendingChanges}
+                    pendingSiteChanges={publish.pendingSiteChanges}
+                    review={review.review}
+                    needsApproval={publish.needsApproval}
+                    canOverride={publish.canOverride}
+                    // KTD-14: a scheduled go-live won't run over this.
+                    scheduledWarning={
+                        releases.scheduledRelease
+                            ? publishOverScheduleWarning(
+                                  releases.scheduledRelease,
+                                  releases.zone,
+                              )
+                            : null
+                    }
+                    wentLive={publish.wentLive}
+                    error={publish.publishError}
+                    addressFix={webAddressFix}
+                    onAddressSaved={(host) => {
+                        publish.setSiteAddress(host);
+                        void publish.refreshFlags();
+                    }}
+                    onPublish={() => void publish.onPublish(chrome.displayName)}
+                    onClose={publish.closeCheck}
+                    onJump={jumpToFlag}
+                />
+                {leaveGuard.dialog}
+            </div>
+        </EditorReadOnly.Provider>
     );
 }
 

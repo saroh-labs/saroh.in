@@ -16,10 +16,24 @@ import type { SiteStyleAccess } from "@/lib/sites/style-access";
 import type { TestReleasesRead } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 
-/** What the editor's page (`app/(editor)/sites/[siteId]/page.tsx`) hands it. */
+/**
+ * What the editor's page (`app/(editor)/sites/[siteId]/page.tsx`) hands it.
+ *
+ * With `readOnly` (a Reviewer, DEC-200) the page sends no flags, no
+ * revision (0), no pending counts, and null or empty for the owner-only
+ * props: `styleAccess`, `templateId`, `addablePageKinds`, `webAddressFix`,
+ * `shopOpen`, `packsOpen`, `publishNeedsApproval`, `canOverride`. The
+ * editor ignores them read-only either way.
+ */
 export interface SiteEditorProps {
     siteId: string;
     pageId: string;
+    /**
+     * Read-only (DEC-200): someone who may read the site but not author it,
+     * a Reviewer. Everything is drawn to read; nothing that writes is drawn,
+     * and nothing is saved. Absent means editable.
+     */
+    readOnly?: boolean;
     /** Every page on this site, for the Pages tab. */
     pages: SitePage[];
     /** The site's advisory flags, as the server computed them. */

@@ -40,6 +40,7 @@ import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
 import { EditorSheet } from "./editor-sheet";
 import { MoreSheet } from "./more-actions";
+import { useEditorReadOnly } from "./read-only";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -158,6 +159,7 @@ export function EditorTopBar({
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const zone = useBusinessZone();
+    const readOnly = useEditorReadOnly();
     const [pagesOpen, setPagesOpen] = useState(false);
 
     const activePage = pages.find((page) => page.id === pageId);
@@ -275,7 +277,9 @@ export function EditorTopBar({
                             />
                         ) : null}
                     </button>
-                    <PublishButton {...actions} className="h-11 shrink-0" />
+                    {readOnly ? null : (
+                        <PublishButton {...actions} className="h-11 shrink-0" />
+                    )}
                 </header>
                 <EditorSheet
                     open={sheet === "pages"}

@@ -25,6 +25,10 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { Segmented } from "@saroh/ui/segmented";
 import { EditorTabs } from "./editor-chrome";
 import { SECTION_LABELS } from "./editor-constants";
+import { useEditorReadOnly } from "./read-only";
+
+/** A Reviewer's powers in Feedback (DEC-200): notes, nothing else here. */
+const READ_ONLY_REVIEW = { approve: false, ask: false, settle: false };
 
 /**
  * The right column: the inspector (#340). Block is what can be changed about
@@ -96,6 +100,12 @@ export function InspectorHost({
         "block",
     );
     const services = useServicesForPicker();
+    /*
+     * Read-only (DEC-200): no settling, no verdict and no preview links in
+     * the panel. The verdict is the top bar's (U4); `readOnly` is the hook
+     * for it.
+     */
+    const readOnly = useEditorReadOnly();
 
     return (
         <aside aria-label="Inspector" className="flex min-h-0 flex-col">
@@ -158,6 +168,7 @@ export function InspectorHost({
                         label={SECTION_LABELS[active.section.type]}
                         comments={comments}
                         onChanged={refreshReview}
+                        canSettle={!readOnly}
                     />
                 ) : inspector === "feedback" ? (
                     <ReviewPanel
@@ -165,6 +176,9 @@ export function InspectorHost({
                         pages={pages}
                         comments={comments}
                         review={review}
+                        {...(readOnly
+                            ? { can: READ_ONLY_REVIEW, previewLinks: false }
+                            : {})}
                         onChanged={() => void refreshReview()}
                         onJump={(jumpPageId, sectionKey) => {
                             jumpToNote(jumpPageId, sectionKey);
@@ -213,6 +227,7 @@ export function InspectorHost({
                             move(active.index, delta);
                             setSelectedIndex(active.index + delta);
                         }}
+                        onAddNote={() => setInspector("feedback")}
                         onRemove={() => {
                             // At once, with Undo (G3): taking a block off
                             // the page is reversible, so it is not asked.

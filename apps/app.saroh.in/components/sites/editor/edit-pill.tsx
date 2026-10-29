@@ -3,6 +3,8 @@
 import { Layers, Palette, Plus } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
+import { useEditorReadOnly } from "./read-only";
+
 /**
  * A phone's one floating pill (DEC-185), in place of the bottom tabs:
  * Blocks · + · Brand, at the foot of the page where a thumb is. It is not
@@ -21,6 +23,8 @@ export function EditPill({
     onBrand: () => void;
 }) {
     const keyboard = useKeyboardUp();
+    // Read-only (DEC-200): nothing to add.
+    const readOnly = useEditorReadOnly();
     if (hidden || keyboard) return null;
     const item =
         "flex h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-colors duration-fast hover:bg-background/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -35,14 +39,16 @@ export function EditPill({
                 <Layers aria-hidden className="size-[18px]" />
                 Blocks
             </button>
-            <button
-                type="button"
-                aria-label="Add a block"
-                onClick={onAdd}
-                className="grid size-11 place-items-center rounded-full bg-background text-foreground transition-colors duration-fast hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <Plus aria-hidden className="size-5" />
-            </button>
+            {readOnly ? null : (
+                <button
+                    type="button"
+                    aria-label="Add a block"
+                    onClick={onAdd}
+                    className="grid size-11 place-items-center rounded-full bg-background text-foreground transition-colors duration-fast hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <Plus aria-hidden className="size-5" />
+                </button>
+            )}
             <button type="button" onClick={onBrand} className={item}>
                 <Palette aria-hidden className="size-[18px]" />
                 Brand

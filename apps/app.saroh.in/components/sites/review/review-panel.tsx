@@ -68,6 +68,7 @@ export function ReviewPanel({
     onJump,
     release = null,
     can = EVERYTHING,
+    previewLinks = true,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -80,6 +81,8 @@ export function ReviewPanel({
     /** The test release under review; null for the draft. */
     release?: PublicationRelease | null;
     can?: ReviewPanelAbilities;
+    /** The draft's preview links; off for a Reviewer (DEC-200). */
+    previewLinks?: boolean;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -172,7 +175,8 @@ export function ReviewPanel({
         </div>
     );
 
-    const shareLinks = release ? null : <PreviewLinks siteId={siteId} />;
+    const shareLinks =
+        release || !previewLinks ? null : <PreviewLinks siteId={siteId} />;
 
     /*
      * Not on your own request (UX-068): approving what you asked to have
