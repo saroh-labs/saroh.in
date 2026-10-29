@@ -341,6 +341,15 @@ export class RequestReviewDto {
  * settled a note; the pipe no longer converts anything (#314), so the decorator
  * says the whole rule and anything but true or false is a 400.
  */
+/** A note's new words (R4): the same rules as leaving one. */
+export class UpdateCommentBodyDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A note needs something in it" })
+    @MaxLength(2000, { message: "Notes are limited to 2000 characters" })
+    body!: string;
+}
+
 export class SetCommentResolvedDto {
     @IsBoolean({ message: "resolved must be true or false" })
     resolved!: boolean;

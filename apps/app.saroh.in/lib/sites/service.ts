@@ -1673,6 +1673,11 @@ export interface SiteCommentView {
     author: { id: string; name: string };
     /** The section this was about is no longer on the page. */
     orphaned: boolean;
+    /**
+     * You may still edit or delete it (R13): yours, open, and written after
+     * the latest approval of its target. The api decides; draw from this.
+     */
+    editable: boolean;
 }
 
 /**
@@ -1979,6 +1984,56 @@ export async function setCommentResolved(
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Couldn't update the note.") };
+}
+
+/**
+ * Rewrite your own open note (DEC-200 U3). Requires `site:comment`; the api
+ * refuses someone else's note (403) and one that is settled or part of an
+ * approved review (409), each in words the screen can show as they are.
+ */
+export async function updateCommentBody(
+    siteId: string,
+    commentId: string,
+    body: string,
+): Promise<SitesResult<{ id: string; body: string }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}/body`, {
+        method: "PATCH",
+        body: JSON.stringify({ body }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        body?: string;
+    } | null;
+    if (res.ok && data?.id)
+        return { ok: true, data: { id: data.id, body: data.body ?? body } };
+    return { ok: false, ...readError(data, "Couldn't change that note.") };
+}
+
+/** Delete your own open note (DEC-200 U3). Same rules as editing it. */
+export async function deleteComment(
+    siteId: string,
+    commentId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}`, {
+        method: "DELETE",
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Couldn't delete that note.") };
 }
 
 // ---------------------------------------------------------------------------

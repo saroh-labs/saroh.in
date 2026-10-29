@@ -140,6 +140,25 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, COMMENT, true],
     },
     {
+        handler: "updateCommentBody",
+        method: RequestMethod.PATCH,
+        path: ":siteId/comments/:commentId/body",
+        target: "sites",
+        call: "updateCommentBody",
+        // The handler unwraps the DTO: the service takes the words.
+        args: [ctx, SITE, COMMENT, { body: "Shorter, please" } as never],
+        expect: [ctx, SITE, COMMENT, "Shorter, please"],
+    },
+    {
+        handler: "deleteComment",
+        method: RequestMethod.DELETE,
+        path: ":siteId/comments/:commentId",
+        target: "sites",
+        call: "deleteComment",
+        args: [ctx, SITE, COMMENT],
+        expect: [ctx, SITE, COMMENT],
+    },
+    {
         handler: "requestReview",
         method: RequestMethod.POST,
         path: ":siteId/review/request",

@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -26,7 +27,11 @@ import {
     readinessMessage,
 } from "../orders/checkout-readiness";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
-import { allows, authorize } from "../organizations/organization-policy";
+import {
+    allows,
+    authorize,
+    ROLE_DENIED,
+} from "../organizations/organization-policy";
 import { domainPausedHere } from "./domain-paused";
 import type {
     CreateApprovalDto,
@@ -181,7 +186,21 @@ export interface CommentView {
     author: { id: string; name: string };
     /** The section this was about is no longer on the page. */
     orphaned: boolean;
+    /**
+     * The caller may still edit or delete it (R13): theirs, open, written
+     * after the latest approval of its target, on a release still open.
+     */
+    editable: boolean;
 }
+
+/** Why a note can't be changed, worded for the person trying (R13). */
+const NOTE_APPROVED_MESSAGE =
+    "This was part of an approved review, so it's kept as it was.";
+const NOTE_SETTLED_MESSAGE =
+    "This note has been settled, so it's kept as it was.";
+const NOTE_NOT_YOURS_MESSAGE =
+    "Only the person who wrote a note can change or delete it.";
+const NOTE_GONE_MESSAGE = "That note isn't there any more.";
 
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
@@ -2419,7 +2438,7 @@ export class SitesService {
             ? await frozenPages(ctx.organizationId, release.id)
             : null;
 
-        const [comments, pages] = await Promise.all([
+        const [comments, pages, approvedAt] = await Promise.all([
             prisma.siteComment.findMany({
                 where: {
                     siteId,
@@ -2455,7 +2474,10 @@ export class SitesService {
                     },
                 },
             }),
+            this.lastApprovalAt(ctx, siteId, release?.id ?? null),
         ]);
+        const mayChange =
+            allows(ctx, "site:comment") && (release?.isOpen ?? true);
 
         // Which section keys still exist, per page.
         const live = new Map<string, Set<string>>(
@@ -2494,7 +2516,158 @@ export class SitesService {
             },
             // A note whose page is gone is orphaned by definition.
             orphaned: c.pageId === null || !attached(c.pageId, c.sectionKey),
+            editable:
+                mayChange &&
+                c.author.id === ctx.userId &&
+                c.resolvedAt === null &&
+                (!approvedAt || c.createdAt > approvedAt),
         }));
+    }
+
+    /**
+     * When the latest APPROVED verdict on a note's target was recorded: the
+     * draft's (no release) or that test release's. Notes written before it
+     * are history (R13, owner 29 Oct).
+     */
+    private async lastApprovalAt(
+        ctx: OrganizationContext,
+        siteId: string,
+        testReleaseId: string | null,
+    ): Promise<Date | null> {
+        const row = await prisma.siteApproval.findFirst({
+            where: {
+                siteId,
+                organizationId: ctx.organizationId,
+                outcome: "APPROVED",
+                testReleaseId,
+            },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+        });
+        return row?.createdAt ?? null;
+    }
+
+    /**
+     * The one where-clause that finds AND changes the caller's own note
+     * (R13): theirs, open, written after the latest approval of its target.
+     * Refuses up front, in words, what it can already see is not allowed;
+     * a settle or an approval that lands between this read and the write is
+     * caught by the clause itself (`noteRaceRefusal`).
+     */
+    private async ownOpenNote(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<Prisma.SiteCommentWhereInput> {
+        authorize(ctx, "site:comment");
+        await assertSiteInOrg(ctx, siteId);
+        const scope = {
+            id: commentId,
+            siteId,
+            organizationId: ctx.organizationId,
+        };
+        const note = await prisma.siteComment.findFirst({
+            where: scope,
+            select: {
+                authorUserId: true,
+                resolvedAt: true,
+                testReleaseId: true,
+                createdAt: true,
+            },
+        });
+        if (!note) throw new NotFoundException(NOTE_GONE_MESSAGE);
+        if (note.authorUserId !== ctx.userId) {
+            throw new ForbiddenException({
+                message: NOTE_NOT_YOURS_MESSAGE,
+                details: { code: ROLE_DENIED, action: "site:comment" },
+            });
+        }
+        // A note on a release changes only while the release takes notes:
+        // 404 with test releases off, 409 once discarded or live.
+        if (note.testReleaseId) {
+            await releaseUnderReview(ctx, siteId, note.testReleaseId, {
+                open: true,
+            });
+        }
+        if (note.resolvedAt) {
+            throw new ConflictException(NOTE_SETTLED_MESSAGE);
+        }
+        const approvedAt = await this.lastApprovalAt(
+            ctx,
+            siteId,
+            note.testReleaseId,
+        );
+        if (approvedAt && note.createdAt <= approvedAt) {
+            throw new ConflictException(NOTE_APPROVED_MESSAGE);
+        }
+        return {
+            ...scope,
+            authorUserId: ctx.userId,
+            resolvedAt: null,
+            testReleaseId: note.testReleaseId,
+            ...(approvedAt ? { createdAt: { gt: approvedAt } } : {}),
+        };
+    }
+
+    /** The guarded write changed nothing: say what got there first. */
+    private async noteRaceRefusal(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<Error> {
+        const note = await prisma.siteComment.findFirst({
+            where: {
+                id: commentId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: { resolvedAt: true },
+        });
+        if (!note) return new NotFoundException(NOTE_GONE_MESSAGE);
+        return new ConflictException(
+            note.resolvedAt ? NOTE_SETTLED_MESSAGE : NOTE_APPROVED_MESSAGE,
+        );
+    }
+
+    /**
+     * Rewrite your own open note (R4, R13). Requires `site:comment`, and the
+     * note must be yours: nobody edits someone else's words.
+     */
+    async updateCommentBody(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+        body: string,
+    ): Promise<{ id: string; body: string; updatedAt: Date }> {
+        const where = await this.ownOpenNote(ctx, siteId, commentId);
+        const { count } = await prisma.siteComment.updateMany({
+            where,
+            data: { body },
+        });
+        if (count === 0) {
+            throw await this.noteRaceRefusal(ctx, siteId, commentId);
+        }
+        return prisma.siteComment.findFirstOrThrow({
+            where: { id: commentId, organizationId: ctx.organizationId },
+            select: { id: true, body: true, updatedAt: true },
+        });
+    }
+
+    /**
+     * Take back your own open note (R4, R13). It leaves the open-note count
+     * and the Ask-for-changes list with it.
+     */
+    async deleteComment(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<{ id: string }> {
+        const where = await this.ownOpenNote(ctx, siteId, commentId);
+        const { count } = await prisma.siteComment.deleteMany({ where });
+        if (count === 0) {
+            throw await this.noteRaceRefusal(ctx, siteId, commentId);
+        }
+        return { id: commentId };
     }
 
     /**

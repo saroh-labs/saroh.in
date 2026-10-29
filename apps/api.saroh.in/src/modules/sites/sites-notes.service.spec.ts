@@ -5,7 +5,16 @@ jest.mock("@saroh/database", () => {
         site: { findFirst: jest.fn() },
         page: { findFirst: jest.fn(), findMany: jest.fn() },
         pageVersion: { findFirst: jest.fn() },
-        siteComment: { create: jest.fn(), findMany: jest.fn() },
+        siteComment: {
+            create: jest.fn(),
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            findFirstOrThrow: jest.fn(),
+            updateMany: jest.fn(),
+            deleteMany: jest.fn(),
+        },
+        // The latest approval a note's edit window is measured from (R13).
+        siteApproval: { findFirst: jest.fn() },
         // A reviewer's note queues its alert on the same transaction (UX-043).
         job: { create: jest.fn() },
         siteReviewer: { count: jest.fn().mockResolvedValue(0) },
@@ -36,7 +45,15 @@ const db = prisma as unknown as {
     site: { findFirst: jest.Mock };
     page: { findFirst: jest.Mock; findMany: jest.Mock };
     pageVersion: { findFirst: jest.Mock };
-    siteComment: { create: jest.Mock; findMany: jest.Mock };
+    siteComment: {
+        create: jest.Mock;
+        findMany: jest.Mock;
+        findFirst: jest.Mock;
+        findFirstOrThrow: jest.Mock;
+        updateMany: jest.Mock;
+        deleteMany: jest.Mock;
+    };
+    siteApproval: { findFirst: jest.Mock };
 };
 
 const service = new SitesService({
@@ -71,6 +88,7 @@ beforeEach(() => {
             versions: [{ sections: [{ key: "sec_live" }] }],
         });
     db.siteComment.create.mockResolvedValue({ id: "note_1" });
+    db.siteApproval.findFirst.mockResolvedValue(null);
 });
 
 describe("createComment pins to a section that exists (#277)", () => {
@@ -240,5 +258,123 @@ describe("getPageForReview is what a reviewer reads (#275, #277)", () => {
         await expect(
             service.getPageForReview(ctx("REVIEWER"), "site_other", "page_1"),
         ).rejects.toThrow(/not found/);
+    });
+});
+
+describe("which notes the caller may still change (R13)", () => {
+    const row = (over: Record<string, unknown>) => ({
+        id: "note_1",
+        pageId: "page_1",
+        pageTitle: "About",
+        sectionKey: "sec_live",
+        body: "…",
+        resolvedAt: null,
+        createdAt: new Date("2026-10-20T10:00:00Z"),
+        author: { id: "user_1", name: "Meera", email: "m@example.com" },
+        ...over,
+    });
+
+    beforeEach(() => {
+        db.page.findMany.mockResolvedValue([
+            {
+                id: "page_1",
+                title: "About",
+                versions: [{ sections: [{ key: "sec_live" }] }],
+            },
+        ]);
+    });
+
+    it("marks your own open notes editable, and nobody else's or a settled one", async () => {
+        db.siteComment.findMany.mockResolvedValue([
+            row({ id: "mine" }),
+            row({
+                id: "theirs",
+                author: { id: "u2", name: "Asha", email: "a@example.com" },
+            }),
+            row({ id: "settled", resolvedAt: new Date() }),
+        ]);
+
+        const notes = await service.listComments(ctx("REVIEWER"), "site_1");
+
+        expect(notes.map((n) => [n.id, n.editable])).toEqual([
+            ["mine", true],
+            ["theirs", false],
+            ["settled", false],
+        ]);
+    });
+
+    it("locks notes written before the latest approval; later ones stay open", async () => {
+        db.siteApproval.findFirst.mockResolvedValue({
+            createdAt: new Date("2026-10-21T00:00:00Z"),
+        });
+        db.siteComment.findMany.mockResolvedValue([
+            row({ id: "before" }),
+            row({ id: "after", createdAt: new Date("2026-10-22T00:00:00Z") }),
+        ]);
+
+        const notes = await service.listComments(ctx("REVIEWER"), "site_1");
+
+        expect(notes.map((n) => [n.id, n.editable])).toEqual([
+            ["before", false],
+            ["after", true],
+        ]);
+        // The draft's approvals only: a release's never lock a draft note.
+        expect(db.siteApproval.findFirst.mock.calls[0][0].where).toMatchObject({
+            outcome: "APPROVED",
+            testReleaseId: null,
+        });
+    });
+
+    it("a MEMBER, who can't leave notes, can't change one either", async () => {
+        db.siteComment.findMany.mockResolvedValue([row({})]);
+
+        const [note] = await service.listComments(ctx("MEMBER"), "site_1");
+
+        expect(note.editable).toBe(false);
+    });
+});
+
+describe("a settle that lands first wins (R13)", () => {
+    beforeEach(() => {
+        // Open when read; settled by the time the guarded write runs.
+        db.siteComment.findFirst
+            .mockResolvedValueOnce({
+                authorUserId: "user_1",
+                resolvedAt: null,
+                testReleaseId: null,
+                createdAt: new Date(),
+            })
+            .mockResolvedValueOnce({ resolvedAt: new Date() });
+        db.siteComment.updateMany.mockResolvedValue({ count: 0 });
+        db.siteComment.deleteMany.mockResolvedValue({ count: 0 });
+    });
+
+    it("refuses the edit with words, not a silent no-op", async () => {
+        await expect(
+            service.updateCommentBody(
+                ctx("REVIEWER"),
+                "site_1",
+                "note_1",
+                "Shorter",
+            ),
+        ).rejects.toMatchObject({
+            status: 409,
+            message: "This note has been settled, so it's kept as it was.",
+        });
+        // The write carried every guard in its one where-clause.
+        expect(db.siteComment.updateMany.mock.calls[0][0].where).toEqual({
+            id: "note_1",
+            siteId: "site_1",
+            organizationId: "org_1",
+            authorUserId: "user_1",
+            resolvedAt: null,
+            testReleaseId: null,
+        });
+    });
+
+    it("refuses the delete the same way", async () => {
+        await expect(
+            service.deleteComment(ctx("REVIEWER"), "site_1", "note_1"),
+        ).rejects.toMatchObject({ status: 409 });
     });
 });

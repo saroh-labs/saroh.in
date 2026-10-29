@@ -29,6 +29,7 @@ import {
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
+    deleteComment as deleteCommentApi,
     deletePage as deletePageApi,
     fillDetails as fillDetailsApi,
     getReviewState as getReviewStateApi,
@@ -45,6 +46,7 @@ import {
     saveSiteIcon as saveSiteIconApi,
     setCommentResolved as setCommentResolvedApi,
     undoStarterContent as undoStarterContentApi,
+    updateCommentBody as updateCommentBodyApi,
     updatePage as updatePageApi,
     updateSiteFooter as updateSiteFooterApi,
     updateSiteNavigation as updateSiteNavigationApi,
@@ -235,6 +237,20 @@ export async function setCommentResolved(
     resolved: boolean,
 ) {
     return setCommentResolvedApi(siteId, commentId, resolved);
+}
+
+/** Rewrite your own open note (DEC-200 U3). */
+export async function updateCommentBody(
+    siteId: string,
+    commentId: string,
+    body: string,
+) {
+    return updateCommentBodyApi(siteId, commentId, body);
+}
+
+/** Delete your own open note (DEC-200 U3). */
+export async function deleteComment(siteId: string, commentId: string) {
+    return deleteCommentApi(siteId, commentId);
 }
 
 export async function listPreviewLinks(siteId: string) {
