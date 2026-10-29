@@ -4296,6 +4296,10 @@ second. On CI's runners, beside every other package's tests, it took 5.3 to
 **Rule**: a test that does real work in a loop (decoding, rasterising,
 hashing many inputs) gets an explicit timeout. CI ran this one six times
 slower than the laptop, so the local time says little.
+**Again (28 Oct, development after #1260)**: `form-sheet.test.tsx` read focus
+right after pressing Cancel; on CI the close animation hadn't handed focus
+back yet. Wait for it (`vi.waitFor`), never read focus once after a close.
+The 70-day showcase seed test also brushed its 300s limit on the same run.
 **Again (27 Oct, #1256)**: saroh.in's `lib/site-pages.test.ts` reads every
 changelog and Help entry and timed out the same way. saroh.in's and
 `@saroh/search-pages`' vitest configs now set `testTimeout: 30_000` for the
@@ -6081,6 +6085,7 @@ only `body_1` and `button_1`; `MESSAGING_SUPPORT_PHONE` is gone.
 **Rule**: sign-in codes use the code-and-button authentication shape only. Before
 spending more test sends on a failing template, get WhatsApp's error code.
 **Category**: integrations · messaging
+
 ## Moving files under a running `next dev` 500s every page
 
 **Symptom**: after `git mv`-ing app.saroh.in's settings pieces into

@@ -250,7 +250,10 @@ describe.each([
             await open(<Settings as={As} />);
             expect(document.activeElement).toBe(input("Name"));
             await press(button("Cancel"));
-            expect(document.activeElement?.id).toBe("edit-name");
+            // Focus goes back after the close animation; CI's runner is slower.
+            await vi.waitFor(() =>
+                expect(document.activeElement?.id).toBe("edit-name"),
+            );
         });
 
         it("goes to the first field Save found wrong", async () => {
