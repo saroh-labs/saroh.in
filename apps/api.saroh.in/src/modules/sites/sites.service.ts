@@ -242,6 +242,12 @@ export interface ReviewState {
      * not a second pair of eyes, and would not settle it anyway.
      */
     askedByYou: boolean;
+    /**
+     * How many of the site's pages the caller has opened since their latest
+     * verdict on the draft, of how many it has now (DEC-200, U9): "You've
+     * read 3 of 4 pages". Null on a test release's review.
+     */
+    pagesRead: { read: number; total: number } | null;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -2978,63 +2984,66 @@ export class SitesService {
                   ],
               }
             : { testReleaseId: null };
-        const [latest, standing, openNotes, newestAsk] = await Promise.all([
-            prisma.siteApproval.findFirst({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    ...scope,
-                },
-                // Two reviews can share a millisecond; the id (a cuid, which grows)
-                // keeps "newest" deterministic.
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: {
-                    outcome: true,
-                    reason: true,
-                    createdAt: true,
-                    by: { select: { name: true, email: true } },
-                },
-            }),
-            // Asked as "what would happen if THIS caller published now",
-            // because that is the question the editor's bar is answering.
-            // A release asks it of its own bytes.
-            release
-                ? readReviewStanding(prisma, {
-                      siteId,
-                      organizationId: ctx.organizationId,
-                      fingerprint: release.fingerprint,
-                      publisherUserId: ctx.userId,
-                      scope: "release",
-                  })
-                : this.currentDraftFingerprint(ctx, siteId).then(
-                      (fingerprint) =>
-                          this.reviewStandingFor(
-                              prisma,
-                              siteId,
-                              ctx.organizationId,
-                              fingerprint,
-                              ctx.userId,
-                          ),
-                  ),
-            prisma.siteComment.count({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    resolvedAt: null,
-                    testReleaseId: release?.id ?? null,
-                },
-            }),
-            prisma.siteApproval.findFirst({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    outcome: "REQUESTED",
-                    ...scope,
-                },
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: { byUserId: true },
-            }),
-        ]);
+        const [latest, standing, openNotes, newestAsk, pagesRead] =
+            await Promise.all([
+                prisma.siteApproval.findFirst({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        ...scope,
+                    },
+                    // Two reviews can share a millisecond; the id (a cuid, which grows)
+                    // keeps "newest" deterministic.
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: {
+                        outcome: true,
+                        reason: true,
+                        createdAt: true,
+                        by: { select: { name: true, email: true } },
+                    },
+                }),
+                // Asked as "what would happen if THIS caller published now",
+                // because that is the question the editor's bar is answering.
+                // A release asks it of its own bytes.
+                release
+                    ? readReviewStanding(prisma, {
+                          siteId,
+                          organizationId: ctx.organizationId,
+                          fingerprint: release.fingerprint,
+                          publisherUserId: ctx.userId,
+                          scope: "release",
+                      })
+                    : this.currentDraftFingerprint(ctx, siteId).then(
+                          (fingerprint) =>
+                              this.reviewStandingFor(
+                                  prisma,
+                                  siteId,
+                                  ctx.organizationId,
+                                  fingerprint,
+                                  ctx.userId,
+                              ),
+                      ),
+                prisma.siteComment.count({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        resolvedAt: null,
+                        testReleaseId: release?.id ?? null,
+                    },
+                }),
+                prisma.siteApproval.findFirst({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        outcome: "REQUESTED",
+                        ...scope,
+                    },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: { byUserId: true },
+                }),
+                // Last, so the reads above keep their order.
+                release ? null : this.pagesReadSinceVerdict(ctx, siteId),
+            ]);
         const pending =
             standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
 
@@ -3049,6 +3058,7 @@ export class SitesService {
             pending,
             askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
+            pagesRead,
             latestApproval:
                 latest === null
                     ? null
@@ -3059,6 +3069,71 @@ export class SitesService {
                           reason: latest.reason ?? null,
                       },
         };
+    }
+
+    /**
+     * The caller's pages read on the draft (DEC-200, U9): pages they opened
+     * after their own latest verdict, against the pages the site has now. A
+     * deleted page takes its views with it, so it drops out of both numbers.
+     */
+    private async pagesReadSinceVerdict(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ read: number; total: number }> {
+        const scope = { siteId, organizationId: ctx.organizationId };
+        const [verdict, total] = await Promise.all([
+            prisma.siteApproval.findFirst({
+                where: {
+                    ...scope,
+                    byUserId: ctx.userId,
+                    testReleaseId: null,
+                    outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { createdAt: true },
+            }),
+            prisma.page.count({ where: scope }),
+        ]);
+        const read = await prisma.siteReviewPageView.count({
+            where: {
+                ...scope,
+                userId: ctx.userId,
+                ...(verdict ? { viewedAt: { gt: verdict.createdAt } } : {}),
+            },
+        });
+        return { read, total };
+    }
+
+    /**
+     * A reviewer opened a page in the editor (DEC-200, U9): what "You've read
+     * 3 of 4 pages" counts. Once per person per page; opening it again moves
+     * the time on. Requires `site:read`. Anyone who can edit records nothing:
+     * the count is a reviewer's, and the owner's editor is not reading.
+     */
+    async recordPageView(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<{ recorded: boolean }> {
+        authorize(ctx, "site:read");
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
+        if (allows(ctx, "section:write")) return { recorded: false };
+        const viewedAt = new Date();
+        await prisma.siteReviewPageView.upsert({
+            where: {
+                siteId_userId_pageId: { siteId, userId: ctx.userId, pageId },
+            },
+            create: {
+                siteId,
+                pageId,
+                userId: ctx.userId,
+                organizationId: ctx.organizationId,
+                viewedAt,
+            },
+            update: { viewedAt },
+        });
+        return { recorded: true };
     }
 
     /**

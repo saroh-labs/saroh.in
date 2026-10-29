@@ -102,6 +102,9 @@ model User {
   // Insights suggestions this person put off with Not now (DEC-171).
   insightSuggestionsNotNow InsightSuggestionNotNow[]
 
+  // Pages of a site this person opened as a reviewer (DEC-200, U9).
+  siteReviewPageViews SiteReviewPageView[]
+
   @@index([email])
 }
 
@@ -283,6 +286,7 @@ model Organization {
   qrCodes              QrCode[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
+  siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
@@ -3862,6 +3866,9 @@ model Site {
   // their redirect lasts (DEC-069, L1).
   addressReservations AddressReservation[]
 
+  // Which pages each reviewer has opened (DEC-200, U9).
+  reviewPageViews SiteReviewPageView[]
+
   // The storefront this site sells from (G11): what `/shop`, the Product
   // grid and checkout read. Set on its own only when the business has
   // exactly one open storefront with listings (the migration's backfill and
@@ -3902,8 +3909,9 @@ model Page {
   // serves, and a site whose front door is hidden has nothing to show.
   hidden Boolean @default(false)
 
-  versions PageVersion[]
-  comments SiteComment[]
+  versions    PageVersion[]
+  comments    SiteComment[]
+  reviewViews SiteReviewPageView[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3997,6 +4005,39 @@ model SiteComment {
   @@index([pageId, sectionKey])
   @@index([organizationId])
   @@index([testReleaseId])
+}
+
+/**
+ * A reviewer opened a page of the site in the editor (DEC-200, U9): what
+ * "You've read 3 of 4 pages" counts. Kept on the server, one row per person
+ * per page, so it follows them to any browser or phone; opening the page
+ * again moves `viewedAt` on rather than adding a row. Only views after the
+ * person's latest verdict count, so a verdict starts the count again.
+ * Cascade on the page, unlike SiteComment's SetNull: a note is a record of
+ * what someone said and outlives its page, a view of a page that is gone is
+ * nothing, and the count is against the site's current pages.
+ */
+model SiteReviewPageView {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  viewedAt DateTime @default(now())
+
+  // Site first: the review state reads one person's views on one site.
+  @@unique([siteId, userId, pageId])
+  @@index([pageId])
+  @@index([userId])
+  @@index([organizationId])
 }
 
 /**

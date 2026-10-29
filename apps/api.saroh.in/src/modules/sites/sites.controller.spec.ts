@@ -281,6 +281,15 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, PAGE],
     },
     {
+        handler: "recordPageView",
+        method: RequestMethod.POST,
+        path: ":siteId/pages/:pageId/viewed",
+        target: "sites",
+        call: "recordPageView",
+        args: [ctx, SITE, PAGE],
+        expect: [ctx, SITE, PAGE],
+    },
+    {
         handler: "replaceDraftSections",
         method: RequestMethod.PUT,
         path: ":siteId/pages/:pageId/draft/sections",

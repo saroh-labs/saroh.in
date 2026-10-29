@@ -5,7 +5,15 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const db: Record<string, unknown> = {
         site: { findFirst: jest.fn() },
-        page: { findFirst: jest.fn(), findMany: jest.fn() },
+        page: {
+            findFirst: jest.fn(),
+            findMany: jest.fn(),
+            count: jest.fn().mockResolvedValue(0),
+        },
+        siteReviewPageView: {
+            count: jest.fn().mockResolvedValue(0),
+            upsert: jest.fn(),
+        },
         siteComment: {
             findMany: jest.fn(),
             findFirst: jest.fn(),
@@ -952,5 +960,93 @@ describe("telling the other side (UX-043)", () => {
         expect(approvalCreate).toHaveBeenCalledTimes(1);
         expect(jobCreate).not.toHaveBeenCalled();
         fingerprint.mockRestore();
+    });
+});
+
+describe("pages read (DEC-200, U9)", () => {
+    const viewUpsert = prisma.siteReviewPageView.upsert as jest.Mock;
+    const viewCount = prisma.siteReviewPageView.count as jest.Mock;
+    const pageCount = prisma.page.count as jest.Mock;
+    const reviewer = () => ctx({ userId: "reviewer", role: "REVIEWER" });
+
+    it("records a reviewer's open of a page, once per person per page", async () => {
+        await expect(
+            service.recordPageView(reviewer(), "site_1", "page_1"),
+        ).resolves.toEqual({ recorded: true });
+        expect(viewUpsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    siteId_userId_pageId: {
+                        siteId: "site_1",
+                        userId: "reviewer",
+                        pageId: "page_1",
+                    },
+                },
+                create: expect.objectContaining({ organizationId: "org_1" }),
+            }),
+        );
+    });
+
+    // A MEMBER can't edit either (no `section:write`), so reads like a reviewer.
+    it.each(["OWNER", "ADMIN"] as const)(
+        "records nothing for %s, who can edit",
+        async (role) => {
+            await expect(
+                service.recordPageView(ctx({ role }), "site_1", "page_1"),
+            ).resolves.toEqual({ recorded: false });
+            expect(viewUpsert).not.toHaveBeenCalled();
+        },
+    );
+
+    it("404s a page that isn't on the site, and a site they weren't invited to", async () => {
+        pageFindFirst.mockResolvedValueOnce(null);
+        await expect(
+            service.recordPageView(reviewer(), "site_1", "page_x"),
+        ).rejects.toThrow(/not found/);
+        siteFindFirst.mockResolvedValueOnce(null);
+        await expect(
+            service.recordPageView(reviewer(), "site_x", "page_1"),
+        ).rejects.toThrow(/not found/);
+        expect(viewUpsert).not.toHaveBeenCalled();
+    });
+
+    it("counts views after the caller's own latest verdict on the draft", async () => {
+        const at = new Date("2026-10-29T10:00:00Z");
+        approvalFindFirst.mockImplementation(({ where }) =>
+            where.byUserId ? { createdAt: at } : null,
+        );
+        approvalFindMany.mockResolvedValue([]);
+        commentCount.mockResolvedValue(0);
+        pageCount.mockResolvedValue(4);
+        viewCount.mockResolvedValue(2);
+
+        const state = await service.getReviewState(reviewer(), "site_1");
+
+        expect(state.pagesRead).toEqual({ read: 2, total: 4 });
+        expect(viewCount.mock.calls[0][0].where).toMatchObject({
+            siteId: "site_1",
+            organizationId: "org_1",
+            userId: "reviewer",
+            viewedAt: { gt: at },
+        });
+        const verdictQuery = approvalFindFirst.mock.calls.find(
+            ([q]) => q.where.byUserId,
+        )?.[0];
+        expect(verdictQuery.where).toMatchObject({
+            byUserId: "reviewer",
+            testReleaseId: null,
+            outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+        });
+    });
+
+    it("counts every view before any verdict, and none for a test release", async () => {
+        approvalFindFirst.mockResolvedValue(null);
+        approvalFindMany.mockResolvedValue([]);
+        commentCount.mockResolvedValue(0);
+        pageCount.mockResolvedValue(3);
+        viewCount.mockResolvedValue(1);
+        const state = await service.getReviewState(reviewer(), "site_1");
+        expect(state.pagesRead).toEqual({ read: 1, total: 3 });
+        expect(viewCount.mock.calls[0][0].where).not.toHaveProperty("viewedAt");
     });
 });

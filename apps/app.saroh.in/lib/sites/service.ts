@@ -1730,6 +1730,17 @@ export interface ReviewState {
      * Approve or Ask for changes on it.
      */
     askedByYou?: boolean;
+    /**
+     * Pages the caller has opened since their latest verdict on the draft, of
+     * the pages the site has now (DEC-200, U9): "You've read 3 of 4 pages".
+     * Null on a test release's review, or from an API that doesn't send it.
+     */
+    pagesRead?: PagesRead | null;
+}
+
+export interface PagesRead {
+    read: number;
+    total: number;
 }
 
 /**
@@ -1799,6 +1810,36 @@ export async function getReviewState(
         pending: data.pending === true,
         approvalIsStale: data.approvalIsStale === true,
         askedByYou: data.askedByYou === true,
+        pagesRead: data.pagesRead ?? null,
+    };
+}
+
+/**
+ * A reviewer opened a page in the editor (DEC-200, U9), so "You've read 3 of
+ * 4 pages" follows them to any browser. Once per page open, not per render.
+ * The API records nothing for someone who can edit.
+ */
+export async function recordPageView(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<{ recorded: boolean }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}/viewed`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as {
+        recorded?: boolean;
+    } | null;
+    if (res.ok)
+        return { ok: true, data: { recorded: data?.recorded === true } };
+    return {
+        ok: false,
+        ...readError(data, "Couldn't save that you read this page."),
     };
 }
 

@@ -334,6 +334,20 @@ export class SitesController {
     }
 
     /**
+     * A reviewer opened this page (DEC-200, U9), for "You've read 3 of 4
+     * pages". Requires `site:read`; an editor's open records nothing.
+     */
+    @Post(":siteId/pages/:pageId/viewed")
+    @HttpCode(200)
+    recordPageView(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.recordPageView(ctx, siteId, pageId);
+    }
+
+    /**
      * Replace a page's DRAFT sections with an ordered list. Each section is
      * contract-validated before any write; the whole request is rejected if any
      * is invalid. Requires `section:write`.

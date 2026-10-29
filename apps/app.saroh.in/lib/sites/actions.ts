@@ -38,6 +38,7 @@ import {
     listDraftVersions as listDraftVersionsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    recordPageView as recordPageViewApi,
     requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
@@ -229,6 +230,11 @@ export async function listComments(siteId: string, testReleaseId?: string) {
 
 export async function getReviewState(siteId: string, testReleaseId?: string) {
     return getReviewStateApi(siteId, testReleaseId);
+}
+
+/** A reviewer opened a page in the editor (DEC-200, U9). */
+export async function recordPageView(siteId: string, pageId: string) {
+    return recordPageViewApi(siteId, pageId);
 }
 
 export async function setCommentResolved(
