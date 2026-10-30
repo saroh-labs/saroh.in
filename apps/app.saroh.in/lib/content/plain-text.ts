@@ -1,6 +1,6 @@
 /**
  * A post's body as plain paragraphs, for the read view a reader gets
- * (`post-read-view.tsx`).
+ * (the post editor read-only, DEC-200 U8).
  *
  * The body is the editor's HTML, and a draft's is sanitized only when it is
  * published (`posts.service.ts`). So a draft is never drawn as markup here:

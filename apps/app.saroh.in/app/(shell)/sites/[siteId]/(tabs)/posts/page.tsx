@@ -107,8 +107,8 @@ export default async function SitePostsPage({
                         >
                             <Link
                                 href={`${base}/${post.id}`}
-                                // A reader opens it to read (`PostReadView`),
-                                // and the row says so.
+                                // A reader opens the post editor read-only,
+                                // with its notes (DEC-200 U8); the row says so.
                                 aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >

@@ -83,7 +83,7 @@ export default async function TestReleasePage({
 
     const back = site.can.edit
         ? { href: `/sites/${siteId}`, label: "Back to the editor" }
-        : { href: `/sites/${siteId}/review`, label: "Back to review" };
+        : { href: `/sites/${siteId}`, label: "Back to review" };
 
     return (
         <PageContainer>

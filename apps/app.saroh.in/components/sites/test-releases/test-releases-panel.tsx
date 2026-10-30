@@ -5,6 +5,7 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
+import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { ReleaseRow } from "@/components/sites/test-releases/release-row";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
@@ -29,7 +30,12 @@ export function TestReleasesPanel({
 }) {
     const [retrying, setRetrying] = useState(false);
     const [allEarlier, setAllEarlier] = useState(false);
-    const { read, zone, releases, abilities } = state;
+    const { read, zone, releases } = state;
+    // Read-only (DEC-200): each release's Review link, nothing else.
+    const readOnly = useEditorReadOnly();
+    const abilities = readOnly
+        ? { ...state.abilities, canUpdate: false, canPublish: false }
+        : state.abilities;
     const current = releases.filter(
         (r) => r.status === "ready" || r.status === "scheduled",
     );

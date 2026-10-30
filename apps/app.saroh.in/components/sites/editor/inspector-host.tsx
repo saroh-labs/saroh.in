@@ -14,6 +14,7 @@ import type {
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
 import { ReviewPanel } from "@/components/sites/review/review-panel";
+import { ReviewerStatus } from "@/components/sites/review/reviewer-status";
 import type {
     Flag,
     ReviewState,
@@ -25,6 +26,10 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { Segmented } from "@saroh/ui/segmented";
 import { EditorTabs } from "./editor-chrome";
 import { SECTION_LABELS } from "./editor-constants";
+import { useEditorReadOnly, useEditorReviewCan } from "./read-only";
+
+/** A Reviewer's powers in Feedback (DEC-200): notes, nothing else here. */
+const READ_ONLY_REVIEW = { approve: false, ask: false, settle: false };
 
 /**
  * The right column: the inspector (#340). Block is what can be changed about
@@ -49,6 +54,7 @@ export function InspectorHost({
     openNotes,
     notesByKey,
     refreshReview,
+    loadFailed = false,
     jumpToNote,
     style,
     styleOptions,
@@ -78,6 +84,8 @@ export function InspectorHost({
     openNotes: number;
     notesByKey: Map<string, number>;
     refreshReview: () => Promise<void>;
+    /** The last re-read of notes and verdict failed (RVD4). */
+    loadFailed?: boolean;
     jumpToNote: (pageId: string, sectionKey: string) => void;
     style: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -96,6 +104,29 @@ export function InspectorHost({
         "block",
     );
     const services = useServicesForPicker();
+    /*
+     * Read-only (DEC-200): no settling, no verdict and no preview links in
+     * the panel; the verdict is the top bar's (U4). Above the notes, where
+     * the review stands for this Reviewer.
+     */
+    const readOnly = useEditorReadOnly();
+    const reviewCan = useEditorReviewCan();
+    /** "See the notes": the whole site, settled notes only (RVD4). */
+    const [settledOnly, setSettledOnly] = useState(false);
+    const status =
+        readOnly && inspector === "feedback" ? (
+            <div className="px-4 pt-4">
+                <ReviewerStatus
+                    review={review}
+                    loadFailed={loadFailed}
+                    onRetry={() => void refreshReview()}
+                    onSeeSettled={() => {
+                        setSettledOnly(true);
+                        setFeedbackScope("site");
+                    }}
+                />
+            </div>
+        ) : null;
 
     return (
         <aside aria-label="Inspector" className="flex min-h-0 flex-col">
@@ -145,6 +176,7 @@ export function InspectorHost({
                         />
                     </div>
                 ) : null}
+                {status}
                 {inspector === "feedback" &&
                 active &&
                 feedbackScope === "block" ? (
@@ -158,6 +190,9 @@ export function InspectorHost({
                         label={SECTION_LABELS[active.section.type]}
                         comments={comments}
                         onChanged={refreshReview}
+                        canSettle={!readOnly}
+                        canComment={reviewCan.comment}
+                        reviewer={readOnly}
                     />
                 ) : inspector === "feedback" ? (
                     <ReviewPanel
@@ -165,11 +200,20 @@ export function InspectorHost({
                         pages={pages}
                         comments={comments}
                         review={review}
+                        {...(readOnly
+                            ? {
+                                  can: READ_ONLY_REVIEW,
+                                  previewLinks: false,
+                                  settledOnly,
+                                  onShowAll: () => setSettledOnly(false),
+                              }
+                            : {})}
                         onChanged={() => void refreshReview()}
                         onJump={(jumpPageId, sectionKey) => {
                             jumpToNote(jumpPageId, sectionKey);
                             // Arrived at the block: show its notes.
                             setFeedbackScope("block");
+                            setSettledOnly(false);
                         }}
                     />
                 ) : selectedChrome ? (
@@ -213,6 +257,7 @@ export function InspectorHost({
                             move(active.index, delta);
                             setSelectedIndex(active.index + delta);
                         }}
+                        onAddNote={() => setInspector("feedback")}
                         onRemove={() => {
                             // At once, with Undo (G3): taking a block off
                             // the page is reversible, so it is not asked.

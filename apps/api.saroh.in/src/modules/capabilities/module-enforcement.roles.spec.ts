@@ -11,9 +11,14 @@ jest.mock("@saroh/database", () => {
                 versions: [{ sections: [{ key: "hero" }] }],
             }),
             findMany: jest.fn().mockResolvedValue([]),
+            // Pages read (DEC-200, U9).
+            count: jest.fn().mockResolvedValue(0),
         },
+        siteReviewPageView: { count: jest.fn().mockResolvedValue(0) },
         siteComment: {
             findMany: jest.fn().mockResolvedValue([]),
+            // A reviewer's newest note, for "settled since you looked" (U4).
+            findFirst: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockResolvedValue({ id: "note_1" }),
             count: jest.fn().mockResolvedValue(0),
         },

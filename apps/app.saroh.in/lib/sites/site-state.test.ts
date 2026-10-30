@@ -73,3 +73,42 @@ describe("pageState", () => {
         ).toBe("live");
     });
 });
+
+describe("siteState for a reader (U6)", () => {
+    const reader = { timeZone: "Asia/Kolkata" };
+
+    it("says live and since when, not the owner's checks", () => {
+        expect(
+            siteState(
+                {
+                    ...base,
+                    currentPublicationId: "p",
+                    currentPublication: {
+                        publishedAt: "2026-10-17T06:00:00.000Z",
+                    },
+                    pendingSectionChanges: 3,
+                    hasUnpublishedChanges: true,
+                    pendingDomain: "shop.example.com",
+                },
+                { reader },
+            ),
+        ).toEqual({ label: "Live · published 17 Oct", tone: "live" });
+    });
+
+    it("says Not published yet for a site never published", () => {
+        expect(siteState(base, { reader })).toEqual({
+            label: "Not published yet",
+            tone: "draft",
+        });
+    });
+
+    it("still tells an editor what there is to look at", () => {
+        expect(
+            siteState({
+                ...base,
+                currentPublicationId: "p",
+                pendingSectionChanges: 3,
+            }).label,
+        ).toBe("Live · 3 things to look at");
+    });
+});

@@ -30,6 +30,7 @@ export function useEditorDraft({
     siteName,
     initialSections,
     initialRevision,
+    readOnly = false,
     publishing,
     recordSaved,
     refreshFlags,
@@ -41,6 +42,11 @@ export function useEditorDraft({
     initialSections: Section[];
     /** Which edit of the draft `initialSections` are (#285). */
     initialRevision: number;
+    /**
+     * No-save mode (DEC-200): a Reviewer's editor keeps the sections for
+     * selection and the canvas, and never saves, whatever changes.
+     */
+    readOnly?: boolean;
     /** Nothing autosaves while a publish is in flight. */
     publishing: boolean;
     /** What publishing would change, as the save recounted it. */
@@ -223,6 +229,7 @@ export function useEditorDraft({
     const failedJson = useRef<string | null>(null);
 
     async function onSave(auto = false) {
+        if (readOnly) return;
         setSaving(true);
         setErrorIndex(null);
         setErrorMessage(null);
@@ -356,7 +363,7 @@ export function useEditorDraft({
      * publish a state the server has not accepted.
      */
     useEffect(() => {
-        if (!dirty || saving || publishing) return;
+        if (readOnly || !dirty || saving || publishing) return;
         /*
          * Nothing autosaves once the draft has moved on under this editor
          * (#285). Every later edit would carry the same stale revision and be
@@ -387,6 +394,7 @@ export function useEditorDraft({
         conflict,
         sections,
         onlyHeldBack,
+        readOnly,
     ]);
 
     return {

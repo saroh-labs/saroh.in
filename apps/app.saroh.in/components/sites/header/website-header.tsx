@@ -150,7 +150,8 @@ export function WebsiteHeader({
                   // Settings is left out of the reading tabs for the reason
                   // it was left out of the rail: it opens, and then says they
                   // cannot change anything.
-                  { id: "review", label: "Review", href: `${base}/review` },
+                  // Opens the editor, read-only (DEC-200).
+                  { id: "review", label: "Review", href: base },
                   {
                       id: "posts",
                       label: "Posts",
@@ -160,7 +161,8 @@ export function WebsiteHeader({
                   ...formsTab,
               ];
     const active =
-        tabs.find((t) => pathname.startsWith(t.href))?.id ?? tabs[0].id;
+        tabs.find((t) => t.href !== base && pathname.startsWith(t.href))?.id ??
+        tabs[0].id;
 
     // Switching site keeps the tab you were on, where the other site has it.
     const switchTo = (id: string) =>

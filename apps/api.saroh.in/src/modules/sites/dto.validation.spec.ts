@@ -13,6 +13,7 @@ import {
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
+    UpdateCommentBodyDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
     UpdateSiteSettingsDto,
@@ -310,5 +311,28 @@ describe("review of a test release (DEC-071, T8)", () => {
         await expect(
             pipe.transform(body, asBody(RequestReviewDto)),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("UpdateCommentBodyDto: a note's new words follow the rules of a new note (R4)", () => {
+    it("takes the words, trimmed", async () => {
+        await expect(
+            pipe.transform(
+                { body: "  Say the hours up top  " },
+                asBody(UpdateCommentBodyDto),
+            ),
+        ).resolves.toMatchObject({ body: "Say the hours up top" });
+    });
+
+    it.each([
+        ["nothing", { body: "" }],
+        ["only spaces", { body: "   " }],
+        ["over 2000 characters", { body: "x".repeat(2001) }],
+        ["no body", {}],
+        ["a field it does not accept", { body: "ok", resolved: true }],
+    ])("refuses %s (400)", async (_label, body) => {
+        await expect(
+            pipe.transform(body, asBody(UpdateCommentBodyDto)),
+        ).rejects.toThrow(BadRequestException);
     });
 });

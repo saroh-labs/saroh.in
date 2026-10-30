@@ -22,6 +22,7 @@ const editor = vi.hoisted(() => ({
     reload: null as null | SiteEditorProps["reloadDraft"],
     sections: [] as unknown[],
     sheet: undefined as SiteEditorProps["initialSheet"],
+    readOnly: undefined as boolean | undefined,
 }));
 vi.mock("./site-editor", async () => {
     const { useState } = await import("react");
@@ -35,6 +36,7 @@ vi.mock("./site-editor", async () => {
             editor.reload = props.reloadDraft ?? null;
             editor.sheet = props.initialSheet;
             editor.sections = sections;
+            editor.readOnly = props.readOnly;
             return null;
         },
     };
@@ -93,6 +95,14 @@ describe("SiteEditorHost", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
         act(() => root.render(<SiteEditorHost {...props("Later")} />));
         expect(editor.mounts).toBe(1);
+    });
+
+    it("hands a Reviewer's editor its read-only switch and the read sections (DEC-200)", () => {
+        act(() => root.render(<SiteEditorHost {...props("Ours")} readOnly />));
+        expect(editor.readOnly).toBe(true);
+        expect(editor.sections).toEqual([
+            { type: "hero", content: { heading: "Ours" } },
+        ]);
     });
 
     it("opens another page by its address", () => {

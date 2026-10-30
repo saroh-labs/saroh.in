@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -26,7 +27,11 @@ import {
     readinessMessage,
 } from "../orders/checkout-readiness";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
-import { allows, authorize } from "../organizations/organization-policy";
+import {
+    allows,
+    authorize,
+    ROLE_DENIED,
+} from "../organizations/organization-policy";
 import { domainPausedHere } from "./domain-paused";
 import type {
     CreateApprovalDto,
@@ -174,14 +179,35 @@ export interface CommentView {
     /** Null once the page it was left on has been deleted (#277). */
     pageId: string | null;
     pageTitle: string | null;
-    sectionKey: string;
+    /** Null on a note about a post (DEC-200 U8). */
+    sectionKey: string | null;
+    /** The post a note is about; null once that post is deleted. */
+    postId: string | null;
+    /** The post's title, live while it exists; null on a page's note. */
+    postTitle: string | null;
     body: string;
     resolvedAt: Date | null;
     createdAt: Date;
     author: { id: string; name: string };
     /** The section this was about is no longer on the page. */
     orphaned: boolean;
+    /**
+     * The caller may still edit or delete it (R13): theirs, open, written
+     * after the latest approval of its target, on a release still open.
+     */
+    editable: boolean;
+    /** The caller wrote it (DEC-200, U4): "You", and the locked line. */
+    mine: boolean;
 }
+
+/** Why a note can't be changed, worded for the person trying (R13). */
+const NOTE_APPROVED_MESSAGE =
+    "This was part of an approved review, so it's kept as it was.";
+const NOTE_SETTLED_MESSAGE =
+    "This note has been settled, so it's kept as it was.";
+const NOTE_NOT_YOURS_MESSAGE =
+    "Only the person who wrote a note can change or delete it.";
+const NOTE_GONE_MESSAGE = "That note isn't there any more.";
 
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
@@ -223,6 +249,25 @@ export interface ReviewState {
      * not a second pair of eyes, and would not settle it anyway.
      */
     askedByYou: boolean;
+    /**
+     * How many of the site's pages the caller has opened since their latest
+     * verdict on the draft, of how many it has now (DEC-200, U9): "You've
+     * read 3 of 4 pages". Null on a test release's review.
+     */
+    pagesRead: { read: number; total: number } | null;
+    /**
+     * The newest request for a review, open or not (DEC-200, U4): who asked
+     * and when, for "Asha asked you to review". Null when nobody ever has.
+     */
+    request: { by: string; at: Date } | null;
+    /** The caller's own latest verdict on the draft; null on a release. */
+    yourVerdict: { outcome: string; at: Date } | null;
+    /**
+     * The caller's notes settled since they last spoke (their newest note
+     * or verdict), for a Reviewer coming back. Null when none, on a
+     * release, or for someone who settles notes themselves.
+     */
+    settledForYou: { count: number; at: Date } | null;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -2419,7 +2464,7 @@ export class SitesService {
             ? await frozenPages(ctx.organizationId, release.id)
             : null;
 
-        const [comments, pages] = await Promise.all([
+        const [comments, pages, approvedAt] = await Promise.all([
             prisma.siteComment.findMany({
                 where: {
                     siteId,
@@ -2435,6 +2480,10 @@ export class SitesService {
                     pageId: true,
                     pageTitle: true,
                     sectionKey: true,
+                    postId: true,
+                    postTitle: true,
+                    // The live title while the post exists (DEC-200 U8).
+                    post: { select: { title: true } },
                     body: true,
                     resolvedAt: true,
                     createdAt: true,
@@ -2455,7 +2504,10 @@ export class SitesService {
                     },
                 },
             }),
+            this.lastApprovalAt(ctx, siteId, release?.id ?? null),
         ]);
+        const mayChange =
+            allows(ctx, "site:comment") && (release?.isOpen ?? true);
 
         // Which section keys still exist, per page.
         const live = new Map<string, Set<string>>(
@@ -2484,6 +2536,8 @@ export class SitesService {
                 (c.pageId === null ? null : titles.get(c.pageId)) ??
                 c.pageTitle,
             sectionKey: c.sectionKey,
+            postId: c.postId,
+            postTitle: c.post?.title ?? c.postTitle ?? null,
             body: c.body,
             resolvedAt: c.resolvedAt,
             createdAt: c.createdAt,
@@ -2492,9 +2546,164 @@ export class SitesService {
                 // A name is nicer, but an email always exists.
                 name: c.author.name ?? c.author.email,
             },
-            // A note whose page is gone is orphaned by definition.
-            orphaned: c.pageId === null || !attached(c.pageId, c.sectionKey),
+            // A note whose page (or post) is gone is orphaned by definition.
+            orphaned:
+                c.sectionKey === null
+                    ? c.postId === null
+                    : c.pageId === null || !attached(c.pageId, c.sectionKey),
+            editable:
+                mayChange &&
+                c.author.id === ctx.userId &&
+                c.resolvedAt === null &&
+                (!approvedAt || c.createdAt > approvedAt),
+            mine: c.author.id === ctx.userId,
         }));
+    }
+
+    /**
+     * When the latest APPROVED verdict on a note's target was recorded: the
+     * draft's (no release) or that test release's. Notes written before it
+     * are history (R13, owner 29 Oct).
+     */
+    private async lastApprovalAt(
+        ctx: OrganizationContext,
+        siteId: string,
+        testReleaseId: string | null,
+    ): Promise<Date | null> {
+        const row = await prisma.siteApproval.findFirst({
+            where: {
+                siteId,
+                organizationId: ctx.organizationId,
+                outcome: "APPROVED",
+                testReleaseId,
+            },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+        });
+        return row?.createdAt ?? null;
+    }
+
+    /**
+     * The one where-clause that finds AND changes the caller's own note
+     * (R13): theirs, open, written after the latest approval of its target.
+     * Refuses up front, in words, what it can already see is not allowed;
+     * a settle or an approval that lands between this read and the write is
+     * caught by the clause itself (`noteRaceRefusal`).
+     */
+    private async ownOpenNote(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<Prisma.SiteCommentWhereInput> {
+        authorize(ctx, "site:comment");
+        await assertSiteInOrg(ctx, siteId);
+        const scope = {
+            id: commentId,
+            siteId,
+            organizationId: ctx.organizationId,
+        };
+        const note = await prisma.siteComment.findFirst({
+            where: scope,
+            select: {
+                authorUserId: true,
+                resolvedAt: true,
+                testReleaseId: true,
+                createdAt: true,
+            },
+        });
+        if (!note) throw new NotFoundException(NOTE_GONE_MESSAGE);
+        if (note.authorUserId !== ctx.userId) {
+            throw new ForbiddenException({
+                message: NOTE_NOT_YOURS_MESSAGE,
+                details: { code: ROLE_DENIED, action: "site:comment" },
+            });
+        }
+        // A note on a release changes only while the release takes notes:
+        // 404 with test releases off, 409 once discarded or live.
+        if (note.testReleaseId) {
+            await releaseUnderReview(ctx, siteId, note.testReleaseId, {
+                open: true,
+            });
+        }
+        if (note.resolvedAt) {
+            throw new ConflictException(NOTE_SETTLED_MESSAGE);
+        }
+        const approvedAt = await this.lastApprovalAt(
+            ctx,
+            siteId,
+            note.testReleaseId,
+        );
+        if (approvedAt && note.createdAt <= approvedAt) {
+            throw new ConflictException(NOTE_APPROVED_MESSAGE);
+        }
+        return {
+            ...scope,
+            authorUserId: ctx.userId,
+            resolvedAt: null,
+            testReleaseId: note.testReleaseId,
+            ...(approvedAt ? { createdAt: { gt: approvedAt } } : {}),
+        };
+    }
+
+    /** The guarded write changed nothing: say what got there first. */
+    private async noteRaceRefusal(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<Error> {
+        const note = await prisma.siteComment.findFirst({
+            where: {
+                id: commentId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: { resolvedAt: true },
+        });
+        if (!note) return new NotFoundException(NOTE_GONE_MESSAGE);
+        return new ConflictException(
+            note.resolvedAt ? NOTE_SETTLED_MESSAGE : NOTE_APPROVED_MESSAGE,
+        );
+    }
+
+    /**
+     * Rewrite your own open note (R4, R13). Requires `site:comment`, and the
+     * note must be yours: nobody edits someone else's words.
+     */
+    async updateCommentBody(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+        body: string,
+    ): Promise<{ id: string; body: string; updatedAt: Date }> {
+        const where = await this.ownOpenNote(ctx, siteId, commentId);
+        const { count } = await prisma.siteComment.updateMany({
+            where,
+            data: { body },
+        });
+        if (count === 0) {
+            throw await this.noteRaceRefusal(ctx, siteId, commentId);
+        }
+        return prisma.siteComment.findFirstOrThrow({
+            where: { id: commentId, organizationId: ctx.organizationId },
+            select: { id: true, body: true, updatedAt: true },
+        });
+    }
+
+    /**
+     * Take back your own open note (R4, R13). It leaves the open-note count
+     * and the Ask-for-changes list with it.
+     */
+    async deleteComment(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+    ): Promise<{ id: string }> {
+        const where = await this.ownOpenNote(ctx, siteId, commentId);
+        const { count } = await prisma.siteComment.deleteMany({ where });
+        if (count === 0) {
+            throw await this.noteRaceRefusal(ctx, siteId, commentId);
+        }
+        return { id: commentId };
     }
 
     /**
@@ -2571,6 +2780,15 @@ export class SitesService {
     ): Promise<{ id: string }> {
         authorize(ctx, "site:comment");
         await assertSiteInOrg(ctx, siteId);
+        if (dto.postId !== undefined) {
+            return this.createPostComment(ctx, siteId, dto);
+        }
+        if (dto.pageId === undefined || dto.sectionKey === undefined) {
+            throw new BadRequestException(
+                "Say which section of which page the note is about.",
+            );
+        }
+        const target = { pageId: dto.pageId, sectionKey: dto.sectionKey };
         // A note on a release is about what it froze (T8), and a release
         // that is gone or live takes no more notes.
         const release = dto.testReleaseId
@@ -2578,7 +2796,7 @@ export class SitesService {
                   open: true,
               })
             : null;
-        await assertPageInSite(ctx, siteId, dto.pageId);
+        await assertPageInSite(ctx, siteId, target.pageId);
 
         /*
          * The key must name a section that is actually on the page's draft
@@ -2592,7 +2810,7 @@ export class SitesService {
          */
         const page = await prisma.page.findFirst({
             where: {
-                id: dto.pageId,
+                id: target.pageId,
                 siteId,
                 organizationId: ctx.organizationId,
             },
@@ -2609,7 +2827,7 @@ export class SitesService {
         });
         if (release) {
             const frozen = await frozenPages(ctx.organizationId, release.id);
-            if (!isOnFrozenPage(frozen, page?.path, dto.sectionKey)) {
+            if (!isOnFrozenPage(frozen, page?.path, target.sectionKey)) {
                 throw new BadRequestException(
                     "That section isn't on this page of the test release. Reload it and try again.",
                 );
@@ -2619,26 +2837,70 @@ export class SitesService {
                 page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ??
                     [],
             );
-            if (!keys.has(dto.sectionKey)) {
+            if (!keys.has(target.sectionKey)) {
                 throw new BadRequestException(
                     "That section is no longer on the page. Reload the draft and try again.",
                 );
             }
         }
 
+        return this.insertComment(ctx, {
+            siteId,
+            pageId: target.pageId,
+            // Where the note was, for when the page itself is gone (#277).
+            pageTitle: page?.title ?? null,
+            organizationId: ctx.organizationId,
+            sectionKey: target.sectionKey,
+            authorUserId: ctx.userId,
+            body: dto.body,
+            ...(release ? { testReleaseId: release.id } : {}),
+        });
+    }
+
+    /**
+     * A note on a post (DEC-200 U8): the post must be one of this site's,
+     * and the note is about the draft. A test release freezes pages, not
+     * posts, so a post note on one is refused.
+     */
+    private async createPostComment(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreateCommentDto,
+    ): Promise<{ id: string }> {
+        if (dto.pageId !== undefined || dto.sectionKey !== undefined) {
+            throw new BadRequestException(
+                "A note is about a section of a page or a post, not both.",
+            );
+        }
+        if (dto.testReleaseId !== undefined) {
+            throw new BadRequestException(
+                "A test release has no posts to leave a note on.",
+            );
+        }
+        const post = await prisma.post.findFirst({
+            where: { id: dto.postId, siteId },
+            select: { id: true, title: true },
+        });
+        if (!post) throw new NotFoundException("Post not found");
+        return this.insertComment(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            postId: post.id,
+            // Which post it was, for when the post is gone (as pages, #277).
+            postTitle: post.title,
+            authorUserId: ctx.userId,
+            body: dto.body,
+        });
+    }
+
+    /** Store a note, and tell the people who publish when a reviewer wrote it. */
+    private insertComment(
+        ctx: OrganizationContext,
+        data: Prisma.SiteCommentUncheckedCreateInput,
+    ): Promise<{ id: string }> {
         return prisma.$transaction(async (tx) => {
             const comment = await tx.siteComment.create({
-                data: {
-                    siteId,
-                    pageId: dto.pageId,
-                    // Where the note was, for when the page itself is gone (#277).
-                    pageTitle: page?.title ?? null,
-                    organizationId: ctx.organizationId,
-                    sectionKey: dto.sectionKey,
-                    authorUserId: ctx.userId,
-                    body: dto.body,
-                    ...(release ? { testReleaseId: release.id } : {}),
-                },
+                data,
                 select: { id: true },
             });
             // A reviewer's note tells the people who publish (UX-043); one
@@ -2805,63 +3067,77 @@ export class SitesService {
                   ],
               }
             : { testReleaseId: null };
-        const [latest, standing, openNotes, newestAsk] = await Promise.all([
-            prisma.siteApproval.findFirst({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    ...scope,
-                },
-                // Two reviews can share a millisecond; the id (a cuid, which grows)
-                // keeps "newest" deterministic.
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: {
-                    outcome: true,
-                    reason: true,
-                    createdAt: true,
-                    by: { select: { name: true, email: true } },
-                },
-            }),
-            // Asked as "what would happen if THIS caller published now",
-            // because that is the question the editor's bar is answering.
-            // A release asks it of its own bytes.
-            release
-                ? readReviewStanding(prisma, {
-                      siteId,
-                      organizationId: ctx.organizationId,
-                      fingerprint: release.fingerprint,
-                      publisherUserId: ctx.userId,
-                      scope: "release",
-                  })
-                : this.currentDraftFingerprint(ctx, siteId).then(
-                      (fingerprint) =>
-                          this.reviewStandingFor(
-                              prisma,
-                              siteId,
-                              ctx.organizationId,
-                              fingerprint,
-                              ctx.userId,
-                          ),
-                  ),
-            prisma.siteComment.count({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    resolvedAt: null,
-                    testReleaseId: release?.id ?? null,
-                },
-            }),
-            prisma.siteApproval.findFirst({
-                where: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    outcome: "REQUESTED",
-                    ...scope,
-                },
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: { byUserId: true },
-            }),
-        ]);
+        /*
+         * Whose own approval can't settle the review: the caller's, when they
+         * could publish (no approving your own work). A reader who can't
+         * publish (a Reviewer) is never the publisher, so their approval
+         * counts here as it does for the owner who will publish (DEC-200).
+         */
+        const publisherUserId = allows(ctx, "site:publish") ? ctx.userId : null;
+        const [latest, standing, openNotes, newestAsk, reader] =
+            await Promise.all([
+                prisma.siteApproval.findFirst({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        ...scope,
+                    },
+                    // Two reviews can share a millisecond; the id (a cuid, which grows)
+                    // keeps "newest" deterministic.
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: {
+                        outcome: true,
+                        reason: true,
+                        createdAt: true,
+                        by: { select: { name: true, email: true } },
+                    },
+                }),
+                // Asked as "what would happen if THIS caller published now",
+                // because that is the question the editor's bar is answering.
+                // A release asks it of its own bytes.
+                release
+                    ? readReviewStanding(prisma, {
+                          siteId,
+                          organizationId: ctx.organizationId,
+                          fingerprint: release.fingerprint,
+                          publisherUserId,
+                          scope: "release",
+                      })
+                    : this.currentDraftFingerprint(ctx, siteId).then(
+                          (fingerprint) =>
+                              this.reviewStandingFor(
+                                  prisma,
+                                  siteId,
+                                  ctx.organizationId,
+                                  fingerprint,
+                                  publisherUserId,
+                              ),
+                      ),
+                prisma.siteComment.count({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        resolvedAt: null,
+                        testReleaseId: release?.id ?? null,
+                    },
+                }),
+                prisma.siteApproval.findFirst({
+                    where: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        outcome: "REQUESTED",
+                        ...scope,
+                    },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: {
+                        byUserId: true,
+                        createdAt: true,
+                        by: { select: { name: true, email: true } },
+                    },
+                }),
+                // Last, so the reads above keep their order.
+                release ? null : this.readerState(ctx, siteId),
+            ]);
         const pending =
             standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
 
@@ -2876,6 +3152,15 @@ export class SitesService {
             pending,
             askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
+            pagesRead: reader?.pagesRead ?? null,
+            request: newestAsk
+                ? {
+                      by: newestAsk.by.name ?? newestAsk.by.email,
+                      at: newestAsk.createdAt,
+                  }
+                : null,
+            yourVerdict: reader?.yourVerdict ?? null,
+            settledForYou: reader?.settledForYou ?? null,
             latestApproval:
                 latest === null
                     ? null
@@ -2886,6 +3171,129 @@ export class SitesService {
                           reason: latest.reason ?? null,
                       },
         };
+    }
+
+    /**
+     * The caller as a reader of the draft (DEC-200, U9, U4). Pages read: pages
+     * they opened after their own latest verdict, against the pages the site
+     * has now; a deleted page takes its views with it, so it drops out of
+     * both numbers. Their latest verdict. And, for someone who doesn't settle
+     * notes, how many of theirs were settled after they last spoke (their
+     * newest note or verdict).
+     */
+    private async readerState(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{
+        pagesRead: { read: number; total: number };
+        yourVerdict: { outcome: string; at: Date } | null;
+        settledForYou: { count: number; at: Date } | null;
+    }> {
+        const scope = { siteId, organizationId: ctx.organizationId };
+        // A publish closes the round (owner, 30 Oct): a verdict and pages read
+        // from before it were about the version that went live, so the next
+        // draft starts with neither.
+        const live = await prisma.site.findFirst({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { currentPublication: { select: { publishedAt: true } } },
+        });
+        const since = live?.currentPublication?.publishedAt ?? null;
+        const [verdict, total, lastNote] = await Promise.all([
+            prisma.siteApproval.findFirst({
+                where: {
+                    ...scope,
+                    byUserId: ctx.userId,
+                    testReleaseId: null,
+                    outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+                    ...(since ? { createdAt: { gt: since } } : {}),
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { outcome: true, createdAt: true },
+            }),
+            prisma.page.count({ where: scope }),
+            allows(ctx, "section:write")
+                ? null
+                : prisma.siteComment.findFirst({
+                      where: {
+                          ...scope,
+                          authorUserId: ctx.userId,
+                          testReleaseId: null,
+                      },
+                      orderBy: { createdAt: "desc" },
+                      select: { createdAt: true },
+                  }),
+        ]);
+        // Pages read count from the later of their verdict and the publish.
+        const readFrom = verdict?.createdAt ?? since;
+        const [read, settled] = await Promise.all([
+            prisma.siteReviewPageView.count({
+                where: {
+                    ...scope,
+                    userId: ctx.userId,
+                    ...(readFrom ? { viewedAt: { gt: readFrom } } : {}),
+                },
+            }),
+            lastNote
+                ? prisma.siteComment.findMany({
+                      where: {
+                          ...scope,
+                          authorUserId: ctx.userId,
+                          testReleaseId: null,
+                          resolvedAt: {
+                              gt:
+                                  verdict &&
+                                  verdict.createdAt > lastNote.createdAt
+                                      ? verdict.createdAt
+                                      : lastNote.createdAt,
+                          },
+                      },
+                      orderBy: { resolvedAt: "desc" },
+                      select: { resolvedAt: true },
+                  })
+                : [],
+        ]);
+        const newest = settled[0]?.resolvedAt;
+        return {
+            pagesRead: { read, total },
+            yourVerdict: verdict
+                ? { outcome: verdict.outcome, at: verdict.createdAt }
+                : null,
+            settledForYou: newest
+                ? { count: settled.length, at: newest }
+                : null,
+        };
+    }
+
+    /**
+     * A reviewer opened a page in the editor (DEC-200, U9): what "You've read
+     * 3 of 4 pages" counts. Once per person per page; opening it again moves
+     * the time on. Requires `site:read`. Anyone who can edit records nothing:
+     * the count is a reviewer's, and the owner's editor is not reading.
+     */
+    async recordPageView(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<{ recorded: boolean }> {
+        authorize(ctx, "site:read");
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
+        if (allows(ctx, "section:write")) return { recorded: false };
+        const viewedAt = new Date();
+        await prisma.siteReviewPageView.upsert({
+            where: {
+                siteId_userId_pageId: { siteId, userId: ctx.userId, pageId },
+            },
+            create: {
+                siteId,
+                pageId,
+                userId: ctx.userId,
+                organizationId: ctx.organizationId,
+                viewedAt,
+            },
+            update: { viewedAt },
+        });
+        return { recorded: true };
     }
 
     /**

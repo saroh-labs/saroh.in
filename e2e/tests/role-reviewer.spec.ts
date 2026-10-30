@@ -1,7 +1,13 @@
-// @covers accounts:/login app:/ app:/sites app:/sites/[siteId]/review app:/contacts app:/settings/billing app:/settings/profile api:sites api:organizations api:capabilities
-import type { Page } from "@playwright/test";
+// @covers accounts:/login app:/ app:/sites app:/sites/[siteId] app:/sites/[siteId]/review app:/contacts app:/settings/billing app:/settings/profile api:sites api:organizations api:capabilities
 import { expect, test } from "@playwright/test";
 
+import { phoneSheet } from "../fixtures/phone-editor";
+import { pressUntil } from "../fixtures/press";
+import {
+    expectNoWriteControl,
+    onPhone,
+    openReviewedSite,
+} from "../fixtures/reviewer-editor";
 import type { MenuRow } from "../fixtures/roles";
 import {
     expectDenied,
@@ -19,7 +25,7 @@ import { REVIEWED_SITE } from "../playwright.config";
  * The narrowest role there is: `site:read`, `site:comment` and
  * `site:approve`, on the sites they were invited to and nothing else of the
  * business (`organization-policy.ts`, `sites/site-access.ts`). So the menu
- * is Home and Website, the site opens on its reading screen, and a verdict
+ * is Home and Website, the site opens in the editor read-only (DEC-200), and a verdict
  * is theirs to give while publishing is not.
  *
  * `site-review.spec.ts` covers the notes and an approval as it is recorded
@@ -43,13 +49,6 @@ const MENU: readonly MenuRow[] = [
  */
 const SETTINGS = ["/settings/profile", "/settings/share"];
 
-/** The reviewer's one site, opened from Website. */
-async function openTheReviewedSite(page: Page): Promise<string> {
-    await page.goto("/sites");
-    await page.waitForURL(/\/sites\/[^/]+\/review/, { timeout: 30_000 });
-    return new URL(page.url()).pathname.split("/")[2] ?? "";
-}
-
 test.describe("a Reviewer", () => {
     test.beforeEach(async ({ page }) => {
         await useSession(page, "reviewer");
@@ -70,15 +69,17 @@ test.describe("a Reviewer", () => {
     });
 
     test("opens the site they review and no other", async ({ page }) => {
-        const siteId = await openTheReviewedSite(page);
-        await expect(
-            page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
-        ).toBeVisible();
+        const siteId = await openReviewedSite(page);
+        if (!onPhone(page)) {
+            await expect(page.locator("[data-editor-bar]")).toContainText(
+                REVIEWED_SITE,
+            );
+        }
 
         // A site they weren't invited to isn't there for them: no page, as
         // for a site that doesn't exist, never a look at what it holds.
         const other = siteId === "seed_site_1" ? "seed_site_2" : "seed_site_1";
-        await page.goto(`/sites/${other}/review`);
+        await page.goto(`/sites/${other}`);
         await expect(
             page.getByRole("heading", { name: "Page not found" }),
         ).toBeVisible();
@@ -90,46 +91,61 @@ test.describe("a Reviewer", () => {
     test("reads the site with nothing to edit or publish, and says what they think", async ({
         page,
     }) => {
-        const siteId = await openTheReviewedSite(page);
-        await expect(
-            page.getByText(/Editing and publishing stay with the owner/),
-        ).toBeVisible();
-        await expect(
-            page.getByRole("button", { name: /^Publish/ }),
-        ).toHaveCount(0);
-        await expect(
-            page.getByRole("link", { name: "Open editor" }),
-        ).toHaveCount(0);
+        const siteId = await openReviewedSite(page);
+        await expectNoWriteControl(page);
 
-        // The verdict is theirs: Approve, or Ask for changes, which asks
-        // what needs changing before anything is recorded.
-        await expect(
-            page
-                .getByRole("button", { name: "Approve" })
-                .filter({ visible: true }),
-        ).toBeEnabled();
-        await page
-            .getByRole("button", { name: "Ask for changes" })
-            .filter({ visible: true })
-            .click();
-        const reason = page
-            .getByLabel("What needs changing?")
-            .filter({ visible: true });
-        await expect(reason).toBeEditable();
-        // Left unsaid: a verdict is read by every spec on this site.
-        await page
-            .getByRole("button", { name: "Cancel", exact: true })
-            .filter({ visible: true })
-            .click();
-        await expect(reason).toHaveCount(0);
+        /*
+         * The verdict is theirs: Approve, or Ask for changes, which asks
+         * what needs changing before anything is recorded. Left unsaid: a
+         * verdict is read by every spec on this site.
+         */
+        if (onPhone(page)) {
+            const sheet = phoneSheet(page, "Your review");
+            await pressUntil(
+                page.getByRole("button", { name: "Review", exact: true }),
+                sheet,
+            );
+            await expect(
+                sheet.getByRole("radio", { name: /^Approve/ }),
+            ).toBeEnabled();
+            await sheet
+                .getByRole("radio", { name: /^Ask for changes/ })
+                .click();
+            await expect(
+                sheet.getByLabel("What needs changing?"),
+            ).toBeEditable();
+            await page
+                .getByRole("button", { name: "Close your review" })
+                .click();
+            await expect(sheet).toHaveCount(0);
+        } else {
+            await expect(page.locator("[data-reviewing]")).toBeVisible();
+            await expect(
+                page
+                    .getByRole("button", { name: "Approve", exact: true })
+                    .filter({ visible: true }),
+            ).toBeEnabled();
+            const reason = page
+                .getByLabel("What needs changing?")
+                .filter({ visible: true });
+            await pressUntil(
+                page
+                    .getByRole("button", { name: "Ask for changes" })
+                    .filter({ visible: true }),
+                reason,
+            );
+            await expect(reason).toBeEditable();
+            await page
+                .getByRole("button", { name: "Cancel", exact: true })
+                .filter({ visible: true })
+                .click();
+            await expect(reason).toHaveCount(0);
+        }
 
-        // The editor's own address hands a reader back to the reading
-        // screen, once, and stays there.
-        await page.goto(`/sites/${siteId}`);
-        await expect(page).toHaveURL(new RegExp(`/sites/${siteId}/review$`));
-        await expect(
-            page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
-        ).toBeVisible();
+        // The old reading screen's address opens this editor, and stays.
+        await page.goto(`/sites/${siteId}/review`);
+        await expect(page).toHaveURL(new RegExp(`/sites/${siteId}$`));
+        await expect(page.locator("[data-layout]")).toBeVisible();
     });
 
     test("has no way to the plans, and reads who has", async ({ page }) => {

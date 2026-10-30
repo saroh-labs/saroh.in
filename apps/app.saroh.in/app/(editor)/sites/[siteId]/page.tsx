@@ -1,4 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { FailedState } from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { notFound, unstable_rethrow } from "next/navigation";
 
 import { SiteEditorHost } from "@/components/sites/editor/site-editor-host";
 import { requireSession } from "@/lib/session";
@@ -7,6 +9,7 @@ import { parseSectionContent } from "@saroh/block-contract";
 import type { Section } from "@/lib/sites/service";
 import {
     getPageDraft,
+    getPageForReview,
     getReviewState,
     getSite,
     getSiteFlags,
@@ -25,7 +28,8 @@ export const metadata = { title: "Editing · Website" };
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
  * permitted), picks its home page (or the first page), loads that page's
- * editable draft, and hands the draft sections to the client SiteEditor. The
+ * editable draft — or, for a Reviewer, reads it read-only (DEC-200) — and
+ * hands the sections to the client SiteEditor. The
  * editing + live preview happen client-side; only Save/Publish hit the API.
  */
 export default async function SiteEditorPage({
@@ -43,15 +47,12 @@ export default async function SiteEditorPage({
     if (!site) notFound();
 
     /*
-     * Someone who may read the site but not author it gets a different screen
-     * (#275), in the shell, where they keep their navigation: this group is
-     * deliberately chrome-less, which is right for a three-pane editor and
-     * wrong for someone reading and commenting.
-     *
-     * A redirect rather than a render, so the link an owner shares — this one —
-     * works for whoever opens it.
+     * Someone who may read the site but not author it opens this same editor,
+     * read-only (DEC-200, superseding #275's separate screen). They see every
+     * page, block, the Brand tab and the block settings; nothing is drawn that
+     * would change them, and the API refuses every write regardless.
      */
-    if (!site.can.edit) redirect(`/sites/${siteId}/review`);
+    const readOnly = !site.can.edit;
 
     if (site.pages.length === 0) notFound();
     /*
@@ -67,21 +68,22 @@ export default async function SiteEditorPage({
     const activePage =
         site.pages.find((page) => page.id === requestedPageId) ?? homePage;
 
-    // Flags are whole-site, so they load alongside the page rather than per
-    // page — the pre-publish check groups them by page and cannot be answered
-    // from the one page that happens to be open.
-    const [draft, flags, comments, review, webAddress, testReleases] =
-        await Promise.all([
-            getPageDraft(siteId, activePage.id),
-            getSiteFlags(siteId),
-            listComments(siteId),
-            getReviewState(siteId),
-            // Where the site is reached, custom domain first (DEC-069, L8).
-            readWebAddressLinks(),
-            // Test releases (DEC-071, T11): `off` hides them; a failed read
-            // is said in their panel and never keeps the editor from opening.
-            readTestReleases(siteId),
-        ]);
+    const load = readOnly
+        ? await loadForReviewer(siteId, activePage.id)
+        : await loadForEditor(siteId, activePage.id);
+    if (load === "failed") {
+        // RVD4: the read failed, said with the house's words (RVD4's "The
+        // draft couldn't be loaded." in the shared grammar), with a Try
+        // again that reads the page afresh, not the editor's error boundary.
+        return (
+            <FailedState
+                title={couldntLoad("the draft")}
+                description="Nothing you wrote is lost."
+                retryHref={`/sites/${siteId}?page=${activePage.id}`}
+            />
+        );
+    }
+    const { draft, flags, comments, review, webAddress, testReleases } = load;
     /*
      * Checked against the block contract, not cast into it (#275).
      *
@@ -124,10 +126,18 @@ export default async function SiteEditorPage({
             siteId={siteId}
             pageId={activePage.id}
             pages={site.pages}
+            readOnly={readOnly}
+            // What a reader may do besides read: never offer a note box or
+            // a verdict the API would refuse (a `site:read`-only role).
+            reviewCan={{
+                comment: site.can.comment,
+                approve: site.can.approve,
+            }}
             initialFlags={flags}
             initialComments={comments}
             initialReview={review}
             neverPublished={site.currentPublicationId === null}
+            publishedAt={site.currentPublication?.publishedAt ?? null}
             // Which edit of the draft these sections are (#285); the editor
             // sends it back on every save.
             initialRevision={draft?.revision ?? 0}
@@ -156,26 +166,29 @@ export default async function SiteEditorPage({
             looksAvailable={site.looksAvailable === true}
             liveLook={site.liveLook ?? null}
             // Which looks, typefaces and colourways are free (DEC-177).
-            styleAccess={site.styleAccess ?? null}
-            templateId={site.template?.id ?? null}
+            // Owner-only from here: never sent to a Reviewer's page (DEC-200).
+            styleAccess={readOnly ? null : (site.styleAccess ?? null)}
+            templateId={readOnly ? null : (site.template?.id ?? null)}
             address={
                 siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
             }
             // The API sends where the site sells from only while the shop is
             // open for the business; only then is a Product grid offered.
-            shopOpen={site.sellsFrom != null}
+            shopOpen={!readOnly && site.sellsFrom != null}
             // The Class packs block, only while Class packs is rolled out
             // and on (DEC-057).
-            packsOpen={site.packsBlockOffered === true}
+            packsOpen={!readOnly && site.packsBlockOffered === true}
             // The module pages the page menu may offer (G14, G16); the API
             // lists none for a role without `site:update`.
-            addablePageKinds={site.addablePageKinds ?? []}
+            addablePageKinds={readOnly ? [] : (site.addablePageKinds ?? [])}
             initialTestReleases={testReleases}
             canPublish={site.can.publish}
             // "Publishing needs approval" (DEC-071, R10), and whether this
             // person is the owner who may go live past it (KTD-11).
-            publishNeedsApproval={site.publishNeedsApproval === true}
-            canOverride={site.canOverride === true}
+            publishNeedsApproval={
+                !readOnly && site.publishNeedsApproval === true
+            }
+            canOverride={!readOnly && site.canOverride === true}
             livePublishedAt={site.currentPublication?.publishedAt ?? null}
             // The address the Publish sheet offers when the site has none
             // (DEC-185); only the owner, with changing on, may choose it.
@@ -190,4 +203,58 @@ export default async function SiteEditorPage({
             }
         />
     );
+}
+
+const NO_FLAGS = { flags: [], awaitingNavigation: [] };
+
+/** An owner's, admin's or member's load: the editable draft and the checks. */
+async function loadForEditor(siteId: string, pageId: string) {
+    // Flags are whole-site, so they load alongside the page rather than per
+    // page — the pre-publish check groups them by page and cannot be answered
+    // from the one page that happens to be open.
+    const [draft, flags, comments, review, webAddress, testReleases] =
+        await Promise.all([
+            getPageDraft(siteId, pageId),
+            getSiteFlags(siteId),
+            listComments(siteId),
+            getReviewState(siteId),
+            // Where the site is reached, custom domain first (DEC-069, L8).
+            readWebAddressLinks(),
+            // Test releases (DEC-071, T11): `off` hides them; a failed read
+            // is said in their panel and never keeps the editor from opening.
+            readTestReleases(siteId),
+        ]);
+    return { draft, flags, comments, review, webAddress, testReleases };
+}
+
+/**
+ * A Reviewer's load (DEC-200): the page through `…/read`, which needs only
+ * `site:read` and writes nothing — `…/draft` would create a draft. No flags
+ * (owner-only, R8), no web address, no revision or pending counts.
+ */
+async function loadForReviewer(siteId: string, pageId: string) {
+    const [page, comments, review, testReleases] = await Promise.all([
+        getPageForReview(siteId, pageId).catch((error: unknown) => {
+            // A 403 or a redirect still reaches its boundary.
+            unstable_rethrow(error);
+            return "failed" as const;
+        }),
+        listComments(siteId),
+        getReviewState(siteId),
+        readTestReleases(siteId),
+    ]);
+    if (page === "failed") return "failed" as const;
+    return {
+        draft: {
+            sections: page.sections,
+            revision: 0,
+            pendingSectionChanges: null,
+            pendingSiteChanges: null,
+        },
+        flags: NO_FLAGS,
+        comments,
+        review,
+        webAddress: null,
+        testReleases,
+    };
 }

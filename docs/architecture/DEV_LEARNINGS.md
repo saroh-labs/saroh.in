@@ -6098,3 +6098,21 @@ content files, including the moved ones.
 **Rule**: after moving or deleting source files a dev server scans, clear that
 app's `.next/` before trusting a 500.
 **Category**: tooling · local dev
+
+## A Reviewer's own approval didn't count for the Reviewer (30 Oct 2026)
+
+**Symptom**: the batch gate for DEC-200: a Reviewer approved, saw "Marked as
+approved.", reloaded, and was offered Approve and Ask for changes again
+instead of Change your review. Later review specs then met a bar they didn't
+expect.
+**Cause**: `getReviewState` asks "what if THIS caller published now", and an
+approval by the publisher never settles a review. For a Reviewer, who can't
+publish, that made their own approval not count, so a request stayed
+"pending" for them while the owner saw it settled.
+**Fix**: the caller is the publisher only when they hold `site:publish`
+(`reviewer-state.db.spec.ts` covers it). The review specs' fixture presses
+Change your review first when an earlier approval left it there.
+**Rule**: a "who is acting" check in a read must ask whether the caller can
+do that act at all. Specs that record a verdict on shared seeded data must
+work from either standing.
+**Category**: sites · review
