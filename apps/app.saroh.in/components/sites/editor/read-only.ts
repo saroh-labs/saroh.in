@@ -23,7 +23,10 @@ export function useEditorReadOnly(): boolean {
  * offered no note box and no verdict the API would refuse. Editors keep
  * the default.
  */
-export type ReviewCan = { comment: boolean; approve: boolean };
+export interface ReviewCan {
+    comment: boolean;
+    approve: boolean;
+}
 
 export const EditorReviewCan = createContext<ReviewCan>({
     comment: true,
