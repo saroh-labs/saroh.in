@@ -6216,3 +6216,16 @@ flakes were also fixed where they were real (savedAt digits, Move class).
 timeout treats the symptom. When unrelated timing tests fail at random, look
 at the job's process count first.
 **Category**: tooling · CI
+## "window is not defined" from a sheet's read that answered after it closed
+
+**Symptom**: 30 Oct, release #1262's unit job: `ReferenceError: window is not
+defined` at `site-blocks/src/account/move-class.tsx:62`; the same commit's
+other run passed.
+**Cause**: Move class read the class's days on open and set state when the
+answer came, even after the sheet was gone; a test that ended first let the
+answer land after jsdom's teardown. A customer closing the sheet early hit
+the same late update.
+**Fix**: the read ignores an answer once the sheet has closed (`open` ref).
+**Rule**: a fetch started in an effect checks the component is still there
+before it sets state.
+**Category**: react · tests
