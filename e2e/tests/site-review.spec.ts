@@ -1,9 +1,20 @@
-// @covers accounts:/login app:/open app:/sites app:/sites/new app:/sites/[siteId]/releases/[releaseId] site:/preview api:sites pkg:site-blocks
+// @covers accounts:/login app:/open app:/sites app:/sites/new app:/sites/[siteId] app:/sites/[siteId]/review app:/sites/[siteId]/releases/[releaseId] app:/sites/[siteId]/posts/[postId] site:/preview api:sites api:content pkg:site-blocks
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp as ownStamp } from "../fixtures/own-data";
 import { openMore } from "../fixtures/phone-editor";
+import { pressUntil } from "../fixtures/press";
+import {
+    approve,
+    askForChanges,
+    changeYourReview,
+    expectNoWriteControl,
+    noteBoxForFirstBlock,
+    onPhone,
+    openReviewedSite,
+    openTestReleases,
+} from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
@@ -23,10 +34,15 @@ import {
  * is part of why #274 — every website route, Review included, returning 404 to
  * this role the moment module enforcement came on — survived a green suite.
  *
+ * Since DEC-200 a reviewer reads in the site editor itself, read-only, and
+ * notes and the verdict are the editor's Feedback and top bar (a phone's
+ * Feedback pill and Review sheet). The old reading screen is gone; its
+ * address redirects to the editor.
+ *
  * These are questions only a browser can answer. Whether the list a reviewer
  * sees holds one site or three is a query the server builds from a session
- * cookie; whether the editor route hands them the reading screen instead is a
- * redirect; whether a shared link says "not live" is a page rendered by a
+ * cookie; whether the editor opens read-only is the server's answer to who
+ * they are; whether a shared link says "not live" is a page rendered by a
  * different app on a different origin. The unit tests prove the policy. This
  * proves the product.
  */
@@ -35,11 +51,9 @@ async function signIn(page: Page, who: { email: string; password: string }) {
     await useSession(page, who);
 }
 
-/** The reviewer's one site, opened from Website in the rail. */
-async function openTheReviewedSite(page: Page) {
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/review/, { timeout: 30_000 });
-}
+/** Northwind's API at its full address, for a request that may be refused. */
+const nwUrl = (path: string) =>
+    `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
 
 test.describe("a reviewer", () => {
     test.beforeEach(async ({ page }) => {
@@ -47,15 +61,17 @@ test.describe("a reviewer", () => {
     });
 
     test("sees only the site they were invited to", async ({ page }) => {
-        await openTheReviewedSite(page);
+        await openReviewedSite(page);
 
         // The reviewer is granted the business's site. With one site and no
         // right to make another, there is nothing to pick. That a reviewer
         // sees only the sites they were granted, when a business has several,
         // is `reviewer-scope.spec.ts` in the API.
-        await expect(
-            page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
-        ).toBeVisible();
+        if (!onPhone(page)) {
+            await expect(page.locator("[data-editor-bar]")).toContainText(
+                REVIEWED_SITE,
+            );
+        }
         await expect(
             page.getByRole("button", { name: /^Website: .*Change it\.$/ }),
         ).toHaveCount(0);
@@ -64,7 +80,8 @@ test.describe("a reviewer", () => {
     test("is offered nothing in the rail that they cannot open", async ({
         page,
     }) => {
-        await page.goto(`${urls.APP_URL}/sites`);
+        // Home, where the workspace's rail is: the editor is full-bleed.
+        await page.goto(`${urls.APP_URL}/`);
 
         /*
          * The rail is not a permission boundary — every destination refuses on
@@ -80,19 +97,13 @@ test.describe("a reviewer", () => {
          * filtered for. Both draw the same groups from the same projection,
          * which is the point of having one `navFor`; running at both widths
          * is what proves the bar did not keep its own copy.
-         *
-         * Decided by the viewport, not by asking what is showing:
-         * `isVisible()` does not wait for anything, and answered before the
-         * chrome had rendered. 760 is where `AppSidebar` stops being hidden.
          */
-        const onPhone = (page.viewportSize()?.width ?? 1440) < 760;
-
-        const rail = onPhone
+        const rail = onPhone(page)
             ? page.getByRole("navigation", { name: "Main" })
             : page.getByRole("navigation", { name: "Primary" });
         // The nav is drawn before anything is said to be missing from it.
         await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
-        if (onPhone) {
+        if (onPhone(page)) {
             // Home and Website are all a reviewer reaches, and both fit on
             // the bar — so there is no More sheet holding anything else.
             await expect(
@@ -111,24 +122,66 @@ test.describe("a reviewer", () => {
             await expect(rail.locator(`a[href="${gone}"]`)).toHaveCount(0);
         }
 
-        // What is left is Website, one row: which site, and Review, are on
-        // the Website screen rather than hung under it.
-        await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
+        // What is left is Website, one row: which site is on the Website
+        // screen rather than hung under it.
         await expect(rail.locator('a[href^="/sites/"]')).toHaveCount(0);
     });
 
-    test("is taken to Review, not to the editor, and is told why", async ({
-        page,
-    }) => {
-        await openTheReviewedSite(page);
+    test("lands in the editor, read-only, and is told so", async ({ page }) => {
+        const id = await openReviewedSite(page);
 
-        // `/sites/:id` is the editor. A caller without `section:write` is
-        // redirected here rather than shown an editor with its controls taken
-        // away — see the page's own note.
-        await expect(page).toHaveURL(/\/sites\/[^/]+\/review/);
-        await expect(
-            page.getByText(/Editing and publishing stay with the owner/i),
-        ).toBeVisible();
+        // The editor itself (DEC-200), not the old reading screen.
+        expect(new URL(page.url()).pathname).toBe(`/sites/${id}`);
+        if (onPhone(page)) {
+            // The phone bar's Review, where Publish sits for an owner.
+            await expect(
+                page.getByRole("button", { name: "Review", exact: true }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("button", { name: /^Feedback, / }),
+            ).toBeVisible();
+        } else {
+            await expect(page.locator("[data-reviewing]")).toHaveText(
+                "Reviewing · you can’t change anything",
+            );
+        }
+
+        // The old screen's address, in emails and on Home, opens the editor.
+        await page.goto(`${urls.APP_URL}/sites/${id}/review`);
+        await expect(page).toHaveURL(new RegExp(`/sites/${id}$`));
+    });
+
+    test("is offered no write control, at either width", async ({ page }) => {
+        await openReviewedSite(page);
+        await expectNoWriteControl(page);
+
+        // Nor in the block's own panel, once one is chosen.
+        await noteBoxForFirstBlock(page);
+        await expectNoWriteControl(page);
+        await expect(page.locator("[draggable=true]")).toHaveCount(0);
+    });
+
+    test("is refused a direct write to the draft (403)", async ({ page }) => {
+        const id = await openReviewedSite(page);
+        const nw = northwind(page.request);
+        const site = await nw.get<{ pages: { id: string; isHome: boolean }[] }>(
+            `/sites/${id}`,
+        );
+        const home = site.pages.find((p) => p.isHome) ?? site.pages[0];
+
+        /*
+         * The API is the guard (DEC-200), whatever the screen draws. The
+         * revision is one the draft never reached, so even a broken guard
+         * would be refused (409) rather than empty the page.
+         */
+        const res = await page.request.put(
+            nwUrl(`/sites/${id}/pages/${home.id}/draft/sections`),
+            {
+                headers: nw.headers,
+                data: { revision: 999_999_999, sections: [] },
+            },
+        );
+        expect(res.status()).toBe(403);
     });
 
     // @serial: it reads the site's first block, which site-versions hides
@@ -139,53 +192,186 @@ test.describe("a reviewer", () => {
             tag: "@serial",
         },
         async ({ page }) => {
-            await openTheReviewedSite(page);
+            await openReviewedSite(page);
 
-            // The seeded home page's own copy, rendered through the real blocks.
-            // What this replaced was a list of titles and paths, which told a
-            // reviewer a site had pages and nothing about what was on them.
+            // The seeded home page's own copy, rendered through the real
+            // blocks on the editor's canvas.
             await expect(
-                page.getByText("Packaging, storage and safety supplies"),
+                page
+                    .getByText("Packaging, storage and safety supplies")
+                    .first(),
             ).toBeVisible();
         },
     );
 
-    test("leaves a note on a section, and the note comes back", async ({
+    test("notes a block, changes the note and deletes it; it survives a reload", async ({
         page,
     }) => {
-        await openTheReviewedSite(page);
-
-        // Commenting is a MODE. Nothing is offered until it is switched on,
-        // because a page covered in "leave a note" buttons is not a page
-        // anybody reads.
-        await page.getByRole("button", { name: "Comment on sections" }).click();
-
-        const note = page.getByRole("button", { name: /^Note on /i }).first();
-        // Revealed on hover or focus; focus, so this works without a pointer.
-        await note.focus();
-        await note.click();
-
+        test.setTimeout(120_000);
+        const id = await openReviewedSite(page);
+        const nw = northwind(page.request);
         const body = `Opening hours look wrong — ${ownStamp(test.info())}`;
-        await page.getByLabel(/Your note about/i).fill(body);
-        await page.getByRole("button", { name: "Add note" }).click();
+        const changed = `${body} (Sundays too)`;
+        try {
+            const box = await noteBoxForFirstBlock(page);
+            await box.fill(body);
+            await page
+                .getByRole("button", { name: "Add note" })
+                .filter({ visible: true })
+                .click();
+            const note = page
+                .getByRole("listitem")
+                .filter({ hasText: body })
+                .filter({ visible: true });
+            await expect(note).toBeVisible({ timeout: 30_000 });
 
-        await expect(page.getByText(body)).toBeVisible();
+            // Your own open note: Edit, then Save.
+            await note.getByRole("button", { name: "Edit your note" }).click();
+            await note.getByLabel("Your note").fill(changed);
+            await note.getByRole("button", { name: "Save note" }).click();
+            const changedNote = page
+                .getByRole("listitem")
+                .filter({ hasText: changed })
+                .filter({ visible: true });
+            await expect(changedNote).toBeVisible({ timeout: 30_000 });
+
+            // Saved on the server: it comes back after a reload.
+            await page.reload();
+            await expect(page.locator("[data-layout]")).toBeVisible({
+                timeout: 30_000,
+            });
+            await noteBoxForFirstBlock(page);
+            await expect(changedNote).toBeVisible({ timeout: 30_000 });
+
+            // And Delete, after a confirm.
+            await changedNote
+                .getByRole("button", { name: "Delete your note" })
+                .click();
+            await page.getByRole("button", { name: "Delete note" }).click();
+            await expect(
+                page.getByText(changed).filter({ visible: true }),
+            ).toHaveCount(0, { timeout: 30_000 });
+        } finally {
+            // A note a failed step left behind is this test's to take away.
+            const left = (
+                await nw.get<{ id: string; body: string }[]>(
+                    `/sites/${id}/comments`,
+                )
+            ).filter((c) => c.body.startsWith(body));
+            for (const c of left) {
+                await nw.delete(`/sites/${id}/comments/${c.id}`);
+            }
+        }
     });
 
-    test("can say what they think, and cannot publish", async ({ page }) => {
-        await openTheReviewedSite(page);
+    test("reads a draft post read-only, and notes it", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        // The owner makes a draft post of this test's own.
+        const ownerContext = await browser.newContext({ ignoreHTTPSErrors });
+        const owner = await ownerContext.newPage();
+        await useSession(owner);
+        const ownerApi = northwind(owner.request);
+        const siteId = (
+            await ownerApi.get<{ id: string; subdomain: string | null }[]>(
+                "/sites",
+            )
+        ).find((s) => s.subdomain === "northwind")?.id;
+        expect(siteId, "Northwind has its site at northwind").toBeTruthy();
+        const title = `Spring stock ${ownStamp(testInfo)}`;
+        const post = await ownerApi.post<{ id: string }>(
+            `/sites/${siteId}/posts`,
+            { title },
+        );
+        try {
+            await page.goto(`${urls.APP_URL}/sites/${siteId}/posts/${post.id}`);
+            await expect(
+                page.getByText("Reviewing · you can't change anything"),
+            ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                page.getByRole("textbox", { name: "Post title" }),
+            ).not.toBeEditable();
+            for (const gone of [/^Publish/, "Save draft"]) {
+                await expect(
+                    page.getByRole("button", { name: gone }),
+                ).toHaveCount(0);
+            }
 
+            // Feedback is open for a Reviewer; the note is on the post.
+            const note = `The second paragraph repeats the first — ${ownStamp(testInfo)}`;
+            await page.getByLabel(`Add a note on ${title}`).fill(note);
+            await page.getByRole("button", { name: "Add note" }).click();
+            await expect(page.getByText(note)).toBeVisible({ timeout: 30_000 });
+        } finally {
+            // Its notes go with it.
+            await ownerApi.delete(`/sites/${siteId}/posts/${post.id}`);
+            await ownerContext.close();
+        }
+    });
+});
+
+/**
+ * The verdict, recorded (DEC-200, U4/U5): the top bar's on a desk, the
+ * Review sheet's on a phone. `@serial`: a verdict on Northwind's draft is
+ * read by every site spec, and an approval locks the notes before it.
+ */
+test.describe("a reviewer's verdict", { tag: "@serial" }, () => {
+    test("asks for changes with a reason, and the owner's editor shows it", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        await signIn(page, demoReviewer);
+        const id = await openReviewedSite(page);
+        const reason = `The opening hours are last season's — ${ownStamp(testInfo)}`;
+        await askForChanges(page, reason);
+
+        // The owner, at the desk, reads it where they publish from.
+        const ownerContext = await browser.newContext({
+            ignoreHTTPSErrors,
+            viewport: { width: 1440, height: 900 },
+        });
+        try {
+            const owner = await ownerContext.newPage();
+            await useSession(owner);
+            await owner.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
+            await owner.goto(`${urls.APP_URL}/sites/${id}`);
+            const sheet = owner.locator("[data-publish-sheet]");
+            const publish = owner
+                .getByRole("button", { name: /^Publish/ })
+                .filter({ visible: true })
+                .first();
+            await expect(publish).toBeEnabled({ timeout: 30_000 });
+            await pressUntil(publish, sheet);
+            await expect(sheet).toContainText(reason);
+            await expect(sheet).toContainText("asked for changes");
+            // Read, not published.
+            await owner.keyboard.press("Escape");
+            await expect(sheet).toHaveCount(0);
+        } finally {
+            await ownerContext.close();
+        }
+    });
+
+    test("approves, and the approval stays after a reload", async ({
+        page,
+    }) => {
+        await signIn(page, demoReviewer);
+        await openReviewedSite(page);
+        await approve(page);
+
+        await page.reload();
+        await expect(page.locator("[data-layout]")).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(await changeYourReview(page)).toBeVisible({
+            timeout: 30_000,
+        });
         await expect(
-            page.getByRole("button", { name: "Approve" }),
+            page.getByText(/^You approved this on /).filter({ visible: true }),
         ).toBeVisible();
-        await expect(
-            page.getByRole("button", { name: "Ask for changes" }),
-        ).toBeVisible();
-        // The whole point of the role: they say what they think, the owner
-        // decides. No publish control exists on this screen.
-        await expect(
-            page.getByRole("button", { name: /^Publish/ }),
-        ).toHaveCount(0);
     });
 });
 
@@ -362,13 +548,17 @@ test.describe("a reviewer and a test release", () => {
                 );
                 releaseId = made.release.id;
 
-                // The reviewer finds it on Review, opens it, and approves it.
+                // The reviewer finds it in the editor's Test releases, opens
+                // its own review page, and approves it there.
                 await useSession(page, "reviewer");
-                await openTheReviewedSite(page);
-                const listed = page.getByRole("listitem", { name });
-                await expect(listed).toContainText(
-                    "Nobody has reviewed this test release yet.",
-                );
+                await openReviewedSite(page);
+                const panel = await openTestReleases(page);
+                const listed = panel.getByRole("listitem", { name });
+                await expect(listed).toBeVisible({ timeout: 30_000 });
+                // Read-only: its Review, nothing to share or put live.
+                await expect(
+                    listed.getByRole("button", { name: /^Go live|^Open$/ }),
+                ).toHaveCount(0);
                 await listed.getByRole("link", { name: "Review" }).click();
                 await page.waitForURL(/\/releases\//, { timeout: 30_000 });
 

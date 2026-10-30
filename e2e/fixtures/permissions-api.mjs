@@ -20,8 +20,33 @@ const siteFor = (scenario) => ({
         manageDomain: false,
     },
     currentPublicationId: null,
-    style: null,
-    styleOptions: null,
+    // A reader opens the editor itself (DEC-200), which draws the look.
+    style: {
+        colours: { pageGround: "paper" },
+        scalars: { sectionPadding: 4 },
+        fontPair: "system",
+    },
+    styleOptions: {
+        rows: [
+            {
+                key: "pageGround",
+                label: "Background",
+                swatches: [{ key: "paper", label: "Paper", hsl: "40 30% 96%" }],
+            },
+        ],
+        scalars: [
+            {
+                key: "sectionPadding",
+                label: "Space between blocks",
+                min: 0,
+                max: 10,
+                step: 1,
+                unit: "rem",
+                default: 4,
+            },
+        ],
+        fontPairs: [{ key: "system", name: "Your visitor's system font" }],
+    },
     seoTitle: null,
     seoDescription: null,
     socialImageUrl: null,
@@ -453,7 +478,7 @@ createServer((req, res) => {
             : reply(200, siteFor(scenario));
     if (path.endsWith("/sites")) return reply(200, [siteFor(scenario)]);
     if (path.endsWith("/comments")) return reply(200, []);
-    // What a reviewer reads instead of the editor's draft (#275).
+    // What a reader's editor loads instead of the draft (DEC-200).
     if (path.endsWith("/read"))
         return reply(200, {
             sections: [
