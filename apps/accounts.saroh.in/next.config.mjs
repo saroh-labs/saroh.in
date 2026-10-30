@@ -62,7 +62,7 @@ const SECURITY_HEADERS = [
 // a page, not the files and redirects SECURITY_HEADERS also reaches.
 const PAGE_POLICIES = pageSecurityHeaders({
     origins: [process.env.NEXT_PUBLIC_BETTER_AUTH_URL],
-    uses: ["turnstile", "msg91"],
+    uses: ["turnstile", "phoneCodeWidget"],
     posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     dev: process.env.NODE_ENV === "development",
 });

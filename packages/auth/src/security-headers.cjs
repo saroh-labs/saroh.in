@@ -39,7 +39,7 @@ const SOURCES = {
     // Turnstile, before a sign-in code is sent (@saroh/site-blocks/challenge).
     turnstile: { script: [TURNSTILE], frame: [TURNSTILE] },
     // MSG91's OTP widget (SMS codes); the API names the script (DEC-196).
-    msg91: {
+    phoneCodeWidget: {
         script: ["https://verify.msg91.com"],
         connect: ["https://*.msg91.com"],
     },
