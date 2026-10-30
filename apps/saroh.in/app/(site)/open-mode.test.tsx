@@ -20,6 +20,12 @@ vi.mock("@/env", () => ({
         NEXT_PUBLIC_ACCOUNTS_URL: "https://accounts.example.test",
     },
 }));
+vi.mock("@/lib/browser/env", () => ({
+    browserEnv: {
+        NEXT_PUBLIC_LAUNCH_MODE: "open",
+        NEXT_PUBLIC_ACCOUNTS_URL: "https://accounts.example.test",
+    },
+}));
 vi.mock("@/lib/pricing", () => ({
     readLivePricing: () => Promise.resolve(fakeCatalog()),
 }));
@@ -131,7 +137,11 @@ describe("open mode (U27)", () => {
 
     it("the nav: Start free to sign-up", async () => {
         const { SiteNav } = await import("@/components/shared/nav/site-nav");
-        const { container } = render(<SiteNav />);
+        const { FEATURE_ITEMS, SOLUTION_ITEMS } =
+            await import("@/components/shared/nav/nav-items");
+        const { container } = render(
+            <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} />,
+        );
         expectOpen(container);
     });
 

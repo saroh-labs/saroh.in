@@ -6,17 +6,20 @@ import { shots } from "@/content/shots";
 
 import { ScreenshotFrame } from "./screenshot-frame";
 
-/** The lightbox (plan U18): opens on click, closes on Esc, focus returns. */
+/**
+ * The lightbox (plan U18): opens on click, closes on Esc, focus returns. It
+ * is fetched on the first click, so each test waits for it.
+ */
 afterEach(cleanup);
 
 describe("ScreenshotFrame with zoom", () => {
-    it("opens the lightbox on click and closes it on Esc, returning focus", () => {
+    it("opens the lightbox on click and closes it on Esc, returning focus", async () => {
         render(<ScreenshotFrame shot="s-billing" zoomable />);
         const trigger = screen.getByTitle("Click to enlarge");
         trigger.focus();
         fireEvent.click(trigger);
 
-        const dialog = screen.getByRole("dialog", {
+        const dialog = await screen.findByRole("dialog", {
             name: "Screenshot, enlarged",
         });
         expect(dialog.getAttribute("aria-modal")).toBe("true");
@@ -27,17 +30,17 @@ describe("ScreenshotFrame with zoom", () => {
         expect(document.activeElement).toBe(trigger);
     });
 
-    it("closes on a click anywhere", () => {
+    it("closes on a click anywhere", async () => {
         render(<ScreenshotFrame shot="s-billing" zoomable />);
         fireEvent.click(screen.getByTitle("Click to enlarge"));
-        fireEvent.click(screen.getByRole("dialog"));
+        fireEvent.click(await screen.findByRole("dialog"));
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
-    it("keeps Tab inside while open", () => {
+    it("keeps Tab inside while open", async () => {
         render(<ScreenshotFrame shot="s-billing" zoomable />);
         fireEvent.click(screen.getByTitle("Click to enlarge"));
-        const close = screen.getByRole("button", {
+        const close = await screen.findByRole("button", {
             name: "Click anywhere or press Esc to close",
         });
         expect(document.activeElement).toBe(close);

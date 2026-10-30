@@ -7,11 +7,12 @@ import { home } from "@/content/home";
 import { shownLegal } from "@/content/resources";
 import { pageTitle, SITE_NAME, SITE_URL } from "@/lib/seo";
 
+import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
 import { siteTagConfig } from "@/lib/site-tag-config";
 
 import { ReferralKeeper } from "./referral-keeper";
-import { SiteTags } from "./site-tags";
+import { LazySiteTags } from "./site-tags-lazy";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -114,15 +115,16 @@ export default function RootLayout({
     const privacy = shownLegal(resourcesContext()).find(
         (p) => p.id === "privacy",
     );
+    const tags = siteTagConfig();
     return (
         <html lang="en-IN" style={{ colorScheme: "light" }}>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
             >
-                <SiteTags
-                    config={siteTagConfig()}
-                    privacyHref={privacy?.href}
-                />
+                {/* With nothing to ask about, it would do nothing: not sent. */}
+                {asksConsent(tags) ? (
+                    <LazySiteTags config={tags} privacyHref={privacy?.href} />
+                ) : null}
                 <ReferralKeeper />
                 <a
                     href="#main"

@@ -14,8 +14,8 @@ import { nextIndex } from "@/lib/roving";
 
 import { CtaLink } from "../buttons/cta-link";
 import { MobileMenu } from "./mobile-menu";
-import type { NavItem, NavSection } from "./nav-items";
-import { FEATURE_ITEMS, SOLUTION_ITEMS, sectionOf } from "./nav-items";
+import type { NavItem, NavSection } from "./nav-section";
+import { sectionOf } from "./nav-section";
 
 type MenuId = "features" | "solutions" | "resources" | "tools";
 
@@ -46,17 +46,20 @@ const CURRENT =
  * arrow keys move within it.
  */
 export function SiteNav({
+    features,
+    solutions,
     resources = [],
     tools = [],
-    solutions = SOLUTION_ITEMS,
 }: {
+    /** The Features menu (`FEATURE_ITEMS`), from the server. */
+    features: NavItem[];
+    /** The Solutions menu, as the server links it (`solutionLink`). */
+    solutions: NavItem[];
     resources?: NavItem[];
     tools?: NavItem[];
-    /** The Solutions menu, as the server links it (`solutionLink`). */
-    solutions?: NavItem[];
 }) {
     const pathname = usePathname();
-    const section = sectionOf(pathname, resources, tools, solutions);
+    const section = sectionOf(pathname, features, solutions, resources, tools);
     const [open, setOpen] = useState<MenuId | null>(null);
     const nav = useRef<HTMLElement>(null);
     const featuresButton = useRef<HTMLButtonElement>(null);
@@ -122,7 +125,7 @@ export function SiteNav({
                 <Menu
                     id="features"
                     label="Features"
-                    items={FEATURE_ITEMS}
+                    items={features}
                     columns={2}
                     current={section === "features"}
                     pathname={pathname}
@@ -214,6 +217,7 @@ export function SiteNav({
                 section={section}
                 pathname={pathname}
                 resources={resources}
+                features={features}
                 solutions={solutions}
                 tools={tools}
                 className="ml-auto min-[760px]:hidden"

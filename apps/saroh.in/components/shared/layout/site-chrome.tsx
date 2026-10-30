@@ -1,5 +1,7 @@
 import {
+    FEATURE_ITEMS,
     resourceItems,
+    SOLUTION_ITEMS,
     solutionItems,
 } from "@/components/shared/nav/nav-items";
 import { SiteFooter } from "@/components/shared/nav/site-footer";
@@ -40,7 +42,7 @@ export function SiteChrome({
     if (preview) {
         return (
             <Shell banner={banner}>
-                <SiteNav />
+                <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} />
                 <main id="main">{children}</main>
                 <SiteFooter />
             </Shell>
@@ -70,6 +72,7 @@ export function SiteChrome({
             }
         >
             <SiteNav
+                features={FEATURE_ITEMS}
                 resources={resources}
                 tools={tools}
                 solutions={solutions}

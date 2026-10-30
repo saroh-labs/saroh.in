@@ -1,6 +1,6 @@
 import { createBrowserTracking } from "@saroh/error-tracking/browser";
 
-import { env } from "@/env";
+import { browserEnv as env } from "@/lib/browser/env";
 import { TRACKED_APP, trackedEnv } from "@/lib/error-tracking";
 
 /**
