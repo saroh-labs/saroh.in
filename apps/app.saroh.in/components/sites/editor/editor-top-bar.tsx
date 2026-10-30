@@ -1,10 +1,12 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -36,10 +38,12 @@ import type {
     SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
+import { readerSiteState } from "@/lib/sites/site-state";
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
 import { EditorSheet } from "./editor-sheet";
 import { MoreSheet } from "./more-actions";
+import { useEditorReadOnly } from "./read-only";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -75,6 +79,7 @@ export function EditorTopBar({
     askForReview,
     withdrawReview,
     neverPublished,
+    publishedAt = null,
     pendingSummary,
     pendingShort,
     pendingKnown,
@@ -99,6 +104,7 @@ export function EditorTopBar({
     sheet = null,
     setSheet,
     sheetHost = null,
+    reviewerVerdict,
 }: {
     siteId: string;
     siteName: string;
@@ -120,6 +126,8 @@ export function EditorTopBar({
     /** Take the open review request back (UX-068). */
     withdrawReview: () => Promise<void>;
     neverPublished: boolean;
+    /** When the site last went live, for a Reviewer's status (U6). */
+    publishedAt?: string | null;
     pendingSummary: string | null;
     pendingShort: string | null;
     pendingKnown: boolean;
@@ -155,17 +163,16 @@ export function EditorTopBar({
     setSheet?: (next: SheetName) => void;
     /** The editor's body, where a phone's sheets are laid. */
     sheetHost?: HTMLElement | null;
+    /** A Reviewer's verdict (DEC-200): the bar's buttons on a desk, the Review sheet's body on a phone. */
+    reviewerVerdict?: ReactNode;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const zone = useBusinessZone();
+    const readOnly = useEditorReadOnly();
     const [pagesOpen, setPagesOpen] = useState(false);
 
     const activePage = pages.find((page) => page.id === pageId);
-    const {
-        status,
-        detail: statusDetail,
-        line: statusLine,
-    } = statusReadout({
+    const ownerReadout = statusReadout({
         saving,
         styleSaving,
         saveError,
@@ -183,6 +190,31 @@ export function EditorTopBar({
         scheduled,
         zone,
     });
+    // A Reviewer reads live-and-since-when, never pending changes (U6).
+    const reader = readerSiteState(
+        {
+            currentPublicationId: neverPublished ? null : "live",
+            currentPublication: publishedAt ? { publishedAt } : null,
+        },
+        zone,
+    );
+    const {
+        status,
+        detail: statusDetail,
+        line: statusLine,
+    } = readOnly
+        ? {
+              status: {
+                  label: reader.label,
+                  tone:
+                      reader.tone === "live"
+                          ? ("done" as const)
+                          : ("quiet" as const),
+              },
+              detail: "",
+              line: "",
+          }
+        : ownerReadout;
     const publishHint = publishTitle({
         publishing,
         dirty: dirty || saving || styleDirty,
@@ -275,8 +307,36 @@ export function EditorTopBar({
                             />
                         ) : null}
                     </button>
-                    <PublishButton {...actions} className="h-11 shrink-0" />
+                    {readOnly ? (
+                        // Where Publish sits: a Reviewer's verdict (RVD3Phone).
+                        // A reader who may not approve has none to open.
+                        reviewerVerdict ? (
+                            <Button
+                                type="button"
+                                aria-haspopup="dialog"
+                                onClick={() => setSheet?.("review")}
+                                className="h-11 shrink-0"
+                            >
+                                Review
+                            </Button>
+                        ) : null
+                    ) : (
+                        <PublishButton {...actions} className="h-11 shrink-0" />
+                    )}
                 </header>
+                {readOnly && reviewerVerdict ? (
+                    <EditorSheet
+                        open={sheet === "review"}
+                        onClose={close}
+                        container={sheetHost}
+                        side="bottom"
+                        title="Your review"
+                        closeLabel="Close your review"
+                        className="h-[80%]"
+                    >
+                        {reviewerVerdict}
+                    </EditorSheet>
+                ) : null}
                 <EditorSheet
                     open={sheet === "pages"}
                     onClose={close}
@@ -422,10 +482,22 @@ export function EditorTopBar({
                     </PopoverContent>
                 </Popover>
                 {readout}
+                {readOnly ? (
+                    <Badge
+                        variant="info"
+                        size="sm"
+                        data-reviewing=""
+                        className="ml-1 shrink-0 gap-1.5"
+                    >
+                        <Eye aria-hidden className="size-3" />
+                        Reviewing · you can&rsquo;t change anything
+                    </Badge>
+                ) : null}
             </nav>
 
             <TopBarActions
                 {...actions}
+                verdict={reviewerVerdict}
                 // Tablet width (UX-035): the secondary actions fold into
                 // "More" so Publish never runs off the bar.
                 compact={layout === "narrow"}

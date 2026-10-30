@@ -1,26 +1,38 @@
 "use client";
 
-import { Layers, Palette, Plus } from "lucide-react";
+import { Layers, MessageSquare, Palette, Plus } from "lucide-react";
 import { useSyncExternalStore } from "react";
+
+import { count } from "@/lib/format/plural";
+import { useEditorReadOnly } from "./read-only";
 
 /**
  * A phone's one floating pill (DEC-185), in place of the bottom tabs:
  * Blocks · + · Brand, at the foot of the page where a thumb is. It is not
  * drawn while a sheet is open over the page, nor while the keyboard is up.
+ * A Reviewer's (DEC-200, RVDPhone) is Blocks · Feedback n: nothing to add,
+ * and Brand is a tab in the Blocks sheet.
  */
 export function EditPill({
     hidden,
     onBlocks,
     onAdd,
     onBrand,
+    openNotes = 0,
+    onFeedback,
 }: {
     /** A sheet or a dialog is over the page. */
     hidden: boolean;
     onBlocks: () => void;
     onAdd: () => void;
     onBrand: () => void;
+    /** A Reviewer's: the open notes on the site, beside Feedback. */
+    openNotes?: number;
+    onFeedback?: () => void;
 }) {
     const keyboard = useKeyboardUp();
+    // Read-only (DEC-200): nothing to add.
+    const readOnly = useEditorReadOnly();
     if (hidden || keyboard) return null;
     const item =
         "flex h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-colors duration-fast hover:bg-background/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -35,18 +47,40 @@ export function EditPill({
                 <Layers aria-hidden className="size-[18px]" />
                 Blocks
             </button>
-            <button
-                type="button"
-                aria-label="Add a block"
-                onClick={onAdd}
-                className="grid size-11 place-items-center rounded-full bg-background text-foreground transition-colors duration-fast hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <Plus aria-hidden className="size-5" />
-            </button>
-            <button type="button" onClick={onBrand} className={item}>
-                <Palette aria-hidden className="size-[18px]" />
-                Brand
-            </button>
+            {readOnly ? (
+                <button
+                    type="button"
+                    aria-label={`Feedback, ${count(openNotes, "open note")}`}
+                    onClick={onFeedback}
+                    className={item}
+                >
+                    <MessageSquare aria-hidden className="size-[18px]" />
+                    Feedback
+                    {openNotes > 0 ? (
+                        <span
+                            aria-hidden
+                            className="min-w-5 rounded-full bg-background px-1.5 text-center text-xs tabular-nums text-foreground"
+                        >
+                            {openNotes}
+                        </span>
+                    ) : null}
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    aria-label="Add a block"
+                    onClick={onAdd}
+                    className="grid size-11 place-items-center rounded-full bg-background text-foreground transition-colors duration-fast hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <Plus aria-hidden className="size-5" />
+                </button>
+            )}
+            {readOnly ? null : (
+                <button type="button" onClick={onBrand} className={item}>
+                    <Palette aria-hidden className="size-[18px]" />
+                    Brand
+                </button>
+            )}
         </div>
     );
 }

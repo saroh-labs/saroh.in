@@ -32,6 +32,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
 import { DEVICES, ZOOMS } from "./editor-constants";
+import { useEditorReadOnly } from "./read-only";
 import { ThemeToggle } from "./theme-toggle";
 
 /** What the bar's right-hand side can do: how the page is shown, and publish. */
@@ -92,8 +93,11 @@ export interface TestReleaseActions {
  */
 export function TopBarActions({
     compact = false,
+    verdict,
     ...p
 }: TopBarActionProps & {
+    /** A Reviewer's verdict (DEC-200) where Share and Publish would be. */
+    verdict?: ReactNode;
     /**
      * Narrow (UX-035): Preview, Feedback and Test release fold into "More",
      * so Publish stays on screen at tablet width.
@@ -101,6 +105,8 @@ export function TopBarActions({
     compact?: boolean;
 }) {
     const [moreOpen, setMoreOpen] = useState(false);
+    // A Reviewer (DEC-200) shares nothing and publishes nothing.
+    const readOnly = useEditorReadOnly();
     /** Close "More" before an action that opens something over the editor. */
     const fromMore = (run: () => void) => (): void => {
         setMoreOpen(false);
@@ -169,9 +175,9 @@ export function TopBarActions({
              * open it says so and offers to take the request back. Style
              * is the rail's Brand tab (G2), so the bar has no button for it.
              */}
-            <ShareControl {...p} />
+            {readOnly ? null : <ShareControl {...p} />}
 
-            <PublishButton {...p} />
+            {readOnly ? verdict : <PublishButton {...p} />}
         </div>
     );
 }
@@ -185,6 +191,7 @@ function SecondaryActions({
     ...p
 }: TopBarActionProps & { stacked: boolean }) {
     const touch = stacked && "h-11 w-full justify-start";
+    const readOnly = useEditorReadOnly();
     return (
         <>
             {/*
@@ -230,7 +237,16 @@ function SecondaryActions({
             ) : null}
 
             {p.testRelease ? (
-                <TestReleaseSplit actions={p.testRelease} stacked={stacked} />
+                <TestReleaseSplit
+                    // Read-only (DEC-200): the list alone, where each
+                    // release's own review page is.
+                    actions={
+                        readOnly
+                            ? { ...p.testRelease, onMake: undefined }
+                            : p.testRelease
+                    }
+                    stacked={stacked || readOnly}
+                />
             ) : null}
         </>
     );

@@ -243,6 +243,7 @@ async function wordNote(
             siteId: true,
             body: true,
             pageTitle: true,
+            postTitle: true,
             authorUserId: true,
             createdAt: true,
             testReleaseId: true,
@@ -289,7 +290,9 @@ async function wordNote(
         line.length > NOTE_QUOTE_MAX
             ? `${line.slice(0, NOTE_QUOTE_MAX - 1).trimEnd()}…`
             : line;
-    const where = c.pageTitle ? `On ${c.pageTitle}: ` : "";
+    // A page's note or a post's (DEC-200 U8): whichever it names.
+    const about = c.pageTitle ?? c.postTitle;
+    const where = about ? `On ${about}: ` : "";
     return {
         event: "site",
         eventKey: `team:review-note:${c.siteId}:${c.testReleaseId ?? "draft"}:${c.authorUserId}:${round?.id ?? "none"}`,

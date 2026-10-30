@@ -282,19 +282,33 @@ export class CreateCommentDto {
     @MaxLength(2000, { message: "Notes are limited to 2000 characters" })
     body!: string;
 
+    /** With `sectionKey`, for a note on a page. Absent for a post. */
+    @IsOptional()
     @IsString()
     @MinLength(1, { message: "pageId is required" })
-    pageId!: string;
+    @MaxLength(64)
+    pageId?: string;
 
     /**
      * On the draft: the section's key. On a test release: its position on
      * the frozen page, `"0"` for the first (a snapshot keeps no keys, and a
-     * frozen page's sections never move).
+     * frozen page's sections never move). Absent for a post.
      */
+    @IsOptional()
     @IsString()
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
-    sectionKey!: string;
+    sectionKey?: string;
+
+    /**
+     * The draft post the note is about (DEC-200 U8), instead of a page's
+     * section. Exactly one of the two; the service says so in words.
+     */
+    @IsOptional()
+    @IsString({ message: "postId must be an id" })
+    @MinLength(1, { message: "postId must be an id" })
+    @MaxLength(64)
+    postId?: string;
 
     /** The test release the note is about (DEC-071, T8). Absent: the draft. */
     @IsOptional()
@@ -341,6 +355,15 @@ export class RequestReviewDto {
  * settled a note; the pipe no longer converts anything (#314), so the decorator
  * says the whole rule and anything but true or false is a 400.
  */
+/** A note's new words (R4): the same rules as leaving one. */
+export class UpdateCommentBodyDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A note needs something in it" })
+    @MaxLength(2000, { message: "Notes are limited to 2000 characters" })
+    body!: string;
+}
+
 export class SetCommentResolvedDto {
     @IsBoolean({ message: "resolved must be true or false" })
     resolved!: boolean;

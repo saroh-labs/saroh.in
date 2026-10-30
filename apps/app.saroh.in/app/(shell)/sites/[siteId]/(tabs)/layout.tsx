@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/shared/page/page-container";
 import { WebsiteHeader } from "@/components/sites/header/website-header";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
 import { listPostCategories, listPosts } from "@/lib/content/service";
+import { businessZone } from "@/lib/format/business-zone";
 import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
@@ -80,12 +81,19 @@ export default async function WebsiteTabsLayout({
         ? await listPostCategories(siteId).catch(() => null)
         : undefined;
 
+    // A reader is told live-and-since-when, never the owner's checks (U6).
+    const stateOptions = {
+        domainState: site.can.manageDomain,
+        reader: site.can.edit
+            ? undefined
+            : { timeZone: businessZone(organization) },
+    };
     const summaries = (
         sites.some((s) => s.id === site.id) ? sites : [site]
     ).map((s) => ({
         id: s.id,
         name: s.name.trim() || "Untitled site",
-        state: siteState(s, { domainState: site.can.manageDomain }),
+        state: siteState(s, stateOptions),
         paused: pausedSites.includes(s.id),
     }));
     const thisPaused = pausedSites.includes(site.id);
@@ -104,7 +112,7 @@ export default async function WebsiteTabsLayout({
                         state: siteState(
                             sites.find((s) => s.id === site.id) ?? site,
                             // Domain state only for whoever can fix it.
-                            { domainState: site.can.manageDomain },
+                            stateOptions,
                         ),
                         paused: thisPaused,
                     }}

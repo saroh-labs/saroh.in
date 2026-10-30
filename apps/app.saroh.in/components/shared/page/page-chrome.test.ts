@@ -175,8 +175,6 @@ describe("a page's title is the page header's", () => {
      * The only hand-written `<h1>`s, each not a workspace page's title.
      */
     const ALLOWED = new Set([
-        // The post as its readers see it: the article's own title.
-        "components/sites/posts/post-read-view.tsx",
         // Setup, outside the workspace: each step's question is the
         // split screen's title, as `app/onboarding/page.tsx` drew it.
         "components/organizations/setup/setup-step-frame.tsx",

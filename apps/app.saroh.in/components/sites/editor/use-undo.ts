@@ -64,6 +64,7 @@ export function useUndo({
     setStyle,
     resetStyle,
     setSelectedIndex,
+    readOnly = false,
 }: {
     sections: Section[];
     restoreSections: (previous: Section[]) => void;
@@ -74,6 +75,8 @@ export function useUndo({
     setStyle: (next: SiteStyle) => void;
     resetStyle: () => void;
     setSelectedIndex: (index: number | null) => void;
+    /** Undo off (DEC-200): read-only, nothing here changes anything. */
+    readOnly?: boolean;
 }) {
     const slotRef = useRef<HoldSlot | null>(null);
     const watch = useRef<Watch | null>(null);
@@ -110,6 +113,7 @@ export function useUndo({
     const label = (section: Section) => SECTION_LABELS[section.type];
 
     function moveWithUndo(from: number, to: number) {
+        if (readOnly) return;
         const count = sections.length;
         if (from < 0 || from >= count || to < 0 || to >= count) return;
         if (from === to) return;
@@ -138,7 +142,7 @@ export function useUndo({
             void slotRef.current?.commitNow();
         },
         removeAt(index: number) {
-            if (index < 0 || index >= sections.length) return;
+            if (readOnly || index < 0 || index >= sections.length) return;
             const section = sections[index];
             const before = sections;
             removeAt(index);
@@ -157,7 +161,7 @@ export function useUndo({
         move: (index: number, delta: number) =>
             moveWithUndo(index, index + delta),
         toggleHidden(index: number) {
-            if (index < 0 || index >= sections.length) return;
+            if (readOnly || index < 0 || index >= sections.length) return;
             const section = sections[index];
             const before = sections;
             toggleHidden(index);
@@ -171,6 +175,7 @@ export function useUndo({
             );
         },
         resetStyle() {
+            if (readOnly) return;
             const before = style;
             resetStyle();
             hold("Colours, type and spacing reset.", "style", before, () =>

@@ -269,6 +269,13 @@ const OPERATIONS: readonly Operation[] = [
         allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
     },
     {
+        what: "record a page read (DEC-200)",
+        handler: "recordPageView",
+        method: "POST",
+        run: (ctx) => service().recordPageView(ctx, SITE, "page_1"),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
         what: "read the notes on a website",
         handler: "listComments",
         method: "GET",

@@ -770,7 +770,8 @@ export function navGroupsWithSites(
                   },
               ]
             : [
-                  { href: `${WEBSITE_HREF}/${siteId}/review`, label: "Review" },
+                  // A Reviewer reviews in the editor, read-only (DEC-200).
+                  { href: `${WEBSITE_HREF}/${siteId}`, label: "Review" },
                   { href: `${WEBSITE_HREF}/${siteId}/posts`, label: "Posts" },
               ];
 

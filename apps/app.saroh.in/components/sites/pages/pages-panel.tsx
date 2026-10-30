@@ -2,11 +2,13 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Check, ChevronRight, Plus, Settings2 } from "lucide-react";
+import { Check, ChevronRight, FileText, Plus, Settings2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
+import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
 import { deletePage } from "@/lib/sites/actions";
 import {
@@ -81,6 +83,7 @@ export function PagesPanel({
     /** In a phone's Pages sheet (DEC-185): each page with its address. */
     phone?: boolean;
 }) {
+    const readOnly = useEditorReadOnly();
     const router = useRouter();
     const [open, setOpen] = useState<Open>("pages");
     const reasonId = useId();
@@ -217,71 +220,97 @@ export function PagesPanel({
                 })}
             </div>
 
-            <div className="border-t p-[5px]">
-                <Disclosure
-                    icon={<Settings2 aria-hidden className="size-3.5" />}
-                    label={
-                        active
-                            ? `Settings for ${active.title}`
-                            : "Page settings"
-                    }
-                    open={open === "settings"}
-                    onToggle={() =>
-                        setOpen(open === "settings" ? "pages" : "settings")
-                    }
-                    hint={
-                        active && unseenBecause(active.id, flags)
-                            ? "Change path"
-                            : undefined
-                    }
-                />
-                {open === "settings" && active ? (
-                    <PageSettings
-                        // Fresh fields when the page itself changes.
-                        key={`${active.id}:${active.title}:${active.path}`}
-                        siteId={siteId}
-                        page={active}
-                        canUpdate={canUpdate}
-                        unseen={unseenBecause(active.id, flags)}
-                        onChanged={() => router.refresh()}
-                        onDelete={() => {
-                            setPendingDelete(active);
-                            setDeleteOpen(true);
-                        }}
-                    />
-                ) : null}
-
-                <Disclosure
-                    icon={<Plus aria-hidden className="size-3.5" />}
-                    label="Add a page"
-                    open={open === "add"}
-                    disabled={!canUpdate}
-                    describedBy={canUpdate ? undefined : reasonId}
-                    onToggle={() => setOpen(open === "add" ? "pages" : "add")}
-                />
-                {canUpdate ? null : (
-                    <p
-                        id={reasonId}
-                        className="px-2.5 pb-1.5 text-[0.71875rem] leading-relaxed text-muted-foreground"
+            {/*
+             * Read-only (DEC-200): switch page only, no settings or add.
+             * Posts are read in the post editor, read-only too (U8).
+             */}
+            {readOnly ? (
+                <div className="border-t p-[5px]">
+                    <Link
+                        href={`/sites/${siteId}/posts`}
+                        onClick={onClose}
+                        className={cn(
+                            MENU_ROW,
+                            phone ? "min-h-11" : "h-[34px]",
+                        )}
                     >
-                        Adding a page needs a role that can change the
-                        website&apos;s settings.
-                    </p>
-                )}
-                {open === "add" && canUpdate ? (
-                    <AddPagePanel
-                        siteId={siteId}
-                        offers={offers}
-                        onCancel={() => setOpen("pages")}
-                        onAdded={(page) => {
-                            showSuccess(`Added ${page.title}.`);
-                            onClose();
-                            router.push(`/sites/${siteId}?page=${page.id}`);
-                            router.refresh();
-                        }}
+                        <FileText aria-hidden className="size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">Posts</span>
+                        <ChevronRight
+                            aria-hidden
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                        />
+                    </Link>
+                </div>
+            ) : (
+                <div className="border-t p-[5px]">
+                    <Disclosure
+                        icon={<Settings2 aria-hidden className="size-3.5" />}
+                        label={
+                            active
+                                ? `Settings for ${active.title}`
+                                : "Page settings"
+                        }
+                        open={open === "settings"}
+                        onToggle={() =>
+                            setOpen(open === "settings" ? "pages" : "settings")
+                        }
+                        hint={
+                            active && unseenBecause(active.id, flags)
+                                ? "Change path"
+                                : undefined
+                        }
                     />
-                ) : null}
-            </div>
+                    {open === "settings" && active ? (
+                        <PageSettings
+                            // Fresh fields when the page itself changes.
+                            key={`${active.id}:${active.title}:${active.path}`}
+                            siteId={siteId}
+                            page={active}
+                            canUpdate={canUpdate}
+                            unseen={unseenBecause(active.id, flags)}
+                            onChanged={() => router.refresh()}
+                            onDelete={() => {
+                                setPendingDelete(active);
+                                setDeleteOpen(true);
+                            }}
+                        />
+                    ) : null}
+
+                    <Disclosure
+                        icon={<Plus aria-hidden className="size-3.5" />}
+                        label="Add a page"
+                        open={open === "add"}
+                        disabled={!canUpdate}
+                        describedBy={canUpdate ? undefined : reasonId}
+                        onToggle={() =>
+                            setOpen(open === "add" ? "pages" : "add")
+                        }
+                    />
+                    {canUpdate ? null : (
+                        <p
+                            id={reasonId}
+                            className="px-2.5 pb-1.5 text-[0.71875rem] leading-relaxed text-muted-foreground"
+                        >
+                            Adding a page needs a role that can change the
+                            website&apos;s settings.
+                        </p>
+                    )}
+                    {open === "add" && canUpdate ? (
+                        <AddPagePanel
+                            siteId={siteId}
+                            offers={offers}
+                            onCancel={() => setOpen("pages")}
+                            onAdded={(page) => {
+                                showSuccess(`Added ${page.title}.`);
+                                onClose();
+                                router.push(`/sites/${siteId}?page=${page.id}`);
+                                router.refresh();
+                            }}
+                        />
+                    ) : null}
+                </div>
+            )}
 
             {/*
              * Deleting a page destroys every section on it, and nothing here

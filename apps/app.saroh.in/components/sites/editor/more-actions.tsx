@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useEditorReadOnly } from "./read-only";
 import type { TopBarActionProps } from "./top-bar-actions";
 import { ViewControls } from "./top-bar-actions";
 
@@ -41,12 +42,14 @@ export function MoreSheet({
         run();
     };
     const release = p.testRelease;
+    // A Reviewer (DEC-200): no Share, no making a release.
+    const readOnly = useEditorReadOnly();
     return (
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
             <div className="flex min-w-0 flex-wrap items-center gap-1">
                 {status}
             </div>
-            {p.publishHint ? (
+            {p.publishHint && !readOnly ? (
                 <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
                     {p.publishHint}
                 </p>
@@ -71,35 +74,37 @@ export function MoreSheet({
                 </li>
             </Group>
 
-            <Group title={p.inReview ? "In review" : "Share"}>
-                {p.inReview ? (
+            {readOnly ? null : (
+                <Group title={p.inReview ? "In review" : "Share"}>
+                    {p.inReview ? (
+                        <Row
+                            icon={<Undo2 />}
+                            label="Withdraw the review request"
+                            hint="The site stops reading In review. Notes stay."
+                            disabled={p.asking}
+                            onClick={then(p.withdrawReview)}
+                        />
+                    ) : (
+                        <Row
+                            icon={<UserCheck />}
+                            label="Ask a teammate to review"
+                            hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
+                            disabled={p.asking}
+                            onClick={then(p.askForReview)}
+                        />
+                    )}
                     <Row
-                        icon={<Undo2 />}
-                        label="Withdraw the review request"
-                        hint="The site stops reading In review. Notes stay."
-                        disabled={p.asking}
-                        onClick={then(p.withdrawReview)}
+                        icon={<Link2 />}
+                        label="Share a preview link"
+                        hint="A link anyone can open to read the draft. Nothing goes live."
+                        onClick={then(p.onSharePreview)}
                     />
-                ) : (
-                    <Row
-                        icon={<UserCheck />}
-                        label="Ask a teammate to review"
-                        hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
-                        disabled={p.asking}
-                        onClick={then(p.askForReview)}
-                    />
-                )}
-                <Row
-                    icon={<Link2 />}
-                    label="Share a preview link"
-                    hint="A link anyone can open to read the draft. Nothing goes live."
-                    onClick={then(p.onSharePreview)}
-                />
-            </Group>
+                </Group>
+            )}
 
             {release ? (
                 <Group title="Test releases">
-                    {release.onMake ? (
+                    {release.onMake && !readOnly ? (
                         <Row
                             icon={<Plus />}
                             label="Make a test release"

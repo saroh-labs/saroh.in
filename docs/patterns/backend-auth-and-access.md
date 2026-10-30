@@ -48,14 +48,15 @@ what the API allows.
   `assertSiteInOrg`, `listSites`, `getSite`, `getSiteFlags`, posts, post
   categories and preview links. A guard would not do: several services query
   `Site` directly, and a guard is something to forget. An ungranted site is a 404.
-- **Current** — **A reviewer never opens the editor** (#275, decided
-  2026-09-12). Reading and commenting is its own screen, not a read-only
-  editor: `/sites/:id` redirects a caller without `section:write` to
-  `/sites/:id/review`, which renders the page with the live site's blocks and a
-  "Comment on sections" mode. It reads through `getPageForReview` (`site:read`,
-  writes nothing), so `getPageDraft` requiring `section:write` is correct and
-  stays. A read-only editor would make every editor change answer "and with no
-  write access?".
+- **Current** — **A reviewer reads in the editor, read-only** (DEC-200,
+  29 Oct 2026, superseding #275's separate screen). `/sites/:id` loads the
+  page through `getPageForReview` (`…/read`, `site:read`, writes nothing) for
+  a caller without `section:write`, so `getPageDraft` requiring
+  `section:write` is correct and stays; `/sites/:id/review` redirects to the
+  editor. The editor gets one `readOnly` switch, and every control that writes
+  asks it: a new editor control that writes must read `readOnly`, and
+  `components/sites/editor/read-only.test.tsx` fails if it doesn't. The API
+  still refuses every write a Reviewer tries.
 - **Adopted** — **Members move kitchen stages, nothing else on an order**
   (DEC-024, amends DEC-020). `order:stage` reads the order's kitchen view —
   items, stage, notes, allergens, customer name — with money figures left out
