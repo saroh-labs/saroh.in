@@ -13,7 +13,7 @@ import { z } from "zod";
  */
 export const env = createEnv({
     server: {
-        MARKETING_URL: z.string().url().optional(),
+        MARKETING_URL: z.url().optional(),
     },
     client: {},
     runtimeEnv: {

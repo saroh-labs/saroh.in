@@ -24,8 +24,8 @@ const formSchema = z.object({
     email: z
         .string()
         .trim()
-        .min(1, { message: "Enter their email" })
-        .email({ message: "Enter a valid email" }),
+        .min(1, { error: "Enter their email" })
+        .email({ error: "Enter a valid email" }),
     role: z.enum(["ADMIN", "MANAGER", "EDITOR", "VIEWER"]),
 });
 

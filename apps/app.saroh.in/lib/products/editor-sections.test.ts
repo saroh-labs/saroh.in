@@ -9,6 +9,7 @@ import {
     descriptionPatch,
     detailsFrom,
     detailsPatch,
+    firstProblem,
     formatDuration,
     isEmptyHtml,
     madeByFrom,
@@ -88,6 +89,12 @@ describe("product editor sections", () => {
         expect(
             madeBySchema.safeParse({ ...base, returnsMode: "OWN" }).success,
         ).toBe(false);
+        expect(firstProblem(madeBySchema, { ...base, madeHere: false })).toBe(
+            "Add who makes it, or switch back to Made here.",
+        );
+        expect(
+            firstProblem(madeBySchema, { ...base, returnsMode: "OWN" }),
+        ).toBe("Write this product's returns rule, or use the location's.");
     });
 
     it("treats an emptied editor as no description, and key points as lines", () => {

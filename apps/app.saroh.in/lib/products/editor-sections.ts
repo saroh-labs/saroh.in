@@ -129,7 +129,7 @@ export const basicsSchema = z
             v.mrp === "" || !isMoney(v.price) || paise(v.mrp) >= paise(v.price),
         {
             path: ["mrp"],
-            message: "MRP can't be lower than the price it sells for.",
+            error: "MRP can't be lower than the price it sells for.",
         },
     );
 export type BasicsValues = z.infer<typeof basicsSchema>;
@@ -275,14 +275,13 @@ export const madeBySchema = z
     })
     .refine((v) => v.madeHere || v.maker.trim() !== "", {
         path: ["maker"],
-        message: "Add who makes it, or switch back to Made here.",
+        error: "Add who makes it, or switch back to Made here.",
     })
     .refine(
         (v) => v.returnsMode === "STOREFRONT" || v.returnsText.trim() !== "",
         {
             path: ["returnsText"],
-            message:
-                "Write this product's returns rule, or use the location's.",
+            error: "Write this product's returns rule, or use the location's.",
         },
     );
 export type MadeByValues = z.infer<typeof madeBySchema>;

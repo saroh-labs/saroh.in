@@ -35,7 +35,7 @@ import {
 } from "@/lib/organizations/web-address-actions";
 
 const schema = z.object({
-    address: z.string().min(1, { message: "Enter a web address" }),
+    address: z.string().min(1, { error: "Enter a web address" }),
 });
 type Values = z.infer<typeof schema>;
 

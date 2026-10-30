@@ -217,7 +217,7 @@ export const enableResponseSchema = z.object({
     // first run can open that site. Lenient: an answer without it is fine.
     created: z
         .object({ siteId: z.string().min(1).optional() })
-        .passthrough()
+        .loose()
         .optional()
         .catch(undefined),
 });

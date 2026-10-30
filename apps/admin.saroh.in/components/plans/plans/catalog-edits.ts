@@ -246,7 +246,10 @@ export function errorsByPath(errors: readonly string[]): Map<string, string> {
 }
 
 function readable(message: string): string {
-    if (message.startsWith("String must contain at least 1 character")) {
+    // zod 4's words for an empty string under `.min(1)`.
+    if (
+        message.startsWith("Too small: expected string to have >=1 character")
+    ) {
         return "This can't be blank";
     }
     return message;

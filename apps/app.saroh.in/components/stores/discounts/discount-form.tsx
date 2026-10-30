@@ -50,11 +50,10 @@ const formSchema = z
         code: z
             .string()
             .trim()
-            .min(2, { message: "At least 2 characters" })
+            .min(2, { error: "At least 2 characters" })
             .max(32)
             .regex(/^[A-Za-z0-9_-]+$/, {
-                message:
-                    "Letters, digits, dashes or underscores, with no spaces",
+                error: "Letters, digits, dashes or underscores, with no spaces",
             }),
         description: z.string().max(200),
         kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
@@ -65,7 +64,7 @@ const formSchema = z
         endsAt: z.date().optional(),
         usageLimit: z
             .string()
-            .regex(/^\d*$/, { message: "A whole number, or empty for no cap" }),
+            .regex(/^\d*$/, { error: "A whole number, or empty for no cap" }),
     })
     .superRefine((v, ctx) => {
         // Only the kind chosen is checked: the other's field is hidden.

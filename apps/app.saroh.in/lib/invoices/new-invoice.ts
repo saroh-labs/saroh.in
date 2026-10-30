@@ -34,7 +34,7 @@ export const DUES = [
 ] as const;
 
 export const invoiceFormSchema = z.object({
-    contactId: z.string().min(1, { message: "Choose who it's for" }),
+    contactId: z.string().min(1, { error: "Choose who it's for" }),
     /** Days from today, or "kept" for a draft's own due date. */
     due: z.union([z.number(), z.literal("kept")]),
     billToGstin: z
@@ -42,7 +42,7 @@ export const invoiceFormSchema = z.object({
         .trim()
         .toUpperCase()
         .refine((v) => v === "" || GSTIN_SHAPE.test(v), {
-            message: "A GSTIN is 15 characters, like 29AAGCR4375J1ZU",
+            error: "A GSTIN is 15 characters, like 29AAGCR4375J1ZU",
         }),
     billToState: z.string(),
     billToAddress: z.string().trim().max(500),
@@ -52,26 +52,26 @@ export const invoiceFormSchema = z.object({
                 description: z
                     .string()
                     .trim()
-                    .min(1, { message: "Say what it's for" })
+                    .min(1, { error: "Say what it's for" })
                     .max(200),
                 quantity: z
-                    .number({ message: "A whole number" })
-                    .int({ message: "A whole number" })
-                    .min(1, { message: "At least 1" })
+                    .number({ error: "A whole number" })
+                    .int({ error: "A whole number" })
+                    .min(1, { error: "At least 1" })
                     .max(9999),
                 unitPrice: z.string().trim().regex(MONEY, {
-                    message: "A price, with at most two decimals",
+                    error: "A price, with at most two decimals",
                 }),
                 gstRate: z.string(),
                 hsnSac: z
                     .string()
                     .trim()
                     .refine((v) => v === "" || isHsnSac(v), {
-                        message: "An HSN or SAC is 4 to 8 digits",
+                        error: "An HSN or SAC is 4 to 8 digits",
                     }),
             }),
         )
-        .min(1, { message: "Add a line" }),
+        .min(1, { error: "Add a line" }),
     /**
      * The draft's own look (DEC-173, U15 #1127): "" follows the business's
      * default. Left out (a form that never offers it), nothing is sent.
@@ -81,7 +81,7 @@ export const invoiceFormSchema = z.object({
     paperColour: z
         .string()
         .refine((v) => v === "" || /^#[0-9A-Fa-f]{6}$/.test(v), {
-            message: "A colour is # and six letters or digits, like #6B3F1D",
+            error: "A colour is # and six letters or digits, like #6B3F1D",
         })
         .optional(),
 });

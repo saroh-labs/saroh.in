@@ -39,7 +39,7 @@ export const waitlistSchema = z.object({
         .trim()
         .min(1, WAITLIST_MESSAGES.business)
         .max(120, WAITLIST_MESSAGES.business),
-    kind: z.enum(KIND_IDS, { message: WAITLIST_MESSAGES.kind }),
+    kind: z.enum(KIND_IDS, { error: WAITLIST_MESSAGES.kind }),
     email: z
         .string()
         .trim()

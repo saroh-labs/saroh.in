@@ -97,7 +97,7 @@ import { z } from "zod";
  */
 export const env = createEnv({
     client: {
-        NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
+        NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
         NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_CHAT: z.enum(["on", "off"]).optional(),
@@ -145,7 +145,7 @@ export const env = createEnv({
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
             .optional(),
-        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.url().optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
         /**
          * Page visits (DEC-160): which pages are opened and for how long,
@@ -163,7 +163,7 @@ export const env = createEnv({
             .optional(),
     },
     server: {
-        API_URL: z.string().url().optional(),
+        API_URL: z.url().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
         PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
         /** Set by Next itself: "phase-production-build" while building. */
