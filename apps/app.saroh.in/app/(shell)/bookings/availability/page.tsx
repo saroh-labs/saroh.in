@@ -1,5 +1,5 @@
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { FailedState } from "@saroh/ui/data-state";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";

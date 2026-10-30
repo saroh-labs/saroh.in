@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { WelcomeForward } from "@/components/v2/welcome-forward";
+import { WelcomeForward } from "@/components/welcome/welcome-forward";
 import { ACCOUNTS_URL } from "@/lib/links";
 import { siteTagConfig } from "@/lib/site-tag-config";
 

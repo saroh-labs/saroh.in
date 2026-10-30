@@ -28,6 +28,7 @@ import {
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
+    UpdateCommentBodyDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
     UpdateSiteSettingsDto,
@@ -143,6 +144,30 @@ export class SitesController {
             commentId,
             dto.resolved,
         );
+    }
+
+    /**
+     * Rewrite your own open note (R4, R13). Requires `site:comment`; author
+     * only, and not once it is settled or part of an approved review.
+     */
+    @Patch(":siteId/comments/:commentId/body")
+    updateCommentBody(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("commentId") commentId: string,
+        @Body() dto: UpdateCommentBodyDto,
+    ) {
+        return this.sites.updateCommentBody(ctx, siteId, commentId, dto.body);
+    }
+
+    /** Delete your own open note (R4, R13). Same rules as editing it. */
+    @Delete(":siteId/comments/:commentId")
+    deleteComment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("commentId") commentId: string,
+    ) {
+        return this.sites.deleteComment(ctx, siteId, commentId);
     }
 
     /**
@@ -306,6 +331,20 @@ export class SitesController {
         @Param("pageId") pageId: string,
     ) {
         return this.sites.getPageForReview(ctx, siteId, pageId);
+    }
+
+    /**
+     * A reviewer opened this page (DEC-200, U9), for "You've read 3 of 4
+     * pages". Requires `site:read`; an editor's open records nothing.
+     */
+    @Post(":siteId/pages/:pageId/viewed")
+    @HttpCode(200)
+    recordPageView(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.recordPageView(ctx, siteId, pageId);
     }
 
     /**

@@ -7,11 +7,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
-import { ChipGroup, RadioCards } from "@/components/shared/fields/choice-group";
 import { initialsOf } from "@/lib/customers/picker";
 import type { LocalDate } from "@/lib/services/diary";
 import type { FlowPerson, FlowService } from "@/lib/services/new-booking";
 import { isClass } from "@/lib/services/new-booking";
+import { ChipGroup, RadioCards } from "@saroh/ui/choice-group";
 
 /** "Anyone free" on With: no one person. */
 export const ANYONE = "__anyone";

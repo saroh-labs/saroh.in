@@ -169,6 +169,10 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         rule: "deleted",
         why: "The account is deleted, with its sessions and pending codes.",
     },
+    "CustomerAccount.phoneE164": {
+        rule: "deleted",
+        why: "The account is deleted, with the phone it signs in with (DEC-196).",
+    },
     "CustomerThreadMessage.body": {
         rule: "deleted",
         why: "The thread is deleted with its messages.",
@@ -186,6 +190,10 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         rule: "cleared",
         why: "Where Saroh tells them it's done (DEC-172): cleared once that email has gone (review #19). The business's list stops showing it once done.",
     },
+    "CustomerDataRequest.requesterPhoneE164": {
+        rule: "cleared",
+        why: "Where Saroh tells a phone-only customer on WhatsApp (DEC-196): cleared once the done notice has been tried.",
+    },
     "CustomerDataRequest.requesterName": {
         rule: "cleared",
         why: "Their name as they asked: cleared when the removal marks the request done (review #19).",
@@ -198,7 +206,7 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
  * body, a note, or a snapshot that can copy any of these.
  */
 export function looksPersonal(field: string): boolean {
-    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|.*Name|.*Email|.*Phone|.*Address)$/.test(
+    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|.*Name|.*Email|.*Phone|.*PhoneE164|phoneE164|.*Address)$/.test(
         field,
     );
 }

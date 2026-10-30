@@ -17,11 +17,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { createTask } from "@/lib/leads/actions";
+import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /**
  * Follow-up task form for a lead (S3-007), drawn inside the lead's "Schedule

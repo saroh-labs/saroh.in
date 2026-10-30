@@ -13,10 +13,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
-import {
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
+import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -30,10 +27,7 @@ import { phoneSchemaKeeping } from "@/lib/organizations/business-phone";
 /** The form's rules; a phone saved before numbers were checked stays. */
 const schemaFor = (savedPhone: string) =>
     z.object({
-        email: z
-            .string()
-            .trim()
-            .min(1, { message: "Add their email address." }),
+        email: z.string().trim().min(1, { error: "Add their email address." }),
         firstName: z.string().optional(),
         lastName: z.string().optional(),
         phone: phoneSchemaKeeping(savedPhone).optional(),

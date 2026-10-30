@@ -107,6 +107,18 @@ export const VERIFY_JOIN_PANEL: PanelCopy = {
     ],
 };
 
+/** "Add your phone" after sign-in or sign-up, while a phone is required (DEC-196). */
+export const PHONE_STEP_PANEL: PanelCopy = {
+    eyebrow: "Your phone",
+    heading: "One more way to reach you.",
+    body: "Saroh now asks every account for a phone. Next, you go on to Saroh.",
+    points: [
+        "We send a one-time code to check it is yours",
+        "Change or remove it later in your account",
+        "Sign in with it or with your email, whichever is handy",
+    ],
+};
+
 /** Which page the code step is on: it decides what "next" can promise. */
 export type CodeFrom = "sign-up" | "sign-in";
 

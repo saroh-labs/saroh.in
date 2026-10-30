@@ -1,14 +1,14 @@
 "use client";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { count, plural } from "@/lib/format/plural";
 import { deleteRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
 import { Info } from "lucide-react";
 import { useRouter } from "next/navigation";

@@ -9,7 +9,6 @@ import type { Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 
 import { BusinessPrintPreview } from "@/components/organizations/business-details/business-print-preview";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     defaultNumberFormat,
     formatFields,
@@ -32,6 +31,7 @@ import type {
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
 import { browserZone } from "@/lib/organizations/time-zones";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import type { FormValues } from "./business-form";
 import {
     FIELD_OF,

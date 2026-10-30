@@ -125,6 +125,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Reaffirmed 2026-10-07 (owner): **a business's messages to its customers go only through its own connected email provider**, review invitations included; Saroh's identity email keeps only sign-in codes and the email-changed notice (ADR-011). DEC-086 is reversed and its code stays off.
 - Amended 2026-10-07 (owner) — **who sends what: whoever is speaking sends it.** (A) Saroh to its own users — sign-in, verification, password and email changes, account deletion, team invitations, Saroh's own billing mail, the waitlist — and (B) Saroh to a business about the business — enquiry alerts and the team alerts (new order, booking, failed payment, someone joined), which move from the business's provider to Saroh — go from **Saroh**. (C) A customer's sign-in on a business's site: with Saroh's built-in customer accounts, **Saroh** sends the codes (‹Business› via Saroh, ADR-011); a business that brings its own login system (Firebase, Auth0, Google or GitHub sign-in, phone OTP) has that system send its own, and Saroh sends nothing — a later feature. (D) A business to its customers — invoices, booking and order notices, waitlist offers, autopay mail, review invitations, marketing — only through **the business's own connected provider**; with none, nothing is emailed. The workspace asks owners and admins to connect their email provider so their customers get emails. Both are built: team alerts from Saroh (#849: `sendTeamAlertEmail`, fixed words and cleaned names only), and that prompt (#850: Home's Needs you and Settings › Providers, from `GET …/comms-providers/email-setup`; Connect for `comms:manage`, or on a plan that can't connect one, DEC-091, See plans for `billing:read`; gone once one is connected), whose note also says why an invoice or a review invitation can't be emailed.
 - Amended 2026-10-20 by [DEC-172](#dec-172-merchant-sites-get-three-looks-on-one-engine-folio-and-quiet-fully-live-for-gyms) (owner): **Saroh's identity email also sends a customer's data-removal acknowledgement and its done notice**, beside the sign-in codes, because they are about the customer's own account.
+- Amended 2026-10-26 by [DEC-191](#dec-191-saroh-may-send-paid-verification-codes-to-a-businesss-customers-as-saroh-beside-the-businesss-own-providers) (owner): **Saroh may send paid verification codes to a business's customers** from its own WhatsApp sender, as "Saroh". Every other message to a business's customers still goes only through its own provider.
 
 ## DEC-012 Analytics event model
 
@@ -2474,3 +2475,185 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The API refuses another country on create or change ("Saroh is for businesses in India for now."). A business already saved with another country keeps it and can still save its other details.
     - The country picker stays in the code for when other countries come (#1212); currency and time zones are #1213.
 - Rules: `apps/api.saroh.in/src/modules/organizations/business-country.ts`; `apps/app.saroh.in/lib/organizations/setup-steps.ts`.
+
+## DEC-191 Saroh may send paid verification codes to a business's customers, as "Saroh", beside the business's own providers
+
+**Status: Accepted — 2026-10-26** · owner · #1235 · #1236
+
+- Context:
+    - A business that wants to check its customers' phone numbers (booking confirm, cash-on-delivery order, customer account) would have to run its own WhatsApp and SMS setup, including Meta business verification and DLT. Most small businesses can't.
+    - DEC-011 keeps a business's messages to its customers on the business's own provider, and Saroh keeps no number (DEC-086 reversed).
+- Decision:
+    - Saroh may act as a **paid message sender** for metered add-ons. v1 sends **verification codes only**, from one Saroh WhatsApp sender, through one provider (MSG91) behind a platform port, the same shape as Saroh's billing provider (credentials from the environment, never per business).
+    - The sender is **"Saroh"** for every business. WhatsApp authentication templates carry Meta's fixed wording ("‹code› is your verification code"), so the business's name can't be put in the message. Sending under the business's own name means the business's own WhatsApp account, which is the own-provider path (DEC-011) or a later per-business sender.
+    - **WhatsApp first.** SMS needs Saroh's own DLT registration, which waits (no earlier than Q1 2027); until then there is no SMS fallback.
+    - A business pays per message from a **prepaid money balance**: a WhatsApp message is charged only once it is delivered, an SMS or email when it is accepted. Sending stops at zero. Prices live in the admin catalogue, never in the code.
+    - Saroh makes the code, stores only its hash and owns expiry, attempt caps and rate limits; MSG91 is transport only.
+    - The own-provider path is unchanged: order, booking and invoice messages still go only through the business's own provider.
+- Consequences: a new paid outbound surface open to toll fraud, so per-number, per-business and per-IP limits ship with it and it is pentested before release (#1246).
+
+## DEC-192 Trade pages say renewals can go by UPI Autopay, and keep owners' lines as quotes
+
+**Status: Accepted — 2026-10-26** · owner · #1202
+
+- Context:
+    - The /for/ trade-page copy brief had treated UPI Autopay as unavailable, while the live FAQ (`apps/saroh.in/content/faq.ts`) and the claims ledger (H6, BK17) say memberships renew by UPI Autopay where it is set up. The phone UX audit asked for one answer.
+    - The audit also asked whether the short owner lines on each card ("Saturday morning, the phone doesn't stop.") read as testimonials.
+- Decision:
+    - **Autopay:** marketing and the /for/ pages may say a membership or monthly fee **can renew by UPI Autopay where the business has set it up on its own Razorpay account**; otherwise the bill is ready on the day with a payment link to send. Never "automatic" without that condition.
+    - **Owner lines stay as quotes.** They are the words owners use about their day, shown as quotes with no name, photo, business or rating, so they are not testimonials; real testimonials stay off until there are customers to quote (`saroh-product.md` → Saying what is true).
+- Rules: `docs/patterns/saroh-product.md` → Saying what is true; the copy brief for trade pages (outside the repo).
+
+## DEC-193 Search pages are written in the code and go live on saroh.in only when someone publishes them in admin
+
+**Status: Accepted — 2026-10-26** · owner · #1202 ("only the published content should be added to sitemap and indexing"; "this should be a controlled action"); design: admin canvas, page "Search pages: publish control"
+
+- Context:
+    - The 34 `/for/` trade pages (design D, approved 26 Oct) are written in the repo and reviewed on development. The owner wants to choose, page by page, what reaches production, without a code change or a release for each one.
+- Decision:
+    - **The words live in the code; whether a page is live lives in the database.** Each page is one content file in `@saroh/search-pages` (frontmatter + MDX). The API keeps one publish record per page path (live, unpublished, archived, with who and when, and a history). Each environment's admin controls its own site: admin.saroh.io → saroh.io, admin.saroh.in → saroh.in.
+    - **Publishing rebuilds the site.** Publish, Unpublish and Archive (one page or many) save the record and start one web deploy (the same dispatch Deployments uses). The site build reads `GET /public/search-pages`; a production build that can't read it fails rather than guess.
+    - If the API can't be read, a production build reuses the live site's own snapshot of the lists it was last built with (`/_build/state.json`) and warns; it fails only when neither answers.
+    - **Production builds only live pages.** Only they are in the sitemap, `/llms.txt`, the `/for/` list, the menu and the footer. On development every page in the code is built, and a page that isn't live there shows a Draft label and `noindex`.
+    - **Unpublished pages don't break links**: a page taken off redirects (302, it may come back) to its family page, or Home when that isn't live either. A page never published simply doesn't exist. Archived pages are hidden from the admin list and can't be published until restored; archiving a live page takes it off first. Nothing is ever deleted from the code by admin.
+    - **The four `/solutions/` pages keep serving until their `/for/` page is published**; from then on they 301 to it (#1202).
+    - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
+    - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
+    - **Who:** a new staff permission, `search-pages:publish`.
+- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(site)/for/`; `apps/admin.saroh.in/app/search-pages/`.
+
+## DEC-195 Reuse the shared component; never redraw it
+
+**Status: Accepted — 2026-10-27** · owner · from the saroh.in de-duplication audit (`docs/plans/2026-10-27-001-saroh-in-dedupe-audit.md`); owner: "we need to have this as a rule for the repo … we cannot rewrite duplicate code everywhere, we have to reuse the component"
+
+- Context:
+    - /for/ pages and Home drew their own plan teaser cards beside the Pricing page's plan cards, and the copies had drifted apart (fixed 27 Oct in `553aed795`: one `PricingCards` everywhere). The audit found about 95 more hand-drawn copies on saroh.in (24 groups), 14 copied helpers (two of them bugs, one CodeQL-flagged email regex) and the focus ring written out 64 times. A clone checker would not have caught the teaser: a redraw shares no lines with the original.
+- Decision:
+    - **One component per UI piece.** A page imports it and passes data; it never copies or redraws it. A page that needs it different adds a variant to the one component. A copy is a bug even when it looks the same today.
+    - **Shared pieces live in `components/shared/<group>/`** (after the move step of the plan); feature pieces in their feature folder (DEC-183).
+    - **Logic helpers likewise**: one email check, one day formatter, one money formatter, one list joiner, one way to read a posted body.
+    - **Enforced, as a ratchet**: `apps/saroh.in/lib/consistency/shared-pieces.test.ts` (a regex per piece, today's copies allow-listed with the step that removes them, the list only shrinks) and `pnpm check:dupes` (`scripts/check-dupes.mjs`, our own script, no new dependency: 6+ lines copied across files; `scripts/dupes-baseline.json` only shrinks). Both in `pnpm prepush` and CI's static job.
+    - **saroh.in first** (with `@saroh/search-pages`); other apps join the scan and the clone check as each is cleaned.
+    - **The target looks** (owner, 27 Oct: all twelve of the audit's picks):
+        - V1 text link: the Resources look, underline on hover, stays Saffron 700 (`TextLink`).
+        - V2 breadcrumb: `Breadcrumbs`, `current="brand"` for feature and solution heroes, one "/" separator.
+        - V3 FAQ: `Faq` everywhere on saroh.in; one package FAQ for /for/ and /tools.
+        - V4 Ink closing band: `CtaBand` with `template`, `note={null}` and `size="compact"`.
+        - V5 link card hover: Ink border + `shadow-mk-lift`, in `CardLink`.
+        - V6 page title: two sizes as tokens (`text-mk-page`, `text-mk-article`).
+        - V7 reading column: two widths, article 760 and list 900, as `Container width`, on the site gutter.
+        - V8 "Coming" list: one `ComingList` with the changelog's layout, one data list.
+        - V9 choice chip: one `ChoiceChip`, 36px, 14px, `bg-card`, 44px on touch.
+        - V10 Ink button: `<Button>` on `buttonClasses`, plus `size="xs"` (36-38px) for in-panel actions.
+        - V11 text field: one `fieldClasses({ onInk })`, 16px text.
+        - V12 small caps label: `Eyebrow` with `tone="brand" | "muted" | "on-ink"` and `size="sm"` (11px).
+- Consequences:
+    - The plan's steps (move, non-visual fixes, merges, the looks above, the package) each delete their allow-list entries and shrink the baseline.
+- Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces on saroh.in"; `apps/saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.
+
+## DEC-194 Free tools are all built in the code, go live only when published in admin, and their results are behind an email
+
+**Status: Accepted — 2026-10-26** · owner: "we create all the pages, and let admin decide when to publish or unpublish them" · written down 27 Oct (it was cited in the code from 26 Oct but missing here)
+
+- Decision:
+    - **Every free tool** (`/tools/<slug>`, 25 browser-only tools in `@saroh/search-pages`) is built in the code and goes live on saroh.in only through admin's Search pages publish control, as DEC-193's /for/ pages do. Only published tools are in the sitemap.
+    - **A tool's result is behind an email** (the package's `EmailGate`), with two exceptions the owner kept: the WhatsApp message templates (one message free) and the refund and cancellation policy generators (reading is free).
+    - **The sample GSTIN is `29AAAAA0000A1ZY`** everywhere a sample shows.
+- Consequences: the Privacy page names the free tools' email (`apps/saroh.in/content/privacy.ts`); the API's gate email names the tool from an allow-list (`apps/api.saroh.in/src/modules/tools/tool-names.ts`).
+
+## DEC-196 A business's customers get codes from Saroh's paid sender or the business's own provider; MSG91's widget is only for Saroh's own sign-in
+
+**Status: Accepted — 2026-10-27** · owner: "they can add their own or use our built-in auth for sending SMS/whatsapp OTPs, this way we will get the benefit as the middlemen"
+
+- Context:
+    - The owner's MSG91 brief (27 Oct) adds phone sign-in for Saroh accounts and for merchant sites' customers. MSG91's OTP widget makes and sends the code itself from the browser and bills Saroh's MSG91 account; it is also the only way to send SMS codes before Saroh has its own DLT registration.
+- Decision:
+    - **Saroh accounts** (owners and staff, accounts.saroh.in) sign in by phone through **MSG91's OTP widget**. The server verifies the widget's token with MSG91 before any session; a client "verified" flag is never trusted. A phone is **added to an email account**, never instead of one. Saroh pays for these codes.
+    - **A business's customers** (sign-in on a merchant site) **never use the widget**. Their codes go either through **Saroh's built-in sender** (DEC-191: server-sent, held against the business's prepaid messaging balance before sending, sold as an add-on with packs) or through **the business's own provider** once connected. A bot on a merchant site can only spend that business's balance, never Saroh's.
+    - **Only `modules/messaging` talks to MSG91**, behind a provider port, so WhatsApp can move to Meta's Cloud API and SMS to Saroh's own DLT templates without touching callers (`docs/architecture/MESSAGING_MSG91.md`).
+    - **Only businesses Saroh approves** (owner, 27 Oct: "this Mobile auth should be only enabled for the businesses I approve from admin, until we completely rollout"): phone codes for a business's customers sit behind a per-business feature flag, off by default, switched on in admin's Flags screen for a business that wants Saroh to handle its customers' sign-in by phone. Email sign-in codes are unchanged: Saroh sends them for every business, free, as before.
+    - **The flows** (owner, 27 Oct, confirming):
+        - **Saroh**: sign in with email or phone. Sign-up takes an email, then a phone; the phone becomes **required** once WhatsApp/SMS is fully rolled out (a platform switch, off until then; when on, an account without a verified phone is asked for one at its next sign-in).
+        - **A merchant site**: the business chooses which ways its customers sign in and sign up (email, WhatsApp, SMS once DLT is in place) **and their order**; the first is the default, the rest are "Use … instead". A customer account needs **an email or a phone, at least one**: phone alone is enough. Email can be switched off only while another way is on and usable; if that way stops (approval removed, out of balance) email comes back on its own, so customers are never locked out. Messages to a phone-only customer go by WhatsApp on the business's balance, or are skipped and the business is told.
+    - **Follow-ups (owner, 27 Oct):** with email switched off, a customer whose account has no phone can still sign in by email through a small "Signed up with email?" link, and is asked to add a WhatsApp number once inside, so no duplicate accounts. A phone-only customer's data-removal acknowledgements ("we got your request", "it's done") go by one WhatsApp utility template from Saroh's number, **paid by Saroh**, so a legally needed notice never depends on a business's balance.
+- Consequences:
+    - The widget's sends cannot be rate-limited by our server alone; its captcha and per-number limits in MSG91's widget settings are the hard stop, and our server limits verification attempts and checks Turnstile before opening the widget.
+- **Amended 2026-10-28** (owner: "we dont want to use widget for Whatsapp, widget is for SMS"): WhatsApp codes for Saroh accounts are made, sent and checked by Saroh's server from Saroh's own number (template `saroh_login_code`: Meta's authentication text, the code and a copy-code button, en_US; `saroh_merchant_login` with four body variables was refused by WhatsApp on every API send, 28 Oct), and WhatsApp is the default way; MSG91's widget is used for SMS only ("Get the code by SMS instead"). The widget couldn't fill the template's four variables, so Meta refused every send (DEV_LEARNINGS, 28 Oct).
+
+## DEC-197 WhatsApp is for Saroh's own users only; Saroh sends nothing on a business's behalf for now
+
+**Status: Accepted — 2026-10-27** · owner: "keep whatsapp updates for only our customers, and no need to send on their behalf for now, They can add their own Whatsapp config later, meanwhile we keep all the logic hidden … No need to delete the code"
+
+- Context:
+    - WhatsApp's rules (enforced from January 2024) allow one WhatsApp business account and number to message for **one** business only. DEC-191 and DEC-196 had Saroh's one number send codes to many businesses' customers, which risks the number being restricted, and with it Saroh's own sign-in codes.
+- Decision:
+    - **WhatsApp from Saroh's number is for Saroh's own users only** (business owners and staff): sign-in codes now (MSG91's widget, DEC-196), daily updates later.
+    - **A business's customers get codes by email from Saroh** (unchanged), and **by SMS from Saroh once Saroh's own DLT registration is in place**. No WhatsApp on a business's behalf.
+    - **Later, a business connects its own WhatsApp** through a flow Saroh builds itself (not the MSG91 channel), and its customers' WhatsApp codes and notices go from the business's own number.
+    - **The built logic stays, hidden**: the customer WhatsApp sign-in, the approval flag `CUSTOMER_PHONE_CODES`, the balance holds and the sign-in ways. `VerificationService.sendsForBusinesses` is `false` in code, so no business can be approved and no customer code is sent, whatever the flag or a business's settings say. The data-removal notice by WhatsApp (DEC-196 follow-ups) is not sent.
+- Consequences:
+    - Supersedes DEC-196's "Saroh's built-in sender" for WhatsApp and its "Saroh pays for data-removal notices on WhatsApp"; a phone-only customer's data-removal acknowledgement is skipped and logged, as before, until SMS or the business's own WhatsApp exists.
+    - Email can't be switched off for a business's customers while no other way works (DEC-196's rule), so every site keeps email sign-in.
+
+## DEC-198 Phone number rules
+
+**Status: Accepted — 2026-10-28** · owner, on the 28 Oct phone code review
+
+- Context:
+    - The 28 Oct review of phone sign-in (DEC-196) found that any +91 number signed in (landlines, a leading 0), a widget token could be used twice, a phone could be added, changed or used with no word to the account's email, staff could sign in by phone, a recycled number opened its old holder's account, a guest booking overwrote a known customer's phone and name, and business and billing phones took any country.
+- Decision:
+    1. **A phone that signs in to Saroh, or that Saroh pays to message, is an Indian mobile**: `+91` and ten digits starting 6 to 9 (`INDIAN_MOBILE_E164`, applied in `indianPhoneE164`). Every other number is read by the shared rule, where an Indian number is `+91` and ten digits not starting with 0 (`INDIAN_E164`); "+91 0…" is refused, never kept as +910….
+    2. **An SMS widget token is used once on Saroh's side**: after the provider says it is good for the expected number, its sha256 is kept (`OtpWidgetTokenUse`, unique, 24 hours) and the same token again is refused. `verifyOtp` always names the expected number.
+    3. **The account's email is told** when its phone is added, changed or removed, and on every phone sign-in: the last four digits, the time and a rough place when known, and "If this wasn't you, sign in with your email and remove the phone". The send is awaited; a failure is logged without the address and undoes nothing.
+    4. **Saroh staff never sign in by phone** (a `PlatformAdmin` grant not revoked, or `ADMIN_ALLOWLIST`). They get the same answer as a phone with no account, and may still keep a phone on the account. **For everyone else, a phone neither verified nor used to sign in for 12 months is refused** with "Sign in with your email to keep using this phone."; an email-code sign-in renews `phoneVerifiedAt`, as does adding the phone again.
+    5. **A guest's booking never overwrites a customer's details**: keyed on a typed email, it fills only an empty phone or name (UX-049); the typed phone stays on `Booking.bookerPhone`. Public checkout and enquiries already fill only.
+    6. **A business's own phone** (Settings' public phone, and the business phone copied into a billing profile) **is Indian**: `+91` and ten digits, a landline allowed, refused on the field otherwise. **Customers' phones are any country**; where phones are matched, a number written with another country's code keeps it (`+…`), so a foreign number never matches an Indian one with the same ten digits.
+    7. **A billing profile's phone is Indian** (owner, 28 Oct), on the profile and at checkout.
+    8. **MSG91's dashboard is the cost stop for widget SMS**, not the API's limits: India only, captcha, 3 to 5 wrong attempts per OTP, per-number and per-IP daily limits, international SMS off, a spend alert (`MESSAGING_MSG91.md` → MSG91 dashboard: required settings).
+- Consequences:
+    - No CHECK constraint was added: rows saved before may not meet the new rules, and a CHECK would block any update of such a row. The counts are an owner to-do before one is added.
+    - A bare ten digits still means India, whatever country was meant (the shared rule, #1036).
+    - `6-9` is the mobile rule the owner chose; a few landline area codes (79, 80, …) also start 6 to 9 after +91, so a landline there passes the shape check and simply never receives a code.
+
+## DEC-199 accounts.saroh.in uses the app's settings pieces from @saroh/ui, and its account area is one read-first frame
+
+**Status: Accepted — 2026-10-28** · owner, on the 28 Oct accounts UX audit (`~/.saroh-design-drafts/accounts-audit/`, 5.3/10: "the layout is not consistent")
+
+- Context:
+    - The account area drew three layouts: Billing profiles was read-first rows with sheets, Profile and sign-in was six open form cards, and Your businesses and /apps were the sign-in layout and a centred card. The app's settings pieces (FormSheet, Section/Row, ConfirmDialog, ChoiceGroup, the leave guard, FailedRead) lived in `apps/app.saroh.in/components/shared/`, where accounts couldn't import them, so accounts redrew them; DEC-195's scan didn't cover accounts.
+- Decision:
+    1. **Shared pieces first**: Section/Row/Absent (`@saroh/ui/settings-rows`), FormSheet, FormDialog and the overlay form, `useLeaveGuard` and `useDraftChanged`, ConfirmDialog, RadioCards/ChoiceGroup/ChipGroup, CheckRow, SectionList, ListCard and FailedRead move into `@saroh/ui`, with their APIs and looks. app.saroh.in imports them from there with no visual change. accounts.saroh.in joins DEC-195: its own shared-pieces scan (`apps/accounts.saroh.in/lib/consistency/shared-pieces.test.ts`) and `scripts/check-dupes.mjs`; the allow-lists and the baseline only shrink.
+    2. **Profile and sign-in is read-first rows** (Name, Email, Phone, Password, Devices, Delete account); each opens a FormDialog, a FormSheet or the one ConfirmDialog, as Billing profiles and the app's Settings do. Every capability stays (00-universal §15).
+    3. **One frame**: Profile and sign-in, Billing profiles and Your businesses (unparked, in the menu) share `app/(area)`'s frame: the app's SectionList at a desk and its TabStrip on a phone, a loading state inside the frame, and "Couldn't reach Saroh" with Try again when the API is down, never the sign-in page.
+    4. **/apps (staff only) moves to admin.saroh.in** as Saroh's apps (`/apps`); accounts' old address redirects there.
+    5. **India-only phones everywhere in accounts**, the billing profile included: `PhoneInput` takes `lockCountry` (a fixed +91, no picker). The browser checks an Indian mobile (`+91[6-9]` and nine digits) for sign-in and add, and an Indian number (`+91[1-9]` and nine digits) for the billing phone, before any request, so the Turnstile check isn't spent; the error is under its field. The server's rules are DEC-198.
+    6. **Cuts**: the duplicate "Edit details" button, the ⋯ › Remove entry (Remove stays once), the initial-letter avatars. Sessions and Delete account are rows that open a sheet or a dialog.
+- Consequences:
+    - Delete account works for an account with no password: the emailed link is its proof (Better Auth's delete with no password, a verification email configured).
+    - Your businesses no longer sends someone with one business straight into it: a menu place stays put.
+    - The leave guard in accounts also asks on Escape, the × and Cancel (`components/account/use-sheet-guard.tsx`); the app's sheets still drop an untouched draft and hold a typed one only against a press outside.
+    - A business the reader pays for but no longer owns names its owner once the API sends `ownerName` on a billing profile's business; until then it says "its new owner".
+- Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces"; `docs/patterns/frontend-forms.md`; `apps/accounts.saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.
+
+## DEC-200 A Reviewer reviews in the site editor itself, read-only
+
+**Status: Accepted — 2026-10-29** · owner, on the 29 Oct reviewer audit (variant D, "it shows the same thing") · supersedes #275's separate review screen · epic #1263
+
+- Context:
+    - Since #275 (12 Sep) a Reviewer read the site on its own screen, `/sites/:id/review`, so that no editor change had to answer "what does a Reviewer see". The 29 Oct audit (5.1/10) found that screen reads the draft but fails the reviewer's job: it never says who asked or what for, puts the verdict under the last section of one page, can't take notes on a phone, scatters notes, shows owner-only checks and can't review posts.
+- Decision:
+    1. **A Reviewer opens the site editor itself, read-only**, instead of the separate review screen. `/sites/:id` loads the page through `…/pages/:pageId/read` (`site:read`, writes nothing) for anyone without `section:write`, never `…/draft`; `/sites/:id/review` and the Pages tab redirect there, keeping `?page=`.
+    2. **Read-only means see everything, change nothing.** Every page, the block list, the Brand tab, the selected block's settings, Desk/Phone and Preview are visible. Nothing is changeable: no add, drag, edit, hide or remove, no Brand change, no page add, rename or delete, no publish, share, test release, preview links or request review, no undo, no autosave, no draft created.
+    3. **Approve and Ask for changes sit where Publish is**; the Feedback tab carries the notes.
+    4. **One tested read-only switch guards every write control** (`readOnly`, decided on the server page and read from one editor context), with a structural test that renders the editor read-only and fails on any enabled write control, so a future editor control can't leak to Reviewers — the risk #275 named. The API stays the guard; no permission widens.
+    5. **Notes** are editable and deletable by their author until an approval is recorded on that target; notes written before an approval are history (no edit, no delete). Settled notes stay locked.
+    6. **Pages read are saved on the server**, so "You've read 3 of 4 pages" follows the Reviewer to any browser or phone.
+    7. **Posts** open in the post editor, read-only, with notes.
+- Unchanged:
+    - Reviewers see only the sites they were invited to (DEC-006, correction #276).
+    - Test releases are reviewed on their own page (DEC-071, KTD-10).
+    - Ask for changes needs a reason (UX-043).
+- Consequences:
+    - The owner-only reads (flags, the web address) are not made for a Reviewer, and owner-only props are sent empty; trimming them from the API's `getSite` response is a follow-up.
+    - `site-review-view.tsx` is retired once the editor covers everything it did (00-universal §15); `section-review.tsx` and `review-panel.tsx` stay for the test-release review page.
+- Rules: `docs/patterns/backend-auth-and-access.md` → "A reviewer reads in the editor, read-only"; plan `docs/plans/2026-10-29-001-feat-reviewer-sees-editor-plan.md` (local); `apps/app.saroh.in/components/sites/editor/read-only.test.tsx`.

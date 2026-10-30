@@ -136,6 +136,7 @@
         "SAROH_BUILT_ROUTES",
         // saroh.in: the moment of the build, written the same way.
         "SAROH_BUILT_AT",
+        "SAROH_SEARCH_PAGES",
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
         "SITE_ACCOUNT_AREA",
@@ -233,7 +234,9 @@
         // generate, which its specs import.
         "@saroh/database#test": {
             "dependsOn": ["^build", "build"],
-            "outputs": []
+            "outputs": [],
+            // CI sets it to "later" and runs the seed sweeps alone (ci.yml).
+            "passThroughEnv": ["SEED_SWEEPS"]
         },
         // The api's DB-free jest project (`scripts/prepush.sh` runs it through
         // turbo for the cache; CI calls the script directly).

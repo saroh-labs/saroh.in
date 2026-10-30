@@ -9,9 +9,9 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { updateSiteSettings } from "@/lib/sites/actions";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { NOTE } from "@/components/sites/settings/settings-sheet";
 import { ShareImageThumb } from "./share-image-thumb";

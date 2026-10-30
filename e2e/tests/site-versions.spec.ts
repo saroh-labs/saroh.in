@@ -1,7 +1,8 @@
-// @covers accounts:/login app:/open app:/sites api:sites pkg:site-blocks
+// @covers accounts:/login app:/open app:/sites app:/sites/[siteId] api:sites pkg:site-blocks
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { askForChanges } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
@@ -162,16 +163,10 @@ test.describe("publishing past a change request", { tag: "@serial" }, () => {
 
         // 1. The reviewer asks for changes.
         const reviewer = await asReviewer(browser);
-        await reviewer.goto(`${urls.APP_URL}/sites/${id}/review`);
-        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
-        // A change request says what (UX-043).
-        await reviewer
-            .getByLabel("What needs changing?")
-            .fill("The hero heading is last season's.");
-        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
-        await expect(
-            reviewer.getByText(/asked for changes/i).first(),
-        ).toBeVisible();
+        // In the editor, read-only (DEC-200); a change request says what
+        // (UX-043).
+        await reviewer.goto(`${urls.APP_URL}/sites/${id}`);
+        await askForChanges(reviewer, "The hero heading is last season's.");
 
         // 2. The owner publishes anyway. Never prevented — that is the design.
         await page.goto(`${urls.APP_URL}/sites/${id}`);
@@ -207,16 +202,10 @@ test.describe("taking a version back", { tag: "@serial" }, () => {
         await publishFromEditor(page);
 
         const reviewer = await asReviewer(browser);
-        await reviewer.goto(`${urls.APP_URL}/sites/${id}/review`);
-        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
-        // A change request says what (UX-043).
-        await reviewer
-            .getByLabel("What needs changing?")
-            .fill("The hero heading is last season's.");
-        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
-        await expect(
-            reviewer.getByText(/asked for changes/i).first(),
-        ).toBeVisible();
+        // In the editor, read-only (DEC-200); a change request says what
+        // (UX-043).
+        await reviewer.goto(`${urls.APP_URL}/sites/${id}`);
+        await askForChanges(reviewer, "The hero heading is last season's.");
 
         await page.goto(`${urls.APP_URL}/sites/${id}/versions`);
 

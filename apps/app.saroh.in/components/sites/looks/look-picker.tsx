@@ -10,11 +10,11 @@ import { ChevronDown, Eye } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useContext, useId, useRef, useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { lookThumbnail } from "@/lib/sites/look-thumbnails";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import {
     BrandInline,
     BrandPicker,

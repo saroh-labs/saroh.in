@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { count } from "@/lib/format/plural";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import { firstName } from "@/lib/names";
 import type { KeptBooking } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
@@ -30,6 +29,7 @@ import type {
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import { useBookingRules } from "@/components/bookings/booking-rules/booking-rules-card";
 import {

@@ -1,8 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import Link from "next/link";
 import * as React from "react";
 
@@ -103,6 +105,66 @@ export const AuthField = React.forwardRef<HTMLInputElement, AuthFieldProps>(
     },
 );
 AuthField.displayName = "AuthField";
+
+/**
+ * {@link AuthField}'s look for a phone (DEC-196): the shared `PhoneInput`
+ * (country picker, India first, value E.164) with this file's field box.
+ */
+export function AuthPhoneField({
+    label,
+    note,
+    id = "phone",
+    value,
+    onValueChange,
+    disabled,
+    error,
+}: {
+    label: string;
+    note?: string;
+    id?: string;
+    value: string;
+    onValueChange: (value: string) => void;
+    disabled?: boolean;
+    /** What is wrong with the number, said under it (DEC-199). */
+    error?: string | null;
+}) {
+    const noteId = note ? `${id}-note` : undefined;
+    const errorId = error ? `${id}-error` : undefined;
+    const describedBy = [errorId, noteId].filter(Boolean).join(" ");
+    return (
+        <div className="sa-rise mb-3.5">
+            <div className="mb-1.5 flex items-baseline gap-3">
+                <label htmlFor={id} className="text-[12.5px] font-medium">
+                    {label}
+                </label>
+            </div>
+            <PhoneInput
+                id={id}
+                name="phone"
+                autoComplete="tel"
+                lockCountry="IN"
+                countryLabel="Country code"
+                value={value}
+                onValueChange={onValueChange}
+                disabled={disabled}
+                aria-describedby={describedBy || undefined}
+                aria-invalid={error ? true : undefined}
+                boxClassName={cn("sa-input", FIELD)}
+            />
+            <FieldError id={errorId} className="mt-[5px]">
+                {error}
+            </FieldError>
+            {note ? (
+                <p
+                    id={noteId}
+                    className="text-muted-foreground mt-[5px] text-pretty text-[11.5px] leading-[1.45]"
+                >
+                    {note}
+                </p>
+            ) : null}
+        </div>
+    );
+}
 
 /** The page's one primary action: full width, 40px, Ink. */
 export function AuthSubmit({

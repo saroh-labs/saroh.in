@@ -1,5 +1,6 @@
 import type { PublishContext } from "@/content/resources";
 import { env } from "@/env";
+import { publishList } from "@/lib/search-pages";
 
 /**
  * Whether unpublished Resources pages are shown (plan KTD-2): only when
@@ -79,5 +80,15 @@ function contextAt(now: Date): PublishContext {
         off: templatesOn(env.NEXT_PUBLIC_TEMPLATES, env.NODE_ENV)
             ? []
             : ["templates"],
+        live: publishedPaths(),
     };
+}
+
+/**
+ * The published paths a free tool must be in to show (#1253): the publish
+ * list's live paths, or null on a preview build, which shows every tool.
+ */
+function publishedPaths(): readonly string[] | null {
+    const list = publishList();
+    return list.preview ? null : list.live;
 }

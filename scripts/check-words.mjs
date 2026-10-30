@@ -100,7 +100,7 @@ const MARKETING = "apps/saroh.in/";
 /** The waitlist page's own files, until the follow-up removes them. */
 const WAITLIST_PAGE = [
     "apps/saroh.in/app/(standalone)/waitlist",
-    "apps/saroh.in/components/v2/waitlist/",
+    "apps/saroh.in/components/waitlist/",
     "apps/saroh.in/content/waitlist.ts",
     "apps/saroh.in/content/help/",
 ];

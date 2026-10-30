@@ -1,8 +1,8 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { FilePlus } from "lucide-react";
 import { useState } from "react";

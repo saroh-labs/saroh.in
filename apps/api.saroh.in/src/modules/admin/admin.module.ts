@@ -14,6 +14,7 @@ import { HealthModule } from "../health/health.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { MediaStorageModule } from "../media/media-storage.module";
+import { AdminMessagingUsageController } from "../messaging/admin-messaging-usage.controller";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
@@ -21,6 +22,8 @@ import { CouponsService } from "../pricing/coupons.service";
 import { PricingModule } from "../pricing/pricing.module";
 import { SarohLeadsController } from "../saroh-leads/saroh-leads.controller";
 import { SarohLeadsModule } from "../saroh-leads/saroh-leads.module";
+import { SearchPagesController } from "../search-pages/search-pages.controller";
+import { SearchPagesModule } from "../search-pages/search-pages.module";
 import { StaffInvitesModule } from "../staff-invites/staff-invites.module";
 import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
@@ -128,6 +131,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         StaffInvitesModule,
         // Saroh's own sales leads (DEC-169, U20).
         SarohLeadsModule,
+        // Search pages' publish records (DEC-193).
+        SearchPagesModule,
     ],
     controllers: [
         AdminController,
@@ -145,6 +150,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminBillingController,
         AdminBillingControlsController,
         SarohLeadsController,
+        // Search pages: list, history, publish (DEC-193).
+        SearchPagesController,
+        // Saroh's own sender's monthly counts (messaging core).
+        AdminMessagingUsageController,
         // Home and the header search (admin console redesign U10).
         AdminConsoleController,
         // Who looks after which business (DEC-169, U25).

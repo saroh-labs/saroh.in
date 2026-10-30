@@ -482,7 +482,7 @@ const galleryV2 = z
     .refine((g) => g.images.length > 0 || Boolean(g.imageBrief), {
         // Loosened from `.min(1)` only for a slot that says what it wants:
         // every gallery that validated before still does.
-        message: "Add at least one image",
+        error: "Add at least one image",
         path: ["images"],
     });
 
@@ -625,8 +625,7 @@ const contactV1 = z
         // An empty string is not a channel, so this is a truthiness test.
         (c) => [c.address, c.phone, c.email, c.whatsapp].some(Boolean),
         {
-            message:
-                "Add at least one way to reach you: address, phone, email or WhatsApp",
+            error: "Add at least one way to reach you: address, phone, email or WhatsApp",
             path: ["address"],
         },
     );
@@ -1238,7 +1237,7 @@ const enquiryV1 = z
         value.fields.forEach((field, index) => {
             if (seen.has(field.name)) {
                 ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
+                    code: "custom",
                     path: ["fields", index, "name"],
                     message: `Duplicate field name "${field.name}" — field names must be unique`,
                 });
@@ -1248,7 +1247,7 @@ const enquiryV1 = z
 
         if (!value.fields.some((field) => field.type === "email")) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: "custom",
                 path: ["fields"],
                 message:
                     'An enquiry form must have at least one field of type "email"',
@@ -1308,7 +1307,7 @@ export type SectionType = (typeof SECTION_TYPES)[number];
 export type ContractVersion = number;
 
 /** A single registered contract for one (type, version) pair. */
-export interface SectionContract<S extends z.ZodTypeAny = z.ZodTypeAny> {
+export interface SectionContract<S extends z.ZodType = z.ZodType> {
     type: SectionType;
     version: ContractVersion;
     /** Zod schema validating (and normalizing) this section's `content`. */
@@ -1556,7 +1555,7 @@ export type SectionContractError =
           code: "INVALID_CONTENT";
           type: string;
           version: number;
-          issues: z.ZodIssue[];
+          issues: z.core.$ZodIssue[];
           message: string;
       };
 
@@ -1739,7 +1738,7 @@ export function parseSectionContent(
                     type,
                     version,
                     issues: unmet.map((req) => ({
-                        code: z.ZodIssueCode.custom,
+                        code: "custom",
                         path: [req.field],
                         message: req.message,
                     })),
@@ -1764,7 +1763,7 @@ export function parseSectionContent(
                 type,
                 version,
                 issues: frame.issues.map((issue) => ({
-                    code: z.ZodIssueCode.custom,
+                    code: "custom",
                     path: issue.path,
                     message: issue.message,
                 })),

@@ -74,7 +74,8 @@ recorded grant (the API refuses it otherwise).
   `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
   `lib/roles-matrix.ts`, `lib/commission-words.ts`,
-  `lib/own-rate-words.ts`, `lib/team-member-words.ts`.
+  `lib/own-rate-words.ts`, `lib/team-member-words.ts`,
+  `lib/search-page-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -343,6 +344,27 @@ recorded grant (the API refuses it otherwise).
   starts with its group's name, never "Instance" or "Saroh".
   `console-nav.test.ts` pins every address the menu reached before the
   redesign: a redesign never drops one.
+- **Search pages (`/search-pages`, DEC-193, #1251)** lists every page in
+  `@saroh/search-pages` merged with `GET /admin/search-pages` (no record
+  is a draft), read with `platform:read`; Publish, Unpublish, Archive and
+  Restore (one page or ticked ones) are `search-pages:publish` (Platform
+  owner), one `POST …/actions` per confirm, all or none (a 409 names the
+  pages). The confirm asks no reason (the API takes none) and Publish needs
+  "I've read … on saroh.io" ticked. While the API says a rebuild runs, the
+  screen re-reads every 20s. A page's tabs live under
+  `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
+  template, light, no console chrome, no links) has no shell; the Content
+  tab frames it. `searchPageChecks` comes from
+  `@saroh/search-pages/checks` and runs only in a client component: it
+  uses react-dom/server, which Next refuses in Server Components and route
+  handlers. The site and its environment come from `marketingSiteUrl()` and
+  `NEXT_PUBLIC_VERCEL_ENV` (`lib/search-pages.ts`).
+- **Saroh's apps (`/apps`, DEC-199)** is the launcher of Saroh's own
+  hosts that was accounts.saroh.in's staff-only `/apps`; accounts' old
+  address redirects here. Any staff member may open it (`requireStaff()`,
+  no permission: it only holds links); its menu row shows for
+  `platform:read`. Local hosts on a `.localhost` console, production ones
+  otherwise (`lib/saroh-apps.ts`).
 - **Home (`/`, admin plan U10, R14)** is "Needs you" and a few counts,
   from `GET /admin/home` (`platform:read`; counts and dates only, each kind
   only for staff whose permissions reach its fix, `lib/home-words.ts` says

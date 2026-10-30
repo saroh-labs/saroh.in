@@ -12,13 +12,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import {
-    lostChanges,
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { formatMoney } from "@/lib/format/money";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import { rateOption } from "@/lib/invoices/gst";
@@ -38,6 +32,8 @@ import type { Invoice } from "@/lib/invoices/service";
 import { ISSUE_AND_SHARE, ISSUE_IT } from "@/lib/invoices/words";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
+import { lostChanges, lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { PaperEditor } from "@/components/invoices/paper-editor/paper-editor";
 import { SeeAsCustomer } from "@/components/invoices/paper-editor/see-as-customer";

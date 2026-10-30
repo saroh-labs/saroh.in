@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { gstinProblem, stateCode } from "../invoices/gst-states";
-import { normalisePublicPhone } from "../organizations/business-phone";
+import { normaliseIndianPhone } from "../organizations/business-phone";
 
 /**
  * Who Saroh bills, before it charges or sets up autopay (owner, 17 Oct
@@ -322,7 +322,7 @@ export function checkoutDetails(
     // "If available": asked when the profile has none, never required.
     const typedPhone = nonEmpty(sent.phone);
     if (typedPhone && !nonEmpty(profile.phone)) {
-        const result = normalisePublicPhone(typedPhone);
+        const result = normaliseIndianPhone(typedPhone);
         if ("problem" in result) refuse(result.problem, "phone");
         if (result.phone) out.profile.phone = result.phone;
     }

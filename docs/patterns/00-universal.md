@@ -269,7 +269,7 @@ with why it stops there:
   paths; and the header, jumps, create flow and two columns. The library
   panel went to `photo-library-panel.tsx`, and the status pill, read-only
   note and next steps to `editor-parts.tsx` (leaving asks through the one
-  guard, `components/shared/forms/use-leave-guard.tsx`). A little over;
+  guard, `@saroh/ui/use-leave-guard`). A little over;
   what is left shares one component's state.
 - `sites/domain/custom-domain.tsx` (417 after DEC-140's bare domains) — the
   domains' read, add, check and remove share its list and busy state. The
@@ -364,7 +364,7 @@ says why.
 ## 9. No `alert()` or `confirm()`
 
 **Current** — none in app code (the last three went in #329). For a
-confirmation in `app.saroh.in` use `components/shared/confirm/confirm-dialog.tsx`,
+confirmation in `app.saroh.in` use `@saroh/ui/confirm-dialog`,
 and only for what cannot be undone (`frontend-forms.md`: one sheet, one
 dialog, one confirm); elsewhere `@saroh/ui/alert-dialog` or
 `@saroh/ui/dialog`, and `@saroh/ui/toast`.
@@ -413,6 +413,20 @@ out is kept — behind a toggle or a secondary control, never a hover-only toolt
 ships. The site editor redesign (#334) dropped Tablet and zoom, the whole-site
 review panel, status details, block previews and settled notes, and #347 had to
 put every one back.
+
+## 16. Check the plan against what was already decided
+
+**Current** — Before building anything the user asked for, and again before
+showing it as done, read what was already decided for that area: the user's
+brief in the conversation (every point, not the first that fits), the `DEC-`
+entries and ADRs that touch it (`DECISIONS.md`, `docs/architecture/adr/`), and
+the issue body's "Decided (owner, date)" lines. Then say back, in a line or two,
+which decisions the plan follows and where it departs from any of them. Where
+two of them read differently, or the plan departs from one, **ask before
+building**; never pick one silently. A brief handed to a subagent names the
+decisions it must follow. (27 Oct: a brief said "SMS through MSG91's widget,
+WhatsApp authentication through the API"; one point was read as "every code
+through the widget", WhatsApp was wired to the widget, and every send failed.)
 
 ## Before calling anything done
 

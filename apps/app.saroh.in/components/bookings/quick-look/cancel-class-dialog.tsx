@@ -13,16 +13,13 @@ import {
 import { Textarea } from "@saroh/ui/textarea";
 import { useForm } from "react-hook-form";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import type { ClassCancelReason } from "@/lib/services/class-cancel-reason";
 import {
     CLASS_CANCEL_REASON_MAX,
     classCancelReasonSchema,
     oneLineReason,
 } from "@/lib/services/class-cancel-reason";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 
 /**
  * Cancel the class (DEC-178, #1172): one question before the whole class

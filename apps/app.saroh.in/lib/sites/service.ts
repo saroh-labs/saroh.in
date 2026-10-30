@@ -1666,13 +1666,25 @@ export interface SiteCommentView {
     /** Null once the page it was left on has been deleted (#277). */
     pageId: string | null;
     pageTitle: string | null;
-    sectionKey: string;
+    /** Null on a note about a post (DEC-200 U8). */
+    sectionKey: string | null;
+    /** The post a note is about; null on a page's note, or once it's deleted. */
+    postId: string | null;
+    /** The post's title; null on a page's note. */
+    postTitle: string | null;
     body: string;
     resolvedAt: string | null;
     createdAt: string;
     author: { id: string; name: string };
     /** The section this was about is no longer on the page. */
     orphaned: boolean;
+    /**
+     * You may still edit or delete it (R13): yours, open, and written after
+     * the latest approval of its target. The api decides; draw from this.
+     */
+    editable: boolean;
+    /** You wrote it (DEC-200, U4). Absent from an older API: not yours. */
+    mine?: boolean;
 }
 
 /**
@@ -1725,6 +1737,26 @@ export interface ReviewState {
      * Approve or Ask for changes on it.
      */
     askedByYou?: boolean;
+    /**
+     * Pages the caller has opened since their latest verdict on the draft, of
+     * the pages the site has now (DEC-200, U9): "You've read 3 of 4 pages".
+     * Null on a test release's review, or from an API that doesn't send it.
+     */
+    pagesRead?: PagesRead | null;
+    /**
+     * The newest request for a review, open or not (DEC-200, U4): "Asha
+     * asked you to review · 28 Oct". Null when nobody ever has.
+     */
+    request?: { by: string; at: string } | null;
+    /** Your own latest verdict on the draft. */
+    yourVerdict?: { outcome: ApprovalOutcome; at: string } | null;
+    /** Your notes settled since you last wrote a note or a verdict. */
+    settledForYou?: { count: number; at: string } | null;
+}
+
+export interface PagesRead {
+    read: number;
+    total: number;
 }
 
 /**
@@ -1794,6 +1826,39 @@ export async function getReviewState(
         pending: data.pending === true,
         approvalIsStale: data.approvalIsStale === true,
         askedByYou: data.askedByYou === true,
+        pagesRead: data.pagesRead ?? null,
+        request: data.request ?? null,
+        yourVerdict: data.yourVerdict ?? null,
+        settledForYou: data.settledForYou ?? null,
+    };
+}
+
+/**
+ * A reviewer opened a page in the editor (DEC-200, U9), so "You've read 3 of
+ * 4 pages" follows them to any browser. Once per page open, not per render.
+ * The API records nothing for someone who can edit.
+ */
+export async function recordPageView(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<{ recorded: boolean }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}/viewed`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as {
+        recorded?: boolean;
+    } | null;
+    if (res.ok)
+        return { ok: true, data: { recorded: data?.recorded === true } };
+    return {
+        ok: false,
+        ...readError(data, "Couldn't save that you read this page."),
     };
 }
 
@@ -1807,13 +1872,16 @@ export async function getReviewState(
  */
 export async function createComment(
     siteId: string,
-    input: {
-        pageId: string;
-        /** On a test release, the section's position on its frozen page (T8). */
-        sectionKey: string;
-        body: string;
-        testReleaseId?: string;
-    },
+    input:
+        | {
+              pageId: string;
+              /** On a test release, the section's position on its frozen page (T8). */
+              sectionKey: string;
+              body: string;
+              testReleaseId?: string;
+          }
+        /** A note on a draft post (DEC-200 U8). */
+        | { postId: string; body: string },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base)
@@ -1979,6 +2047,56 @@ export async function setCommentResolved(
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Couldn't update the note.") };
+}
+
+/**
+ * Rewrite your own open note (DEC-200 U3). Requires `site:comment`; the api
+ * refuses someone else's note (403) and one that is settled or part of an
+ * approved review (409), each in words the screen can show as they are.
+ */
+export async function updateCommentBody(
+    siteId: string,
+    commentId: string,
+    body: string,
+): Promise<SitesResult<{ id: string; body: string }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}/body`, {
+        method: "PATCH",
+        body: JSON.stringify({ body }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        body?: string;
+    } | null;
+    if (res.ok && data?.id)
+        return { ok: true, data: { id: data.id, body: data.body ?? body } };
+    return { ok: false, ...readError(data, "Couldn't change that note.") };
+}
+
+/** Delete your own open note (DEC-200 U3). Same rules as editing it. */
+export async function deleteComment(
+    siteId: string,
+    commentId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}`, {
+        method: "DELETE",
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Couldn't delete that note.") };
 }
 
 // ---------------------------------------------------------------------------

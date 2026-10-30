@@ -8,7 +8,6 @@ import { notFound } from "next/navigation";
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { activeCut, pausedListWords, postPaused } from "@/lib/billing/paused";
 import type { Post } from "@/lib/content/service";
 import { listPosts } from "@/lib/content/service";
@@ -16,6 +15,7 @@ import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 import { postUpdatedIso } from "@/lib/sites/updated";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 export const metadata = { title: "Posts · Website" };
 
@@ -107,8 +107,8 @@ export default async function SitePostsPage({
                         >
                             <Link
                                 href={`${base}/${post.id}`}
-                                // A reader opens it to read (`PostReadView`),
-                                // and the row says so.
+                                // A reader opens the post editor read-only,
+                                // with its notes (DEC-200 U8); the row says so.
                                 aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >

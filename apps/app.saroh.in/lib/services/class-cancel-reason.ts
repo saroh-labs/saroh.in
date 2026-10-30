@@ -17,10 +17,10 @@ export const classCancelReasonSchema = z.object({
     reason: z
         .string()
         .refine((v) => oneLineReason(v).length > 0, {
-            message: "Say why the class is cancelled",
+            error: "Say why the class is cancelled",
         })
         .refine((v) => oneLineReason(v).length <= CLASS_CANCEL_REASON_MAX, {
-            message: `A reason can be at most ${CLASS_CANCEL_REASON_MAX} characters`,
+            error: `A reason can be at most ${CLASS_CANCEL_REASON_MAX} characters`,
         }),
 });
 

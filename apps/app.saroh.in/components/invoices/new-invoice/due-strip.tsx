@@ -1,9 +1,9 @@
 "use client";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ChipGroup } from "@/components/shared/fields/choice-group";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import { DUES, dueFrom } from "@/lib/invoices/new-invoice";
+import { ChipGroup } from "@saroh/ui/choice-group";
 
 /**
  * Due (INVNewA): On receipt, 7, 14 or 30 days, or the draft's own date when

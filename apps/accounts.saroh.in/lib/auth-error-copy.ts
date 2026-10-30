@@ -33,6 +33,9 @@ const COPY: Record<string, string> = {
         "Something is missing or mistyped. Check each field and try again.",
     MISSING_FIELD:
         "Something is missing or mistyped. Check each field and try again.",
+    // An address past its hourly code cap (API `code-mail-limits.ts`): the
+    // bot check, then the code or link goes.
+    CHALLENGE: "Confirm you're not a robot below, then we send it.",
     // Too many tries.
     [TOO_MANY_REQUESTS]: "Too many tries. Wait a minute, then try again.",
     TOO_MANY_ATTEMPTS:
@@ -65,6 +68,11 @@ const COPY: Record<string, string> = {
 export interface AuthFailure {
     code?: string;
     status?: number;
+    /**
+     * A sentence of Saroh's own API (phone sign-in, DEC-196), written for
+     * the screen: shown as it is. Never a library's message.
+     */
+    words?: string;
 }
 
 /** The code to look up: the failure's own, or one for a bare 429. */
@@ -97,6 +105,7 @@ export function authFailureCopy(
     failure: AuthFailure | null | undefined,
     fallback?: string,
 ): string {
+    if (failure?.words) return failure.words;
     return authErrorCopy(authErrorCode(failure), fallback);
 }
 

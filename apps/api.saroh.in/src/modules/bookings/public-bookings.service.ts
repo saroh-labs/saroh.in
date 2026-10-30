@@ -852,7 +852,8 @@ export class PublicBookingsService {
                 : given.bookerPhone?.trim();
         return {
             ...given,
-            bookerEmail: account.email,
+            // A phone-only account (DEC-196) books as the account, with no email.
+            bookerEmail: account.email ?? undefined,
             bookerName,
             // The phone they gave for this booking (UX-049), else the one
             // their record has. The record keeps its own; a given phone

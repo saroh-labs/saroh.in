@@ -888,6 +888,7 @@ bg_step words pnpm run check:words
 bg_step content-dates pnpm run check:content-dates "$BASE"
 bg_step formats pnpm run check:formats
 bg_step copy pnpm run check:copy
+bg_step dupes pnpm run check:dupes
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,

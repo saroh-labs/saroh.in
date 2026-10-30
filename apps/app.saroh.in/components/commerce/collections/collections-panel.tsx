@@ -1,8 +1,8 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/states/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import { Pencil } from "lucide-react";
 import Link from "next/link";

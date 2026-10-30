@@ -40,6 +40,8 @@ const HOLD_AWARE: Record<string, string> = {
  * reads this list to know what a hold does not cover.
  */
 const NOT_TENANT_DATA: Record<string, string> = {
+    "messaging/messaging.service.ts":
+        "Used SMS widget tokens past their expiry (DEC-198): hashes for Saroh's own sign-in; no business owns a row.",
     "waitlist/waitlist-retention.handler.ts":
         "Saroh's own waitlist (people who asked for an invite); no business owns a row.",
     "billing/addon-charges.ts":

@@ -40,7 +40,12 @@ module.exports = {
     ],
     testEnvironment: "node",
     rootDir: ".",
-    testMatch: ["<rootDir>/src/modules/**/*.spec.ts"],
+    // `src/common` holds unit specs (jest.config.js) and the odd db spec:
+    // only the latter runs here.
+    testMatch: [
+        "<rootDir>/src/modules/**/*.spec.ts",
+        "<rootDir>/src/common/**/*.db.spec.ts",
+    ],
     // The organizations module specs mock Prisma (pure unit tests) and run in
     // the default/unit project — keep them out of the DB-backed run.
     // The organizations specs mock Prisma (pure unit tests), and the S1-006
@@ -53,6 +58,8 @@ module.exports = {
         // admin *.db.spec.ts (U11's overrides) run here.
         "<rootDir>/src/modules/admin/(?!.*\\.db\\.spec\\.ts$)",
         "\\.authorization\\.spec\\.ts$",
+        // Phone sign-in's options spec mocks Prisma: unit project only.
+        "<rootDir>/src/modules/account-phone/(?!.*\\.db\\.spec\\.ts$)",
         // #384 customer delete: mocked Prisma, runs in the unit project.
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         // ADR-006 store creation cap: mocked Prisma, runs in the unit project.
@@ -79,6 +86,8 @@ module.exports = {
         // Saroh's own leads (U20): pure specs in the unit project; only
         // saroh-leads.db.spec.ts runs here.
         "<rootDir>/src/modules/saroh-leads/(?!.*\\.db\\.spec\\.ts$)",
+        // Search pages: pure specs run in the unit project.
+        "<rootDir>/src/modules/search-pages/(?!.*\\.db\\.spec\\.ts$)",
         // Commission (U21): pure specs in the unit project; only
         // commission.db.spec.ts runs here.
         "<rootDir>/src/modules/commission/(?!.*\\.db\\.spec\\.ts$)",

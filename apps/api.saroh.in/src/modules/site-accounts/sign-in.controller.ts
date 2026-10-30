@@ -9,7 +9,14 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
-import { RequestCodeDto, VerifyCodeDto } from "./dto";
+import {
+    RequestCodeDto,
+    RequestPhoneCodeDto,
+    VerifyCodeDto,
+    VerifyPhoneCodeDto,
+} from "./dto";
+import type { PhoneNeedsEmail } from "./phone-sign-in.service";
+import { PhoneSignInService } from "./phone-sign-in.service";
 import type {
     CodeRequested,
     SessionIssued,
@@ -34,17 +41,26 @@ import { RelayContext, SiteRelayGuard } from "./site-relay";
 @Controller("public/site-accounts")
 @UseGuards(SiteRelayGuard)
 export class SignInController {
-    constructor(private readonly codes: SignInCodesService) {}
+    constructor(
+        private readonly codes: SignInCodesService,
+        private readonly phone: PhoneSignInService,
+    ) {}
 
     /**
      * What the sign-in sheet needs up front: whether a challenge is likely,
      * the widget's public key, and the business's phone for the "couldn't
      * send" line. Every published site takes sign-in; there is no switch.
+     * `ways` are the ways it offers now, in the business's order (DEC-196,
+     * `sign-in-ways.ts`); `whatsapp` says whether WhatsApp is one of them,
+     * for a site built before `ways`.
      */
     @Get("options")
     @Header("Cache-Control", "no-store")
-    options(@RelayContext() relay: SiteRelay): Promise<SignInOptions> {
-        return this.codes.options(relay);
+    async options(
+        @RelayContext() relay: SiteRelay,
+    ): Promise<SignInOptions & { whatsapp: boolean }> {
+        const options = await this.codes.options(relay);
+        return { ...options, whatsapp: options.ways.includes("WHATSAPP") };
     }
 
     /**
@@ -75,5 +91,38 @@ export class SignInController {
         @Body() dto: VerifyCodeDto,
     ): Promise<SessionIssued> {
         return this.codes.verifyCode(relay, dto);
+    }
+
+    /**
+     * Send a sign-in code by WhatsApp (DEC-196). 202 with the same body for
+     * every number. 400 `challenge` asks for the bot challenge (every code
+     * needs it), 400 for a number that isn't an Indian mobile, 422 for one
+     * not on WhatsApp, 429 `limit`|`wait`, 503 `unavailable`.
+     */
+    @Post("phone-codes")
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Header("Cache-Control", "no-store")
+    requestPhoneCode(
+        @RelayContext() relay: SiteRelay,
+        @Body() dto: RequestPhoneCodeDto,
+    ): Promise<CodeRequested> {
+        return this.phone.requestCode(relay, dto);
+    }
+
+    /**
+     * Trade a WhatsApp code for a session. A phone no account holds signs
+     * up with the phone alone, or, at a business that never chose its ways,
+     * answers `{ emailNeeded, phoneProof }`: the email code that follows
+     * takes the proof and adds the phone. 400 invalid|expired as for email
+     * codes; 503 `unavailable` when the site doesn't offer WhatsApp now.
+     */
+    @Post("phone-sessions")
+    @HttpCode(HttpStatus.CREATED)
+    @Header("Cache-Control", "no-store")
+    verifyPhone(
+        @RelayContext() relay: SiteRelay,
+        @Body() dto: VerifyPhoneCodeDto,
+    ): Promise<SessionIssued | PhoneNeedsEmail> {
+        return this.phone.verifyCode(relay, dto);
     }
 }

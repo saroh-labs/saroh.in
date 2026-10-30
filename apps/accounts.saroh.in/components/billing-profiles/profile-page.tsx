@@ -11,6 +11,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { PageHeader } from "@saroh/ui/page-header";
+import { Absent } from "@saroh/ui/settings-rows";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
@@ -24,27 +26,29 @@ import {
 } from "@/lib/billing-profile-actions";
 import type {
     BillingProfile,
+    OwnedBusiness,
     ProfileBusiness,
     ProfileDetail,
 } from "@/lib/billing-profiles";
 import {
     addressLine,
-    initial,
+    gstLine,
     money,
     nextLine,
+    notOwnerLine,
     paysForCount,
     pendingLine,
     phoneLabel,
     planLine,
     planName,
-    shortDate,
     SYNC_FAILED_SAYS,
     SYNC_LINKING_SAYS,
     syncBadge,
 } from "@/lib/billing-profiles";
+import { day } from "@/lib/day";
 
 import { MoveDialog } from "./move-dialog";
-import { EditProfileSheet } from "./profile-sheet";
+import { AddProfileSheet, EditProfileSheet } from "./profile-sheet";
 import { RemoveDialog } from "./remove-dialog";
 
 /**
@@ -56,23 +60,29 @@ import { RemoveDialog } from "./remove-dialog";
  */
 
 const section = "overflow-hidden rounded-xl border border-border bg-card";
+// The settings size (the app's Section): 14px semibold, one scale with the
+// account page.
 const sectionHead =
-    "m-0 border-b border-border/70 px-[18px] py-3 font-display text-[15px] font-semibold";
+    "m-0 border-b border-border/70 px-[18px] py-3 text-sm font-semibold";
 const rowLine = "border-b border-foreground/[0.06] last:border-b-0";
 
 type Open =
     | { kind: "edit" }
     | { kind: "remove" }
     | { kind: "move"; business: ProfileBusiness }
+    | { kind: "add"; billFirst: string }
     | null;
 
 export function ProfilePage({
     profile,
     profiles,
+    businesses,
     appUrl,
     showAll,
 }: {
     profile: ProfileDetail;
+    /** The owner's businesses, for Add's "Bill a business to it now". */
+    businesses: readonly OwnedBusiness[];
     /** All the owner's profiles: where a business can move, whose emails are taken. */
     profiles: readonly BillingProfile[];
     appUrl: string;
@@ -106,66 +116,37 @@ export function ProfilePage({
 
     return (
         <div className="flex max-w-[980px] flex-col gap-4">
-            <nav
-                aria-label="Breadcrumb"
-                className="text-muted-foreground text-[12.5px]"
-            >
-                <Link
-                    href="/account/billing-profiles"
-                    className="hover:text-foreground"
-                >
-                    Billing profiles
-                </Link>{" "}
-                <span aria-hidden>›</span>{" "}
-                <span data-ph-mask="">{profile.legalName}</span>
-            </nav>
-
-            <div className="flex flex-wrap items-start gap-3">
-                <span
-                    aria-hidden
-                    className="bg-muted font-display flex size-11 flex-none items-center justify-center rounded-[11px] text-[17px] font-semibold"
-                >
-                    {initial(profile.legalName)}
-                </span>
-                <div className="min-w-0 flex-[1_1_300px]">
-                    <span className="flex flex-wrap items-center gap-2">
-                        <h1
-                            className="font-display m-0 text-[23px] font-semibold tracking-[-0.03em] [overflow-wrap:anywhere] md:text-[25px]"
-                            data-ph-mask=""
-                        >
-                            {profile.legalName}
-                        </h1>
-                        {badge ? (
-                            <Badge variant={badge.variant}>{badge.label}</Badge>
-                        ) : null}
-                    </span>
-                    <p className="text-muted-foreground mt-[5px] text-[13px]">
-                        {profile.gstin
-                            ? `GSTIN ${profile.gstin}`
-                            : "Not GST-registered"}{" "}
-                        · {paysForCount(profile.payingFor.length)}
-                    </p>
-                </div>
-                <span className="flex gap-2">
-                    <Button
-                        type="button"
-                        onClick={() => show({ kind: "edit" })}
-                    >
-                        Edit details
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                aria-label="More actions"
-                            >
-                                <MoreHorizontal className="size-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {profile.sync === "failed" ? (
+            <PageHeader
+                breadcrumb={[
+                    <Link key="list" href="/account/billing-profiles">
+                        Billing profiles
+                    </Link>,
+                    profile.legalName,
+                ]}
+                title={profile.legalName}
+                holdsData="title"
+                badge={
+                    badge ? (
+                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                    ) : undefined
+                }
+                description={`${gstLine(profile)} · ${paysForCount(profile.payingFor.length)}`}
+                actions={
+                    // One Edit (on "On Saroh's invoices") and one Remove
+                    // (its card): the menu holds only what has no other door.
+                    profile.sync === "failed" ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    aria-label="More actions"
+                                >
+                                    <MoreHorizontal className="size-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                     onSelect={() =>
                                         void retry(profile.id, router)
@@ -173,17 +154,11 @@ export function ProfilePage({
                                 >
                                     Try linking again
                                 </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuItem
-                                disabled={Boolean(blocked)}
-                                onSelect={() => show({ kind: "remove" })}
-                            >
-                                Remove profile…
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </span>
-            </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : undefined
+                }
+            />
 
             {profile.sync === "failed" || profile.sync === "linking" ? (
                 <SyncCard
@@ -220,7 +195,7 @@ export function ProfilePage({
                                 className={`${rowLine} text-muted-foreground px-[18px] py-3 text-[12.5px]`}
                             >
                                 {m.name} moves here
-                                {m.at ? ` on ${shortDate(m.at)}` : ""}.
+                                {m.at ? ` on ${day(m.at)}` : ""}.
                             </p>
                         ))}
                     </section>
@@ -247,7 +222,7 @@ export function ProfilePage({
                                         {v.businessName}
                                     </span>
                                     <span className="text-muted-foreground hidden sm:inline">
-                                        {shortDate(v.issuedAt)}
+                                        {day(v.issuedAt)}
                                     </span>
                                     <span className="order-4 tabular-nums sm:order-none">
                                         {money(v.totalPaise, v.currency)}
@@ -294,7 +269,7 @@ export function ProfilePage({
                         <div className="border-border/70 flex items-center border-b px-[18px] py-3">
                             <h2
                                 id="pg-det"
-                                className="font-display m-0 flex-1 text-[15px] font-semibold"
+                                className="m-0 flex-1 text-sm font-semibold"
                             >
                                 On Saroh&apos;s invoices
                             </h2>
@@ -322,11 +297,11 @@ export function ProfilePage({
                                         {profile.gstin}
                                     </span>
                                 ) : (
-                                    <Missing>Not GST-registered</Missing>
+                                    <Absent>Not GST-registered</Absent>
                                 )}
                             </Detail>
                             <Detail term="Address">
-                                {address ?? <Missing>Not added</Missing>}
+                                {address ?? <Absent>Not added</Absent>}
                             </Detail>
                             <Detail term="Invoices go to">
                                 <span className="[overflow-wrap:anywhere]">
@@ -337,7 +312,7 @@ export function ProfilePage({
                                 {profile.phone ? (
                                     phoneLabel(profile.phone)
                                 ) : (
-                                    <Missing>Not added</Missing>
+                                    <Absent>Not added</Absent>
                                 )}
                             </Detail>
                         </dl>
@@ -393,6 +368,19 @@ export function ProfilePage({
                     from={profile}
                     profiles={profiles}
                     appUrl={appUrl}
+                    open
+                    onClose={close}
+                    onNewProfile={() =>
+                        show({ kind: "add", billFirst: open.business.id })
+                    }
+                />
+            ) : null}
+            {open?.kind === "add" ? (
+                <AddProfileSheet
+                    key={`add-${opening}`}
+                    profiles={profiles}
+                    businesses={businesses}
+                    billFirst={open.billFirst}
                     open
                     onClose={close}
                 />
@@ -491,7 +479,7 @@ function BusinessRow({
     const waiting = b.pendingMove && !b.pendingMove.authorised;
     return (
         <div
-            className={`${rowLine} grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[18px] py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_150px_auto]`}
+            className={`${rowLine} grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[18px] py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_150px_112px]`}
             data-business={b.id}
         >
             <span className="min-w-0">
@@ -503,7 +491,7 @@ function BusinessRow({
                 </span>
                 <span className="text-muted-foreground block text-xs sm:hidden">
                     {planName(b)}
-                    {b.nextChargeAt ? ` · ${shortDate(b.nextChargeAt)}` : ""}
+                    {b.nextChargeAt ? ` · ${day(b.nextChargeAt)}` : ""}
                 </span>
                 {b.pendingMove ? (
                     <span className="text-foreground mt-0.5 block text-[11.5px] font-medium">
@@ -512,14 +500,14 @@ function BusinessRow({
                 ) : null}
                 {!b.owner ? (
                     <span className="text-muted-foreground mt-0.5 block text-[11.5px]">
-                        You&apos;re no longer its owner, so only its owner can
-                        move it.
+                        {notOwnerLine(b)}
                     </span>
                 ) : null}
             </span>
             <span className="dark:text-muted-foreground hidden text-neutral-700 sm:inline">
                 {nextLine(b)}
             </span>
+            {/* An empty cell keeps the columns where they are. */}
             {!b.owner ? (
                 <span />
             ) : waiting ? (
@@ -553,8 +541,4 @@ function Detail({ term, children }: { term: string; children: ReactNode }) {
             <dd className="mb-0 ml-0 mt-0.5">{children}</dd>
         </div>
     );
-}
-
-function Missing({ children }: { children: ReactNode }) {
-    return <span className="text-muted-foreground">{children}</span>;
 }

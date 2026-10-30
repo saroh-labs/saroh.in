@@ -1,7 +1,7 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";

@@ -51,12 +51,12 @@ export function setupSchema(
                 ? z
                       .string()
                       .trim()
-                      .min(1, { message: "Enter your name" })
+                      .min(1, { error: "Enter your name" })
                       .max(120)
                 : z.string().optional(),
-            name: z.string().trim().min(1, { message: "It needs a name" }),
+            name: z.string().trim().min(1, { error: "It needs a name" }),
             address: z.string().min(3, {
-                message: "A web address needs at least 3 characters",
+                error: "A web address needs at least 3 characters",
             }),
             // India only for now (#1214): setup never asks, and sends IN.
             country: z.literal("IN"),
@@ -445,8 +445,10 @@ export function readSetupDraft(email: string): SetupDraft | null {
         const parsed = draftSchema.safeParse(JSON.parse(raw));
         if (!parsed.success || parsed.data.for !== email) return null;
         const { for: _for, ...draft } = parsed.data;
-        // India only for now (#1214), whatever an older draft said.
-        return { ...draft, values: { ...draft.values, country: "IN" } };
+        // India only for now (#1214), whatever an older draft said. zod 4
+        // types a conditional `yourName` as a key that is always present.
+        const { yourName, ...values } = draft.values;
+        return { ...draft, values: { ...values, yourName, country: "IN" } };
     } catch {
         return null;
     }

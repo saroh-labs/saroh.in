@@ -1,5 +1,7 @@
 import { toast } from "sonner";
 
+import { isRefusal } from "../../lib/refusal";
+
 /**
  * The one entry point for transient feedback.
  *
@@ -68,7 +70,7 @@ function sayError(
     description?: string,
 ): string | number | undefined {
     // A refusal is not a breakage: it is said calmly, never in red.
-    if (refusals.some((is) => is(message))) {
+    if (isRefusal(message)) {
         showRefusal(message, description);
         return undefined;
     }
@@ -139,26 +141,7 @@ export function showRefusal(message: string, description?: string) {
     });
 }
 
-type RefusalTest = (message: string) => boolean;
-const refusals: RefusalTest[] = [];
-
-/**
- * Teach `showError` which sentences are refusals, wherever they are shown
- * from.
- *
- * Hundreds of call sites only know `showError(res.error)`, and the sentence
- * is all that reaches them. An app registers how to tell its refusals (the
- * merchant app: `isRoleRefusal`) once, on mount, and every one of those
- * call sites then says a refusal through `showRefusal`. Call the returned
- * function to take it back.
- */
-export function setRefusalTest(is: RefusalTest): () => void {
-    refusals.push(is);
-    return () => {
-        const at = refusals.indexOf(is);
-        if (at !== -1) refusals.splice(at, 1);
-    };
-}
+export { isRefusal, setRefusalTest } from "../../lib/refusal";
 
 /** How long anything can be undone: ten seconds, everywhere. */
 export const UNDO_MS = 10_000;

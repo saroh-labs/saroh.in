@@ -51,6 +51,7 @@ import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
+import { hashPayToken } from "../invoices/pay-token";
 import { encryptSecret } from "./crypto";
 import { PaymentsService } from "./payments.service";
 import {
@@ -264,7 +265,14 @@ describe("PaymentsService.getReceipt (S5-004)", () => {
             currency: "INR",
         });
 
-        const receipt = await service.getReceipt("order_1");
+        const receipt = await service.getReceipt("order_1", "tok_1");
+
+        // Looked up by the order's id AND its pay-link token's hash.
+        expect(orderFindUnique).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { payTokenHash: hashPayToken("tok_1"), id: "order_1" },
+            }),
+        );
 
         expect(receipt).toEqual({
             orderNumber: "ORD-001",
@@ -310,15 +318,15 @@ describe("PaymentsService.getReceipt (S5-004)", () => {
         });
         intentFindFirst.mockResolvedValue(null);
 
-        const receipt = await service.getReceipt("order_2");
+        const receipt = await service.getReceipt("order_2", "tok_2");
         expect(receipt.paymentStatus).toBe("UNPAID");
         expect(receipt.latestPayment).toBeNull();
     });
 
-    it("404s a missing order", async () => {
+    it("404s a missing order, or a token that isn't the order's", async () => {
         const { service } = makeService();
         orderFindUnique.mockResolvedValue(null);
-        await expect(service.getReceipt("nope")).rejects.toBeInstanceOf(
+        await expect(service.getReceipt("nope", "tok")).rejects.toBeInstanceOf(
             NotFoundException,
         );
     });
@@ -479,7 +487,7 @@ describe("Storefront settings on the buyer's path", () => {
             },
         });
         intentFindFirst.mockResolvedValue(null);
-        const receipt = await service.getReceipt("order_3");
+        const receipt = await service.getReceipt("order_3", "tok_3");
         expect(receipt.storefront).toEqual({
             name: "Web shop",
             kind: "ONLINE",

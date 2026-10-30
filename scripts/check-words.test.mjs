@@ -37,7 +37,7 @@ test('fails on "Join the waitlist" in saroh.in content', () => {
 
 test('fails on "announced at launch" in a saroh.in page', () => {
     const r = check({
-        "apps/saroh.in/app/(v2)/page.tsx":
+        "apps/saroh.in/app/(site)/page.tsx":
             "export default () => <p>Plan details are announced at launch.</p>;\n",
     });
     assert.equal(r.status, 1);

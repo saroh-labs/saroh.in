@@ -22,6 +22,8 @@ export interface ReleaseUnderReview {
     name: string;
     /** What a verdict on it is bound to, instead of the draft's (KTD-10). */
     fingerprint: string;
+    /** Neither discarded nor live: it still takes notes and verdicts. */
+    isOpen: boolean;
 }
 
 const flags = new FeatureFlagService();
@@ -77,6 +79,7 @@ export async function releaseUnderReview(
         number: release.number,
         name: release.name,
         fingerprint: release.fingerprint,
+        isOpen: !release.discardedAt && !release.wentLiveAt,
     };
 }
 

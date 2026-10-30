@@ -5,10 +5,10 @@ import { Switch } from "@saroh/ui/switch";
 import { showError } from "@saroh/ui/toast";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { setMembersCanPause } from "@/lib/subscriptions/actions";
 import { PAUSE_LABEL } from "@/lib/subscriptions/plan-settings";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
  * "Members can pause from their account" (round-2 A8), changed in its

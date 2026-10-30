@@ -1,4 +1,4 @@
-// @covers app:/ app:/sites app:/sites/[siteId]/review app:/settings/organization app:/settings/people
+// @covers app:/ app:/sites app:/sites/[siteId] app:/sites/[siteId]/review app:/settings/organization app:/settings/people
 // @covers app:/contacts app:/commerce/orders app:/commerce/products app:/bookings app:/bookings/all
 // @covers app:/billing/invoices app:/billing/subscriptions app:/commerce/customers/new
 import type { BrowserContext } from "@playwright/test";
@@ -43,53 +43,62 @@ test.beforeEach(async ({ page, isMobile }) => {
 });
 
 for (const role of ["MEMBER", "REVIEWER"]) {
-    test(`${role} can reach Sites and read a site without an editable draft`, async ({
+    test(`${role} can reach Sites and read a site in the editor, read-only`, async ({
         page,
         context,
+        isMobile,
     }, testInfo) => {
         await scenario(context, role);
-        // Website from the rail lands on the site itself: its Pages tab, which
-        // sends a reader on to Review.
-        await page.goto("/sites");
-        await expect(page).toHaveURL(/\/sites\/site_1\/review$/);
-        await expect(
-            page.getByRole("heading", { name: "Website", exact: true }),
-        ).toBeVisible();
         /*
-         * The editor's own route, which redirects a caller without
-         * `section:write` to the reading screen (#275). Asserted from the link
-         * a merchant actually follows rather than from the destination, so a
-         * redirect that stops working is a failure here.
+         * Website from the rail lands on the site's editor, read-only, for
+         * anyone without `section:write` (DEC-200): its Pages tab sends a
+         * reader on, and the old reading screen's address does too.
          */
-        await page.goto("/sites/site_1");
-        await expect(page).toHaveURL(/\/sites\/site_1\/review$/);
-        await expect(
-            page.getByRole("heading", {
-                name: "Permission test site",
-                exact: true,
-            }),
-        ).toBeVisible();
+        await page.goto("/sites");
+        await expect(page).toHaveURL(/\/sites\/site_1$/);
+        await page.goto("/sites/site_1/review");
+        await expect(page).toHaveURL(/\/sites\/site_1$/);
         // The draft, drawn by the live site's blocks — not a list of titles.
         await expect(
-            page.getByRole("heading", { name: "Racking that fits" }),
+            page.getByRole("heading", { name: "Racking that fits" }).first(),
         ).toBeVisible();
-        // Nothing that writes: the editor's draft load is a 403 for both roles.
-        await expect(
-            page.getByRole("button", { name: /publish/i }),
-        ).toHaveCount(0);
-        await expect(
-            page.getByRole("button", { name: /add section/i }),
-        ).toHaveCount(0);
+        if (!isMobile) {
+            await expect(page.locator("[data-reviewing]")).toHaveText(
+                "Reviewing · you can’t change anything",
+            );
+        }
         /*
-         * The one difference between the two roles on this screen: a REVIEWER
-         * may say something, a MEMBER may only look.
+         * The verdict is `site:approve`'s (the fixture's `can.approve`): a
+         * Reviewer is offered it, in the bar on a desk and behind Review on
+         * a phone; a Member, who may only read, is offered neither.
          */
-        await expect(
-            page.getByRole("button", { name: "Comment on sections" }),
-        ).toHaveCount(role === "REVIEWER" ? 1 : 0);
-        await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(
-            role === "REVIEWER" ? 1 : 0,
-        );
+        const verdict = isMobile
+            ? page.getByRole("button", { name: "Review", exact: true })
+            : page.getByRole("button", { name: "Ask for changes" });
+        if (role === "REVIEWER") await expect(verdict).toBeVisible();
+        else await expect(verdict).toHaveCount(0);
+        /*
+         * Nothing that writes, at either width. The editor's draft load is a
+         * 403 for both roles here, so the page read through `…/read` is the
+         * only way it can have drawn. That a direct write is refused 403 by
+         * the real API is `site-review.spec.ts` (this suite's API is a fake).
+         */
+        for (const name of [
+            /^Publish/,
+            /^Share/,
+            "Add a block",
+            "Make a test release",
+            "Move block up",
+            "Save draft",
+        ]) {
+            await expect(
+                page.getByRole("button", {
+                    name,
+                    exact: typeof name === "string",
+                }),
+            ).toHaveCount(0);
+        }
+        await expect(page.locator("[draggable=true]")).toHaveCount(0);
         expect(
             await page.evaluate(
                 () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -111,7 +120,7 @@ test("REVIEWER's Home is what was sent to them for review, and nothing about the
     await expect(
         page.getByRole("heading", { name: "Sent to you for review" }),
     ).toBeVisible();
-    // A row per page waiting, opening the Review tab on that page.
+    // A row per page waiting, opening that page in the editor.
     const row = page.getByRole("link", { name: /Home.*From Priya Raman/ });
     await expect(row).toHaveAttribute(
         "href",
@@ -125,7 +134,8 @@ test("REVIEWER's Home is what was sent to them for review, and nothing about the
         ).toHaveCount(0);
     }
     await row.click();
-    await expect(page).toHaveURL(/\/sites\/site_1\/review\?page=page_1$/);
+    // The old address opens the editor on that page (DEC-200).
+    await expect(page).toHaveURL(/\/sites\/site_1\?page=page_1$/);
 });
 
 test("a staff member lands on their storefront's work, and the header says so (F11)", async ({

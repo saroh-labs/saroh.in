@@ -19,13 +19,13 @@ export const env = createEnv({
             .default("development"),
     },
     server: {
-        API_URL: z.string().url().optional(),
-        NGROK_URL: z.string().url().optional(),
+        API_URL: z.url().optional(),
+        NGROK_URL: z.url().optional(),
     },
     client: {
-        NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
-        NEXT_PUBLIC_API_URL: z.string().url().optional(),
-        NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
+        NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
+        NEXT_PUBLIC_API_URL: z.url().optional(),
+        NEXT_PUBLIC_BETTER_AUTH_URL: z.url().optional(),
         /**
          * The host a merchant's subdomain hangs off — `saroh.app`, not the
          * marketing site. The sites index used to build that address from a
@@ -65,7 +65,7 @@ export const env = createEnv({
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
             .optional(),
-        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.url().optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
         /**
          * Page visits (DEC-160): which screens are opened and for how

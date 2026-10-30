@@ -49,6 +49,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
 import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
+import { SearchPagesModule } from "./modules/search-pages/search-pages.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
@@ -57,6 +58,8 @@ import { SitesModule } from "./modules/sites/sites.module";
 import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 // "Tell me when it's back" (DEC-174 U23).
+import { AccountPhoneModule } from "./modules/account-phone/account-phone.module";
+import { MessagingModule } from "./modules/messaging/messaging.module";
 import { StockWatchModule } from "./modules/stock/stock-watch.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
@@ -77,6 +80,11 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AuthModule.forRoot({
             auth,
             disableGlobalAuthGuard: true,
+            // CORS is main.ts's alone (common/cors.ts). The wrapper's own
+            // `enableCors({ credentials: true })` ran for every path, so a
+            // `/public/*` answer reflecting any origin also said
+            // Allow-Credentials: true (pentest 29 Oct).
+            disableTrustedOriginsCors: true,
             // rawBody: true attaches the raw request Buffer to `req.rawBody` (via
             // the JSON parser's `verify` hook) for every non-auth route. The
             // public webhook endpoint (S5-003) needs those exact bytes to
@@ -90,6 +98,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         }),
         HealthModule,
         SignInOptionsModule,
+        // Phone sign-in for Saroh accounts (DEC-196).
+        AccountPhoneModule,
         FeatureFlagModule,
         AdminModule,
         PricingModule,
@@ -107,6 +117,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProductsModule,
         StockModule,
         StockWatchModule,
+        MessagingModule,
         CategoriesModule,
         CollectionsModule,
         CatalogueModule,
@@ -146,6 +157,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ToolsModule,
         BusinessReportsModule,
         ContactMessagesModule,
+        // Search pages published from the console (DEC-193).
+        SearchPagesModule,
         SelfTestModule,
     ],
 })

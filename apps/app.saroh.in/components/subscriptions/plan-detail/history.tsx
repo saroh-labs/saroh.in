@@ -1,6 +1,6 @@
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { HistoryRow } from "@/lib/subscriptions/plan-detail";

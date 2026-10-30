@@ -8,6 +8,7 @@ import type {
     SignInApi,
     SignInOptions,
 } from "../account/api";
+import { customerHandle } from "../account/api";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
 import type { InlineCodeHandle } from "./inline-code";
@@ -80,18 +81,19 @@ export function LookDetails({
                         aria-hidden="true"
                         className="bg-site-accent-soft text-site-fg font-site-heading flex size-11 shrink-0 items-center justify-center rounded-full text-[17px]"
                     >
-                        {(customer.name ?? customer.email)
+                        {(customer.name ?? customerHandle(customer))
                             .trim()
                             .charAt(0)
                             .toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold">
-                            Booking as {customer.name ?? customer.email}
+                            Booking as{" "}
+                            {customer.name ?? customerHandle(customer)}
                         </span>
                         {customer.name ? (
                             <span className="text-site-body block text-[13.5px] [overflow-wrap:anywhere]">
-                                {customer.email}
+                                {customerHandle(customer)}
                             </span>
                         ) : null}
                     </span>

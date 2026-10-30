@@ -1,6 +1,5 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import {
@@ -9,6 +8,7 @@ import {
     LoadingState,
     PartialNotice,
 } from "@saroh/ui/data-state";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check } from "lucide-react";

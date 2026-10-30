@@ -5,8 +5,6 @@ import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { deleteContact } from "@/lib/contacts/actions";
 import {
     deletedLine,
@@ -28,9 +26,12 @@ import type {
 } from "@/lib/customer-workspace/service";
 import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
 import {
+    signsInWith,
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { EditSheet } from "./edit-sheet";
 import { IdentityLinkDialog } from "./identity-link-dialog";
@@ -112,7 +113,7 @@ export function useMoreActions({
     async function separate(preview: UnlinkPreview): Promise<ConfirmResult> {
         const res = await unlinkAccountAction(d.contact.id);
         if (!res.ok) return { ok: false, error: res.error };
-        showSuccess(unlinkedLine(preview.email));
+        showSuccess(unlinkedLine(signsInWith(preview)));
         router.refresh();
     }
 

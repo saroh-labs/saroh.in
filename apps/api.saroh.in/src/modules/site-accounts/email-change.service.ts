@@ -11,6 +11,7 @@ import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 import type { EmailOutcome } from "../../common/email";
 import { sendSiteEmailChangedEmail } from "../../common/email";
 import { structuredLogger } from "../../common/logging/structured-logger";
+import { isReservedContactEmail } from "../contacts/contact-email";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { normaliseAccountEmail } from "./customer-account.repository";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -27,7 +28,8 @@ import type { SiteRelay } from "./site-relay";
 
 /**
  * A customer changing their sign-in email from Me (round-2 plan A, A5;
- * ADR-011 "Email changes").
+ * ADR-011 "Email changes"), or a phone-only customer adding their first
+ * (DEC-196), by the same code.
  *
  * 1. A code goes to the **new** address, under a destination bound to the
  *    account (`changeDestinationHashFor`), with the same limits, challenge
@@ -58,7 +60,8 @@ export interface EmailChanged {
     done: true;
 }
 
-type Applied = { changed: false } | { changed: true; oldEmail: string };
+/** `oldEmail` is null when a phone-only account added its first (DEC-196). */
+type Applied = { changed: false } | { changed: true; oldEmail: string | null };
 
 /**
  * How many different new addresses one account may send change codes to in
@@ -172,7 +175,10 @@ export class EmailChangeService {
             );
             return this.apply(customer, email, now);
         });
-        if (applied.changed) await this.tellOldAddress(site, applied.oldEmail);
+        // A first email added to a phone-only account has no old address.
+        if (applied.changed && applied.oldEmail) {
+            await this.tellOldAddress(site, applied.oldEmail);
+        }
         return { done: true };
     }
 
@@ -217,9 +223,15 @@ export class EmailChangeService {
                     where: { id: account.contactId, organizationId },
                     select: { email: true },
                 });
+                // A phone-only account's contact (DEC-196) holds only its
+                // `phone+…@phone.invalid` placeholder: the first real email
+                // replaces it, as a walk-in's does.
                 const heldOld =
                     contact !== null &&
-                    normaliseAccountEmail(contact.email) === account.email;
+                    (account.email === null
+                        ? isReservedContactEmail(contact.email)
+                        : normaliseAccountEmail(contact.email) ===
+                          account.email);
                 if (heldOld) {
                     const holder = await tx.contact.count({
                         where: {

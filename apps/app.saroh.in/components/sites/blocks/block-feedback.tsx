@@ -1,8 +1,8 @@
 "use client";
 
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -10,8 +10,14 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
 import { initials } from "@/lib/names";
-import { createComment, setCommentResolved } from "@/lib/sites/actions";
+import {
+    createComment,
+    deleteComment,
+    setCommentResolved,
+    updateCommentBody,
+} from "@/lib/sites/actions";
 import type { SiteCommentView } from "@/lib/sites/service";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 import { Tip } from "@saroh/ui/tooltip";
@@ -38,6 +44,9 @@ export function BlockFeedback({
     label,
     comments,
     onChanged,
+    canSettle = true,
+    canComment = true,
+    reviewer = false,
 }: {
     siteId: string;
     pageId: string;
@@ -48,9 +57,21 @@ export function BlockFeedback({
     /** Every note on the site; this component picks the block's own. */
     comments: SiteCommentView[];
     onChanged: () => Promise<void>;
+    /** `section:write`: settle and reopen. Off for a Reviewer (DEC-200). */
+    canSettle?: boolean;
+    /** `site:comment`: the note box. Off for a role that may only read. */
+    canComment?: boolean;
+    /** A Reviewer (DEC-200, RVD1): "Add a note on Opening section". */
+    reviewer?: boolean;
 }) {
     const zone = useBusinessZone();
     const [reply, setReply] = useState("");
+    /** Your own note being rewritten, and the words so far. */
+    const [editing, setEditing] = useState<{ id: string; body: string } | null>(
+        null,
+    );
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState<SiteCommentView | null>(null);
     const [sending, setSending] = useState(false);
     /** Notes with a settle/reopen in flight — one each, so one click never re-enables another's button. */
     const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
@@ -76,6 +97,25 @@ export function BlockFeedback({
             return;
         }
         showSuccess(settled ? "Note marked settled." : "Note reopened.");
+        await onChanged();
+    }
+
+    /** Rewrite your own open note (DEC-200, U3). */
+    async function saveEdit() {
+        if (!editing) return;
+        const body = editing.body.trim();
+        if (!body) return;
+        const res = await runAction(
+            () => updateCommentBody(siteId, editing.id, body),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        setEditing(null);
+        showSuccess("Note changed.");
         await onChanged();
     }
 
@@ -132,12 +172,61 @@ export function BlockFeedback({
                                     {initials(c.author.name)}
                                 </span>
                                 <span className="min-w-0 truncate text-[0.8125rem] font-semibold">
-                                    {c.author.name}
+                                    {c.mine ? "You" : c.author.name}
                                 </span>
                             </div>
-                            <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">
-                                {c.body}
-                            </p>
+                            {editing?.id === c.id ? (
+                                <form
+                                    className="grid gap-2"
+                                    onKeyDown={submitOnModEnter}
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        void saveEdit();
+                                    }}
+                                >
+                                    <Field label="Your note">
+                                        <Textarea
+                                            id={`note-edit-${c.id}`}
+                                            value={editing.body}
+                                            rows={3}
+                                            maxLength={2000}
+                                            autoFocus
+                                            onChange={(e) =>
+                                                setEditing({
+                                                    id: c.id,
+                                                    body: e.target.value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={
+                                                editing.body.trim() === ""
+                                            }
+                                            busy={saving}
+                                            busyLabel="Saving…"
+                                        >
+                                            Save note
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            disabled={saving}
+                                            onClick={() => setEditing(null)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">
+                                    {c.body}
+                                </p>
+                            )}
                             <p
                                 className="text-xs text-muted-foreground"
                                 title={formatDateTime(c.createdAt, zone, {
@@ -146,15 +235,49 @@ export function BlockFeedback({
                             >
                                 {formatDate(c.createdAt, zone)}
                             </p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={busy.has(c.id)}
-                                onClick={() => void setSettled(c, true)}
-                            >
-                                Mark settled
-                            </Button>
+                            {c.editable && editing?.id !== c.id ? (
+                                <div className="flex gap-1">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Edit your note"
+                                        onClick={() =>
+                                            setEditing({
+                                                id: c.id,
+                                                body: c.body,
+                                            })
+                                        }
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Delete your note"
+                                        onClick={() => setDeleting(c)}
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            ) : c.mine && !c.editable ? (
+                                // Written before an approval (R13): history.
+                                <p className="text-xs text-muted-foreground">
+                                    Kept with the approved review
+                                </p>
+                            ) : null}
+                            {canSettle ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy.has(c.id)}
+                                    onClick={() => void setSettled(c, true)}
+                                >
+                                    Mark settled
+                                </Button>
+                            ) : null}
                         </li>
                     ))}
                 </ul>
@@ -201,17 +324,19 @@ export function BlockFeedback({
                                     <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">
                                         {c.body}
                                     </p>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={busy.has(c.id)}
-                                        onClick={() =>
-                                            void setSettled(c, false)
-                                        }
-                                    >
-                                        Reopen
-                                    </Button>
+                                    {canSettle ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={busy.has(c.id)}
+                                            onClick={() =>
+                                                void setSettled(c, false)
+                                            }
+                                        >
+                                            Reopen
+                                        </Button>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>
@@ -219,44 +344,87 @@ export function BlockFeedback({
                 </div>
             ) : null}
 
-            <form
-                onKeyDown={submitOnModEnter}
-                className="grid gap-2 border-t pt-4"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void send();
-                }}
-            >
-                <Field label={open.length === 0 ? "Add a note" : "Reply"}>
-                    <Textarea
-                        id="block-feedback-reply"
-                        value={reply}
-                        rows={3}
-                        maxLength={2000}
-                        placeholder="What should change, and why?"
-                        onChange={(e) => setReply(e.target.value)}
-                    />
-                </Field>
-                <div>
-                    <Tip
+            {canComment ? (
+                <form
+                    onKeyDown={submitOnModEnter}
+                    className="grid gap-2 border-t pt-4"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        void send();
+                    }}
+                >
+                    <Field
                         label={
-                            reply.trim() === ""
-                                ? "Write something first"
-                                : undefined
+                            reviewer
+                                ? `Add a note on ${label}`
+                                : open.length === 0
+                                  ? "Add a note"
+                                  : "Reply"
                         }
                     >
-                        <Button
-                            type="submit"
-                            size="sm"
-                            disabled={reply.trim() === ""}
-                            busy={sending}
-                            busyLabel="Sending…"
+                        <Textarea
+                            id="block-feedback-reply"
+                            value={reply}
+                            rows={3}
+                            maxLength={2000}
+                            placeholder="What should change, and why?"
+                            onChange={(e) => setReply(e.target.value)}
+                        />
+                    </Field>
+                    <div
+                        className={
+                            reviewer ? "flex justify-end gap-2" : undefined
+                        }
+                    >
+                        {reviewer && reply !== "" ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setReply("")}
+                            >
+                                Cancel
+                            </Button>
+                        ) : null}
+                        <Tip
+                            label={
+                                reply.trim() === ""
+                                    ? "Write something first"
+                                    : undefined
+                            }
                         >
-                            {open.length === 0 ? "Add note" : "Reply"}
-                        </Button>
-                    </Tip>
-                </div>
-            </form>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={reply.trim() === ""}
+                                busy={sending}
+                                busyLabel="Sending…"
+                            >
+                                {reviewer || open.length === 0
+                                    ? "Add note"
+                                    : "Reply"}
+                            </Button>
+                        </Tip>
+                    </div>
+                </form>
+            ) : null}
+            <ConfirmDialog
+                open={deleting !== null}
+                onOpenChange={(o) => (o ? null : setDeleting(null))}
+                title="Delete your note?"
+                description="It goes from the block and from the owner's list. This cannot be undone."
+                confirmLabel="Delete note"
+                keepLabel="Keep note"
+                onConfirm={async () => {
+                    if (!deleting) return;
+                    const res = await deleteComment(siteId, deleting.id);
+                    if (!res.ok) return res;
+                    setDeleting(null);
+                    showSuccess("Note deleted.");
+                    await onChanged();
+                    return res;
+                }}
+            />
         </div>
     );
 }

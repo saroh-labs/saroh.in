@@ -16,6 +16,8 @@ import {
     withGstPaise,
 } from "@saroh/pricing-catalog";
 
+import { sentenceList } from "@/lib/format/list";
+
 import type { UsageRow, UsageView } from "./pricing-model";
 import { NOT_INCLUDED } from "./pricing-model";
 
@@ -152,13 +154,6 @@ function counted(m: CatalogModule): string {
     return what ? what.replace(/ a month$/, "") : m.name.toLowerCase();
 }
 
-/** "Plan B and Plan C". */
-function names(list: string[]): string {
-    const rest = list.slice(0, -1);
-    const last = list[list.length - 1] ?? "";
-    return rest.length ? `${rest.join(", ")} and ${last}` : last;
-}
-
 /**
  * The notes under the table, each true of the product today (DEC-157,
  * `PRICING_ROLLOUT.md` › Add-ons, `billing/metering.service.ts`).
@@ -196,13 +191,13 @@ export function usageNotes(
             }),
         );
         notes.push(
-            `On ${names(on.map((p) => p.name))}, ${names(soft.map(counted))} past the allowance still come in, so no customer is turned away. We let you know when you pass it.`,
+            `On ${sentenceList(on.map((p) => p.name))}, ${sentenceList(soft.map(counted))} past the allowance still come in, so no customer is turned away. We let you know when you pass it.`,
         );
     }
     const free = plans.filter((p) => p.pricePaise === 0);
     if (free.length && paid.length) {
         notes.push(
-            `On ${names(free.map((p) => p.name))}, the allowance is what you get: adding more is for paid plans.`,
+            `On ${sentenceList(free.map((p) => p.name))}, the allowance is what you get: adding more is for paid plans.`,
         );
     }
     notes.push(

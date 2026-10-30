@@ -8,7 +8,7 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/lists/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
+import { CheckRow } from "@saroh/ui/check-row";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Tip } from "@saroh/ui/tooltip";

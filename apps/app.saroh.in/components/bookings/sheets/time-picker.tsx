@@ -11,10 +11,6 @@ import { TextLink } from "@saroh/ui/text-link";
 import { CalendarDays } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 
-import {
-    ChipGroup,
-    ChoiceGroup,
-} from "@/components/shared/fields/choice-group";
 import { formatTime } from "@/lib/format/datetime";
 import { listAvailability } from "@/lib/services/actions";
 import type { LocalDate } from "@/lib/services/diary";
@@ -32,6 +28,7 @@ import {
     takenMessage,
     zoneShortName,
 } from "@/lib/services/time-picker";
+import { ChipGroup, ChoiceGroup } from "@saroh/ui/choice-group";
 
 /** Someone who takes the service. */
 export interface TimePickerPerson {

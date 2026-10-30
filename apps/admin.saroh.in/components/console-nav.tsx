@@ -6,9 +6,11 @@ import {
     CircleAlert,
     CloudUpload,
     Cog,
+    FileSearch,
     Flag,
     HardDrive,
     Home,
+    LayoutGrid,
     Mail,
     ReceiptText,
     Repeat,
@@ -164,6 +166,13 @@ const GROUPS: ConsoleNavGroup[] = [
                 permission: "pricing:read",
             },
             {
+                // The /for/ pages and whether each is live (DEC-193).
+                href: "/search-pages",
+                label: "Search pages",
+                icon: FileSearch,
+                permission: "platform:read",
+            },
+            {
                 href: "/usage",
                 label: "Usage",
                 icon: HardDrive,
@@ -203,6 +212,13 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Deployments",
                 icon: CloudUpload,
                 permission: "deployments:run",
+            },
+            {
+                // Saroh's own hosts, moved from accounts' /apps (DEC-199).
+                href: "/apps",
+                label: "Saroh's apps",
+                icon: LayoutGrid,
+                permission: "platform:read",
             },
             {
                 href: "/team",

@@ -13,7 +13,6 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
 import {
     ENQUIRY_FIELD_TYPES,
     FIELD_LABEL,
@@ -24,6 +23,7 @@ import type {
     EnquiryField,
     EnquiryFieldType,
 } from "@/lib/sites/service";
+import { CheckRow } from "@saroh/ui/check-row";
 
 /**
  * The `enquiry` section's editor fields.

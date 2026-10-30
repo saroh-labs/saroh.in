@@ -1,0 +1,254 @@
+---
+slug: physiotherapy
+name: Physiotherapy
+plural: physiotherapists
+pickAs: physiotherapy
+family: Health
+search: physiotherapy clinic software
+title: Physiotherapy clinic software for sessions and bills
+description: "Physiotherapy clinic software: patients book with their physio, a 10-session package counts down, and every payment gets a bill."
+updated: 2026-10-26
+shape: appointments
+h1: Every session booked, and no package counted by hand.
+lead: Software for your physiotherapy clinic. Let patients book with their physio, sell a 10-session package that counts down, and give a bill for each payment.
+phoneLead: Software for your physiotherapy clinic. Patients book their physio, and a 10-session pack counts down.
+problemsTitle: What gets easier in your physio clinic.
+problems:
+  - area: Taking bookings
+    quote: Evenings go on WhatsApp, fitting people in after work.
+    title: Patients book their own session
+    body: Your booking page shows only the times each physio is free. The patient picks a session and a physio, or says anyone is fine.
+    link: Bookings
+  - area: Session packages
+    quote: Who has sessions left is tally marks in a register.
+    title: Packages that count themselves
+    body: Sell a pack of 10 sessions. One is used each time they book, and the pack ends on the date you choose.
+  - area: Your physios' days
+    quote: Two physios, two different shifts.
+    title: Each physio's own hours
+    body: Set when each physio works and the days you're closed. Patients only see those times.
+  - area: Your patients
+    quote: She told me about her knee last week, and I've forgotten what she said.
+    title: Your notes from every session
+    body: Visits, sessions left and your notes, all on one page. Mark a note sensitive, and only the roles you choose can read it.
+    link: Customers
+  - area: Getting paid
+    quote: Patients ask for a bill after every session.
+    title: A bill for every session and package
+    body: Each session and package gets a numbered bill, without GST when the service doesn't carry it.
+    link: Billing
+  - area: Your own website
+    quote: People ask what an assessment costs before they come.
+    title: Your sessions and prices online
+    body: Your website shows each service and its price, from the same list patients book from.
+    link: Website
+services:
+  - name: Assessment
+    detail: 45 min
+  - name: Physiotherapy session
+    detail: 30 min
+  - name: 10-session package
+    detail: 10 sessions
+related:
+  - name: Clinics
+    slug: clinics
+  - name: Personal trainers
+    slug: personal-trainers
+  - name: Ayurveda clinics
+    slug: ayurveda-clinics
+ctaTitle: Every session booked, and every package counted.
+scene:
+  business: Stride Physio Clinic
+  site: stride-physio.saroh.app
+  day: Sat 25 Oct
+  place: clinic
+  heroAlt: "What a physiotherapy clinic's day looks like in Saroh: an assessment booked with Sana on Saturday at 17:30, a ₹450 deposit paid by UPI, a bill with no GST on an exempt session, and Rohit on session 4 of his 10-session package."
+  hero:
+    title: Today · Sat 25 Oct
+    count: 11 sessions
+    highlight: 1
+    rows:
+      - time: 09:00
+        name: Rohit Bhatia
+        right: Session 4 of 10
+      - time: 17:30
+        name: Pooja Iyer
+        right: Assessment · Sana
+      - time: 18:00
+        name: Imran Qureshi
+        right: Kiran
+      - time: 18:30
+        name: Deepa Rao
+        right: Session 7 of 10
+  chips:
+    - icon: cal
+      title: Booked · Sat 17:30 · Sana
+      sub: Pooja Iyer · Assessment
+    - icon: ok
+      title: ₹450 deposit paid · UPI
+      sub: Into your own Razorpay account
+      phoneSub: Into your own Razorpay
+    - icon: bill
+      title: "Bill #276 · no GST"
+      sub: Session marked GST-exempt
+    - icon: person
+      title: Rohit · session 4 of 10
+      pill: "Knee: no deep squats yet"
+  staff:
+    - Kiran
+    - Sana
+  items:
+    - name: Assessment
+      short: Assessment
+      len: 45 min
+      who: with Kiran or Sana
+      price: 900
+    - name: Physiotherapy session
+      short: Session
+      len: 30 min
+      who: with Kiran or Sana
+      price: 700
+    - name: 10-session package
+      short: 10 sessions
+      len: 10 sessions
+      who: with your physio
+      price: 6000
+  booking:
+    item: 0
+    staff: Sana
+    time: 17:30
+    deposit: half
+    depositBy: Pooja Iyer
+    times:
+      - time: 09:00
+      - time: 10:00
+        taken: true
+      - time: 11:00
+      - time: 11:30
+        taken: true
+      - time: 12:30
+      - time: 16:30
+        taken: true
+      - time: 17:00
+      - time: 17:30
+        picked: true
+      - time: 18:30
+      - time: 19:00
+    phoneTimes:
+      - time: 09:00
+      - time: 10:00
+        taken: true
+      - time: 11:00
+      - time: 11:30
+        taken: true
+      - time: 12:30
+      - time: 16:30
+        taken: true
+      - time: 17:00
+      - time: 17:30
+        picked: true
+  today:
+    - time: 09:00
+      name: Rohit
+      who: Kiran
+      status:
+        tone: grey
+        text: 4 of 10
+    - time: 17:30
+      name: Pooja
+      who: Sana
+      status:
+        tone: paid
+        text: Paid
+    - time: 18:00
+      name: Imran
+      who: Kiran
+      status:
+        tone: amb
+        text: Check first
+  customer:
+    name: Rohit Bhatia
+    initials: RB
+    stats:
+      - 4 visits
+      - ₹6,900 spent
+    tag: "Knee: no deep squats yet"
+    note: "Package: 6 of 10 sessions left, ends 30 Nov."
+    noteBy: Sensitive note · Kiran · 21 Oct
+  bill:
+    no: 276
+    status:
+      tone: paid
+      text: Paid · UPI
+    gstin: false
+    showCodes: true
+    rate: 0
+    noGst: None · exempt treatment
+    lines:
+      - name: Physiotherapy session
+        short: Session
+        code: SAC 999314
+        codeStatus: to-confirm
+        amount: 700
+    cgst: 0
+    sgst: 0
+    total: 700
+    foot: null
+  tiles:
+    booking:
+      title: Patients book the physio they want
+      line: Your booking page shows only the times each physio is free.
+      phoneLine: Your booking page shows only the times each physio is free.
+    deposit:
+      title: Hold the time with a deposit
+      line: A quarter, half or all of it, into your own Razorpay or Cashfree.
+      phoneLine: Paid into your own Razorpay or Cashfree.
+    today:
+      title: Today's sessions, first thing
+      line: Who's coming, which session of their package it is, and what to check.
+      phoneLine: Who's coming, and which session it is.
+    customer:
+      title: Know every patient before the session
+      line: Sessions left, spend and your notes. Mark a note sensitive.
+      phoneLine: Sessions left and your notes.
+    bill:
+      title: No GST where none is due
+      line: Mark a session GST-exempt once, and its bills leave GST off.
+      phoneLine: Exempt sessions, billed without GST.
+    website:
+      title: Your sessions and prices online
+      line: Change a price once, and your website shows it.
+      phoneLine: Change a price once, and it shows.
+  quote:
+    text: Who has sessions left is tally marks in a register.
+    caption: Sound like your clinic? Sell a pack of 10 sessions, and one comes off each time they book.
+  also:
+    - title: A pack of 10 sessions
+      line: One comes off each booking, and the pack ends on the date you choose.
+    - title: Each physio's days
+      line: Working days, time off and the days the clinic is closed.
+    - title: Payment links
+      line: Send a link. They pay by UPI or card, straight to your account.
+    - title: Sensitive notes
+      line: Mark a note sensitive. Only the roles you allow can read it.
+    - title: In their phone's calendar
+      line: Patients add their booking to their own calendar.
+    - title: Who didn't come
+      line: Mark it once, and it shows on the patient's page.
+---
+
+## What does Start free include?
+
+You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
+
+## Can I sell a pack of 10 sessions?
+
+Yes, sell a pack of 10 sessions at one price at the desk. One comes off each time they book, and the pack ends on the date you choose.
+
+## Can a patient choose their physio?
+
+Yes. When more than one physio does a service, your booking page offers Anyone or a named person, with only their free times.
+
+## How do patients pay?
+
+By UPI or card when they book or from a payment link, straight into your own Razorpay or Cashfree account. Cash at the desk works too, and every payment gets a bill.

@@ -61,6 +61,19 @@ describe("the form's checks", () => {
         expect(res.error?.issues[0]?.message).toBe("Choose who it's for");
     });
 
+    it("says what a GSTIN looks like, after trimming and upper-casing", () => {
+        const bad = invoiceFormSchema.safeParse(
+            values({ billToGstin: "29AB" }),
+        );
+        expect(bad.error?.issues.map((i) => i.message)).toEqual([
+            "A GSTIN is 15 characters, like 29AAGCR4375J1ZU",
+        ]);
+        const good = invoiceFormSchema.safeParse(
+            values({ billToGstin: " 29aaaaa0000a1zy " }),
+        );
+        expect(good.data?.billToGstin).toBe("29AAAAA0000A1ZY");
+    });
+
     it("says what is wrong with a line, field by field", () => {
         const res = invoiceFormSchema.safeParse(
             values({

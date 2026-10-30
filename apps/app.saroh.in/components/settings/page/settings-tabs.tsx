@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation";
 
 import { SETTINGS_PAGES } from "@/components/shared/navigation/nav-items";
-import { SectionList } from "@/components/shared/page/section-list";
 import { settingsPageLabel } from "@/lib/settings/search";
+import { SectionList } from "@saroh/ui/section-list";
 
 /**
  * The settings screen's tabs ("Saroh Settings" design): Business, Team,

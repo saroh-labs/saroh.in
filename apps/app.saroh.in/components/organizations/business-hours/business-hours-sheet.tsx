@@ -4,7 +4,6 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import type { UndoOutcome } from "@/components/organizations/business-settings/use-settings-undo";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     DEFAULT_WEEK,
     OpeningHoursFields,
@@ -20,6 +19,7 @@ import type {
     OpeningHoursDay,
     StorefrontHours,
 } from "@/lib/stores/storefronts";
+import { FormSheet } from "@saroh/ui/form-sheet";
 
 const WORDS = sheetWords("hours", { kind: undefined, registered: false });
 

@@ -53,6 +53,28 @@ export const LINK_PREVIEW_SOURCE = "link-preview";
 /** The `source` of an entry the QR code maker's email gate made (QR codes plan U9). */
 export const QR_MAKER_SOURCE = "qr-maker";
 
+/**
+ * The `source` of an entry another free tool's email gate made (#1253):
+ * `tool:<slug>`, the slug one the gate's allow-list holds
+ * (`tools/tool-names.ts`). The QR code maker keeps its own.
+ */
+export const TOOL_SOURCE_PREFIX = "tool:";
+
+/** The `source` the email gate stores for this tool (none: the QR code maker). */
+export function toolGateSource(slug?: string): string {
+    return !slug || slug === "qr-code-maker"
+        ? QR_MAKER_SOURCE
+        : `${TOOL_SOURCE_PREFIX}${slug}`;
+}
+
+/** An entry an email gate made: the QR code maker's or another tool's. */
+export function isToolGateSource(source: string | null | undefined): boolean {
+    return (
+        source === QR_MAKER_SOURCE ||
+        (source?.startsWith(TOOL_SOURCE_PREFIX) ?? false)
+    );
+}
+
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
 /**

@@ -196,6 +196,7 @@ describe("robots.txt", () => {
             "/api/",
             "/pricing/draft",
             "/pricing/preview",
+            "/_build/",
         ]);
     });
 });

@@ -431,6 +431,32 @@ describe("a profile's page", () => {
         expect(page.invoices[0]!.pdfPath).toBeNull();
         expect(page.payingFor[0]).toMatchObject({ owner: false });
     });
+
+    it("names who owns a business it pays for when the caller doesn't (audit 28 Oct)", async () => {
+        const asha = await person();
+        const pulse = await profileOf(asha.id);
+        const shop = await business(asha.id, pulse.id, "ADMIN");
+        const ravi = await person("Ravi Kumar");
+        await prisma.membership.create({
+            data: { organizationId: shop.id, userId: ravi.id, role: "OWNER" },
+        });
+        const page = await account.detail(asha.id, pulse.id);
+        expect(page.payingFor[0]).toMatchObject({
+            owner: false,
+            ownerName: "Ravi Kumar",
+        });
+        const mine = await business(
+            asha.id,
+            pulse.id,
+            "OWNER",
+            "Asha's Studio",
+        );
+        const again = await account.detail(asha.id, pulse.id);
+        expect(again.payingFor.find((b) => b.id === mine.id)).toMatchObject({
+            owner: true,
+            ownerName: null,
+        });
+    });
 });
 
 describe("edit and add", () => {

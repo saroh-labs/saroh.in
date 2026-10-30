@@ -9,17 +9,13 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import {
     addNoteAction,
     deleteNoteAction,
 } from "@/lib/customer-workspace/actions";
 import type { DetailNote } from "@/lib/customer-workspace/detail";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 import { runAction } from "@/lib/api/run-action";
 import { Empty } from "./parts";

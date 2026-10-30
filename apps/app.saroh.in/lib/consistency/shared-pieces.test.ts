@@ -60,10 +60,8 @@ function stale(pattern: RegExp, allow: Record<string, string>) {
 
 describe("one of each small piece", () => {
     it("no hand-rolled tab strip: role=tablist belongs to TabStrip", () => {
-        const allow = {
-            "components/shared/page/section-list.tsx":
-                "the one vertical list of sections, shared by Settings and Website › Settings",
-        };
+        // SectionList, the one vertical list, lives in @saroh/ui.
+        const allow = {};
         const pattern = /role="tablist"/;
         expect(offenders(pattern, allow)).toEqual([]);
         expect(stale(pattern, allow)).toEqual([]);

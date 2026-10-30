@@ -6,15 +6,12 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { ChipGroup, RadioCards } from "@/components/shared/fields/choice-group";
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { payOf } from "@/lib/gst/on-price";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
+import { ChipGroup, RadioCards } from "@saroh/ui/choice-group";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 
 export type Step = "pause" | "switch" | "cancel";
 

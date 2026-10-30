@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { focusRing } from "../booking-flow/styles";
@@ -108,7 +108,21 @@ export interface MeProps {
     api: MeApi;
 }
 
-type Open = "details" | "email" | "note" | null;
+type Open = "details" | "email" | "phone" | "note" | null;
+
+/** Where "Not now" on the WhatsApp ask is kept, in this browser. */
+export const PHONE_ASK_DISMISSED_KEY = "saroh:phone-ask-dismissed";
+
+// Nothing to listen to: only this page writes it.
+const noStore = () => () => undefined;
+
+function readAskDismissed(): boolean {
+    try {
+        return window.localStorage.getItem(PHONE_ASK_DISMISSED_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
 
 export function Me({
     account: initial,
@@ -138,6 +152,43 @@ export function Me({
                     : "general")
         ];
     const contact = [account.phone, account.email].filter(Boolean).join(" · ");
+    // How they sign in (DEC-196): an email, a WhatsApp number, or both.
+    const signIn = [
+        account.email,
+        account.signInPhone ? `WhatsApp ${account.signInPhone}` : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    // A number can be added while the site signs in by WhatsApp.
+    const phoneAdd = api.phoneAdd;
+    const canAddPhone =
+        phoneAdd !== undefined && (options.ways ?? []).includes("WHATSAPP");
+    // The "Signing in" row only when WhatsApp is part of it; an email-only
+    // account keeps the one row it always had (email shown once).
+    const signInRow = canAddPhone || !!account.signInPhone || !account.email;
+    // Email is off and they signed in with it ("Signed up with email?",
+    // DEC-196): asked once to add a number, so they never sign up twice.
+    // Drawn on the server as dismissed; the browser reads its own "Not now".
+    const dismissedBefore = useSyncExternalStore(
+        noStore,
+        readAskDismissed,
+        () => true,
+    );
+    const [dismissedNow, setDismissedNow] = useState(false);
+    const askPhone =
+        canAddPhone &&
+        !dismissedBefore &&
+        !dismissedNow &&
+        !account.signInPhone &&
+        !(options.ways ?? []).includes("EMAIL");
+    function dismissAsk() {
+        setDismissedNow(true);
+        try {
+            window.localStorage.setItem(PHONE_ASK_DISMISSED_KEY, "1");
+        } catch {
+            // Asked again next visit: no harm.
+        }
+    }
 
     async function signOut(everywhere: boolean) {
         if (signingOut) return;
@@ -171,6 +222,35 @@ export function Me({
                 </p>
             ) : null}
 
+            {askPhone ? (
+                <AccountCard
+                    labelledBy="me-phone-ask"
+                    title="Add your WhatsApp number"
+                    lead={`${account.businessName} now signs you in with a code on WhatsApp.`}
+                    actions={
+                        <>
+                            <button
+                                type="button"
+                                className={buttonClasses(true)}
+                                onClick={() => {
+                                    dismissAsk();
+                                    setOpen("phone");
+                                }}
+                            >
+                                Add WhatsApp number
+                            </button>
+                            <button
+                                type="button"
+                                className={quietButton}
+                                onClick={dismissAsk}
+                            >
+                                Not now
+                            </button>
+                        </>
+                    }
+                />
+            ) : null}
+
             <AccountCard labelledBy="me-details" title="Name and contact">
                 <AccountRow
                     title={account.name ?? "Add your name"}
@@ -184,16 +264,48 @@ export function Me({
                             >
                                 Edit
                             </button>
-                            <button
-                                type="button"
-                                className={smallButton}
-                                onClick={() => setOpen("email")}
-                            >
-                                Change email
-                            </button>
+                            {signInRow ? null : (
+                                <button
+                                    type="button"
+                                    className={smallButton}
+                                    onClick={() => setOpen("email")}
+                                >
+                                    Change email
+                                </button>
+                            )}
                         </>
                     }
                 />
+                {signInRow ? (
+                    <AccountRow
+                        title="Signing in"
+                        sub={signIn}
+                        actions={
+                            <>
+                                <button
+                                    type="button"
+                                    className={smallButton}
+                                    onClick={() => setOpen("email")}
+                                >
+                                    {account.email
+                                        ? "Change email"
+                                        : "Add email"}
+                                </button>
+                                {canAddPhone ? (
+                                    <button
+                                        type="button"
+                                        className={smallButton}
+                                        onClick={() => setOpen("phone")}
+                                    >
+                                        {account.signInPhone
+                                            ? "Change WhatsApp number"
+                                            : "Add WhatsApp number"}
+                                    </button>
+                                ) : null}
+                            </>
+                        }
+                    />
+                ) : null}
             </AccountCard>
 
             {account.healthNotes && notes ? (
@@ -272,7 +384,8 @@ export function Me({
                 )}
             </AccountCard>
 
-            {notices ? (
+            {/* No email to send to: a phone-only account (DEC-196). */}
+            {notices && account.email ? (
                 <EmailChoice
                     notices={notices}
                     account={account}
@@ -360,18 +473,47 @@ export function Me({
             />
             <SignInSheet
                 open={open === "email"}
-                purpose="change-email"
+                purpose={account.email ? "change-email" : "add-email"}
                 onClose={() => setOpen(null)}
                 options={options}
                 api={api.emailChange}
                 onSignedIn={(customer) => {
+                    const added = !account.email;
                     setAccount((a) => ({ ...a, email: customer.email }));
                     setSaid(
-                        "Done. Use that email to sign in from now on. Other devices are signed out.",
+                        added
+                            ? "Done. You can sign in with that email too."
+                            : "Done. Use that email to sign in from now on. Other devices are signed out.",
                     );
                     router.refresh();
                 }}
             />
+            {phoneAdd ? (
+                <SignInSheet
+                    open={open === "phone"}
+                    purpose="add-phone"
+                    onClose={() => setOpen(null)}
+                    options={options}
+                    api={{
+                        // The sheet asks only for the number here.
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        ...phoneAdd,
+                    }}
+                    onSignedIn={(customer) => {
+                        setAccount((a) => ({
+                            ...a,
+                            signInPhone: customer.signInPhone ?? a.signInPhone,
+                        }));
+                        setSaid(
+                            "Done. You can sign in with a code on WhatsApp too.",
+                        );
+                        router.refresh();
+                    }}
+                />
+            ) : null}
             <NoteSheet
                 open={open === "note"}
                 title={words.sheet}

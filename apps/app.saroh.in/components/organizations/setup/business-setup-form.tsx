@@ -1,8 +1,8 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormField, FormItem } from "@saroh/ui/form";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { useRouter } from "next/navigation";
 import {
     useEffect,

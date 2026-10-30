@@ -6,7 +6,7 @@ import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
-import { FormDialog } from "./form-dialog";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 /**
  * The one-field dialog a list you manage adds and renames with: a new

@@ -20,7 +20,6 @@ import {
 import type { ReactNode } from "react";
 
 import { mayChangeWho } from "@/components/bookings/sheets/change-who";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
@@ -42,6 +41,7 @@ import {
     visitLabel,
     visitsDoneText,
 } from "@/lib/services/treatment";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 import type { MoreRow } from "./quick-look-more";
 import { QuickLookMore } from "./quick-look-more";

@@ -118,7 +118,8 @@ test.describe("Billing profiles in the account (DEC-167 step 2)", () => {
                 .click();
             await expect(dialog).toBeVisible({ timeout: 2_000 });
         }).toPass();
-        await dialog.getByText(n.second, { exact: true }).click();
+        // Choices read "legal name (billing email)" (DEC-199).
+        await dialog.getByRole("radio", { name: n.second }).click();
         await expect(dialog).toContainText("It moves now.");
         await dialog.getByRole("button", { name: "Move now" }).click();
         await expect(dialog).toBeHidden();

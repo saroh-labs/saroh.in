@@ -545,6 +545,7 @@ export class CustomerDetailService {
                     where: { status: { in: ["ACTIVE", "BLOCKED"] } },
                     select: {
                         email: true,
+                        phoneE164: true,
                         status: true,
                         linkedAt: true,
                         lastSignedInAt: true,

@@ -16,8 +16,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
 import { ReleaseLinks } from "@/components/sites/test-releases/release-links";
 import { runAction } from "@/lib/api/run-action";
@@ -35,6 +34,8 @@ import {
     cancelScheduledGoLive,
     discardTestRelease,
 } from "@/lib/sites/test-releases-actions";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 const BADGE = {
     success: "success",
@@ -73,6 +74,11 @@ export function ReleaseRow({
     onGoLive: (release: TestRelease, mode: "now" | "schedule") => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
+    /*
+     * Read-only (DEC-200): the Review link alone. Open makes a preview
+     * token, and the links, going live and discarding are the owner's.
+     */
+    const readOnly = useEditorReadOnly();
     const [discarding, setDiscarding] = useState(false);
     const status = releaseStatusCopy(release, zone);
     const standing = standingCopy(release.standing);
@@ -167,7 +173,7 @@ export function ReleaseRow({
                 </ul>
             ) : null}
 
-            {current ? (
+            {current && !readOnly ? (
                 <ReleaseLinks
                     siteId={siteId}
                     release={release}
@@ -180,18 +186,20 @@ export function ReleaseRow({
             {current ? (
                 <div className="grid gap-1.5">
                     <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={busy !== null}
-                            onClick={() => void open()}
-                            busy={busy === "open"}
-                            busyLabel="Opening…"
-                        >
-                            <ExternalLink aria-hidden className="size-4" />
-                            Open
-                        </Button>
+                        {readOnly ? null : (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={busy !== null}
+                                onClick={() => void open()}
+                                busy={busy === "open"}
+                                busyLabel="Opening…"
+                            >
+                                <ExternalLink aria-hidden className="size-4" />
+                                Open
+                            </Button>
+                        )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
                                 href={`/sites/${siteId}/releases/${release.id}`}
@@ -203,7 +211,7 @@ export function ReleaseRow({
                                 Review
                             </Link>
                         </Button>
-                        {release.status === "scheduled" ? (
+                        {readOnly ? null : release.status === "scheduled" ? (
                             can.canPublish ? (
                                 <Button
                                     type="button"
@@ -273,7 +281,9 @@ export function ReleaseRow({
                         ) : null}
                     </div>
                     {/* Why Go live is off, or what it would leave behind. */}
-                    {gate.kind !== "go" && release.status === "ready" ? (
+                    {!readOnly &&
+                    gate.kind !== "go" &&
+                    release.status === "ready" ? (
                         <p
                             className={cn(
                                 "text-[12px] leading-normal",

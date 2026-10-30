@@ -11,8 +11,13 @@
  * downloaded in the page, and the email only says where the page is.
  */
 
-/** The tool on saroh.in (the canonical host). */
-export const QR_MAKER_URL = "https://www.saroh.in/tools/qr-code-maker";
+import { TOOL_NAMES } from "./tool-names";
+
+/** The free tools on saroh.in (the canonical host). */
+export const TOOLS_URL = "https://www.saroh.in/tools";
+
+/** The QR code maker on saroh.in. */
+export const QR_MAKER_URL = `${TOOLS_URL}/qr-code-maker`;
 
 /** Every email has the same subject. */
 export const QR_MAKER_SUBJECT = "Your link back to the QR code maker";
@@ -30,4 +35,33 @@ export function qrMakerEmailText(): string {
         "",
         "Saroh",
     ].join("\n");
+}
+
+/**
+ * Every other free tool's email (#1253): the same shape, naming the tool.
+ * The slug is one the DTO already held to {@link TOOL_NAMES}, and the name
+ * and link come from that list, never the request, so this carries nothing
+ * a visitor chose. No slug, or the QR code maker's, is the email above.
+ */
+export function toolEmail(slug?: string): { subject: string; text: string } {
+    if (!slug || slug === "qr-code-maker") {
+        return { subject: QR_MAKER_SUBJECT, text: qrMakerEmailText() };
+    }
+    const name = TOOL_NAMES[slug];
+    if (!name) throw new Error(`no free tool "${slug}"`);
+    return {
+        subject: `${name}: your link back`,
+        text: [
+            "Here's the link back to the tool you used on saroh.in:",
+            "",
+            name,
+            `${TOOLS_URL}/${slug}`,
+            "",
+            "What you typed stayed in your browser, so we never received it, and it isn't in this email. Open the tool to use it again.",
+            "",
+            "You asked for this on saroh.in. We won't send you anything else unless you ask.",
+            "",
+            "Saroh",
+        ].join("\n"),
+    };
 }

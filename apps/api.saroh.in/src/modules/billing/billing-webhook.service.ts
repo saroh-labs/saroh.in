@@ -16,6 +16,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { CommissionQueue } from "../commission/commission-queue";
+import { creditInTx } from "../messaging/wallet.service";
 import type { EndedAddons } from "./addon-charges";
 import {
     clearAddonsInTx,
@@ -220,6 +221,14 @@ export class BillingWebhookService {
                       select: { id: true, organizationId: true },
                   })
                 : null;
+            // A messaging top-up's order (#1241): neither of the above.
+            const topup =
+                subId && !subscription && !checkout
+                    ? await tx.messagingTopup.findFirst({
+                          where: { provider: name, providerOrderId: subId },
+                          select: { id: true, organizationId: true },
+                      })
+                    : null;
 
             // Insert-or-nothing: a caught unique violation would abort the
             // transaction, so a duplicate is read from the count.
@@ -232,6 +241,7 @@ export class BillingWebhookService {
                         organizationId:
                             subscription?.organizationId ??
                             checkout?.organizationId ??
+                            topup?.organizationId ??
                             null,
                         payload: payload as Prisma.InputJsonValue,
                     },
@@ -254,6 +264,8 @@ export class BillingWebhookService {
                 );
             } else if (checkout) {
                 outcome = await this.onCheckout(tx, checkout, event, now);
+            } else if (topup) {
+                outcome = await this.onTopup(tx, topup.id, event, now);
             } else {
                 // No business (DEC-166): a refund or dispute is kept; an
                 // unmatched charge is raised and left not applied.
@@ -369,6 +381,85 @@ export class BillingWebhookService {
             await this.afterCheckoutCommit(checkoutId, event);
         }
         return outcome.result;
+    }
+
+    /**
+     * {@link reconcileCheckout} for a messaging top-up (#1241): what the
+     * provider says of its order, asked when the owner comes back from
+     * paying, applied by the webhook's own rule.
+     */
+    async reconcileTopup(
+        topupId: string,
+        event: ParsedBillingEvent,
+        now: Date = new Date(),
+    ): Promise<BillingWebhookResult> {
+        const outcome = await prisma.$transaction((tx) =>
+            this.onTopup(tx, topupId, event, now),
+        );
+        return outcome.result;
+    }
+
+    // ── A messaging top-up's order (#1241) ──────────────────────────────
+
+    /**
+     * Paid: the wallet is credited the pack's amount (its validity reset),
+     * the top-up is PAID and Saroh's invoice written, all on this
+     * transaction. Only a PENDING top-up moves, under its row lock, so a
+     * replayed event or the owner's return after the webhook credits
+     * nothing more. Cancelled or halted: FAILED, never credited.
+     */
+    private async onTopup(
+        tx: Tx,
+        topupId: string,
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<Outcome> {
+        const ignored: Outcome = {
+            result: { status: "ignored", changed: false },
+        };
+        await tx.$queryRaw`SELECT "id" FROM "MessagingTopup" WHERE "id" = ${topupId} FOR UPDATE`;
+        const topup = await tx.messagingTopup.findUnique({
+            where: { id: topupId },
+        });
+        if (!topup) return ignored;
+        const phase = event.phase ?? "other";
+        const paid = PAID_PHASES.includes(phase);
+        if (topup.status !== "PENDING") {
+            if (paid && topup.status === "FAILED") {
+                this.logger.error(
+                    `messaging_topup_paid_after_failed topup=${topup.id} org=${topup.organizationId}`,
+                );
+            }
+            return ignored;
+        }
+        if (paid) {
+            await creditInTx(tx, topup.organizationId, topup.amountPaise, {
+                topupId: topup.id,
+            });
+            const invoiceId =
+                (await this.invoices?.invoiceTopupInTx(tx, {
+                    topup,
+                    event,
+                    now,
+                })) ?? null;
+            await tx.messagingTopup.update({
+                where: { id: topup.id },
+                data: {
+                    status: "PAID",
+                    paidAt: now,
+                    sarohInvoiceId: invoiceId,
+                },
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        if (ENDED_PHASES.includes(phase) || phase === "halted") {
+            await tx.messagingTopup.update({
+                where: { id: topup.id },
+                data: { status: "FAILED" },
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        return ignored;
     }
 
     private async recordCompleted(c: Completed | undefined): Promise<void> {

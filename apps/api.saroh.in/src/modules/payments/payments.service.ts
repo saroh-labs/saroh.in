@@ -27,6 +27,7 @@ import {
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
+import { hashPayToken } from "../invoices/pay-token";
 import { queueProviderBack } from "../notifications/provider-alerts";
 import { assertWithinOrderLeftInTx } from "../orders/hand-refund";
 import {
@@ -2157,10 +2158,19 @@ export class PaymentsService {
      * the latest intent's status. NO secrets, NO internal ids. Anonymous (no
      * session): a buyer polls this after paying to see PAID/UNPAID/FAILED/
      * REFUNDED once the webhook reconciler (S5-003) moves the order.
+     *
+     * The order's id alone is not enough (pentest 29 Oct): the caller must
+     * hold the order's pay-link token, the one credential its customer is
+     * given. A wrong token reads as a missing order, so neither says which
+     * orders exist. The token is cleared when the order is paid online, so
+     * from then on the pay page and the customer's account show the order.
      */
-    async getReceipt(orderId: string): Promise<PublicReceiptResult> {
+    async getReceipt(
+        orderId: string,
+        token: string,
+    ): Promise<PublicReceiptResult> {
         const order = await prisma.order.findUnique({
-            where: { id: orderId },
+            where: { payTokenHash: hashPayToken(token), id: orderId },
             select: {
                 orderId: true,
                 subtotal: true,

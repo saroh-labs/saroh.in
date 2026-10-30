@@ -20,6 +20,8 @@ const mk = (name: string) => `hsl(var(--mk-${name}) / <alpha-value>)`;
 
 const config: Config = {
     ...sharedConfig,
+    // lib/ring.ts spells out the focus ring's classes (DEC-195, C1).
+    content: [...(sharedConfig.content as string[]), "./lib/ring.ts"],
     theme: {
         ...sharedConfig.theme,
         extend: {
@@ -68,7 +70,7 @@ const config: Config = {
              * The design's type scale. Display sizes are fluid, as drawn;
              * each carries its tracking, and its line height where the design
              * sets one. Where the design sets none, the text takes the V2
-             * shell's `line-height: normal` (app/(v2)/layout.tsx), as the
+             * shell's `line-height: normal` (app/(site)/layout.tsx), as the
              * design's own page does.
              */
             fontSize: {
@@ -105,10 +107,23 @@ const config: Config = {
                     "clamp(42px, 5.6vw, 68px)",
                     { lineHeight: "1", letterSpacing: "-0.045em" },
                 ],
+                // Page titles (DEC-195, V6): an index page (Help, Changelog,
+                // Integrations, Templates) and an article (an entry, a help
+                // article, an integration, a template, legal, the tools).
+                "mk-page": [
+                    "clamp(36px, 6vw, 60px)",
+                    { lineHeight: "1.02", letterSpacing: "-0.045em" },
+                ],
+                "mk-article": [
+                    "clamp(34px, 6vw, 48px)",
+                    { lineHeight: "1.02", letterSpacing: "-0.04em" },
+                ],
                 "mk-h2-xs": [
                     "clamp(28px, 3vw, 34px)",
                     { letterSpacing: "-0.03em" },
                 ],
+                // An H2 inside an article's column (an integration page).
+                "mk-h2-article": ["26px", { letterSpacing: "-0.02em" }],
                 "mk-card-lg": ["22px", { letterSpacing: "-0.02em" }],
                 "mk-card": ["21px", { letterSpacing: "-0.02em" }],
                 "mk-lead": ["19px", { lineHeight: "1.6" }],
@@ -129,6 +144,9 @@ const config: Config = {
             },
             maxWidth: {
                 "mk-page": "1280px",
+                // Reading columns (DEC-195, V7), gutter included as mk-page's.
+                "mk-article": "760px",
+                "mk-list": "900px",
             },
             borderRadius: {
                 ...(shared.borderRadius as Record<string, string>),

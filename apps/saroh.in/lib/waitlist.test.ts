@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { HERO_KINDS, WAITLIST, WAITLIST_KINDS } from "@/content/waitlist";
 
@@ -87,7 +88,8 @@ describe("waitlistSchema", () => {
             city: "",
         });
         expect(result.success).toBe(false);
-        const messages = result.error?.flatten().fieldErrors;
+        const messages =
+            result.error && z.flattenError(result.error).fieldErrors;
         expect(messages?.business).toEqual([WAITLIST_MESSAGES.business]);
         expect(messages?.kind).toEqual([WAITLIST_MESSAGES.kind]);
         expect(messages?.email).toEqual([WAITLIST_MESSAGES.email]);

@@ -7,8 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import {
     disconnectCommsProvider,
     disconnectPaymentProvider,
@@ -24,6 +22,8 @@ import type {
     ConnectedPaymentProvider,
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import type { StatusTone } from "@/components/shared/lists/status-badge";

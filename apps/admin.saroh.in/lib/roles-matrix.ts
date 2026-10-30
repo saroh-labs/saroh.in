@@ -192,6 +192,11 @@ export const MATRIX_AREAS: readonly MatrixAreaDef[] = [
                 change: ["flags:publish"],
             },
             {
+                key: "search-pages",
+                label: "Publish search pages on the website",
+                change: ["search-pages:publish"],
+            },
+            {
                 key: "deployments",
                 label: "Deploy Saroh's apps",
                 change: ["deployments:run"],

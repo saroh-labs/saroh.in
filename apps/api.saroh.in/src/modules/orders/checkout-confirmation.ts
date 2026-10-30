@@ -330,7 +330,9 @@ export class CheckoutConfirmationService {
                         select: { email: true },
                     }),
                 ]);
-                return account ? { reach, email: account.email } : { reach };
+                return account?.email
+                    ? { reach, email: account.email }
+                    : { reach };
             });
         } catch {
             return {};

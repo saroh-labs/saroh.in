@@ -16,15 +16,16 @@ import type { QrMakerUnlock } from "./qr-maker-gate.service";
 import { QrMakerGateService } from "./qr-maker-gate.service";
 
 /**
- * PUBLIC: the QR code maker's email gate (QR codes plan U9), what
- * saroh.in's `/api/qr-code-maker/unlock` forwards to, server to server. No
+ * PUBLIC: the free tools' email gate (QR codes plan U9; every tool since
+ * #1253, by an optional `tool` slug), what saroh.in's `/api/tools/unlock`
+ * forwards to, server to server. The path is still the QR code maker's. No
  * account: a stranger uses the tool before one exists. Only saroh.in's
  * server may call it — {@link SiteRelayGuard} refuses (401) a request
  * without a valid signed `x-saroh-relay` — so nobody can call the API
  * directly to skip the site, or pick the address their limits count.
  *
  * The code itself is drawn and downloaded in the visitor's browser; this
- * route takes an email and nothing else. The limits count the relayed
+ * route takes an email and a tool's slug, and nothing else. The limits count the relayed
  * visitor, per process: 5 a minute (the link preview unlock's) and 30 an
  * hour. The emails' own caps are durable, in the gate.
  */
@@ -50,6 +51,10 @@ export class QrMakerController {
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
-        return this.gate.unlock({ email: dto.email, ipHash: key });
+        return this.gate.unlock({
+            email: dto.email,
+            tool: dto.tool,
+            ipHash: key,
+        });
     }
 }

@@ -14,8 +14,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
     confirmAttentionAction,
@@ -45,6 +43,8 @@ import {
 } from "@/lib/customer-workspace/attention";
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { CheckRow } from "@saroh/ui/check-row";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 
 interface Choice {

@@ -10,7 +10,9 @@ import {
 
 import {
     loadSignInOptions,
+    requestPhoneSignInCode,
     requestSignInCode,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
 
@@ -82,6 +84,8 @@ export default async function ShopOrderPage({
                     api={{
                         requestCode: requestSignInCode,
                         verifyCode: verifySignInCode,
+                        requestPhoneCode: requestPhoneSignInCode,
+                        verifyPhoneCode: verifyPhoneSignInCode,
                     }}
                     loadOptions={loadSignInOptions}
                 />

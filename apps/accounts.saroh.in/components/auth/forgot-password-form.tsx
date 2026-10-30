@@ -1,8 +1,10 @@
 "use client";
 
+import { CODE_CHALLENGE_HEADER } from "@saroh/auth/constants";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import {
     AuthError,
     AuthField,
@@ -10,7 +12,7 @@ import {
     AuthHeading,
     AuthSubmit,
 } from "@/components/auth/field";
-import { authFailureCopy, settle } from "@/lib/auth-error-copy";
+import { authErrorCode, authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import Link from "next/link";
 
@@ -32,21 +34,35 @@ export function ForgotPasswordForm() {
     const [email, setEmail] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // Past the address's hourly cap the API asks for the bot check first.
+    const [challenge, setChallenge] = useState(false);
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        void askForLink();
+    }
+
+    async function askForLink(turnstileToken?: string) {
         setError(null);
+        setChallenge(false);
         setIsLoading(true);
         const redirectTo =
             typeof window !== "undefined"
                 ? `${window.location.origin}/reset-password`
                 : undefined;
         const { error: err } = await settle(() =>
-            requestPasswordReset({ email, redirectTo }),
+            requestPasswordReset({
+                email,
+                redirectTo,
+                fetchOptions: turnstileToken
+                    ? { headers: { [CODE_CHALLENGE_HEADER]: turnstileToken } }
+                    : undefined,
+            }),
         );
         setIsLoading(false);
         if (err) {
             setError(authFailureCopy(err));
+            setChallenge(authErrorCode(err) === "CHALLENGE");
             return;
         }
         router.push(`/forgot-password/sent?email=${encodeURIComponent(email)}`);
@@ -72,6 +88,11 @@ export function ForgotPasswordForm() {
                     required
                     disabled={isLoading}
                 />
+                {challenge ? (
+                    <CodeChallenge
+                        onToken={(token) => void askForLink(token)}
+                    />
+                ) : null}
                 <AuthSubmit disabled={isLoading}>
                     {isLoading ? "Sending…" : "Send the link"}
                 </AuthSubmit>

@@ -15,7 +15,6 @@ import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
 import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {
     OrderFilterOptions,
     OrderListPage,
@@ -27,6 +26,7 @@ import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
 import type { OrderPlace } from "@/lib/stores/abilities";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";

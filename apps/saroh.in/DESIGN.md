@@ -66,9 +66,10 @@ sideways.
 
 ## Components
 
-V2 components live in `components/v2/`: nav and footer, buttons and CTA links,
-cards, pills, the screenshot frame and lightbox, FAQ, CTA band, and the
-per-page parts (`home/`, `feature/`, `solution/`, `pricing/`, `waitlist/`).
+Components live in `components/`: the shared pieces in `components/shared/`
+(nav and footer, buttons and CTA links, cards, pills, the screenshot frame and
+lightbox, FAQ, CTA band), and the per-page parts (`home/`, `feature/`,
+`solution/`, `pricing/`, `waitlist/`).
 Words live in `content/`, never in a component. Screenshots come from the
 manifest in `content/shots.ts`, each with alt text.
 

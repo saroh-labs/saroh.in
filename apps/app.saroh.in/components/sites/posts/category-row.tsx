@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { NameDialog } from "@/components/shared/forms/name-dialog";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * One category in a list you manage: its name, a line about it, and the two

@@ -38,14 +38,14 @@ const envSchema = z.object({
 
     // Data (REQUIRED — the one true prerequisite; the api cannot serve any
     // request without a database).
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL: z.url(),
     // Auth secret: REQUIRED in production, OPTIONAL elsewhere. When unset in
     // dev/test the @saroh/auth layer (resolveAuthSecret) supplies a fixed,
     // insecure dev fallback with a warning, so a fresh clone boots with just
     // DATABASE_URL. Must be byte-identical across the api + session-validating
     // apps in any shared environment.
     BETTER_AUTH_SECRET: z.string().min(1).optional(),
-    BETTER_AUTH_URL: z.string().url().optional(),
+    BETTER_AUTH_URL: z.url().optional(),
     BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
 
     // OAuth providers (optional — email/password works without them).
@@ -56,24 +56,24 @@ const envSchema = z.object({
 
     // CORS + links.
     CORS_ORIGIN: z.string().optional(),
-    APP_URL: z.string().url().optional(),
+    APP_URL: z.url().optional(),
     // The merchant-site renderer's own address (saroh.app), for links a
     // customer opens there — product review invitations. Unset: the local
     // renderer in development, the production one everywhere else.
-    RENDERER_URL: z.string().url().optional(),
+    RENDERER_URL: z.url().optional(),
     // The sign-in app's own address (accounts), for links someone opens to
     // create their account — waitlist invitations. Unset: the local accounts
     // app in development, and no invitation link anywhere else.
-    ACCOUNTS_URL: z.string().url().optional(),
+    ACCOUNTS_URL: z.url().optional(),
     // The admin console's own address, for links staff open from an email —
     // a manager's daily list of quiet businesses. Unset: the local admin app
     // in development, and no links anywhere else.
-    ADMIN_URL: z.string().url().optional(),
+    ADMIN_URL: z.url().optional(),
     // The API's own public address (e.g. https://api.saroh.in), which payment
     // providers send webhooks to. Merchants paste the address built from it
     // into their Razorpay dashboard, so it must stay stable. Unset: setup shows
     // no webhook address and says so (DEC-063); nothing is guessed.
-    API_PUBLIC_URL: z.string().url().optional(),
+    API_PUBLIC_URL: z.url().optional(),
 
     // Object storage (S2-008 — media uploads via @saroh/object-storage).
     // All optional: when the R2 credentials below are absent the media module
@@ -128,7 +128,7 @@ const envSchema = z.object({
     // `<PRICING_SITE_URL>/api/revalidate` with the secret in `x-saroh-revalidate`. Both unset:
     // nothing is queued, and saroh.in picks the change up on its ISR timer.
     // The secret is byte-identical in saroh.in. Never logged.
-    PRICING_SITE_URL: z.string().url().optional(),
+    PRICING_SITE_URL: z.url().optional(),
     PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
     // saroh.in is static: a publish starts its build instead (plans catalogue
     // KTD-10). A fine-grained GitHub token allowed only to run this repo's
@@ -177,7 +177,7 @@ const envSchema = z.object({
     TURNSTILE_SECRET_KEY: z.string().optional(),
     // The code email's own sending address and stream, apart from workspace
     // sign-in mail. The SMTP_* set below is the fallback transport.
-    SITE_CODES_EMAIL_FROM: z.string().email().optional(),
+    SITE_CODES_EMAIL_FROM: z.email().optional(),
     SITE_CODES_SMTP_HOST: z.string().optional(),
     SITE_CODES_SMTP_PORT: z.string().optional(),
     SITE_CODES_SMTP_USER: z.string().optional(),
@@ -190,6 +190,38 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+    // Saroh's own MSG91 account (DEC-191): the platform sender of customer
+    // verification codes on WhatsApp, never a merchant's credentials. The
+    // auth key, the integrated WhatsApp number and the approved
+    // authentication template's name. Unset (any of the three) outside
+    // production, codes go to the in-memory fake
+    // (`messaging/providers/messaging-provider.factory.ts`); in production a
+    // send fails, naming the missing variable. The key is never logged.
+    // docs/architecture/MESSAGING_MSG91.md lists every name below.
+    MSG91_AUTH_KEY: z.string().optional(),
+    MSG91_WHATSAPP_NUMBER: z.string().optional(),
+    MSG91_WHATSAPP_TEMPLATE: z.string().optional(),
+    // Approved WhatsApp utility templates: `key=msg91_name` pairs, comma
+    // separated. Callers name the key; an unknown key is refused.
+    MSG91_WHATSAPP_UTILITY_TEMPLATES: z.string().optional(),
+    // The OTP widget (SMS codes until Saroh's own DLT): its id and token are
+    // public client config the browser loads the widget with.
+    MSG91_WIDGET_ID: z.string().optional(),
+    MSG91_WIDGET_TOKEN: z.string().optional(),
+    // Which adapter sends: `msg91` or `fake` (the fake only in development
+    // and test). Unset, MSG91 when configured, else the fake in dev/test.
+    MESSAGING_PROVIDER: z.enum(["msg91", "fake"]).optional(),
+    // A 32-byte AES-256-GCM key (base64 or 64-hex) sealing a queued
+    // WhatsApp send's number and words until the provider accepts it (a
+    // retry). Its own key, never the payments one. Development and test
+    // fall back to a public value; elsewhere a send fails naming it.
+    MESSAGING_ENC_KEY: z.string().optional(),
+    // TEST ONLY in practice: where MSG91 calls go instead of its own API.
+    MSG91_BASE_URL: z.url().optional(),
+    // A long random secret the owner also adds as the `x-saroh-webhook-secret`
+    // header in MSG91's webhook settings; delivery reports without it are
+    // refused (`messaging/msg91-webhook.controller.ts`). Unset, all are.
+    MSG91_WEBHOOK_SECRET: z.string().min(32).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
@@ -270,7 +302,7 @@ const envSchema = z.object({
     // The registered address printed on the paper, one line.
     SAROH_REGISTERED_ADDRESS: z.string().optional(),
     // The contact address printed on the paper and the billing email's reply-to.
-    SAROH_BILLING_EMAIL: z.string().email().optional(),
+    SAROH_BILLING_EMAIL: z.email().optional(),
     // The SAC printed against each line.
     SAROH_INVOICE_SAC: z
         .string()
@@ -325,7 +357,7 @@ const envSchema = z.object({
         .string()
         .regex(/^phc_[A-Za-z0-9]+$/)
         .optional(),
-    POSTHOG_HOST: z.string().url().optional(),
+    POSTHOG_HOST: z.url().optional(),
     POSTHOG_ENVIRONMENT: z.enum(["development", "production"]).optional(),
 
     npm_package_version: z.string().optional(),
@@ -356,7 +388,7 @@ const checkedSchema = envSchema.superRefine((value, ctx) => {
     for (const key of TEST_ONLY) {
         if (value[key]) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: "custom",
                 path: [key],
                 message: "test only: never set when NODE_ENV=production",
             });
@@ -365,7 +397,7 @@ const checkedSchema = envSchema.superRefine((value, ctx) => {
     for (const key of REQUIRED_IN_PRODUCTION) {
         if (!value[key]) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: "custom",
                 path: [key],
                 message: "required when NODE_ENV=production",
             });

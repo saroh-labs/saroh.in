@@ -13,8 +13,8 @@ import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
 import { NameDialog } from "@/components/shared/forms/name-dialog";
 import { listTable } from "@/components/shared/lists/list-toolbar";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Tip } from "@saroh/ui/tooltip";
 import { SettingsReadOnly, TabIntro } from "./product-settings";
 

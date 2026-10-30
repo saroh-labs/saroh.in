@@ -41,8 +41,10 @@ vi.mock("next/navigation", () => ({
 
 const getSite = vi.fn();
 const listSites = vi.fn(() => Promise.resolve([]));
+const listComments = vi.fn(() => Promise.resolve([] as unknown[]));
 vi.mock("@/lib/sites/service", () => ({
     getSite: (...args: unknown[]) => getSite(...args) as unknown,
+    listComments: () => listComments(),
     listSites: () => listSites(),
     listTemplates: () => Promise.resolve([]),
     getNewSiteDefaults: () => Promise.resolve(null),
@@ -81,7 +83,17 @@ vi.mock("@/components/customers/store-customer/add-customer-form", () => ({
     AddCustomerForm: () => <form data-testid="add-customer-form" />,
 }));
 vi.mock("@/components/sites/posts/post-editor", () => ({
-    PostEditor: () => <form data-testid="post-editor" />,
+    PostEditor: (props: {
+        readOnly?: boolean;
+        feedback?: { comments: { id: string }[]; canComment: boolean };
+    }) => (
+        <form
+            data-testid="post-editor"
+            data-read-only={String(props.readOnly ?? false)}
+            data-notes={props.feedback?.comments.map((c) => c.id).join(",")}
+            data-can-comment={String(props.feedback?.canComment)}
+        />
+    ),
 }));
 
 const org = (actions: string[], over: Partial<Organization> = {}) =>
@@ -236,7 +248,7 @@ describe("New post and a post, for someone who reads the site", () => {
         id: "site_1",
         name: "Rye",
         postsPrefix: "journal",
-        can: { edit },
+        can: { edit, comment: !edit },
         pages: [],
     });
     const post = {
@@ -285,9 +297,14 @@ describe("New post and a post, for someone who reads the site", () => {
         ).toContain("post-editor");
     });
 
-    it("a post opens to read for a Member: no input, no Save, no Publish", async () => {
+    it("a post opens in the editor read-only for a reader, with its own notes (DEC-200 U8)", async () => {
         getSite.mockResolvedValue(site(false));
         getPost.mockResolvedValue(post);
+        listComments.mockResolvedValueOnce([
+            { id: "note_post", postId: "post_1" },
+            { id: "note_other", postId: "post_2" },
+            { id: "note_section", postId: null },
+        ]);
         const { default: Page } =
             await import("@/app/(shell)/sites/[siteId]/posts/[postId]/page");
         const said = text(
@@ -295,20 +312,11 @@ describe("New post and a post, for someone who reads the site", () => {
                 params: params({ siteId: "site_1", postId: "post_1" }),
             }),
         );
-        expect(said).toContain(
-            "Your role can read this post but not change it. An owner or admin can change this in Settings › Team.",
-        );
-        expect(said).toContain("Winter hours");
-        expect(said).toContain("Draft");
-        expect(said).toContain("/journal/winter-hours");
-        expect(said).toContain("News");
-        expect(said).toContain("From 1 December we close at 6.");
-        expect(said).toContain("See you & yours.");
-        // The body is text. A draft's markup is never drawn, least of all
-        // a script.
-        expect(said).not.toMatch(/<strong>|<script|alert\(1\)/i);
-        expect(said).not.toMatch(/<input|<textarea|<form|post-editor/);
-        expect(said).not.toMatch(/>Save<|>Publish<|Save draft/);
+        expect(said).toContain('data-read-only="true"');
+        expect(said).toContain('data-notes="note_post"');
+        expect(said).toContain('data-can-comment="true"');
+        // The old read view and its refusal line are retired.
+        expect(said).not.toContain("Your role can read this post");
     });
 
     it("a post opens in the editor for someone who may write", async () => {

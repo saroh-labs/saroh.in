@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { ChipGroup } from "@saroh/ui/choice-group";
 
 import {
     LABEL,

@@ -4,6 +4,7 @@ import { AccountHomeService } from "./account-home.service";
 import { AccountMessagesController } from "./account-messages.controller";
 import { AccountUnlinkService } from "./account-unlink.service";
 import { AccountController } from "./account.controller";
+import { PhoneSignInService } from "./phone-sign-in.service";
 import { SignInController } from "./sign-in.controller";
 import { SiteAccountsModule } from "./site-accounts.module";
 import { UNLINK_MOVERS } from "./unlink-plan";
@@ -15,6 +16,9 @@ describe("SiteAccountsModule", () => {
             imports: [SiteAccountsModule],
         }).compile();
         expect(module.get(SignInController)).toBeInstanceOf(SignInController);
+        expect(module.get(PhoneSignInService)).toBeInstanceOf(
+            PhoneSignInService,
+        );
         await module.close();
     });
 

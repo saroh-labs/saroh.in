@@ -21,10 +21,7 @@ import { refusedResult } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { sayRefusal } from "@/components/shared/confirm/confirm-dialog";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
@@ -64,6 +61,9 @@ import {
     OPEN_WHATSAPP,
     WHATSAPP_HOW,
 } from "@/lib/invoices/words";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { sayRefusal } from "@saroh/ui/confirm-dialog";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { useInvoiceSend } from "./send-dialog";
 import { NewLinkConfirm, UnseenLinkNote } from "./unseen-link";
 

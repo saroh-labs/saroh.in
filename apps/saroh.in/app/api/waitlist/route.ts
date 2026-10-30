@@ -15,28 +15,19 @@
 import { NextResponse } from "next/server";
 
 import { env } from "@/env";
+import { readPosted, relaySecret } from "@/lib/relay";
 import type { WaitlistResponse } from "@/lib/waitlist";
 import {
     forwardHeaders,
     joinBody,
-    relaySecret,
     visitorCountry,
 } from "@/lib/waitlist-forward";
 
 let warnedNoSecret = false;
 
 export async function POST(req: Request) {
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        return NextResponse.json<WaitlistResponse>(
-            { status: "failure", reason: { code: "BAD_REQUEST" } },
-            { status: 400 },
-        );
-    }
-
-    const join = joinBody(posted);
+    // Not JSON, or not a join: the same refusal.
+    const join = joinBody(await readPosted(req));
     if (!join) {
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "BAD_REQUEST" } },

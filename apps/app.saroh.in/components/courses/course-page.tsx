@@ -41,10 +41,10 @@ import {
     priceHistoryShown,
 } from "@/lib/price-history/words";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { PriceHistoryList } from "@/components/shared/price-history/price-history";
 import { useHold } from "@/components/shared/undo/use-hold";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { runAction } from "@/lib/api/run-action";
 import type { GstAsk } from "@/lib/gst/item-words";

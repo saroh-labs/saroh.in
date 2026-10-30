@@ -1,3 +1,5 @@
+import { CODE_CHALLENGE_HEADER } from "@saroh/auth/constants";
+
 import { authClient } from "./auth.client";
 import type { CodeClient } from "./sign-in-code";
 
@@ -8,14 +10,18 @@ import type { CodeClient } from "./sign-in-code";
  *
  * A refusal for asking too often carries the server's wait in
  * `X-Retry-After`, which the client's result leaves out, so it is read off
- * the response as it passes.
+ * the response as it passes. The bot check's token, when there is one, goes
+ * in {@link CODE_CHALLENGE_HEADER}.
  */
 export const codeClient: CodeClient = {
-    async send({ email, kind }) {
+    async send({ email, kind, turnstileToken }) {
         let retryAfter: string | null = null;
         const { error } = await authClient.emailOtp.sendVerificationOtp(
             { email, type: kind },
             {
+                headers: turnstileToken
+                    ? { [CODE_CHALLENGE_HEADER]: turnstileToken }
+                    : undefined,
                 onError(context) {
                     retryAfter = context.response.headers.get("x-retry-after");
                 },

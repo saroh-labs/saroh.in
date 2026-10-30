@@ -18,19 +18,19 @@ export const env = createEnv({
             .default("development"),
     },
     client: {
-        NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
-        NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
+        NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
+        NEXT_PUBLIC_BETTER_AUTH_URL: z.url().optional(),
         // Where a verified user is handed off to (app.saroh.in/onboarding).
         // Optional: `lib/app-urls.ts` falls back to the standard dev/prod
         // origins, so a fresh clone needs no extra config.
-        NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+        NEXT_PUBLIC_APP_URL: z.url().optional(),
         /**
          * saroh.in's `/welcome` (DEC-127). Set, a newly verified account
          * passes through it on the way to onboarding, where saroh.in counts
          * the sign-up for a visitor who accepted advertising cookies there.
          * Unset, the account goes straight on. This app loads no ad tag.
          */
-        NEXT_PUBLIC_SIGNUP_WELCOME_URL: z.string().url().optional(),
+        NEXT_PUBLIC_SIGNUP_WELCOME_URL: z.url().optional(),
         /**
          * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
@@ -40,7 +40,7 @@ export const env = createEnv({
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
             .optional(),
-        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.url().optional(),
         /** Which environment this build is for (wrangler.jsonc, DEC-107). */
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])

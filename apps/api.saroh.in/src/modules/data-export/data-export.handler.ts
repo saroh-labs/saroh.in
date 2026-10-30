@@ -34,7 +34,8 @@ function exportIdOf(job: Job): string | null {
  * deletion on that transaction and emails the owner who asked a signed
  * link. It can run for minutes, so it keeps its lease
  * (`jobs/job-lease.ts`). Idempotent: an export no longer being made is
- * left alone, and a retry writes the same storage key again. A failure is
+ * left alone, and a retry writes a new unguessable key; a zip whose export
+ * couldn't be marked READY is deleted again. A failure is
  * retried by the queue; the last one marks the export FAILED in words.
  * The email is best-effort — the workspace shows the export either way.
  *
@@ -96,6 +97,8 @@ export class DataExportHandler {
         });
 
         const release = keepJobLease(job);
+        // The zip just stored, until its export is marked READY.
+        let unclaimed: string | undefined;
         try {
             const built = await buildDataExport({
                 organizationId: row.organizationId,
@@ -103,6 +106,7 @@ export class DataExportHandler {
                 businessName: row.organization.name,
                 storage: this.storage,
             });
+            unclaimed = built.storageKey;
             const readyAt = new Date();
             const expiresAt = new Date(
                 readyAt.getTime() + DATA_EXPORT_KEPT_DAYS * DAY_MS,
@@ -131,12 +135,17 @@ export class DataExportHandler {
                 });
                 return true;
             });
-            if (!marked) return;
+            if (!marked) {
+                await this.discard(built.storageKey);
+                return;
+            }
+            unclaimed = undefined;
             this.logger.log(
                 `data_export_ready org=${row.organizationId} export=${exportId} bytes=${built.sizeBytes} media=${built.counts.media.included} left_out=${built.counts.media.leftOut}`,
             );
             await this.tell(row, built.storageKey, readyAt, expiresAt);
         } catch (error) {
+            if (unclaimed) await this.discard(unclaimed);
             const name = error instanceof Error ? error.name : "Error";
             this.logger.warn(
                 `data_export_failed org=${row.organizationId} export=${exportId} attempt=${job.attempts + 1}/${job.maxAttempts} error=${name}`,
@@ -168,6 +177,15 @@ export class DataExportHandler {
         });
         this.logger.log(`data_export_expired export=${exportId}`);
     };
+
+    /** Delete a zip no export row names. Best-effort: never masks the job's own error. */
+    private async discard(storageKey: string): Promise<void> {
+        await this.storage.deleteObject(storageKey).catch((error: unknown) => {
+            // Never the key: it is what keeps the zip unguessable.
+            const name = error instanceof Error ? error.name : "Error";
+            this.logger.warn(`data_export_discard_failed error=${name}`);
+        });
+    }
 
     private async fail(exportId: string, failure: string): Promise<void> {
         await prisma.dataExport.updateMany({

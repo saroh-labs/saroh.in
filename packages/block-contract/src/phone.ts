@@ -29,6 +29,16 @@ export const PHONE_EXAMPLE = "+91 98450 12345";
  */
 const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
 
+/** An Indian number as stored: +91 and ten digits, the first not 0. */
+export const INDIAN_E164 = /^\+91[1-9]\d{9}$/;
+
+/**
+ * An Indian MOBILE as stored: +91 and ten digits starting 6 to 9. What a
+ * phone that signs in to Saroh, or that Saroh pays to message, must be
+ * (DEC-198); landlines can't take a code.
+ */
+export const INDIAN_MOBILE_E164 = /^\+91[6-9]\d{9}$/;
+
 export type PhoneResult = { phone: string | null } | { problem: string };
 
 /**
@@ -59,9 +69,16 @@ export function normalisePhoneNumber(raw: string): PhoneResult {
             problem: `That isn't a whole phone number. Check the digits and the country code, like ${PHONE_EXAMPLE}.`,
         };
     }
-    // India's numbers are ten digits after +91, mobile and landline alike.
+    // India's numbers are ten digits after +91, mobile and landline alike,
+    // and never start with 0 there: "+91 0…" is a trunk 0 typed twice.
     if (compact.startsWith("+91") && compact.length !== 13) {
         return { problem: "An Indian number is +91 and then 10 digits." };
+    }
+    if (compact.startsWith("+91") && !INDIAN_E164.test(compact)) {
+        return {
+            problem:
+                "An Indian number is +91 and then 10 digits, without a 0 in front.",
+        };
     }
     return { phone: compact };
 }
@@ -500,8 +517,13 @@ export function phoneLabel(stored: string | null | undefined): string {
     const typed = stored.trim();
     const result = normalisePhoneNumber(typed);
     const e164 = "phone" in result ? result.phone : null;
+    // A stored +91 number the rule now refuses (+910…) still reads grouped.
+    if (!e164 && /^\+91\d{10}$/.test(typed)) {
+        return `+91 ${typed.slice(3, 8)} ${typed.slice(8)}`;
+    }
     if (!e164) return typed;
-    if (typed.startsWith("+") && /\s/.test(typed)) return typed;
+    // The typed grouping, only when it is a + and digits in groups.
+    if (/^\+[\d ]+$/.test(typed) && typed.includes(" ")) return typed;
     const digits = e164.slice(1);
     const country = countryOfDigits(digits);
     if (!country) return e164;
@@ -530,4 +552,23 @@ export const PHONE_CASES: readonly {
     { typed: "+91 98765 4321", stored: null, country: "IN" },
     { typed: "call me", stored: null, country: "IN" },
     { typed: "98765 4321x", stored: null, country: "IN" },
+    // DEC-198: landlines and 1-5 starts are Indian numbers (a business's
+    // own phone may be one), never sign-in phones (`INDIAN_MOBILE_E164`).
+    { typed: "+91 22 4567 8901", stored: "+912245678901", country: "IN" },
+    { typed: "+91 12345 67890", stored: "+911234567890", country: "IN" },
+    { typed: "+91 55555 12345", stored: "+915555512345", country: "IN" },
+    // A bare ten digits is India, whatever country it was meant for.
+    { typed: "4155550100", stored: "+914155550100", country: "IN" },
+    {
+        typed: "+91\u00a098765\u00a043210",
+        stored: "+919876543210",
+        country: "IN",
+    },
+    { typed: "+91 0987654321", stored: null, country: "IN" },
+    { typed: "+910987654321", stored: null, country: "IN" },
+    { typed: "0+91 98765 43210", stored: null, country: "IN" },
+    { typed: "+९१ ९८७६५ ४३२१०", stored: null, country: "IN" },
+    { typed: "＋９１ ９８７６５ ４３２１０", stored: null, country: "IN" },
+    { typed: "98765\u201343210", stored: null, country: "IN" },
+    { typed: "+91 98765 43210 98765 43210", stored: null, country: "IN" },
 ];

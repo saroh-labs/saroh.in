@@ -9,29 +9,34 @@ import {
     utcDay,
 } from "../waitlist/tool-email-cap";
 import {
+    isToolGateSource,
     maskEmail,
     normaliseEmail,
-    QR_MAKER_SOURCE,
+    toolGateSource,
 } from "../waitlist/waitlist-keys";
-import { QR_MAKER_SUBJECT, qrMakerEmailText } from "./qr-maker-email";
+import { toolEmail } from "./qr-maker-email";
 
 /**
  * The QR code maker's email gate (QR codes plan U9), in the shape of the
  * link preview tool's (`link-preview/link-report-gate.service.ts`).
  *
+ * Every free tool's gate since #1253: the request names the tool by a slug
+ * the DTO holds to `tool-names.ts`, and none is the QR code maker.
+ *
  * An email unlocks the downloads in the page. It is kept in the waitlist's
- * store: a new entry with source `qr-maker` and when the tool was last
+ * store: a new entry with source `qr-maker` (another tool: `tool:<slug>`,
+ * `toolGateSource`) and when the tool was last
  * used (`checkedAt`; there is no link to keep, the API never sees it). An
  * address the store already holds from somewhere else is left exactly as
  * it was. The retention sweep drops a `qr-maker` entry 12 months after its
- * last use (`waitlist-retention.handler.ts`).
+ * last use, and so does a `tool:` one (`waitlist-retention.handler.ts`).
  *
  * No marketing consent is taken: anyone can type anyone's address, so an
  * unverified address can't say yes to news. `newsConsent` is false on the
  * entries this makes and never set.
  *
  * One email goes, in our own words, with a link back to the tool
- * (`qr-maker-email.ts`). It shares the tools' caps, counted in the database
+ * (`qr-maker-email.ts`), naming the tool. It shares the tools' caps, counted in the database
  * (`waitlist/tool-email-cap.ts`): 3 a UTC day to one address, 300 a day in
  * all. Past either the page still unlocks, and says no email went.
  */
@@ -55,14 +60,18 @@ export class QrMakerGateService {
 
     async unlock(input: {
         email: string;
+        /** The tool's slug, already one of `TOOL_SLUGS`; none: the QR code maker. */
+        tool?: string;
         ipHash?: string;
         now?: Date;
     }): Promise<QrMakerUnlock> {
+        const mail = toolEmail(input.tool);
         const now = input.now ?? new Date();
         const { email, key } = normaliseEmail(input.email);
         const id = await this.store({
             email,
             emailKey: key,
+            source: toolGateSource(input.tool),
             usedAt: now,
             ipHash: input.ipHash,
         });
@@ -78,8 +87,8 @@ export class QrMakerGateService {
         // The tools' plain-text sender: a fixed subject and fixed words.
         const outcome = await sendLinkReportEmail(
             email,
-            QR_MAKER_SUBJECT,
-            qrMakerEmailText(),
+            mail.subject,
+            mail.text,
         );
         if (outcome !== "sent") {
             this.logger.warn(
@@ -96,6 +105,7 @@ export class QrMakerGateService {
     private async store(row: {
         email: string;
         emailKey: string;
+        source: string;
         usedAt: Date;
         ipHash?: string;
     }): Promise<string> {
@@ -111,9 +121,10 @@ export class QrMakerGateService {
                 select: { id: true, source: true },
             });
             if (!existing) return null;
-            // Only the tool's own entry counts its 12 months from this
-            // use; a waitlist or link-report entry keeps its own clock.
-            if (existing.source === QR_MAKER_SOURCE) {
+            // Only a tool gate's entry (any tool's: it keeps the first
+            // tool's source) counts its 12 months from this use; a waitlist
+            // or link-report entry keeps its own clock.
+            if (isToolGateSource(existing.source)) {
                 await prisma.waitlistSignup.update({
                     where,
                     data: { checkedAt: row.usedAt },
@@ -130,7 +141,7 @@ export class QrMakerGateService {
                     email: row.email,
                     emailKey: row.emailKey,
                     businessKey: NO_BUSINESS,
-                    source: QR_MAKER_SOURCE,
+                    source: row.source,
                     checkedAt: row.usedAt,
                     newsConsent: false,
                     ipHash: row.ipHash ?? null,

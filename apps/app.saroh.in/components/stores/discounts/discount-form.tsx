@@ -1,7 +1,6 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -16,6 +15,7 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -23,11 +23,6 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    lostChanges,
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
@@ -46,6 +41,7 @@ import type {
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { Segmented } from "@saroh/ui/segmented";
+import { lostChanges, lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 import type { MultiOption } from "./multi-select";
 import { MultiSelect } from "./multi-select";
 
@@ -54,11 +50,10 @@ const formSchema = z
         code: z
             .string()
             .trim()
-            .min(2, { message: "At least 2 characters" })
+            .min(2, { error: "At least 2 characters" })
             .max(32)
             .regex(/^[A-Za-z0-9_-]+$/, {
-                message:
-                    "Letters, digits, dashes or underscores, with no spaces",
+                error: "Letters, digits, dashes or underscores, with no spaces",
             }),
         description: z.string().max(200),
         kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
@@ -69,7 +64,7 @@ const formSchema = z
         endsAt: z.date().optional(),
         usageLimit: z
             .string()
-            .regex(/^\d*$/, { message: "A whole number, or empty for no cap" }),
+            .regex(/^\d*$/, { error: "A whole number, or empty for no cap" }),
     })
     .superRefine((v, ctx) => {
         // Only the kind chosen is checked: the other's field is hidden.

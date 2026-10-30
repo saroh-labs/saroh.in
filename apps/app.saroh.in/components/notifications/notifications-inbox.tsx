@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -23,6 +22,7 @@ import { notificationHref } from "@/lib/notifications/href";
 import type { Notification } from "@/lib/notifications/service";
 import type { NoticeGroup } from "@/lib/notifications/when";
 import { exactWhen, noticeGroup, relativeWhen } from "@/lib/notifications/when";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 const GROUPS: { key: NoticeGroup; label: string }[] = [
     { key: "today", label: "Today" },

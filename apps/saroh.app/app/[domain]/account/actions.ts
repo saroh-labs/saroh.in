@@ -10,6 +10,7 @@ import type {
 import {
     accountFetch,
     clearSessionCookie,
+    sessionCustomer,
     setSessionCookie,
     siteAccountsFetch,
 } from "@/lib/customer-session";
@@ -19,6 +20,7 @@ import {
     codeResult,
     customerFromEmail,
     getSignInOptions,
+    phoneSessionAnswer,
     sessionAnswer,
 } from "@/lib/sign-in";
 import { testMode } from "@/lib/test-release";
@@ -63,6 +65,7 @@ export async function requestSignInCode(
 export async function verifySignInCode(
     email: string,
     code: string,
+    phoneProof?: string,
 ): Promise<VerifyResult> {
     if (!(await siteOrigin())) return { ok: false, reason: "error" };
     if (await testMode()) return { ok: false, reason: "test-release" };
@@ -71,9 +74,15 @@ export async function verifySignInCode(
     if (!address || digits.length !== 6) {
         return { ok: false, reason: "invalid" };
     }
+    const proof =
+        typeof phoneProof === "string" && phoneProof
+            ? phoneProof.slice(0, 256)
+            : null;
     const call = await siteAccountsFetch("sessions", {
         method: "POST",
-        body: { email: address, code: digits },
+        body: proof
+            ? { email: address, code: digits, phoneProof: proof }
+            : { email: address, code: digits },
     });
     if (!call.ok) return { ok: false, reason: "error" };
     const answer = sessionAnswer(
@@ -86,20 +95,70 @@ export async function verifySignInCode(
     return { ok: true, customer: await whoIs(answer.token, address) };
 }
 
+const MAX_PHONE = 32;
+
+function cleanPhone(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const phone = value.trim();
+    return phone && phone.length <= MAX_PHONE ? phone : null;
+}
+
+/** A sign-in code by WhatsApp (DEC-196), when the options offered it. */
+export async function requestPhoneSignInCode(
+    phone: string,
+    challenge?: string,
+): Promise<CodeRequestResult> {
+    if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
+    const number = cleanPhone(phone);
+    if (!number) return { ok: false, reason: "phone" };
+    const call = await siteAccountsFetch("phone-codes", {
+        method: "POST",
+        body:
+            typeof challenge === "string" && challenge
+                ? { phone: number, challenge: challenge.slice(0, 2_048) }
+                : { phone: number },
+    });
+    if (!call.ok) return codeCallFailed(call.reason);
+    return codeResult(call.res.status, await call.res.json().catch(() => null));
+}
+
+/**
+ * Trade a WhatsApp code for a session; a number no account holds answers
+ * `email-needed` with the proof the email code then carries.
+ */
+export async function verifyPhoneSignInCode(
+    phone: string,
+    code: string,
+): Promise<VerifyResult> {
+    if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
+    const number = cleanPhone(phone);
+    const digits = typeof code === "string" ? code.replace(/\D/g, "") : "";
+    if (!number || digits.length !== 6) return { ok: false, reason: "invalid" };
+    const call = await siteAccountsFetch("phone-sessions", {
+        method: "POST",
+        body: { phone: number, code: digits },
+    });
+    if (!call.ok) return { ok: false, reason: "error" };
+    const answer = phoneSessionAnswer(
+        call.res.status,
+        await call.res.json().catch(() => null),
+    );
+    if (!answer.ok) return answer;
+
+    await setSessionCookie(answer.token);
+    return { ok: true, customer: await whoIs(answer.token, "") };
+}
+
 /** The customer a brand-new session belongs to, for "Welcome, ‹name›". */
 async function whoIs(token: string, email: string): Promise<SignedInCustomer> {
     const call = await siteAccountsFetch("session", { session: token });
     if (call.ok && call.res.ok) {
-        const body = (await call.res.json().catch(() => null)) as {
-            email?: unknown;
-            name?: unknown;
-        } | null;
-        if (typeof body?.email === "string") {
-            return {
-                email: body.email,
-                name: typeof body.name === "string" ? body.name : null,
-            };
-        }
+        const customer = sessionCustomer(
+            await call.res.json().catch(() => null),
+        );
+        if (customer) return customer;
     }
     return customerFromEmail(email);
 }

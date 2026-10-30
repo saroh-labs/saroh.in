@@ -204,11 +204,13 @@ describe("moving a business", () => {
 
 describe("lines", () => {
     it("reads a profile and a business as the design does", () => {
-        expect(chips(PULSE)).toEqual([
+        expect(chips(PULSE).map((c) => c.name)).toEqual([
             "Pulse Fitness Rohtak",
             "Pulse Fitness Gurugram",
         ]);
-        expect(chips({ payingFor: [] })).toEqual(["Pays for nothing yet"]);
+        expect(chips({ payingFor: [] }).map((c) => c.name)).toEqual([
+            "Pays for nothing yet",
+        ]);
         const moving = {
             payingFor: [
                 {
@@ -222,7 +224,9 @@ describe("lines", () => {
                 },
             ],
         };
-        expect(chips(moving)).toEqual(["Yoga Corner · moving"]);
+        expect(chips(moving).map((c) => c.name)).toEqual([
+            "Yoga Corner · moving",
+        ]);
         expect(paysForLine(moving)).toBe("Pays for Yoga Corner (moving)");
         expect(paysForCount(2)).toBe("pays for 2 businesses");
         expect(phoneLabel("+919845012345")).toBe("+91 98450 12345");

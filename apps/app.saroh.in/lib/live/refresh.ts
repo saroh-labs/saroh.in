@@ -1,3 +1,5 @@
+import { holdLiveRefresh, liveRefreshHeld } from "@saroh/ui/lib/live-hold";
+
 /**
  * The screen updates by itself (10 Oct 2026): the rules, apart from the
  * hook that runs them (`components/shared/live-refresh/use-live-refresh.ts`), so they
@@ -38,27 +40,8 @@ export function isLiveRoute(pathname: string | null | undefined): boolean {
     return (LIVE_ROUTES as readonly string[]).includes(path);
 }
 
-/*
- * The shared "busy" signal. A screen holding unsaved work says so here,
- * and nothing reads the page again while it does: `useLeaveGuard` holds it
- * for every guarded form while it is dirty, so no screen has to remember.
- */
-let holds = 0;
-
-/** Hold live refresh; call the returned function to let go (once). */
-export function holdLiveRefresh(): () => void {
-    holds += 1;
-    let held = true;
-    return () => {
-        if (!held) return;
-        held = false;
-        holds -= 1;
-    };
-}
-
-export function liveRefreshHeld(): boolean {
-    return holds > 0;
-}
+// The shared "busy" signal lives beside the leave guard that holds it.
+export { holdLiveRefresh, liveRefreshHeld };
 
 /** The parts of a document `pageBusy` reads; a jsdom or a stand-in. */
 export interface BusyDocument {

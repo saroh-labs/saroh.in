@@ -14,6 +14,7 @@ import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
+import type { SignInIdentity } from "./account-linking.service";
 import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -29,9 +30,13 @@ import {
 } from "./code-limits";
 import { normaliseAccountEmail } from "./customer-account.repository";
 import type { RequestCodeDto, VerifyCodeDto } from "./dto";
+import { readPhoneProof } from "./phone-proof";
 import { cleanBusinessName } from "./sender-name";
 import type { SessionIssued } from "./sessions.service";
 import { SessionsService } from "./sessions.service";
+import type { SignInWay } from "./sign-in-way-rules";
+import { UNAVAILABLE_MESSAGE } from "./sign-in-way-rules";
+import { SignInWaysService } from "./sign-in-ways";
 import type { SiteHost } from "./site-host";
 import { businessPublicPhone, resolveSiteHost } from "./site-host";
 import type { SiteRelay } from "./site-relay";
@@ -58,6 +63,12 @@ export interface CodeRequested {
     resendAfterSeconds: number;
 }
 
+const CODE_REQUESTED: CodeRequested = {
+    sent: true,
+    expiresInSeconds: CODE_TTL_MS / 1000,
+    resendAfterSeconds: OWN_RESEND_MS / 1000,
+};
+
 export type { SessionIssued } from "./sessions.service";
 
 /** What the sign-in sheet needs before anything is typed. */
@@ -66,6 +77,13 @@ export interface SignInOptions {
     /** The business's public phone, for "Or call ‹Business› on ‹phone›". */
     phone: string | null;
     challenge: { required: boolean; siteKey: string | null };
+    /**
+     * The ways this site offers now, in the business's order (DEC-196):
+     * the first is the sheet's default, the rest "Use … instead".
+     */
+    ways: SignInWay[];
+    /** A WhatsApp sign-up may stand on the phone alone (no email asked). */
+    phoneOnlySignUp: boolean;
 }
 
 /**
@@ -86,8 +104,7 @@ const CODE_REQUESTS_PER_ADDRESS = 30;
 const VERIFY_TRIES_PER_ADDRESS = 60;
 const ADDRESS_WINDOW_MS = 10 * 60_000;
 
-export const UNAVAILABLE_MESSAGE =
-    "We couldn't send your code. Try again in a few minutes";
+export { UNAVAILABLE_MESSAGE };
 
 function hmac(parts: string[]): string {
     return createHmac("sha256", siteCodeSecret())
@@ -136,7 +153,7 @@ function sameHash(a: string, b: string): boolean {
     return x.length === y.length && timingSafeEqual(x, y);
 }
 
-function limited(
+export function limited(
     reason: "limit" | "wait",
     retryAfterSeconds: number,
 ): HttpException {
@@ -169,6 +186,7 @@ export class SignInCodesService {
         private readonly delivery: SiteCodeDelivery,
         private readonly challenge: ChallengeVerifier,
         private readonly alerts: SiteCodeAlerts,
+        private readonly ways: SignInWaysService,
         @Optional()
         private readonly codeLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
             CODE_REQUESTS_PER_ADDRESS,
@@ -183,6 +201,7 @@ export class SignInCodesService {
 
     async options(relay: SiteRelay): Promise<SignInOptions> {
         const site = await resolveSiteHost(relay.host);
+        const ways = await this.ways.view(site.organizationId);
         return runInOrgContext(site.organizationId, async () => {
             const now = new Date();
             const counts = await loadBusinessCounts(
@@ -202,6 +221,8 @@ export class SignInCodesService {
                     required: likely && this.challenge.configured,
                     siteKey: this.challenge.siteKey,
                 },
+                ways: ways.effective,
+                phoneOnlySignUp: ways.phoneOnlySignUp,
             };
         });
     }
@@ -226,6 +247,12 @@ export class SignInCodesService {
             // the one hard stop on one address asking this business for
             // code after code (A-2).
             const addressBusy = this.takeAddress(site, relay, now);
+
+            // Email off (DEC-196): only an email-only account gets a code;
+            // anyone else gets the same answer and nothing is sent.
+            if (!(await this.ways.emailAllowed(site.organizationId, email))) {
+                return CODE_REQUESTED;
+            }
 
             const returning = await prisma.customerAccount.count({
                 where: {
@@ -349,17 +376,27 @@ export class SignInCodesService {
                 email,
             );
             this.takeVerifyTry(site, relay, destinationHash, now);
+            // Email off and not an email-only account: as if no code was
+            // sent, which none was (DEC-196).
+            if (!(await this.ways.emailAllowed(site.organizationId, email))) {
+                throw wrongCode("expired");
+            }
             await this.consumeCode(
                 site.organizationId,
                 destinationHash,
                 dto.code,
                 now,
             );
-            return this.openSession(site, email, now);
+            // A phone just proved by WhatsApp joins this email's account
+            // (DEC-196). A stale or forged proof only means no phone is added.
+            const phone = dto.phoneProof
+                ? readPhoneProof(site.organizationId, dto.phoneProof, now)
+                : null;
+            return this.openSession(site, email, now, phone);
         });
     }
 
-    private async passChallenge(
+    async passChallenge(
         site: SiteHost,
         relay: SiteRelay,
         token: string | undefined,
@@ -436,11 +473,7 @@ export class SignInCodesService {
             data: { retiredAt: now },
         });
 
-        return {
-            sent: true,
-            expiresInSeconds: CODE_TTL_MS / 1000,
-            resendAfterSeconds: OWN_RESEND_MS / 1000,
-        };
+        return CODE_REQUESTED;
     }
 
     /**
@@ -500,22 +533,58 @@ export class SignInCodesService {
     }
 
     /** Sign in (or up), and hand back a new session's token once. */
-    private async openSession(
+    openSession(
         site: SiteHost,
         email: string,
         now: Date,
+        addPhoneE164?: string | null,
+    ): Promise<SessionIssued> {
+        return this.issue(
+            site,
+            (tx) =>
+                this.linking.linkOrCreate(tx, site.organizationId, email, now),
+            now,
+            "This email",
+            addPhoneE164,
+        );
+    }
+
+    /**
+     * Sign in (or up, phone alone) with a phone just proved by WhatsApp
+     * code (DEC-196): a merged or blocked account answers as an email's.
+     */
+    openPhoneSession(
+        site: SiteHost,
+        phoneE164: string,
+        now: Date,
+    ): Promise<SessionIssued> {
+        return this.issue(
+            site,
+            (tx) =>
+                this.linking.linkOrCreateByPhone(
+                    tx,
+                    site.organizationId,
+                    phoneE164,
+                    now,
+                ),
+            now,
+            "This number",
+        );
+    }
+
+    private async issue(
+        site: SiteHost,
+        link: (tx: Prisma.TransactionClient) => Promise<SignInIdentity>,
+        now: Date,
+        what: string,
+        addPhoneE164?: string | null,
     ): Promise<SessionIssued> {
         const run = () =>
             prisma.$transaction(async (tx) => {
-                const identity = await this.linking.linkOrCreate(
-                    tx,
-                    site.organizationId,
-                    email,
-                    now,
-                );
+                const identity = await link(tx);
                 if (identity.kind === "merged") {
                     throw new ConflictException({
-                        message: `This email now signs in as ${identity.maskedEmail}`,
+                        message: `${what} now signs in as ${identity.maskedEmail}`,
                         details: {
                             reason: "merged",
                             signsInAs: identity.maskedEmail,
@@ -528,6 +597,15 @@ export class SignInCodesService {
                             "You can't sign in here. Please contact the business.",
                         details: { reason: "blocked" },
                     });
+                }
+                if (addPhoneE164) {
+                    await this.linking.addPhone(
+                        tx,
+                        site.organizationId,
+                        identity.account.id,
+                        addPhoneE164,
+                        now,
+                    );
                 }
                 return this.sessions.create(tx, {
                     organizationId: site.organizationId,

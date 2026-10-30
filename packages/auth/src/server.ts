@@ -5,11 +5,12 @@ import type {
 } from "better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 
 import {
     CODE_ALLOWED_ATTEMPTS,
+    CODE_CHALLENGE_HEADER,
     CODE_LIMIT_MAX,
     CODE_LIMIT_WINDOW_SECONDS,
     sessionCookiePrefix,
@@ -17,6 +18,7 @@ import {
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
 import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import { phoneSignIn } from "./phone-sign-in";
 import type { OnAuthServerError } from "./server-errors";
 import { serverErrorHook } from "./server-errors";
 
@@ -27,12 +29,14 @@ export { getTrustedOrigins, isTrustedOrigin } from "./origins";
 // in that file.
 export {
     CODE_ALLOWED_ATTEMPTS,
+    CODE_CHALLENGE_HEADER,
     CODE_LIMIT_MAX,
     CODE_LIMIT_WINDOW_SECONDS,
     CODE_RESEND_SECONDS,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+export { startPhoneSession } from "./phone-sign-in";
 export type { AuthServerFault, OnAuthServerError } from "./server-errors";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -186,6 +190,21 @@ export interface CreateAuthOptions {
      * host's own `trust proxy` does. None: only a single-address header.
      */
     trustedProxies?: string[];
+    /**
+     * Asked before a code or link is mailed to an address someone typed
+     * ({@link CODE_MAIL_PATHS}), with that address, lowercased: the API's
+     * per-address cap, on top of the per-caller rate limit, with the bot
+     * challenge's token the page sent in {@link CODE_CHALLENGE_HEADER}. A
+     * wait refuses with 429 and `X-Retry-After`, as the rate limit does;
+     * `challenge` refuses with 400 `CHALLENGE`, as phone sign-in's start
+     * does, and the page sends again with a token. Asked whether or not the
+     * address has an account, so a refusal says nothing about that. Not
+     * asked on a server-side `auth.api` call (staff's own sends).
+     */
+    mayMailCode?: (
+        email: string,
+        challenge: { turnstileToken: string | null },
+    ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
 }
 
 /**
@@ -259,8 +278,8 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
         // `InternalAPIError extends Error`. But it exposes APIError as a const
         // with a construct signature rather than a class, so only-throw-error
         // cannot see the inheritance and its `allow` option has no named class
-        // to match. Scoped to this one throw — it is the only APIError throw in
-        // the repo. reportUnusedDisableDirectives is on, so this line will be
+        // to match. Scoped to this one throw (`phone-sign-in.ts` disables it the
+        // same way). reportUnusedDisableDirectives is on, so this line will be
         // flagged as unnecessary once better-auth ships types the rule accepts.
         // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
         throw new APIError("BAD_REQUEST", {
@@ -447,6 +466,49 @@ export function userDatabaseHooks(
  * signing in with an emailed code, and verifying an address with one.
  * Never a password or a provider's sign-in.
  */
+/** The endpoints that mail a code or link to the `email` in their body. */
+export const CODE_MAIL_PATHS: readonly string[] = [
+    "/email-otp/send-verification-otp",
+    "/email-otp/request-password-reset",
+    "/forget-password/email-otp",
+    "/send-verification-email",
+    "/request-password-reset",
+];
+
+/** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
+function codeMailHook(
+    mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
+) {
+    return createAuthMiddleware(async (ctx) => {
+        if (!ctx.request || !CODE_MAIL_PATHS.includes(ctx.path)) return;
+        const email: unknown = (ctx.body as { email?: unknown } | undefined)
+            ?.email;
+        if (typeof email !== "string" || !email.trim()) return;
+        const verdict = await mayMailCode(email.trim().toLowerCase(), {
+            turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
+        });
+        if (!verdict) return;
+        if ("challenge" in verdict) {
+            // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+            throw new APIError("BAD_REQUEST", {
+                code: "CHALLENGE",
+                message: "Confirm you're not a robot, then try again.",
+            });
+        }
+        const wait = verdict;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+        throw new APIError(
+            "TOO_MANY_REQUESTS",
+            {
+                code: "TOO_MANY_REQUESTS",
+                message:
+                    "Too many codes asked for this address. Wait a while, then try again.",
+            },
+            { "X-Retry-After": String(wait.retryAfterSeconds) },
+        );
+    });
+}
+
 export const MAILBOX_PROOF_PATHS: readonly string[] = [
     "/sign-in/email-otp",
     "/email-otp/verify-email",
@@ -518,6 +580,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         ...(opts.onServerError
             ? { onAPIError: serverErrorHook(opts.onServerError) }
             : {}),
+        ...(opts.mayMailCode
+            ? { hooks: { before: codeMailHook(opts.mayMailCode) } }
+            : {}),
         account: {
             accountLinking: {
                 enabled: true,
@@ -575,6 +640,18 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             // code the verify screen is built to accept.
         },
         user: {
+            // A verified phone (DEC-196), read on the session so the account
+            // page can show it. `input: false`: never set through
+            // `/update-user`; only the API writes it, after checking the
+            // OTP widget's token on the server (`account-phone/`).
+            additionalFields: {
+                phoneE164: { type: "string", required: false, input: false },
+                phoneVerifiedAt: {
+                    type: "date",
+                    required: false,
+                    input: false,
+                },
+            },
             changeEmail: {
                 enabled: true,
                 // Approval goes to the CURRENT address. `updateEmailWithoutVerification`
@@ -644,6 +721,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                 : { enabled: false },
         },
         plugins: [
+            // Sign-in by a verified phone: a server-only endpoint the API
+            // calls after its own check (`phone-sign-in.ts`).
+            phoneSignIn(),
             emailOTP({
                 // Replace the built-in verification LINK with a code. The link
                 // flow could not work here: it is sent by the api, so its

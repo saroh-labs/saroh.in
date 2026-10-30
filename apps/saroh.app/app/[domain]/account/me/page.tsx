@@ -24,8 +24,10 @@ import {
     addHealthNote,
     askDataRemoval,
     confirmEmailChange,
+    confirmPhoneAdd,
     payInvoiceNow,
     requestEmailChangeCode,
+    requestPhoneAddCode,
     saveEmailChoice,
     updateAccountDetails,
 } from "./actions";
@@ -77,6 +79,10 @@ export default async function MePage() {
                 emailChange: {
                     requestCode: requestEmailChangeCode,
                     verifyCode: confirmEmailChange,
+                },
+                phoneAdd: {
+                    requestPhoneCode: requestPhoneAddCode,
+                    verifyPhoneCode: confirmPhoneAdd,
                 },
                 addNote: addHealthNote,
                 signOut,

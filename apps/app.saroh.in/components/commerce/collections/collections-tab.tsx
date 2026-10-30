@@ -1,8 +1,8 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Layers, Pencil } from "lucide-react";
 import { useState } from "react";
 

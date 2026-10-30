@@ -16,7 +16,7 @@ import {
 } from "@/lib/organizations/web-address";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import { FailedRead } from "@/components/shared/states/failed-read";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { WebAddressDialog } from "./web-address-dialog";
 
 /**

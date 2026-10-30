@@ -463,7 +463,10 @@ describe("the booking through a reload", () => {
         // Nor the phone number: what is about the person is not written
         // to the browser's storage. A signed-in customer's comes back
         // from their account.
-        expect(stored).not.toContain("98450");
+        // The whole number, in either form: "98450" alone was once found
+        // inside the draft's savedAt timestamp (CI, 30 Oct).
+        expect(stored).not.toContain("98450 12345");
+        expect(stored).not.toContain("9845012345");
         expect(document.cookie).toBe("");
         expect(JSON.stringify({ ...window.localStorage })).not.toContain(
             "svc_pt",

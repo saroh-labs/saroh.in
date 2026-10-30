@@ -4,6 +4,7 @@ import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-freshness";
 import { signedUp } from "../../modules/analytics/product-milestones";
 import { noticeProfilesOfDeletedOwnerInTx } from "../../modules/billing/billing-profile-owner";
 import {
@@ -13,6 +14,7 @@ import {
     sendPasswordResetEmail,
 } from "../email";
 import { trustedProxyRanges } from "../trust-proxy";
+import { claimCodeMail } from "./code-mail-limits";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -35,7 +37,11 @@ export const auth: Auth = createAuth({
     mayStartSession: ({ id }) => mayStartSession(id),
     // A code proves the mailbox: a verification staff marked becomes the
     // person's own (`email-verification.ts`).
-    onMailboxProven: ({ id }) => clearStaffVerification(id),
+    // It also vouches for the account's phone again (DEC-198).
+    onMailboxProven: async ({ id }) => {
+        await clearStaffVerification(id);
+        await renewPhoneOnEmailSignIn(id);
+    },
     sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
     // A sign-up for an address that already has an account: the screen says
     // "Check your email" either way, and this is what arrives.
@@ -62,4 +68,8 @@ export const auth: Auth = createAuth({
     onServerError: reportAuthServerError,
     // The sign-in rate limit counts the same client the API's `req.ip` does.
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
+    // Per address too, not only per caller: many callers can't flood one
+    // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
+    mayMailCode: (email, { turnstileToken }) =>
+        claimCodeMail(email, turnstileToken),
 });

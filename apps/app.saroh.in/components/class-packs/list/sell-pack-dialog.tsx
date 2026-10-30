@@ -1,6 +1,6 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/forms/form-dialog";
+import { FormDialog } from "@saroh/ui/form-dialog";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { ChipGroup } from "@/components/shared/fields/choice-group";
 import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { ContactPicker } from "@/components/shared/fields/contact-picker";
 import { runAction } from "@/lib/api/run-action";
@@ -33,6 +32,7 @@ import {
     soldMessage,
 } from "@/lib/class-packs/sell-words";
 import type { GstAsk } from "@/lib/gst/item-words";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 /** "Vinyasa, Hatha and Yin". */

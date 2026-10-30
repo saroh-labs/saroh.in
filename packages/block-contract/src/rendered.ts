@@ -526,7 +526,7 @@ export const RENDERED_SCHEMAS = {
     timetable: renderedTimetable,
     hours: renderedHours,
     person: renderedPerson,
-} satisfies Record<SectionType, z.ZodTypeAny>;
+} satisfies Record<SectionType, z.ZodType>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
     (typeof RENDERED_SCHEMAS)[T]
@@ -565,11 +565,12 @@ export function parseRenderedContent<T extends SectionType>(
     content: unknown,
 ):
     | { success: true; data: RenderedContent<T> }
-    | { success: false; issues: z.ZodIssue[] } {
+    | { success: false; issues: z.core.$ZodIssue[] } {
     const schema = RENDERED_SCHEMAS[type];
     const result = schema.safeParse(content);
     return result.success
-        ? { success: true, data: result.data }
+        ? // zod 4 loses T through the indexed schema; the schema is RENDERED_SCHEMAS[T].
+          { success: true, data: result.data as RenderedContent<T> }
         : { success: false, issues: result.error.issues };
 }
 

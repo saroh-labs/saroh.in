@@ -288,6 +288,72 @@ describe("the booking page (real database)", () => {
         expect(JSON.stringify(diary)).toContain("DESK");
     });
 
+    it("a guest's booking by a known email never replaces that customer's phone or name (DEC-198, UX-049)", async () => {
+        const email = `known-${process.pid}@example.in`;
+        const known = await prisma.contact.create({
+            data: {
+                organizationId: owner.organizationId,
+                email,
+                firstName: "Meera",
+                lastName: "Iyer",
+                phone: "+919845012345",
+                source: "manual",
+            },
+        });
+        const { booking } = await publicBookings.bookOnline(
+            oneToOne,
+            {
+                ...booker(email, "DESK", nextMonday(6, 6)),
+                bookerName: "Someone Else",
+                bookerPhone: "+91 98450 99999",
+            },
+            "ip_1",
+        );
+        expect(booking.contactId).toBe(known.id);
+        expect(booking.bookerPhone).toBe("+91 98450 99999");
+        await expect(
+            prisma.contact.findUniqueOrThrow({
+                where: { id: known.id },
+                select: { firstName: true, lastName: true, phone: true },
+            }),
+        ).resolves.toEqual({
+            firstName: "Meera",
+            lastName: "Iyer",
+            phone: "+919845012345",
+        });
+
+        // A contact with no phone or name has them filled.
+        const bare = await prisma.contact.create({
+            data: {
+                organizationId: owner.organizationId,
+                email: `bare-${process.pid}@example.in`,
+                source: "manual",
+            },
+        });
+        await publicBookings.bookOnline(
+            oneToOne,
+            {
+                ...booker(
+                    `bare-${process.pid}@example.in`,
+                    "DESK",
+                    nextMonday(7, 6),
+                ),
+                bookerPhone: "+91 98450 88888",
+            },
+            "ip_1",
+        );
+        await expect(
+            prisma.contact.findUniqueOrThrow({
+                where: { id: bare.id },
+                select: { firstName: true, lastName: true, phone: true },
+            }),
+        ).resolves.toEqual({
+            firstName: "Asha",
+            lastName: "Rao",
+            phone: "+91 98450 88888",
+        });
+    });
+
     it("pays now: the hold takes the place, the webhook confirms it and numbers the invoice", async () => {
         const at = nextMonday(7);
         const { booking, payToken } = await publicBookings.bookOnline(

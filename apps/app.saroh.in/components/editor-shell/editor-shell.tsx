@@ -1,16 +1,13 @@
 "use client";
 
-import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { focusFirstError } from "@saroh/ui/field";
+import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import {
     heldAtOpen,
@@ -30,6 +27,9 @@ import type {
     EditorProblem,
     EditorRecord,
 } from "@/lib/editor-shell/types";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";

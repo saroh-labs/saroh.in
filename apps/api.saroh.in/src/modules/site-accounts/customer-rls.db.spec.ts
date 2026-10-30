@@ -189,7 +189,12 @@ describe("the customer session on a site", () => {
 
         const first = await me(kavi.host, token);
         expect(first.status).toBe(200);
-        expect(first.body).toEqual({ email, name: null, phone: null });
+        expect(first.body).toEqual({
+            email,
+            signInPhone: null,
+            name: null,
+            phone: null,
+        });
         // A reload is the same token again.
         expect((await me(kavi.host, token)).status).toBe(200);
 
@@ -218,6 +223,7 @@ describe("the customer session on a site", () => {
         const seen = await me(kavi.host, token);
         expect(seen.body).toEqual({
             email,
+            signInPhone: null,
             name: "Farah Khan",
             phone: "999",
         });

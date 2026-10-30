@@ -326,6 +326,7 @@ describe("This isn't them (A4)", () => {
 
         expect(await unlinking.preview(ctx, farah.id)).toEqual({
             email: who,
+            phone: null,
             moves: [],
             sentence:
                 "Nothing they did online is on this record, so everything here stays.",

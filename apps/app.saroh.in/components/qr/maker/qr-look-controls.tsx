@@ -11,12 +11,8 @@ import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import {
-    ChoiceGroup,
-    Eyebrow,
-    pillClass,
-} from "@/components/shared/fields/choice-group";
-import { FailedRead } from "@/components/shared/states/failed-read";
+import { ChoiceGroup, Eyebrow, pillClass } from "@saroh/ui/choice-group";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { QrAddLogo } from "./qr-add-logo";

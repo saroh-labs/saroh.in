@@ -139,7 +139,11 @@ describe("Add billing profile", () => {
         expect(text(d)).toContain("Bill a business to it now (optional)");
         type(field("Legal name"), "Asha Verma Studio");
         await press(
-            must(d?.querySelector<HTMLElement>('[role="radio"][value="no"]')),
+            must(
+                d?.querySelector<HTMLElement>(
+                    '[role="radio"][data-value="no"]',
+                ),
+            ),
         );
         type(field("Billing email"), "studio@example.com");
         actions.createProfileAction.mockResolvedValue({
@@ -171,7 +175,7 @@ describe("Add billing profile", () => {
         await press(
             must(
                 dialog()?.querySelector<HTMLElement>(
-                    '[role="radio"][value="no"]',
+                    '[role="radio"][data-value="no"]',
                 ),
             ),
         );

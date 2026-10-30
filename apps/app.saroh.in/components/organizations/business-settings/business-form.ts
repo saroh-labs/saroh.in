@@ -42,20 +42,20 @@ import type {
  */
 
 /** Allow an empty string (field left blank / cleared) or a valid value. */
-const optionalText = (schema: z.ZodString) =>
+const optionalText = (schema: z.ZodType<string, string>) =>
     z.union([z.literal(""), schema]).optional();
 
 export const formSchema = z
     .object({
-        name: z.string().trim().min(1, { message: "Add a name." }),
+        name: z.string().trim().min(1, { error: "Add a name." }),
         // What is being set up (DEC-070): words and defaults only.
         kind: z.enum(ORGANIZATION_KINDS),
         legalName: z.string().optional(),
         type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
         taxId: z.string().optional(),
-        contactEmail: optionalText(z.string().email("Enter a valid email")),
-        website: optionalText(z.string().url("Enter a valid URL")),
+        contactEmail: optionalText(z.email("Enter a valid email")),
+        website: optionalText(z.url("Enter a valid URL")),
         // The public phone (DEC-053): E.164 once saved; the API judges it.
         phone: phoneSchema,
         // An IANA zone, or "" for none; the API checks it's a real one.

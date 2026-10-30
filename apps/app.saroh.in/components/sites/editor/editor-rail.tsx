@@ -20,9 +20,11 @@ import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
+import { BrandReadOnly } from "./brand-read-only";
 import { EditorTabs, railRowState } from "./editor-chrome";
 import { SECTION_LABELS, sectionTitle } from "./editor-constants";
 import { PhoneBlocks } from "./phone-blocks";
+import { useEditorReadOnly } from "./read-only";
 
 export type RailTab = "page" | "add" | "brand";
 
@@ -125,23 +127,36 @@ export function EditorRail({
     const railId = useId();
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
+    // Read-only (DEC-200): Page and Brand, no Add, nothing to drag.
+    const readOnly = useEditorReadOnly();
 
     // Page · Add · Brand (G2), as the design draws the rail.
-    const tab = railTabFor(rail, adding);
+    const tab = railTabFor(rail, adding && !readOnly);
     const selectTab = (next: RailTab) =>
         selectRailTab(next, setRail, setAdding);
 
     return (
         <aside className="flex min-h-0 flex-1 flex-col">
-            {phone ? null : (
+            {/* A Reviewer's Blocks sheet keeps Page | Brand (RVD2Phone). */}
+            {phone && !readOnly ? null : (
                 <EditorTabs
                     label="Editor panels"
-                    tabs={RAIL_TABS}
+                    tabs={
+                        readOnly
+                            ? RAIL_TABS.filter((t) => t.key !== "add")
+                            : RAIL_TABS
+                    }
                     value={tab}
                     onSelect={selectTab}
                 />
             )}
-            {tab === "brand" ? (
+            {tab === "brand" && readOnly ? (
+                <BrandReadOnly
+                    style={style}
+                    options={styleOptions}
+                    looks={looks?.available === true}
+                />
+            ) : tab === "brand" ? (
                 <StylePanel
                     style={style}
                     options={styleOptions}
@@ -157,7 +172,7 @@ export function EditorRail({
                 />
             ) : (
                 <>
-                    {adding ? (
+                    {tab === "add" ? (
                         <AddBlockPanel
                             search={phone}
                             shopOpen={shopOpen}
@@ -254,21 +269,28 @@ export function EditorRail({
                                              * handle that also navigates makes
                                              * every aborted drag a selection.
                                              */}
-                                            <span
-                                                draggable
-                                                onDragStart={() => {
-                                                    setDragIndex(index);
-                                                    setDropIndex(index);
-                                                }}
-                                                onDragEnd={() => {
-                                                    setDragIndex(null);
-                                                    setDropIndex(null);
-                                                }}
-                                                aria-hidden="true"
-                                                className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
-                                            >
-                                                ⋮
-                                            </span>
+                                            {readOnly ? (
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="w-[18px] shrink-0"
+                                                />
+                                            ) : (
+                                                <span
+                                                    draggable
+                                                    onDragStart={() => {
+                                                        setDragIndex(index);
+                                                        setDropIndex(index);
+                                                    }}
+                                                    onDragEnd={() => {
+                                                        setDragIndex(null);
+                                                        setDropIndex(null);
+                                                    }}
+                                                    aria-hidden="true"
+                                                    className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
+                                                >
+                                                    ⋮
+                                                </span>
+                                            )}
                                             <Tip
                                                 label={
                                                     SECTION_LABELS[section.type]

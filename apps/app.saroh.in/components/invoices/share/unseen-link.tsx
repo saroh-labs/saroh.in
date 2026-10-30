@@ -3,14 +3,14 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Link2Off } from "lucide-react";
 
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
     newLinkWarning,
     UNSEEN_LINK,
     unseenLinkLine,
 } from "@/lib/invoices/minted-links";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /**
  * A payment link is out that this tab can't show (UX-048): after a reload, on

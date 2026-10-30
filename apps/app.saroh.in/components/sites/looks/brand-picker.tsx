@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 import { createContext, useContext } from "react";
 
-import { useNarrow } from "@/lib/hooks/use-narrow";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 /**
  * The phone's Brand sheet (DEC-185): its tabs show each set of options

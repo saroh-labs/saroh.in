@@ -29,6 +29,7 @@ import {
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
+    deleteComment as deleteCommentApi,
     deletePage as deletePageApi,
     fillDetails as fillDetailsApi,
     getReviewState as getReviewStateApi,
@@ -37,6 +38,7 @@ import {
     listDraftVersions as listDraftVersionsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    recordPageView as recordPageViewApi,
     requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
@@ -45,6 +47,7 @@ import {
     saveSiteIcon as saveSiteIconApi,
     setCommentResolved as setCommentResolvedApi,
     undoStarterContent as undoStarterContentApi,
+    updateCommentBody as updateCommentBodyApi,
     updatePage as updatePageApi,
     updateSiteFooter as updateSiteFooterApi,
     updateSiteNavigation as updateSiteNavigationApi,
@@ -77,12 +80,8 @@ export async function saveDraftSections(
 /** Leave a note on a section (#277). */
 export async function createComment(
     siteId: string,
-    input: {
-        pageId: string;
-        sectionKey: string;
-        body: string;
-        testReleaseId?: string;
-    },
+    /** A page's section, or a post (DEC-200 U8). */
+    input: Parameters<typeof createCommentApi>[1],
 ) {
     return createCommentApi(siteId, input);
 }
@@ -229,12 +228,31 @@ export async function getReviewState(siteId: string, testReleaseId?: string) {
     return getReviewStateApi(siteId, testReleaseId);
 }
 
+/** A reviewer opened a page in the editor (DEC-200, U9). */
+export async function recordPageView(siteId: string, pageId: string) {
+    return recordPageViewApi(siteId, pageId);
+}
+
 export async function setCommentResolved(
     siteId: string,
     commentId: string,
     resolved: boolean,
 ) {
     return setCommentResolvedApi(siteId, commentId, resolved);
+}
+
+/** Rewrite your own open note (DEC-200 U3). */
+export async function updateCommentBody(
+    siteId: string,
+    commentId: string,
+    body: string,
+) {
+    return updateCommentBodyApi(siteId, commentId, body);
+}
+
+/** Delete your own open note (DEC-200 U3). */
+export async function deleteComment(siteId: string, commentId: string) {
+    return deleteCommentApi(siteId, commentId);
 }
 
 export async function listPreviewLinks(siteId: string) {

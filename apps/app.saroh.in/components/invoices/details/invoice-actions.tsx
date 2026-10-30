@@ -9,9 +9,6 @@ import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
-import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import {
     creditInvoice,
@@ -21,6 +18,9 @@ import {
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
 import type { CreditExpect, InvoiceStanding } from "@/lib/invoices/service";
+import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { FormDialog } from "@saroh/ui/form-dialog";
 
 export interface InvoiceRef {
     id: string;

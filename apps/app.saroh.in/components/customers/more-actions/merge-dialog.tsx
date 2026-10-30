@@ -1,8 +1,8 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { Refusal } from "@/components/shared/states/refusal";
 import { Button } from "@saroh/ui/button";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -34,8 +34,8 @@ import {
     pickable,
 } from "@/lib/customer-workspace/merge";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 import { AccountBox, pickClass } from "./merge-parts";
 import { MergeSearch } from "./merge-search";

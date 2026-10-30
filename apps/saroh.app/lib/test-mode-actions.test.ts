@@ -100,6 +100,10 @@ const WRITES: Record<string, () => Promise<unknown>> = {
     requestSignInCode: () => account.requestSignInCode("asha@example.in"),
     verifySignInCode: () =>
         account.verifySignInCode("asha@example.in", "123456"),
+    requestPhoneSignInCode: () =>
+        account.requestPhoneSignInCode("+91 98450 12345"),
+    verifyPhoneSignInCode: () =>
+        account.verifyPhoneSignInCode("+91 98450 12345", "123456"),
     signOut: () => account.signOut(),
     signOutEverywhere: () => account.signOutEverywhere(),
     moveBooking: () => bookings.moveBooking("bkg_1", AT),
@@ -110,6 +114,8 @@ const WRITES: Record<string, () => Promise<unknown>> = {
         me.updateAccountDetails({ name: "Asha", phone: "" }),
     requestEmailChangeCode: () => me.requestEmailChangeCode("new@example.in"),
     confirmEmailChange: () => me.confirmEmailChange("new@example.in", "123456"),
+    requestPhoneAddCode: () => me.requestPhoneAddCode("+91 98450 12345"),
+    confirmPhoneAdd: () => me.confirmPhoneAdd("+91 98450 12345", "123456"),
     addHealthNote: () => me.addHealthNote("Sore knee"),
     payInvoiceNow: () => me.payInvoiceNow("inv_1"),
     saveEmailChoice: () => me.saveEmailChoice(false),

@@ -8,6 +8,8 @@
 
 import { phoneNumberProblem } from "@saroh/ui/lib/phone";
 
+import { isEmailShape } from "@/lib/email-shape";
+
 export interface ReportBody {
     site: string;
     message: string;
@@ -33,8 +35,6 @@ export const REPORT_LIMITS = {
     phone: 24,
 } as const;
 export const MESSAGE_MIN = 10;
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * A website address someone could mean: a host with a dot, with or without
@@ -80,7 +80,7 @@ export function reportProblem(input: {
         return "message";
     }
     const email = input.email.trim();
-    if (!email || email.length > REPORT_LIMITS.email || !EMAIL.test(email)) {
+    if (!email || email.length > REPORT_LIMITS.email || !isEmailShape(email)) {
         return "email";
     }
     // The API's loose rule, and the shared one the field keeps (#1036): a

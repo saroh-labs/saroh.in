@@ -1,9 +1,9 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {

@@ -328,6 +328,13 @@ describe("what a profile is made of (R1)", () => {
         ).rejects.toMatchObject({
             response: { details: { field: "billingEmail" } },
         });
+        // A payer's phone is Indian (DEC-198).
+        await expect(
+            profiles.create(owner.id, {
+                ...details(email),
+                phone: "+44 20 7946 0958",
+            }),
+        ).rejects.toMatchObject({ response: { details: { field: "phone" } } });
         await expect(
             profiles.create(owner.id, { ...details(email), legalName: " " }),
         ).rejects.toMatchObject({

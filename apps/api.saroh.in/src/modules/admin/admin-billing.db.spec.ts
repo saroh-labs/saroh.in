@@ -229,7 +229,7 @@ beforeAll(async () => {
     ).id;
 
     invoices.a = await invoice(orgs.a, 1, null);
-    invoices.b = await invoice(orgs.b, 2, "29AAAAA0000A1Z5");
+    invoices.b = await invoice(orgs.b, 2, "29AAAAA0000A1ZY");
 
     const plan = await prisma.plan.create({
         data: {
@@ -349,7 +349,7 @@ describe("Admin › Billing: who may read it", () => {
         const csv = await res.text();
         expect(csv).toContain("Buyer 1");
         expect(csv).toContain(
-            "Buyer 2,29AAAAA0000A1Z5,Karnataka,29,B2B,999999",
+            "Buyer 2,29AAAAA0000A1ZY,Karnataka,29,B2B,999999",
         );
     });
 

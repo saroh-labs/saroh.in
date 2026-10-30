@@ -142,14 +142,14 @@ the task. Never write a `SheetContent`, a `DialogContent` or an
 (what is not a form, such as a quick look or a picker, is on its short
 list with its reason).
 
-| Component       | For                                | File                                           |
-| --------------- | ---------------------------------- | ---------------------------------------------- |
-| `FormSheet`     | More than three fields             | `components/shared/forms/form-sheet.tsx`       |
-| `FormDialog`    | One to three fields, or one choice | `components/shared/forms/form-dialog.tsx`      |
-| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm/confirm-dialog.tsx` |
+| Component       | For                                | File                       |
+| --------------- | ---------------------------------- | -------------------------- |
+| `FormSheet`     | More than three fields             | `@saroh/ui/form-sheet`     |
+| `FormDialog`    | One to three fields, or one choice | `@saroh/ui/form-dialog`    |
+| `ConfirmDialog` | Only what cannot be undone         | `@saroh/ui/confirm-dialog` |
 
 The sheet and the dialog share one set of rules
-(`components/shared/forms/overlay-form.tsx`):
+(`@saroh/ui/overlay-form`):
 
 - **Width.** A sheet is the screen on a phone and 448px beside the page,
   512px with `wide`. A dialog is `size="sm" | "md" | "lg"` (420, 460,
@@ -250,7 +250,7 @@ holds at most one note.
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
 Settings › Business (`components/organizations/`) draw `Row`s from
-`components/shared/page/settings-rows.tsx` — label, a sentence of what is saved,
+`@saroh/ui/settings-rows` — label, a sentence of what is saved,
 Edit — and each Edit opens its own `FormSheet` with one Save
 (`PlaceSheetFrame` names it by a location's row): the fields scroll, Cancel
 then Save sit at the foot, nothing saves until Save, a refusal keeps the
@@ -271,7 +271,7 @@ No row turns into a form, and the task finishes inside what opened.
 nothing has changed. Once the draft differs from what it opened with, a
 press outside does nothing, and Cancel, Escape and the close button are the
 ways out. The frame reads that from its own fields
-(`components/shared/forms/use-draft-changed.ts`: boxes, ticks, chips, what a
+(`@saroh/ui/lib/use-draft-changed`: boxes, ticks, chips, what a
 picker shows, a picture, a rich text box), so an overlay passes nothing.
 One whose work the fields can't show passes `dirty`, or calls
 `useFormSheetDraft` / `useFormSheetDirty` from a draft under the frame.
@@ -384,7 +384,7 @@ preview under its fields, from the draft.
   course), it is the submit, so Enter runs it.
 - **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
   create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from
-  `components/shared/forms/use-leave-guard.tsx` and draws its `dialog`: "Leave
+  `@saroh/ui/use-leave-guard` and draws its `dialog`: "Leave
   without saving?", one sentence saying what would be lost (`lostNew`,
   `lostChanges`, or the flow's own), then Stay (the default) or Leave, and
   Save and leave only where a draft can be kept. It catches every link, the
@@ -507,13 +507,13 @@ preview under its fields, from the draft.
   (10 Oct). All but the tick are a radio group to a screen reader and a
   keyboard: one tab stop, and the arrows move the choice.
 
-    | Piece         | For                                              | File                                        |
-    | ------------- | ------------------------------------------------ | ------------------------------------------- |
-    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                       |
-    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/fields/choice-group.tsx` |
-    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/fields/choice-group.tsx` |
-    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/fields/choice-group.tsx` |
-    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/fields/check-row.tsx`    |
+    | Piece         | For                                              | File                     |
+    | ------------- | ------------------------------------------------ | ------------------------ |
+    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`    |
+    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `@saroh/ui/choice-group` |
+    | `RadioCards`  | Choices that are a sentence, or carry a note     | `@saroh/ui/choice-group` |
+    | `ChoiceGroup` | The same group drawn the screen's own way        | `@saroh/ui/choice-group` |
+    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `@saroh/ui/check-row`    |
 
     `ChoiceGroup` is for what the first three can't draw (colour swatches,
     photo thumbnails, times under day headings with `layout`, a card with

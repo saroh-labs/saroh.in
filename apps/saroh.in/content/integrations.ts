@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { ComingGroupKey } from "./coming";
-import { NOT_AVAILABLE_YET } from "./coming";
+import { COMING, NOT_AVAILABLE_YET } from "./coming";
 import { SAROH_CONTACT_EMAIL } from "./contact";
 
 /**
@@ -9,7 +9,7 @@ import { SAROH_CONTACT_EMAIL } from "./contact";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-19";
+export const UPDATED = "2026-10-27";
 
 /**
  * The Integrations pages (Resources plan U3): what connects today, what is
@@ -111,65 +111,14 @@ export const liveIntegrations: readonly LiveIntegration[] = [
 ];
 
 /**
- * The changelog's Coming next rows that connect Saroh to another service,
- * in the same groups and the same words (`content/changelog.ts`, ledger §12
- * CN1–CN18; `integrations.test.ts` holds the two lists together). What is
- * Saroh's own work stays on the changelog: the Android app, invoice
- * layouts, API keys, bringing your own login and customers
- * signing in with Google.
+ * The planned rows that connect Saroh to another service, from the one
+ * roadmap list (`./coming`, B3). What is Saroh's own work stays on the
+ * changelog only: the Android app, invoice layouts, API keys, bringing your
+ * own login and customers signing in with Google.
  */
-export const plannedIntegrations: readonly PlannedIntegration[] = [
-    {
-        group: "next",
-        name: "Automatic WhatsApp messages",
-        line: "Order updates and pay links sent to your customers on WhatsApp for you.",
-    },
-    {
-        group: "next",
-        name: "Google Calendar",
-        line: "Bookings show up in your Google Calendar, and busy times there block the slot in Saroh.",
-    },
-    {
-        group: "next",
-        name: "Google Meet and Zoom",
-        line: "Online appointments get a meeting link made for them automatically.",
-    },
-    {
-        group: "early-2027",
-        name: "Shopify import",
-        line: "Move products, customers and past orders over from Shopify in one go.",
-    },
-    {
-        group: "early-2027",
-        name: "PhonePe",
-        line: "Take payments through PhonePe, alongside Razorpay and Cashfree.",
-    },
-    {
-        group: "early-2027",
-        name: "Shiprocket",
-        line: "Shipping labels and courier pick-up for orders that ship, with tracking filled in for you.",
-    },
-    {
-        group: "early-2027",
-        name: "Google Business Profile",
-        line: "Your booking or shop link on your Google listing.",
-    },
-    {
-        group: "early-2027",
-        name: "Tally and Zoho Books export",
-        line: "Send orders and invoices to your accountant in their format.",
-    },
-    {
-        group: "later",
-        name: "Social publishing",
-        line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
-    },
-    {
-        group: "later",
-        name: "Canva",
-        line: "Open any post in Canva to edit it, or bring in designs you've made there, then schedule them from Saroh.",
-    },
-];
+export const plannedIntegrations: readonly PlannedIntegration[] = COMING.filter(
+    (item) => item.integration,
+).map(({ group, name, line }) => ({ group, name, line }));
 
 /* ── A provider page's frontmatter ──────────────────────────────────── */
 

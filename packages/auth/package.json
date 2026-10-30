@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@saroh/database": "workspace:*",
-    "better-auth": "^1.6.26",
+    "better-auth": "^1.7.10",
     "react": "catalog:react19"
   },
   "peerDependencies": {
@@ -75,6 +75,7 @@
     "./middleware": "./src/middleware.ts",
     "./dev-access": "./src/dev-access.ts",
     "./private-app": "./src/private-app.ts",
+    "./security-headers": "./src/security-headers.cjs",
     "./next": "./src/next.ts"
   }
 }

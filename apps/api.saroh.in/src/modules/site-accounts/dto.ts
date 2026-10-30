@@ -25,11 +25,11 @@ import { PAUSE_WEEKS } from "../subscriptions/dto";
 import { MESSAGE_MAX } from "./thread-store";
 
 /**
- * The two bodies site sign-in takes (round-2 plan A, A2). Email is the only
- * channel this round (ADR-011 §6), and the business comes from the relayed
- * host: with the global pipe's `forbidNonWhitelisted`, a body carrying a
- * `phone`, a `channel`, a `host`, an `organizationId` or anything else is a
- * 400, so nothing can half-enable a phone path or pick a business.
+ * The bodies site sign-in takes (round-2 plan A, A2; DEC-196 adds the
+ * WhatsApp code's two). The business comes from the relayed host: with the
+ * global pipe's `forbidNonWhitelisted`, a body carrying a `channel`, a
+ * `host`, an `organizationId`, a "verified" flag or anything else is a 400,
+ * so nothing can pick a business or skip the server's check.
  */
 const lowerTrim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value;
@@ -59,6 +59,41 @@ export class VerifyCodeDto {
     @Transform(trim)
     @IsString()
     @Matches(/^\d{6}$/, { message: "Enter the 6-digit code from the email" })
+    code!: string;
+
+    /**
+     * The proof a WhatsApp code left for a phone no account held (DEC-196):
+     * this email's account takes the phone.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(256)
+    phoneProof?: string;
+}
+
+/** A WhatsApp sign-in code (DEC-196): an Indian mobile number. */
+export class RequestPhoneCodeDto {
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    phone!: string;
+
+    /** The bot challenge's token: every WhatsApp code needs one. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2_048)
+    challenge?: string;
+}
+
+export class VerifyPhoneCodeDto {
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    phone!: string;
+
+    @Transform(trim)
+    @IsString()
+    @Matches(/^\d{6}$/, { message: "Enter the 6-digit code" })
     code!: string;
 }
 

@@ -1,68 +1,28 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import {
-    couldntLoad,
-    NOTHING_CHANGED,
-    TRY_AGAIN,
-} from "@saroh/ui/lib/state-copy";
-import { Skeleton } from "@saroh/ui/skeleton";
-import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { EmptyState, LoadingState } from "@saroh/ui/data-state";
+import { FailedRead } from "@saroh/ui/failed-read";
+import { useState } from "react";
 
+import type { BillingProfile, OwnedBusiness } from "@/lib/billing-profiles";
 import { namesList } from "@/lib/billing-profiles";
 
+import { AddProfileSheet } from "./profile-sheet";
+
 /**
- * The Billing profiles pages' states (F7): loading, no profiles yet, a
- * teammate who owns none, and a read that failed. The page's title stays
- * above each, so it never arrives as a different layout.
+ * The Billing profiles pages' states (F7), on the shared states
+ * (`@saroh/ui/data-state`, `FailedRead`): loading, no profiles yet, an owner
+ * whose business has none, a teammate who owns none, and a read that
+ * failed. The page's header stays above each.
  */
-
-export const card = "rounded-xl border border-border bg-card";
-
-export function PageTitle({ children }: { children: ReactNode }) {
-    return (
-        <h1 className="font-display text-[23px] font-semibold leading-tight tracking-[-0.03em] md:text-[25px]">
-            {children}
-        </h1>
-    );
-}
 
 export function LoadingProfiles({
     what = "your billing profiles",
 }: {
     what?: string;
 }) {
-    return (
-        <div role="status" aria-busy="true" className="flex flex-col gap-2.5">
-            <span className="sr-only">Loading {what}</span>
-            <Skeleton aria-hidden className="h-3.5 w-3/5 rounded-md" />
-            <Skeleton aria-hidden className="h-[92px] rounded-xl" />
-            <Skeleton aria-hidden className="h-[92px] rounded-xl" />
-        </div>
-    );
-}
-
-function Panel({
-    title,
-    children,
-    action,
-}: {
-    title: string;
-    children: ReactNode;
-    action?: ReactNode;
-}) {
-    return (
-        <div className={`${card} flex flex-col items-start gap-2 p-[26px]`}>
-            <strong className="font-display text-[17px] font-semibold">
-                {title}
-            </strong>
-            <span className="text-muted-foreground text-[13px] leading-[1.55]">
-                {children}
-            </span>
-            {action ? <div className="mt-1">{action}</div> : null}
-        </div>
-    );
+    return <LoadingState rows={3} label={`Loading ${what}`} />;
 }
 
 export const EMPTY_TITLE = "No billing profiles yet";
@@ -71,16 +31,64 @@ export const EMPTY_SAYS =
 
 export function EmptyProfiles({ createUrl }: { createUrl: string }) {
     return (
-        <Panel
+        <EmptyState
+            size="panel"
             title={EMPTY_TITLE}
+            description={EMPTY_SAYS}
             action={
                 <Button asChild>
                     <a href={createUrl}>Create a business</a>
                 </Button>
             }
-        >
-            {EMPTY_SAYS}
-        </Panel>
+        />
+    );
+}
+
+/** "Saroh hasn't got billing details for CarePoint Clinic yet." */
+export function ownerNoProfileSays(names: string[]): string {
+    return `Saroh hasn't got billing details for ${namesList(names)} yet. Add them before you pick a paid plan.`;
+}
+
+/**
+ * An owner whose business has no profile (UX audit, 28 Oct: they were told
+ * the first is made when a business is created, with no way through). Add
+ * opens here, the business already chosen to bill.
+ */
+export function OwnerNoProfile({
+    businesses,
+}: {
+    businesses: readonly OwnedBusiness[];
+}) {
+    const [adding, setAdding] = useState(false);
+    const [opening, setOpening] = useState(0);
+    const none: readonly BillingProfile[] = [];
+    return (
+        <>
+            <EmptyState
+                size="panel"
+                title={EMPTY_TITLE}
+                description={ownerNoProfileSays(businesses.map((b) => b.name))}
+                action={
+                    <Button
+                        type="button"
+                        onClick={() => {
+                            setOpening((n) => n + 1);
+                            setAdding(true);
+                        }}
+                    >
+                        + Add billing profile
+                    </Button>
+                }
+            />
+            <AddProfileSheet
+                key={opening}
+                profiles={none}
+                businesses={businesses}
+                billFirst={businesses[0]?.id}
+                open={adding}
+                onClose={() => setAdding(false)}
+            />
+        </>
     );
 }
 
@@ -95,7 +103,13 @@ export function teammateSays(businesses: string[]): string {
 }
 
 export function TeammateState({ businesses }: { businesses: string[] }) {
-    return <Panel title={TEAMMATE_TITLE}>{teammateSays(businesses)}</Panel>;
+    return (
+        <EmptyState
+            size="panel"
+            title={TEAMMATE_TITLE}
+            description={teammateSays(businesses)}
+        />
+    );
 }
 
 /** A read that failed: said, with Try again; nothing was changed. */
@@ -104,26 +118,5 @@ export function FailedProfiles({
 }: {
     what?: string;
 }) {
-    const router = useRouter();
-    return (
-        <div
-            role="alert"
-            className={`${card} flex flex-col items-start gap-1.5 p-5`}
-        >
-            <strong className="text-sm font-semibold">
-                {couldntLoad(what)}
-            </strong>
-            <span className="text-muted-foreground text-[13px]">
-                {NOTHING_CHANGED}
-            </span>
-            <Button
-                type="button"
-                size="sm"
-                className="mt-1.5"
-                onClick={() => router.refresh()}
-            >
-                {TRY_AGAIN}
-            </Button>
-        </div>
-    );
+    return <FailedRead size="panel" things={what} />;
 }

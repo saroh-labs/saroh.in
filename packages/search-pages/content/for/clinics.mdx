@@ -1,0 +1,252 @@
+---
+slug: clinics
+name: Clinics
+plural: clinics
+pickAs: clinics
+family: Health
+search: clinic software
+title: Clinic software for bookings, visits and bills
+description: "Clinic software for dental, physio, skin and diet clinics: patients book a free time, and treatments over several visits stay in one place."
+updated: 2026-10-26
+shape: appointments
+h1: Patients book a time, and you know what to check first.
+lead: Patient booking software for dental, physio, skin and diet clinics. Patients book a free time and tell you what you should know, and treatments over several visits stay in one place.
+phoneLead: Patient booking software for clinics. Patients book a free time, and long treatments stay together.
+problemsTitle: What gets easier in your clinic.
+problems:
+  - quote: I learn about a patient's blood thinners when they're already in the chair.
+  - quote: The phone rings all morning with people asking for a time.
+  - quote: A root canal is three visits, and I lose track of which one they're on.
+  - quote: Notes from the phone end up on a sticky note.
+  - quote: Anyone at the desk can read a patient's medical history.
+  - quote: Most treatments have no GST, and my bills get it wrong.
+services:
+  - name: Consultation
+    detail: 20 min
+  - name: Follow-up
+    detail: 15 min
+  - name: Video consultation
+    detail: 20 min
+  - name: Dental check-up
+    detail: 30 min
+  - name: Physiotherapy session
+    detail: 30 min
+  - name: Diet consultation
+    detail: 30 min
+related:
+  - name: Dental clinics
+    slug: dental-clinics
+  - name: Physiotherapy
+    slug: physiotherapy
+  - name: Dermatology clinics
+    slug: dermatology-clinics
+  - name: Counsellors
+    slug: counsellors
+  - name: Dieticians
+    slug: dieticians
+  - name: Pathology labs
+    slug: pathology-labs
+  - name: Homeopathy clinics
+    slug: homeopathy-clinics
+  - name: Ayurveda clinics
+    slug: ayurveda-clinics
+ctaTitle: Know every patient before they sit down.
+scene:
+  business: Banyan Family Clinic
+  site: banyan-clinic.saroh.app
+  day: Sat 25 Oct
+  place: clinic
+  heroAlt: "What a clinic's day looks like in Saroh: a consultation booked with Dr. Shah on Saturday at 18:00, a ₹150 deposit paid by UPI, a bill with no GST on an exempt consultation, and an allergy shown before the patient arrives."
+  hero:
+    title: Today · Sat 25 Oct
+    count: 18 bookings
+    highlight: 2
+    rows:
+      - time: 17:00
+        name: Vivek Saxena
+        right: Video · Dr. Bose
+      - time: 17:30
+        name: Ritu Agarwal
+        right: Diet · visit 2 of 4
+      - time: 18:00
+        name: Manoj Pandey
+        right: Dr. Shah
+      - time: 18:30
+        name: Kavita Rao
+        right: Consultation
+  chips:
+    - icon: cal
+      title: Booked · Sat 18:00 · Dr. Shah
+      sub: Manoj Pandey · Consultation
+    - icon: ok
+      title: ₹150 deposit paid · UPI
+      sub: Into your own Razorpay account
+      phoneSub: Into your own Razorpay
+    - icon: bill
+      title: "Bill #905 · no GST"
+      sub: Consultation marked GST-exempt
+    - icon: person
+      title: Ritu · diet plan, visit 2 of 4
+      pill: Allergic to penicillin
+  staff:
+    - Dr. Shah
+    - Dr. Bose
+  items:
+    - name: Consultation
+      short: Consultation
+      len: 20 min
+      who: with Dr. Shah or Dr. Bose
+      price: 600
+    - name: Video consultation
+      short: Video
+      len: 20 min
+      who: with Dr. Shah or Dr. Bose
+      price: 500
+    - name: Diet consultation
+      short: Diet
+      len: 30 min
+      who: with Dr. Bose
+      price: 900
+  booking:
+    item: 0
+    staff: Dr. Shah
+    time: 18:00
+    deposit: quarter
+    depositBy: Manoj Pandey
+    times:
+      - time: 10:00
+      - time: 10:30
+      - time: 11:00
+      - time: 11:30
+      - time: 12:00
+      - time: 17:00
+        taken: true
+      - time: 17:30
+        taken: true
+      - time: 18:00
+        picked: true
+      - time: 18:30
+      - time: 19:00
+        taken: true
+    phoneTimes:
+      - time: 10:00
+      - time: 10:30
+      - time: 11:00
+      - time: 11:30
+      - time: 12:00
+      - time: 17:00
+        taken: true
+      - time: 17:30
+        taken: true
+      - time: 18:00
+        picked: true
+  today:
+    - time: 17:00
+      name: Vivek
+      who: Dr. Bose
+      status:
+        tone: grey
+        text: Video
+    - time: 17:30
+      name: Ritu
+      who: Dr. Bose
+      status:
+        tone: amb
+        text: Check first
+    - time: 18:00
+      name: Manoj
+      who: Dr. Shah
+      status:
+        tone: paid
+        text: Paid
+  customer:
+    name: Ritu Agarwal
+    initials: RA
+    stats:
+      - 5 visits
+      - ₹4,200 spent
+    tag: Allergic to penicillin
+    note: "Diet plan: visits 3 and 4 still to book."
+    noteBy: Sensitive note · Dr. Bose · 11 Oct
+  bill:
+    no: 905
+    status:
+      tone: paid
+      text: Paid · UPI
+    gstin: false
+    showCodes: true
+    rate: 0
+    noGst: None · exempt treatment
+    lines:
+      - name: Consultation
+        short: Consultation
+        code: SAC 999312
+        codeStatus: to-confirm
+        amount: 600
+    cgst: 0
+    sgst: 0
+    total: 600
+    foot: null
+  tiles:
+    booking:
+      title: Patients book the doctor they want
+      line: Your booking page shows only the times each doctor is free.
+      phoneLine: Your booking page shows only the times each doctor is free.
+    deposit:
+      title: Hold the time with a deposit
+      line: A quarter, half or all of it, into your own Razorpay or Cashfree.
+      phoneLine: Paid into your own Razorpay or Cashfree.
+    today:
+      title: Today's patients, and what to check
+      line: Who's coming, who they're seeing, and anything to check first.
+      phoneLine: Who's coming, and what to check first.
+    customer:
+      title: Sensitive notes for the right people
+      line: Allergies show on their bookings. Sensitive notes, only to roles you allow.
+      phoneLine: Allergies and sensitive notes.
+    bill:
+      title: No GST where none is due
+      line: Mark a treatment GST-exempt once, and its bills leave GST off.
+      phoneLine: Exempt treatments, billed without GST.
+    website:
+      title: Your treatments and prices online
+      line: Change a price once, and your website shows it.
+      phoneLine: Change a price once, and it shows.
+  quote:
+    text: I learn about a patient's blood thinners when they're already in the chair.
+    caption: Sound familiar? Today's list shows what to check first, before the first patient arrives.
+  also:
+    - title: Treatments over several visits
+      line: Say a treatment takes four visits. See which are done and which to book.
+      icon: layers
+    - title: Each doctor's days
+      line: Working days, time off and the days the clinic is closed.
+    - title: Payment links
+      line: Send a link. They pay by UPI or card, straight to your account.
+    - title: Who sees what
+      line: Give each person a role. Only the roles you pick see money or sensitive notes.
+    - title: In their phone's calendar
+      line: Patients add their booking to their own calendar.
+    - title: Who didn't come
+      line: Mark it once, and it shows on the patient's page.
+---
+
+## What does Start free include?
+
+You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
+
+## Who can read a patient's sensitive notes?
+
+Only you and the people you allow. Allergies still show on a patient's bookings and today's list, so the desk knows to take care.
+
+## Can I give bills without GST?
+
+Yes, mark a treatment as GST-exempt once, and its bills are made without GST. Which treatments carry GST is for you and your accountant to decide.
+
+## How do patients pay me?
+
+By UPI or card when they book or from a payment link, straight into your own Razorpay or Cashfree account. Cash at the desk works too, and every payment gets a bill.
+
+## Can my front desk use it without seeing everything?
+
+Yes. Give each person a role, and only the roles you choose see the money or sensitive notes.

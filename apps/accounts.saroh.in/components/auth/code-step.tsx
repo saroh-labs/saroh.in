@@ -4,6 +4,7 @@ import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
 import { cn } from "@saroh/ui/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import {
     AuthAlt,
     AuthError,
@@ -18,9 +19,13 @@ import {
     CODE_WORDS,
     codeDigits,
     codeLead,
+    PHONE_CODE_WORDS,
+    phoneCodeLead,
     resendLabel,
     resendWait,
     sendCode,
+    WHATSAPP_CODE_WORDS,
+    whatsappCodeLead,
 } from "@/lib/sign-in-code";
 
 /* Success choreography. The order matters: the mark has to COMPLETE before the
@@ -86,6 +91,8 @@ export function CodeStep({
     const [spent, setSpent] = useState(false);
     const [checking, setChecking] = useState(false);
     const [sending, setSending] = useState(false);
+    // The API asked for the bot check before it sends a new code.
+    const [challenge, setChallenge] = useState(false);
     const [done, setDone] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [resendAt, setResendAt] = useState<number | null>(
@@ -99,6 +106,19 @@ export function CodeStep({
     const failed = useRef<string | null>(null);
 
     const wait = resendWait(resendAt, now);
+    // A phone's code (DEC-196) is the same step with its own few words.
+    const phone = Boolean(client.channel);
+    const whatsapp = client.channel === "whatsapp";
+    const words = whatsapp
+        ? { ...CODE_WORDS, ...PHONE_CODE_WORDS, ...WHATSAPP_CODE_WORDS }
+        : phone
+          ? { ...CODE_WORDS, ...PHONE_CODE_WORDS }
+          : CODE_WORDS;
+    const lead = whatsapp
+        ? whatsappCodeLead(email)
+        : phone
+          ? phoneCodeLead(email)
+          : codeLead(email);
 
     // This step exists to take six digits, so it starts in the field.
     useEffect(() => {
@@ -155,12 +175,13 @@ export function CodeStep({
         if (complete && digits !== failed.current) void check(digits);
     }
 
-    async function resend() {
+    async function resend(turnstileToken?: string) {
         if (sending || (!spent && wait > 0)) return;
         setSending(true);
+        setChallenge(false);
         setError(null);
         setNotice(null);
-        const result = await sendCode(client, { email, kind });
+        const result = await sendCode(client, { email, kind, turnstileToken });
         setSending(false);
         const at = Date.now();
         setNow(at);
@@ -174,6 +195,7 @@ export function CodeStep({
             return;
         }
         setError(result.message);
+        setChallenge(result.challenge === true);
         if (result.resendAfterSeconds !== null) {
             setResendAt(at + result.resendAfterSeconds * 1_000);
         }
@@ -204,10 +226,10 @@ export function CodeStep({
     return (
         <div>
             <AuthHeading
-                title={CODE_WORDS.title}
+                title={words.title}
                 blurb={
                     <>
-                        {codeLead(email)}
+                        {lead}
                         {next ? ` ${next}` : null}
                     </>
                 }
@@ -243,20 +265,26 @@ export function CodeStep({
                     onChange={(e) => onCode(e.target.value)}
                     disabled={checking}
                     aria-invalid={error ? true : undefined}
-                    note={CODE_WORDS.spam}
+                    note={words.spam}
                     className="coarse:text-[17px] font-mono text-[17px] tracking-[0.4em]"
                 />
                 <AuthSubmit disabled={checking}>
                     {checking ? CODE_WORDS.checking : CODE_WORDS.submit}
                 </AuthSubmit>
             </form>
+            {challenge ? (
+                <CodeChallenge onToken={(token) => void resend(token)} />
+            ) : null}
             {spent ? (
-                <AuthAlt onClick={resend} disabled={sending || checking}>
+                <AuthAlt
+                    onClick={() => void resend()}
+                    disabled={sending || checking}
+                >
                     {sending ? "Sending…" : CODE_WORDS.sendNew}
                 </AuthAlt>
             ) : (
                 <AuthAlt
-                    onClick={resend}
+                    onClick={() => void resend()}
                     disabled={sending || checking || wait > 0}
                 >
                     {sending ? "Sending…" : resendLabel(wait)}
@@ -267,7 +295,7 @@ export function CodeStep({
                 disabled={checking}
                 className="mt-0"
             >
-                {CODE_WORDS.changeEmail}
+                {words.changeEmail}
             </AuthAlt>
         </div>
     );

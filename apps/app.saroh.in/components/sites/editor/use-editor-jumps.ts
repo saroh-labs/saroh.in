@@ -8,6 +8,21 @@ import type {
 import type { Section } from "@/lib/sites/service";
 
 /**
+ * A note on another page, to select once that page's editor opens: the
+ * editor is remounted per page, so the block can only be found after the
+ * navigation. Module state, not storage: it lives exactly one client-side
+ * navigation.
+ */
+let pendingNote: { pageId: string; sectionKey: string } | null = null;
+
+/** The note to select on this page, if a jump brought us here; once. */
+export function takePendingNote(pageId: string): string | null {
+    const hit = pendingNote?.pageId === pageId ? pendingNote.sectionKey : null;
+    pendingNote = null;
+    return hit;
+}
+
+/**
  * Going to what a note or a pre-publish flag is about: a selection on this
  * page, or a navigation to another. Moved out of `site-editor.tsx` unchanged
  * (#260).
@@ -47,6 +62,7 @@ export function useEditorJumps({
                 showError("Save this page before opening another.");
                 return;
             }
+            pendingNote = { pageId: jumpPageId, sectionKey };
             router.push(`/sites/${siteId}?page=${jumpPageId}`);
             return;
         }

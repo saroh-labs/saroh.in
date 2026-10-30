@@ -6,6 +6,7 @@ import { CommunicationsService } from "../communications/communications.service"
 import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { MessagingCoreModule } from "../messaging/messaging-core.module";
 import { AccountAreaGuard } from "./account-area";
 import { AccountDataRequestController } from "./account-data-request.controller";
 import { AccountDataRequestService } from "./account-data-request.service";
@@ -38,6 +39,7 @@ import {
     EMAIL_CHANGED_SENDER,
     EmailChangeService,
 } from "./email-change.service";
+import { PhoneSignInService } from "./phone-sign-in.service";
 import { ReceiptPdfService } from "./receipt-pdf.service";
 import { SessionsController } from "./sessions.controller";
 import { SessionsService } from "./sessions.service";
@@ -77,6 +79,8 @@ import { WaitlistClaimService } from "./waitlist-claim.service";
         JobsModule,
         // A receipt's "Download PDF" (DEC-083).
         InvoicePdfModule,
+        // WhatsApp sign-in codes from Saroh's sender (DEC-196).
+        MessagingCoreModule,
     ],
     controllers: [
         SignInController,
@@ -111,6 +115,7 @@ import { WaitlistClaimService } from "./waitlist-claim.service";
         SiteCodeDelivery,
         SessionsService,
         SignInCodesService,
+        PhoneSignInService,
         SiteRelayGuard,
         CustomerSessionGuard,
         ThreadsService,

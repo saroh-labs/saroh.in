@@ -101,3 +101,27 @@ describe("the header's site address", () => {
         expect(html).toContain("not live yet (opens in a new tab)");
     });
 });
+
+describe("the header for someone who reads the site (DEC-200)", () => {
+    it("sends Review to the editor, not a separate screen", () => {
+        const site = {
+            id: "site_1",
+            name: "Rehearsal Bakery",
+            state: { label: "Live · published 17 Oct", tone: "live" as const },
+        };
+        const html = renderToStaticMarkup(
+            <WebsiteHeader
+                site={site}
+                sites={[site]}
+                address="rehearsal-bakery.saroh.app"
+                canEdit={false}
+                mayCreate={false}
+                pageCount={3}
+                postCount={2}
+            />,
+        );
+        expect(html).toMatch(/href="\/sites\/site_1"[^>]*>[^<]*Review/);
+        expect(html).not.toContain("/sites/site_1/review");
+        expect(html).toContain("Live · published 17 Oct");
+    });
+});

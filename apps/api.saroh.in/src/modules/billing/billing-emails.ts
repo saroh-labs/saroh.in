@@ -128,10 +128,14 @@ export function invoiceEmail(input: {
     total: string;
     period: string | null;
     firstMonth?: boolean;
+    /** A messaging top-up (#1241): no plan, the balance it adds. */
+    topup?: boolean;
 }): RenderedEmail {
-    const what = input.firstMonth
-        ? `the first month of ${input.businessName}'s ${input.planName} plan`
-        : `${input.businessName}'s ${input.planName} plan`;
+    const what = input.topup
+        ? `${input.businessName}'s messaging balance`
+        : input.firstMonth
+          ? `the first month of ${input.businessName}'s ${input.planName} plan`
+          : `${input.businessName}'s ${input.planName} plan`;
     return {
         subject: `Your Saroh invoice ${input.number}`,
         html: wrap(`Invoice ${input.number}`, [

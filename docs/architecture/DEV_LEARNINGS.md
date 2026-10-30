@@ -3767,7 +3767,7 @@ files. The optimizer only re-encoded them.
 `/_next/image`. If a browser spec waits on an image's `naturalWidth`, a
 trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
-**Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+**Category**: marketing · `apps/saroh.in/components/help/help-step.tsx`
 
 ## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
 
@@ -4296,6 +4296,14 @@ second. On CI's runners, beside every other package's tests, it took 5.3 to
 **Rule**: a test that does real work in a loop (decoding, rasterising,
 hashing many inputs) gets an explicit timeout. CI ran this one six times
 slower than the laptop, so the local time says little.
+**Again (28 Oct, development after #1260)**: `form-sheet.test.tsx` read focus
+right after pressing Cancel; on CI the close animation hadn't handed focus
+back yet. Wait for it (`vi.waitFor`), never read focus once after a close.
+The 70-day showcase seed test also brushed its 300s limit on the same run.
+**Again (27 Oct, #1256)**: saroh.in's `lib/site-pages.test.ts` reads every
+changelog and Help entry and timed out the same way. saroh.in's and
+`@saroh/search-pages`' vitest configs now set `testTimeout: 30_000` for the
+whole app, since most of their tests read content from disk.
 **Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
 
 ## The gate's quick API test step hung for ever on watchman
@@ -4827,7 +4835,7 @@ what is true, and `builtContext()` asks the build's own moment
 page. Launch day is a checklist:
 `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
 **Check**: `public-headers.test.ts`, `lib/shot-sources.test.ts` (a missing
-sized copy fails, naming the command), `app/(v2)/seo-pages.test.tsx` (the
+sized copy fails, naming the command), `app/(site)/seo-pages.test.tsx` (the
 link preview page takes no props and awaits nothing),
 `lib/help-host.test.ts`.
 **Rule**: a static site's caching is set where its files are served, so
@@ -5968,3 +5976,256 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) calendar-week clicked `[data-strip-day="<tomorrow>"]` guarded by `isEnabled()` — but when today is the week strip's last day, tomorrow starts the next week and isn't on the strip, so `isEnabled()` on a missing locator hangs 15s and times out. (2) bookings "opens on List" used `region[Free times].or(heading /Closed on|Nothing booked/)` — an open, unbooked day shows **both** "Nothing booked today" and a Free times section, so `.or()` matched two and tripped strict mode.
 - **Fix:** guard with `(await next.count()) > 0` before `isEnabled()`; add `.first()` to the `.or()`. Both in `e2e/tests/`.
 - **Rule:** an e2e assertion about "today"/"tomorrow" must survive week and DST boundaries — `isEnabled()`/`isVisible()` on a locator that may not exist waits the full timeout (use `count()` first), and an `.or()` that can match more than one state needs `.first()`.
+
+## An audit called every "Start free" false because a pattern doc still said sign-up was waitlist-only (26 Oct 2026)
+
+- **Symptom:** the /for/ phone UX audit rated "Every CTA promises a sign-up that isn't open" severity 4 and proposed "Join the waitlist" buttons, nine days after launch.
+- **Cause:** `docs/patterns/saroh-product.md` → "Saying what is true" still read "Signup is waitlist-only … until then no CTA points at sign-up". Agents treat that file as current truth; nobody rewrote it when the launch switches were flipped on 17 Oct.
+- **Fix:** the bullet now says sign-up is open since the 17 Oct launch (both switches flipped) and keeps the old rule as history. Checked live: www.saroh.in's Start free links to accounts `/signup?src=…`, and `/signup` answers 200 "Sign up · Saroh" without the key.
+- **Rule:** when a launch or release flips a switch a pattern doc describes as "until then…", update that doc in the same batch; an audit claim about what's live gets checked against the live site before it's reported.
+
+## prettier-plugin-tailwindcss glues a class onto the one before it (26 Oct 2026)
+
+- **Symptom:** the /for/ pages' picked time, service and person weren't highlighted, taken times weren't struck through, and pills wrapped. The agent's screenshots had been right; the committed code was not.
+- **Cause:** the commit hook runs Prettier with `prettier-plugin-tailwindcss`, which trims the whitespace at the edges of each string inside a `className` template. `` `vc-time${on ? " on" : ""}` `` became `` `vc-time${on ? "on" : ""}` ``, so the class came out `vc-timeon`.
+- **Fix:** keep the space in the template's fixed text, outside `${…}`: `` `vc-time ${on ? "on" : ""}` `` (or use `cn()`/`clsx`). Every other className template in the repo already did this.
+- **Where the rule lives:** `packages/search-pages/src/search-page.test.tsx` ("class names") fails when a page draws a class `styles.css` doesn't style. Screenshots for review are taken from committed code, never from a working copy before the hook runs.
+
+## `@saroh/search-pages`' index pulled react-dom/server into every Server Component (26 Oct 2026)
+
+- **Symptom:** the admin's first Server Component importing `@saroh/search-pages` failed `next build`: "You're importing a component that imports react-dom/server". Moving the import into a route handler failed the same way ("App Route").
+- **Cause:** `searchPageChecks` (`checks.tsx`) reads a page by drawing it with `renderToStaticMarkup`, and the package index re-exported it, so `listSearchPages()` or `<SearchPage>` from a Server Component brought react-dom/server along. Next refuses it on the whole server graph (Server Components and route handlers); the package's own vitest never sees that rule.
+- **Fix:** the index no longer exports it; it is `@saroh/search-pages/checks` (package.json `exports`). The admin runs it in a client component (`components/search-pages/page-checks.tsx`).
+- **Rule:** a shared package a Next app imports on the server never re-exports a module that imports react-dom/server from its index; that goes behind its own subpath, used from client components or Node scripts. Check a new package with the consuming app's `next build`, not only its own tests.
+
+## A new API controller must be named in the module rollout list (26 Oct 2026)
+
+- **Symptom:** `pnpm prepush --all` failed `module-annotations.spec.ts` ("names every controller under src/modules in one of the lists") after the search-pages unit's own quick gate had passed.
+- **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
+- **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
+
+## A hand-merged stylesheet broke the site build while every test passed (26 Oct 2026)
+
+- **Symptom:** saroh.in's build failed "CssSyntaxError … Unclosed block" in `packages/search-pages/src/styles.css` after four tool branches were merged; the package's 475 tests were green.
+- **Cause:** each branch appended its own CSS; resolving the conflicts by keeping "both sides" of each hunk dropped a closing brace the hunks shared. No test loads the stylesheet.
+- **Fix:** rebuilt the file as the base plus each branch's appended part; `search-page.test.tsx` now fails when the stylesheet's blocks don't close. When several branches append to one file, rebuild it from base + each branch's suffix rather than hand-resolving hunks.
+
+## CodeQL flagged regexes in build-time content checks (26 Oct 2026)
+
+- **Symptom:** PR #1252's CodeQL check failed with four warnings in `packages/search-pages`: polynomial ReDoS on `<[^>]+>`, `[\w.-]+@[\w.-]+` and an unanchored `[^?.]*[?.]`, and double unescaping (`&amp;` replaced before `&lt;`). `pnpm prepush --all` had passed; it doesn't run CodeQL.
+- **Fix:** `[^<>]*` in the tag match, email words found by splitting on spaces first (`emailsIn`), `indexOf` for the first sentence, `&amp;` unescaped last; tests pin each.
+- **Rule:** in any matcher run on text, never put an unbounded class that can match the next token's first character in front of it (`[\w.-]+@`, `<[^>]+>`), and never unescape `&amp;` before the other entities.
+
+## An API outage blocked every website deploy (26 Oct 2026)
+
+- **Symptom:** a production build of saroh.in reads the /for/ publish list (DEC-193) and the published pricing from the API, and fails when it can't, after a minute of retries. So with the API down, no saroh.in deploy could go out, not even an urgent fix unrelated to either list.
+- **Fix:** every production build writes what it read to `public/_build/state.json` (served at `https://www.saroh.in/_build/state.json`, robots-disallowed, `noindex`). When the API can't be read, the prebuild (`search-pages.config.js`, `build-state.config.js`) fetches the live site's copy once, validates it with the same checks, builds from it for both lists and prints a `::warning` annotation with when that snapshot was built. Pricing is read once, in the prebuild, and `lib/pricing.ts` reads it back from `.build-pricing.json` in a production build. Neither answering, the build fails as before. Previews are unchanged.
+- **Rule:** a build that depends on a live service has a last-known-good fallback that is itself public and versioned with the site; it warns loudly and never invents data. Pattern: `docs/patterns/frontend-app-structure.md` (saroh.in, "What a build reads from the API"); tests: `apps/saroh.in/build-state.test.ts`.
+
+## Every Help and Integrations share card was a 500 on saroh.in (27 Oct 2026)
+
+- **Symptom:** og:image for every `/help/<slug>` and `/integrations/<provider>` page answered 500 ("Image failed to load" in link previews); the hub pages' cards were fine.
+- **Cause:** those `opengraph-image.tsx` files read the article's .mdx through `lib/help-docs.ts` / `lib/integration-docs.ts` (`readdirSync`). Cards under a dynamic segment with `generateImageMetadata` are drawn on request by the Worker, which has no `content/` on disk; `generateStaticParams` doesn't make Next pre-draw them. The Solutions and Features cards work because their words are TS modules.
+- **Fix:** `og-cards.config.js` writes `lib/og-cards.gen.ts` (each article's title/area, each integration's name/intro); the cards import that. `lib/og-cards.test.ts` fails when the file is behind the articles, and when any `opengraph-image` imports an .mdx reader or `node:fs`. Checked with `opennextjs-cloudflare preview` (a plain `next start` reads files and hides it).
+- **Also 27 Oct:** `@saroh/search-pages` tests timed out on CI (lazily loaded tools; 5s test / 1s findBy defaults) — the package now sets testTimeout 30s and asyncUtilTimeout 10s.
+
+## site-booking-steps "a pay-now hold survives a step back" failed in full runs (27 Oct 2026)
+
+- **Symptom:** failed twice in a row in 2 of 5 `prepush --all` runs (desk or phone): Back from pay landed on "when", not "details"; passed alone and on re-runs.
+- **Cause:** it booked the Warehouse walkthrough on the same day and last time as site-booking-looks (`count - (phone ? 5 : 1)`). When both ran together one lost the time; `bookUntilOurs`'s retry goes back through "when", so the history behind pay was different.
+- **Fix:** the spec books 4th from the end on desk, 9th on a phone, days no other spec books this service on. Rule: a spec that asserts history or a specific time picks a day/time no other spec uses for the same service (`saroh-browser-tests`: a spec owns its data).
+
+## Every WhatsApp sign-in code from MSG91's widget was refused by Meta (27–28 Oct 2026)
+
+- **Symptom:** on saroh.io, phone sign-in on WhatsApp never arrived; MSG91's log showed Meta refusing each send. The same template sent by hand from MSG91's dashboard with all its values was delivered.
+- **Cause:** Saroh's approved authentication template `saroh_merchant_login` (en_US) has four body variables (code, app name, validity, number to call) plus a copy-code button. MSG91's OTP widget fills only `body_1`, `body_2` and the button, so Meta rejected every send for missing parameters.
+- **Fix (owner, 28 Oct: "widget is for SMS"):** WhatsApp codes for Saroh accounts are made, sent and checked by the API (`account-phone/phone-codes.ts`, `AccountPhoneCode`), with all four variables in en_US (`Msg91Provider.sendWhatsappAuth`). The widget does SMS only. Rule: a WhatsApp template with more than two body variables is server-sent, never through the widget; `msg91.provider.spec.ts` pins the four variables and the language (`docs/architecture/MESSAGING_MSG91.md`).
+
+## A webhook's secret header reached the error line
+
+**Symptom**: local pentest (28 Oct): a 2 MB body to `POST /public/webhooks/msg91`
+answered 500, and the `unhandled_exception` line carried
+`x-saroh-webhook-secret` in clear. The error tracker gets the same headers.
+**Cause**: `SENSITIVE_HEADERS` didn't list the new header, and body-parser's
+`entity.too.large` wasn't mapped, so it took the 5xx path that logs headers.
+**Fix**: the header is redacted; an oversized body is a 413
+(`AllExceptionsFilter`). saroh.io's logs were checked: no copy of the secret.
+**Rule**: a new header that proves who is calling goes into
+`SENSITIVE_HEADERS` in the same commit (`common/logging/redact.ts`).
+**Category**: security · logging
+
+## A limit checked and recorded apart lets a burst through
+
+**Symptom**: local pentest (28 Oct): 20 simultaneous `POST /account-phone/start`
+for one number sent 19 WhatsApp codes; the 30-second cooldown and daily caps
+were meant to allow 1.
+**Cause**: `phone-limits.ts` counted rows, then the service wrote the START row
+later; every request in the burst counted before any wrote. Its own `shortcut:`
+comment named the gap.
+**Fix**: `claimStart` checks and writes the START row in one transaction under
+`pg_advisory_xact_lock` per phone, then per address (fixed order), as
+`messaging/abuse-guard.ts` already did; a failed send marks the row instead of
+writing another. A DB spec fires 20 at once and expects 1.
+**Rule**: a limit that guards money or sends is checked and recorded in one
+locked step; never "count now, write later".
+**Category**: security · rate limits
+
+## A WhatsApp authentication template with extra variables is refused on API sends
+
+**Symptom**: 28 Oct, saroh.io: every server-sent sign-in code with
+`saroh_merchant_login` (code, app name, validity, number to call, plus a
+copy-code button) came back FAILED from WhatsApp within a second: six tries,
+with and without the template namespace, with the number as digits or
+"+91 …". The same template sent by hand from MSG91's dashboard was delivered.
+**Cause**: not found in detail (MSG91 showed no reason); Meta's authentication
+category is built for its fixed text with one variable, the code.
+**Fix**: `saroh_login_code`, Meta's standard authentication template (the code
+and a copy-code button), delivered on the first try. `sendWhatsappAuth` sends
+only `body_1` and `button_1`; `MESSAGING_SUPPORT_PHONE` is gone.
+**Rule**: sign-in codes use the code-and-button authentication shape only. Before
+spending more test sends on a failing template, get WhatsApp's error code.
+**Category**: integrations · messaging
+
+## Moving files under a running `next dev` 500s every page
+
+**Symptom**: after `git mv`-ing app.saroh.in's settings pieces into
+`@saroh/ui` (DEC-199), every page of the running dev server answered 500 with
+`ENOENT … components/shared/forms/form-sheet.test.tsx` from Tailwind's
+`resolveChangedFiles`; restarting the server alone didn't help.
+**Cause**: Turbopack's persistent cache under `.next/` kept Tailwind's list of
+content files, including the moved ones.
+**Fix**: stop the app, delete its `.next/`, start it again.
+**Rule**: after moving or deleting source files a dev server scans, clear that
+app's `.next/` before trusting a 500.
+**Category**: tooling · local dev
+
+## A library's own CORS made every public answer credentialed
+
+**Symptom**: 29 Oct pentest, saroh.io: a GET to any `/public/*` route from
+any Origin came back with that origin in `Access-Control-Allow-Origin` and
+`Access-Control-Allow-Credentials: true`, though `common/cors.ts` answers
+public routes without credentials (its spec passed).
+**Cause**: `@thallesp/nestjs-better-auth` calls `enableCors({ origin:
+trustedOrigins, credentials: true })` for every path unless told not to. Two
+`cors` middlewares ran: ours set the reflected origin, the wrapper's added the
+credentials header (a preflight looked right, since ours ends it first).
+**Fix**: `disableTrustedOriginsCors: true` in `AuthModule.forRoot`; main.ts's
+`corsOptionsFor` is the only CORS layer (`app.bootstrap.spec.ts` checks it).
+**Rule**: one CORS layer. Check response headers on a real request, not only
+the options function, and read what a module does in `configure`.
+**Category**: security · CORS
+
+## A db spec under `src/common` never ran
+
+**Symptom**: 30 Oct: `common/auth/code-mail-limits.db.spec.ts` (the per-address
+code cap) was committed "tested", but neither jest project ran it.
+**Cause**: the unit project (`jest.config.js`) skips every `*.db.spec.ts`, and
+the integration project matched only `src/modules/**`.
+**Fix**: `jest.integration.config.js` also matches `src/common/**/*.db.spec.ts`.
+**Rule**: a new spec's first run is by its path; "No tests found" means no
+project picks it up, not that it passed.
+**Category**: tooling · tests
+
+## A data export failed now and then with ENOENT on its own zip
+
+**Symptom**: 30 Oct gate: `data-export.db.spec.ts` ("says it failed … once the
+tries run out") failed once under RLS with ENOENT opening the temp zip; it
+passed in other runs.
+**Cause**: `buildDataExport` handed the store a lazily opened
+`createReadStream(path)`. A store that refused without reading it let
+`finally` delete the file before the stream's own open ran.
+**Fix**: open a `FileHandle` before the upload, stream from it, and close it
+before `rm` (`data-export-build.ts`).
+**Rule**: never delete a file that a lazily opened stream may still open; hold
+the handle and close it first.
+**Category**: api · files
+
+## A privacy check failed because a timestamp held the same digits
+
+**Symptom**: 30 Oct, CI on #1273: `booking-flow-customer.test.tsx` failed
+"not to contain '98450'" though no phone number was stored; the draft's
+`savedAt` was `1793343798450`.
+**Cause**: the check searched the whole stored JSON for five digits of the
+sample number, which any millisecond timestamp can contain.
+**Fix**: assert on the whole number in both forms (`98450 12345`,
+`9845012345`).
+**Rule**: a "not stored" check looks for the full value, never a fragment
+short enough to appear in an id or a timestamp.
+**Category**: tests · flakes
+
+## A seed sweep timed out on CI only when every package's tests ran
+
+**Symptom**: 30 Oct, #1273: `clinic.test.ts` "70 days running" passed
+locally in 13s but timed out at 300s on CI, twice in a row.
+**Cause**: the zod upgrade touched every package, so the unit job ran every
+package's tests at once; the 490-seed sweep starved under that load (it had
+needed over 120s on CI before, #825).
+**Fix**: the unit step sets `SEED_SWEEPS=later` (passed through by turbo for
+`@saroh/database#test`), the sweeps skip there, and a "Seed sweeps" step runs
+them alone right after. Locally nothing changes.
+**Rule**: a test that needs minutes of CPU runs in a CI step of its own, not
+inside the all-packages run.
+**Category**: tooling · CI
+
+## A Reviewer's own approval didn't count for the Reviewer (30 Oct 2026)
+
+**Symptom**: the batch gate for DEC-200: a Reviewer approved, saw "Marked as
+approved.", reloaded, and was offered Approve and Ask for changes again
+instead of Change your review. Later review specs then met a bar they didn't
+expect.
+**Cause**: `getReviewState` asks "what if THIS caller published now", and an
+approval by the publisher never settles a review. For a Reviewer, who can't
+publish, that made their own approval not count, so a request stayed
+"pending" for them while the owner saw it settled.
+**Fix**: the caller is the publisher only when they hold `site:publish`
+(`reviewer-state.db.spec.ts` covers it). The review specs' fixture presses
+Change your review first when an earlier approval left it there.
+**Rule**: a "who is acting" check in a read must ask whether the caller can
+do that act at all. Specs that record a verdict on shared seeded data must
+work from either standing.
+**Category**: sites · review
+
+## A booking-flow test missed its 1s wait on CI under every package's tests
+
+**Symptom**: 30 Oct, development after #1273: `booking-flow.test.tsx` "opens on
+the day and says so when the time has just gone" could not find its message;
+74/74 pass locally.
+**Cause**: Testing Library's `findBy*` waits 1s by default; the all-packages
+CI run (zod 4 touched every package) is slower than that.
+**Fix**: `packages/site-blocks/vitest.setup.ts` sets
+`configure({ asyncUtilTimeout: 10_000 })`, as `search-pages` did on 27 Oct.
+**Rule**: a package whose tests wait on findBy* sets asyncUtilTimeout in its
+setup; the 1s default is a CI flake waiting to happen.
+**Category**: tests · flakes
+
+## CI's unit job failed one run in four, always on timing
+
+**Symptom**: 25–30 Oct, about 11 of 40 CI runs failed, nearly all in "Unit
+tests" and nearly all timing: 5s test timeouts (saroh.in, search-pages ×2),
+a 1s findBy wait (booking flow), a focus check (form-sheet), an update after
+jsdom's teardown (Move class), a 300s seed sweep. The same commit's other run
+usually passed; everything passed locally.
+**Cause**: the job ran `turbo run test` with turbo's default concurrency (ten
+packages at once), each vitest starting a worker per core: ~40 jsdom
+processes on the runner's four cores. Timing tests starved. A change touching
+every package (zod 4) made it run everything together.
+**Fix**: `--concurrency=2 -- --maxWorkers=2` on the unit step (four
+processes, four cores), and the seed sweeps in their own step. The individual
+flakes were also fixed where they were real (savedAt digits, Move class).
+**Rule**: CI parallelism is sized to the runner's cores; raising one test's
+timeout treats the symptom. When unrelated timing tests fail at random, look
+at the job's process count first.
+**Category**: tooling · CI
+## "window is not defined" from a sheet's read that answered after it closed
+
+**Symptom**: 30 Oct, release #1262's unit job: `ReferenceError: window is not
+defined` at `site-blocks/src/account/move-class.tsx:62`; the same commit's
+other run passed.
+**Cause**: Move class read the class's days on open and set state when the
+answer came, even after the sheet was gone; a test that ended first let the
+answer land after jsdom's teardown. A customer closing the sheet early hit
+the same late update.
+**Fix**: the read ignores an answer once the sheet has closed (`open` ref).
+**Rule**: a fetch started in an effect checks the component is still there
+before it sets state.
+**Category**: react · tests

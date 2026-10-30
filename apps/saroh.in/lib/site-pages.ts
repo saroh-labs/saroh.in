@@ -51,6 +51,15 @@ import { integrationMeta } from "@/lib/integration-docs";
 import type { LaunchMode } from "@/lib/links";
 import { llmsText } from "@/lib/llms";
 import { resourcesContext } from "@/lib/resources-context";
+import type { PublishList } from "@/lib/search-pages";
+import {
+    FOR_HUB,
+    liveSearchPages,
+    liveTools,
+    publishList,
+    TOOLS_HUB,
+} from "@/lib/search-pages";
+import { listSearchPages } from "@saroh/search-pages";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
@@ -65,8 +74,29 @@ import { resourcesContext } from "@/lib/resources-context";
  * published and built, the changelog's live entries, Help's live
  * articles and the gallery's templates, follow. Without
  * one, only the fixed pages: what a redirect may always land on.
+ *
+ * With it too, the live /for/ pages and their hub (DEC-193): never a draft,
+ * and a /solutions/ page no longer once its /for/ page is live (it then
+ * redirects there, `redirects.js`).
  */
-export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
+export function indexedPaths(
+    mode: LaunchMode,
+    ctx?: PublishContext,
+    list: PublishList = publishList(),
+): string[] {
+    const forPages: string[] = ctx
+        ? liveSearchPages(list).map((p) => p.path)
+        : [];
+    // The package's live tools (#1253; the app's two are Resources pages,
+    // in `resources`) and their hub, once any tool is live.
+    const tools = ctx ? liveTools(list) : [];
+    const toolPages = tools
+        .filter((t) => !t.inApp && routeExists(t.path, ctx?.routes ?? null))
+        .map((t) => t.path);
+    const toolsHub =
+        tools.length > 0 && routeExists(TOOLS_HUB.path, ctx?.routes ?? null)
+            ? [TOOLS_HUB.path]
+            : [];
     const resources = ctx ? resourcePaths(ctx) : [];
     const entries =
         ctx && resources.includes("/changelog")
@@ -90,7 +120,11 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         "/",
         ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
         ...FEATURE_SLUGS.map(featureHref),
-        ...SOLUTION_SLUGS.map(solutionHref),
+        ...SOLUTION_SLUGS.map(solutionHref).filter(
+            (path) =>
+                !forPages.includes(path.replace(/^\/solutions\//, "/for/")),
+        ),
+        ...(forPages.length > 0 ? [FOR_HUB.path, ...forPages] : []),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
         // Who makes Saroh and how to write to it (DEC-137): pages in
         // either launch mode, with no publish date.
@@ -102,6 +136,8 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         // For language models (#1187): served in either launch mode.
         "/llms.txt",
         ...resources,
+        ...toolsHub,
+        ...toolPages,
         ...entries,
         ...help,
         ...templates,
@@ -176,6 +212,26 @@ export function lastModified(
     if (article) return dayInIndia(article.updated);
     const provider = INTEGRATION_SLUGS.find((s) => integrationHref(s) === path);
     if (provider) return dayInIndia(integrationMeta(provider).updated);
+    // A /for/ page or a package tool: its own `updated`; a hub, its newest
+    // live page's. The app's two tools keep their content modules' days.
+    const forPage = listSearchPages().find(
+        (p) => p.path === path && !(p.kind === "tools" && p.inApp),
+    );
+    if (forPage) return dayInIndia(forPage.updated);
+    if (path === TOOLS_HUB.path) {
+        const day = liveTools()
+            .map((p) => p.updated)
+            .sort()
+            .at(-1);
+        return day ? dayInIndia(day) : undefined;
+    }
+    if (path === FOR_HUB.path) {
+        const day = liveSearchPages()
+            .map((p) => p.updated)
+            .sort()
+            .at(-1);
+        return day ? dayInIndia(day) : undefined;
+    }
     if (path.startsWith(`${TEMPLATES_PATH}/`)) {
         return dayInIndia(TEMPLATES_UPDATED);
     }
@@ -205,4 +261,10 @@ export const SERVED_PATHS: readonly string[] = indexedPaths("waitlist");
  * crawler that is kept out never reads that, so the address could still be
  * listed bare from a link to it. Left open, the page is read and dropped.
  */
-export const CRAWL_DISALLOWED = ["/api/", "/pricing/draft", "/pricing/preview"];
+export const CRAWL_DISALLOWED = [
+    "/api/",
+    "/pricing/draft",
+    "/pricing/preview",
+    // The last build's snapshot of what it read (build-state.config.js).
+    "/_build/",
+];

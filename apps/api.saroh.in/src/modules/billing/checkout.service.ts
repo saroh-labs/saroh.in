@@ -1422,6 +1422,74 @@ export class CheckoutService {
         };
     }
 
+    /**
+     * A one-off charge that is no plan (a messaging top-up, #1241): an order
+     * on Saroh's billing provider, made as a yearly plan's is — linked to
+     * the billing profile's customer, refused until who is billed is whole
+     * (owner, 17 Oct 2026) — with what the browser's window needs. Owner
+     * only. `amountPaise` is GST included; `reference` is the caller's id.
+     */
+    async startOneOff(
+        ctx: OrganizationContext,
+        input: { amountPaise: number; reference: string; itemKey: string },
+    ): Promise<{
+        provider: string;
+        providerOrderId: string;
+        handoff: CheckoutHandoff | null;
+    }> {
+        authorize(ctx, "billing:manage");
+        await assertWorkspaceWrite(ctx.organizationId, "new");
+        await assertBillingMayStart(prisma, ctx.organizationId);
+        const party = await readBillingParty(prisma, ctx.organizationId);
+        checkoutDetails(party, {}, { state: null, gstin: null });
+        const billingProfileId = party.profile?.id ?? null;
+        const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
+        if (!provider.orders) {
+            throw new ConflictException("This can't be bought yet.");
+        }
+        const billTo = { billToGstin: null, billingProfileId };
+        let customerId: string | null;
+        let providerOrderId: string;
+        try {
+            customerId = await this.customers.idFor(billingProfileId);
+            ({ providerOrderId } = await provider.orders.createOrder({
+                amountPaise: input.amountPaise,
+                currency: "INR",
+                reference: input.reference,
+                organizationId: ctx.organizationId,
+                planKey: input.itemKey,
+                customer: await this.billingCustomer(ctx, billTo),
+            }));
+        } catch (error) {
+            if (error instanceof HttpException) throw error;
+            this.logger.warn(
+                `billing_one_off_provider_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
+            );
+            throw new ServiceUnavailableException(
+                "We couldn't start the payment. Try again in a minute.",
+            );
+        }
+        const handoff = await this.handoff(
+            ctx,
+            {
+                provider: CATALOGUE_BILLING_PROVIDER,
+                providerSubscriptionId: providerOrderId,
+                providerPlanId: ONE_TIME_PAYMENT,
+                providerCustomerId: customerId,
+                billingProfileId,
+                billToGstin: null,
+                billToEmail: null,
+                billToPhone: null,
+            },
+            input.amountPaise,
+        );
+        return {
+            provider: CATALOGUE_BILLING_PROVIDER,
+            providerOrderId,
+            handoff,
+        };
+    }
+
     /** An OPEN checkout is replaced by a new one. */
     private async dropOpenCheckout(tx: Tx, organizationId: string) {
         const open = await tx.billingCheckout.findMany({

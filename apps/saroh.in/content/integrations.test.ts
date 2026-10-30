@@ -160,7 +160,7 @@ describe("the frontmatter check", () => {
     it("fails a page with a missing field, naming the file and the field", () => {
         const broken = source.replace(/^intro: .*$/m, "");
         expect(() => splitIntegration("razorpay.mdx", broken)).toThrow(
-            /razorpay\.mdx: frontmatter is wrong\n {2}intro: Required/,
+            /razorpay\.mdx: frontmatter is wrong\n {2}intro: Invalid input: expected string, received undefined/,
         );
     });
 

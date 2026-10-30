@@ -1,12 +1,14 @@
 import {
     Body,
     Controller,
+    ForbiddenException,
     Get,
     HttpCode,
     HttpException,
     Ip,
     Param,
     Post,
+    Query,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
@@ -96,16 +98,24 @@ export class PublicPaymentsController {
     /**
      * The buyer-safe receipt for `:orderId`: order number, line totals,
      * currency, reconciled `paymentStatus`, and the latest intent's status. No
-     * secrets, no internal ids.
+     * secrets, no internal ids. Only with the order's pay-link token
+     * (`?token=`): an id alone, or an old link without one, is refused in
+     * words that send the customer to the link they were given.
      */
     @Get(":orderId/receipt")
     async receipt(
         @Param("orderId") orderId: string,
+        @Query("token") token?: string,
         @Ip() ip?: string,
     ): Promise<PublicReceiptResult> {
         if (!this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown")) {
             throw tooManyRequests();
         }
-        return this.payments.getReceipt(orderId);
+        if (typeof token !== "string" || token.length === 0) {
+            throw new ForbiddenException(
+                "This receipt link is missing its key. Open it from the link in your email or from your order page.",
+            );
+        }
+        return this.payments.getReceipt(orderId, token);
     }
 }

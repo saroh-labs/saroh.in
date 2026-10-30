@@ -1,9 +1,5 @@
 "use client";
 
-import {
-    FormDialog,
-    FormDialogFoot,
-} from "@/components/shared/forms/form-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -14,6 +10,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@saroh/ui/form";
+import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -38,7 +35,7 @@ import {
 } from "@/lib/organizations/web-address-actions";
 
 const schema = z.object({
-    address: z.string().min(1, { message: "Enter a web address" }),
+    address: z.string().min(1, { error: "Enter a web address" }),
 });
 type Values = z.infer<typeof schema>;
 

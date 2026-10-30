@@ -3,17 +3,11 @@
 import { ShareCards } from "@saroh/ui/share-cards";
 import { useState } from "react";
 
-import {
-    Absent,
-    Group,
-    InUse,
-    Row,
-    Section,
-} from "@/components/shared/page/settings-rows";
 import { updateSiteSettings } from "@/lib/sites/actions";
 import type { SiteDetail } from "@/lib/sites/service";
 import { ROW_ANCHORS, siteNameOf } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import { Absent, Group, InUse, Row, Section } from "@saroh/ui/settings-rows";
 
 import { EditAction } from "@/components/sites/settings/edit-actions";
 import type { SettingsSave } from "@/components/sites/settings/use-settings-save";

@@ -1,7 +1,7 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { qrFileName, qrSvg } from "@saroh/ui/lib/qr-art";
 import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 import type { QrArtLogo } from "@saroh/ui/qr-art";

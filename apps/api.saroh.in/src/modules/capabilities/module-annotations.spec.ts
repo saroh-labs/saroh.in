@@ -123,6 +123,8 @@ const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
  * finishing the rollout and would in fact break the thing the runbook protects.
  */
 const NEVER: Record<string, string> = {
+    "messaging/messaging.controller.ts":
+        "Saroh-sent codes are paid from the wallet with their own per-module switch, not a plan module",
     "product-reviews/public-product-reviews.controller.ts":
         "the customer review page — no session, hangs on its token",
     "capabilities/capabilities.controller.ts":
@@ -319,7 +321,12 @@ const NEVER: Record<string, string> = {
         "someone reads an invitation before they have an account, let alone a module",
     "sign-in-options/sign-in-options.controller.ts":
         "the sign-in pages ask which providers to draw before anyone is signed in",
+    // DEC-196: a Saroh account's own phone and phone sign-in; a person, not a business.
+    "account-phone/account-phone.controller.ts":
+        "signing in to Saroh and a person's own phone, before or across any business",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
+    "messaging/msg91-webhook.controller.ts":
+        "Saroh's own MSG91 delivery reports, across businesses",
     // P1: the buyer's browser reports a payment the moment the provider's
     // window closes. Never module-gated: a payment already taken is settled
     // whatever the business has switched off since.
@@ -375,6 +382,14 @@ const NEVER: Record<string, string> = {
         "Saroh's own plan prompts to the owner — no module holds them",
     "data-export/data-export.controller.ts":
         "the owner's download of the business's own data — no module holds it",
+    // DEC-193: which of Saroh's own /for/ pages are live on saroh.in.
+    "search-pages/search-pages.controller.ts":
+        "staff control plane (Saroh's own search pages), not a tenant surface",
+    "search-pages/public-search-pages.controller.ts":
+        "saroh.in's build reads Saroh's own live page list, not a tenant surface",
+    // Messaging core: Saroh's own sender's monthly counts, no business.
+    "messaging/admin-messaging-usage.controller.ts":
+        "staff control plane (Saroh's own sender's usage), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

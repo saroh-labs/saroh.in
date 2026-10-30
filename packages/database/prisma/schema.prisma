@@ -46,6 +46,16 @@ model User {
   // recorded before it has been.
   usageNoticeSeenAt DateTime?
 
+  // A phone added to the account (messaging brief, 27 Oct; DEC-196): a second
+  // way to sign in, never instead of the email. E.164 ("+919876543210").
+  // Written only after the server checked the OTP widget's token for this
+  // number (`account-phone/`); a client's "verified" is never trusted.
+  // `phoneVerifiedAt` is renewed by every sign-in with an email code: a
+  // phone not vouched for by a code or a phone sign-in in 12 months no
+  // longer signs in (DEC-198).
+  phoneE164       String?   @unique
+  phoneVerifiedAt DateTime?
+
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
@@ -91,6 +101,9 @@ model User {
 
   // Insights suggestions this person put off with Not now (DEC-171).
   insightSuggestionsNotNow InsightSuggestionNotNow[]
+
+  // Pages of a site this person opened as a reviewer (DEC-200, U9).
+  siteReviewPageViews SiteReviewPageView[]
 
   @@index([email])
 }
@@ -273,6 +286,7 @@ model Organization {
   qrCodes              QrCode[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
+  siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
@@ -445,45 +459,52 @@ model Organization {
   customerThreadMessages CustomerThreadMessage[]
 
   // Autopay mandates at the business's own provider (round-2 D11, D20).
-  paymentMandates          PaymentMandate[]
+  paymentMandates               PaymentMandate[]
   // A class pack's history and its holders' extensions (round-2 E13).
-  packEvents               PackEvent[]
-  packExtensions           PackExtension[]
+  packEvents                    PackEvent[]
+  packExtensions                PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
-  customerNotices          CustomerNotice[]
+  customerNotices               CustomerNotice[]
   // Which automatic customer notices it has turned off or on, where that
   // differs from the default in code (DEC-174, U1 #1132).
-  customerNoticeSettings   CustomerNoticeSetting[]
-  overdueReminderTiming    OverdueReminderTiming?
+  customerNoticeSettings        CustomerNoticeSetting[]
+  overdueReminderTiming         OverdueReminderTiming?
   // "Tell me when it's back" (DEC-174 U23).
-  stockWatches             StockWatch[]
+  stockWatches                  StockWatch[]
+  // Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191, #1235).
+  phoneVerifications            PhoneVerification[]
+  messagingSends                MessagingSend[]
+  messagingWallet               MessagingWallet?
+  messagingLedgerEntries        MessagingLedgerEntry[]
+  messagingVerificationSettings MessagingVerificationSetting[]
+  messagingTopups               MessagingTopup[]
   // Places in line for full classes (round-2 A12).
-  classWaitlistEntries     ClassWaitlistEntry[]
+  classWaitlistEntries          ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
-  customerDataRequests     CustomerDataRequest[]
+  customerDataRequests          CustomerDataRequest[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
-  orderStageBatches        OrderStageBatch[]
+  orderStageBatches             OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
-  notificationPreferences  NotificationPreference[]
+  notificationPreferences       NotificationPreference[]
   // Its one order-number series, across every storefront (P3, DEC-066).
-  orderNumberSequence      OrderNumberSequence?
+  orderNumberSequence           OrderNumberSequence?
   // Web addresses it used to have, held for it after a change (DEC-069, L1).
-  addressReservations      AddressReservation[]
+  addressReservations           AddressReservation[]
   // Saroh billing: add-ons bought and coupons used (pricing catalogue U1).
-  subscriptionAddons       SubscriptionAddon[]
-  pricingCouponRedemptions PricingCouponRedemption[]
+  subscriptionAddons            SubscriptionAddon[]
+  pricingCouponRedemptions      PricingCouponRedemption[]
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
-  billingCheckouts         BillingCheckout[]
-  billingCustomers         BillingCustomer[]
+  billingCheckouts              BillingCheckout[]
+  billingCustomers              BillingCustomer[]
   // Who Saroh bills for this business (DEC-167): one of its owner's
   // billing profiles. Null only for a business made before the profile in
   // the same transaction, or whose profile's owner was deleted; a checkout
   // then makes one for the paying owner.
-  billingProfileId         String?
-  billingProfile           BillingProfile?           @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
-  sarohInvoices            SarohInvoice[]
+  billingProfileId              String?
+  billingProfile                BillingProfile?                @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
+  sarohInvoices                 SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
-  subscriptionAddonCharges SubscriptionAddonCharge[]
+  subscriptionAddonCharges      SubscriptionAddonCharge[]
 
   @@index([referredByOrganizationId])
   @@index([billingProfileId])
@@ -621,6 +642,14 @@ model BusinessProfile {
   // Off stops only Saroh's own posts: the team's replies and what the
   // customer writes are untouched.
   accountUpdates Boolean @default(true)
+
+  // The ways the business's customers sign in and sign up on its site, in
+  // its order (DEC-196): EMAIL, WHATSAPP, SMS. The first usable one is the
+  // sign-in sheet's default. Empty means never chosen: EMAIL then WHATSAPP,
+  // which is how every business worked before the choice. What the site
+  // offers is this filtered by what works now (`site-accounts/sign-in-ways.ts`),
+  // and email when nothing is left, so customers are never locked out.
+  customerSignInWays String[] @default([])
 
   // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
   // (the invoice and bank notice go out early so the debit lands on the
@@ -2296,6 +2325,8 @@ model Post {
   publications         Publication[] @relation("PostPublications")
 
   comments Comment[]
+  // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
+  reviewNotes SiteComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3837,6 +3868,9 @@ model Site {
   // their redirect lasts (DEC-069, L1).
   addressReservations AddressReservation[]
 
+  // Which pages each reviewer has opened (DEC-200, U9).
+  reviewPageViews SiteReviewPageView[]
+
   // The storefront this site sells from (G11): what `/shop`, the Product
   // grid and checkout read. Set on its own only when the business has
   // exactly one open storefront with listings (the migration's backfill and
@@ -3877,8 +3911,9 @@ model Page {
   // serves, and a site whose front door is hidden has nothing to show.
   hidden Boolean @default(false)
 
-  versions PageVersion[]
-  comments SiteComment[]
+  versions    PageVersion[]
+  comments    SiteComment[]
+  reviewViews SiteReviewPageView[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3946,8 +3981,9 @@ model SiteComment {
 
   // The section this is about. NOT a relation: the row it names is deleted and
   // recreated on every save, so a foreign key would either block the save or
-  // cascade the note away with it.
-  sectionKey String
+  // cascade the note away with it. Null on a note about a post (DEC-200 U8):
+  // a note is about a section or a post, never both (CHECK in the migration).
+  sectionKey String?
 
   authorUserId String
   author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
@@ -3968,10 +4004,51 @@ model SiteComment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The post the note is about (DEC-200 U8), instead of a page's section.
+  // SetNull, as pages are (#277): the note outlives the post, and the title
+  // snapshot below still says which one it was.
+  postId    String?
+  post      Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
+  postTitle String?
+
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])
+  @@index([postId])
   @@index([organizationId])
   @@index([testReleaseId])
+}
+
+/**
+ * A reviewer opened a page of the site in the editor (DEC-200, U9): what
+ * "You've read 3 of 4 pages" counts. Kept on the server, one row per person
+ * per page, so it follows them to any browser or phone; opening the page
+ * again moves `viewedAt` on rather than adding a row. Only views after the
+ * person's latest verdict count, so a verdict starts the count again.
+ * Cascade on the page, unlike SiteComment's SetNull: a note is a record of
+ * what someone said and outlives its page, a view of a page that is gone is
+ * nothing, and the count is against the site's current pages.
+ */
+model SiteReviewPageView {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  viewedAt DateTime @default(now())
+
+  // Site first: the review state reads one person's views on one site.
+  @@unique([siteId, userId, pageId])
+  @@index([pageId])
+  @@index([userId])
+  @@index([organizationId])
 }
 
 /**
@@ -4689,10 +4766,10 @@ model Contact {
 
   // The customer's account on the business's site (ADR-011). At most one
   // that isn't REMOVED (a partial unique on CustomerAccount).
-  customerAccounts         CustomerAccount[] @relation("CustomerAccountContact")
+  customerAccounts         CustomerAccount[]     @relation("CustomerAccountContact")
   // Accounts staff said "This isn't them" about this contact (A4), so the
   // pair is never suggested again.
-  unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
+  unlinkedCustomerAccounts CustomerAccount[]     @relation("CustomerAccountUnlinkedFrom")
   // Their "Ask to remove my data" requests (DEC-172): kept after a removal.
   dataRequests             CustomerDataRequest[]
 
@@ -7215,9 +7292,9 @@ model InvoiceEvent {
   data        Json?
   createdAt   DateTime @default(now())
 
-  @@index([invoiceId, createdAt])
   // A failed send is told once per email, however often its job retries.
   @@unique([messageId, kind], map: "InvoiceEvent_message_kind_key", where: raw("\"messageId\" IS NOT NULL"))
+  @@index([invoiceId, createdAt])
 }
 
 model InvoiceLine {
@@ -7620,9 +7697,17 @@ model CustomerAccount {
 
   // The verified sign-in email, lower-cased and trimmed. The contact's own
   // email may be a reserved placeholder (contacts/contact-email.ts) when
-  // another contact already held this one (DEC-049).
-  email           String
-  emailVerifiedAt DateTime
+  // another contact already held this one (DEC-049). Null for an account
+  // made by phone alone (DEC-196).
+  email           String?
+  emailVerifiedAt DateTime?
+
+  // A phone proved by a WhatsApp code from Saroh's sender (DEC-196), E.164.
+  // An account holds a verified email or a verified phone, at least one
+  // (CHECK "CustomerAccount_email_or_phone", migration
+  // 20270109100000_customer_sign_in_ways): a phone alone is enough.
+  phoneE164       String?
+  phoneVerifiedAt DateTime?
 
   status CustomerAccountStatus @default(ACTIVE)
 
@@ -7669,6 +7754,8 @@ model CustomerAccount {
   @@unique([organizationId, email], map: "CustomerAccount_one_live_per_email", where: raw("status <> 'REMOVED'"))
   // One live account per contact.
   @@unique([contactId], map: "CustomerAccount_one_live_per_contact", where: raw("status <> 'REMOVED'"))
+  // One live account per phone per business, as for email.
+  @@unique([organizationId, phoneE164], map: "CustomerAccount_one_live_per_phone", where: raw("status <> 'REMOVED'"))
   // The target of (accountId, organizationId) and merge foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])
@@ -7704,8 +7791,12 @@ model CustomerDataRequest {
   // Who asked, as they were when they asked. Once their details are removed
   // (DONE) the name is cleared, and the email too once the "done" email has
   // gone (review #19); a CHECK keeps the email until then.
-  requesterName  String?
-  requesterEmail String?
+  requesterName      String?
+  requesterEmail     String?
+  // A phone-only requester's verified number (DEC-196), for the WhatsApp
+  // notices; null when they have an email. Cleared once the "done" notice
+  // has been tried. A CHECK keeps an email or this until DONE.
+  requesterPhoneE164 String?
 
   kind   CustomerDataRequestKind   @default(REMOVAL)
   status CustomerDataRequestStatus @default(OPEN)
@@ -8787,4 +8878,386 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ── Saroh-sent verification codes (DEC-191, epic #1235) ─────────────────────
+// Saroh sends a business's customer a code (WhatsApp first) and the business
+// pays per message from a prepaid balance. Platform sender, not the business's
+// own provider (CommunicationProvider is untouched).
+
+enum MessagingChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum VerificationModule {
+  BOOKING
+  ORDER
+  ACCOUNT
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+enum MessagingSendStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessagingLedgerKind {
+  TOPUP
+  DEBIT
+  RELEASE
+  EXPIRE
+  ADJUST
+}
+
+// One "send a code to this number" session. Rate limits count these rows.
+model PhoneVerification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  module     VerificationModule
+  // What it verifies (a booking, an order…); informational, no FK.
+  subjectRef String?
+  phoneE164  String
+  // Never the code itself.
+  codeHash   String
+  status     PhoneVerificationStatus @default(PENDING)
+  attempts   Int                     @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  // Hashed caller address, for the per-address limit (as Waitlist's).
+  ipHash     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sends MessagingSend[]
+
+  @@unique([id, organizationId])
+  @@index([phoneE164, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
+// One actual message to the provider. Carries its own status and price, and
+// whether it was charged (chargedAt) or its hold given back (releasedAt).
+model MessagingSend {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  verificationId String
+  // Composite so a send can only belong to its own business's session.
+  verification   PhoneVerification @relation(fields: [verificationId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  channel           MessagingChannel
+  pricePaise        Int
+  providerMessageId String?
+  status            MessagingSendStatus @default(QUEUED)
+  failureReason     String?
+  chargedAt         DateTime?
+  releasedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries MessagingLedgerEntry[]
+
+  @@index([providerMessageId])
+  @@index([organizationId, createdAt])
+  @@index([verificationId])
+}
+
+// A business's prepaid balance, in paise. Available = balancePaise - heldPaise.
+model MessagingWallet {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  balancePaise Int       @default(0)
+  // Held for sends still in flight (a WhatsApp waits for delivery).
+  heldPaise    Int       @default(0)
+  // 12 months from the last top-up; null before the first.
+  expiresAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Append-only money trail. One entry of a kind per send, so a replayed
+// delivery report can't charge twice.
+model MessagingLedgerEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind         MessagingLedgerKind
+  // Signed: a top-up is positive, a debit or expiry negative, a release 0.
+  amountPaise  Int
+  balanceAfter Int
+  sendId       String?
+  send         MessagingSend?      @relation(fields: [sendId], references: [id], onDelete: SetNull)
+  // The top-up it came from (#1241).
+  topupId      String?
+  topup        MessagingTopup?     @relation(fields: [topupId], references: [id], onDelete: SetNull)
+  reason       String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([sendId, kind])
+  @@index([organizationId, createdAt])
+}
+
+enum MessagingTopupStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// A money pack bought for the messaging wallet (#1241): a one-off order on
+// Saroh's own billing provider; paid, it credits the wallet once and is
+// invoiced by Saroh. The pack's amount is copied from the live catalogue.
+model MessagingTopup {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  packId          String
+  // What the wallet is credited, before GST.
+  amountPaise     Int
+  provider        String
+  providerOrderId String               @unique
+  status          MessagingTopupStatus @default(PENDING)
+  sarohInvoiceId  String?
+  paidAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries MessagingLedgerEntry[]
+
+  @@index([organizationId, createdAt])
+}
+
+// Whether a business has Saroh send its customers a code for one module
+// (#1242). Off until the business turns it on.
+model MessagingVerificationSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  module  VerificationModule
+  enabled Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, module])
+}
+
+// ── Messaging core (messaging core, 27 Oct) ────────────────────────────────────
+// Saroh's own sender, behind the MessagingProvider port. Platform-level: no
+// organization, so no row-level security policy (named in
+// `packages/database/src/rls-coverage.test.ts`). Never a message's text or
+// a number in clear: a number is an HMAC (`numberHash`).
+
+enum MessagingUsageChannel {
+  OTP
+  WHATSAPP
+  SMS
+}
+
+// One outbound send that isn't a verification code (those are MessagingSend),
+// keyed by the provider's message id once accepted.
+model MessagingMessage {
+  id                String              @id @default(cuid())
+  channel           MessagingChannel
+  // Saroh's template key (never the text); null for a free-form reply.
+  templateName      String?
+  // "authentication" or "utility"; null for a free-form reply.
+  templateCategory  String?
+  numberHash        String
+  providerMessageId String?             @unique
+  status            MessagingSendStatus @default(QUEUED)
+  // A short code only, never the provider's words.
+  failureReason     String?
+  // The request sealed (AES-256-GCM, MESSAGING_ENC_KEY) for a retry; cleared
+  // once the provider accepts it or it fails for good.
+  sealedRequest     Json?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([numberHash, createdAt])
+}
+
+// Each provider webhook event applied once: a repeat is a no-op.
+model MessagingWebhookEvent {
+  id        String   @id @default(cuid())
+  // The provider's message uuid or request id.
+  eventId   String
+  // The status it reported, or INBOUND.
+  status    String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, status])
+  @@index([createdAt])
+}
+
+// The last time a number wrote to Saroh's WhatsApp sender: a free-form reply
+// is allowed only within 24 hours of it (Meta's customer service window).
+model MessagingContactWindow {
+  numberHash    String   @id
+  lastInboundAt DateTime
+  updatedAt     DateTime @updatedAt
+}
+
+// How many messages the provider accepted per month and channel (a widget
+// token verified counts as OTP).
+model MessagingUsage {
+  // "YYYY-MM", in UTC.
+  month     String
+  channel   MessagingUsageChannel
+  count     Int                   @default(0)
+  updatedAt DateTime              @updatedAt
+
+  @@id([month, channel])
+}
+
+// Each code or link Saroh's sign-in asked to mail to an address someone
+// typed, by the address's HMAC, never the address: the per-address cap
+// counts them (`common/auth/code-mail-limits.ts`), account or not.
+// Platform-level, not a business.
+model AccountEmailCodeSend {
+  id        String   @id @default(cuid())
+  emailHash String
+  createdAt DateTime @default(now())
+
+  @@index([emailHash, createdAt])
+}
+
+// Phone sign-in for Saroh accounts (DEC-196): each widget start, failed
+// verify, phone sign-in and phone added or removed, by number HMAC and
+// address HMAC, never the number. The start and failure rows are what the
+// abuse limits count (`account-phone/phone-limits.ts`); the rest is the
+// person's trail. No relation to User, so the trail outlives the account,
+// as AuditEvent's does. Platform-level, not a business.
+enum AccountPhoneEventKind {
+  START
+  VERIFY_FAILED
+  SIGNED_IN
+  PHONE_ADDED
+  PHONE_REMOVED
+}
+
+model AccountPhoneEvent {
+  id        String                @id @default(cuid())
+  kind      AccountPhoneEventKind
+  phoneHash String?
+  ipHash    String?
+  userId    String?
+  // Why a verify failed ("invalid_token", "unknown_phone", …).
+  reason    String?
+  createdAt DateTime              @default(now())
+
+  @@index([phoneHash, kind, createdAt])
+  @@index([ipHash, kind, createdAt])
+  @@index([userId, createdAt])
+}
+
+// A WhatsApp sign-in code for a Saroh account, made and sent by the server
+// from Saroh's own number (owner, 28 Oct 2026: "widget is for SMS"). Only
+// HMACs: of the number and of the code, never either one. A code lives 10
+// minutes and allows 5 tries; the newest unused one for a number and purpose
+// is the one checked. `userId` is the signed-in person an ADD code was sent
+// for. No relation to User, as AccountPhoneEvent. Platform-level, not a
+// business.
+enum AccountPhoneCodePurpose {
+  SIGN_IN
+  ADD
+}
+
+model AccountPhoneCode {
+  id        String                  @id @default(cuid())
+  phoneHash String
+  codeHash  String
+  purpose   AccountPhoneCodePurpose
+  userId    String?
+  expiresAt DateTime
+  attempts  Int                     @default(0)
+  usedAt    DateTime?
+  createdAt DateTime                @default(now())
+
+  @@index([phoneHash, purpose, createdAt])
+}
+
+// An SMS widget access token already used to sign in or add a phone
+// (DEC-198): sha256 of the token only, so a token seen once is never taken
+// again, whatever the provider says. Rows past `expiresAt` are pruned as new
+// ones arrive. Platform-level, not a business.
+model OtpWidgetTokenUse {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+// Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The
+// words live in `@saroh/search-pages`; this is the one publish record per
+// page path, set by staff in the admin console (search-pages:publish). A
+// path with no row has never been published. Saroh's own site: no
+// organization, so no row-level security policy (named in
+// `packages/database/src/rls-coverage.test.ts`).
+model SearchPage {
+  id              String           @id @default(cuid())
+  // `/for/<slug>`.
+  path            String           @unique
+  status          SearchPageStatus
+  // When it last went live; null while it isn't.
+  liveSince       DateTime?
+  // When it last stopped being live; null if it never was. A page taken
+  // off redirects on the site, so a restored page keeps this.
+  takenOffAt      DateTime?
+  changedAt       DateTime         @default(now())
+  // The staff user (`User.id`) who made the last change.
+  changedByUserId String?
+}
+
+enum SearchPageStatus {
+  LIVE
+  UNPUBLISHED
+  ARCHIVED
+  // Restored from the archive: back where a page with no record starts.
+  DRAFT
+}
+
+// Every publish, unpublish, archive and restore of a search page, oldest
+// to newest. Append-only.
+model SearchPageEvent {
+  id         String            @id @default(cuid())
+  path       String
+  action     String
+  // Null when the page had no record yet.
+  fromStatus SearchPageStatus?
+  toStatus   SearchPageStatus
+  byUserId   String
+  at         DateTime          @default(now())
+
+  @@index([path, at])
 }

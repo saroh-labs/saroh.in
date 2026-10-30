@@ -13,8 +13,8 @@ import { useState } from "react";
 
 import type { CrmResult } from "@/lib/api/http";
 import { runAction } from "@/lib/api/run-action";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { IconButton } from "@saroh/ui/icon-button";
-import { ConfirmDialog } from "./confirm-dialog";
 
 /**
  * A record's "…" menu with one thing in it: delete, for good.

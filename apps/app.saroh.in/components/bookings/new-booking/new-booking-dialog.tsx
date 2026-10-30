@@ -8,14 +8,10 @@ import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { bookVisit } from "@/lib/services/actions";
 import type { VisitToBook } from "@/lib/services/treatment";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /**
  * "Book visit N" of a treatment (E10): the service, the customer and the

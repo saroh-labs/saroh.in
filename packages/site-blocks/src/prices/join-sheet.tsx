@@ -154,7 +154,7 @@ function Join({
             handoff,
             business: businessName,
             description: plan.name,
-            booker: { name: customer.name ?? "", email: customer.email },
+            booker: { name: customer.name ?? "", email: customer.email ?? "" },
             apiUrl,
         });
         session.current = opened;

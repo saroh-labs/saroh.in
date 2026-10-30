@@ -5,11 +5,11 @@ import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
 import type { PaidKind, StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Label } from "@saroh/ui/label";
 import { TabStrip } from "@saroh/ui/tabs";
 import { BrandInline } from "./brand-picker";

@@ -1,4 +1,7 @@
+import { setRefusalTest } from "@saroh/ui/lib/refusal";
 import { vi } from "vitest";
+
+import { isRoleRefusal } from "@/lib/api/role-denied";
 
 /*
  * jsdom has no top layer, and its selector engine (nwsapi) resolves `:modal`
@@ -64,3 +67,10 @@ if (
 vi.mock("@/lib/billing/upgrade-prompts-action", () => ({
     recordUpgradePrompt: () => Promise.resolve(),
 }));
+
+/*
+ * The app tells its role refusals apart once, on mount (`app/providers.tsx`);
+ * the shared ConfirmDialog in @saroh/ui asks the same test. Tests render
+ * without the providers, so register it here too.
+ */
+setRefusalTest(isRoleRefusal);

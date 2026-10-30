@@ -83,7 +83,13 @@ export type SarohPaymentStatus = "Paid" | "Due";
  * of today's sources is paid when written. A source that bills before it
  * is paid must not be added here, and then reads "Due".
  */
-const PAID_WHEN_WRITTEN = new Set(["NEW", "UPGRADE", "SCHEDULED", "RENEWAL"]);
+const PAID_WHEN_WRITTEN = new Set([
+    "NEW",
+    "UPGRADE",
+    "SCHEDULED",
+    "RENEWAL",
+    "TOPUP",
+]);
 
 /** Whether the invoice's payment has been received, from how it was written. */
 export function sarohPaymentStatus(

@@ -2,7 +2,7 @@
 /**
  * The account area's frame: the top bar, Back to Saroh, and the menu of
  * what is the person's own. Billing profiles is in it only for an owner;
- * on a phone the menu is a row of tabs (one nav, laid out by width).
+ * at a desk the menu is the app's SectionList, on a phone its TabStrip.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +10,6 @@ import {
     button,
     draw,
     host,
-    must,
     setUp,
     tearDown,
     text,
@@ -36,14 +35,13 @@ const frame = (showBilling: boolean) =>
         </AccountFrame>,
     );
 
+/** The desk's SectionList. */
 const menu = () =>
-    Array.from(host.querySelectorAll("nav[aria-label='Your account'] a")).map(
-        (a) => [
-            a.textContent,
-            a.getAttribute("href"),
-            a.getAttribute("aria-current"),
-        ],
-    );
+    Array.from(host.querySelectorAll("[data-section-list] a")).map((a) => [
+        a.textContent,
+        a.getAttribute("href"),
+        a.getAttribute("aria-current"),
+    ]);
 
 describe("the account frame", () => {
     it("has the top bar and, for an owner, all three places", () => {
@@ -73,15 +71,26 @@ describe("the account frame", () => {
         ]);
     });
 
-    it("is a row of tabs on a phone and a column from md up", () => {
-        path = "/account/billing-profiles/bp_1";
+    it("keeps Billing profiles in the menu, lit, for a teammate on its page", () => {
+        path = "/account/billing-profiles";
+        frame(false);
+        expect(menu()[1]).toEqual([
+            "Billing profiles",
+            "/account/billing-profiles",
+            "page",
+        ]);
+    });
+
+    it("is the same places as tabs on a phone", () => {
+        path = "/businesses";
         frame(true);
-        const nav = must(host.querySelector("nav[aria-label='Your account']"));
-        expect(nav.className).toContain("overflow-x-auto");
-        expect(nav.className).toContain("md:flex-col");
-        for (const a of Array.from(nav.querySelectorAll("a"))) {
-            expect(a.className).toContain("min-h-11");
-        }
-        expect(menu()[1]?.[2]).toBe("page");
+        const tabs = Array.from(
+            host.querySelectorAll("nav:not([data-section-list]) a"),
+        ).map((a) => [a.textContent, a.getAttribute("aria-current")]);
+        expect(tabs).toEqual([
+            ["Profile and sign-in", null],
+            ["Billing profiles", null],
+            ["Your businesses", "page"],
+        ]);
     });
 });

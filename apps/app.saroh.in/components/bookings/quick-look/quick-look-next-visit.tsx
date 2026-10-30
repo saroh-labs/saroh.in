@@ -13,8 +13,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { formatDay, formatTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
@@ -34,6 +32,8 @@ import {
 import type { Slot } from "@/lib/services/service";
 import { takenMessage, zoneShortName } from "@/lib/services/time-picker";
 import { visitToBook } from "@/lib/services/treatment";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 import { QL_BTN, StepBody, StepFoot, StepHead } from "./quick-look-parts";
 import type { NextDayChoice } from "./quick-look-state";

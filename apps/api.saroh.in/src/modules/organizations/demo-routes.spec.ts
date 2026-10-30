@@ -29,6 +29,15 @@ const ASKS: Record<string, How> = {
     "POST public/site-accounts/codes": "site-accounts/sign-in-codes.service.ts",
     "POST public/site-accounts/sessions":
         "site-accounts/sign-in-codes.service.ts",
+    "POST public/site-accounts/phone-codes":
+        "site-accounts/phone-sign-in.service.ts",
+    "POST public/site-accounts/phone-sessions":
+        "site-accounts/phone-sign-in.service.ts",
+    // Saroh-sent verification codes (DEC-191): neither sent nor checked on a demo.
+    "POST public/site-accounts/verifications":
+        "messaging/messaging.controller.ts",
+    "POST public/site-accounts/verifications/:id/check":
+        "messaging/messaging.controller.ts",
     "DELETE public/site-accounts/session": SESSION,
     "DELETE public/site-accounts/sessions": SESSION,
     // The customer's account.
@@ -36,6 +45,8 @@ const ASKS: Record<string, How> = {
     "PATCH public/site-accounts/me/notifications": SESSION,
     "POST public/site-accounts/me/email": SESSION,
     "POST public/site-accounts/me/email/code": SESSION,
+    "POST public/site-accounts/me/phone": SESSION,
+    "POST public/site-accounts/me/phone/code": SESSION,
     "POST public/site-accounts/me/messages": SESSION,
     "POST public/site-accounts/me/notes": SESSION,
     "POST public/site-accounts/me/data-request": SESSION,
@@ -108,6 +119,7 @@ const ASKS: Record<string, How> = {
     "POST public/webhooks/:provider/:organizationId": {
         exempt: "a provider's callback",
     },
+    "POST public/webhooks/msg91": { exempt: "Saroh's MSG91 delivery reports" },
 };
 
 const modules = join(__dirname, "..");

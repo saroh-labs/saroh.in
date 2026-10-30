@@ -8,7 +8,6 @@ import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { LocationAddressFields } from "@/components/stores/place/location-address-fields";
 import { runAction } from "@/lib/api/run-action";
@@ -33,6 +32,7 @@ import {
 } from "@/lib/stores/location-address";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { TextLink } from "@saroh/ui/text-link";
 
 /** Sell › Locations, for a business with no location customers visit yet. */

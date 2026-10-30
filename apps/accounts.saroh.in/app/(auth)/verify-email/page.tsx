@@ -3,6 +3,7 @@ import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import { VERIFY_JOIN_PANEL, VERIFY_PANEL } from "@/components/auth/panel-copy";
 import { VerifyEmailForm } from "@/components/auth/verify-email-form";
 import { isJoining } from "@/lib/joining";
+import { phoneOptions } from "@/lib/phone-sign-in";
 import { safeDestination } from "@/lib/return-to";
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -23,6 +24,7 @@ export default async function VerifyEmailPage({
     // first should still land where they were going.
     const { redirect } = await searchParams;
     const returnTo = safeDestination(redirect);
+    const phone = await phoneOptions();
 
     // `useSearchParams` (the form reads ?email=) opts the tree into client-side
     // rendering, so it needs a Suspense boundary to prerender.
@@ -37,7 +39,10 @@ export default async function VerifyEmailPage({
             }
         >
             <Suspense>
-                <VerifyEmailForm returnTo={returnTo} />
+                <VerifyEmailForm
+                    returnTo={returnTo}
+                    phoneRequired={phone.required}
+                />
             </Suspense>
         </SplitShell>
     );

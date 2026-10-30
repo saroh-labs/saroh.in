@@ -5,7 +5,8 @@ export type SocialProvider = "google" | "github";
 
 const KNOWN: readonly SocialProvider[] = ["google", "github"];
 
-function apiBase(): string {
+/** The API's origin, for a call from this app's server or the browser. */
+export function apiBase(): string {
     if (env.NEXT_PUBLIC_BETTER_AUTH_URL) {
         return new URL(env.NEXT_PUBLIC_BETTER_AUTH_URL).origin;
     }

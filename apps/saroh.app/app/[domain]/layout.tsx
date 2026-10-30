@@ -63,7 +63,9 @@ import { lookDock } from "@/lib/header-action";
 import { SITE_FACES } from "@/lib/site-fonts";
 import {
     loadSignInOptions,
+    requestPhoneSignInCode,
     requestSignInCode,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "./account/actions";
 import {
@@ -334,6 +336,8 @@ export default async function SiteLayout({
                     signIn: {
                         requestCode: requestSignInCode,
                         verifyCode: verifySignInCode,
+                        requestPhoneCode: requestPhoneSignInCode,
+                        verifyPhoneCode: verifyPhoneSignInCode,
                     },
                 }}
             />
@@ -352,6 +356,8 @@ export default async function SiteLayout({
             api={{
                 requestCode: requestSignInCode,
                 verifyCode: verifySignInCode,
+                requestPhoneCode: requestPhoneSignInCode,
+                verifyPhoneCode: verifyPhoneSignInCode,
             }}
             loadOptions={loadSignInOptions}
         />

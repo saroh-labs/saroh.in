@@ -10,14 +10,15 @@
 Every provider sits behind a port, with adapters under the module's
 `providers/` directory and a fake for tests.
 
-| Port               | Where                     | For                                                                                                                                                    |
-| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MerchantProvider` | `modules/payments`        | An Organization's own customer payments — Razorpay and Cashfree                                                                                        |
-| `BillingProvider`  | `modules/billing`         | Saroh charging the Organization                                                                                                                        |
-| `WebhookProvider`  | `modules/webhooks`        | Signed inbound events                                                                                                                                  |
-| `CommsProvider`    | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel                                                                                           |
-| `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter; `putObject` and `readObject` for what the server writes and copies itself (a data export, DEC-120) |
-| `DomainHosting`    | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS                                                                                             |
+| Port                | Where                     | For                                                                                                                                                    |
+| ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MerchantProvider`  | `modules/payments`        | An Organization's own customer payments — Razorpay and Cashfree                                                                                        |
+| `BillingProvider`   | `modules/billing`         | Saroh charging the Organization                                                                                                                        |
+| `WebhookProvider`   | `modules/webhooks`        | Signed inbound events                                                                                                                                  |
+| `CommsProvider`     | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel                                                                                           |
+| `MessagingProvider` | `modules/messaging`       | Saroh's own sender (DEC-191): WhatsApp and the OTP widget, through `MessagingService`                                                                  |
+| `ObjectStorage`     | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter; `putObject` and `readObject` for what the server writes and copies itself (a data export, DEC-120) |
+| `DomainHosting`     | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS                                                                                             |
 
 `DomainHosting` (#859) registers a domain's hostname as a custom hostname on
 the merchant-sites zone once its TXT check passes, and deletes it there
@@ -41,6 +42,12 @@ domain and stores where it stands (`bare-domain.ts`, `bare-domain-sync.ts`,
 (`tldts`), never a list of suffixes kept here. The look is a notice: it never
 changes the `www` domain's verification or hosting. Its requests go to a host
 a merchant typed, so they use the link-preview guard and read no body.
+
+`MessagingProvider` (`modules/messaging/providers`) is Saroh's own sender
+(DEC-191): WhatsApp, the OTP widget and, after DLT, SMS. Other modules call
+`MessagingService`, never the provider, and only `modules/messaging/` names
+the provider. Env names, dashboard places, the webhook and how to swap the
+provider: `docs/architecture/MESSAGING_MSG91.md`.
 
 DEC-011 describes separate `EmailProvider` and `WhatsAppProvider` ports; the
 code has one `CommsProvider` port with per-channel adapters. DECISIONS.md carries
@@ -69,9 +76,10 @@ a note saying so.
   that emails stranger-supplied text is a relay").
   saroh.in's free tools share one email budget, `waitlist/tool-email-cap.ts`
   (3 a UTC day to an address, 300 a day in all): a new tool's gate claims
-  from it rather than counting its own. The QR code maker's email
-  (`tools/qr-maker-email.ts`) takes no input at all, because the API never
-  receives what the visitor typed.
+  from it rather than counting its own. The tools' gate email
+  (`tools/qr-maker-email.ts`) takes only a tool slug, refused unless it is
+  on the API's own list (`tools/tool-names.ts`), which gives the name and
+  link; the API never receives what the visitor typed.
 - **Current** (10 Oct 2026) — **A sentence the API writes formats its
   amount, day and time through `src/common/words-format.ts`**, the API's
   twin of the app's `lib/format`: `moneyWords` and `moneyWordsMinor`

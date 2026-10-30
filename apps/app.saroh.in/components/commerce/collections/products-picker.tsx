@@ -7,11 +7,11 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { CheckRow } from "@/components/shared/fields/check-row";
 import { ProductThumb } from "@/components/stores/catalogue/product-thumb";
 import type { PickableProduct } from "@/lib/collections/actions";
 import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
+import { CheckRow } from "@saroh/ui/check-row";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 

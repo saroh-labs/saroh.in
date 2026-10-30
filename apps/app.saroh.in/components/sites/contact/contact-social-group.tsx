@@ -12,12 +12,6 @@ import {
     valuesOf,
 } from "@/components/organizations/business-settings/business-form";
 import { SocialLinksSheet } from "@/components/organizations/social-links/social-links-sheet";
-import {
-    Absent,
-    Group,
-    Row,
-    Section,
-} from "@/components/shared/page/settings-rows";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { savedWords } from "@/lib/organizations/business-sheet-words";
 import type {
@@ -35,10 +29,11 @@ import {
     CONTACT_UNREAD,
 } from "@/lib/sites/site-contact";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
+import { Absent, Group, Row, Section } from "@saroh/ui/settings-rows";
 
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { EditAction } from "@/components/sites/settings/edit-actions";
 import type { SettingsSave } from "@/components/sites/settings/use-settings-save";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { SiteAddressSheet } from "./site-address-sheet";
 
 /** The group's sheets. */

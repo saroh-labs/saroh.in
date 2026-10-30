@@ -16,8 +16,8 @@ import {
     rateOption,
 } from "@/lib/invoices/gst";
 
-import type { Choice } from "./choice-group";
-import { ChipGroup } from "./choice-group";
+import type { Choice } from "@saroh/ui/choice-group";
+import { ChipGroup } from "@saroh/ui/choice-group";
 
 /** The main row's "Not set" chip (an optional field only). */
 const NOT_SET = "none";

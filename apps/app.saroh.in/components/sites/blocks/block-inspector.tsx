@@ -6,6 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Info } from "lucide-react";
 
 import { SECTION_LABELS } from "@/components/sites/editor/editor-constants";
+import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionFrameFields } from "@/components/sites/section-fields/frame";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
@@ -42,6 +43,7 @@ export function BlockInspector({
     onToggleHidden,
     onMove,
     onRemove,
+    onAddNote,
 }: {
     /** The site being edited, for a link to one of its own screens. */
     siteId?: string;
@@ -65,7 +67,11 @@ export function BlockInspector({
     onToggleHidden: () => void;
     onMove: (delta: -1 | 1) => void;
     onRemove: () => void;
+    /** Read-only (DEC-200): "Add a note on this block" opens its Feedback. */
+    onAddNote?: () => void;
 }) {
+    // A Reviewer (DEC-200) reads the settings; nothing here changes them.
+    const readOnly = useEditorReadOnly();
     if (active === null) {
         return (
             <div className="px-6 py-10 text-center">
@@ -101,30 +107,43 @@ export function BlockInspector({
                             {SECTION_LABELS[section.type]}
                         </span>
                     </h2>
-                    <Tip
-                        label={
-                            section.hidden
-                                ? "Hidden. This block is left out when you publish"
-                                : "Visible. This block publishes with the page"
-                        }
-                    >
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            aria-pressed={section.hidden === true}
-                            onClick={onToggleHidden}
+                    {readOnly ? (
+                        <span
                             className={cn(
-                                "shrink-0 gap-1.5",
+                                "shrink-0 text-xs font-medium",
                                 section.hidden && "text-muted-foreground",
                             )}
                         >
-                            <span aria-hidden="true">
-                                {section.hidden ? "○" : "●"}
-                            </span>
-                            {section.hidden ? "Hidden" : "Visible"}
-                        </Button>
-                    </Tip>
+                            {section.hidden
+                                ? "Hidden when published"
+                                : "Shown on the site"}
+                        </span>
+                    ) : (
+                        <Tip
+                            label={
+                                section.hidden
+                                    ? "Hidden. This block is left out when you publish"
+                                    : "Visible. This block publishes with the page"
+                            }
+                        >
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                aria-pressed={section.hidden === true}
+                                onClick={onToggleHidden}
+                                className={cn(
+                                    "shrink-0 gap-1.5",
+                                    section.hidden && "text-muted-foreground",
+                                )}
+                            >
+                                <span aria-hidden="true">
+                                    {section.hidden ? "○" : "●"}
+                                </span>
+                                {section.hidden ? "Hidden" : "Visible"}
+                            </Button>
+                        </Tip>
+                    )}
                 </div>
 
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
@@ -155,57 +174,63 @@ export function BlockInspector({
                 </div>
             ) : null}
 
-            <SectionFields
-                section={section}
-                services={services}
-                pages={pages}
-                onChange={onChange}
-            />
-
             {/*
-             * Said, not hidden (#275). This block's stored content does not
-             * match the shape it promises, so the fields may show blanks that
-             * are not what was written. Saving over it is what would lose it.
+             * Read-only: the same fields with their values, all disabled at
+             * once by the fieldset, so a field added later can't leak.
              */}
-            {unreadable ? (
-                <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-                    Saroh cannot read this block&apos;s saved content. The
-                    fields may look empty even though something is stored.
-                    Editing and saving will replace whatever is there.
-                </p>
-            ) : null}
+            <fieldset disabled={readOnly} className="contents">
+                <SectionFields
+                    section={section}
+                    services={services}
+                    pages={pages}
+                    onChange={onChange}
+                />
 
-            {/*
-             * The advisory flags — "quiet until publish", so they are listed
-             * under the fields rather than interrupting them.
-             */}
-            {flags.length > 0 ? (
-                <ul className="grid gap-1.5 border-t pt-3">
-                    {flags.map((flag, i) => (
-                        <li
-                            key={i}
-                            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
-                        >
-                            <span
-                                aria-hidden="true"
-                                className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
-                            />
-                            <span>{flag.message}</span>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
+                {/*
+                 * Said, not hidden (#275). This block's stored content does not
+                 * match the shape it promises, so the fields may show blanks that
+                 * are not what was written. Saving over it is what would lose it.
+                 */}
+                {unreadable ? (
+                    <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
+                        Saroh cannot read this block&apos;s saved content. The
+                        fields may look empty even though something is stored.
+                        Editing and saving will replace whatever is there.
+                    </p>
+                ) : null}
 
-            <SectionFrameFields section={section} onChange={onChange} />
+                {/*
+                 * The advisory flags — "quiet until publish", so they are listed
+                 * under the fields rather than interrupting them.
+                 */}
+                {flags.length > 0 ? (
+                    <ul className="grid gap-1.5 border-t pt-3">
+                        {flags.map((flag, i) => (
+                            <li
+                                key={i}
+                                className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
+                                />
+                                <span>{flag.message}</span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
 
-            <SectionPadding
-                section={section}
-                siteDefault={style.scalars.sectionPadding}
-                bounds={styleOptions.scalars.find(
-                    (sc) => sc.key === "sectionPadding",
-                )}
-                onChange={onChange}
-            />
+                <SectionFrameFields section={section} onChange={onChange} />
+
+                <SectionPadding
+                    section={section}
+                    siteDefault={style.scalars.sectionPadding}
+                    bounds={styleOptions.scalars.find(
+                        (sc) => sc.key === "sectionPadding",
+                    )}
+                    onChange={onChange}
+                />
+            </fieldset>
 
             {error ? (
                 <p className="text-sm text-destructive">{error}</p>
@@ -221,31 +246,45 @@ export function BlockInspector({
              * drag handle — a list you can only reorder by dragging is a list
              * some people cannot reorder.
              */}
-            <div className="flex items-center gap-1 border-t pt-3">
-                <IconButton
-                    label="Move block up"
-                    icon={<span>↑</span>}
-                    variant="outline"
-                    disabled={index === 0}
-                    onClick={() => onMove(-1)}
-                />
-                <IconButton
-                    label="Move block down"
-                    icon={<span>↓</span>}
-                    variant="outline"
-                    disabled={index === count - 1}
-                    onClick={() => onMove(1)}
-                />
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto text-destructive hover:text-destructive"
-                    onClick={onRemove}
-                >
-                    Remove
-                </Button>
-            </div>
+            {readOnly ? (
+                onAddNote ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={onAddNote}
+                    >
+                        Add a note on this block
+                    </Button>
+                ) : null
+            ) : (
+                <div className="flex items-center gap-1 border-t pt-3">
+                    <IconButton
+                        label="Move block up"
+                        icon={<span>↑</span>}
+                        variant="outline"
+                        disabled={index === 0}
+                        onClick={() => onMove(-1)}
+                    />
+                    <IconButton
+                        label="Move block down"
+                        icon={<span>↓</span>}
+                        variant="outline"
+                        disabled={index === count - 1}
+                        onClick={() => onMove(1)}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto text-destructive hover:text-destructive"
+                        onClick={onRemove}
+                    >
+                        Remove
+                    </Button>
+                </div>
+            )}
 
             {/*
              * Where editing does NOT happen. A merchant who expects to change

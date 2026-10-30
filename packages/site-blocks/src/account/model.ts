@@ -32,8 +32,14 @@ export interface AccountTab {
 
 export interface AccountView {
     name: string | null;
-    email: string;
+    /** Null for an account made by phone alone (DEC-196). */
+    email: string | null;
     phone: string | null;
+    /**
+     * The verified phone they sign in with by WhatsApp (DEC-196), or null.
+     * Absent from an older API.
+     */
+    signInPhone?: string | null;
     businessName: string;
     tabs: AccountTab[];
     offers: { appointments: boolean; orders: boolean; plans: boolean };

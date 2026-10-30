@@ -100,7 +100,7 @@ export const metadata: Metadata = {
  * The shell every page shares: fonts, the tags and the recorder behind the
  * cookie notice (`site-tags.tsx`), the referral code a visitor arrived with
  * (`referral-keeper.tsx`) and the light-only scheme. Pages bring their own chrome
- * through route groups: `(v2)` the Marketing Site V2 pages, `(standalone)`
+ * through route groups: `(site)` the Marketing Site V2 pages, `(standalone)`
  * the waitlist and the sign-up hand-off, `(preview)` the pricing draft.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no

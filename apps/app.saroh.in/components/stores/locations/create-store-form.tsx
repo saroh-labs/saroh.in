@@ -1,6 +1,5 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -12,22 +11,20 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    lostNew,
-    useLeaveGuard,
-} from "@/components/shared/forms/use-leave-guard";
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
+import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Add a name." }),
+    name: z.string().trim().min(1, { error: "Add a name." }),
     description: z.string().optional(),
 });
 

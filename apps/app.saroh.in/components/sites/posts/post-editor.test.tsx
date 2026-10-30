@@ -45,6 +45,15 @@ vi.mock("@/lib/content/actions", () => ({
 vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,
 }));
+const createComment = vi.fn<(...a: unknown[]) => Promise<unknown>>();
+const deleteComment = vi.fn<(...a: unknown[]) => Promise<unknown>>();
+const setCommentResolved = vi.fn<(...a: unknown[]) => Promise<unknown>>();
+vi.mock("@/lib/sites/actions", () => ({
+    createComment: (...a: unknown[]) => createComment(...a),
+    deleteComment: (...a: unknown[]) => deleteComment(...a),
+    setCommentResolved: (...a: unknown[]) => setCommentResolved(...a),
+    updateCommentBody: vi.fn(),
+}));
 vi.mock("@/components/billing/plan-refusal", () => ({
     showPlanRefusal: vi.fn(),
 }));
@@ -176,5 +185,156 @@ describe("PostEditor, the byline (UX-091)", () => {
             (a) => a.textContent.trim() === "Change your name",
         );
         expect(link?.getAttribute("href")).toMatch(/\/account$/);
+    });
+});
+
+describe("PostEditor read-only, for a Reviewer (DEC-200 U8)", () => {
+    const post = {
+        id: "p1",
+        title: "Winter hours",
+        slug: "winter-hours",
+        excerpt: "We close early in December.",
+        content:
+            "<p>From <strong>1 December</strong> we close at 6.</p><script>alert(1)</script>",
+        categoryId: null,
+        featured: false,
+        image: null,
+        status: "DRAFT" as const,
+        publishedAt: null,
+        createdAt: "2026-10-07T00:00:00Z",
+        author: "Asha Rao",
+        live: false,
+        liveAt: null,
+    };
+    const note = (over: Record<string, unknown>) => ({
+        id: "n1",
+        pageId: null,
+        pageTitle: null,
+        sectionKey: null,
+        postId: "p1",
+        postTitle: "Winter hours",
+        body: "Say which day.",
+        resolvedAt: null,
+        createdAt: "2026-10-28T00:00:00Z",
+        author: { id: "u1", name: "Meera" },
+        orphaned: false,
+        editable: false,
+        ...over,
+    });
+    const buttons = () =>
+        Array.from(container.querySelectorAll("button")).map((b) =>
+            b.textContent.trim(),
+        );
+    const press = (label: string) =>
+        Array.from(container.querySelectorAll("button"))
+            .find((b) => b.textContent.trim() === label)
+            ?.click();
+
+    it("draws no Save, Publish or delete, no live input, and the body as text", () => {
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={post}
+                    readOnly
+                    feedback={{
+                        comments: [],
+                        canComment: true,
+                        canSettle: false,
+                    }}
+                />,
+            ),
+        );
+        act(() => press("Details"));
+        expect(buttons()).not.toEqual(
+            expect.arrayContaining([
+                expect.stringMatching(
+                    /Save draft|^Publish|Take off the site|Delete this post/,
+                ),
+            ]),
+        );
+        expect(container.textContent).toContain("you can't change anything");
+        expect((field("Post title") as HTMLInputElement).readOnly).toBe(true);
+        expect(field("Post path").disabled).toBe(true);
+        expect(field("Post summary").disabled).toBe(true);
+        expect(field("Cover image address").disabled).toBe(true);
+        expect(container.querySelector('[aria-label="Post body"]')).toBeNull();
+        // Shown as plain text: no element is made from the body's markup.
+        expect(container.querySelector("strong, script")).toBeNull();
+        expect(container.textContent).toContain(
+            "From 1 December we close at 6.",
+        );
+        expect(container.textContent).not.toContain("Change your name");
+        // Nothing is written however long it stays open.
+        act(() => {
+            vi.advanceTimersByTime(10_000);
+        });
+        expect(createPost).not.toHaveBeenCalled();
+        expect(updatePost).not.toHaveBeenCalled();
+    });
+
+    it("opens on Feedback: a Reviewer adds a note on the post, and edits or deletes their own", async () => {
+        createComment.mockResolvedValue({ ok: true, data: { id: "n9" } });
+        deleteComment.mockResolvedValue({ ok: true, data: { id: "n2" } });
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={post}
+                    readOnly
+                    feedback={{
+                        comments: [
+                            note({}),
+                            note({ id: "n2", body: "Mine", editable: true }),
+                        ],
+                        canComment: true,
+                        canSettle: false,
+                    }}
+                />,
+            ),
+        );
+        expect(container.textContent).toContain("Say which day.");
+        // Only the reviewer's own open note offers Edit and Delete.
+        expect(buttons().filter((b) => b === "Edit")).toHaveLength(1);
+        expect(buttons()).not.toContain("Mark settled");
+
+        const box = container.querySelector<HTMLTextAreaElement>(
+            "#post-feedback-note",
+        );
+        if (!box) throw new Error("no note box");
+        act(() => type(box, "Add the Sunday hours."));
+        await settle(() => press("Add note"));
+        expect(createComment).toHaveBeenCalledWith("s1", {
+            postId: "p1",
+            body: "Add the Sunday hours.",
+        });
+
+        await settle(() => press("Delete"));
+        expect(deleteComment).toHaveBeenCalledWith("s1", "n2");
+        expect(router.refresh).toHaveBeenCalled();
+    });
+
+    it("lets the owner settle a post's note in the post editor", async () => {
+        setCommentResolved.mockResolvedValue({ ok: true, data: { id: "n1" } });
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={post}
+                    feedback={{
+                        comments: [note({})],
+                        canComment: true,
+                        canSettle: true,
+                    }}
+                />,
+            ),
+        );
+        expect(buttons()).toContain("Publish");
+        act(() => press("Feedback · 1"));
+        await settle(() => press("Mark settled"));
+        expect(setCommentResolved).toHaveBeenCalledWith("s1", "n1", true);
     });
 });

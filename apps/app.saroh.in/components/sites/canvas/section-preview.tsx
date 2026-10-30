@@ -323,7 +323,7 @@ export function DraftPreview({
              * without leaving; ⌘/Ctrl-click opens the link there.
              *
              * These are not ways off the editor, so the leave guard
-             * (`components/shared/forms/use-leave-guard.tsx`) leaves them to
+             * (`@saroh/ui/use-leave-guard`) leaves them to
              * the handler below.
              */
             data-leave-guard="off"

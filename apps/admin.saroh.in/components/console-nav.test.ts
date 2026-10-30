@@ -64,7 +64,10 @@ describe("navFor", () => {
                     "Provider events",
                 ],
             ],
-            ["Product", ["Releases", "Plans and modules", "Usage"]],
+            [
+                "Product",
+                ["Releases", "Plans and modules", "Search pages", "Usage"],
+            ],
             [
                 "Keep it running",
                 [
@@ -73,6 +76,7 @@ describe("navFor", () => {
                     "Webhooks",
                     "Providers",
                     "Deployments",
+                    "Saroh's apps",
                     "Team",
                     "Audit trail",
                 ],
@@ -131,8 +135,8 @@ describe("navFor", () => {
         ).toEqual([
             ["Home", ["Home"]],
             ["Help customers", ["Businesses", "Reports"]],
-            ["Product", ["Releases", "Usage"]],
-            ["Keep it running", ["Health"]],
+            ["Product", ["Releases", "Search pages", "Usage"]],
+            ["Keep it running", ["Health", "Saroh's apps"]],
         ]);
         // An Account manager reaches Home, their own leads board and their
         // own page on the Team (U22).

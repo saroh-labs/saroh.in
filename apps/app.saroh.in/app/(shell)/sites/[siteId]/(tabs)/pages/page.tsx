@@ -6,7 +6,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { requireSession } from "@/lib/session";
 import {
     describePendingChanges,
@@ -15,6 +14,7 @@ import {
 import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
 import { pageUpdatedIso } from "@/lib/sites/updated";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { Notice } from "@saroh/ui/notice";
 
 export const metadata = { title: "Pages · Website" };
@@ -43,9 +43,8 @@ export default async function SitePagesPage({
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();
-    // The editor is where pages are worked on; a reader has the Review tab,
-    // which renders each page rather than listing it.
-    if (!site.can.edit) redirect(`/sites/${siteId}/review`);
+    // A reader reads the pages in the editor, read-only (DEC-200).
+    if (!site.can.edit) redirect(`/sites/${siteId}`);
 
     const editorHref = `/sites/${siteId}`;
     if (site.pages.length === 0) {

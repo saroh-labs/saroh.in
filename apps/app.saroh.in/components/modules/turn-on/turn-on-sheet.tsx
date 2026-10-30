@@ -5,11 +5,6 @@ import { Skeleton } from "@saroh/ui/skeleton";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/forms/form-sheet";
 import { BLOCKER_COPY } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
@@ -24,6 +19,7 @@ import {
 } from "@/lib/modules/turn-on";
 import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
+import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { Refusal } from "@/components/shared/states/refusal";

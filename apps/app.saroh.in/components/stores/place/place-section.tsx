@@ -4,11 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import {
-    Absent,
-    Row,
-    Section as Rows,
-} from "@/components/shared/page/settings-rows";
 import type { LocationDetails } from "@/lib/stores/location-details";
 import {
     detailsEmpty,
@@ -26,6 +21,7 @@ import {
     PLACE_ROW_ID,
     placeEditId,
 } from "@/lib/stores/place-rows";
+import { Absent, Row, Section as Rows } from "@saroh/ui/settings-rows";
 
 import type {
     Saver,

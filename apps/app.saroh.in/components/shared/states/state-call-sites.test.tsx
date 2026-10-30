@@ -38,7 +38,7 @@ import { InvitationProblemView } from "@/components/organizations/team/invitatio
 import { SettingsSectionError } from "@/components/settings/page/settings-section-error";
 import { ApiError } from "@/lib/api/errors";
 import type { PlanMeter } from "@/lib/billing/meter";
-import { FailedRead } from "./failed-read";
+import { FailedRead } from "@saroh/ui/failed-read";
 import { SectionError } from "./section-error";
 
 const html = (node: React.ReactNode) =>

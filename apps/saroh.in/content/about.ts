@@ -1,3 +1,5 @@
+import { formatDay } from "@/lib/format/day";
+
 import { EARLY_ACCESS_DAY } from "./early-access";
 import { CTA_BAND } from "./home";
 import type { ModeWords, OpenOnly } from "./launch-words";
@@ -8,7 +10,7 @@ import { SAROH_NAME } from "./name";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-12";
+export const UPDATED = "2026-10-27";
 
 /**
  * /about, from the design "Saroh Marketing Site V2 - About" (DEC-137): who
@@ -59,12 +61,10 @@ export interface AboutValue extends OpenOnly {
 }
 
 /** The day early access opens, as a sentence writes it: "17 October 2026". */
-export const EARLY_ACCESS_LONG = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
+export const EARLY_ACCESS_LONG = formatDay(EARLY_ACCESS_DAY, {
     month: "long",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-}).format(new Date(`${EARLY_ACCESS_DAY}T12:00:00+05:30`));
+    year: true,
+});
 
 export const ABOUT = {
     href: "/about",

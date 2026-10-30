@@ -5,7 +5,6 @@ import { showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Row, Section } from "@/components/shared/page/settings-rows";
 import {
     setAutopayChargeTiming,
     setMembersCanPause,
@@ -22,6 +21,7 @@ import {
     timingSentence,
 } from "@/lib/subscriptions/plan-settings";
 import type { SubscriptionSettings } from "@/lib/subscriptions/service";
+import { Row, Section } from "@saroh/ui/settings-rows";
 
 import { AutopayTimingSheet } from "./autopay-timing-sheet";
 import { MembersPauseSheet } from "./members-pause-sheet";

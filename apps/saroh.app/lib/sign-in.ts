@@ -2,6 +2,7 @@ import type {
     CodeRequestResult,
     SignedInCustomer,
     SignInOptions,
+    SignInWay,
     VerifyResult,
 } from "@saroh/site-blocks";
 import { isTestReleaseRefusal } from "@saroh/site-blocks";
@@ -17,6 +18,9 @@ import { siteAccountsFetch } from "./customer-session";
  *   GET  public/site-accounts/options   → the challenge and the phone
  *   POST public/site-accounts/codes     → 202 · 429 limit|wait · 400 challenge · 503 unavailable
  *   POST public/site-accounts/sessions  → 201 token · 400 invalid|expired · 409 merged · 403 blocked|closed
+ *   POST public/site-accounts/phone-codes    → as codes, + 400 field phone · 422 not on WhatsApp (DEC-196)
+ *   POST public/site-accounts/phone-sessions → as sessions, + 201 emailNeeded with a phoneProof
+ *   (a business that chose its ways signs a new number up on its own: 201 token)
  *
  * Either POST from a test host is a 409 `TEST_RELEASE` (DEC-071, T4): the
  * sheet says signing in is off on a test release (KTD-9).
@@ -68,7 +72,11 @@ export function codeResult(status: number, body: unknown): CodeRequestResult {
                 typeof details.siteKey === "string" ? details.siteKey : null,
         };
     }
+    if (status === 400 && details.field === "phone") {
+        return { ok: false, reason: "phone" };
+    }
     if (status === 400) return { ok: false, reason: "email" };
+    if (status === 422) return { ok: false, reason: "not-on-whatsapp" };
     if (status === 503) return { ok: false, reason: "unavailable" };
     if (status === 403) return { ok: false, reason: "closed" };
     return { ok: false, reason: "error" };
@@ -140,6 +148,26 @@ export function sessionAnswer(status: number, body: unknown): SessionAnswer {
     return { ok: false, reason: "error" };
 }
 
+/**
+ * A WhatsApp code's answer (DEC-196): a session, or — for a number no
+ * account holds — the proof that the email code which follows carries.
+ */
+export function phoneSessionAnswer(
+    status: number,
+    body: unknown,
+): SessionAnswer {
+    const b = body as { emailNeeded?: unknown; phoneProof?: unknown } | null;
+    if (
+        status === 201 &&
+        b?.emailNeeded === true &&
+        typeof b.phoneProof === "string" &&
+        b.phoneProof
+    ) {
+        return { ok: false, reason: "email-needed", phoneProof: b.phoneProof };
+    }
+    return sessionAnswer(status, body);
+}
+
 export function optionsResult(body: unknown): SignInOptions | null {
     if (!body || typeof body !== "object") return null;
     const b = body as Record<string, unknown>;
@@ -155,8 +183,20 @@ export function optionsResult(body: unknown): SignInOptions | null {
                     ? challenge.siteKey
                     : null,
         },
+        ...(b.whatsapp === true ? { whatsapp: true } : {}),
+        // The business's ways, in its order (DEC-196); unknown ones dropped.
+        ...(Array.isArray(b.ways)
+            ? {
+                  ways: b.ways.filter((w): w is SignInWay =>
+                      (KNOWN_WAYS as readonly unknown[]).includes(w),
+                  ),
+              }
+            : {}),
+        ...(b.phoneOnlySignUp === true ? { phoneOnlySignUp: true } : {}),
     };
 }
+
+const KNOWN_WAYS = ["EMAIL", "WHATSAPP", "SMS"] as const;
 
 /**
  * What the sheet needs up front, for the site this request is on. Null when

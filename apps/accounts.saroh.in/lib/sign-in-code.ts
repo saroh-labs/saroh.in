@@ -39,6 +39,31 @@ export const CODE_WORDS = {
     signedIn: "You're signed in",
 } as const;
 
+/**
+ * The same step for a code sent to a phone (DEC-196): the widget sends it,
+ * so its lifetime is the widget's and is not promised here.
+ */
+export const PHONE_CODE_WORDS = {
+    title: "Check your phone",
+    changeEmail: "Change number",
+    spam: "Not there? Wait a moment, then resend.",
+} as const;
+
+/** The same step for a code Saroh sent on WhatsApp (owner, 28 Oct). */
+export const WHATSAPP_CODE_WORDS = {
+    title: "Check your WhatsApp",
+} as const;
+
+/** "We sent a 6-digit code on WhatsApp to +91 98450 12345. It lasts 10 minutes." */
+export function whatsappCodeLead(phone: string): string {
+    return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code on WhatsApp to ${phone}. It lasts 10 minutes.`;
+}
+
+/** "We sent a 6-digit code to +91 98450 12345." */
+export function phoneCodeLead(phone: string): string {
+    return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code to ${phone}.`;
+}
+
 /** "We sent a 6-digit code to asha@example.com. It lasts 10 minutes." */
 export function codeLead(email: string): string {
     return `We sent a ${VERIFICATION_OTP_LENGTH}-digit code to ${email}. It lasts ${CODE_MINUTES} minutes.`;
@@ -95,7 +120,14 @@ export type CodeKind = "sign-in" | "email-verification";
 
 /** The auth client, as far as these steps use it. */
 export interface CodeClient {
-    send: (input: { email: string; kind: CodeKind }) => Promise<Answer>;
+    /** A phone's code (DEC-196): the address is a number, not an email. */
+    channel?: "phone" | "whatsapp";
+    send: (input: {
+        email: string;
+        kind: CodeKind;
+        /** The bot check's token, after a `CHALLENGE` answer. */
+        turnstileToken?: string | null;
+    }) => Promise<Answer>;
     check: (input: {
         email: string;
         code: string;
@@ -107,7 +139,13 @@ export interface CodeClient {
 
 export type CodeSent =
     | { ok: true; resendAfterSeconds: number }
-    | { ok: false; message: string; resendAfterSeconds: number | null };
+    | {
+          ok: false;
+          message: string;
+          resendAfterSeconds: number | null;
+          /** Past the address's hourly cap: the bot check, then send again with its token. */
+          challenge?: true;
+      };
 
 /**
  * Ask for a code. The same answer whether or not the address has an account
@@ -116,10 +154,10 @@ export type CodeSent =
  */
 export async function sendCode(
     client: CodeClient,
-    input: { email: string; kind?: CodeKind },
+    input: { email: string; kind?: CodeKind; turnstileToken?: string | null },
 ): Promise<CodeSent> {
     const email = input.email.trim();
-    if (!looksLikeEmail(email)) {
+    if (!client.channel && !looksLikeEmail(email)) {
         return {
             ok: false,
             message: authFailureCopy({ code: "INVALID_EMAIL" }),
@@ -127,12 +165,32 @@ export async function sendCode(
         };
     }
     const answer = await settle<Answer>(() =>
-        client.send({ email, kind: input.kind ?? "sign-in" }),
+        client.send({
+            email,
+            kind: input.kind ?? "sign-in",
+            turnstileToken: input.turnstileToken,
+        }),
     );
     const { error } = answer;
     const retryAfter = "retryAfter" in answer ? answer.retryAfter : null;
     if (!error) return { ok: true, resendAfterSeconds: CODE_RESEND_SECONDS };
+    if (authErrorCode(error) === "CHALLENGE") {
+        return {
+            ok: false,
+            message: authFailureCopy(error),
+            resendAfterSeconds: null,
+            challenge: true,
+        };
+    }
     const limited = authErrorCode(error) === "TOO_MANY_REQUESTS";
+    // The API's own sentence (phone): it already says when to try again.
+    if (error.words) {
+        return {
+            ok: false,
+            message: error.words,
+            resendAfterSeconds: limited ? waitFromServer(retryAfter) : null,
+        };
+    }
     return {
         ok: false,
         message: limited
@@ -141,6 +199,32 @@ export async function sendCode(
         // Only a refusal for asking too often has a wait to count down.
         resendAfterSeconds: limited ? waitFromServer(retryAfter) : null,
     };
+}
+
+/**
+ * `sendCode` for a form: shows it sending, says a refusal, and shows the
+ * bot check when the address is past its hourly cap (CHALLENGE). The wait
+ * to count down when sent, or null when not.
+ */
+export async function sendCodeFromForm(
+    client: CodeClient,
+    input: { email: string; turnstileToken?: string | null },
+    form: {
+        setIsLoading: (loading: boolean) => void;
+        setChallenge: (challenge: boolean) => void;
+        setError: (message: string) => void;
+    },
+): Promise<number | null> {
+    form.setIsLoading(true);
+    form.setChallenge(false);
+    const result = await sendCode(client, input);
+    form.setIsLoading(false);
+    if (!result.ok) {
+        form.setError(result.message);
+        form.setChallenge(result.challenge === true);
+        return null;
+    }
+    return result.resendAfterSeconds;
 }
 
 export type CodeChecked =

@@ -30,8 +30,8 @@ export const env = createEnv({
             .default("development"),
     },
     server: {
-        API_URL: z.string().url().optional(),
-        NGROK_URL: z.string().url().optional(),
+        API_URL: z.url().optional(),
+        NGROK_URL: z.url().optional(),
         REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS: z.string().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
         SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
@@ -51,10 +51,10 @@ export const env = createEnv({
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
             .optional(),
-        POSTHOG_HOST: z.string().url().optional(),
+        POSTHOG_HOST: z.url().optional(),
     },
     client: {
-        NEXT_PUBLIC_API_URL: z.string().url().optional(),
+        NEXT_PUBLIC_API_URL: z.url().optional(),
         NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),
         /**
          * The business media's public address (`https://media.saroh.in`;
@@ -65,7 +65,7 @@ export const env = createEnv({
          * nowhere else. Unset (`next dev`, `next start`, e2e): plain `src`.
          * Compiled into the bundle; `siteImage` reads it as written.
          */
-        NEXT_PUBLIC_SITE_MEDIA_URL: z.string().url().optional(),
+        NEXT_PUBLIC_SITE_MEDIA_URL: z.url().optional(),
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])
             .optional(),

@@ -51,6 +51,9 @@ module.exports = {
         // Saroh's own leads (U20): the rules, pure. The rows are in
         // saroh-leads.db.spec.ts (integration).
         "<rootDir>/src/modules/saroh-leads/**/*.spec.ts",
+        // Search pages (DEC-193): the transition rules and the deploy job,
+        // pure. The rows are in search-pages.db.spec.ts (integration).
+        "<rootDir>/src/modules/search-pages/**/*.spec.ts",
         // Commission (U21): the pay rules, pure. The rows are in
         // commission.db.spec.ts (integration).
         "<rootDir>/src/modules/commission/**/*.spec.ts",
@@ -496,6 +499,11 @@ module.exports = {
         // Which social sign-in buttons the accounts pages show: only
         // providers with both keys set. Pure; no DB.
         "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
+        // Messaging add-ons (#1235): the messaging provider adapter and its fake,
+        // with a stubbed fetch. No DB.
+        "<rootDir>/src/modules/messaging/**/*.spec.ts",
+        // Phone sign-in's options (DEC-196): mocked services, no database.
+        "<rootDir>/src/modules/account-phone/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

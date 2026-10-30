@@ -16,7 +16,6 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useForm, useWatch } from "react-hook-form";
 
-import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import type {
@@ -36,6 +35,7 @@ import {
 } from "@/lib/organizations/pay-instructions";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { FormSheet } from "@saroh/ui/form-sheet";
 import { PayPreview } from "./pay-preview";
 
 /** The fields, in the order the customer's card reads them. */

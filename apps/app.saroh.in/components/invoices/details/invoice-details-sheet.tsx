@@ -15,7 +15,6 @@ import {
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { QuickLook } from "@/components/shared/forms/quick-look";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceDetails } from "@/lib/invoices/details";
 import { loadInvoiceDetails } from "@/lib/invoices/details-actions";
@@ -25,6 +24,7 @@ import type { Invoice } from "@/lib/invoices/service";
 import type { InvoiceTab } from "@/lib/invoices/status";
 import { billedTo, headerPill } from "@/lib/invoices/status";
 import { invoiceZone } from "@/lib/invoices/zone";
+import { FailedRead } from "@saroh/ui/failed-read";
 
 type Read =
     | { state: "loading" }

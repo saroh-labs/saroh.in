@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
-import { CheckRow } from "@/components/shared/fields/check-row";
 import { runAction } from "@/lib/api/run-action";
 import { saveProductCollections } from "@/lib/collections/actions";
 import type { MembershipRow } from "@/lib/collections/rules";
 import { membershipRows, pickedIds, sameList } from "@/lib/collections/rules";
 import type { CollectionSummary } from "@/lib/collections/service";
 import type { ProductPlacement } from "@/lib/products/overview-rules";
+import { CheckRow } from "@saroh/ui/check-row";
 
 /**
  * The product page's "Edit collections" (#524), after the design's sheet:

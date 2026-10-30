@@ -20,11 +20,11 @@ import {
     refusedResult,
     showPlanRefusal,
 } from "@/components/billing/plan-refusal";
-import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { deleteProduct } from "@/lib/products/actions";
 import { productHref } from "@/lib/products/links";
 import { duplicateListedProduct } from "@/lib/products/list-actions";
 import type { ProductStatus } from "@/lib/products/service";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { useProductStatus } from "./use-product-status";
 

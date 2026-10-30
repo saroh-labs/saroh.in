@@ -1,11 +1,8 @@
 "use client";
 
-import { FormSheetBody } from "@/components/shared/forms/form-sheet";
-import {
-    useOverlaySubmit,
-    useToastsAboveFoot,
-} from "@/components/shared/forms/overlay-form";
 import { Refusal } from "@/components/shared/states/refusal";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
+import { useOverlaySubmit, useToastsAboveFoot } from "@saroh/ui/overlay-form";
 import { Segmented } from "@saroh/ui/segmented";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -22,7 +19,6 @@ import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
-import { useNarrow } from "@/lib/hooks/use-narrow";
 import { firstName } from "@/lib/names";
 import { bookByHand } from "@/lib/services/actions";
 import type {
@@ -51,6 +47,7 @@ import {
 } from "@/lib/services/free-time";
 import type { Service } from "@/lib/services/service";
 import { zoneShortName } from "@/lib/services/time-picker";
+import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import { isTakenRefusal } from "@/components/bookings/quick-look/quick-look-state";
 import { blockGapTime, closeExtraHours, useGapStarts } from "./gap-actions";

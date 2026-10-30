@@ -26,7 +26,8 @@ export async function contactNoticeAddress(
         orderBy: { linkedAt: "desc" },
         select: { email: true },
     });
-    const verified = account?.email.trim();
+    // A phone-only account (DEC-196) has none: the contact's own, if real.
+    const verified = account?.email?.trim();
     if (verified) return verified;
     const contact = await db.contact.findFirst({
         where: { id: contactId, organizationId },
