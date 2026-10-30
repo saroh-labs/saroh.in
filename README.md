@@ -1,19 +1,18 @@
 # Saroh
 
-**One place a small business sells, takes bookings, follows up on enquiries,
-bills its regulars and keeps a website in step.**
+**Small business software for shops, studios and clinics in India: your
+website, bookings, orders and GST invoices in one place.**
 
 **सारोह** (_saaroh_): _sa_, "with", and _aaroh_, "rising". Let's rise together.
 
-Saroh is built for businesses like a gym, a yoga studio, a clinic, a design
-studio or a shop: one login instead of four tools. It is **source-available**,
+Saroh is built for businesses like a shop or bakery, a salon, a gym or yoga
+studio, or a clinic: one login instead of four tools. It is **source-available**,
 so you can use, modify and self-host it, including to run your own business
 ([licence](#licence)).
 
-> **Where it stands:** early, and built in the open. The hosted service is not
-> open yet — [join the waitlist at saroh.in](https://www.saroh.in/waitlist). The whole
-> product runs on your machine today; running your own copy for real use works
-> but has no step-by-step guide yet
+> **Where it stands:** live in production and built in the open, full-time.
+> [Start free at saroh.in](https://www.saroh.in). You can also run your own
+> copy; that works but has no step-by-step guide yet
 > ([what it takes](setup-instructions.md#running-your-own-copy)).
 
 Follow along: [Instagram](https://www.instagram.com/sarohlabs) ·
@@ -40,7 +39,8 @@ stock for each size, a new cover photo, and a reply to a review. At
 
 ## What it does
 
-A business turns on the parts it needs; each is a module it can switch on or
+Nine parts in one workspace: Dashboard, Products, Orders, Customers, Bookings,
+Subscriptions, Billing, Website and Insights. A business turns on the parts it needs; each is a module it can switch on or
 off. One login can hold several businesses, and the workspace changes shape
 with the one you are in.
 
@@ -49,8 +49,9 @@ with the one you are in.
 Pages built from blocks — hero, services, booking, enquiry form, gallery, FAQ,
 testimonials, rich text — plus posts, and publishing when it is ready. A site
 can take a custom domain and verify it, and a draft can be shared as a private
-preview link. Someone can be invited purely to review a site: they comment and
-approve, and see nothing else of the business. Merchant sites carry the
+preview link. Someone can be invited purely to review a site: they read it in
+the same editor with the controls hidden, leave notes on sections and posts,
+and approve, and see nothing else of the business. Merchant sites carry the
 business's own brand, never Saroh's.
 
 ### Schedule
@@ -85,7 +86,8 @@ product. After delivery a customer can be invited to review what they bought.
 
 Plans and the memberships on them: subscriptions renew on their own, can be
 paused, resumed, ended at the period's end or cancelled, and each renewal
-writes its invoice. Invoices run from INV-0001 with no gaps, carry tax and due
+writes its invoice. Invoices are GST invoices, or bills of supply for a
+business outside GST; they run from INV-0001 with no gaps, carry tax and due
 dates, and are paid by hand or through a pay link on the business's own
 provider. Overdue is worked out, never stored, and the money a person owes
 shows on their contact page.
@@ -99,6 +101,9 @@ leads, membership, packs, courses and invoices in one place.
 
 ### Team and access
 
+People sign in with email, Google, or their phone (Indian mobiles, with a code
+on WhatsApp or SMS).
+
 Owner, admin, member and reviewer, and a business can invent its own role and
 tick exactly what it reaches. People are invited by email to one business only.
 A role that cannot reach a page is refused it by address, not merely shown a
@@ -110,8 +115,9 @@ Site visits, enquiries and sales over the last 7, 30 or 90 days. Home says what
 needs doing today across everything at once. Alongside: notifications, payment
 and messaging providers, and the modules themselves.
 
-Messaging (with each contact's consent, over the business's own providers) and
-automations exist in the API but have no workspace screens yet. Platform staff
+Messaging a business's customers (with their consent, over the business's own
+providers) and automations exist in the API but are not switched on yet.
+saroh.in also has [free tools](https://www.saroh.in/tools) for small businesses. Platform staff
 have an admin app for feature flags and the audit log. The
 [roadmap](docs/architecture/PRODUCT_ROADMAP.md) tracks what is next.
 
@@ -185,8 +191,8 @@ service from simply being resold. If that is what you want to build,
 The [Open Source Definition](https://opensource.org/osd) doesn't allow limits on
 how software is used, so Saroh is source-available rather than open source.
 
-Saroh is built part-time. Issues and pull requests may wait a while, and a
-nudge after a week or two is fair. Your first pull request needs the one-line
+Saroh is built full-time. Issues and pull requests are read, and a nudge after
+a few days is fair. Your first pull request needs the one-line
 agreement in [CLA.md](CLA.md).
 
 ## Contact
