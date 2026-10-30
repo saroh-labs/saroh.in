@@ -1,3 +1,5 @@
+import { pageSecurityHeaders } from "@saroh/auth/security-headers";
+
 // A production deployment that falls back to built-in addresses talks to
 // whatever the code assumed; one missing variable once dropped every waitlist
 // join for two days (DEV_LEARNINGS, 5 Oct 2026). So a production build (`VERCEL_ENV`,
@@ -54,6 +56,17 @@ const SECURITY_HEADERS = [
     { key: "X-Content-Type-Options", value: "nosniff" },
 ];
 
+// The page policies (pentest, 29 Oct 2026): a report-only CSP naming what
+// this app's pages load, and the browser features they never use switched
+// off (@saroh/auth/security-headers). A rule of their own: a policy governs
+// a page, not the files and redirects SECURITY_HEADERS also reaches.
+const PAGE_POLICIES = pageSecurityHeaders({
+    origins: [process.env.NEXT_PUBLIC_BETTER_AUTH_URL],
+    uses: ["turnstile", "phoneCodeWidget"],
+    posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    dev: process.env.NODE_ENV === "development",
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
@@ -61,6 +74,7 @@ const nextConfig = {
     async headers() {
         return [
             { source: "/:path*", headers: SECURITY_HEADERS },
+            { source: "/:path*", headers: PAGE_POLICIES },
             // A staff invite's page (admin console U24) sends no referrer to
             // anything it links to or loads, as its meta tag says too.
             {

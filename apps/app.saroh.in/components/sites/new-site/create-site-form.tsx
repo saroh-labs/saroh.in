@@ -56,11 +56,11 @@ export function initialTemplateId(
 }
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Add a name." }),
+    name: z.string().trim().min(1, { error: "Add a name." }),
     subdomain: z
         .string()
         .trim()
-        .min(3, { message: "Choose a web address of at least 3 characters" }),
+        .min(3, { error: "Choose a web address of at least 3 characters" }),
     templateId: z.string(),
     /** The chosen colourway; empty for the template's first. */
     styleId: z.string(),

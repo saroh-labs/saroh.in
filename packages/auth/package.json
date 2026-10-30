@@ -75,6 +75,7 @@
     "./middleware": "./src/middleware.ts",
     "./dev-access": "./src/dev-access.ts",
     "./private-app": "./src/private-app.ts",
+    "./security-headers": "./src/security-headers.cjs",
     "./next": "./src/next.ts"
   }
 }

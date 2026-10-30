@@ -30,12 +30,10 @@ import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 
 // The API's limits (`CreateTestReleaseDto`), said before it refuses.
 const schema = z.object({
-    name: z
-        .string()
-        .max(80, { message: "A name can be at most 80 characters" }),
+    name: z.string().max(80, { error: "A name can be at most 80 characters" }),
     note: z
         .string()
-        .max(500, { message: "A note can be at most 500 characters" }),
+        .max(500, { error: "A note can be at most 500 characters" }),
 });
 type Values = z.infer<typeof schema>;
 

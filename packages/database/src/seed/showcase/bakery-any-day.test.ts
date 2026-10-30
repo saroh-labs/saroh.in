@@ -134,8 +134,12 @@ const TIMES = ["00:00", "05:30", "09:00", "12:30", "15:00", "18:30", "23:30"];
 // 420 whole seeds in one test: ~6s on a CI runner, past vitest's 5s default.
 const SWEEP_TIMEOUT_MS = 60_000;
 
+// CI runs the sweeps in a step of their own (ci.yml, "Seed sweeps"): under
+// every package's tests at once they ran past their timeout (#1273).
+const sweepIt = process.env.SEED_SWEEPS === "later" ? it.skip : it;
+
 describe("Rye & Co. seeded on any day", () => {
-    it(
+    sweepIt(
         "reviews have buyers and the stock log chains, 60 days running",
         () => {
             const start = ist("2026-09-01", "00:00").getTime();
@@ -149,7 +153,7 @@ describe("Rye & Co. seeded on any day", () => {
         SWEEP_TIMEOUT_MS,
     );
 
-    it(
+    sweepIt(
         "the same across month, year and leap-day boundaries",
         () => {
             const dates = [

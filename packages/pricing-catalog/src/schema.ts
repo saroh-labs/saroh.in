@@ -136,7 +136,7 @@ export const moduleSchema = z.object({
     child: z.string().optional(),
     what: z.string().default(""),
     /** One cell per plan id; a missing cell reads as excluded and locked. */
-    cells: z.record(cellSchema),
+    cells: z.record(z.string(), cellSchema),
 });
 
 export const yearlySchema = z.object({
@@ -283,7 +283,7 @@ function duplicates(ids: readonly string[]): string[] {
 /** A catalogue snapshot, with the rules that span its parts. */
 export const catalogSchema = catalogShape.superRefine((c, ctx) => {
     const issue = (message: string, path: (string | number)[]) =>
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+        ctx.addIssue({ code: "custom", message, path });
 
     for (const [list, label] of [
         [c.plans.map((p) => p.id), "plans"],

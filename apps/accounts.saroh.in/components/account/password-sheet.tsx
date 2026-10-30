@@ -1,6 +1,9 @@
 "use client";
 
-import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
+import {
+    CODE_CHALLENGE_HEADER,
+    VERIFICATION_OTP_LENGTH,
+} from "@saroh/auth/constants";
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
 import { Field } from "@saroh/ui/field";
@@ -10,7 +13,8 @@ import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
-import { authFailureCopy, settle } from "@/lib/auth-error-copy";
+import { CodeChallenge } from "@/components/auth/code-challenge";
+import { authErrorCode, authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import type { PasswordClient } from "@/lib/password";
 import { passwordProblem, setFirstPassword } from "@/lib/password";
@@ -19,7 +23,13 @@ import { CODE_MINUTES, CODE_WORDS, codeDigits } from "@/lib/sign-in-code";
 import { useSheetGuard } from "./use-sheet-guard";
 
 const realClient: PasswordClient = {
-    askForCode: (email) => authClient.emailOtp.requestPasswordReset({ email }),
+    askForCode: (email, turnstileToken) =>
+        authClient.emailOtp.requestPasswordReset({
+            email,
+            fetchOptions: turnstileToken
+                ? { headers: { [CODE_CHALLENGE_HEADER]: turnstileToken } }
+                : undefined,
+        }),
     setWithCode: ({ email, code, password }) =>
         authClient.emailOtp.resetPassword({ email, otp: code, password }),
     signIn: ({ email, password }) =>
@@ -69,6 +79,7 @@ export function PasswordSheet({
     );
     const [errors, setErrors] = useState<Errors>({});
     const [busy, setBusy] = useState(false);
+    const [challenge, setChallenge] = useState(false);
     const dirty = Boolean(current || password || confirm);
 
     function reset() {
@@ -118,7 +129,7 @@ export function PasswordSheet({
         close();
     }
 
-    async function askForCode() {
+    async function askForCode(turnstileToken?: string) {
         const problem = passwordProblem(password, confirm);
         if (problem) {
             return setErrors(
@@ -127,8 +138,11 @@ export function PasswordSheet({
                     : { password: problem },
             );
         }
+        setChallenge(false);
         setBusy(true);
-        const { error } = await settle(() => client.askForCode(email));
+        const { error } = await settle(() =>
+            client.askForCode(email, turnstileToken),
+        );
         setBusy(false);
         if (error) {
             setErrors({
@@ -137,6 +151,8 @@ export function PasswordSheet({
                     "Couldn't send the code. Try again.",
                 ),
             });
+            // Past the address's hourly cap the API asks for the bot check.
+            setChallenge(authErrorCode(error) === "CHALLENGE");
             return;
         }
         setCode("");
@@ -281,6 +297,11 @@ export function PasswordSheet({
                                 autoComplete="new-password"
                             />
                         </Field>
+                        {setting && challenge ? (
+                            <CodeChallenge
+                                onToken={(token) => void askForCode(token)}
+                            />
+                        ) : null}
                         {setting ? (
                             <p className="text-muted-foreground text-sm">
                                 We email a code to {email} to check it is you.

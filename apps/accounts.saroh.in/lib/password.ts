@@ -53,7 +53,8 @@ export function hasPassword(
 
 /** The auth client, as far as setting a first password uses it. */
 export interface PasswordClient {
-    askForCode: (email: string) => Promise<Answer>;
+    /** `turnstileToken` once the API asked for the bot check (CHALLENGE). */
+    askForCode: (email: string, turnstileToken?: string) => Promise<Answer>;
     setWithCode: (input: {
         email: string;
         code: string;

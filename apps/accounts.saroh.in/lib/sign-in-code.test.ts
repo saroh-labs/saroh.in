@@ -127,6 +127,29 @@ describe("sendCode: asking for a code", () => {
         });
     });
 
+    it("past the address's cap: the bot check, not a wait, and the token goes with the next ask", async () => {
+        const c = client({
+            send: vi.fn().mockResolvedValue({
+                error: { code: "CHALLENGE", status: 400 },
+            }),
+        });
+        expect(await sendCode(c, { email: "asha@example.com" })).toEqual({
+            ok: false,
+            message: "Confirm you're not a robot below, then we send it.",
+            resendAfterSeconds: null,
+            challenge: true,
+        });
+        await sendCode(c, {
+            email: "asha@example.com",
+            turnstileToken: "token-1",
+        });
+        expect(c.send).toHaveBeenLastCalledWith({
+            email: "asha@example.com",
+            kind: "sign-in",
+            turnstileToken: "token-1",
+        });
+    });
+
     it("a dropped connection is said, never left hanging", async () => {
         const c = client({
             send: vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import { CodeStep } from "@/components/auth/code-step";
 import {
     AuthAlt,
@@ -24,7 +25,7 @@ import { isJoining, withCarry } from "@/lib/joining";
 import type { PhoneOptions } from "@/lib/phone-sign-in";
 import { throughPhoneStep } from "@/lib/phone-step";
 import type { CodeClient } from "@/lib/sign-in-code";
-import { sendCode } from "@/lib/sign-in-code";
+import { sendCodeFromForm } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
@@ -85,6 +86,8 @@ export function LoginForm({
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // The API asked for the bot check before it sends the code.
+    const [challenge, setChallenge] = useState(false);
     // The code step, once a code has gone: the wait before Resend, and
     // which kind of code it is.
     const [sent, setSent] = useState<{
@@ -106,15 +109,13 @@ export function LoginForm({
         }
     }
 
-    async function askForCode() {
-        setIsLoading(true);
-        const result = await sendCode(client, { email });
-        setIsLoading(false);
-        if (!result.ok) {
-            setError(result.message);
-            return;
-        }
-        setSent({ wait: result.resendAfterSeconds, kind: "sign-in" });
+    async function askForCode(turnstileToken?: string) {
+        const wait = await sendCodeFromForm(
+            client,
+            { email, turnstileToken },
+            { setIsLoading, setChallenge, setError },
+        );
+        if (wait !== null) setSent({ wait, kind: "sign-in" });
     }
 
     async function withPassword() {
@@ -233,6 +234,14 @@ export function LoginForm({
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         disabled={isLoading}
+                    />
+                ) : null}
+                {challenge && way === "code" ? (
+                    <CodeChallenge
+                        onToken={(token) => {
+                            setError(null);
+                            void askForCode(token);
+                        }}
                     />
                 ) : null}
                 <AuthSubmit disabled={isLoading}>

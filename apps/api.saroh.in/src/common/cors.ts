@@ -14,6 +14,13 @@ import { WEBHOOK_ROUTE } from "@saroh/integrations";
  * origin may call them, WITHOUT credentials: the browser sends no cookie and
  * reads no response that one could have shaped. The webhook routes are
  * server-to-server and keep the strict answer.
+ *
+ * This is the only CORS layer: the Better Auth wrapper's own is off
+ * (`disableTrustedOriginsCors` in app.module.ts). Left on, it added
+ * Allow-Credentials: true to every answer, `/public/*` included, beside
+ * the origin reflected here (pentest 29 Oct). No public route reads a
+ * cookie: a site customer's session reaches the API through saroh.app's
+ * server, never the browser.
  */
 export function corsOptionsFor(
     path: string,

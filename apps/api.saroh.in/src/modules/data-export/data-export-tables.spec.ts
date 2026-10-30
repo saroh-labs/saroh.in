@@ -11,6 +11,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { dataExportKey } from "./data-export-build";
 import {
     columnsOf,
     csvCell,
@@ -18,6 +19,17 @@ import {
     isOmitted,
 } from "./data-export-tables";
 import { ZipFile } from "./zip-file";
+
+describe("where the zip is kept", () => {
+    it("can't be guessed from the export's id", () => {
+        const one = dataExportKey("org_1", "exp_1");
+        const two = dataExportKey("org_1", "exp_1");
+        expect(one).not.toBe(two);
+        expect(one).toMatch(
+            /^org\/org-1\/data-export\/exp_1-[0-9a-f-]{36}-saroh-data\.zip$/,
+        );
+    });
+});
 
 describe("the export's tables", () => {
     it("covers what the owner asked for", () => {

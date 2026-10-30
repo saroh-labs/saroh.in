@@ -24,6 +24,14 @@ const ALLOWED: Record<string, string> = {
         "lists the public webhook path",
     "apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts":
         "names the webhook controller's file",
+    // A page's script policy must name the host the phone-code widget loads
+    // from; the source itself is called `phoneCodeWidget` everywhere else.
+    "packages/auth/src/security-headers.cjs":
+        "the phone-code widget's host in the page policy",
+    "apps/accounts.saroh.in/lib/page-policies.test.ts":
+        "checks the widget's host is allowed",
+    "apps/saroh.in/page-policies.test.ts":
+        "checks the widget's host is not allowed there",
 };
 
 function files(): string[] {

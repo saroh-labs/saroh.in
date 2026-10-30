@@ -1,3 +1,4 @@
+const { pageSecurityHeaders } = require("@saroh/auth/security-headers");
 const {
     REDIRECTS,
     temporary,
@@ -58,6 +59,16 @@ const SECURITY_HEADERS = [
     { key: "X-Content-Type-Options", value: "nosniff" },
 ];
 
+// The page policies (pentest, 29 Oct 2026): a report-only CSP naming what
+// this app's pages load, and the browser features they never use switched
+// off (@saroh/auth/security-headers). A rule of their own: a policy governs
+// a page, not the files and redirects SECURITY_HEADERS also reaches.
+const PAGE_POLICIES = pageSecurityHeaders({
+    uses: ["google", "meta"],
+    posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    dev: process.env.NODE_ENV === "development",
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
@@ -101,6 +112,7 @@ const nextConfig = {
         ];
         return [
             { source: "/:path*", headers: SECURITY_HEADERS },
+            { source: "/:path*", headers: PAGE_POLICIES },
             { source: "/pricing/draft", headers: preview },
             { source: "/pricing/preview", headers: preview },
         ];

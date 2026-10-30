@@ -41,10 +41,25 @@ describe("PublicPaymentsController limits (PAY-08)", () => {
     it("lets a checkout poll its receipt, within reason", async () => {
         const controller = make();
         for (let i = 0; i < 240; i++) {
-            await controller.receipt("order_1", "203.0.113.8");
+            await controller.receipt("order_1", "tok", "203.0.113.8");
         }
         await expect(
-            controller.receipt("order_1", "203.0.113.8"),
+            controller.receipt("order_1", "tok", "203.0.113.8"),
         ).rejects.toMatchObject({ status: 429 });
+    });
+
+    it("refuses a receipt asked for by the order's id alone, in words", async () => {
+        const controller = make();
+        for (const token of [undefined, ""]) {
+            await expect(
+                controller.receipt("order_1", token, "203.0.113.9"),
+            ).rejects.toMatchObject({
+                status: 403,
+                message: expect.stringContaining("from the link in your email"),
+            });
+        }
+        expect(payments.getReceipt).not.toHaveBeenCalled();
+        await controller.receipt("order_1", "tok", "203.0.113.9");
+        expect(payments.getReceipt).toHaveBeenCalledWith("order_1", "tok");
     });
 });

@@ -80,6 +80,11 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AuthModule.forRoot({
             auth,
             disableGlobalAuthGuard: true,
+            // CORS is main.ts's alone (common/cors.ts). The wrapper's own
+            // `enableCors({ credentials: true })` ran for every path, so a
+            // `/public/*` answer reflecting any origin also said
+            // Allow-Credentials: true (pentest 29 Oct).
+            disableTrustedOriginsCors: true,
             // rawBody: true attaches the raw request Buffer to `req.rawBody` (via
             // the JSON parser's `verify` hook) for every non-auth route. The
             // public webhook endpoint (S5-003) needs those exact bytes to

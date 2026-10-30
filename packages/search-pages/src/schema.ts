@@ -266,7 +266,7 @@ export const frontmatterSchema = z
         for (const k of need[fm.shape]) {
             if (fm.scene[k] === undefined) {
                 ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
+                    code: "custom",
                     path: ["scene", k],
                     message: `an ${fm.shape} page needs scene.${k}`,
                 });

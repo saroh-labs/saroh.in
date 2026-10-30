@@ -49,6 +49,14 @@ const SECURITY_HEADERS = [
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
     { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
     { key: "X-Content-Type-Options", value: "nosniff" },
+    // Camera, microphone, location and USB off (pentest, 29 Oct 2026); the
+    // checkout's payment keeps the browser's default. No CSP beyond
+    // frame-ancestors yet: each business's trackers (#889), checkout and
+    // media hosts would need listing.
+    {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), usb=()",
+    },
 ];
 
 /**

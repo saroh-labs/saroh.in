@@ -25,9 +25,9 @@ const schema = z.object({
     reason: z
         .string()
         .trim()
-        .min(1, { message: "Say why you're closing it" })
+        .min(1, { error: "Say why you're closing it" })
         .max(MAX_CLOSE_REASON, {
-            message: `A reason can be at most ${MAX_CLOSE_REASON} characters`,
+            error: `A reason can be at most ${MAX_CLOSE_REASON} characters`,
         }),
 });
 type Values = z.infer<typeof schema>;

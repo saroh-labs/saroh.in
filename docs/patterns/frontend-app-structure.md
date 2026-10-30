@@ -217,6 +217,26 @@ accounts and the operator console. `pnpm run check:titles` and
   token in its address (`/invite/[token]`, `/reset-password`) keeps a fixed
   title and sets `referrer: "no-referrer"`.
 
+## Page policies: CSP and Permissions-Policy
+
+**Current** (30 Oct 2026, pentest 29 Oct) — saroh.in, the workspace,
+accounts and the operator console send `Content-Security-Policy-Report-Only`
+and an enforced `Permissions-Policy` on every page, built by
+`pageSecurityHeaders` (`@saroh/auth/security-headers`) in each next.config.
+The merchant sites (saroh.app) send only the Permissions-Policy: each
+business's own trackers would need listing first.
+
+- **A new third-party script, frame, upload target or image host** goes in
+  that file's `SOURCES` and in the app's `uses`, in the same change; a
+  missing one shows as a `[Report Only]` console line. Each app's
+  `page-policies.test.ts` pins its hosts; `check:security-headers` fails an
+  app that drops either header.
+- **Camera, microphone, location, USB and payment are off**, payment open
+  only to Razorpay's frame in the workspace. Using one means changing
+  `permissionsPolicy` first.
+- **Not enforced yet**: Next's inline bootstrap needs `'unsafe-inline'`
+  until the apps send a nonce; enforce after a release runs clean.
+
 ## saroh.in and search
 
 - **Current** (DEC-143) — **A main page of saroh.in has search words of its

@@ -24,7 +24,7 @@ import { storefrontHref } from "@/lib/stores/links";
 import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Add a name." }),
+    name: z.string().trim().min(1, { error: "Add a name." }),
     description: z.string().optional(),
 });
 

@@ -330,7 +330,14 @@ jobs:
       # app (#287). `@saroh/api` is excluded: its bare `test` script is `jest`,
       # which picks up the integration specs that need a database.
       - name: Unit tests (packages and the app)
+        env:
+          # The seed sweeps (hundreds of seeded days) run next, alone: under
+          # every package's tests at once they ran past their timeout (#1273).
+          SEED_SWEEPS: later
         run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED
+
+      - name: Seed sweeps
+        run: pnpm --filter @saroh/database exec vitest run src/seed/showcase/clinic.test.ts src/seed/showcase/bakery-any-day.test.ts
 
   build:
     name: Build

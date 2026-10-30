@@ -122,7 +122,12 @@ export type CodeKind = "sign-in" | "email-verification";
 export interface CodeClient {
     /** A phone's code (DEC-196): the address is a number, not an email. */
     channel?: "phone" | "whatsapp";
-    send: (input: { email: string; kind: CodeKind }) => Promise<Answer>;
+    send: (input: {
+        email: string;
+        kind: CodeKind;
+        /** The bot check's token, after a `CHALLENGE` answer. */
+        turnstileToken?: string | null;
+    }) => Promise<Answer>;
     check: (input: {
         email: string;
         code: string;
@@ -134,7 +139,13 @@ export interface CodeClient {
 
 export type CodeSent =
     | { ok: true; resendAfterSeconds: number }
-    | { ok: false; message: string; resendAfterSeconds: number | null };
+    | {
+          ok: false;
+          message: string;
+          resendAfterSeconds: number | null;
+          /** Past the address's hourly cap: the bot check, then send again with its token. */
+          challenge?: true;
+      };
 
 /**
  * Ask for a code. The same answer whether or not the address has an account
@@ -143,7 +154,7 @@ export type CodeSent =
  */
 export async function sendCode(
     client: CodeClient,
-    input: { email: string; kind?: CodeKind },
+    input: { email: string; kind?: CodeKind; turnstileToken?: string | null },
 ): Promise<CodeSent> {
     const email = input.email.trim();
     if (!client.channel && !looksLikeEmail(email)) {
@@ -154,11 +165,23 @@ export async function sendCode(
         };
     }
     const answer = await settle<Answer>(() =>
-        client.send({ email, kind: input.kind ?? "sign-in" }),
+        client.send({
+            email,
+            kind: input.kind ?? "sign-in",
+            turnstileToken: input.turnstileToken,
+        }),
     );
     const { error } = answer;
     const retryAfter = "retryAfter" in answer ? answer.retryAfter : null;
     if (!error) return { ok: true, resendAfterSeconds: CODE_RESEND_SECONDS };
+    if (authErrorCode(error) === "CHALLENGE") {
+        return {
+            ok: false,
+            message: authFailureCopy(error),
+            resendAfterSeconds: null,
+            challenge: true,
+        };
+    }
     const limited = authErrorCode(error) === "TOO_MANY_REQUESTS";
     // The API's own sentence (phone): it already says when to try again.
     if (error.words) {
@@ -176,6 +199,32 @@ export async function sendCode(
         // Only a refusal for asking too often has a wait to count down.
         resendAfterSeconds: limited ? waitFromServer(retryAfter) : null,
     };
+}
+
+/**
+ * `sendCode` for a form: shows it sending, says a refusal, and shows the
+ * bot check when the address is past its hourly cap (CHALLENGE). The wait
+ * to count down when sent, or null when not.
+ */
+export async function sendCodeFromForm(
+    client: CodeClient,
+    input: { email: string; turnstileToken?: string | null },
+    form: {
+        setIsLoading: (loading: boolean) => void;
+        setChallenge: (challenge: boolean) => void;
+        setError: (message: string) => void;
+    },
+): Promise<number | null> {
+    form.setIsLoading(true);
+    form.setChallenge(false);
+    const result = await sendCode(client, input);
+    form.setIsLoading(false);
+    if (!result.ok) {
+        form.setError(result.message);
+        form.setChallenge(result.challenge === true);
+        return null;
+    }
+    return result.resendAfterSeconds;
 }
 
 export type CodeChecked =

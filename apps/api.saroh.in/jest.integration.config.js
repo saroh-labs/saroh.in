@@ -40,7 +40,12 @@ module.exports = {
     ],
     testEnvironment: "node",
     rootDir: ".",
-    testMatch: ["<rootDir>/src/modules/**/*.spec.ts"],
+    // `src/common` holds unit specs (jest.config.js) and the odd db spec:
+    // only the latter runs here.
+    testMatch: [
+        "<rootDir>/src/modules/**/*.spec.ts",
+        "<rootDir>/src/common/**/*.db.spec.ts",
+    ],
     // The organizations module specs mock Prisma (pure unit tests) and run in
     // the default/unit project — keep them out of the DB-backed run.
     // The organizations specs mock Prisma (pure unit tests), and the S1-006

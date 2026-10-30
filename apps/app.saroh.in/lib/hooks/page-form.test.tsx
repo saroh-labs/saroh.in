@@ -18,8 +18,8 @@ import { Input } from "@saroh/ui/input";
 import { PAGE_FORM, toFirstError } from "./page-form";
 
 const schema = z.object({
-    kind: z.string().min(1, { message: "Choose a kind." }),
-    name: z.string().min(1, { message: "Add a name." }),
+    kind: z.string().min(1, { error: "Choose a kind." }),
+    name: z.string().min(1, { error: "Add a name." }),
 });
 
 function Sample({ onSave }: { onSave: () => void }) {

@@ -33,6 +33,9 @@ const COPY: Record<string, string> = {
         "Something is missing or mistyped. Check each field and try again.",
     MISSING_FIELD:
         "Something is missing or mistyped. Check each field and try again.",
+    // An address past its hourly code cap (API `code-mail-limits.ts`): the
+    // bot check, then the code or link goes.
+    CHALLENGE: "Confirm you're not a robot below, then we send it.",
     // Too many tries.
     [TOO_MANY_REQUESTS]: "Too many tries. Wait a minute, then try again.",
     TOO_MANY_ATTEMPTS:

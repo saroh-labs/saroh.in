@@ -33,8 +33,8 @@ const formSchema = z.object({
     email: z
         .string()
         .trim()
-        .min(1, { message: "An email is needed to add them." })
-        .email({ message: "That doesn't look like an email address." }),
+        .min(1, { error: "An email is needed to add them." })
+        .email({ error: "That doesn't look like an email address." }),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: phoneSchema.optional(),

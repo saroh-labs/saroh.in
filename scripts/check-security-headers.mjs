@@ -14,6 +14,11 @@
  * for the files Cloudflare serves without the Worker. This fails when one of
  * the three is missing, isn't wired in, or says something different.
  *
+ * Every page also switches off the browser features no app uses
+ * (Permissions-Policy), and every app but the merchant sites reports a
+ * Content-Security-Policy (pentest, 29 Oct 2026; @saroh/auth/security-headers).
+ * The merchant sites have none yet: each business's trackers would need listing.
+ *
  * Run from the repo root.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -32,7 +37,12 @@ const REQUIRED = {
     "x-frame-options": /^SAMEORIGIN$/u,
     "content-security-policy": /frame-ancestors 'self'/u,
     "x-content-type-options": /^nosniff$/u,
+    "permissions-policy": /camera=\(\), microphone=\(\), geolocation=\(\)/u,
 };
+/** The apps whose pages report a full CSP; saroh.app isn't one yet. */
+const REPORTED_CSP =
+    /^default-src 'self';.*object-src 'none'; base-uri 'self'$/u;
+const NO_CSP_YET = new Set(["apps/saroh.app/next.config.js"]);
 
 /** The signed-in apps, and the file whose default export is their middleware. */
 const PRIVATE_APPS = {
@@ -91,13 +101,25 @@ for (const file of CONFIGS) {
     if (config.poweredByHeader !== false)
         problems.push(`${file}: poweredByHeader isn't false`);
     const rules = config.headers ? await config.headers() : [];
-    const all = rules.find((r) => r.source === "/:path*" && !r.has);
+    // Every rule that reaches every page, merged as Next merges them.
     const sent = new Map(
-        (all?.headers ?? []).map((h) => [h.key.toLowerCase(), h.value]),
+        rules
+            .filter((r) => r.source === "/:path*" && !r.has)
+            .flatMap((r) => r.headers)
+            .map((h) => [h.key.toLowerCase(), h.value]),
     );
     for (const [key, shape] of Object.entries(REQUIRED))
         if (!shape.test(sent.get(key) ?? ""))
             problems.push(`${file}: every page must send ${key}`);
+    if (
+        !NO_CSP_YET.has(file) &&
+        !REPORTED_CSP.test(
+            sent.get("content-security-policy-report-only") ?? "",
+        )
+    )
+        problems.push(
+            `${file}: every page must report a CSP (pageSecurityHeaders, @saroh/auth/security-headers)`,
+        );
 
     const middleware = PRIVATE_APPS[file];
     if (!middleware) continue;

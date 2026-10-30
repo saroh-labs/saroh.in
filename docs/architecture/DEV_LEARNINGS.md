@@ -6099,6 +6099,73 @@ content files, including the moved ones.
 app's `.next/` before trusting a 500.
 **Category**: tooling · local dev
 
+## A library's own CORS made every public answer credentialed
+
+**Symptom**: 29 Oct pentest, saroh.io: a GET to any `/public/*` route from
+any Origin came back with that origin in `Access-Control-Allow-Origin` and
+`Access-Control-Allow-Credentials: true`, though `common/cors.ts` answers
+public routes without credentials (its spec passed).
+**Cause**: `@thallesp/nestjs-better-auth` calls `enableCors({ origin:
+trustedOrigins, credentials: true })` for every path unless told not to. Two
+`cors` middlewares ran: ours set the reflected origin, the wrapper's added the
+credentials header (a preflight looked right, since ours ends it first).
+**Fix**: `disableTrustedOriginsCors: true` in `AuthModule.forRoot`; main.ts's
+`corsOptionsFor` is the only CORS layer (`app.bootstrap.spec.ts` checks it).
+**Rule**: one CORS layer. Check response headers on a real request, not only
+the options function, and read what a module does in `configure`.
+**Category**: security · CORS
+
+## A db spec under `src/common` never ran
+
+**Symptom**: 30 Oct: `common/auth/code-mail-limits.db.spec.ts` (the per-address
+code cap) was committed "tested", but neither jest project ran it.
+**Cause**: the unit project (`jest.config.js`) skips every `*.db.spec.ts`, and
+the integration project matched only `src/modules/**`.
+**Fix**: `jest.integration.config.js` also matches `src/common/**/*.db.spec.ts`.
+**Rule**: a new spec's first run is by its path; "No tests found" means no
+project picks it up, not that it passed.
+**Category**: tooling · tests
+
+## A data export failed now and then with ENOENT on its own zip
+
+**Symptom**: 30 Oct gate: `data-export.db.spec.ts` ("says it failed … once the
+tries run out") failed once under RLS with ENOENT opening the temp zip; it
+passed in other runs.
+**Cause**: `buildDataExport` handed the store a lazily opened
+`createReadStream(path)`. A store that refused without reading it let
+`finally` delete the file before the stream's own open ran.
+**Fix**: open a `FileHandle` before the upload, stream from it, and close it
+before `rm` (`data-export-build.ts`).
+**Rule**: never delete a file that a lazily opened stream may still open; hold
+the handle and close it first.
+**Category**: api · files
+
+## A privacy check failed because a timestamp held the same digits
+
+**Symptom**: 30 Oct, CI on #1273: `booking-flow-customer.test.tsx` failed
+"not to contain '98450'" though no phone number was stored; the draft's
+`savedAt` was `1793343798450`.
+**Cause**: the check searched the whole stored JSON for five digits of the
+sample number, which any millisecond timestamp can contain.
+**Fix**: assert on the whole number in both forms (`98450 12345`,
+`9845012345`).
+**Rule**: a "not stored" check looks for the full value, never a fragment
+short enough to appear in an id or a timestamp.
+**Category**: tests · flakes
+
+## A seed sweep timed out on CI only when every package's tests ran
+
+**Symptom**: 30 Oct, #1273: `clinic.test.ts` "70 days running" passed
+locally in 13s but timed out at 300s on CI, twice in a row.
+**Cause**: the zod upgrade touched every package, so the unit job ran every
+package's tests at once; the 490-seed sweep starved under that load (it had
+needed over 120s on CI before, #825).
+**Fix**: the unit step sets `SEED_SWEEPS=later` (passed through by turbo for
+`@saroh/database#test`), the sweeps skip there, and a "Seed sweeps" step runs
+them alone right after. Locally nothing changes.
+**Rule**: a test that needs minutes of CPU runs in a CI step of its own, not
+inside the all-packages run.
+**Category**: tooling · CI
 ## A Reviewer's own approval didn't count for the Reviewer (30 Oct 2026)
 
 **Symptom**: the batch gate for DEC-200: a Reviewer approved, saw "Marked as
