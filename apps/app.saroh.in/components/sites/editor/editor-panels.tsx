@@ -58,6 +58,7 @@ export function EditorPanels({
     body,
     setBody,
     releases,
+    openNotes = 0,
 }: {
     layout: EditorLayout;
     viewport: EditorViewport;
@@ -88,6 +89,8 @@ export function EditorPanels({
      * the foot on a phone. Absent while test releases are off.
      */
     releases?: { open: boolean; onClose: () => void; content: ReactNode };
+    /** The site's open notes, on a Reviewer's pill (DEC-200). */
+    openNotes?: number;
 }) {
     const { previewing, railWidth, panelWidth } = viewport;
     const { sheet, setSheet } = sheets;
@@ -155,6 +158,8 @@ export function EditorPanels({
                         onBlocks={() => openRail("page")}
                         onAdd={() => openRail("add")}
                         onBrand={() => openRail("brand")}
+                        openNotes={openNotes}
+                        onFeedback={() => selection.setInspector("feedback")}
                     />
                 ) : null}
 

@@ -13,6 +13,7 @@ import { BrandSheetActions } from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
+import { ReviewSheet } from "@/components/sites/review/review-sheet";
 import {
     reviewOwner,
     TopBarVerdict,
@@ -168,6 +169,7 @@ export function SiteEditor({
         layout,
         viewport.previewing,
         initialSheet,
+        readOnly,
     );
     const { selection } = sheets;
     // The editor's body, below the top bar: where its sheets are laid.
@@ -338,6 +340,36 @@ export function SiteEditor({
           })
         : null;
 
+    // A Reviewer's verdict (DEC-200): the bar's on a desk, a sheet on a phone.
+    const verdict = readOnly
+        ? {
+              owner: reviewOwner(review.review),
+              approved: youApproved(review.review),
+              pagesRead: review.review.pagesRead,
+              recording: review.recording,
+              onRecord: review.record,
+              openNotes: review.comments
+                  .filter((c) => c.editable && c.resolvedAt === null)
+                  .map((c) => {
+                      const type =
+                          c.pageId === pageId
+                              ? sections.find((s) => s.key === c.sectionKey)
+                                    ?.type
+                              : undefined;
+                      return {
+                          id: c.id,
+                          where: [
+                              c.pageTitle ?? "Removed page",
+                              type && SECTION_LABELS[type],
+                          ]
+                              .filter(Boolean)
+                              .join(" · "),
+                          body: c.body,
+                      };
+                  }),
+          }
+        : null;
+
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
         <EditorReadOnly.Provider value={readOnly}>
@@ -376,40 +408,23 @@ export function SiteEditor({
                     setSheet={sheets.setSheet}
                     sheetHost={body}
                     reviewerVerdict={
-                        readOnly ? (
-                            <TopBarVerdict
-                                owner={reviewOwner(review.review)}
-                                approved={youApproved(review.review)}
-                                pagesRead={review.review.pagesRead}
-                                recording={review.recording}
-                                onRecord={review.record}
-                                openNotes={review.comments
-                                    .filter(
-                                        (c) =>
-                                            c.editable && c.resolvedAt === null,
-                                    )
-                                    .map((c) => {
-                                        const type =
-                                            c.pageId === pageId
-                                                ? sections.find(
-                                                      (s) =>
-                                                          s.key ===
-                                                          c.sectionKey,
-                                                  )?.type
-                                                : undefined;
-                                        return {
-                                            id: c.id,
-                                            where: [
-                                                c.pageTitle ?? "Removed page",
-                                                type && SECTION_LABELS[type],
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" · "),
-                                            body: c.body,
-                                        };
-                                    })}
+                        !verdict ? undefined : layout === "phone" ? (
+                            <ReviewSheet
+                                {...verdict}
+                                review={review.review}
+                                loadFailed={review.loadFailed}
+                                onRetry={() => void review.refreshReview()}
+                                onSeeSettled={() => {
+                                    // The whole site's Feedback, where the
+                                    // settled notes are (RVD4).
+                                    setSelectedIndex(null);
+                                    setInspector("feedback");
+                                }}
+                                onDone={() => sheets.setSheet(null)}
                             />
-                        ) : undefined
+                        ) : (
+                            <TopBarVerdict {...verdict} />
+                        )
                     }
                 />
 
@@ -425,7 +440,10 @@ export function SiteEditor({
                             ? "Header"
                             : selection.selectedChrome === "footer"
                               ? "Footer"
-                              : selection.inspector === "feedback" || !active
+                              : // A Reviewer's Feedback sheet names its block (RVD1Phone).
+                                (selection.inspector === "feedback" &&
+                                      !readOnly) ||
+                                  !active
                                 ? "Feedback"
                                 : SECTION_LABELS[active.section.type]
                     }
@@ -433,6 +451,7 @@ export function SiteEditor({
                         pages.find((p) => p.id === pageId)?.title ?? "this page"
                     }
                     overlayOpen={publish.checking}
+                    openNotes={review.openNotes}
                     brandActions={
                         readOnly ? undefined : (
                             <BrandSheetActions

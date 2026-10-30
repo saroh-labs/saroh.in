@@ -137,7 +137,8 @@ export function EditorRail({
 
     return (
         <aside className="flex min-h-0 flex-1 flex-col">
-            {phone ? null : (
+            {/* A Reviewer's Blocks sheet keeps Page | Brand (RVD2Phone). */}
+            {phone && !readOnly ? null : (
                 <EditorTabs
                     label="Editor panels"
                     tabs={

@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { ChevronDown, ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
@@ -162,7 +163,7 @@ export function EditorTopBar({
     setSheet?: (next: SheetName) => void;
     /** The editor's body, where a phone's sheets are laid. */
     sheetHost?: HTMLElement | null;
-    /** A Reviewer's Ask for changes and Approve (DEC-200), desk and narrow. */
+    /** A Reviewer's verdict (DEC-200): the bar's buttons on a desk, the Review sheet's body on a phone. */
     reviewerVerdict?: ReactNode;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
@@ -306,10 +307,33 @@ export function EditorTopBar({
                             />
                         ) : null}
                     </button>
-                    {readOnly ? null : (
+                    {readOnly ? (
+                        // Where Publish sits: a Reviewer's verdict (RVD3Phone).
+                        <Button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() => setSheet?.("review")}
+                            className="h-11 shrink-0"
+                        >
+                            Review
+                        </Button>
+                    ) : (
                         <PublishButton {...actions} className="h-11 shrink-0" />
                     )}
                 </header>
+                {readOnly ? (
+                    <EditorSheet
+                        open={sheet === "review"}
+                        onClose={close}
+                        container={sheetHost}
+                        side="bottom"
+                        title="Your review"
+                        closeLabel="Close your review"
+                        className="h-[80%]"
+                    >
+                        {reviewerVerdict}
+                    </EditorSheet>
+                ) : null}
                 <EditorSheet
                     open={sheet === "pages"}
                     onClose={close}

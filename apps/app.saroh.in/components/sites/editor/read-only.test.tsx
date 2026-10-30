@@ -291,6 +291,13 @@ const ALLOWED: RegExp[] = [
     // The verdict, in the top bar (`site:approve`, DEC-200 U4); the spy
     // below proves none of these is pressed by the scenes here.
     /^(Ask for changes|Approve|Change your review)$/,
+    // A phone's verdict (U5): Review opens the sheet; its two rows, the
+    // reason and Send. The spy below proves Send is not pressed here.
+    /^Review$/,
+    /^(Approve|Ask for changes)(It’s ready to go live\.|Your \d+ open notes? go(es)? with it\.|Say what needs changing\.)$/,
+    /^What needs changing\?$/,
+    /^Send to .+$/,
+    /^Feedback, \d+ open notes?$/,
     /^(See the notes|Show all|Try again)$/,
     // Test releases: the list, and each one's own review page (a link).
     /^Test releases( · )?\d*$/,
@@ -333,6 +340,8 @@ function isEnabled(el: Element): boolean {
     if ((el as HTMLButtonElement).disabled) return false;
     if (el.getAttribute("aria-disabled") === "true") return false;
     if (el.closest("fieldset[disabled], [inert], [hidden]")) return false;
+    // A radio group's hidden form input: its radio is what is pressed.
+    if (el.getAttribute("aria-hidden") === "true") return false;
     return true;
 }
 
@@ -613,9 +622,18 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         click(button(/^HeroWelcome in/));
         expectReadOnly("phone, a block's sheet");
         click(button("Close the block panel"));
+        // Brand is a tab in the Blocks sheet, not on the pill (U5).
+        expect(has("Brand")).toBe(false);
+        click(button("Blocks"));
         click(button("Brand"));
-        expectReadOnly("phone, Brand sheet");
-        click(button("Close Brand"));
+        expectReadOnly("phone, Blocks sheet, Brand tab");
+        click(button("Close the block list"));
+        click(button(/^Feedback, /));
+        expectReadOnly("phone, Feedback sheet");
+        click(button("Close the block panel"));
+        click(button("Review"));
+        expectReadOnly("phone, Review sheet");
+        click(button("Close your review"));
         click(button(/^More: preview/));
         expectReadOnly("phone, More");
         click(button("Close More"));
@@ -802,6 +820,134 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
     });
 });
 
+describe("a Reviewer on a phone (DEC-200, U5)", () => {
+    const sheet = (title: string) =>
+        $(`[data-editor-sheet="${title}"]`)?.textContent ?? null;
+    const onCanvas = (index: number) => {
+        const block = $(`[data-block-index='${index}'] > button[aria-pressed]`);
+        if (!block) throw new Error(`No block ${index} on the canvas`);
+        return block;
+    };
+
+    beforeEach(() => atWidth(390));
+
+    it("the pill is Blocks · Feedback n; Feedback opens the notes", () => {
+        render();
+        const pill = $("[data-edit-pill]");
+        expect(
+            Array.from(pill?.querySelectorAll("button") ?? []).map(nameOf),
+        ).toEqual(["Blocks", "Feedback, 1 open note"]);
+        click(button("Feedback, 1 open note"));
+        expect($("[data-editor-sheet]")).not.toBeNull();
+        expect(button(/^Feedback/).getAttribute("aria-selected")).toBe("true");
+    });
+
+    it("tapping a block on the canvas selects it and opens its Feedback", () => {
+        render();
+        click(onCanvas(0));
+        expect(onCanvas(0).getAttribute("aria-pressed")).toBe("true");
+        // The sheet names the block, on its Feedback (RVD1Phone).
+        expect(sheet("Hero")).toContain("Add a note on Hero");
+        // Even after the Block tab was looked at.
+        click(button("Block"));
+        click(button("Close the block panel"));
+        click(onCanvas(0));
+        expect(button(/^Feedback/).getAttribute("aria-selected")).toBe("true");
+    });
+
+    it("tapping a block in the Blocks sheet scrolls the page to it and selects it", () => {
+        render();
+        click(button("Blocks"));
+        expect(sheet("Blocks on Home")).not.toBeNull();
+        const scrolled = vi.fn();
+        Element.prototype.scrollTo = scrolled;
+        click(button(/^HeroWelcome in/));
+        act(() => {
+            vi.advanceTimersByTime(20);
+        });
+        expect(scrolled).toHaveBeenCalled();
+        expect(onCanvas(0).getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("the Blocks sheet's Brand tab shows the look as rows", () => {
+        render();
+        click(button("Blocks"));
+        click(button("Brand"));
+        expect(sheet("Blocks on Home")).toContain(
+            "You can see the look. Owners and admins change it.",
+        );
+        expect(sheet("Blocks on Home")).toContain("Newsreader");
+    });
+
+    it("every control in the pill, the bar's Review and the sheets is 44px", () => {
+        render();
+        const tall = /(^|\s)(coarse:)?(min-)?h-1[12]\b|(^|\s)size-11\b/;
+        const short = (scope: string) =>
+            Array.from(document.querySelectorAll(scope))
+                .flatMap((el) => Array.from(el.querySelectorAll(CONTROLS)))
+                // The grip is a mouse's: the sheet's whole head drags.
+                .filter((el) => !nameOf(el).startsWith("Make the sheet"))
+                // A field of several lines is taller than a row anyway.
+                .filter((el) => el.tagName !== "TEXTAREA")
+                .filter((el) => el.getAttribute("aria-hidden") !== "true")
+                .filter((el) => {
+                    const own = el.className.toString();
+                    const row = el.closest("label")?.className ?? "";
+                    return !tall.test(own) && !tall.test(row);
+                })
+                .map(nameOf);
+        expect(short("[data-edit-pill]"), "pill").toEqual([]);
+        expect(tall.test(button("Review").className)).toBe(true);
+        click(button("Blocks"));
+        expect(short("[data-editor-sheet]"), "Blocks").toEqual([]);
+        click(button("Brand"));
+        expect(short("[data-editor-sheet]"), "Brand").toEqual([]);
+        click(button("Close the block list"));
+        click(button("Review"));
+        click(button(/^Ask for changes/));
+        expect(short("[data-editor-sheet]"), "Your review").toEqual([]);
+    });
+
+    it("Review opens the sheet: the request, what you've read, and a reason for Ask", () => {
+        render({
+            initialComments: [
+                { ...NOTE, mine: true, editable: true },
+            ] as SiteCommentView[],
+            initialReview: {
+                ...REVIEW,
+                request: { by: "Asha Example", at: "2026-10-28T09:00:00.000Z" },
+                pagesRead: { read: 1, total: 2 },
+            },
+        });
+        click(button("Review"));
+        const text = () => sheet("Your review") ?? "";
+        expect(text()).toContain("Asha Example asked you to review");
+        expect(text()).toContain("You’ve read 1 of 2 pages · 1 open note");
+        expect(text()).toContain(
+            "Approving doesn’t publish. Asha Example decides when it goes live.",
+        );
+        // With a note of your own, Ask for changes is chosen, and needs a reason.
+        expect(button(/^Ask for changes/).getAttribute("aria-checked")).toBe(
+            "true",
+        );
+        expect(text()).toContain("Your 1 open note goes with it.");
+        click(button("Send to Asha Example"));
+        expect(text()).toContain("Say what needs changing.");
+        expect(writes.createApproval).not.toHaveBeenCalled();
+        click(button(/^Approve/));
+        expect(document.querySelector("textarea[maxlength='500']")).toBeNull();
+    });
+
+    it("a page with no blocks: Feedback has no note composer", () => {
+        render({ initialSections: [] });
+        click(button(/^Feedback, /));
+        expect(sheet("Feedback")).not.toBeNull();
+        expect($("#block-feedback-reply")).toBeNull();
+        expect(document.body.textContent).not.toContain("Add a note on");
+        expectReadOnly("phone, no blocks, Feedback");
+    });
+});
+
 describe("the same editor, editable (owner regression)", () => {
     it("keeps every write control", () => {
         render({ readOnly: false, canUpdateSite: true, canPublish: true });
@@ -822,6 +968,20 @@ describe("the same editor, editable (owner regression)", () => {
         expect(has("Approve")).toBe(false);
         expect(has("Ask for changes")).toBe(false);
         expect(actions.recordPageView).not.toHaveBeenCalled();
+    });
+    it("keeps the phone's own pill and Publish (U5)", () => {
+        atWidth(390);
+        render({ readOnly: false, canUpdateSite: true, canPublish: true });
+        const pill = $("[data-edit-pill]");
+        expect(
+            Array.from(pill?.querySelectorAll("button") ?? []).map(nameOf),
+        ).toEqual(["Blocks", "Add a block", "Brand"]);
+        expect(has("Publish")).toBe(true);
+        expect(has("Review")).toBe(false);
+        click(button("Blocks"));
+        // No Page | Brand tabs in an owner's Blocks sheet.
+        expect(has("Page")).toBe(false);
+        expect($("[aria-label^='Move ']")).not.toBeNull();
     });
 });
 

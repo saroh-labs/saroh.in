@@ -69,7 +69,15 @@ export function useLayoutKnown(): boolean {
  * inspector (narrow or phone), or one of a phone's own (DEC-185).
  */
 export type EditorSheet =
-    "inspector" | "blocks" | "add" | "pages" | "brand" | "more" | null;
+    | "inspector"
+    | "blocks"
+    | "add"
+    | "pages"
+    | "brand"
+    | "more"
+    /** A Reviewer's verdict (DEC-200, RVD3Phone). */
+    | "review"
+    | null;
 
 /** The sheets only a phone has. */
 const PHONE_ONLY: readonly EditorSheet[] = [
@@ -78,6 +86,7 @@ const PHONE_ONLY: readonly EditorSheet[] = [
     "pages",
     "brand",
     "more",
+    "review",
 ];
 
 /**
@@ -101,6 +110,8 @@ export function useEditorSheets(
     /** Preview (G5) has no editing tools, so it puts any sheet away. */
     previewing: boolean,
     initial: EditorSheet = null,
+    /** A Reviewer (DEC-200): on a phone, a chosen block opens its Feedback. */
+    readOnly = false,
 ) {
     const [sheet, setSheet] = useState<EditorSheet>(
         PHONE_ONLY.includes(initial) && layout === "phone" ? initial : null,
@@ -129,6 +140,9 @@ export function useEditorSheets(
         ...selection,
         setSelectedIndex(next) {
             selection.setSelectedIndex(next);
+            if (next !== null && readOnly && layout === "phone") {
+                selection.setInspector("feedback");
+            }
             if (next !== null) showInspector();
             else if (selection.inspector === "block") setSheet(null);
         },
