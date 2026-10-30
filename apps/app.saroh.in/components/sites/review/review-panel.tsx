@@ -4,6 +4,7 @@ import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -318,8 +319,12 @@ export function ReviewPanel({
     // Null since #277: deleting a page now leaves its notes behind rather than
     // deleting them with it.
     const strays = shown.filter(
-        (c) => c.pageId === null || !pageIds.has(c.pageId),
+        (c) =>
+            c.sectionKey !== null &&
+            (c.pageId === null || !pageIds.has(c.pageId)),
     );
+    // Notes on posts (DEC-200 U8): no page, so a group of their own.
+    const postNotes = shown.filter((c) => c.sectionKey === null);
 
     /*
      * ONE scroller for the whole panel, which is what the empty state above
@@ -382,6 +387,7 @@ export function ReviewPanel({
                                 <Note
                                     key={note.id}
                                     note={note}
+                                    siteId={siteId}
                                     busy={busy === note.id}
                                     onToggle={
                                         can.settle
@@ -395,6 +401,28 @@ export function ReviewPanel({
                     </section>
                 ))}
 
+                {postNotes.length > 0 ? (
+                    <section className="mb-4">
+                        <h3 className="label px-1 pb-1">Posts</h3>
+                        <ul className="grid gap-1">
+                            {postNotes.map((note) => (
+                                <Note
+                                    key={note.id}
+                                    note={note}
+                                    siteId={siteId}
+                                    busy={busy === note.id}
+                                    onToggle={
+                                        can.settle
+                                            ? () => void toggle(note)
+                                            : null
+                                    }
+                                    onJump={onJump}
+                                />
+                            ))}
+                        </ul>
+                    </section>
+                ) : null}
+
                 {strays.length > 0 ? (
                     <section className="mb-4">
                         <h3 className="label px-1 pb-1">
@@ -405,6 +433,7 @@ export function ReviewPanel({
                                 <Note
                                     key={note.id}
                                     note={note}
+                                    siteId={siteId}
                                     busy={busy === note.id}
                                     onToggle={
                                         can.settle
@@ -424,11 +453,13 @@ export function ReviewPanel({
 
 function Note({
     note,
+    siteId,
     busy,
     onToggle,
     onJump,
 }: {
     note: SiteCommentView;
+    siteId: string;
     busy: boolean;
     /** Null for someone who can't settle notes: the control is absent. */
     onToggle: (() => void) | null;
@@ -438,7 +469,7 @@ function Note({
     const settled = note.resolvedAt !== null;
     // A local const narrows where the property access does not: the page is
     // null once it has been deleted (#277).
-    const pageId = note.pageId;
+    const { pageId, sectionKey, postId } = note;
     return (
         <li
             className={cn(
@@ -468,22 +499,40 @@ function Note({
                  * nothing would read as broken.
                  */
                 <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                    {note.pageId === null
-                        ? note.pageTitle === null
-                            ? "The page this was about has been deleted."
-                            : `The page this was about, ${note.pageTitle}, has been deleted.`
-                        : "The section this was about is no longer on the page."}
+                    {sectionKey === null
+                        ? `The post this was about, ${note.postTitle ?? "untitled"}, has been deleted.`
+                        : note.pageId === null
+                          ? note.pageTitle === null
+                              ? "The page this was about has been deleted."
+                              : `The page this was about, ${note.pageTitle}, has been deleted.`
+                          : "The section this was about is no longer on the page."}
                 </p>
             ) : null}
 
             <div className="mt-2 flex items-center gap-1">
-                {note.orphaned || pageId === null ? null : (
+                {postId !== null ? (
+                    <Button
+                        asChild
+                        variant="ghost"
+                        size="xs"
+                        className="min-w-0 px-1.5 text-[0.6875rem]"
+                    >
+                        <Link href={`/sites/${siteId}/posts/${postId}`}>
+                            <span className="truncate">
+                                Open {note.postTitle ?? "the post"}
+                            </span>
+                        </Link>
+                    </Button>
+                ) : null}
+                {note.orphaned ||
+                pageId === null ||
+                sectionKey === null ? null : (
                     <Button
                         type="button"
                         variant="ghost"
                         size="xs"
                         className="px-1.5 text-[0.6875rem]"
-                        onClick={() => onJump(pageId, note.sectionKey)}
+                        onClick={() => onJump(pageId, sectionKey)}
                     >
                         Go to section
                     </Button>

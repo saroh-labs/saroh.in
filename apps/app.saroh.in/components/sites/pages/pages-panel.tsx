@@ -2,7 +2,8 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Check, ChevronRight, Plus, Settings2 } from "lucide-react";
+import { Check, ChevronRight, FileText, Plus, Settings2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
@@ -219,8 +220,29 @@ export function PagesPanel({
                 })}
             </div>
 
-            {/* Read-only (DEC-200): switch page only, no settings or add. */}
-            {readOnly ? null : (
+            {/*
+             * Read-only (DEC-200): switch page only, no settings or add.
+             * Posts are read in the post editor, read-only too (U8).
+             */}
+            {readOnly ? (
+                <div className="border-t p-[5px]">
+                    <Link
+                        href={`/sites/${siteId}/posts`}
+                        onClick={onClose}
+                        className={cn(
+                            MENU_ROW,
+                            phone ? "min-h-11" : "h-[34px]",
+                        )}
+                    >
+                        <FileText aria-hidden className="size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">Posts</span>
+                        <ChevronRight
+                            aria-hidden
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                        />
+                    </Link>
+                </div>
+            ) : (
                 <div className="border-t p-[5px]">
                     <Disclosure
                         icon={<Settings2 aria-hidden className="size-3.5" />}

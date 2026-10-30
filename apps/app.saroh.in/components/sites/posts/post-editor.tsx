@@ -28,11 +28,16 @@ import {
     unpublishPost,
     updatePost,
 } from "@/lib/content/actions";
+import { postParagraphs } from "@/lib/content/plain-text";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
+import type { SiteCommentView } from "@/lib/sites/service";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { EmptyState } from "@saroh/ui/data-state";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
+
+import { PostFeedback } from "./post-feedback";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
    used: the editor is heavy, and it is created in the browser. */
@@ -81,6 +86,8 @@ export function PostEditor({
     categories,
     post,
     paused = false,
+    readOnly = false,
+    feedback,
 }: {
     siteId: string;
     categories: PostCategory[];
@@ -92,6 +99,18 @@ export function PostEditor({
      * it off the site stays, as that only ever lowers the count.
      */
     paused?: boolean;
+    /**
+     * Someone who may read the site's writing but not change it, a
+     * Reviewer or a Member (DEC-200 U8): the same editor, every field shown
+     * and none changeable, and no Save, Publish, take-down or delete.
+     */
+    readOnly?: boolean;
+    /** This post's notes, and what the caller may do with them. */
+    feedback?: {
+        comments: SiteCommentView[];
+        canComment: boolean;
+        canSettle: boolean;
+    };
 }) {
     const zone = useBusinessZone();
     const router = useRouter();
@@ -107,7 +126,13 @@ export function PostEditor({
 
     const [live, setLive] = useState(post?.live ?? false);
     const [liveAt, setLiveAt] = useState<string | null>(post?.liveAt ?? null);
-    const [detailsOpen, setDetailsOpen] = useState(false);
+    /** The one side panel open: Details, Feedback, or neither. */
+    const [panel, setPanel] = useState<"details" | "feedback" | null>(
+        readOnly && feedback ? "feedback" : null,
+    );
+    const detailsOpen = panel === "details";
+    const openNotes =
+        feedback?.comments.filter((c) => c.resolvedAt === null).length ?? 0;
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [publishing, setPublishing] = useState(false);
@@ -241,7 +266,7 @@ export function PostEditor({
     // waiting first and asks only when that save can't go; closing the
     // tab gets the browser's own warning.
     // Cmd/Ctrl+S: Save draft, said aloud if it can't (no title yet).
-    useSaveShortcut(() => void save(), !paused);
+    useSaveShortcut(() => void save(), !paused && !readOnly);
     const guard = useLeaveGuard({
         dirty,
         lost: title.trim()
@@ -344,45 +369,73 @@ export function PostEditor({
                               : ""}
                 </span>
 
+                {readOnly ? (
+                    <span className="text-xs text-muted-foreground">
+                        Reviewing · you can&apos;t change anything
+                    </span>
+                ) : null}
+
                 <div className="ml-auto flex items-center gap-2">
+                    {feedback && postId ? (
+                        <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={() =>
+                                setPanel((v) =>
+                                    v === "feedback" ? null : "feedback",
+                                )
+                            }
+                            aria-expanded={panel === "feedback"}
+                        >
+                            Feedback{openNotes > 0 ? ` · ${openNotes}` : ""}
+                        </Button>
+                    ) : null}
                     <Button
                         variant="outline"
                         size="xs"
-                        onClick={() => setDetailsOpen((v) => !v)}
+                        onClick={() =>
+                            setPanel((v) =>
+                                v === "details" ? null : "details",
+                            )
+                        }
                         aria-expanded={detailsOpen}
                     >
                         Details
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={paused || !dirty}
-                        busy={saving}
-                        busyLabel="Saving…"
-                        onClick={() => void save()}
-                    >
-                        Save draft
-                    </Button>
-                    {live ? (
-                        <Button
-                            variant="outline"
-                            size="xs"
-                            disabled={publishing}
-                            onClick={() => void onUnpublish()}
-                        >
-                            Take off the site
-                        </Button>
-                    ) : null}
-                    <Button
-                        size="xs"
-                        variant="brand"
-                        disabled={paused || !title.trim()}
-                        onClick={() => void onPublish()}
-                        busy={publishing}
-                        busyLabel="Publishing…"
-                    >
-                        {live ? "Publish changes" : "Publish"}
-                    </Button>
+                    {readOnly ? null : (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={paused || !dirty}
+                                busy={saving}
+                                busyLabel="Saving…"
+                                onClick={() => void save()}
+                            >
+                                Save draft
+                            </Button>
+                            {live ? (
+                                <Button
+                                    variant="outline"
+                                    size="xs"
+                                    disabled={publishing}
+                                    onClick={() => void onUnpublish()}
+                                >
+                                    Take off the site
+                                </Button>
+                            ) : null}
+                            <Button
+                                size="xs"
+                                variant="brand"
+                                disabled={paused || !title.trim()}
+                                onClick={() => void onPublish()}
+                                busy={publishing}
+                                busyLabel="Publishing…"
+                            >
+                                {live ? "Publish changes" : "Publish"}
+                            </Button>
+                        </>
+                    )}
                 </div>
             </header>
             {paused ? (
@@ -399,6 +452,7 @@ export function PostEditor({
                             product where a form would be the wrong metaphor. */}
                         <input
                             value={title}
+                            readOnly={readOnly}
                             onChange={(e) => touched(setTitle)(e.target.value)}
                             placeholder="Title"
                             aria-label="Post title"
@@ -408,16 +462,43 @@ export function PostEditor({
                             document heading, not a labelled field, and a boxed
                             body beneath it would make the page half document
                             and half form. The toolbar keeps its own rule. */}
-                        <div className="mt-6">
-                            <RichTextEditor
-                                value={content}
-                                onChange={touched(setContent)}
-                                placeholder="Write…"
-                                className="rounded-none border-0 bg-transparent [&>div:first-child]:border-0 [&>div:first-child]:px-0 [&_.ProseMirror]:min-h-[50vh] [&_.ProseMirror]:px-0"
-                            />
-                        </div>
+                        {readOnly ? (
+                            <ReadOnlyBody content={content} />
+                        ) : (
+                            <div className="mt-6">
+                                <RichTextEditor
+                                    value={content}
+                                    onChange={touched(setContent)}
+                                    placeholder="Write…"
+                                    className="rounded-none border-0 bg-transparent [&>div:first-child]:border-0 [&>div:first-child]:px-0 [&_.ProseMirror]:min-h-[50vh] [&_.ProseMirror]:px-0"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
+
+                {panel === "feedback" && feedback && postId ? (
+                    <aside className="w-80 shrink-0 space-y-4 border-l p-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-semibold">Feedback</h2>
+                            <Button
+                                variant="ghost"
+                                size="xs"
+                                className="px-1.5"
+                                onClick={() => setPanel(null)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                        <PostFeedback
+                            siteId={siteId}
+                            postId={postId}
+                            title={title}
+                            {...feedback}
+                            onChanged={() => router.refresh()}
+                        />
+                    </aside>
+                ) : null}
 
                 {detailsOpen ? (
                     <aside className="w-80 shrink-0 space-y-5 border-l p-4">
@@ -427,7 +508,7 @@ export function PostEditor({
                                 variant="ghost"
                                 size="xs"
                                 className="px-1.5"
-                                onClick={() => setDetailsOpen(false)}
+                                onClick={() => setPanel(null)}
                             >
                                 Close
                             </Button>
@@ -443,13 +524,18 @@ export function PostEditor({
                                     <span className="font-medium">
                                         {post.author}
                                     </span>
-                                    .{" "}
-                                    <a
-                                        href={accountSettingsUrl}
-                                        className="underline underline-offset-2"
-                                    >
-                                        Change your name
-                                    </a>
+                                    .
+                                    {readOnly ? null : (
+                                        <>
+                                            {" "}
+                                            <a
+                                                href={accountSettingsUrl}
+                                                className="underline underline-offset-2"
+                                            >
+                                                Change your name
+                                            </a>
+                                        </>
+                                    )}
                                 </p>
                             </Field>
                         ) : null}
@@ -460,6 +546,7 @@ export function PostEditor({
                         >
                             <Input
                                 value={slug}
+                                disabled={readOnly}
                                 onChange={(e) =>
                                     touched(setSlug)(e.target.value)
                                 }
@@ -474,6 +561,7 @@ export function PostEditor({
                         >
                             <Textarea
                                 value={excerpt}
+                                disabled={readOnly}
                                 rows={3}
                                 onChange={(e) =>
                                     touched(setExcerpt)(e.target.value)
@@ -486,6 +574,7 @@ export function PostEditor({
                             <OptionSelect
                                 aria-label="Post category"
                                 value={categoryId}
+                                disabled={readOnly}
                                 onValueChange={(v) => {
                                     touched(setCategoryId)(v);
                                 }}
@@ -513,11 +602,16 @@ export function PostEditor({
                                         className="aspect-[1.91/1] w-full rounded border object-cover"
                                     />
                                 ) : null}
-                                <MediaPicker
-                                    onPick={(img) => touched(setImage)(img.src)}
-                                />
+                                {readOnly ? null : (
+                                    <MediaPicker
+                                        onPick={(img) =>
+                                            touched(setImage)(img.src)
+                                        }
+                                    />
+                                )}
                                 <Input
                                     value={image}
+                                    disabled={readOnly}
                                     placeholder="or paste an image address"
                                     onChange={(e) =>
                                         touched(setImage)(e.target.value)
@@ -534,36 +628,67 @@ export function PostEditor({
                                         ? `Live copy published ${formatDateTime(liveAt, zone, { year: "always" })}.`
                                         : "This post has never been published."}
                                 </p>
-                                <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    className={cn(
-                                        "mt-2 px-1.5",
-                                        "text-destructive hover:text-destructive",
-                                    )}
-                                    onClick={() => setConfirmDelete(true)}
-                                >
-                                    Delete this post
-                                </Button>
-                                <ConfirmDialog
-                                    open={confirmDelete}
-                                    onOpenChange={setConfirmDelete}
-                                    title="Delete this post?"
-                                    description={
-                                        liveAt
-                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. To take it down and keep it, use Take off the site instead. This cannot be undone."
-                                            : "It has never been published, so nobody outside your team has seen it. This cannot be undone."
-                                    }
-                                    confirmLabel="Delete post"
-                                    keepLabel="Keep post"
-                                    onConfirm={onDelete}
-                                />
+                                {readOnly ? null : (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="xs"
+                                            className={cn(
+                                                "mt-2 px-1.5",
+                                                "text-destructive hover:text-destructive",
+                                            )}
+                                            onClick={() =>
+                                                setConfirmDelete(true)
+                                            }
+                                        >
+                                            Delete this post
+                                        </Button>
+                                        <ConfirmDialog
+                                            open={confirmDelete}
+                                            onOpenChange={setConfirmDelete}
+                                            title="Delete this post?"
+                                            description={
+                                                liveAt
+                                                    ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. To take it down and keep it, use Take off the site instead. This cannot be undone."
+                                                    : "It has never been published, so nobody outside your team has seen it. This cannot be undone."
+                                            }
+                                            confirmLabel="Delete post"
+                                            keepLabel="Keep post"
+                                            onConfirm={onDelete}
+                                        />
+                                    </>
+                                )}
                             </div>
                         ) : null}
                     </aside>
                 ) : null}
             </div>
             {guard.dialog}
+        </div>
+    );
+}
+
+/**
+ * The body for a reader (DEC-200 U8). Plain text, as the read view drew it:
+ * a draft's markup is sanitized only at publish, so it is never drawn as
+ * markup for someone who didn't write it.
+ */
+function ReadOnlyBody({ content }: { content: string }) {
+    const body = postParagraphs(content);
+    return (
+        <div className="mt-6 space-y-4 text-[15px] leading-relaxed">
+            {body.length > 0 ? (
+                body.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+            ) : (
+                <EmptyState
+                    size="inline"
+                    title="Nothing has been written in this post yet"
+                />
+            )}
+            <p className="text-[12.5px] text-muted-foreground">
+                Shown as plain text. Its formatting and pictures show on the
+                site once it is published.
+            </p>
         </div>
     );
 }

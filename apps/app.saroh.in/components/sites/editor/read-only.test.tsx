@@ -572,6 +572,10 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         expectReadOnly("desk, page picker");
         expect(has(/^Add a page/)).toBe(false);
         expect(has(/^Settings for/)).toBe(false);
+        // Posts are reached from here, read-only in the post editor (U8).
+        expect(document.querySelector('a[href$="/posts"]')?.textContent).toBe(
+            "Posts",
+        );
     });
 
     it("test releases: each one's review, nothing to make, share or put live", () => {

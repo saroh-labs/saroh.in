@@ -80,12 +80,8 @@ export async function saveDraftSections(
 /** Leave a note on a section (#277). */
 export async function createComment(
     siteId: string,
-    input: {
-        pageId: string;
-        sectionKey: string;
-        body: string;
-        testReleaseId?: string;
-    },
+    /** A page's section, or a post (DEC-200 U8). */
+    input: Parameters<typeof createCommentApi>[1],
 ) {
     return createCommentApi(siteId, input);
 }

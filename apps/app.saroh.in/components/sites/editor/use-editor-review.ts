@@ -168,13 +168,19 @@ export function useEditorReview({
                 (c) =>
                     c.pageId === pageId && c.resolvedAt === null && !c.orphaned,
             )
-            .map((c) => c.sectionKey),
+            // A post's note has no section (DEC-200 U8); it has no page either.
+            .flatMap((c) => (c.sectionKey === null ? [] : [c.sectionKey])),
     );
 
     /** Open notes per block on this page — the canvas draws them as pins. */
     const notesByKey = new Map<string, number>();
     for (const c of comments) {
-        if (c.pageId !== pageId || c.resolvedAt !== null || c.orphaned)
+        if (
+            c.pageId !== pageId ||
+            c.resolvedAt !== null ||
+            c.orphaned ||
+            c.sectionKey === null
+        )
             continue;
         notesByKey.set(c.sectionKey, (notesByKey.get(c.sectionKey) ?? 0) + 1);
     }

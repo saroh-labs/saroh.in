@@ -2325,6 +2325,8 @@ model Post {
   publications         Publication[] @relation("PostPublications")
 
   comments Comment[]
+  // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
+  reviewNotes SiteComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3979,8 +3981,9 @@ model SiteComment {
 
   // The section this is about. NOT a relation: the row it names is deleted and
   // recreated on every save, so a foreign key would either block the save or
-  // cascade the note away with it.
-  sectionKey String
+  // cascade the note away with it. Null on a note about a post (DEC-200 U8):
+  // a note is about a section or a post, never both (CHECK in the migration).
+  sectionKey String?
 
   authorUserId String
   author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
@@ -4001,8 +4004,16 @@ model SiteComment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The post the note is about (DEC-200 U8), instead of a page's section.
+  // SetNull, as pages are (#277): the note outlives the post, and the title
+  // snapshot below still says which one it was.
+  postId    String?
+  post      Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
+  postTitle String?
+
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])
+  @@index([postId])
   @@index([organizationId])
   @@index([testReleaseId])
 }

@@ -179,7 +179,12 @@ export interface CommentView {
     /** Null once the page it was left on has been deleted (#277). */
     pageId: string | null;
     pageTitle: string | null;
-    sectionKey: string;
+    /** Null on a note about a post (DEC-200 U8). */
+    sectionKey: string | null;
+    /** The post a note is about; null once that post is deleted. */
+    postId: string | null;
+    /** The post's title, live while it exists; null on a page's note. */
+    postTitle: string | null;
     body: string;
     resolvedAt: Date | null;
     createdAt: Date;
@@ -2475,6 +2480,10 @@ export class SitesService {
                     pageId: true,
                     pageTitle: true,
                     sectionKey: true,
+                    postId: true,
+                    postTitle: true,
+                    // The live title while the post exists (DEC-200 U8).
+                    post: { select: { title: true } },
                     body: true,
                     resolvedAt: true,
                     createdAt: true,
@@ -2527,6 +2536,8 @@ export class SitesService {
                 (c.pageId === null ? null : titles.get(c.pageId)) ??
                 c.pageTitle,
             sectionKey: c.sectionKey,
+            postId: c.postId,
+            postTitle: c.post?.title ?? c.postTitle ?? null,
             body: c.body,
             resolvedAt: c.resolvedAt,
             createdAt: c.createdAt,
@@ -2535,8 +2546,11 @@ export class SitesService {
                 // A name is nicer, but an email always exists.
                 name: c.author.name ?? c.author.email,
             },
-            // A note whose page is gone is orphaned by definition.
-            orphaned: c.pageId === null || !attached(c.pageId, c.sectionKey),
+            // A note whose page (or post) is gone is orphaned by definition.
+            orphaned:
+                c.sectionKey === null
+                    ? c.postId === null
+                    : c.pageId === null || !attached(c.pageId, c.sectionKey),
             editable:
                 mayChange &&
                 c.author.id === ctx.userId &&
@@ -2766,6 +2780,15 @@ export class SitesService {
     ): Promise<{ id: string }> {
         authorize(ctx, "site:comment");
         await assertSiteInOrg(ctx, siteId);
+        if (dto.postId !== undefined) {
+            return this.createPostComment(ctx, siteId, dto);
+        }
+        if (dto.pageId === undefined || dto.sectionKey === undefined) {
+            throw new BadRequestException(
+                "Say which section of which page the note is about.",
+            );
+        }
+        const target = { pageId: dto.pageId, sectionKey: dto.sectionKey };
         // A note on a release is about what it froze (T8), and a release
         // that is gone or live takes no more notes.
         const release = dto.testReleaseId
@@ -2773,7 +2796,7 @@ export class SitesService {
                   open: true,
               })
             : null;
-        await assertPageInSite(ctx, siteId, dto.pageId);
+        await assertPageInSite(ctx, siteId, target.pageId);
 
         /*
          * The key must name a section that is actually on the page's draft
@@ -2787,7 +2810,7 @@ export class SitesService {
          */
         const page = await prisma.page.findFirst({
             where: {
-                id: dto.pageId,
+                id: target.pageId,
                 siteId,
                 organizationId: ctx.organizationId,
             },
@@ -2804,7 +2827,7 @@ export class SitesService {
         });
         if (release) {
             const frozen = await frozenPages(ctx.organizationId, release.id);
-            if (!isOnFrozenPage(frozen, page?.path, dto.sectionKey)) {
+            if (!isOnFrozenPage(frozen, page?.path, target.sectionKey)) {
                 throw new BadRequestException(
                     "That section isn't on this page of the test release. Reload it and try again.",
                 );
@@ -2814,26 +2837,70 @@ export class SitesService {
                 page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ??
                     [],
             );
-            if (!keys.has(dto.sectionKey)) {
+            if (!keys.has(target.sectionKey)) {
                 throw new BadRequestException(
                     "That section is no longer on the page. Reload the draft and try again.",
                 );
             }
         }
 
+        return this.insertComment(ctx, {
+            siteId,
+            pageId: target.pageId,
+            // Where the note was, for when the page itself is gone (#277).
+            pageTitle: page?.title ?? null,
+            organizationId: ctx.organizationId,
+            sectionKey: target.sectionKey,
+            authorUserId: ctx.userId,
+            body: dto.body,
+            ...(release ? { testReleaseId: release.id } : {}),
+        });
+    }
+
+    /**
+     * A note on a post (DEC-200 U8): the post must be one of this site's,
+     * and the note is about the draft. A test release freezes pages, not
+     * posts, so a post note on one is refused.
+     */
+    private async createPostComment(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreateCommentDto,
+    ): Promise<{ id: string }> {
+        if (dto.pageId !== undefined || dto.sectionKey !== undefined) {
+            throw new BadRequestException(
+                "A note is about a section of a page or a post, not both.",
+            );
+        }
+        if (dto.testReleaseId !== undefined) {
+            throw new BadRequestException(
+                "A test release has no posts to leave a note on.",
+            );
+        }
+        const post = await prisma.post.findFirst({
+            where: { id: dto.postId, siteId },
+            select: { id: true, title: true },
+        });
+        if (!post) throw new NotFoundException("Post not found");
+        return this.insertComment(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            postId: post.id,
+            // Which post it was, for when the post is gone (as pages, #277).
+            postTitle: post.title,
+            authorUserId: ctx.userId,
+            body: dto.body,
+        });
+    }
+
+    /** Store a note, and tell the people who publish when a reviewer wrote it. */
+    private insertComment(
+        ctx: OrganizationContext,
+        data: Prisma.SiteCommentUncheckedCreateInput,
+    ): Promise<{ id: string }> {
         return prisma.$transaction(async (tx) => {
             const comment = await tx.siteComment.create({
-                data: {
-                    siteId,
-                    pageId: dto.pageId,
-                    // Where the note was, for when the page itself is gone (#277).
-                    pageTitle: page?.title ?? null,
-                    organizationId: ctx.organizationId,
-                    sectionKey: dto.sectionKey,
-                    authorUserId: ctx.userId,
-                    body: dto.body,
-                    ...(release ? { testReleaseId: release.id } : {}),
-                },
+                data,
                 select: { id: true },
             });
             // A reviewer's note tells the people who publish (UX-043); one

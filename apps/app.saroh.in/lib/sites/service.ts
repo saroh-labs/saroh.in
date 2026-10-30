@@ -1666,7 +1666,12 @@ export interface SiteCommentView {
     /** Null once the page it was left on has been deleted (#277). */
     pageId: string | null;
     pageTitle: string | null;
-    sectionKey: string;
+    /** Null on a note about a post (DEC-200 U8). */
+    sectionKey: string | null;
+    /** The post a note is about; null on a page's note, or once it's deleted. */
+    postId: string | null;
+    /** The post's title; null on a page's note. */
+    postTitle: string | null;
     body: string;
     resolvedAt: string | null;
     createdAt: string;
@@ -1867,13 +1872,16 @@ export async function recordPageView(
  */
 export async function createComment(
     siteId: string,
-    input: {
-        pageId: string;
-        /** On a test release, the section's position on its frozen page (T8). */
-        sectionKey: string;
-        body: string;
-        testReleaseId?: string;
-    },
+    input:
+        | {
+              pageId: string;
+              /** On a test release, the section's position on its frozen page (T8). */
+              sectionKey: string;
+              body: string;
+              testReleaseId?: string;
+          }
+        /** A note on a draft post (DEC-200 U8). */
+        | { postId: string; body: string },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base)
