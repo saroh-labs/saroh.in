@@ -6125,3 +6125,17 @@ the integration project matched only `src/modules/**`.
 **Rule**: a new spec's first run is by its path; "No tests found" means no
 project picks it up, not that it passed.
 **Category**: tooling · tests
+
+## A data export failed now and then with ENOENT on its own zip
+
+**Symptom**: 30 Oct gate: `data-export.db.spec.ts` ("says it failed … once the
+tries run out") failed once under RLS with ENOENT opening the temp zip; it
+passed in other runs.
+**Cause**: `buildDataExport` handed the store a lazily opened
+`createReadStream(path)`. A store that refused without reading it let
+`finally` delete the file before the stream's own open ran.
+**Fix**: open a `FileHandle` before the upload, stream from it, and close it
+before `rm` (`data-export-build.ts`).
+**Rule**: never delete a file that a lazily opened stream may still open; hold
+the handle and close it first.
+**Category**: api · files

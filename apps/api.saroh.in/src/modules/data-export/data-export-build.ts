@@ -2,8 +2,8 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { buildObjectKey, sanitizeFilename } from "@saroh/object-storage";
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { rm } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
+import { open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -110,9 +110,10 @@ export async function buildDataExport(input: {
     const made = input.now ?? new Date();
     const path = join(tmpdir(), `saroh-data-export-${exportId}.zip`);
     const zip = new ZipFile(path);
-    // Closed before the file goes: a store that refuses without reading it
-    // would otherwise leave it opening a deleted file, an uncaught ENOENT.
-    let upload: ReturnType<typeof createReadStream> | null = null;
+    // Opened before the upload and closed before the file goes. A lazily
+    // opened stream raced the delete when a store refused without reading
+    // it: an uncaught ENOENT now and then (gate, 30 Oct).
+    let handle: FileHandle | null = null;
     const counts: DataExportCounts = {
         files: {},
         media: { included: 0, leftOut: 0, bytes: 0 },
@@ -139,17 +140,21 @@ export async function buildDataExport(input: {
 
         const sizeBytes = await zip.close();
         const storageKey = dataExportKey(organizationId, exportId);
-        upload = createReadStream(path);
-        await storage.putObject(storageKey, upload, {
-            contentType: "application/zip",
-            contentLength: sizeBytes,
-        });
+        handle = await open(path, "r");
+        await storage.putObject(
+            storageKey,
+            handle.createReadStream({ autoClose: false }),
+            {
+                contentType: "application/zip",
+                contentLength: sizeBytes,
+            },
+        );
         return { storageKey, sizeBytes, counts };
     } catch (error) {
         zip.abort();
         throw error;
     } finally {
-        upload?.destroy();
+        await handle?.close();
         await rm(path, { force: true });
     }
 }
