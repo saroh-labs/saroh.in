@@ -147,6 +147,43 @@ describe("a Reviewer's own review state (DEC-200, U4)", () => {
         });
     });
 
+    it("a publish closes the round: an earlier approval and pages read no longer count", async () => {
+        const b = await business();
+        await verdict(b, b.reviewerCtx, "APPROVED");
+        await prisma.siteReviewPageView.create({
+            data: {
+                siteId: b.site.id,
+                organizationId: b.org.id,
+                pageId: b.home.id,
+                userId: b.reviewerCtx.userId,
+                viewedAt: at(),
+            },
+        });
+        expect((await state(b)).yourVerdict?.outcome).toBe("APPROVED");
+
+        const published = await prisma.publication.create({
+            data: {
+                siteId: b.site.id,
+                organizationId: b.org.id,
+                snapshot: {},
+                templateId: "classic",
+                templateVersion: 1,
+                publishedAt: at(),
+            },
+        });
+        await prisma.site.update({
+            where: { id: b.site.id },
+            data: { currentPublicationId: published.id },
+        });
+        const after = await state(b);
+        expect(after.yourVerdict).toBeNull();
+        expect(after.pagesRead).toEqual({ read: 0, total: 1 });
+
+        // The next round counts again.
+        await verdict(b, b.reviewerCtx, "CHANGES_REQUESTED");
+        expect((await state(b)).yourVerdict?.outcome).toBe("CHANGES_REQUESTED");
+    });
+
     it("keeps the reviewer's own latest verdict, not someone else's", async () => {
         const b = await business();
         await verdict(b, b.ctx, "REQUESTED");

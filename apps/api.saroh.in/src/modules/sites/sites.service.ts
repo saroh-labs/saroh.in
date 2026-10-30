@@ -3190,6 +3190,14 @@ export class SitesService {
         settledForYou: { count: number; at: Date } | null;
     }> {
         const scope = { siteId, organizationId: ctx.organizationId };
+        // A publish closes the round (owner, 30 Oct): a verdict and pages read
+        // from before it were about the version that went live, so the next
+        // draft starts with neither.
+        const live = await prisma.site.findFirst({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { currentPublication: { select: { publishedAt: true } } },
+        });
+        const since = live?.currentPublication?.publishedAt ?? null;
         const [verdict, total, lastNote] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: {
@@ -3197,6 +3205,7 @@ export class SitesService {
                     byUserId: ctx.userId,
                     testReleaseId: null,
                     outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+                    ...(since ? { createdAt: { gt: since } } : {}),
                 },
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: { outcome: true, createdAt: true },
@@ -3214,12 +3223,14 @@ export class SitesService {
                       select: { createdAt: true },
                   }),
         ]);
+        // Pages read count from the later of their verdict and the publish.
+        const readFrom = verdict?.createdAt ?? since;
         const [read, settled] = await Promise.all([
             prisma.siteReviewPageView.count({
                 where: {
                     ...scope,
                     userId: ctx.userId,
-                    ...(verdict ? { viewedAt: { gt: verdict.createdAt } } : {}),
+                    ...(readFrom ? { viewedAt: { gt: readFrom } } : {}),
                 },
             }),
             lastNote
