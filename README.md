@@ -89,7 +89,8 @@ paused, resumed, ended at the period's end or cancelled, and each renewal
 writes its invoice. Invoices are GST invoices, or bills of supply for a
 business outside GST; they run from INV-0001 with no gaps, carry tax and due
 dates, and are paid by hand or through a pay link on the business's own
-provider. Overdue is worked out, never stored, and the money a person owes
+provider. Where the business's provider supports it, a customer can put their
+plan on UPI Autopay. Overdue is worked out, never stored, and the money a person owes
 shows on their contact page.
 
 ### Contacts and leads
@@ -140,13 +141,21 @@ step is explained in [setup-instructions.md](setup-instructions.md).
 
 A pnpm + Turborepo monorepo:
 
-- **Nine Next.js apps** (Next.js 16, React 19). The main ones are the merchant
-  workspace, sign-in, platform admin, the public renderer for merchant sites
-  and the marketing site.
-- **One NestJS API** (`apps/api.saroh.in`). It hosts **Better Auth**, and it is
-  the only service that reads or writes the database.
-- **PostgreSQL through Prisma 7.** The **Organization** is the tenant root. Every
-  query is scoped to it, and PostgreSQL row-level security backs that up.
+- **The websites are Next.js 16 apps** (React 19), running on Cloudflare
+  Workers through OpenNext. The ones people use are the merchant workspace
+  (`app.saroh.in`), sign-in and accounts (`accounts.saroh.in`), the operator
+  console (`admin.saroh.in`), every merchant's own site (`saroh.app`, or the
+  business's domain) and saroh.in itself, with its help pages and free tools.
+- **One NestJS API** (`apps/api.saroh.in`), shipped as a Docker image. It
+  hosts sign-in (**Better Auth**), and it is the only service that reads or
+  writes the database.
+- **PostgreSQL through Prisma 7.** Each business (an **Organization**) is its
+  own tenant. Every query is scoped to it, and PostgreSQL row-level security
+  backs that up.
+- **Outside services are providers that can be swapped.** Payments go
+  through the business's own Razorpay or Cashfree account, never through
+  Saroh's; messages, sign-in codes and files each go through their own
+  provider.
 
 ## Find your way around
 
