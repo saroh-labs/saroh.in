@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import type { Result } from "../booking-flow/api";
@@ -56,14 +56,26 @@ export function MoveClass({
     } | null>(null);
 
     const serviceRef = row?.serviceRef ?? null;
+    // A read that answers after the sheet closed changes nothing: it used to
+    // set state on a gone component (a CI test once ran past its teardown).
+    const open = useRef(true);
+    useEffect(
+        () => () => {
+            open.current = false;
+        },
+        [],
+    );
     const read = useCallback(() => {
         if (!serviceRef) return;
-        void fetchDays(apiUrl, serviceRef).then((result: Result<BookingDays>) =>
-            setDays(
-                result.ok
-                    ? { kind: "ready", days: result.value }
-                    : { kind: "failed" },
-            ),
+        void fetchDays(apiUrl, serviceRef).then(
+            (result: Result<BookingDays>) => {
+                if (!open.current) return;
+                setDays(
+                    result.ok
+                        ? { kind: "ready", days: result.value }
+                        : { kind: "failed" },
+                );
+            },
         );
     }, [apiUrl, serviceRef]);
     useEffect(read, [read]);

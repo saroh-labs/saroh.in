@@ -6166,6 +6166,7 @@ them alone right after. Locally nothing changes.
 **Rule**: a test that needs minutes of CPU runs in a CI step of its own, not
 inside the all-packages run.
 **Category**: tooling · CI
+
 ## A Reviewer's own approval didn't count for the Reviewer (30 Oct 2026)
 
 **Symptom**: the batch gate for DEC-200: a Reviewer approved, saw "Marked as
@@ -6196,3 +6197,17 @@ CI run (zod 4 touched every package) is slower than that.
 **Rule**: a package whose tests wait on findBy* sets asyncUtilTimeout in its
 setup; the 1s default is a CI flake waiting to happen.
 **Category**: tests · flakes
+
+## "window is not defined" from a sheet's read that answered after it closed
+
+**Symptom**: 30 Oct, release #1262's unit job: `ReferenceError: window is not
+defined` at `site-blocks/src/account/move-class.tsx:62`; the same commit's
+other run passed.
+**Cause**: Move class read the class's days on open and set state when the
+answer came, even after the sheet was gone; a test that ended first let the
+answer land after jsdom's teardown. A customer closing the sheet early hit
+the same late update.
+**Fix**: the read ignores an answer once the sheet has closed (`open` ref).
+**Rule**: a fetch started in an effect checks the component is still there
+before it sets state.
+**Category**: react · tests
