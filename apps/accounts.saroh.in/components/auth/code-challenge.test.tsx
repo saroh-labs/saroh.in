@@ -3,7 +3,7 @@
  * An address past its hourly code cap (owner, 30 Oct): the API answers
  * `CHALLENGE` rather than refusing, the screen shows the bot check, and the
  * code (or reset link) is asked for again with its token. Sign in, the code
- * step's Resend and Forgot password; sign-up is the same few lines as sign
+ * step's Resend, Forgot password and Profile's first password; sign-up is the same few lines as sign
  * in.
  */
 import { act } from "react";
@@ -13,16 +13,20 @@ import type { CodeClient } from "@/lib/sign-in-code";
 
 import {
     button,
+    dialog,
     draw,
+    field,
     host,
     must,
     press,
     setUp,
+    submit,
     tearDown,
     text,
     type,
 } from "../billing-profiles/test-kit";
 
+import { PasswordSheet } from "../account/password-sheet";
 import { CodeStep } from "./code-step";
 import { ForgotPasswordForm } from "./forgot-password-form";
 import { LoginForm } from "./login-form";
@@ -153,5 +157,37 @@ describe("a code past the address's cap needs the bot check", () => {
         expect(push).toHaveBeenCalledWith(
             "/forgot-password/sent?email=asha%40example.com",
         );
+    });
+
+    it("Profile, set a first password: the code is asked for again with the token", async () => {
+        const c = {
+            askForCode: vi
+                .fn()
+                .mockResolvedValueOnce(CHALLENGE)
+                .mockResolvedValue({ error: null }),
+            setWithCode: vi.fn(),
+            signIn: vi.fn(),
+        };
+        draw(
+            <PasswordSheet
+                open
+                email="asha@example.com"
+                has={false}
+                onClose={vi.fn()}
+                onSet={vi.fn()}
+                client={c}
+            />,
+        );
+        type(field("New password"), "a-long-password");
+        type(field("Confirm new password"), "a-long-password");
+        await submit();
+        expect(text(dialog())).toContain(SAID);
+        await press(button("Pass the check", dialog()));
+        await settle();
+        expect(c.askForCode).toHaveBeenLastCalledWith(
+            "asha@example.com",
+            "token-1",
+        );
+        expect(text(dialog())).toContain("We sent a");
     });
 });
