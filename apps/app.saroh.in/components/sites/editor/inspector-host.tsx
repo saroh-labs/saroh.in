@@ -26,7 +26,7 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { Segmented } from "@saroh/ui/segmented";
 import { EditorTabs } from "./editor-chrome";
 import { SECTION_LABELS } from "./editor-constants";
-import { useEditorReadOnly } from "./read-only";
+import { useEditorReadOnly, useEditorReviewCan } from "./read-only";
 
 /** A Reviewer's powers in Feedback (DEC-200): notes, nothing else here. */
 const READ_ONLY_REVIEW = { approve: false, ask: false, settle: false };
@@ -110,6 +110,7 @@ export function InspectorHost({
      * the review stands for this Reviewer.
      */
     const readOnly = useEditorReadOnly();
+    const reviewCan = useEditorReviewCan();
     /** "See the notes": the whole site, settled notes only (RVD4). */
     const [settledOnly, setSettledOnly] = useState(false);
     const status =
@@ -190,6 +191,7 @@ export function InspectorHost({
                         comments={comments}
                         onChanged={refreshReview}
                         canSettle={!readOnly}
+                        canComment={reviewCan.comment}
                         reviewer={readOnly}
                     />
                 ) : inspector === "feedback" ? (

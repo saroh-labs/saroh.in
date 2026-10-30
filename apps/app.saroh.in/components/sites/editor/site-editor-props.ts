@@ -1,3 +1,4 @@
+import type { ReviewCan } from "@/components/sites/editor/read-only";
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
 import type { WebAddressFix } from "@/components/sites/publish/address-fix";
 import type { SiteChangeKind } from "@/lib/sites/pending";
@@ -34,6 +35,8 @@ export interface SiteEditorProps {
      * and nothing is saved. Absent means editable.
      */
     readOnly?: boolean;
+    /** What a reader may do besides read; absent means both (editors). */
+    reviewCan?: ReviewCan;
     /** Every page on this site, for the Pages tab. */
     pages: SitePage[];
     /** The site's advisory flags, as the server computed them. */

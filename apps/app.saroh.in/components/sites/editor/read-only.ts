@@ -16,3 +16,20 @@ export const EditorReadOnly = createContext(false);
 export function useEditorReadOnly(): boolean {
     return useContext(EditorReadOnly);
 }
+
+/**
+ * What a reader may do besides read (`site:comment`, `site:approve`). A
+ * Reviewer has both; a custom role with only `site:read` has neither, and is
+ * offered no note box and no verdict the API would refuse. Editors keep
+ * the default.
+ */
+export type ReviewCan = { comment: boolean; approve: boolean };
+
+export const EditorReviewCan = createContext<ReviewCan>({
+    comment: true,
+    approve: true,
+});
+
+export function useEditorReviewCan(): ReviewCan {
+    return useContext(EditorReviewCan);
+}

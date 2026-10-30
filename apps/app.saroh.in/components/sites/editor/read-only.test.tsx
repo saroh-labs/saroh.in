@@ -705,6 +705,23 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         expect(document.body.textContent).toContain("Add a note on Hero");
     });
 
+    it("a reader who may only read is offered no note box and no verdict", async () => {
+        render({ reviewCan: { comment: false, approve: false } });
+        await flush();
+        expect(has("Ask for changes")).toBe(false);
+        expect(has("Approve")).toBe(false);
+        expect(document.body.textContent).not.toContain("Add a note on Hero");
+        // Reading stays: the tag and the Feedback tab are still there.
+        expect($("[data-reviewing]")).not.toBeNull();
+    });
+
+    it("may comment but not approve: the note box, no verdict", async () => {
+        render({ reviewCan: { comment: true, approve: false } });
+        await flush();
+        expect(has("Approve")).toBe(false);
+        expect(document.body.textContent).toContain("Add a note on Hero");
+    });
+
     it("the request line, from the review state", () => {
         render({
             initialReview: {

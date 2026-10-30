@@ -127,6 +127,12 @@ export default async function SiteEditorPage({
             pageId={activePage.id}
             pages={site.pages}
             readOnly={readOnly}
+            // What a reader may do besides read: never offer a note box or
+            // a verdict the API would refuse (a `site:read`-only role).
+            reviewCan={{
+                comment: site.can.comment,
+                approve: site.can.approve,
+            }}
             initialFlags={flags}
             initialComments={comments}
             initialReview={review}

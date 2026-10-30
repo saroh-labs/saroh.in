@@ -45,6 +45,7 @@ export function BlockFeedback({
     comments,
     onChanged,
     canSettle = true,
+    canComment = true,
     reviewer = false,
 }: {
     siteId: string;
@@ -58,6 +59,8 @@ export function BlockFeedback({
     onChanged: () => Promise<void>;
     /** `section:write`: settle and reopen. Off for a Reviewer (DEC-200). */
     canSettle?: boolean;
+    /** `site:comment`: the note box. Off for a role that may only read. */
+    canComment?: boolean;
     /** A Reviewer (DEC-200, RVD1): "Add a note on Opening section". */
     reviewer?: boolean;
 }) {
@@ -341,66 +344,70 @@ export function BlockFeedback({
                 </div>
             ) : null}
 
-            <form
-                onKeyDown={submitOnModEnter}
-                className="grid gap-2 border-t pt-4"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void send();
-                }}
-            >
-                <Field
-                    label={
-                        reviewer
-                            ? `Add a note on ${label}`
-                            : open.length === 0
-                              ? "Add a note"
-                              : "Reply"
-                    }
+            {canComment ? (
+                <form
+                    onKeyDown={submitOnModEnter}
+                    className="grid gap-2 border-t pt-4"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        void send();
+                    }}
                 >
-                    <Textarea
-                        id="block-feedback-reply"
-                        value={reply}
-                        rows={3}
-                        maxLength={2000}
-                        placeholder="What should change, and why?"
-                        onChange={(e) => setReply(e.target.value)}
-                    />
-                </Field>
-                <div
-                    className={reviewer ? "flex justify-end gap-2" : undefined}
-                >
-                    {reviewer && reply !== "" ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setReply("")}
-                        >
-                            Cancel
-                        </Button>
-                    ) : null}
-                    <Tip
+                    <Field
                         label={
-                            reply.trim() === ""
-                                ? "Write something first"
-                                : undefined
+                            reviewer
+                                ? `Add a note on ${label}`
+                                : open.length === 0
+                                  ? "Add a note"
+                                  : "Reply"
                         }
                     >
-                        <Button
-                            type="submit"
-                            size="sm"
-                            disabled={reply.trim() === ""}
-                            busy={sending}
-                            busyLabel="Sending…"
+                        <Textarea
+                            id="block-feedback-reply"
+                            value={reply}
+                            rows={3}
+                            maxLength={2000}
+                            placeholder="What should change, and why?"
+                            onChange={(e) => setReply(e.target.value)}
+                        />
+                    </Field>
+                    <div
+                        className={
+                            reviewer ? "flex justify-end gap-2" : undefined
+                        }
+                    >
+                        {reviewer && reply !== "" ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setReply("")}
+                            >
+                                Cancel
+                            </Button>
+                        ) : null}
+                        <Tip
+                            label={
+                                reply.trim() === ""
+                                    ? "Write something first"
+                                    : undefined
+                            }
                         >
-                            {reviewer || open.length === 0
-                                ? "Add note"
-                                : "Reply"}
-                        </Button>
-                    </Tip>
-                </div>
-            </form>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={reply.trim() === ""}
+                                busy={sending}
+                                busyLabel="Sending…"
+                            >
+                                {reviewer || open.length === 0
+                                    ? "Add note"
+                                    : "Reply"}
+                            </Button>
+                        </Tip>
+                    </div>
+                </form>
+            ) : null}
             <ConfirmDialog
                 open={deleting !== null}
                 onOpenChange={(o) => (o ? null : setDeleting(null))}
