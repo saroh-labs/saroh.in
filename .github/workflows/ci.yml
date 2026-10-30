@@ -329,12 +329,18 @@ jobs:
       # Everything else with a `test` script: the packages and the workspace
       # app (#287). `@saroh/api` is excluded: its bare `test` script is `jest`,
       # which picks up the integration specs that need a database.
+      #
+      # Two packages at a time, two vitest workers each: four processes for
+      # the runner's four cores. Turbo's default (ten packages, each with a
+      # worker per core) put ~40 jsdom processes on four cores, and timing
+      # tests failed at random: 5s test timeouts, 1s findBy waits, focus and
+      # after-teardown updates (CI 25–30 Oct, DEV_LEARNINGS).
       - name: Unit tests (packages and the app)
         env:
           # The seed sweeps (hundreds of seeded days) run next, alone: under
           # every package's tests at once they ran past their timeout (#1273).
           SEED_SWEEPS: later
-        run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED
+        run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED --concurrency=2 -- --maxWorkers=2
 
       - name: Seed sweeps
         run: pnpm --filter @saroh/database exec vitest run src/seed/showcase/clinic.test.ts src/seed/showcase/bakery-any-day.test.ts

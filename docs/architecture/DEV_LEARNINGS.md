@@ -6198,6 +6198,24 @@ CI run (zod 4 touched every package) is slower than that.
 setup; the 1s default is a CI flake waiting to happen.
 **Category**: tests · flakes
 
+## CI's unit job failed one run in four, always on timing
+
+**Symptom**: 25–30 Oct, about 11 of 40 CI runs failed, nearly all in "Unit
+tests" and nearly all timing: 5s test timeouts (saroh.in, search-pages ×2),
+a 1s findBy wait (booking flow), a focus check (form-sheet), an update after
+jsdom's teardown (Move class), a 300s seed sweep. The same commit's other run
+usually passed; everything passed locally.
+**Cause**: the job ran `turbo run test` with turbo's default concurrency (ten
+packages at once), each vitest starting a worker per core: ~40 jsdom
+processes on the runner's four cores. Timing tests starved. A change touching
+every package (zod 4) made it run everything together.
+**Fix**: `--concurrency=2 -- --maxWorkers=2` on the unit step (four
+processes, four cores), and the seed sweeps in their own step. The individual
+flakes were also fixed where they were real (savedAt digits, Move class).
+**Rule**: CI parallelism is sized to the runner's cores; raising one test's
+timeout treats the symptom. When unrelated timing tests fail at random, look
+at the job's process count first.
+**Category**: tooling · CI
 ## "window is not defined" from a sheet's read that answered after it closed
 
 **Symptom**: 30 Oct, release #1262's unit job: `ReferenceError: window is not
