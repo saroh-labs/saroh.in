@@ -364,8 +364,12 @@ const TIMES = ["00:00", "06:30", "09:00", "12:30", "16:00", "19:30", "23:30"];
 // turbo runs every package's tests at once (PR #825); hence the headroom.
 const SWEEP_TIMEOUT_MS = 300_000;
 
+// CI runs the sweeps in a step of their own (ci.yml, "Seed sweeps"): under
+// every package's tests at once they ran past their timeout (#1273).
+const sweepIt = process.env.SEED_SWEEPS === "later" ? it.skip : it;
+
 describe("Kavi Dental seeded on any day", () => {
-    it(
+    sweepIt(
         "keeps every booking, bill and state, 70 days running",
         () => {
             // Across Diwali 2026: before the closure, inside it and after.
@@ -380,7 +384,7 @@ describe("Kavi Dental seeded on any day", () => {
         SWEEP_TIMEOUT_MS,
     );
 
-    it(
+    sweepIt(
         "the same across month, year, leap-day and financial-year boundaries",
         () => {
             const dates = [

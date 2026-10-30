@@ -6152,3 +6152,17 @@ sample number, which any millisecond timestamp can contain.
 **Rule**: a "not stored" check looks for the full value, never a fragment
 short enough to appear in an id or a timestamp.
 **Category**: tests · flakes
+
+## A seed sweep timed out on CI only when every package's tests ran
+
+**Symptom**: 30 Oct, #1273: `clinic.test.ts` "70 days running" passed
+locally in 13s but timed out at 300s on CI, twice in a row.
+**Cause**: the zod upgrade touched every package, so the unit job ran every
+package's tests at once; the 490-seed sweep starved under that load (it had
+needed over 120s on CI before, #825).
+**Fix**: the unit step sets `SEED_SWEEPS=later` (passed through by turbo for
+`@saroh/database#test`), the sweeps skip there, and a "Seed sweeps" step runs
+them alone right after. Locally nothing changes.
+**Rule**: a test that needs minutes of CPU runs in a CI step of its own, not
+inside the all-packages run.
+**Category**: tooling · CI
