@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import { CodeStep } from "@/components/auth/code-step";
 import {
     AuthAlt,
@@ -85,6 +86,8 @@ export function LoginForm({
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // The API asked for the bot check before it sends the code.
+    const [challenge, setChallenge] = useState(false);
     // The code step, once a code has gone: the wait before Resend, and
     // which kind of code it is.
     const [sent, setSent] = useState<{
@@ -106,12 +109,14 @@ export function LoginForm({
         }
     }
 
-    async function askForCode() {
+    async function askForCode(turnstileToken?: string) {
         setIsLoading(true);
-        const result = await sendCode(client, { email });
+        setChallenge(false);
+        const result = await sendCode(client, { email, turnstileToken });
         setIsLoading(false);
         if (!result.ok) {
             setError(result.message);
+            setChallenge(result.challenge === true);
             return;
         }
         setSent({ wait: result.resendAfterSeconds, kind: "sign-in" });
@@ -233,6 +238,14 @@ export function LoginForm({
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         disabled={isLoading}
+                    />
+                ) : null}
+                {challenge && way === "code" ? (
+                    <CodeChallenge
+                        onToken={(token) => {
+                            setError(null);
+                            void askForCode(token);
+                        }}
                     />
                 ) : null}
                 <AuthSubmit disabled={isLoading}>

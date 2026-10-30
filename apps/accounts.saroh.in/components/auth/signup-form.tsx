@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import { CodeStep } from "@/components/auth/code-step";
 import {
     AuthError,
@@ -65,6 +66,8 @@ export function SignupForm({
     const [email, setEmail] = useState(invitedEmail ?? "");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // The API asked for the bot check before it sends the code.
+    const [challenge, setChallenge] = useState(false);
     // The wait before Resend that the send came back with: set, the code
     // step is showing.
     const [sent, setSent] = useState<number | null>(null);
@@ -73,18 +76,24 @@ export function SignupForm({
     // The invitation's address, which the accept insists on: fixed.
     const emailLocked = joining && !!invitedEmail;
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        void askForCode();
+    }
+
+    async function askForCode(turnstileToken?: string) {
         setError(null);
         if (joining && !name.trim()) {
             setError("Enter your name. It is what the team sees.");
             return;
         }
         setIsLoading(true);
-        const result = await sendCode(client, { email });
+        setChallenge(false);
+        const result = await sendCode(client, { email, turnstileToken });
         setIsLoading(false);
         if (!result.ok) {
             setError(result.message);
+            setChallenge(result.challenge === true);
             return;
         }
         setSent(result.resendAfterSeconds);
@@ -164,6 +173,11 @@ export function SignupForm({
                     required
                     disabled={isLoading}
                 />
+                {challenge ? (
+                    <CodeChallenge
+                        onToken={(token) => void askForCode(token)}
+                    />
+                ) : null}
                 <AuthSubmit disabled={isLoading}>
                     {isLoading ? "Sending…" : "Email me a code"}
                 </AuthSubmit>

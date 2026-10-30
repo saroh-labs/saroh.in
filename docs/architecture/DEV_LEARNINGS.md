@@ -6114,3 +6114,14 @@ credentials header (a preflight looked right, since ours ends it first).
 **Rule**: one CORS layer. Check response headers on a real request, not only
 the options function, and read what a module does in `configure`.
 **Category**: security · CORS
+
+## A db spec under `src/common` never ran
+
+**Symptom**: 30 Oct: `common/auth/code-mail-limits.db.spec.ts` (the per-address
+code cap) was committed "tested", but neither jest project ran it.
+**Cause**: the unit project (`jest.config.js`) skips every `*.db.spec.ts`, and
+the integration project matched only `src/modules/**`.
+**Fix**: `jest.integration.config.js` also matches `src/common/**/*.db.spec.ts`.
+**Rule**: a new spec's first run is by its path; "No tests found" means no
+project picks it up, not that it passed.
+**Category**: tooling · tests

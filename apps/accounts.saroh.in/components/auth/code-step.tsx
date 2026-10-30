@@ -4,6 +4,7 @@ import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
 import { cn } from "@saroh/ui/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CodeChallenge } from "@/components/auth/code-challenge";
 import {
     AuthAlt,
     AuthError,
@@ -90,6 +91,8 @@ export function CodeStep({
     const [spent, setSpent] = useState(false);
     const [checking, setChecking] = useState(false);
     const [sending, setSending] = useState(false);
+    // The API asked for the bot check before it sends a new code.
+    const [challenge, setChallenge] = useState(false);
     const [done, setDone] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [resendAt, setResendAt] = useState<number | null>(
@@ -172,12 +175,13 @@ export function CodeStep({
         if (complete && digits !== failed.current) void check(digits);
     }
 
-    async function resend() {
+    async function resend(turnstileToken?: string) {
         if (sending || (!spent && wait > 0)) return;
         setSending(true);
+        setChallenge(false);
         setError(null);
         setNotice(null);
-        const result = await sendCode(client, { email, kind });
+        const result = await sendCode(client, { email, kind, turnstileToken });
         setSending(false);
         const at = Date.now();
         setNow(at);
@@ -191,6 +195,7 @@ export function CodeStep({
             return;
         }
         setError(result.message);
+        setChallenge(result.challenge === true);
         if (result.resendAfterSeconds !== null) {
             setResendAt(at + result.resendAfterSeconds * 1_000);
         }
@@ -267,13 +272,19 @@ export function CodeStep({
                     {checking ? CODE_WORDS.checking : CODE_WORDS.submit}
                 </AuthSubmit>
             </form>
+            {challenge ? (
+                <CodeChallenge onToken={(token) => void resend(token)} />
+            ) : null}
             {spent ? (
-                <AuthAlt onClick={resend} disabled={sending || checking}>
+                <AuthAlt
+                    onClick={() => void resend()}
+                    disabled={sending || checking}
+                >
                     {sending ? "Sending…" : CODE_WORDS.sendNew}
                 </AuthAlt>
             ) : (
                 <AuthAlt
-                    onClick={resend}
+                    onClick={() => void resend()}
                     disabled={sending || checking || wait > 0}
                 >
                     {sending ? "Sending…" : resendLabel(wait)}

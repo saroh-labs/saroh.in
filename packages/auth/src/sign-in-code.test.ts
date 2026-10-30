@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     CODE_ALLOWED_ATTEMPTS,
+    CODE_CHALLENGE_HEADER,
     CODE_LIMIT_MAX,
     CODE_LIMIT_WINDOW_SECONDS,
     CODE_RESEND_SECONDS,
@@ -64,7 +65,12 @@ function stack(
         rateLimit: { enabled: extra.rateLimit ?? false, storage: "memory" },
         logger: { disabled: true },
     });
-    async function post(path: string, body: unknown, from = "203.0.113.7") {
+    async function post(
+        path: string,
+        body: unknown,
+        from = "203.0.113.7",
+        headers: Record<string, string> = {},
+    ) {
         const response = await auth.handler(
             new Request(`${BASE}/api/auth${path}`, {
                 method: "POST",
@@ -72,6 +78,7 @@ function stack(
                     "content-type": "application/json",
                     origin: ORIGIN,
                     "x-forwarded-for": from,
+                    ...headers,
                 },
                 body: JSON.stringify(body),
             }),
@@ -90,11 +97,12 @@ function stack(
         db,
         sent,
         post,
-        ask: (email: string, from?: string) =>
+        ask: (email: string, from?: string, token?: string) =>
             post(
                 "/email-otp/send-verification-otp",
                 { email, type: "sign-in" },
                 from,
+                token ? { [CODE_CHALLENGE_HEADER]: token } : {},
             ),
         signIn: (
             email: string,
@@ -410,6 +418,36 @@ describe("sign up and sign in with an emailed code", () => {
             expect(asked[0]).toBe("held@example.com");
             // Another address is not held up.
             expect((await s.ask("free@example.com")).status).toBe(200);
+        });
+
+        it("an address past its cap needs the challenge, account or not, and a token sends", async () => {
+            const tokens: (string | null)[] = [];
+            const s = stack({
+                hooks: {
+                    mayMailCode: (_email, { turnstileToken }) => {
+                        tokens.push(turnstileToken);
+                        return Promise.resolve(
+                            turnstileToken === "good"
+                                ? null
+                                : { challenge: true as const },
+                        );
+                    },
+                },
+            });
+            const known = await s.ask("held@example.com");
+            const unknown = await s.ask("nobody@example.com");
+            for (const refused of [known, unknown]) {
+                expect(refused.status).toBe(400);
+                expect(refused.body?.code).toBe("CHALLENGE");
+            }
+            expect(known.body).toEqual(unknown.body);
+            expect(s.sent).toHaveLength(0);
+            expect(tokens).toEqual([null, null]);
+
+            const passed = await s.ask("held@example.com", undefined, "good");
+            expect(passed.status).toBe(200);
+            expect(s.sent).toHaveLength(1);
+            expect(tokens.at(-1)).toBe("good");
         });
 
         it("the screen's Resend wait lets one resend through", () => {

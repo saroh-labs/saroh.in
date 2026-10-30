@@ -10,6 +10,7 @@ import { emailOTP } from "better-auth/plugins";
 
 import {
     CODE_ALLOWED_ATTEMPTS,
+    CODE_CHALLENGE_HEADER,
     CODE_LIMIT_MAX,
     CODE_LIMIT_WINDOW_SECONDS,
     sessionCookiePrefix,
@@ -28,6 +29,7 @@ export { getTrustedOrigins, isTrustedOrigin } from "./origins";
 // in that file.
 export {
     CODE_ALLOWED_ATTEMPTS,
+    CODE_CHALLENGE_HEADER,
     CODE_LIMIT_MAX,
     CODE_LIMIT_WINDOW_SECONDS,
     CODE_RESEND_SECONDS,
@@ -191,14 +193,18 @@ export interface CreateAuthOptions {
     /**
      * Asked before a code or link is mailed to an address someone typed
      * ({@link CODE_MAIL_PATHS}), with that address, lowercased: the API's
-     * per-address cap, on top of the per-caller rate limit. A wait refuses
-     * with 429 and `X-Retry-After`, as the rate limit does. Asked whether or
-     * not the address has an account, so a refusal says nothing about that.
-     * Not asked on a server-side `auth.api` call (staff's own sends).
+     * per-address cap, on top of the per-caller rate limit, with the bot
+     * challenge's token the page sent in {@link CODE_CHALLENGE_HEADER}. A
+     * wait refuses with 429 and `X-Retry-After`, as the rate limit does;
+     * `challenge` refuses with 400 `CHALLENGE`, as phone sign-in's start
+     * does, and the page sends again with a token. Asked whether or not the
+     * address has an account, so a refusal says nothing about that. Not
+     * asked on a server-side `auth.api` call (staff's own sends).
      */
     mayMailCode?: (
         email: string,
-    ) => Promise<{ retryAfterSeconds: number } | null>;
+        challenge: { turnstileToken: string | null },
+    ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
 }
 
 /**
@@ -478,8 +484,18 @@ function codeMailHook(
         const email: unknown = (ctx.body as { email?: unknown } | undefined)
             ?.email;
         if (typeof email !== "string" || !email.trim()) return;
-        const wait = await mayMailCode(email.trim().toLowerCase());
-        if (!wait) return;
+        const verdict = await mayMailCode(email.trim().toLowerCase(), {
+            turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
+        });
+        if (!verdict) return;
+        if ("challenge" in verdict) {
+            // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+            throw new APIError("BAD_REQUEST", {
+                code: "CHALLENGE",
+                message: "Confirm you're not a robot, then try again.",
+            });
+        }
+        const wait = verdict;
         // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
         throw new APIError(
             "TOO_MANY_REQUESTS",

@@ -1,8 +1,10 @@
 import { createHmac } from "node:crypto";
 
+import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { visitorHashSecret } from "../../modules/analytics/visitor-hash";
+import { ChallengeVerifier } from "../../modules/site-accounts/challenge";
 
 /**
  * The per-address cap on the codes and links Saroh's sign-in mails
@@ -14,6 +16,13 @@ import { visitorHashSecret } from "../../modules/analytics/visitor-hash";
  * phones (`account-phone/phone-limits.ts`), so a burst can't pass together
  * and the cap holds across API instances and restarts. Every ask counts,
  * whether or not the address has an account.
+ *
+ * Past the hourly cap a code is not refused (owner, 30 Oct: a refusal would
+ * let anyone lock a person out of their codes): it needs the bot challenge
+ * (Turnstile), as a site customer's does past its limit (ADR-011). With a
+ * valid token it goes. With Turnstile not set up there is no challenge to
+ * ask, so it goes and Saroh logs it, as phone sign-in's start does. The
+ * 30-second cooldown holds either way.
  *
  * shortcut: rows are never swept (an index keeps the count cheap); add a sweep if the table grows large.
  */
@@ -30,12 +39,28 @@ export function emailHash(email: string): string {
         .digest("hex");
 }
 
-/** Null when a code may go to `email` now (and the ask is recorded); else the wait. */
-export function claimCodeMail(
+const challenge = new ChallengeVerifier();
+const logger = new Logger("CodeMailLimits");
+let unconfiguredWarnedAt = 0;
+
+export type CodeMailVerdict =
+    { retryAfterSeconds: number } | { challenge: true } | null;
+
+/**
+ * Null when a code may go to `email` now (and the ask is recorded); else the
+ * wait, or `challenge` when it is past the cap and has no passing token.
+ */
+export async function claimCodeMail(
     email: string,
+    turnstileToken: string | null = null,
     now = new Date(),
-): Promise<{ retryAfterSeconds: number } | null> {
+    verifier: Pick<ChallengeVerifier, "configured" | "verify"> = challenge,
+): Promise<CodeMailVerdict> {
     const hash = emailHash(email);
+    // Asked before the lock: a token is only sent after a `challenge` answer.
+    const passed = turnstileToken
+        ? await verifier.verify(turnstileToken, "")
+        : false;
     return prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`account-email:${hash}`}))`;
         const recent = await tx.accountEmailCodeSend.findMany({
@@ -60,8 +85,14 @@ export function claimCodeMail(
             if (cooldownEnds > now.getTime()) return wait(cooldownEnds);
         }
         if (recent.length >= CODE_MAILS_PER_ADDRESS_PER_HOUR) {
-            const oldest = recent[recent.length - 1];
-            return wait(oldest.createdAt.getTime() + HOUR_MS);
+            if (verifier.configured) {
+                if (!passed) return { challenge: true } as const;
+            } else if (now.getTime() - unconfiguredWarnedAt > HOUR_MS) {
+                unconfiguredWarnedAt = now.getTime();
+                logger.error(
+                    "account_email_challenge_not_configured: an address past its hourly code cap got a code with no bot check; set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY",
+                );
+            }
         }
         await tx.accountEmailCodeSend.create({
             data: { emailHash: hash, createdAt: now },

@@ -69,6 +69,7 @@ export const auth: Auth = createAuth({
     // The sign-in rate limit counts the same client the API's `req.ip` does.
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
     // Per address too, not only per caller: many callers can't flood one
-    // mailbox (`code-mail-limits.ts`).
-    mayMailCode: (email) => claimCodeMail(email),
+    // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
+    mayMailCode: (email, { turnstileToken }) =>
+        claimCodeMail(email, turnstileToken),
 });

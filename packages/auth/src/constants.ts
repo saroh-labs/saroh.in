@@ -57,3 +57,9 @@ export function sessionCookiePrefix(): string {
     if (!prefix) return "better-auth";
     return prefix;
 }
+
+/**
+ * The header an emailed-code request carries the bot challenge's token in,
+ * once the API has answered 400 `CHALLENGE` (an address past its hourly cap).
+ */
+export const CODE_CHALLENGE_HEADER = "x-turnstile-token";
