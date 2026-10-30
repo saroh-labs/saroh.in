@@ -512,6 +512,7 @@ function Note({
             <div className="mt-2 flex items-center gap-1">
                 {postId !== null ? (
                     <Button
+                        data-ph-mask=""
                         asChild
                         variant="ghost"
                         size="xs"

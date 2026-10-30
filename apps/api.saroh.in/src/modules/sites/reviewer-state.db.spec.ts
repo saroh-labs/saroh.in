@@ -20,7 +20,13 @@ const sites = new SitesService({
 
 let seq = 0;
 const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
-const tick = () => new Promise((r) => setTimeout(r, 5));
+/**
+ * Each write's time, said explicitly rather than slept for: an hour ago and
+ * a second apart, so "after" never rests on two writes landing in
+ * different milliseconds.
+ */
+let clock = Date.now() - 3_600_000;
+const at = () => new Date((clock += 1_000));
 
 /** A one-page site, its owner Asha and Meera, a reviewer invited to it. */
 async function business() {
@@ -80,9 +86,9 @@ async function verdict(b: Business, by: OrganizationContext, outcome: string) {
             byUserId: by.userId,
             outcome,
             reason: outcome === "CHANGES_REQUESTED" ? "Fix the hours" : null,
+            createdAt: at(),
         },
     });
-    await tick();
 }
 
 async function note(b: Business, by: OrganizationContext, body: string) {
@@ -94,18 +100,17 @@ async function note(b: Business, by: OrganizationContext, body: string) {
             sectionKey: "hero",
             authorUserId: by.userId,
             body,
+            createdAt: at(),
         },
     });
-    await tick();
     return row;
 }
 
 async function settle(b: Business, id: string) {
     await prisma.siteComment.update({
         where: { id },
-        data: { resolvedAt: new Date(), resolvedByUserId: b.ctx.userId },
+        data: { resolvedAt: at(), resolvedByUserId: b.ctx.userId },
     });
-    await tick();
 }
 
 describe("a Reviewer's own review state (DEC-200, U4)", () => {
@@ -117,6 +122,29 @@ describe("a Reviewer's own review state (DEC-200, U4)", () => {
         expect(s.request?.by).toBe("Asha");
         expect(s.request?.at).toBeInstanceOf(Date);
         expect(s.pending).toBe(true);
+    });
+
+    it("a Reviewer's own approval settles the request, for them as for the owner", async () => {
+        const b = await business();
+        await sites.requestReview(b.ctx, b.site.id);
+        await sites.createApproval(b.reviewerCtx, b.site.id, {
+            outcome: "CHANGES_REQUESTED",
+            reason: "Fix the hours",
+        });
+        await sites.createApproval(b.reviewerCtx, b.site.id, {
+            outcome: "APPROVED",
+        });
+        // They can't publish, so their approval is not "their own work":
+        // the editor shows them Change your review, not the choice again.
+        expect(await state(b)).toMatchObject({
+            pending: false,
+            outstanding: false,
+            yourVerdict: { outcome: "APPROVED" },
+        });
+        expect(await state(b, b.ctx)).toMatchObject({
+            pending: false,
+            outstanding: false,
+        });
     });
 
     it("keeps the reviewer's own latest verdict, not someone else's", async () => {

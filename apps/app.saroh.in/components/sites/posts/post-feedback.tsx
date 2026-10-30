@@ -279,7 +279,10 @@ export function PostFeedback({
                         void send();
                     }}
                 >
-                    <Field label={`Add a note on ${title || "this post"}`}>
+                    <Field
+                        label={`Add a note on ${title || "this post"}`}
+                        holdsData
+                    >
                         <Textarea
                             id="post-feedback-note"
                             value={draft}

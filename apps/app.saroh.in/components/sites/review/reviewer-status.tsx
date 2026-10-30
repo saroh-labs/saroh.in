@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { Notice } from "@saroh/ui/notice";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -34,7 +35,8 @@ export function ReviewerStatus({
         return (
             <Notice
                 tone="error"
-                title="The draft couldn't be loaded."
+                // The house's words, as the editor page's own failed read.
+                title={couldntLoad("the draft")}
                 data-reviewer-status="failed"
             >
                 Nothing you wrote is lost.{" "}

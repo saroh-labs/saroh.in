@@ -112,7 +112,7 @@ describe("ReviewerStatus (RVD4)", () => {
 
     it("couldn't load: says nothing is lost, and tries again", () => {
         const { text, onRetry } = draw({ request: ASKED }, true);
-        expect(text).toContain("The draft couldn't be loaded.");
+        expect(text).toContain("Couldn't load the draft");
         expect(text).toContain("Nothing you wrote is lost.");
         press("Try again");
         expect(onRetry).toHaveBeenCalled();

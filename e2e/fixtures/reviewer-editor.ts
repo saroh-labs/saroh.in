@@ -30,9 +30,13 @@ export async function openReviewedSite(page: Page): Promise<string> {
     return id;
 }
 
-/** The first block drawn on the canvas, by its "Hero block, 1 of 4" name. */
+/**
+ * The first block drawn on the canvas, by its "Hero block, 1 of 4" name.
+ * The editor opens with it chosen ("…, selected"): a desk shows its
+ * Feedback at once, a phone opens the sheet only when it is tapped.
+ */
 export const firstBlock = (page: Page): Locator =>
-    page.getByRole("button", { name: /block, 1 of \d+$/ }).first();
+    page.getByRole("button", { name: /block, 1 of \d+(, selected)?$/ }).first();
 
 /**
  * The note box for the first block on the canvas. A Reviewer's inspector
@@ -57,23 +61,35 @@ async function reviewSheet(page: Page): Promise<Locator> {
     return sheet;
 }
 
+/**
+ * A reviewer who approved before (an earlier spec, an earlier run) sees
+ * Change your review where the choice was: pressed until `choice` shows.
+ */
+async function choiceAgain(within: Page | Locator, choice: Locator) {
+    const change = within
+        .getByRole("button", { name: "Change your review" })
+        .filter({ visible: true });
+    if (await change.isVisible()) await pressUntil(change, choice);
+}
+
 /** Ask for changes, with a reason, at either width. */
 export async function askForChanges(page: Page, reason: string) {
     if (onPhone(page)) {
         const sheet = await reviewSheet(page);
-        await sheet.getByRole("radio", { name: /^Ask for changes/ }).click();
+        const ask = sheet.getByRole("radio", { name: /^Ask for changes/ });
+        await choiceAgain(sheet, ask);
+        await ask.click();
         await sheet.getByLabel("What needs changing?").fill(reason);
         await sheet.getByRole("button", { name: /^Send to / }).click();
     } else {
         const reasonBox = page
             .getByLabel("What needs changing?")
             .filter({ visible: true });
-        await pressUntil(
-            page
-                .getByRole("button", { name: "Ask for changes" })
-                .filter({ visible: true }),
-            reasonBox,
-        );
+        const ask = page
+            .getByRole("button", { name: "Ask for changes" })
+            .filter({ visible: true });
+        await choiceAgain(page, ask);
+        await pressUntil(ask, reasonBox);
         await reasonBox.fill(reason);
         await page
             .getByRole("button", { name: /^Send to / })
@@ -89,13 +105,16 @@ export async function askForChanges(page: Page, reason: string) {
 export async function approve(page: Page) {
     if (onPhone(page)) {
         const sheet = await reviewSheet(page);
-        await sheet.getByRole("radio", { name: /^Approve/ }).click();
+        const yes = sheet.getByRole("radio", { name: /^Approve/ });
+        await choiceAgain(sheet, yes);
+        await yes.click();
         await sheet.getByRole("button", { name: /^Send to / }).click();
     } else {
-        await page
+        const yes = page
             .getByRole("button", { name: "Approve", exact: true })
-            .filter({ visible: true })
-            .click();
+            .filter({ visible: true });
+        await choiceAgain(page, yes);
+        await yes.click();
     }
     await expect(page.getByText("Marked as approved.").first()).toBeVisible({
         timeout: 30_000,

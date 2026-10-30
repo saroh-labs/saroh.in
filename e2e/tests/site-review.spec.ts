@@ -493,7 +493,6 @@ test.describe("a reviewer and a test release", () => {
                 pending: boolean;
             }
             const draftReview = () => nw.get<Review>(`/sites/${siteId}/review`);
-            const before = await draftReview();
 
             const site = await nw.get<{
                 pages: { id: string; isHome: boolean }[];
@@ -547,6 +546,12 @@ test.describe("a reviewer and a test release", () => {
                     { name },
                 );
                 releaseId = made.release.id;
+                /*
+                 * The draft's review, read with the draft as the release
+                 * froze it: a change to the draft can turn an earlier
+                 * approval stale, so it is compared at the same bytes.
+                 */
+                const before = await draftReview();
 
                 // The reviewer finds it in the editor's Test releases, opens
                 // its own review page, and approves it there.
@@ -579,6 +584,11 @@ test.describe("a reviewer and a test release", () => {
                 await expect(
                     page.locator("[data-release-verdict]"),
                 ).toContainText("approved this test release.");
+                // The draft's own review is as it was.
+                const after = await draftReview();
+                expect(after.latestApproval).toEqual(before.latestApproval);
+                expect(after.outstanding).toBe(before.outstanding);
+                expect(after.pending).toBe(before.pending);
 
                 // The draft moves on after the verdict.
                 await withHeading(`After review ${name}`);
@@ -609,12 +619,6 @@ test.describe("a reviewer and a test release", () => {
                 const row = releasesPanel.getByRole("listitem", { name });
                 await expect(row).toContainText(/Approved by /);
                 await expect(row).toContainText("Your draft has changed since");
-
-                // And the draft's own review is as it was.
-                const after = await draftReview();
-                expect(after.latestApproval).toEqual(before.latestApproval);
-                expect(after.outstanding).toBe(before.outstanding);
-                expect(after.pending).toBe(before.pending);
             } finally {
                 // Put the home draft back as it was.
                 const now = await nw.get<{ revision: number }>(draftPath);

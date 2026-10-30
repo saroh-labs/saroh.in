@@ -715,6 +715,14 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         expect($("[data-reviewing]")).not.toBeNull();
     });
 
+    it("on a phone, a reader who may not approve has no Review to open", async () => {
+        atWidth(390);
+        render({ reviewCan: { comment: true, approve: false } });
+        await flush();
+        expect(has("Review")).toBe(false);
+        expect(has(/^Publish/)).toBe(false);
+    });
+
     it("may comment but not approve: the note box, no verdict", async () => {
         render({ reviewCan: { comment: true, approve: false } });
         await flush();
@@ -813,7 +821,7 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         );
         render();
         await flush();
-        expect(inspector()).toContain("The draft couldn't be loaded.");
+        expect(inspector()).toContain("Couldn't load the draft");
         const field = document.querySelector<HTMLTextAreaElement>(
             "#block-feedback-reply",
         );
@@ -829,7 +837,7 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         });
         click(button("Try again"));
         await flush();
-        expect(inspector()).not.toContain("couldn't be loaded");
+        expect(inspector()).not.toContain("Couldn't load the draft");
         expect(
             document.querySelector<HTMLTextAreaElement>("#block-feedback-reply")
                 ?.value,

@@ -25,7 +25,9 @@ const sites = new SitesService({
 
 let seq = 0;
 const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
-const tick = () => new Promise((r) => setTimeout(r, 5));
+/** A time an hour ago, a second apart: "before" said, not slept for. */
+let clock = Date.now() - 3_600_000;
+const at = () => new Date((clock += 1_000));
 
 /**
  * A site with a home page holding one section and one draft post, its owner
@@ -229,11 +231,17 @@ describe("notes on a post (DEC-200 U8)", () => {
     it("follows the approval lock: notes before the approval are history", async () => {
         const b = await business();
         const before = await postNote(b, b.meera, "Before");
-        await tick();
+        await prisma.siteComment.update({
+            where: { id: before.id },
+            data: { createdAt: at() },
+        });
         await sites.createApproval(b.meera, b.site.id, {
             outcome: "APPROVED",
         });
-        await tick();
+        await prisma.siteApproval.updateMany({
+            where: { siteId: b.site.id, outcome: "APPROVED" },
+            data: { createdAt: at() },
+        });
         const after = await postNote(b, b.meera, "After");
 
         await expect(

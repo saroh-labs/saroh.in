@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { Field } from "@saroh/ui/field";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId, useState } from "react";
 
@@ -87,8 +88,10 @@ export function ReviewSheet({
         .filter(Boolean)
         .join(" · ");
 
+    // The body of the editor's own sheet (`EditorSheet`, which draws the
+    // frame): the shared sheet body, laid out as RVD3Phone's column.
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <FormSheetBody className="mx-0 flex flex-col gap-0 p-0">
             <div className="grid gap-2 px-4 pt-1">
                 <ReviewerStatus
                     review={review}
@@ -179,6 +182,6 @@ export function ReviewSheet({
                     </div>
                 </form>
             )}
-        </div>
+        </FormSheetBody>
     );
 }

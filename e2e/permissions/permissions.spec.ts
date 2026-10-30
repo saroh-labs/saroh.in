@@ -62,15 +62,21 @@ for (const role of ["MEMBER", "REVIEWER"]) {
         await expect(
             page.getByRole("heading", { name: "Racking that fits" }).first(),
         ).toBeVisible();
-        if (isMobile) {
-            await expect(
-                page.getByRole("button", { name: "Review", exact: true }),
-            ).toBeVisible();
-        } else {
+        if (!isMobile) {
             await expect(page.locator("[data-reviewing]")).toHaveText(
                 "Reviewing · you can’t change anything",
             );
         }
+        /*
+         * The verdict is `site:approve`'s (the fixture's `can.approve`): a
+         * Reviewer is offered it, in the bar on a desk and behind Review on
+         * a phone; a Member, who may only read, is offered neither.
+         */
+        const verdict = isMobile
+            ? page.getByRole("button", { name: "Review", exact: true })
+            : page.getByRole("button", { name: "Ask for changes" });
+        if (role === "REVIEWER") await expect(verdict).toBeVisible();
+        else await expect(verdict).toHaveCount(0);
         /*
          * Nothing that writes, at either width. The editor's draft load is a
          * 403 for both roles here, so the page read through `…/read` is the

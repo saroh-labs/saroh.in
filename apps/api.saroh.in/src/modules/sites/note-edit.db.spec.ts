@@ -142,18 +142,30 @@ function note(
     });
 }
 
-/** Make sure the next row's createdAt is strictly later. */
-const tick = () => new Promise((r) => setTimeout(r, 5));
+/**
+ * Times said explicitly rather than slept for: an hour ago, a second apart.
+ * A row set to `at()` is strictly before anything the service writes next.
+ */
+let clock = Date.now() - 3_600_000;
+const at = () => new Date((clock += 1_000));
+
+/** A note, as if written at the clock's next second. */
+async function earlierNote(id: string) {
+    await prisma.siteComment.update({
+        where: { id },
+        data: { createdAt: at(), updatedAt: at() },
+    });
+}
 
 describe("edit and delete your own note (DEC-200 U3)", () => {
     it("lets the author rewrite an open note, and stamps when", async () => {
         const b = await business();
         const { id } = await note(b, b.meera);
+        await earlierNote(id);
         const before = await prisma.siteComment.findUniqueOrThrow({
             where: { id },
             select: { updatedAt: true },
         });
-        await tick();
 
         const edited = await sites.updateCommentBody(
             b.meera,
@@ -299,10 +311,13 @@ describe("edit and delete your own note (DEC-200 U3)", () => {
     it("keeps notes written before the latest approval; notes after it are the next round", async () => {
         const b = await business();
         const { id: old } = await note(b, b.meera);
-        await tick();
+        await earlierNote(old);
         // Approved by anyone: the work was signed off with this note in it.
         await sites.createApproval(b.ravi, b.site.id, { outcome: "APPROVED" });
-        await tick();
+        await prisma.siteApproval.updateMany({
+            where: { siteId: b.site.id, outcome: "APPROVED" },
+            data: { createdAt: at() },
+        });
         const { id: fresh } = await note(b, b.meera, "Next round: the footer");
 
         await expect(
@@ -334,7 +349,7 @@ describe("edit and delete your own note (DEC-200 U3)", () => {
             "On the release",
             made.release.id,
         );
-        await tick();
+        await earlierNote(onRelease);
         // The draft is approved; the release's notes are untouched by it.
         await sites.createApproval(b.ravi, b.site.id, { outcome: "APPROVED" });
 
@@ -347,7 +362,8 @@ describe("edit and delete your own note (DEC-200 U3)", () => {
             ),
         ).resolves.toMatchObject({ body: "Still mine" });
 
-        await tick();
+        // Written now, so after the note (at the clock's time).
+        await earlierNote(onRelease);
         await sites.createApproval(b.ravi, b.site.id, {
             outcome: "APPROVED",
             testReleaseId: made.release.id,

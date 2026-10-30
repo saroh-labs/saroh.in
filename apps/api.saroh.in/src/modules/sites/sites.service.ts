@@ -3067,6 +3067,13 @@ export class SitesService {
                   ],
               }
             : { testReleaseId: null };
+        /*
+         * Whose own approval can't settle the review: the caller's, when they
+         * could publish (no approving your own work). A reader who can't
+         * publish (a Reviewer) is never the publisher, so their approval
+         * counts here as it does for the owner who will publish (DEC-200).
+         */
+        const publisherUserId = allows(ctx, "site:publish") ? ctx.userId : null;
         const [latest, standing, openNotes, newestAsk, reader] =
             await Promise.all([
                 prisma.siteApproval.findFirst({
@@ -3093,7 +3100,7 @@ export class SitesService {
                           siteId,
                           organizationId: ctx.organizationId,
                           fingerprint: release.fingerprint,
-                          publisherUserId: ctx.userId,
+                          publisherUserId,
                           scope: "release",
                       })
                     : this.currentDraftFingerprint(ctx, siteId).then(
@@ -3103,7 +3110,7 @@ export class SitesService {
                                   siteId,
                                   ctx.organizationId,
                                   fingerprint,
-                                  ctx.userId,
+                                  publisherUserId,
                               ),
                       ),
                 prisma.siteComment.count({

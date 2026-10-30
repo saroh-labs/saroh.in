@@ -21,7 +21,13 @@ const sites = new SitesService({
 
 let seq = 0;
 const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
-const tick = () => new Promise((r) => setTimeout(r, 5));
+/**
+ * Each write's time, said explicitly rather than slept for: an hour ago and
+ * a second apart, so "after" never rests on two writes landing in
+ * different milliseconds.
+ */
+let clock = Date.now() - 3_600_000;
+const at = () => new Date((clock += 1_000));
 
 /** A site with four pages, its owner and Meera, a reviewer invited to it. */
 async function business() {
@@ -81,12 +87,19 @@ async function business() {
 
 type Business = Awaited<ReturnType<typeof business>>;
 
-const view = (b: Business, pageId: string, ctx = b.reviewerCtx) =>
-    sites.recordPageView(ctx, b.site.id, pageId);
+/** A page opened, at the clock's next second (the service writes "now"). */
+async function view(b: Business, pageId: string, ctx = b.reviewerCtx) {
+    const result = await sites.recordPageView(ctx, b.site.id, pageId);
+    await prisma.siteReviewPageView.updateMany({
+        where: { siteId: b.site.id, userId: ctx.userId, pageId },
+        data: { viewedAt: at() },
+    });
+    return result;
+}
 const pagesRead = async (b: Business, ctx = b.reviewerCtx) =>
     (await sites.getReviewState(ctx, b.site.id)).pagesRead;
 
-/** A verdict (or request) on the draft, at the time it is written. */
+/** A verdict (or request) on the draft, at the clock's next second. */
 async function verdict(b: Business, by: OrganizationContext, outcome: string) {
     await prisma.siteApproval.create({
         data: {
@@ -95,9 +108,9 @@ async function verdict(b: Business, by: OrganizationContext, outcome: string) {
             byUserId: by.userId,
             outcome,
             reason: outcome === "CHANGES_REQUESTED" ? "Fix the hours" : null,
+            createdAt: at(),
         },
     });
-    await tick();
 }
 
 describe("pages read, saved on the server (DEC-200, U9)", () => {
@@ -129,14 +142,12 @@ describe("pages read, saved on the server (DEC-200, U9)", () => {
         const b = await business();
         await view(b, b.home.id);
         await view(b, b.about.id);
-        await tick();
         await verdict(b, b.reviewerCtx, "CHANGES_REQUESTED");
         expect(await pagesRead(b)).toEqual({ read: 0, total: 4 });
 
         await view(b, b.home.id);
         expect(await pagesRead(b)).toEqual({ read: 1, total: 4 });
 
-        await tick();
         await verdict(b, b.reviewerCtx, "APPROVED");
         expect(await pagesRead(b)).toEqual({ read: 0, total: 4 });
     });
@@ -144,7 +155,6 @@ describe("pages read, saved on the server (DEC-200, U9)", () => {
     it("ignores someone else's verdict and the owner's request", async () => {
         const b = await business();
         await view(b, b.home.id);
-        await tick();
         await verdict(b, b.ctx, "REQUESTED");
         await verdict(b, b.ctx, "APPROVED");
         expect(await pagesRead(b)).toEqual({ read: 1, total: 4 });

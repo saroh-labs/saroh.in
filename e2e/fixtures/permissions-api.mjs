@@ -55,6 +55,14 @@ const siteFor = (scenario) => ({
     socialImageBytes: null,
     pendingSectionChanges: null,
     pendingSiteChanges: null,
+    // The editor's canvas draws the header and footer (#336): the real API
+    // always sends these, null when unset; absent, the editor threw on SSR.
+    footer: null,
+    footerPreview: null,
+    navigation: null,
+    currentPublication: null,
+    template: null,
+    postsPrefix: null,
     pages: [
         { id: "page_1", title: "Home", path: "/", isHome: true, hidden: false },
     ],

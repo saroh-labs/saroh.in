@@ -309,19 +309,22 @@ export function EditorTopBar({
                     </button>
                     {readOnly ? (
                         // Where Publish sits: a Reviewer's verdict (RVD3Phone).
-                        <Button
-                            type="button"
-                            aria-haspopup="dialog"
-                            onClick={() => setSheet?.("review")}
-                            className="h-11 shrink-0"
-                        >
-                            Review
-                        </Button>
+                        // A reader who may not approve has none to open.
+                        reviewerVerdict ? (
+                            <Button
+                                type="button"
+                                aria-haspopup="dialog"
+                                onClick={() => setSheet?.("review")}
+                                className="h-11 shrink-0"
+                            >
+                                Review
+                            </Button>
+                        ) : null
                     ) : (
                         <PublishButton {...actions} className="h-11 shrink-0" />
                     )}
                 </header>
-                {readOnly ? (
+                {readOnly && reviewerVerdict ? (
                     <EditorSheet
                         open={sheet === "review"}
                         onClose={close}
