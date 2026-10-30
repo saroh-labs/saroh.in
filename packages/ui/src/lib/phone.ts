@@ -14,4 +14,4 @@ export {
     phoneLabel,
     phoneNumberProblem,
     splitPhone,
-} from "@saroh/block-contract/phone";
+} from "@saroh/block-contract";

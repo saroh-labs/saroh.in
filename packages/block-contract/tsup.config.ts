@@ -8,9 +8,7 @@ export default defineConfig((options) => ({
     // that window, and they do not re-resolve. Clean only on a one-off build.
     clean: !options.watch,
     dts: true,
-    // `phone` on its own too: the phone field in the browser needs only it,
-    // and the whole contract brings zod along (`@saroh/block-contract/phone`).
-    entry: ["src/index.ts", "src/phone.ts"],
+    entry: ["src/index.ts"],
     format: ["cjs", "esm"],
     minify: isProduction,
     sourcemap: true,

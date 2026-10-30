@@ -5,25 +5,6 @@
     "main": "./dist/index.js",
     "module": "./dist/index.mjs",
     "types": "./dist/index.d.ts",
-    "typesVersions": {
-        "*": {
-            "phone": [
-                "./dist/phone.d.ts"
-            ]
-        }
-    },
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.mjs",
-            "require": "./dist/index.js"
-        },
-        "./phone": {
-            "types": "./dist/phone.d.ts",
-            "import": "./dist/phone.mjs",
-            "require": "./dist/phone.js"
-        }
-    },
     "files": [
         "dist/**"
     ],
