@@ -260,7 +260,8 @@ describe("PostEditor read-only, for a Reviewer (DEC-200 U8)", () => {
         expect(field("Post summary").disabled).toBe(true);
         expect(field("Cover image address").disabled).toBe(true);
         expect(container.querySelector('[aria-label="Post body"]')).toBeNull();
-        expect(container.innerHTML).not.toMatch(/<strong>|<script/);
+        // Shown as plain text: no element is made from the body's markup.
+        expect(container.querySelector("strong, script")).toBeNull();
         expect(container.textContent).toContain(
             "From 1 December we close at 6.",
         );
