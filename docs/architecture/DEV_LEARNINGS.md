@@ -6183,3 +6183,16 @@ Change your review first when an earlier approval left it there.
 do that act at all. Specs that record a verdict on shared seeded data must
 work from either standing.
 **Category**: sites · review
+
+## A booking-flow test missed its 1s wait on CI under every package's tests
+
+**Symptom**: 30 Oct, development after #1273: `booking-flow.test.tsx` "opens on
+the day and says so when the time has just gone" could not find its message;
+74/74 pass locally.
+**Cause**: Testing Library's `findBy*` waits 1s by default; the all-packages
+CI run (zod 4 touched every package) is slower than that.
+**Fix**: `packages/site-blocks/vitest.setup.ts` sets
+`configure({ asyncUtilTimeout: 10_000 })`, as `search-pages` did on 27 Oct.
+**Rule**: a package whose tests wait on findBy* sets asyncUtilTimeout in its
+setup; the 1s default is a CI flake waiting to happen.
+**Category**: tests · flakes
