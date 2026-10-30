@@ -13,11 +13,16 @@
 // The line above is types only — erased at runtime — and gives `expect` the
 // matchers' signatures; the extend below is what adds them.
 import * as matchers from "@testing-library/jest-dom/matchers";
+import { configure } from "@testing-library/react";
 import { afterEach, beforeEach, expect } from "vitest";
 
 import { viewport } from "./src/test-viewport";
 
 expect.extend(matchers);
+
+// findBy* waits for a flow's first read; 1s was too short on CI under every
+// package's tests at once (30 Oct, as search-pages on 27 Oct).
+configure({ asyncUtilTimeout: 10_000 });
 
 // Every test starts at a desk's width: what only a phone shows is hidden,
 // as it is for a visitor there. A phone's test asks for `viewport("phone")`.
