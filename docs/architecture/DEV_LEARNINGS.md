@@ -6139,3 +6139,16 @@ before `rm` (`data-export-build.ts`).
 **Rule**: never delete a file that a lazily opened stream may still open; hold
 the handle and close it first.
 **Category**: api · files
+
+## A privacy check failed because a timestamp held the same digits
+
+**Symptom**: 30 Oct, CI on #1273: `booking-flow-customer.test.tsx` failed
+"not to contain '98450'" though no phone number was stored; the draft's
+`savedAt` was `1793343798450`.
+**Cause**: the check searched the whole stored JSON for five digits of the
+sample number, which any millisecond timestamp can contain.
+**Fix**: assert on the whole number in both forms (`98450 12345`,
+`9845012345`).
+**Rule**: a "not stored" check looks for the full value, never a fragment
+short enough to appear in an id or a timestamp.
+**Category**: tests · flakes
