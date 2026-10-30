@@ -472,16 +472,6 @@
                 "apps/accounts.saroh.in/components/auth/signup-form.tsx"
             ],
             "windows": [
-                "7b65054ce49c"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/accounts.saroh.in/components/auth/login-form.tsx",
-                "apps/accounts.saroh.in/components/auth/signup-form.tsx"
-            ],
-            "windows": [
                 "72ed8aa605af"
             ]
         },

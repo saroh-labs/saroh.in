@@ -25,7 +25,7 @@ import { isJoining, withCarry } from "@/lib/joining";
 import type { PhoneOptions } from "@/lib/phone-sign-in";
 import { throughPhoneStep } from "@/lib/phone-step";
 import type { CodeClient } from "@/lib/sign-in-code";
-import { sendCode } from "@/lib/sign-in-code";
+import { sendCodeFromForm } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
@@ -110,16 +110,12 @@ export function LoginForm({
     }
 
     async function askForCode(turnstileToken?: string) {
-        setIsLoading(true);
-        setChallenge(false);
-        const result = await sendCode(client, { email, turnstileToken });
-        setIsLoading(false);
-        if (!result.ok) {
-            setError(result.message);
-            setChallenge(result.challenge === true);
-            return;
-        }
-        setSent({ wait: result.resendAfterSeconds, kind: "sign-in" });
+        const wait = await sendCodeFromForm(
+            client,
+            { email, turnstileToken },
+            { setIsLoading, setChallenge, setError },
+        );
+        if (wait !== null) setSent({ wait, kind: "sign-in" });
     }
 
     async function withPassword() {

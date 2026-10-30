@@ -24,7 +24,7 @@ import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
 import { throughPhoneStep } from "@/lib/phone-step";
 import type { CodeClient } from "@/lib/sign-in-code";
-import { sendCode } from "@/lib/sign-in-code";
+import { sendCodeFromForm } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
@@ -87,16 +87,12 @@ export function SignupForm({
             setError("Enter your name. It is what the team sees.");
             return;
         }
-        setIsLoading(true);
-        setChallenge(false);
-        const result = await sendCode(client, { email, turnstileToken });
-        setIsLoading(false);
-        if (!result.ok) {
-            setError(result.message);
-            setChallenge(result.challenge === true);
-            return;
-        }
-        setSent(result.resendAfterSeconds);
+        const wait = await sendCodeFromForm(
+            client,
+            { email, turnstileToken },
+            { setIsLoading, setChallenge, setError },
+        );
+        if (wait !== null) setSent(wait);
     }
 
     if (sent !== null) {

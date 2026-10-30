@@ -201,6 +201,32 @@ export async function sendCode(
     };
 }
 
+/**
+ * `sendCode` for a form: shows it sending, says a refusal, and shows the
+ * bot check when the address is past its hourly cap (CHALLENGE). The wait
+ * to count down when sent, or null when not.
+ */
+export async function sendCodeFromForm(
+    client: CodeClient,
+    input: { email: string; turnstileToken?: string | null },
+    form: {
+        setIsLoading: (loading: boolean) => void;
+        setChallenge: (challenge: boolean) => void;
+        setError: (message: string) => void;
+    },
+): Promise<number | null> {
+    form.setIsLoading(true);
+    form.setChallenge(false);
+    const result = await sendCode(client, input);
+    form.setIsLoading(false);
+    if (!result.ok) {
+        form.setError(result.message);
+        form.setChallenge(result.challenge === true);
+        return null;
+    }
+    return result.resendAfterSeconds;
+}
+
 export type CodeChecked =
     | { ok: true }
     | {
