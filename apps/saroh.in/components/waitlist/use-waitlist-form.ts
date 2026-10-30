@@ -7,16 +7,16 @@ import { readAddress } from "@/lib/page-address";
 import { keptReferral } from "@/lib/referral";
 import { fireConversion } from "@/lib/tags";
 import { useBrowserValue } from "@/lib/use-browser-value";
-import type { WaitlistTemplate, WaitlistValues } from "@/lib/waitlist";
+import type { WaitlistTemplate } from "@/lib/waitlist";
 import {
-    EMPTY_WAITLIST,
     postWaitlist,
     referralLink,
     SEND_FAILED,
     WAITLIST_MESSAGES,
     waitlistContext,
-    waitlistSchema,
 } from "@/lib/waitlist";
+import type { WaitlistValues } from "@/lib/waitlist-schema";
+import { EMPTY_WAITLIST, waitlistSchema } from "@/lib/waitlist-schema";
 
 import type { WaitlistJoined } from "./waitlist-done";
 

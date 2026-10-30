@@ -3,14 +3,20 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * What the browser is sent (30 Oct 2026): `@/env` brings zod and
- * `createEnv` (about 30 KB) and `nav-items.ts` every feature's and solution's
- * page copy (about 45 KB) into every page's JS. Code a client component or
- * `instrumentation-client.ts` reaches reads `lib/browser/env.ts` instead, and
- * the nav gets its items from the server.
+ * What the browser is sent (30 Oct 2026). zod is about 30 KB and, once a
+ * schema is built, evaluates code from a string, which the page's CSP
+ * blocks; it came in through `@/env` (every page) and `content/help.ts`
+ * (Help). `nav-items.ts` brought every feature's and solution's page copy
+ * (about 45 KB). Code a client component or `instrumentation-client.ts`
+ * reaches reads `lib/browser/env.ts` instead, the nav gets its items from
+ * the server, and Help's schema is `content/help-frontmatter.ts`.
  */
 const ROOT = __dirname;
-const NEVER_IN_THE_BROWSER = ["env.ts", "components/shared/nav/nav-items.ts"];
+const NEVER_IN_THE_BROWSER = ["components/shared/nav/nav-items.ts"];
+/** The waitlist form checks its fields with zod in the browser, by design. */
+const ZOD_ON_PURPOSE = new Set(["lib/waitlist-schema.ts"]);
+const SERVER_ONLY_PACKAGES =
+    /^import (?!type )[^;]*?from "(zod|@t3-oss\/[^"]+)"/m;
 
 function sources(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -58,7 +64,7 @@ function reach(entry: string, seen = new Set<string>()): Set<string> {
 }
 
 describe("saroh.in's browser JS", () => {
-    it("never loads @/env or the nav's page copy", () => {
+    it("never loads zod, createEnv or the nav's page copy", () => {
         const entries = [
             join(ROOT, "instrumentation-client.ts"),
             ...["app", "components", "lib"]
@@ -71,7 +77,14 @@ describe("saroh.in's browser JS", () => {
         const found = entries.flatMap((entry) =>
             [...reach(entry)]
                 .map((path) => relative(ROOT, path))
-                .filter((path) => NEVER_IN_THE_BROWSER.includes(path))
+                .filter(
+                    (path) =>
+                        NEVER_IN_THE_BROWSER.includes(path) ||
+                        (!ZOD_ON_PURPOSE.has(path) &&
+                            SERVER_ONLY_PACKAGES.test(
+                                readFileSync(join(ROOT, path), "utf8"),
+                            )),
+                )
                 .map((path) => `${relative(ROOT, entry)} → ${path}`),
         );
         expect(found).toEqual([]);

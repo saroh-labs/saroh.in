@@ -8,13 +8,13 @@ import {
     groupsWithArticles,
     HELP_PUBLISH_ON,
     helpDate,
-    helpFrontmatter,
     liveArticles,
     namesPriceOrLimit,
     SEARCH_LIMIT,
     searchArticles,
     summarise,
 } from "./help";
+import { helpFrontmatter } from "./help-frontmatter";
 import { dayStartsAt } from "./resources";
 import { CAPTURED } from "./shots.captured";
 import { helpErrors } from "./validate";

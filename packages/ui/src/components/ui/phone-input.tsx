@@ -1,13 +1,13 @@
 "use client";
 
-import type { PhoneParts } from "@saroh/block-contract";
+import type { PhoneParts } from "@saroh/block-contract/phone";
 import {
     countryFlag,
     joinPhone,
     phoneCountry,
     searchCountries,
     splitPhone,
-} from "@saroh/block-contract";
+} from "@saroh/block-contract/phone";
 import { Check, ChevronDown } from "lucide-react";
 import * as React from "react";
 import { cn } from "../../lib/utils";

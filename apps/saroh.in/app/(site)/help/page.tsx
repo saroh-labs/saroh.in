@@ -21,6 +21,9 @@ import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 
+/** A link inside a sentence: underlined, not told apart by colour alone. */
+const RUNNING_TEXT = "underline underline-offset-[3px]";
+
 export const metadata: Metadata = pageMetadata({
     title: helpHome.seo.title,
     socialTitle: helpHome.seo.socialTitle,
@@ -99,7 +102,9 @@ export default function HelpPage() {
                         Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}
-                            className={textLinkClasses()}
+                            className={textLinkClasses({
+                                className: RUNNING_TEXT,
+                            })}
                         >
                             {HELP_EMAIL}
                         </a>
@@ -110,7 +115,12 @@ export default function HelpPage() {
                             Something new?
                         </strong>{" "}
                         See what&apos;s changed in the{" "}
-                        <Link href="/changelog" className={textLinkClasses()}>
+                        <Link
+                            href="/changelog"
+                            className={textLinkClasses({
+                                className: RUNNING_TEXT,
+                            })}
+                        >
                             changelog
                         </Link>
                         .

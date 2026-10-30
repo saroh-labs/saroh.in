@@ -1,10 +1,11 @@
-import { z } from "zod";
-
 import { formatDay } from "@/lib/format/day";
 
 import { SAROH_CONTACT_EMAIL } from "./contact";
+import type { HelpFrontmatter } from "./help-frontmatter";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
+
+export type { HelpFrontmatter, HelpStep } from "./help-frontmatter";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
@@ -84,65 +85,6 @@ export const helpHome = {
             "Step-by-step answers for the first things you set up in Saroh, each with a picture of the screen you'll see.",
     },
 } as const;
-
-/* ── An article's frontmatter ───────────────────────────────────────── */
-
-const text = z.string().trim().min(1);
-const day = z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "is not a day (YYYY-MM-DD)");
-const slug = z
-    .string()
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "is not a lowercase-hyphen slug");
-
-const step = z
-    .object({
-        title: text,
-        body: text,
-        /**
-         * The captured screenshot's key in `shots.captured.ts`, `help-…`
-         * (`e2e/marketing-shots/shots.config.ts`). Required: a step without
-         * its real screen fails the build (KTD-6).
-         */
-        shot: text,
-        /** Under the picture; names the demo business it was taken in. */
-        caption: text,
-        /** Only where it's needed (design 2a). */
-        tip: text.optional(),
-        /**
-         * The control the step names, which the picture rings in Saffron.
-         * The ring's place comes from the capture (`mark` in the manifest),
-         * so a step with a marker needs a shot captured with one.
-         */
-        marker: text.optional(),
-    })
-    .strict();
-
-export const helpFrontmatter = z
-    .object({
-        title: text,
-        slug,
-        area: z.enum(HELP_AREAS),
-        group: z.enum(HELP_GROUPS),
-        /** The first paragraph: what this is and how long it takes. */
-        intro: text,
-        /** The meta and share description. */
-        description: text.max(170),
-        readMinutes: z.number().int().min(1).max(30),
-        /** The day its words or shots last changed (R20). */
-        updated: day,
-        /** The day it goes live, in India (KTD-2). */
-        publishOn: day.default(HELP_PUBLISH_ON),
-        /** Its place in its group and area: lower first, then by title. */
-        order: z.number().int().default(100),
-        steps: z.array(step).min(1),
-        /** Up to three articles to read next, by slug. */
-        next: z.array(slug).max(3).default([]),
-    })
-    .strict();
-
-export type HelpFrontmatter = z.infer<typeof helpFrontmatter>;
-export type HelpStep = HelpFrontmatter["steps"][number];
 
 /** What lists, search and nav need of an article: no step text. */
 export interface HelpSummary {
