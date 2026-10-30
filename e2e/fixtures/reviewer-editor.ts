@@ -69,6 +69,9 @@ async function choiceAgain(within: Page | Locator, choice: Locator) {
     const change = within
         .getByRole("button", { name: "Change your review" })
         .filter({ visible: true });
+    // Wait for the verdict to load, one way or the other, before deciding:
+    // asked too early, neither shows and the choice never comes.
+    await expect(choice.or(change).first()).toBeVisible({ timeout: 20_000 });
     if (await change.isVisible()) await pressUntil(change, choice);
 }
 
