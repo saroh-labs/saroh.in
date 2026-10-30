@@ -1,6 +1,7 @@
 import { prisma, runInOrgContext } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { buildObjectKey, sanitizeFilename } from "@saroh/object-storage";
+import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,7 +43,11 @@ export interface BuiltDataExport {
     counts: DataExportCounts;
 }
 
-/** Where an export's zip is kept: tenant-scoped like every stored object. */
+/**
+ * Where an export's zip is kept: tenant-scoped like every stored object.
+ * The random part makes it unguessable from the export's id (pentest
+ * 29 Oct); the key is stored on the row, so every build gets a new one.
+ */
 export function dataExportKey(
     organizationId: string,
     exportId: string,
@@ -51,7 +56,7 @@ export function dataExportKey(
         organizationId,
         purpose: "data-export",
         filename: "saroh-data.zip",
-        uuid: exportId,
+        uuid: `${exportId}-${randomUUID()}`,
     });
 }
 

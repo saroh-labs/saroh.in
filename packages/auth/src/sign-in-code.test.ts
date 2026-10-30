@@ -33,7 +33,10 @@ type Sent = Parameters<
 function stack(
     extra: {
         rateLimit?: boolean;
-        hooks?: Pick<CreateAuthOptions, "mayStartSession" | "onMailboxProven">;
+        hooks?: Pick<
+            CreateAuthOptions,
+            "mayStartSession" | "onMailboxProven" | "mayMailCode"
+        >;
     } = {},
 ) {
     const sent: Sent[] = [];
@@ -366,6 +369,47 @@ describe("sign up and sign in with an emailed code", () => {
             expect(
                 (await s.signIn("asha@example.com", "000000", {}, from)).status,
             ).toBe(429);
+        });
+
+        it("an address past its own cap is refused with the wait, account or not", async () => {
+            const asked: string[] = [];
+            const capped = new Set(["held@example.com", "nobody@example.com"]);
+            const s = stack({
+                hooks: {
+                    mayMailCode: (email) => {
+                        asked.push(email);
+                        return Promise.resolve(
+                            capped.has(email)
+                                ? { retryAfterSeconds: 120 }
+                                : null,
+                        );
+                    },
+                },
+            });
+            // One capped address has an account, one has none.
+            await s.ask("Held@Example.com ");
+            await s.signIn("held@example.com", s.lastCode());
+            capped.add("held@example.com");
+            const sentBefore = s.sent.length;
+
+            const known = await s.ask("held@example.com");
+            const unknown = await s.ask("nobody@example.com");
+            for (const refused of [known, unknown]) {
+                expect(refused.status).toBe(429);
+                expect(refused.body?.code).toBe("TOO_MANY_REQUESTS");
+                expect(refused.headers.get("x-retry-after")).toBe("120");
+            }
+            // The two answers can't be told apart.
+            expect(known.body).toEqual(unknown.body);
+            const reset = await s.post("/email-otp/request-password-reset", {
+                email: "nobody@example.com",
+            });
+            expect(reset.status).toBe(429);
+            expect(s.sent).toHaveLength(sentBefore);
+            // Asked with the address as typed, lowercased and trimmed.
+            expect(asked[0]).toBe("held@example.com");
+            // Another address is not held up.
+            expect((await s.ask("free@example.com")).status).toBe(200);
         });
 
         it("the screen's Resend wait lets one resend through", () => {

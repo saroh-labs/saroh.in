@@ -116,7 +116,10 @@ describe("Download your data (DEC-120)", () => {
         });
         expect(row.status).toBe("READY");
         expect(row.storageKey).toMatch(
-            new RegExp(`^org/[a-z0-9-]+/data-export/${row.id}-`),
+            // The id, then a random UUID nobody can guess from it.
+            new RegExp(
+                `^org/[a-z0-9-]+/data-export/${row.id}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-saroh-data\\.zip$`,
+            ),
         );
         expect(
             (row.expiresAt?.getTime() ?? 0) - (row.readyAt?.getTime() ?? 0),

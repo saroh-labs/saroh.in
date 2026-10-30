@@ -6098,3 +6098,19 @@ content files, including the moved ones.
 **Rule**: after moving or deleting source files a dev server scans, clear that
 app's `.next/` before trusting a 500.
 **Category**: tooling · local dev
+
+## A library's own CORS made every public answer credentialed
+
+**Symptom**: 29 Oct pentest, saroh.io: a GET to any `/public/*` route from
+any Origin came back with that origin in `Access-Control-Allow-Origin` and
+`Access-Control-Allow-Credentials: true`, though `common/cors.ts` answers
+public routes without credentials (its spec passed).
+**Cause**: `@thallesp/nestjs-better-auth` calls `enableCors({ origin:
+trustedOrigins, credentials: true })` for every path unless told not to. Two
+`cors` middlewares ran: ours set the reflected origin, the wrapper's added the
+credentials header (a preflight looked right, since ours ends it first).
+**Fix**: `disableTrustedOriginsCors: true` in `AuthModule.forRoot`; main.ts's
+`corsOptionsFor` is the only CORS layer (`app.bootstrap.spec.ts` checks it).
+**Rule**: one CORS layer. Check response headers on a real request, not only
+the options function, and read what a module does in `configure`.
+**Category**: security · CORS

@@ -14,6 +14,7 @@ import {
     sendPasswordResetEmail,
 } from "../email";
 import { trustedProxyRanges } from "../trust-proxy";
+import { claimCodeMail } from "./code-mail-limits";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -67,4 +68,7 @@ export const auth: Auth = createAuth({
     onServerError: reportAuthServerError,
     // The sign-in rate limit counts the same client the API's `req.ip` does.
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
+    // Per address too, not only per caller: many callers can't flood one
+    // mailbox (`code-mail-limits.ts`).
+    mayMailCode: (email) => claimCodeMail(email),
 });

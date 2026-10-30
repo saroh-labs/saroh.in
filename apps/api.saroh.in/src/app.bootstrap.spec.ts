@@ -23,12 +23,20 @@ import { Test } from "@nestjs/testing";
  * needs no database and never starts the job worker.
  */
 
+const mockAuthForRoot = jest.fn();
 jest.mock("@thallesp/nestjs-better-auth", () => {
     // Minimal Nest module so AppModule's `AuthModule.forRoot(...)` is valid.
     const { Module } = require("@nestjs/common");
     class StubAuthModule {}
     Module({})(StubAuthModule);
-    return { AuthModule: { forRoot: () => ({ module: StubAuthModule }) } };
+    return {
+        AuthModule: {
+            forRoot: (options: unknown) => {
+                mockAuthForRoot(options);
+                return { module: StubAuthModule };
+            },
+        },
+    };
 });
 jest.mock("./common/auth/auth", () => ({ auth: { api: {} } }));
 jest.mock("@saroh/auth", () => ({
@@ -47,6 +55,13 @@ if (!process.env.DATABASE_URL) {
 }
 
 describe("API bootstrap", () => {
+    it("leaves CORS to main.ts: the auth wrapper adds no credentialed CORS of its own", async () => {
+        await import("./app.module");
+        expect(mockAuthForRoot).toHaveBeenCalledWith(
+            expect.objectContaining({ disableTrustedOriginsCors: true }),
+        );
+    });
+
     it("compiles AppModule — the full DI graph resolves", async () => {
         const { AppModule } = await import("./app.module");
         const moduleRef = await Test.createTestingModule({

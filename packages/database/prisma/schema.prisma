@@ -9087,6 +9087,18 @@ model MessagingUsage {
   @@id([month, channel])
 }
 
+// Each code or link Saroh's sign-in asked to mail to an address someone
+// typed, by the address's HMAC, never the address: the per-address cap
+// counts them (`common/auth/code-mail-limits.ts`), account or not.
+// Platform-level, not a business.
+model AccountEmailCodeSend {
+  id        String   @id @default(cuid())
+  emailHash String
+  createdAt DateTime @default(now())
+
+  @@index([emailHash, createdAt])
+}
+
 // Phone sign-in for Saroh accounts (DEC-196): each widget start, failed
 // verify, phone sign-in and phone added or removed, by number HMAC and
 // address HMAC, never the number. The start and failure rows are what the

@@ -71,6 +71,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "When a number last wrote to Saroh's own WhatsApp sender, by its hash (messaging core); not a business.",
     MessagingUsage:
         "Saroh's own sender's monthly message counts per channel (messaging core); platform-level, not a business.",
+    AccountEmailCodeSend:
+        "Sign-in codes asked for an address, for the per-address cap (security fix, 30 Oct); a person spans businesses, so no organization.",
     AccountPhoneEvent:
         "Phone sign-in attempts and phone changes for Saroh accounts (DEC-196); a person spans businesses, so no organization.",
     AccountPhoneCode:

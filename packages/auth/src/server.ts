@@ -5,7 +5,7 @@ import type {
 } from "better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 
 import {
@@ -188,6 +188,17 @@ export interface CreateAuthOptions {
      * host's own `trust proxy` does. None: only a single-address header.
      */
     trustedProxies?: string[];
+    /**
+     * Asked before a code or link is mailed to an address someone typed
+     * ({@link CODE_MAIL_PATHS}), with that address, lowercased: the API's
+     * per-address cap, on top of the per-caller rate limit. A wait refuses
+     * with 429 and `X-Retry-After`, as the rate limit does. Asked whether or
+     * not the address has an account, so a refusal says nothing about that.
+     * Not asked on a server-side `auth.api` call (staff's own sends).
+     */
+    mayMailCode?: (
+        email: string,
+    ) => Promise<{ retryAfterSeconds: number } | null>;
 }
 
 /**
@@ -449,6 +460,39 @@ export function userDatabaseHooks(
  * signing in with an emailed code, and verifying an address with one.
  * Never a password or a provider's sign-in.
  */
+/** The endpoints that mail a code or link to the `email` in their body. */
+export const CODE_MAIL_PATHS: readonly string[] = [
+    "/email-otp/send-verification-otp",
+    "/email-otp/request-password-reset",
+    "/forget-password/email-otp",
+    "/send-verification-email",
+    "/request-password-reset",
+];
+
+/** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
+function codeMailHook(
+    mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
+) {
+    return createAuthMiddleware(async (ctx) => {
+        if (!ctx.request || !CODE_MAIL_PATHS.includes(ctx.path)) return;
+        const email: unknown = (ctx.body as { email?: unknown } | undefined)
+            ?.email;
+        if (typeof email !== "string" || !email.trim()) return;
+        const wait = await mayMailCode(email.trim().toLowerCase());
+        if (!wait) return;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+        throw new APIError(
+            "TOO_MANY_REQUESTS",
+            {
+                code: "TOO_MANY_REQUESTS",
+                message:
+                    "Too many codes asked for this address. Wait a while, then try again.",
+            },
+            { "X-Retry-After": String(wait.retryAfterSeconds) },
+        );
+    });
+}
+
 export const MAILBOX_PROOF_PATHS: readonly string[] = [
     "/sign-in/email-otp",
     "/email-otp/verify-email",
@@ -519,6 +563,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         // these errors otherwise.
         ...(opts.onServerError
             ? { onAPIError: serverErrorHook(opts.onServerError) }
+            : {}),
+        ...(opts.mayMailCode
+            ? { hooks: { before: codeMailHook(opts.mayMailCode) } }
             : {}),
         account: {
             accountLinking: {

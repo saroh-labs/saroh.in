@@ -48,6 +48,8 @@ const oneVisitor = args.get("one-visitor") === "true";
 const FORM = args.get("form") ?? "seed_sc_pulse_form_3_2";
 const SERVICE = args.get("service") ?? "seed_sc_pulse_service_1";
 const ORDER = args.get("order") ?? "seed_order_1";
+// The receipt needs the order's pay-link token (pentest 29 Oct).
+const ORDER_TOKEN = args.get("order-token") ?? "";
 
 let visitor = 0;
 function nextIp() {
@@ -119,7 +121,10 @@ async function scenarios() {
         // Checkout start as far as it runs without a payment provider: the
         // buyer's receipt read, which the checkout page polls. Creating a real
         // intent calls Razorpay or Cashfree, which a load smoke must not do.
-        checkout: () => call("GET", `/public/orders/${ORDER}/receipt`),
+        checkout: () => call(
+                "GET",
+                `/public/orders/${ORDER}/receipt?token=${encodeURIComponent(ORDER_TOKEN)}`,
+            ),
     };
 }
 
