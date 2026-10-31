@@ -12,7 +12,7 @@ import { heldWarning, planDocs, writeDocs } from "./docs-content.config";
 const TODAY = "2026-10-31";
 const pages = embeddedDocs.all();
 const GST = "/gst/salon-and-beauty-services";
-const GUIDE = "/guides/reduce-no-shows";
+const GUIDE = "/guides/when-you-need-a-gst-invoice"; // still waits for a CA check
 const DOWNLOAD = "/downloads/customer-list-template";
 
 /** The code's pages with every fact confirmed, so their checks pass. */
@@ -43,7 +43,7 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
         expect(plan).toEqual({ all: false, built: [GST], held: [] });
         writeDocs(plan, at);
         expect(gen()).toContain('"salon-and-beauty-services"');
-        expect(gen()).not.toContain("reduce-no-shows");
+        expect(gen()).not.toContain("when-you-need-a-gst-invoice");
         expect(gen()).not.toContain("customer-list-template");
         expect(gen()).toContain("export const DOC_PARTIAL: boolean = true;");
         expect(downloads()).toEqual([]);
