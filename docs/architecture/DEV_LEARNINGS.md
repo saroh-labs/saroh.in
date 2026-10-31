@@ -6216,6 +6216,7 @@ flakes were also fixed where they were real (savedAt digits, Move class).
 timeout treats the symptom. When unrelated timing tests fail at random, look
 at the job's process count first.
 **Category**: tooling · CI
+
 ## "window is not defined" from a sheet's read that answered after it closed
 
 **Symptom**: 30 Oct, release #1262's unit job: `ReferenceError: window is not
@@ -6229,3 +6230,18 @@ the same late update.
 **Rule**: a fetch started in an effect checks the component is still there
 before it sets state.
 **Category**: react · tests
+
+## A seeded random roll left the showcase without a state its check needs
+
+**Symptom**: 31 Oct, `pnpm prepush --all`'s browser step failed before any
+spec ran: "Pulse Fitness is missing what its films show: class places paid
+by membership, pack, online and at the desk". Nothing in the seed had changed.
+**Cause**: the showcase is generated from today's date, and a class place
+that is neither membership nor pack is paid online on a 40% roll. That day
+only 8 places in the next fortnight fell to the roll and none came up online,
+so `checkPulse` refused the seed, on every machine and in CI, for the day.
+**Fix**: after the roll, the first place at the desk in the next fortnight is
+made online when none is (`seed/showcase/pulse.ts`).
+**Rule**: a state the seed's own check requires is placed, never left to a
+roll; a roll only adds variety on top.
+**Category**: seed · tests
