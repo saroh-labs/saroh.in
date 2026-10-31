@@ -3,11 +3,9 @@ import type { ResourcePage } from "@/content/resources";
 import { solutionHref, solutionList } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 
-export interface NavItem {
-    name: string;
-    line: string;
-    href: string;
-}
+import type { NavItem } from "./nav-section";
+
+export type { NavItem, NavSection } from "./nav-section";
 
 /** The Features menu: eight items, each with its line (the Nav design). */
 export const FEATURE_ITEMS: NavItem[] = featureList.map((f) => ({
@@ -39,36 +37,4 @@ export const SOLUTION_ITEMS: NavItem[] = solutionItems();
  */
 export function resourceItems(pages: readonly ResourcePage[]): NavItem[] {
     return pages.map((p) => ({ name: p.name, line: p.line, href: p.href }));
-}
-
-export type NavSection =
-    "features" | "solutions" | "pricing" | "resources" | "tools" | null;
-
-/** Whether `pathname` is the page `href` or a page under it. */
-const within = (pathname: string, href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
-
-/** Which top-level section a path is in, for the saffron underline. */
-export function sectionOf(
-    pathname: string,
-    resources: readonly NavItem[] = [],
-    tools: readonly NavItem[] = [],
-    solutions: readonly NavItem[] = SOLUTION_ITEMS,
-): NavSection {
-    if (FEATURE_ITEMS.some((i) => i.href === pathname)) return "features";
-    if (
-        solutions.some((i) => i.href === pathname) ||
-        within(pathname, "/for")
-    ) {
-        return "solutions";
-    }
-    if (pathname === "/pricing") return "pricing";
-    if (resources.some((i) => within(pathname, i.href))) return "resources";
-    // The /tools hub too (#1253), which no menu item is.
-    if (
-        tools.some((i) => within(pathname, i.href)) ||
-        within(pathname, "/tools")
-    )
-        return "tools";
-    return null;
 }

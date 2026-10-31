@@ -585,6 +585,25 @@ export function planPulse(input: PulseInput): PulsePlan {
             atDesk(b);
         }
     }
+    // The films show a place paid online in the next fortnight. Few places
+    // fall to the roll there, so on some days none came up PAID (31 Oct 2026):
+    // the first one at the desk is made online instead.
+    const comingClass = (b: Prisma.BookingCreateManyInput) =>
+        isClass(b) &&
+        b.status === "CONFIRMED" &&
+        ms(b.startAt) >= nowMs &&
+        ms(b.startAt) < nowMs + 13 * DAY; // inside checkPulse's fortnight
+    if (!byStart.some((b) => comingClass(b) && b.paidWith === "PAID")) {
+        const atTheDesk = byStart.find(
+            (b) => comingClass(b) && b.paidWith === "DESK",
+        );
+        if (atTheDesk) {
+            atTheDesk.paidWith = "PAID";
+            // Booked on the site, so no one at the desk took it.
+            const event = bookedEvent.get(idOf(atTheDesk));
+            if (event) event.actorUserId = null;
+        }
+    }
 
     // --- a late cancel of a pack class and of a membership class this week
     const lateCandidates = byStart.filter(

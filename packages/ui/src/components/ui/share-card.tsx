@@ -147,7 +147,7 @@ export function ShareCard({
                                 <span className="text-[12.5px] leading-[1.35] text-[#4D5B4A]">
                                     {descShort}
                                 </span>
-                                <span className="text-xs text-[#6B7A68]">
+                                <span className="text-xs text-[#596756]">
                                     {domain}
                                 </span>
                             </div>
@@ -155,7 +155,7 @@ export function ShareCard({
                         <span className="truncate px-1.5 py-0.5 text-[13.5px] text-[#0B6E99]">
                             https://{domain}
                         </span>
-                        <span className="justify-self-end px-1.5 pb-0.5 text-[11px] text-[#6B7A68]">
+                        <span className="justify-self-end px-1.5 pb-0.5 text-[11px] text-[#596756]">
                             7:42 pm ✓✓
                         </span>
                     </div>

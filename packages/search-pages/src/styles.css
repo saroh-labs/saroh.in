@@ -1330,6 +1330,11 @@
     line-height: 1.5;
     color: var(--sp-on-ink-muted);
 }
+/* Inside the note's text, colour alone doesn't mark a link (WCAG 1.4.1). */
+.tp-gate-note a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
 .tp-result .tp-gate-note a,
 .tp-result .tp-linkbtn {
     color: var(--tp-link-on-ink);

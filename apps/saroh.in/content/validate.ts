@@ -5,8 +5,8 @@ import {
     webhookPath,
 } from "@saroh/integrations";
 
-import type { HelpFrontmatter } from "./help";
 import { HELP_AREAS, HELP_GROUPS, namesPriceOrLimit } from "./help";
+import type { HelpFrontmatter } from "./help-frontmatter";
 import type { IntegrationFrontmatter } from "./integrations";
 import { API_ORIGIN, PLACEHOLDER_BUSINESS_ID } from "./integrations";
 import type { FaqItem, Feature, Solution } from "./types";

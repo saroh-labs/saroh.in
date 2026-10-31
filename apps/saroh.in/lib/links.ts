@@ -1,4 +1,4 @@
-import { env } from "@/env";
+import { browserEnv as env } from "@/lib/browser/env";
 
 /** accounts.saroh.in, or this environment's own. */
 export const ACCOUNTS_URL =

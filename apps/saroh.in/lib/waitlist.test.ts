@@ -10,8 +10,8 @@ import {
     referralLink,
     WAITLIST_MESSAGES,
     waitlistContext,
-    waitlistSchema,
 } from "./waitlist";
+import { waitlistSchema } from "./waitlist-schema";
 
 /** The waitlist page's rules (plan U30). Dates and ids here are made up. */
 describe("waitlistContext", () => {
