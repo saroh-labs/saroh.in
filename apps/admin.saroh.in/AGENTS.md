@@ -356,7 +356,13 @@ recorded grant (the API refuses it otherwise).
   Deploy changes (`POST …/deploy`, same permission) rebuilds the site once
   for all of them; a row shows "Published · not deployed yet" or "Taken
   off · not deployed yet" until then. While the API says a rebuild runs,
-  the bar says so, Deploy changes waits, and the screen re-reads every 20s. A page's tabs live under
+  the bar says so, Deploy changes waits, and the screen re-reads every 20s.
+  For GST pages, guides and downloads, Publish is disabled (one page or a
+  selection) while an error-level check fails, naming it, and a live page
+  that fails them shows "Held by checks": the site build leaves it out
+  ("Page held by checks" warning, `held` in `/_build/state.json`,
+  DEC-201). /for/ and tools keep the confirm that only counts failing
+  checks. A page's tabs live under
   `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
   template, light, no console chrome, no links) has no shell; the Content
   tab frames it. `searchPageChecks` comes from
