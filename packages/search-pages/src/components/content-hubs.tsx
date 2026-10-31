@@ -180,7 +180,7 @@ export function GuidesHub({
             band={band(
                 links,
                 "Less reading, more doing.",
-                "Saroh sends the reminders, takes the deposits and asks for the reviews for you.",
+                "Saroh takes deposits when people book and sends the pay links, so you chase less.",
             )}
         />
     );

@@ -436,7 +436,7 @@ export function HubShowcase() {
                 <ClosingBand
                     look="wide"
                     title="Less reading, more doing."
-                    line="Saroh sends the reminders, takes the deposits and asks for the reviews for you."
+                    line="Saroh takes deposits when people book and sends the pay links, so you chase less."
                     label="Start free"
                 />
             }
