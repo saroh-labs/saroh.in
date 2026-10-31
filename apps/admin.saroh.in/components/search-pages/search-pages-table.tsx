@@ -29,17 +29,17 @@ import type {
     PageRow,
 } from "@/lib/search-page-words";
 import {
+    badgeOf,
+    cantPublishWords,
     countBy,
     eligible,
     FILTER_LABEL,
+    heldWords,
     inFilter,
-    isLive,
     KINDS,
     matchesQuery,
     rowActions,
     statCards,
-    STATE_BADGE,
-    STATE_LABEL,
     stateNote,
 } from "@/lib/search-page-words";
 
@@ -66,6 +66,7 @@ export function SearchPagesTable({
     kind = "for",
     kindCounts,
     rows,
+    allRows = rows,
     site,
     reviewSite,
     reviewUrl,
@@ -74,8 +75,10 @@ export function SearchPagesTable({
     /** Which kind the rows are (`?kind=`): trade pages or free tools. */
     kind?: PageKind;
     /** How many pages of each kind, for the Kind choice; none hides it. */
-    kindCounts?: Record<PageKind, number>;
+    kindCounts?: Partial<Record<PageKind, number>>;
     rows: PageRow[];
+    /** Every kind's rows: what a page links to may be another kind (U12). */
+    allRows?: PageRow[];
     site: string;
     reviewSite: string;
     reviewUrl: string;
@@ -89,7 +92,7 @@ export function SearchPagesTable({
 
     const counts = countBy(rows);
     const shown = rows.filter(
-        (r) => inFilter(r.state, filter) && matchesQuery(r, query),
+        (r) => inFilter(r, filter) && matchesQuery(r, query),
     );
     const picked = rows.filter((r) => ticked.has(r.path));
     const allOn = shown.length > 0 && shown.every((r) => ticked.has(r.path));
@@ -177,11 +180,11 @@ export function SearchPagesTable({
                                     value={kind}
                                     options={KINDS.map((k) => ({
                                         value: k.kind,
-                                        label: `${k.label} · ${k.path} · ${kindCounts[k.kind]}`,
+                                        label: `${k.label} · ${k.path} · ${kindCounts[k.kind] ?? 0}`,
                                         href:
                                             k.kind === "for"
                                                 ? "/search-pages"
-                                                : "/search-pages?kind=tools",
+                                                : `/search-pages?kind=${k.kind}`,
                                     }))}
                                 />
                             </span>
@@ -233,7 +236,7 @@ export function SearchPagesTable({
                         </span>
                         <span>Page</span>
                         <span>Target search</span>
-                        <span>{kind === "tools" ? "Section" : "Family"}</span>
+                        <span>{kind === "for" ? "Family" : "Section"}</span>
                         <span>Status</span>
                         <span>Content changed</span>
                         <span className="sr-only">Actions</span>
@@ -278,8 +281,8 @@ export function SearchPagesTable({
                                     {row.family}
                                 </span>
                                 <span className="col-start-2 grid justify-items-start gap-0.5 md:col-start-auto">
-                                    <Badge variant={STATE_BADGE[row.state]}>
-                                        {STATE_LABEL[row.state]}
+                                    <Badge variant={badgeOf(row).variant}>
+                                        {badgeOf(row).label}
                                     </Badge>
                                     <span className="text-[12px] text-muted-foreground">
                                         {stateNote(row)}
@@ -287,8 +290,7 @@ export function SearchPagesTable({
                                 </span>
                                 <span className="col-start-2 text-[13px] text-muted-foreground md:col-start-auto">
                                     {formatDate(row.updated)}
-                                    {isLive(row.state) &&
-                                        " · goes out with releases"}
+                                    {row.onSite && " · goes out with releases"}
                                 </span>
                                 <div className="col-start-3 row-start-1 justify-self-end md:col-start-auto md:row-start-auto">
                                     <RowMenu
@@ -321,6 +323,9 @@ export function SearchPagesTable({
                         type="button"
                         size="sm"
                         disabled={eligible("publish", picked).length === 0}
+                        aria-describedby={
+                            heldWords(picked) ? "publish-held-bulk" : undefined
+                        }
                         onClick={() => open("publish", picked)}
                     >
                         Publish {eligible("publish", picked).length}
@@ -343,6 +348,14 @@ export function SearchPagesTable({
                     >
                         Archive
                     </Button>
+                    {heldWords(picked) && (
+                        <p
+                            id="publish-held-bulk"
+                            className="basis-full text-[12.5px] text-muted-foreground"
+                        >
+                            {heldWords(picked)}
+                        </p>
+                    )}
                     <Button
                         type="button"
                         size="icon"
@@ -359,6 +372,7 @@ export function SearchPagesTable({
                 <SearchPageDialog
                     action={opened.action}
                     pages={opened.pages}
+                    rows={allRows}
                     skipped={opened.skipped}
                     site={site}
                     reviewSite={reviewSite}
@@ -419,20 +433,33 @@ function RowMenu({
                 {canPublish && (
                     <>
                         <DropdownMenuSeparator />
-                        {rowActions(row.state, site).map((item) => (
-                            <DropdownMenuItem
-                                key={item.label}
-                                disabled={!item.action}
-                                className={cn(
-                                    item.danger && "text-destructive",
-                                )}
-                                onSelect={() => {
-                                    if (item.action) onAction(item.action);
-                                }}
-                            >
-                                {item.label}
-                            </DropdownMenuItem>
-                        ))}
+                        {rowActions(row.state, site).map((item) => {
+                            // A disabled item can't be hovered on a phone: the reason is part of it.
+                            const why =
+                                item.action === "publish"
+                                    ? cantPublishWords(row)
+                                    : null;
+                            return (
+                                <DropdownMenuItem
+                                    key={item.label}
+                                    disabled={!item.action || !!why}
+                                    className={cn(
+                                        item.danger && "text-destructive",
+                                        why && "flex-col items-start gap-0.5",
+                                    )}
+                                    onSelect={() => {
+                                        if (item.action) onAction(item.action);
+                                    }}
+                                >
+                                    {item.label}
+                                    {why && (
+                                        <span className="max-w-64 text-xs leading-snug">
+                                            {why}
+                                        </span>
+                                    )}
+                                </DropdownMenuItem>
+                            );
+                        })}
                     </>
                 )}
             </DropdownMenuContent>

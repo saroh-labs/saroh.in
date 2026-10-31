@@ -3,6 +3,7 @@ import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { stamp } from "../fixtures/own-data";
+import { sitemapPages } from "../fixtures/sitemap";
 import { urls } from "../playwright.config";
 
 /**
@@ -40,10 +41,7 @@ const isResource = (path: string) =>
 
 /** The Resources pages the sitemap lists today. */
 async function resourcePages(request: APIRequestContext): Promise<string[]> {
-    const xml = await (await request.get(`${WEB}/sitemap.xml`)).text();
-    return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
-        .map((m) => new URL(m[1]).pathname)
-        .filter(isResource);
+    return (await sitemapPages(request, WEB)).filter(isResource);
 }
 
 /** A link resolves: 200, or a single 301/308 to a 200. */

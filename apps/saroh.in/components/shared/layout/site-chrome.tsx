@@ -11,6 +11,7 @@ import { shownLegal, shownResources } from "@/content/resources";
 import { env } from "@/env";
 import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
+import { docHubLinks } from "@/lib/search-page-route";
 import { publishList, shownToolLinks, solutionLink } from "@/lib/search-pages";
 import { siteTagConfig } from "@/lib/site-tag-config";
 import { whatsappNumber } from "@/lib/whatsapp";
@@ -49,9 +50,13 @@ export function SiteChrome({
         );
     }
     const ctx = resourcesContext();
-    const resources = resourceItems(shownResources(ctx));
     // A solution goes to its /for/ page once that is live (DEC-193).
     const published = publishList();
+    // Then the GST, guides and downloads hubs, each once a page is live.
+    const resources = [
+        ...resourceItems(shownResources(ctx)),
+        ...docHubLinks(published),
+    ];
     // The app's tools and the package's, each once published (#1253).
     const tools = shownToolLinks(ctx, published);
     const solutions = solutionItems((slug) => solutionLink(slug, published));

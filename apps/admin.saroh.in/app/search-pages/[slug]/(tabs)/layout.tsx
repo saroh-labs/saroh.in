@@ -12,7 +12,7 @@ import { SearchPageActions } from "@/components/search-pages/search-page-actions
 import { SearchPageTabs } from "@/components/search-pages/search-page-tabs";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { STATE_BADGE, STATE_LABEL, stateNote } from "@/lib/search-page-words";
+import { badgeOf, KINDS, stateNote } from "@/lib/search-page-words";
 import {
     loadPage,
     readSearchPages,
@@ -63,20 +63,20 @@ export default async function SearchPageLayout({
                         <Link
                             key="list"
                             href={
-                                row.kind === "tools"
-                                    ? "/search-pages?kind=tools"
-                                    : "/search-pages"
+                                row.kind === "for"
+                                    ? "/search-pages"
+                                    : `/search-pages?kind=${row.kind}`
                             }
                         >
                             Search pages
                         </Link>,
-                        row.kind === "tools" ? "Free tools" : "Trade pages",
+                        KINDS.find((k) => k.kind === row.kind)?.label ?? "",
                         row.name,
                     ]}
                     title={row.name}
                     badge={
-                        <Badge variant={STATE_BADGE[row.state]}>
-                            {STATE_LABEL[row.state]}
+                        <Badge variant={badgeOf(row).variant}>
+                            {badgeOf(row).label}
                         </Badge>
                     }
                     description={
@@ -93,6 +93,7 @@ export default async function SearchPageLayout({
                     actions={
                         <SearchPageActions
                             row={row}
+                            rows={data.rows}
                             site={site.host}
                             siteUrl={site.url}
                             production={site.production}

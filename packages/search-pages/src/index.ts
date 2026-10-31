@@ -10,9 +10,41 @@
 // react-dom/server, which Next refuses in a Server Component's imports, so
 // the index stays importable from one.
 export type { SearchPageCheck } from "./checks";
+export {
+    AnswerBox,
+    Byline,
+    Callout,
+    FactsStrip,
+    Figure,
+    LinkCard,
+    NumberedList,
+    OnThisPage,
+    Related,
+    Section,
+    pickRelated,
+} from "./components/content-blocks";
+export type { Author, CardItem, Fact } from "./components/content-blocks";
+export { ContentLayout } from "./components/content-layout";
+export { DataTable } from "./components/data-table";
+export type {
+    Cell,
+    Column,
+    DataTableProps,
+    Row,
+} from "./components/data-table";
 export { ForHub } from "./components/for-hub";
 export type { ForHubProps } from "./components/for-hub";
+export { HubCards, HubChips, HubPage } from "./components/hub-page";
+export type { HubChip, HubGroup } from "./components/hub-page";
+export {
+    ClosingBand,
+    Crumbs,
+    Questions,
+    StartButton,
+} from "./components/page-parts";
+export type { Crumb } from "./components/page-parts";
 export { PRESETS, smallKeys } from "./components/parts";
+export { Prose } from "./components/prose";
 export { SearchPage, starterWords } from "./components/search-page";
 export type {
     SearchPageLinks,

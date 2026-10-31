@@ -282,6 +282,9 @@
   (`scripts/check-dupes.mjs`, a copy-paste of 6+ lines across saroh.in and
   `@saroh/search-pages`; `scripts/dupes-baseline.json` only shrinks, `--update`
   after removing one). Both run in `pnpm prepush` and CI.
+  **Search-page blocks** (GST pages, guides, downloads; DEC-201) have one
+  map: `packages/search-pages/src/components/BLOCKS.md` names each board
+  block's one component. A page passes props; a difference is a variant.
   **accounts.saroh.in joined on 28 Oct (DEC-199)**: the app's settings
   pieces (Section/Row, FormSheet, FormDialog, the leave guard,
   ConfirmDialog, RadioCards/ChoiceGroup, CheckRow, SectionList, ListCard,

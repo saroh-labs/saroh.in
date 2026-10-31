@@ -350,8 +350,26 @@ recorded grant (the API refuses it otherwise).
   Restore (one page or ticked ones) are `search-pages:publish` (Platform
   owner), one `POST …/actions` per confirm, all or none (a 409 names the
   pages). The confirm asks no reason (the API takes none) and Publish needs
-  "I've read … on saroh.io" ticked. While the API says a rebuild runs, the
-  screen re-reads every 20s. A page's tabs live under
+  "I've read … on saroh.io" ticked. Those actions only stage a change
+  (R13, owner 31 Oct): the list's deploy bar ("N changes waiting to
+  deploy", `components/search-pages/deploy-bar.tsx`) lists them and its
+  Deploy changes (`POST …/deploy`, same permission) rebuilds the site once
+  for all of them; a row shows "Published · not deployed yet" or "Taken
+  off · not deployed yet" until then. While the API says a rebuild runs,
+  the bar says so, Deploy changes waits, and the screen re-reads every 20s.
+  For GST pages, guides and downloads, Publish is disabled (one page or a
+  selection) while an error-level check fails, naming it, and a live page
+  that fails them shows "Held by checks": the site build leaves it out
+  ("Page held by checks" warning, `held` in `/_build/state.json`,
+  DEC-201). /for/ and tools keep the confirm that only counts failing
+  checks. Publish also needs every search page a page's words link to
+  (`docLinks`, `PageRow.links`) to be live or in the same publish: the
+  confirm names each one and "Publish these too" adds them (their links
+  too); an archived or failing one, or a link to no page in the code,
+  holds Publish with how to fix it. Unpublish and Archive name the live
+  pages that link there, and don't block (DEC-201 item 9). The dialog
+  gets every kind's rows (`rows`/`allRows`), since a guide links to tools.
+  A page's tabs live under
   `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
   template, light, no console chrome, no links) has no shell; the Content
   tab frames it. `searchPageChecks` comes from

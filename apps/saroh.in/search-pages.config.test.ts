@@ -1,6 +1,12 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
+import { searchRedirects } from "./redirects.js";
 import {
+    docExists,
     familyOf,
     parseAnswer,
     readPublishList,
@@ -158,11 +164,83 @@ describe("parseAnswer", () => {
     });
 });
 
+describe("parseAnswer and the page groups on the shared kit", () => {
+    it("takes /gst/, /guides/ and /downloads/ pages, as the API does, and still refuses any other group", () => {
+        const list = {
+            live: ["/gst/a", "/guides/b"],
+            takenOff: [{ path: "/downloads/c", at: "x" }],
+        };
+        expect(parseAnswer(list)).toEqual(list);
+        expect(() =>
+            parseAnswer({ live: ["/blog/x"], takenOff: [] }),
+        ).toThrow();
+        expect(() =>
+            parseAnswer({ live: ["/gst/a/b"], takenOff: [] }),
+        ).toThrow();
+    });
+});
+
 describe("toolExists", () => {
     it("finds a tool's content file, the app's own tools included", () => {
         expect(toolExists("no-show-cost-calculator")).toBe(true);
         expect(toolExists("qr-code-maker")).toBe(true);
         expect(toolExists("no-such-tool")).toBe(false);
+    });
+});
+
+describe("docExists", () => {
+    const state = (body: unknown) => {
+        const file = join(mkdtempSync(join(tmpdir(), "state-")), "s.json");
+        writeFileSync(file, JSON.stringify(body));
+        return file;
+    };
+
+    it("is true only for a page this build drew, not one held by its checks", () => {
+        const file = state({
+            v: 1,
+            docs: {
+                built: ["/guides/reduce-no-shows"],
+                held: [{ path: "/gst/x", why: ["Facts to confirm"] }],
+            },
+        });
+        expect(docExists("/guides/reduce-no-shows", file)).toBe(true);
+        expect(docExists("/gst/x", file)).toBe(false);
+    });
+
+    it("is false without a snapshot (not a production build)", () => {
+        expect(docExists("/gst/a", join(tmpdir(), "no-such-state.json"))).toBe(
+            false,
+        );
+        expect(docExists("/gst/a", state({ v: 1 }))).toBe(false);
+    });
+
+    it("sends a taken-off guide to /guides while a guide is built, else Home, in one hop", () => {
+        const list = (live: string[]) => ({
+            preview: false,
+            live,
+            takenOff: [{ path: "/guides/booking-deposits", at: "x" }],
+        });
+        const built = state({
+            v: 1,
+            docs: { built: ["/guides/reduce-no-shows"], held: [] },
+        });
+        const held = state({ v: 1, docs: { built: [], held: [] } });
+        const go = (file: string) =>
+            searchRedirects(
+                list(["/guides/reduce-no-shows"]),
+                familyOf,
+                toolExists,
+                (p) => docExists(p, file),
+            );
+        expect(go(built)).toEqual([
+            {
+                source: "/guides/booking-deposits",
+                destination: "/guides",
+                statusCode: 302,
+            },
+        ]);
+        // The live guide was held back: /guides isn't built, so Home.
+        expect(go(held)[0]?.destination).toBe("/");
     });
 });
 

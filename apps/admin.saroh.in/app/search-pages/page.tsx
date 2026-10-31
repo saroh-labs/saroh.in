@@ -5,11 +5,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
+import { DeployBar } from "@/components/search-pages/deploy-bar";
 import { RebuildBanner } from "@/components/search-pages/rebuild-banner";
 import { SearchPagesTable } from "@/components/search-pages/search-pages-table";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { kindOf, rebuildWords } from "@/lib/search-page-words";
+import { KINDS, kindOf, rebuildWords } from "@/lib/search-page-words";
 import { readSearchPages, searchPagesGate, siteInfo } from "@/lib/search-pages";
 
 export const metadata = { title: "Search pages" };
@@ -17,8 +18,9 @@ export const metadata = { title: "Search pages" };
 /**
  * Search pages (DEC-193): every /for/ page or free tool (`?kind=tools`,
  * #1253) in the code, with whether it is live on this console's site.
- * Publishing rebuilds the site; only `search-pages:publish` acts, anyone
- * who reads the console sees it.
+ * Publishing stages a page; Deploy changes rebuilds the site once with
+ * every staged page (R13). Only `search-pages:publish` acts, anyone who
+ * reads the console sees it.
  */
 export default async function SearchPagesPage({
     searchParams,
@@ -41,7 +43,7 @@ export default async function SearchPagesPage({
                 <PageHeader
                     breadcrumb={["Product", "Search pages"]}
                     title="Search pages"
-                    description={`Pages written for people who search Google: software for their trade, or a free tool. A page is on ${site.host} only after you publish it here. Only published pages go in the sitemap.${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
+                    description={`Pages written for people who search Google: software for their trade, or a free tool. A page is on ${site.host} only after you publish it here and deploy the changes. Only published pages go in the sitemap.${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
                     meta={
                         <Badge
                             dot
@@ -72,25 +74,32 @@ export default async function SearchPagesPage({
                                 running={data.read.rebuild.running}
                                 startedAt={data.read.rebuild.startedAt}
                                 site={site.host}
-                                words={rebuildWords(data.rows)}
+                                words={rebuildWords(data.read.rebuild)}
                                 deploymentsHref={
                                     can(staff, "deployments:run")
                                         ? "/deployments"
                                         : undefined
                                 }
                             />
+                            <DeployBar
+                                rows={data.rows.filter((r) => r.pending)}
+                                site={site.host}
+                                rebuilding={data.read.rebuild.running}
+                                canPublish={canPublish}
+                            />
                             <SearchPagesTable
                                 key={kind}
                                 kind={kind}
-                                kindCounts={{
-                                    for: data.rows.filter(
-                                        (r) => r.kind === "for",
-                                    ).length,
-                                    tools: data.rows.filter(
-                                        (r) => r.kind === "tools",
-                                    ).length,
-                                }}
+                                kindCounts={Object.fromEntries(
+                                    KINDS.map((k) => [
+                                        k.kind,
+                                        data.rows.filter(
+                                            (r) => r.kind === k.kind,
+                                        ).length,
+                                    ]),
+                                )}
                                 rows={data.rows.filter((r) => r.kind === kind)}
+                                allRows={data.rows}
                                 site={site.host}
                                 reviewSite={site.reviewHost}
                                 reviewUrl={site.reviewUrl}

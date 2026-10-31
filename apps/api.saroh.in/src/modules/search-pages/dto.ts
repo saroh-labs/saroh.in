@@ -16,7 +16,7 @@ import {
 } from "./search-page-rules";
 
 const PATH_MESSAGE =
-    "Each path is /for/ or /tools/ and a slug of a-z, 0-9 and -";
+    "Each path is /for/, /tools/, /gst/, /guides/ or /downloads/ and a slug of a-z, 0-9 and -";
 
 /** `POST /admin/search-pages/actions`: one action on 1–100 pages, all or none. */
 export class SearchPageActionDto {

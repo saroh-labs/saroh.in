@@ -8,6 +8,8 @@ export interface NavItem {
     name: string;
     line: string;
     href: string;
+    /** The footer's small "new" tag beside it. */
+    isNew?: boolean;
 }
 
 export type NavSection =

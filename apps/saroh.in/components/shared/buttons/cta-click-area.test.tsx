@@ -48,4 +48,24 @@ describe("CtaClickArea", () => {
             mode: "open",
         });
     });
+
+    it("a button that names its own spot keeps that, not the page's", () => {
+        render(
+            <CtaClickArea src="gst-salon" mode="waitlist">
+                <a
+                    data-cta="gst-salon-band"
+                    href="#start"
+                    onClick={(e) => e.preventDefault()}
+                >
+                    Start free
+                </a>
+            </CtaClickArea>,
+        );
+        fireEvent.click(screen.getByText("Start free"));
+        expect(keep).toHaveBeenCalledWith("gst-salon-band", expect.any(String));
+        expect(track).toHaveBeenCalledWith("cta_click", {
+            page: "gst-salon-band",
+            mode: "waitlist",
+        });
+    });
 });

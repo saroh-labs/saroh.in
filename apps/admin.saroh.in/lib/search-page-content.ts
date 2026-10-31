@@ -1,5 +1,8 @@
 import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
 import { PRESETS, smallKeys, starterWords } from "@saroh/search-pages";
+import type { Block, DocPage } from "@saroh/search-pages/docs";
+import { gstCardName } from "@saroh/search-pages/docs";
+import { DOC_KINDS } from "@saroh/search-pages/kinds";
 
 /**
  * A search page's words, built from its data for the Overview's "What's on
@@ -209,5 +212,159 @@ export function toolSections(p: ToolPageData): { k: string; v: string }[] {
             v: `${p.questions.length}${first ? `, starting with “${first}”` : ""}`,
         },
         ...(p.ctaTitle ? [{ k: "Closing line", v: p.ctaTitle }] : []),
+    ];
+}
+
+/** A parsed body's words: each H2 a title, then its text, a block a line. */
+function bodyItems(blocks: readonly Block[]): WordItem[] {
+    const run = (xs: readonly { text: string }[]) =>
+        xs.map((x) => x.text).join("");
+    return blocks.flatMap((b): WordItem[] => {
+        switch (b.type) {
+            case "h2":
+                return [{ k: "Heading", v: b.text, look: "title" }];
+            case "p":
+                return [{ k: "Text", v: run(b.inline) }];
+            case "callout":
+                return [{ k: "In Saroh", v: run(b.inline) }];
+            case "ul":
+            case "ol":
+                return b.items.map((it) => ({ k: "•", v: run(it) }));
+            case "table":
+                return b.rows.map((r) => ({
+                    k: "Table row",
+                    v: r.map(run).join(" · "),
+                }));
+            case "image":
+                return [{ k: "Picture", v: b.alt }];
+        }
+    });
+}
+
+/** A GST page's, guide's or download's words, top to bottom, as its template draws them. */
+export function docWordBlocks(p: DocPage): WordBlock[] {
+    const hub = DOC_KINDS.find((k) => k.id === p.kind)?.hubLabel ?? "";
+    const top: WordItem[] = [
+        { k: "Breadcrumb", v: `Home › ${hub} › ${p.name}` },
+        { k: "Headline", v: p.h1, look: "headline" },
+    ];
+    const blocks: WordBlock[] = [{ label: "Top of the page", items: top }];
+    if (p.kind === "gst") {
+        top.push(
+            { k: "In short", v: p.answer.map((x) => x.text).join("") },
+            {
+                k: "Checked on",
+                v: `${p.checkedOn} against ${p.sources[0]?.label ?? ""}`,
+            },
+        );
+        blocks.push(
+            {
+                label: "The facts",
+                items: p.facts.map((f) => ({
+                    k: f.label,
+                    v: f.value,
+                    sub: f.note,
+                })),
+            },
+            {
+                label: p.table.title,
+                items: [
+                    { k: "Columns", v: p.table.head.join(" · ") },
+                    ...p.table.rows.map((r) => ({
+                        k: "Row",
+                        v: r.join(" · "),
+                    })),
+                    ...(p.table.foot
+                        ? [{ k: "Total", v: p.table.foot.join(" · ") }]
+                        : []),
+                    ...(p.table.note
+                        ? [{ k: "Under it", v: p.table.note }]
+                        : []),
+                ],
+            },
+        );
+    } else {
+        top.push({ k: "Under it", v: p.lead });
+        if (p.kind === "downloads")
+            top.push(...p.benefits.map((b) => ({ k: "✓", v: b })));
+    }
+    if (p.body.length)
+        blocks.push({ label: "The text", items: bodyItems(p.body) });
+    if (p.kind === "gst")
+        blocks.push({
+            label: "Common mistakes",
+            items: p.mistakes.map((m, i) => ({
+                k: `${i + 1}`,
+                v: m.title,
+                sub: m.body,
+                look: "title" as const,
+            })),
+        });
+    if (p.questions.length)
+        blocks.push({
+            label: "Questions",
+            items: p.questions.map((q, i) => ({
+                k: `Q${i + 1}`,
+                v: q.question,
+                sub: q.answer.join(" "),
+                look: "title" as const,
+            })),
+        });
+    blocks.push({
+        label: "On the hub and in lists",
+        items: [
+            {
+                k: "Card",
+                v:
+                    p.kind === "gst"
+                        ? gstCardName(p)
+                        : p.kind === "guides"
+                          ? p.h1
+                          : p.name,
+                sub: p.line,
+                look: "title",
+            },
+            { k: "Target search", v: p.search },
+        ],
+    });
+    blocks.push({
+        label: "Bottom of the page",
+        items: [
+            {
+                k: "Closing line",
+                v: p.band?.title ?? "The kind's own",
+                sub: p.band?.line,
+                look: "headline",
+            },
+            {
+                k: "Byline",
+                v: `${p.author.name}, ${p.author.role} · Last updated ${p.updated}`,
+                sub:
+                    p.kind === "gst"
+                        ? "A guide, not tax advice: check with your CA for your own case."
+                        : undefined,
+            },
+        ],
+    });
+    return blocks;
+}
+
+/** The Overview's facts about a GST page, guide or download. */
+export function docSections(p: DocPage): { k: string; v: string }[] {
+    const first = p.questions[0]?.question;
+    return [
+        { k: "Headline", v: p.h1 },
+        { k: "On the hub", v: p.line },
+        ...(p.kind === "gst"
+            ? [{ k: "Checked on", v: p.checkedOn }]
+            : [{ k: "Section", v: p.group }]),
+        {
+            k: "Questions answered",
+            v: `${p.questions.length}${first ? `, starting with “${first}”` : ""}`,
+        },
+        {
+            k: "Facts to confirm",
+            v: p.toConfirm.length ? p.toConfirm.join(" · ") : "None",
+        },
     ];
 }

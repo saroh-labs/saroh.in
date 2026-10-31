@@ -279,6 +279,18 @@ business's own trackers would need listing first.
   at `/tools/<slug>` with `<ToolPage>`; the two app tools (`inApp: true`)
   keep their own routes and obey the same publish list
   (`PublishContext.live`). Copy `no-show-cost-calculator` for a new one.
+- **A new search-page group (GST pages, guides, downloads; DEC-201) is one
+  entry in `packages/search-pages/kinds.js`**, a frontmatter schema in
+  `src/kinds/<group>-schema.ts`, a template built only from the shared
+  blocks (`src/components/BLOCKS.md`), and a route through the route kit
+  (`lib/search-page-route.ts`: params, metadata, JSON-LD, share card,
+  related). /for/ and /tools/ stay off the list. Pages are
+  `content/<group>/<slug>.mdx`; run the package's content embed after an
+  edit. A production build carries only live pages' words and files
+  (`docs-content.config.ts`); a live page whose checks fail is held out
+  with a warning, never a failed build. `/sitemap.xml` is an index of one
+  sitemap per group (`lib/sitemaps.ts`). In admin, Publish only stages;
+  Deploy changes rebuilds once for every staged page.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;

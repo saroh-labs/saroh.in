@@ -6,6 +6,7 @@ const {
     searchRedirects,
 } = require("./redirects");
 const {
+    docExists,
     familyOf,
     loadPublishList,
     toolExists,
@@ -64,7 +65,7 @@ const SECURITY_HEADERS = [
 // off (@saroh/auth/security-headers). A rule of their own: a policy governs
 // a page, not the files and redirects SECURITY_HEADERS also reaches.
 const PAGE_POLICIES = pageSecurityHeaders({
-    uses: ["google", "meta"],
+    uses: ["google", "meta", "turnstile"],
     posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     dev: process.env.NODE_ENV === "development",
 });
@@ -72,7 +73,11 @@ const PAGE_POLICIES = pageSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
-    transpilePackages: ["@saroh/ui", "@saroh/search-pages"],
+    transpilePackages: [
+        "@saroh/ui",
+        "@saroh/search-pages",
+        "@saroh/site-blocks",
+    ],
 
     // No database here — saroh.in is the public marketing site (single backend
     // lives at api.saroh.in).
@@ -125,7 +130,7 @@ const nextConfig = {
     async redirects() {
         return [
             ...REDIRECTS,
-            ...searchRedirects(searchPages, familyOf, toolExists),
+            ...searchRedirects(searchPages, familyOf, toolExists, docExists),
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
             ...launched(
                 process.env.NEXT_PUBLIC_LAUNCH_MODE,

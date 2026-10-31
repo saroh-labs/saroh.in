@@ -46,11 +46,13 @@ import {
 } from "@/content/templates";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
 import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
+import { docPages } from "@/lib/docs-pages";
 import { helpArticles } from "@/lib/help-docs";
 import { integrationMeta } from "@/lib/integration-docs";
 import type { LaunchMode } from "@/lib/links";
 import { llmsText } from "@/lib/llms";
 import { resourcesContext } from "@/lib/resources-context";
+import { newestUpdated } from "@/lib/search-page-route";
 import type { PublishList } from "@/lib/search-pages";
 import {
     FOR_HUB,
@@ -60,6 +62,7 @@ import {
     TOOLS_HUB,
 } from "@/lib/search-pages";
 import { listSearchPages } from "@saroh/search-pages";
+import { DOC_KINDS, docKindOf } from "@saroh/search-pages/kinds";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
@@ -187,6 +190,7 @@ export function lastModified(
     path: string,
     pricingLiveAt: string | null = null,
     now: Date = new Date(),
+    list: PublishList = publishList(),
 ): string | undefined {
     if (path === "/pricing" || path === "/pricing.md") {
         return pricingLiveAt
@@ -198,9 +202,17 @@ export function lastModified(
             ...summarise(fm),
             description: fm.description,
         }));
-        const text = llmsText("", resourcesContext(now), articles);
+        const text = llmsText(
+            "",
+            resourcesContext(now),
+            articles,
+            undefined,
+            undefined,
+            undefined,
+            list,
+        );
         const days = Array.from(text.matchAll(/\]\((\/[^)]*)\)/g))
-            .map((m) => lastModified(m[1], pricingLiveAt, now))
+            .map((m) => lastModified(m[1], pricingLiveAt, now, list))
             .filter((d): d is string => d !== undefined);
         return days.sort().at(-1);
     }
@@ -231,6 +243,21 @@ export function lastModified(
             .sort()
             .at(-1);
         return day ? dayInIndia(day) : undefined;
+    }
+    // A GST page, guide or download: its own `updated`; a hub, its newest
+    // live page's.
+    const docHub = DOC_KINDS.find((k) => k.hub === path);
+    if (docHub) {
+        const day = newestUpdated(docHub.id, list);
+        return day ? dayInIndia(day) : undefined;
+    }
+    const docKind = docKindOf(path);
+    if (docKind) {
+        const page = docPages.load(
+            docKind.id,
+            path.slice(docKind.prefix.length),
+        );
+        return page ? dayInIndia(page.updated) : undefined;
     }
     if (path.startsWith(`${TEMPLATES_PATH}/`)) {
         return dayInIndia(TEMPLATES_UPDATED);

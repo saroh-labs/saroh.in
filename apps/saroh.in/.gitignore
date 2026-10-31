@@ -47,3 +47,6 @@ next-env.d.ts
 # What a production build read, and its snapshot for the next one (build-state.config.js)
 /.build-pricing.json
 /public/_build/
+# The GST pages', guides' and downloads' words and files this build carries (docs-content.config.ts)
+/lib/docs-content.gen.ts
+/public/downloads/

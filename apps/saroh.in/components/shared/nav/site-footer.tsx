@@ -11,6 +11,7 @@ import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 import { ring } from "@/lib/ring";
 
+import { Pill } from "../links/pill";
 import { textLinkClasses } from "../links/text-link";
 import { CookieChoicesButton } from "./cookie-choices-button";
 import type { NavItem } from "./nav-items";
@@ -159,6 +160,14 @@ export function SiteFooter({
                                     className={LINK}
                                 >
                                     {item.name}
+                                    {item.isNew ? (
+                                        <Pill
+                                            tone="soon"
+                                            className="ml-1.5 px-1.5 py-px text-[10.5px]"
+                                        >
+                                            new
+                                        </Pill>
+                                    ) : null}
                                 </Link>
                             ))}
                         </Column>

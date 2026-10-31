@@ -331,6 +331,59 @@ const RULES: Rule[] = [
         files: PACKAGE,
     },
     {
+        name: "package: a question list or a breadcrumb is page-parts.tsx's (A11, #1201)",
+        pattern: /<details\b|aria-label="Breadcrumbs?"/,
+        home: ["src/components/page-parts.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    // The content pages' blocks (plan 2026-10-31-002 U4, components/BLOCKS.md):
+    // each class family is drawn in its home file only, so a template that
+    // redraws a block, under any prefix, uses the block instead.
+    {
+        name: "package: the content blocks are content-blocks.tsx's (#1201)",
+        pattern:
+            /\bsp-(?:sc|ans|facts|nl|by|lc|rel|otp|call|fig)(?:-[\w-]+)?\b/,
+        home: ["src/components/content-blocks.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: a content table is DataTable (#1201)",
+        pattern: /\bsp-dt(?:-[\w-]+)?\b|<table\b/,
+        // A tool's own working table is the tool's.
+        home: ["src/components/data-table.tsx", "src/tools/"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: the content page shell is ContentLayout (#1201)",
+        pattern: /\bsp-cl(?:-[\w-]+)?\b/,
+        home: ["src/components/content-layout.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: parsed text is Prose (#1201)",
+        pattern: /\bsp-prose(?:-[\w-]+)?\b/,
+        home: ["src/components/prose.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: a hub's cards and chips are hub-page.tsx's (#1201)",
+        pattern:
+            /\bsp-(?:hp|hc|fchips?)(?:-[\w-]+)?\b|\b(?:sp|tp)-hub-(?:list|grid)\b/,
+        home: ["src/components/hub-page.tsx"],
+        allow: {
+            "src/components/for-hub.tsx":
+                "follow-up (plan 2026-10-31-002, Deferred): /for moves onto HubCards once the owner has seen the look change",
+            "src/components/tools-hub.tsx":
+                "follow-up (plan 2026-10-31-002, Deferred): /tools moves onto HubCards once the owner has seen the look change",
+        },
+        files: PACKAGE,
+    },
+    {
         name: "package: an email shape is email-gate.tsx's (B1)",
         pattern: /\[\^\\s@\]/,
         home: ["src/tools/email-gate.tsx"],
@@ -406,6 +459,22 @@ describe("the scan catches a redraw", () => {
         };
         expect(offenders(rule("the Ink closing band"), [band])).toEqual([
             band.rel,
+        ]);
+    });
+
+    it("a content template that redraws a block fails (#1201)", () => {
+        const gst: Source = {
+            rel: "src/components/gst-page.tsx",
+            code: `<details><summary>Q</summary></details><table className="gp-table" /><div className="sp-ans" />`,
+        };
+        expect(offenders(rule("package: a question list"), [gst])).toEqual([
+            gst.rel,
+        ]);
+        expect(offenders(rule("package: a content table"), [gst])).toEqual([
+            gst.rel,
+        ]);
+        expect(offenders(rule("package: the content blocks"), [gst])).toEqual([
+            gst.rel,
         ]);
     });
 

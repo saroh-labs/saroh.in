@@ -10,7 +10,7 @@ import { keepButtonSource } from "@/lib/referral";
 /**
  * Around a page drawn by `@saroh/search-pages` (the /for/ and /tools pages):
  * a click on one of its start buttons (`a[data-cta]`) does what `CtaLink`
- * does — keeps the button's `src` for the business it may make and sends
+ * does — keeps the button's own `data-cta` (else the page's `src`) for the business it may make and sends
  * `cta_click` — since the package can't import the site's own button.
  */
 export function CtaClickArea({
@@ -28,8 +28,11 @@ export function CtaClickArea({
             onClickCapture={(e) => {
                 const a = (e.target as Element).closest("a[data-cta]");
                 if (!a) return;
-                keepButtonSource(src, ACCOUNTS_URL);
-                track("cta_click", { page: src, mode });
+                // A button that names its own spot (`gst-salon-band`) wins.
+                const own = a.getAttribute("data-cta");
+                const from = own === null || own === "" ? src : own;
+                keepButtonSource(from, ACCOUNTS_URL);
+                track("cta_click", { page: from, mode });
             }}
         >
             {children}

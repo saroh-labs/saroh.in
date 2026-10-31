@@ -9,6 +9,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { stamp } from "../fixtures/own-data";
+import { sitemapPages } from "../fixtures/sitemap";
 import { urls } from "../playwright.config";
 
 /**
@@ -623,13 +624,8 @@ test.describe("links, redirects and the sitemap", () => {
         request,
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
-        const sitemap = await request.get(`${WEB}/sitemap.xml`);
-        expect(sitemap.status()).toBe(200);
-        const listed = [
-            ...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g),
-        ]
-            .map((m) => new URL(m[1]).pathname)
-            .sort();
+        // The index and every group sitemap, none with changefreq or priority.
+        const listed = (await sitemapPages(request, WEB)).sort();
         expect(listed).toEqual(
             expect.arrayContaining([...INDEXED, ...TEXT_FILES]),
         );
@@ -658,9 +654,6 @@ test.describe("links, redirects and the sitemap", () => {
         // own noindex is seen (a blocked page can still be listed bare).
         expect(robots).not.toMatch(/^Host:/m);
         expect(robots).not.toContain("Disallow: /welcome");
-        // No guessed changefreq or priority in the sitemap.
-        const xml = await (await request.get(`${WEB}/sitemap.xml`)).text();
-        expect(xml).not.toMatch(/<changefreq>|<priority>/);
 
         // The draft and its link say noindex themselves too.
         const draft = await head(request, `${WEB}/pricing/draft`);
