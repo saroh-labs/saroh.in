@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { checkList } from "./check-list";
+import { NOT_AVAILABLE } from "./claims";
 import { AlsoSvg } from "./components/icons";
 import {
     bigTile,
@@ -12,6 +14,9 @@ import {
 } from "./components/parts";
 import { SearchPage } from "./components/search-page";
 import type { SearchPageData } from "./schema";
+
+export { docPageChecks, GST_CHECKED_MAX_DAYS } from "./docs-checks";
+export { NOT_AVAILABLE };
 
 /**
  * What the admin lists as "Checked before you publish", and what the
@@ -91,21 +96,6 @@ export const PRICE_RANGE: Record<SearchPageData["family"], [number, number]> = {
     Learning: [100, 60000],
     "Shops and food": [30, 20000],
 };
-
-/** What Saroh doesn't do: online orders on the website, reminders, sending on WhatsApp. */
-export const NOT_AVAILABLE = [
-    /order(ing)? online/,
-    /\b(pay|buy|order) (on|from|through) (the|your) (website|site)/,
-    /checkout/,
-    /add to (cart|bag)/,
-    /reminders? (sent|go(es)? out)/,
-    /sends? (a |the )?reminders?/,
-    /whatsapp (message )?sent/,
-    /sent (on|by|via|over) whatsapp/,
-    /saroh sends/,
-    /buy now/,
-    /cart\b/,
-];
 
 /** The app calls a note only some roles can read "Sensitive" (customer attention notes). */
 const PRIVATE_NOTE = /\b(note private|private notes?)\b/;
@@ -188,20 +178,7 @@ export function searchPageChecks(p: SearchPageData): SearchPageCheck[] {
     const drawn = drawingsText(p);
     const dt = drawn.toLowerCase();
     const s = p.scene;
-    const out: SearchPageCheck[] = [];
-    const add = (
-        id: string,
-        title: string,
-        problems: string[],
-        severity: SearchPageCheck["severity"] = "error",
-    ) =>
-        out.push({
-            id,
-            ok: problems.length === 0,
-            title,
-            detail: problems.join(" "),
-            severity,
-        });
+    const { out, add } = checkList();
 
     // Words from another trade.
     const leaks: string[] = [];
