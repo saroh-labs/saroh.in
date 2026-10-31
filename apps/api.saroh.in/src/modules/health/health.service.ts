@@ -1,4 +1,4 @@
-import { Injectable, Optional } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 /**
@@ -33,6 +33,8 @@ export interface ReadinessReport {
 /** A failed check must not hang the probe and keep a bad instance in rotation. */
 const CHECK_TIMEOUT_MS = 3_000;
 
+const logger = new Logger("HealthService");
+
 async function timed(
     name: string,
     run: () => Promise<unknown>,
@@ -53,12 +55,19 @@ async function timed(
         ]);
         return { name, status: "up", durationMs: Date.now() - started };
     } catch (error) {
+        // The probe is public: a Prisma error's own message names the
+        // database host, so it goes to the log, never the response.
+        const fromDriver =
+            error instanceof Error && error.name.startsWith("PrismaClient");
+        if (fromDriver) logger.warn(`${name} check failed: ${error.message}`);
         return {
             name,
             status: "down",
-            // The message only — never the cause chain, which for Prisma
-            // errors can contain the connection string.
-            detail: error instanceof Error ? error.message : "check failed",
+            detail: fromDriver
+                ? "unreachable"
+                : error instanceof Error
+                  ? error.message
+                  : "check failed",
             durationMs: Date.now() - started,
         };
     }
