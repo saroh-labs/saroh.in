@@ -355,7 +355,7 @@ e2e_stack() {
     # picker in the app, which the templates specs open. Unset is off.
     export NEXT_PUBLIC_TEMPLATES=on
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""
     if specs_open_admin "$specs"; then admin_filter=--filter=admin; fi
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
@@ -699,7 +699,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     # The operator console, when an `admin:` spec is in the run.
     [ "$E2E_STATUS" = run ] && specs_open_admin "$specs" && ports="$ports 3006"
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
