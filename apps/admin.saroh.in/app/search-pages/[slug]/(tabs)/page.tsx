@@ -3,7 +3,11 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Facts, Panel } from "@/components/panel";
 import { PageChecks } from "@/components/search-pages/page-checks";
 import { formatDate } from "@/lib/format";
-import { pageSections, toolSections } from "@/lib/search-page-content";
+import {
+    docSections,
+    pageSections,
+    toolSections,
+} from "@/lib/search-page-content";
 import { familyPage, whereItShows } from "@/lib/search-page-words";
 import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
@@ -69,11 +73,11 @@ export default async function SearchPageOverview({
                 <Panel title="What's on the page">
                     {() => (
                         <dl className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                            {(tool
-                                ? toolSections(tool)
+                            {(data.page.kind === "tools"
+                                ? toolSections(data.page.page)
                                 : data.page.kind === "for"
                                   ? pageSections(data.page.page)
-                                  : []
+                                  : docSections(data.page.page)
                             ).map((s) => (
                                 <div
                                     key={s.k}

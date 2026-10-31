@@ -33,6 +33,7 @@ import {
     countBy,
     eligible,
     FILTER_LABEL,
+    heldWords,
     inFilter,
     KINDS,
     matchesQuery,
@@ -231,7 +232,7 @@ export function SearchPagesTable({
                         </span>
                         <span>Page</span>
                         <span>Target search</span>
-                        <span>{kind === "tools" ? "Section" : "Family"}</span>
+                        <span>{kind === "for" ? "Family" : "Section"}</span>
                         <span>Status</span>
                         <span>Content changed</span>
                         <span className="sr-only">Actions</span>
@@ -340,6 +341,11 @@ export function SearchPagesTable({
                     >
                         Archive
                     </Button>
+                    {heldWords(picked) && (
+                        <p className="basis-full text-[12.5px] text-muted-foreground">
+                            {heldWords(picked)}
+                        </p>
+                    )}
                     <Button
                         type="button"
                         size="icon"
@@ -419,7 +425,17 @@ function RowMenu({
                         {rowActions(row.state, site).map((item) => (
                             <DropdownMenuItem
                                 key={item.label}
-                                disabled={!item.action}
+                                disabled={
+                                    !item.action ||
+                                    (item.action === "publish" &&
+                                        row.blocked.length > 0)
+                                }
+                                title={
+                                    item.action === "publish" &&
+                                    row.blocked.length
+                                        ? `Fails: ${row.blocked.join(", ")}`
+                                        : undefined
+                                }
                                 className={cn(
                                     item.danger && "text-destructive",
                                 )}

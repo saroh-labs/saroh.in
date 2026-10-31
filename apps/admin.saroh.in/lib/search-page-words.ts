@@ -75,6 +75,25 @@ export interface PageRow {
     /** Waiting for Deploy changes, or null. */
     pending: Pending | null;
     record: SearchPageRecord | null;
+    /**
+     * A GST page's, guide's or download's checks that fail (their titles):
+     * it can't be published, and a live one is left out of the site's
+     * build (plan 2026-10-31-002, R9). Always empty for /for/ and tools.
+     */
+    blocked: string[];
+}
+
+/** A GST page, guide or download as the list has it, with its failing checks. */
+export interface DocEntry {
+    kind: DocKindId;
+    path: string;
+    slug: string;
+    name: string;
+    search: string;
+    updated: string;
+    /** Its group on the hub: "By trade", "Bookings and no-shows". */
+    group: string;
+    blocked: string[];
 }
 
 export const STATE_LABEL: Record<RowState, string> = {
@@ -100,10 +119,15 @@ const PENDING_LABEL: Record<Pending, string> = {
 };
 
 /** A row's status badge: the staged status, or that it waits for Deploy changes. */
-export function badgeOf(row: Pick<PageRow, "state" | "pending">): {
+export function badgeOf(
+    row: Pick<PageRow, "state" | "pending" | "onSite"> & { blocked?: string[] },
+): {
     label: string;
-    variant: (typeof STATE_BADGE)[RowState];
+    variant: (typeof STATE_BADGE)[RowState] | "error";
 } {
+    // Live, but the site's build leaves it out until its checks pass.
+    if (row.onSite && row.state === "live" && row.blocked?.length)
+        return { label: "Held by checks", variant: "error" };
     return row.pending
         ? { label: PENDING_LABEL[row.pending], variant: "warning" }
         : { label: STATE_LABEL[row.state], variant: STATE_BADGE[row.state] };
@@ -137,7 +161,7 @@ export function siteOf(record: SearchPageRecord | null): {
 
 /** The manifest, each page with its record (or none): the manifest's order, records for pages no longer in the code left out. */
 export function mergePages(
-    manifest: readonly SearchPageEntry[],
+    manifest: readonly (SearchPageEntry | DocEntry)[],
     read: SearchPagesRead,
 ): PageRow[] {
     const byPath = new Map(read.pages.map((r) => [r.path, r]));
@@ -150,6 +174,7 @@ export function mergePages(
             name: entry.name,
             family: entry.kind === "for" ? entry.family : entry.group,
             inApp: entry.kind === "tools" && entry.inApp,
+            blocked: "blocked" in entry ? entry.blocked : [],
             search: entry.search,
             updated: entry.updated,
             record,
@@ -162,6 +187,8 @@ export function mergePages(
 /** The line under a status: since when, or what Deploy changes does to it. */
 export function stateNote(row: PageRow): string {
     const r = row.record;
+    if (row.onSite && row.state === "live" && row.blocked.length)
+        return `Left out of the site until it passes: ${row.blocked.join(", ")}`;
     if (row.pending === "on") return "Goes live when changes are deployed";
     if (row.pending === "off") return "Stays live until changes are deployed";
     switch (row.state) {
@@ -268,11 +295,29 @@ export function canDo(action: PageAction, state: RowState): boolean {
     }
 }
 
-export function eligible<T extends { state: RowState }>(
+/** Which pages an action can be done to; Publish leaves out a page whose checks fail. */
+export function eligible<T extends { state: RowState; blocked?: string[] }>(
     action: PageAction,
     rows: readonly T[],
 ): T[] {
-    return rows.filter((r) => canDo(action, r.state));
+    return rows.filter(
+        (r) =>
+            canDo(action, r.state) &&
+            !(action === "publish" && r.blocked?.length),
+    );
+}
+
+/** Why Publish is held back for these pages: each one's name and failing checks. */
+export function heldWords(
+    rows: readonly Pick<PageRow, "name" | "state" | "blocked">[],
+): string | null {
+    const held = rows.filter(
+        (r) => canDo("publish", r.state) && r.blocked.length,
+    );
+    if (!held.length) return null;
+    return `Can't publish until its checks pass: ${held
+        .map((r) => `${r.name} (${r.blocked.join(", ")})`)
+        .join("; ")}.`;
 }
 
 /** A row's ⋯ menu, past Open details and Read it: what can be done to it. */

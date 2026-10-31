@@ -160,8 +160,8 @@ const FAMILY_PAGE = {
  * @param {(slug: string) => string | null} familyOf
  * @param {(slug: string) => boolean} [toolExists]
  * @param {(path: string) => boolean} [docExists] whether this build has
- *   the page at a group's path; none until the groups' routes are built,
- *   so until then every taken-off page of theirs goes Home
+ *   the page at a group's path (`search-pages.config.js`); without it every
+ *   taken-off page of theirs goes Home
  * @returns {Redirect[]}
  */
 const searchRedirects = (

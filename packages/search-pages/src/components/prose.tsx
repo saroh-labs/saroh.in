@@ -7,7 +7,13 @@ import { DataTable } from "./data-table";
 type Resolve = (href: string) => string | undefined;
 
 /** A run of words; a link goes through `resolve`, or nowhere without it. */
-function Words({ inline, resolve }: { inline: Inline[]; resolve?: Resolve }) {
+export function Words({
+    inline,
+    resolve,
+}: {
+    inline: Inline[];
+    resolve?: Resolve;
+}) {
     return inline.map((r, i) =>
         r.t === "link" ? (
             <a key={i} href={resolve?.(r.href)}>

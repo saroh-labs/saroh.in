@@ -40,6 +40,17 @@ function markersOf(fm) {
         .filter((t) => t.length >= 25 && !/[&'"<>’]/.test(t));
 }
 
+/** The live /for/ and tool pages' words: a phrase they share isn't a draft's own. */
+const liveText = ["for", "tools"]
+    .flatMap((kind) => {
+        const dir = path.join(PACKAGE, "content", kind);
+        return fs
+            .readdirSync(dir)
+            .map((f) => fs.readFileSync(path.join(dir, f), "utf8"));
+    })
+    .join("\n")
+    .toLowerCase();
+
 /** Every GST page, guide and download in the code; none is live in this build. */
 const docs = ["gst", "guides", "downloads"].flatMap((kind) => {
     const dir = path.join(PACKAGE, "content", kind);
@@ -48,7 +59,9 @@ const docs = ["gst", "guides", "downloads"].flatMap((kind) => {
         .filter((f) => f.endsWith(".mdx"))
         .map((f) => ({
             path: `/${kind}/${f.slice(0, -4)}`,
-            markers: markersOf(frontmatter(path.join(dir, f))),
+            markers: markersOf(frontmatter(path.join(dir, f))).filter(
+                (m) => !liveText.includes(m.toLowerCase()),
+            ),
         }));
 });
 const files = fs.readdirSync(path.join(PACKAGE, "content/downloads/files"), {

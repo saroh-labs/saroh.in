@@ -54,6 +54,8 @@ export function SearchPageActions({
     const main = (["publish", "unpublish", "restore"] as const).find((a) =>
         canDo(a, row.state),
     );
+    // A GST page's, guide's or download's failing checks hold Publish back.
+    const held = main === "publish" && row.blocked.length > 0;
     const label = {
         publish: `Publish on ${site}`,
         unpublish: "Unpublish",
@@ -76,10 +78,21 @@ export function SearchPageActions({
                     type="button"
                     size="sm"
                     variant={main === "unpublish" ? "outline" : "default"}
+                    disabled={held}
+                    aria-describedby={held ? "publish-held" : undefined}
                     onClick={() => setOpened(main)}
                 >
                     {label[main]}
                 </Button>
+            )}
+            {canPublish && held && (
+                <p
+                    id="publish-held"
+                    className="basis-full text-[12.5px] text-muted-foreground"
+                >
+                    Publish waits until these checks pass:{" "}
+                    {row.blocked.join(", ")}.
+                </p>
             )}
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>

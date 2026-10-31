@@ -23,6 +23,7 @@
         "./docs-embedded": "./src/docs-embedded.ts",
         "./embed-docs": "./scripts/embed-docs.mjs",
         "./download": "./src/tools/download.ts",
+        "./pages": "./src/content-pages.ts",
         "./kinds": "./kinds.js",
         "./styles.css": "./src/styles.css"
     },

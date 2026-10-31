@@ -6,6 +6,7 @@ const {
     searchRedirects,
 } = require("./redirects");
 const {
+    docExists,
     familyOf,
     loadPublishList,
     toolExists,
@@ -125,7 +126,7 @@ const nextConfig = {
     async redirects() {
         return [
             ...REDIRECTS,
-            ...searchRedirects(searchPages, familyOf, toolExists),
+            ...searchRedirects(searchPages, familyOf, toolExists, docExists),
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
             ...launched(
                 process.env.NEXT_PUBLIC_LAUNCH_MODE,

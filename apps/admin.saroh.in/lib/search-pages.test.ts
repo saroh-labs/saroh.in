@@ -26,3 +26,38 @@ describe("loadPage (plan 2026-10-31-002, U3)", () => {
         expect(loadPage("not-a-page")).toBeNull();
     });
 });
+
+describe("docEntries (plan 2026-10-31-002, U6)", () => {
+    it("lists the 19 GST pages, each grouped, with its failing checks", async () => {
+        const { docEntries } = await import("./search-pages");
+        const gst = docEntries().filter((e) => e.kind === "gst");
+        expect(gst).toHaveLength(19);
+        const salon = gst.find((e) => e.slug === "salon-and-beauty-services");
+        expect(salon?.group).toBe("By trade");
+        // Unconfirmed facts hold it back.
+        expect(salon?.blocked).toContain("Every fact is confirmed");
+        expect(gst.find((e) => e.slug === "composition-scheme")?.group).toBe(
+            "The basics",
+        );
+    });
+});
+
+describe("docWordBlocks", () => {
+    it("lists a GST page's words in the template's order", async () => {
+        const { docWordBlocks } = await import("./search-page-content");
+        const page = loadPage("salon-and-beauty-services");
+        if (page?.kind !== "gst") throw new Error("no GST page");
+        const blocks = docWordBlocks(page.page);
+        expect(blocks.map((b) => b.label)).toEqual([
+            "Top of the page",
+            "The facts",
+            "A sample invoice",
+            "The text",
+            "Common mistakes",
+            "Questions",
+            "On the hub and in lists",
+            "Bottom of the page",
+        ]);
+        expect(JSON.stringify(blocks.at(-1))).toContain("not tax advice");
+    });
+});

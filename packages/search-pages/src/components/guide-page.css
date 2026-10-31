@@ -1,0 +1,24 @@
+/* GuidePage's own layout (guide-page.tsx); its blocks are styles.css's. Boards guides/Sample*. */
+.sp-gd-top {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.sp .sp-gd-h1 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(36px, 4.4vw, 50px);
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+.sp .sp-gd-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--sp-body);
+}
+@media (max-width: 899.98px) {
+    .sp .sp-gd-h1 {
+        font-size: 26px;
+    }
+}

@@ -48,6 +48,8 @@ export const baseFields = {
     /** Pages of the same kind to show in Related first, by slug. */
     related: z.array(slug).max(3).default([]),
     questions: z.array(question).default([]),
+    /** The closing band's heading and line; left out, the template's own for the kind. */
+    band: z.object({ title: text, line: text }).strict().optional(),
     /** Facts still to check; a page can't go live while any is left. */
     toConfirm: z.array(text).default([]),
 };

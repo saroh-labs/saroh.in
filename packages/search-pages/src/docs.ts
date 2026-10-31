@@ -28,7 +28,11 @@ export {
     downloadFrontmatterSchema,
 } from "./kinds/download-schema";
 export type { DownloadFrontmatter } from "./kinds/download-schema";
-export { GST_TABLE_KINDS, gstFrontmatterSchema } from "./kinds/gst-schema";
+export {
+    GST_TABLE_KINDS,
+    gstCardName,
+    gstFrontmatterSchema,
+} from "./kinds/gst-schema";
 export type { GstFrontmatter } from "./kinds/gst-schema";
 export { GUIDE_TRADES, guideFrontmatterSchema } from "./kinds/guide-schema";
 export type { GuideFrontmatter } from "./kinds/guide-schema";

@@ -62,6 +62,8 @@ export const gstFrontmatterSchema = z
         mistakes: z
             .array(z.object({ title: text, body: text }).strict())
             .min(1),
+        /** Its place on the /gst hub, 1 first (the list board's order); left out, after the ranked ones. */
+        rank: z.number().int().positive().optional(),
         /** The /for/ page of the same trade, linked when it is live. */
         forPage: slug.optional(),
         /** Where this page's rate or code differs from Saroh's own data, and why. */
@@ -87,3 +89,8 @@ export const gstFrontmatterSchema = z
     });
 
 export type GstFrontmatter = z.infer<typeof gstFrontmatterSchema>;
+
+/** A GST page's name on a card or in a list: "GST on <topic>" for a trade, or a basics page's own name. */
+export const gstCardName = (
+    p: Pick<GstFrontmatter, "type" | "topic" | "name">,
+) => (p.type === "trade" ? `GST on ${p.topic}` : p.name);

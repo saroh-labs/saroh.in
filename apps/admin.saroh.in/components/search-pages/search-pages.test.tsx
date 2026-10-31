@@ -35,6 +35,7 @@ vi.mock("@saroh/ui/toast", () => ({
 }));
 
 import { DeployBar } from "./deploy-bar";
+import { SearchPageActions } from "./search-page-actions";
 import { SearchPageDialog } from "./search-page-dialog";
 import { SearchPagesTable } from "./search-pages-table";
 
@@ -51,6 +52,7 @@ const row = (slug: string, state: PageRow["state"]): PageRow => ({
     onSite: state === "live",
     pending: null,
     record: null,
+    blocked: [],
 });
 
 const table = (canPublish: boolean) =>
@@ -371,6 +373,79 @@ describe("a row waiting for Deploy changes", () => {
         ).toBeTruthy();
         expect(
             within(list).getByText("Taken off · not deployed yet"),
+        ).toBeTruthy();
+    });
+});
+
+describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, U6)", () => {
+    const blocked = (slug: string, state: PageRow["state"]): PageRow => ({
+        ...row(slug, state),
+        path: `/gst/${slug}`,
+        kind: "gst",
+        family: "By trade",
+        blocked: ["Every fact is confirmed"],
+    });
+
+    it("can't be published from a bulk selection, and the bar names the check", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "draft"), row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        fireEvent.click(screen.getByLabelText("Select every page shown"));
+        const bar = screen.getByRole("region", { name: "Selected pages" });
+        expect(
+            within(bar).getByRole("button", { name: "Publish 1" }),
+        ).toBeTruthy();
+        expect(bar.textContent).toContain("Salon (Every fact is confirmed)");
+        expect(screen.getByText("Section")).toBeTruthy();
+    });
+
+    it("shows Held by checks while live, and says why", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "live")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish={false}
+            />,
+        );
+        expect(screen.getByText("Held by checks")).toBeTruthy();
+        expect(
+            screen.getByText(
+                /Left out of the site until it passes: Every fact is confirmed/,
+            ),
+        ).toBeTruthy();
+    });
+
+    it("keeps the page's own Publish off, naming the failing check", () => {
+        render(
+            <SearchPageActions
+                row={blocked("salon", "draft")}
+                site="saroh.in"
+                siteUrl="https://saroh.in"
+                production
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+                page={{} as never}
+            />,
+        );
+        const publish = screen.getByRole("button", {
+            name: "Publish on saroh.in",
+        });
+        expect((publish as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            screen.getByText(
+                /Publish waits until these checks pass: Every fact is confirmed/,
+            ),
         ).toBeTruthy();
     });
 });

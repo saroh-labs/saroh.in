@@ -4524,6 +4524,7 @@
     .sp-cl-rail .sp-cl-grid {
         display: flex;
         flex-direction: column;
+        align-items: stretch;
         gap: 36px;
     }
     .sp-cl-rail .sp-cl-main {
@@ -4541,6 +4542,11 @@
     }
     .sp-cl-hero .sp-cl-grid {
         gap: 24px;
+    }
+    /* Stacked, a column's 440px basis would be its height. */
+    .sp-cl-hero .sp-cl-main,
+    .sp-cl-hero .sp-cl-aside {
+        flex: none;
     }
     .sp .sp-h2c {
         font-size: 22px;

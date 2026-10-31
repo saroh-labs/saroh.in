@@ -12,7 +12,7 @@ import { SearchPageActions } from "@/components/search-pages/search-page-actions
 import { SearchPageTabs } from "@/components/search-pages/search-page-tabs";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { badgeOf, stateNote } from "@/lib/search-page-words";
+import { badgeOf, KINDS, stateNote } from "@/lib/search-page-words";
 import {
     loadPage,
     readSearchPages,
@@ -63,14 +63,14 @@ export default async function SearchPageLayout({
                         <Link
                             key="list"
                             href={
-                                row.kind === "tools"
-                                    ? "/search-pages?kind=tools"
-                                    : "/search-pages"
+                                row.kind === "for"
+                                    ? "/search-pages"
+                                    : `/search-pages?kind=${row.kind}`
                             }
                         >
                             Search pages
                         </Link>,
-                        row.kind === "tools" ? "Free tools" : "Trade pages",
+                        KINDS.find((k) => k.kind === row.kind)?.label ?? "",
                         row.name,
                     ]}
                     title={row.name}

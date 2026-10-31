@@ -3,7 +3,11 @@ import { Segmented } from "@saroh/ui/segmented";
 
 import { Panel } from "@/components/panel";
 import { PreviewFrame } from "@/components/search-pages/preview-frame";
-import { toolWordBlocks, wordBlocks } from "@/lib/search-page-content";
+import {
+    docWordBlocks,
+    toolWordBlocks,
+    wordBlocks,
+} from "@/lib/search-page-content";
 import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
 type View = "desk" | "phone" | "words";
@@ -45,13 +49,12 @@ export default async function SearchPageContent({
             : asked === "phone"
               ? "phone"
               : "desk";
-    // GST pages', guides' and downloads' words are listed with their preview (plan 2026-10-31-002, U6).
     const blocks =
         data.page.kind === "tools"
             ? toolWordBlocks(data.page.page)
             : data.page.kind === "for"
               ? wordBlocks(data.page.page)
-              : [];
+              : docWordBlocks(data.page.page);
     const base = `/search-pages/${slug}/content`;
     const caption = `${site.host}${page.path} · preview, not public`;
 

@@ -9,6 +9,7 @@ import type {
     GstPage,
     GuidePage,
 } from "@saroh/search-pages/docs";
+import { docPageChecks } from "@saroh/search-pages/docs";
 import { embeddedDocs } from "@saroh/search-pages/docs-embedded";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -18,6 +19,7 @@ import { env } from "@/env";
 import { can, requireStaff } from "./console";
 import { getJson } from "./control-plane";
 import type {
+    DocEntry,
     PageRow,
     SearchPageEvent,
     SearchPagesRead,
@@ -44,12 +46,37 @@ export const readSearchPages = cache(async (): Promise<SearchPagesData> => {
         return {
             status: "ok",
             read,
-            rows: mergePages(listSearchPages(), read),
+            rows: mergePages([...listSearchPages(), ...docEntries()], read),
         };
     } catch {
         return { status: "failed" };
     }
 });
+
+/**
+ * The GST pages, guides and downloads in the code, drafts too, each with
+ * the checks that fail: what holds Publish back here and leaves a live page
+ * out of the site's build (the same checks, run on the same words).
+ */
+export function docEntries(): DocEntry[] {
+    return embeddedDocs.all().map((p) => ({
+        kind: p.kind,
+        path: p.path,
+        slug: p.slug,
+        name: p.name,
+        search: p.search,
+        updated: p.updated,
+        group:
+            p.kind === "gst"
+                ? p.type === "trade"
+                    ? "By trade"
+                    : "The basics"
+                : p.group,
+        blocked: docPageChecks(p)
+            .filter((c) => !c.ok && c.severity === "error")
+            .map((c) => c.title),
+    }));
+}
 
 export function readSearchPageHistory(
     path: string,

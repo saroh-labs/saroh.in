@@ -24,6 +24,8 @@ function wordsOf(p: DocPage): string {
         p.h1,
         p.author.name,
         p.author.role,
+        p.band?.title ?? "",
+        p.band?.line ?? "",
         ...p.questions.flatMap((q) => [q.question, ...q.answer]),
         blockWords(p.body),
     ];

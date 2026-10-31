@@ -202,6 +202,26 @@ function toolExists(slug) {
     return fs.existsSync(path.join(TOOLS_CONTENT, `${slug}.mdx`));
 }
 
+/**
+ * Whether this build carries the GST page, guide or download at `pagePath`:
+ * a live page `docs-content.config.ts` built (not held by its checks), as
+ * it recorded in this build's snapshot. Nothing outside a production build,
+ * which makes no taken-off redirects anyway.
+ * @param {string} pagePath
+ * @param {string} [stateFile]
+ * @returns {boolean}
+ */
+function docExists(pagePath, stateFile = buildState.STATE_FILE) {
+    try {
+        const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+        return Array.isArray(state.docs?.built)
+            ? state.docs.built.includes(pagePath)
+            : false;
+    } catch {
+        return false;
+    }
+}
+
 module.exports = {
     FILE,
     parseAnswer,
@@ -209,6 +229,7 @@ module.exports = {
     loadPublishList,
     familyOf,
     toolExists,
+    docExists,
     prebuild,
 };
 
