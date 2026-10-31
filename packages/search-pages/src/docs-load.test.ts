@@ -45,12 +45,13 @@ describe("docs content", () => {
             "/guides/reduce-no-shows",
             "/guides/waitlist-for-cancelled-slots",
         ]);
-        expect(paths).toEqual(
-            expect.arrayContaining([
-                "/gst/salon-and-beauty-services",
-                "/downloads/customer-list-template",
-            ]),
-        );
+        expect(paths.filter((p) => p.startsWith("/downloads/"))).toEqual([
+            "/downloads/bill-of-supply-format",
+            "/downloads/customer-list-template",
+            "/downloads/gst-invoice-format",
+            "/downloads/receipt-format",
+        ]);
+        expect(paths).toContain("/gst/salon-and-beauty-services");
     });
 
     it("reads a GST trade page into facts, an invoice table, mistakes and questions", () => {
@@ -96,11 +97,14 @@ describe("docs content", () => {
         expect(
             embeddedDocs.load("downloads", "customer-list-template"),
         ).toMatchObject({
-            files: [{ name: "customer-list.csv", format: "CSV", bytes: 81 }],
+            files: [
+                { name: "customer-list.xlsx", format: "Excel" },
+                { name: "customer-list.csv", format: "CSV", bytes: 213 },
+            ],
         });
         expect(
             parseDocPage("downloads", DOWNLOAD, "customer-list-template", {}),
-        ).toMatchObject({ files: [{ bytes: null }] });
+        ).toMatchObject({ files: [{ bytes: null }, { bytes: null }] });
     });
 
     it.each([

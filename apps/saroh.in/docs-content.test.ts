@@ -62,8 +62,8 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
             fs.readdirSync(
                 path.join(at.downloadsDir, "customer-list-template"),
             ),
-        ).toEqual(["customer-list.csv"]);
-        expect(gen()).toContain('"customer-list.csv": 81');
+        ).toEqual(["customer-list.csv", "customer-list.xlsx"]);
+        expect(gen()).toContain('"customer-list.csv": 213');
     });
 
     it("a preview: every page, files for all, nothing held", () => {
@@ -77,7 +77,12 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
         for (const slug of pages.map((p) => p.slug))
             expect(gen()).toContain(`"${slug}"`);
         expect(gen()).toContain("export const DOC_PARTIAL: boolean = false;");
-        expect(downloads()).toEqual(["customer-list-template"]);
+        expect(downloads()).toEqual([
+            "bill-of-supply-format",
+            "customer-list-template",
+            "gst-invoice-format",
+            "receipt-format",
+        ]);
     });
 
     it("production with no live page: an empty map, no files, and it still builds", () => {
