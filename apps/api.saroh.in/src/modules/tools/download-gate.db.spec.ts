@@ -11,6 +11,9 @@ jest.mock("../../common/email", () => ({
     sendLinkReportEmail: jest.fn().mockResolvedValue("sent"),
 }));
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { prisma } from "@saroh/database";
 
 import { sendLinkReportEmail } from "../../common/email";
@@ -23,6 +26,10 @@ import { DOWNLOAD_CONSENT_VERSION } from "./download-names";
 import { DownloadUnlockDto } from "./dto";
 
 const SLUG = "customer-list-template";
+const MIGRATION = join(
+    __dirname,
+    "../../../../../packages/database/prisma/migrations/20270117100000_download_leads/migration.sql",
+);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const gate = new DownloadGateService();
 const send = sendLinkReportEmail as jest.Mock;
@@ -85,8 +92,11 @@ describe("a download's lead", () => {
 
     it("a repeat for the same contact and download updates its one row", async () => {
         await ask({ phone: "9845012345" });
-        const first = await prisma.downloadLead.findFirstOrThrow();
-        await new Promise((r) => setTimeout(r, 5));
+        // Back-date the first request so the repeat's is later on any clock.
+        const first = await prisma.downloadLead.update({
+            where: { id: (await prisma.downloadLead.findFirstOrThrow()).id },
+            data: { lastRequestedAt: new Date(Date.now() - DAY_MS) },
+        });
         await ask({ phone: "+91 98450 12345" });
         const rows = await prisma.downloadLead.findMany();
         expect(rows).toHaveLength(1);
@@ -104,6 +114,24 @@ describe("a download's lead", () => {
     });
 
     it("a row with both or neither contact is refused by the table", async () => {
+        // `db push` (plain integration) builds no CHECK: add the migration's own.
+        const [has] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
+            `SELECT count(*) AS n FROM pg_constraint WHERE conname = 'DownloadLead_one_contact'`,
+        );
+        if (!has || Number(has.n) === 0) {
+            const check = readFileSync(MIGRATION, "utf8")
+                .split("\n")
+                .map((line) => line.trim().replace(/,$/, ""))
+                .find((line) =>
+                    line.startsWith(
+                        'CONSTRAINT "DownloadLead_one_contact" CHECK',
+                    ),
+                );
+            if (!check) throw new Error("the migration has no CHECK");
+            await prisma.$executeRawUnsafe(
+                `ALTER TABLE "DownloadLead" ADD ${check}`,
+            );
+        }
         const row = {
             contactKey: "k",
             slug: SLUG,

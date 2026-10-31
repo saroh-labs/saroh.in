@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 
+import type { SearchPageCheck } from "./check-list";
 import { checkList } from "./check-list";
 import { NOT_AVAILABLE } from "./claims";
 import { AlsoSvg } from "./components/icons";
@@ -17,22 +18,7 @@ import type { SearchPageData } from "./schema";
 
 export { docPageChecks, GST_CHECKED_MAX_DAYS } from "./docs-checks";
 export { NOT_AVAILABLE };
-
-/**
- * What the admin lists as "Checked before you publish", and what the
- * package's tests hold every page to. Ported from the for-d generator's data
- * checks (gen.py, 26 Oct 2026): they read the page as drawn, so a word from
- * another trade or a claim Saroh can't make is caught wherever it sits.
- */
-export interface SearchPageCheck {
-    id: string;
-    ok: boolean;
-    /** What is checked, in plain words. */
-    title: string;
-    /** When it fails, what and where; empty when it passes. */
-    detail: string;
-    severity: "error" | "warning";
-}
+export type { SearchPageCheck };
 
 /** Words that belong to one family and must not show on another family's page. */
 export const FAMILY_WORDS: Record<SearchPageData["family"], string[]> = {

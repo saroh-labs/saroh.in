@@ -1,6 +1,6 @@
 import { blockWords } from "./blocks/parse";
+import type { SearchPageCheck } from "./check-list";
 import { checkList } from "./check-list";
-import type { SearchPageCheck } from "./checks";
 import { NOT_AVAILABLE } from "./claims";
 import type { DocPage } from "./docs-load";
 import { todayIst } from "./kinds/base-schema";

@@ -181,12 +181,24 @@ test.describe("GST pages, guides and downloads", () => {
         await expect(gate.getByText("+91", { exact: true })).toBeVisible();
         await expect(gate).toContainText("never message it");
 
-        await pressUntil(gate.getByRole("radio", { name: "Email" }), email);
+        // The radio sits hidden under its pill: a person presses the pill.
+        await pressUntil(gate.getByText("Email", { exact: true }), email);
         await expect(phone).toHaveCount(0);
         await expect(gate.getByText("+91", { exact: true })).toHaveCount(0);
         await expect(gate).toContainText("No newsletter");
 
-        await gate.getByRole("radio", { name: "WhatsApp" }).check();
+        // From the keyboard: Shift+Tab back from the field reaches the
+        // checked radio, its pill shows a focus ring, an arrow switches it.
+        await email.focus();
+        await page.keyboard.press("Shift+Tab");
+        await expect(gate.getByRole("radio", { name: "Email" })).toBeFocused();
+        await expect(
+            gate.locator(".sp-dl-gate-opt", { hasText: "Email" }),
+        ).toHaveCSS("outline-style", "solid");
+        await page.keyboard.press("ArrowLeft");
+        await expect(
+            gate.getByRole("radio", { name: "WhatsApp" }),
+        ).toBeChecked();
         await expect(phone).toBeVisible();
         await expect(email).toHaveCount(0);
 
@@ -206,7 +218,7 @@ test.describe("GST pages, guides and downloads", () => {
         await page.goto(`${WEB}/downloads/gst-invoice-format`);
         const gate = page.getByRole("form", { name: "Get the files" });
         const email = gate.getByRole("textbox", { name: "Email address" });
-        await pressUntil(gate.getByRole("radio", { name: "Email" }), email);
+        await pressUntil(gate.getByText("Email", { exact: true }), email);
         await email.fill(address);
 
         const unlocked = page.waitForResponse(
