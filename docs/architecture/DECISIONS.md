@@ -2657,3 +2657,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The owner-only reads (flags, the web address) are not made for a Reviewer, and owner-only props are sent empty; trimming them from the API's `getSite` response is a follow-up.
     - `site-review-view.tsx` is retired once the editor covers everything it did (00-universal §15); `section-review.tsx` and `review-panel.tsx` stay for the test-release review page.
 - Rules: `docs/patterns/backend-auth-and-access.md` → "A reviewer reads in the editor, read-only"; plan `docs/plans/2026-10-29-001-feat-reviewer-sees-editor-plan.md` (local); `apps/app.saroh.in/components/sites/editor/read-only.test.tsx`.
+
+## DEC-202 Dialogs are bottom sheets on phones in every product app
+
+**Status: Accepted — 2026-10-31** · owner ("the dialogs shown on desktop should be changed to bottom sheet on mobiles, to make UI consistent"); all product apps, done once in the shared component
+
+- Context: on a phone the side sheets already rose from the bottom (`FormSheet bottomOnPhone`, the More sheet, Publish), while every dialog and confirm still floated in the middle of the screen, so a phone showed two overlay looks.
+- Decision:
+    1. **Below `sm` (640px) every `DialogContent` and `AlertDialogContent` is a bottom sheet**, and so every `FormDialog`, `ConfirmDialog`, leave guard and the search palette: the screen's width, pinned to the foot, top corners rounded (18px), at most 92dvh tall, a grab handle, rising from the bottom at a sheet's pace (still under reduced motion), clearing the home indicator (`env(safe-area-inset-bottom)`). It wears the bottom `FormSheet`'s look and shares its handle (`SheetHandle`).
+    2. **A `FormDialog` keeps its title and its buttons in view** on a phone: only the fields scroll, and the foot is pinned with the sheet's rule above it. Footers stack full width with the main button on top, as they already did.
+    3. **At a desk nothing changes**: the centred dialog, its widths, its focus trap, Escape, outside press and the alert dialog's no-outside-close.
+    4. One component, no per-app copies (DEC-195): the phone look is `max-sm:` classes in `@saroh/ui/dialog` (`SHEET_ON_PHONE`), which never meet a caller's own `sm:` classes, so no call site is patched.
+- Not affected: merchant sites (`saroh.app`, `site-blocks`) draw their own overlays in `--site-*` tokens and use none of these components.
+- Why `sm` and not `desk` (760px): Tailwind emits `max-desk:` before `sm:`, so a caller's `sm:max-w-lg` or `sm:rounded-xl` would win between 640 and 759px and pin a half-width sheet to the left; the dialog's own phone rules (stacked footer, rounded corners) already switch at `sm`.
+- Rules: `docs/patterns/frontend-design-system.md` → "Overlays come in fixed sizes"; `packages/ui/src/components/ui/dialog.test.tsx`.

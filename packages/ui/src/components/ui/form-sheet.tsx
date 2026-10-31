@@ -6,6 +6,7 @@ import {
     Sheet,
     SheetContent,
     SheetDescription,
+    SheetHandle,
     SheetHeader,
     SheetTitle,
     SheetTrigger,
@@ -170,12 +171,7 @@ export function FormSheet({
                 )}
                 {...frame.contentProps}
             >
-                {bottom ? (
-                    <div
-                        aria-hidden
-                        className="mx-auto mb-3 h-[5px] w-10 shrink-0 rounded-full bg-border"
-                    />
-                ) : null}
+                {bottom ? <SheetHandle className="mb-3" /> : null}
                 <SheetHeader className={ownHeader ? "sr-only" : undefined}>
                     {heading}
                 </SheetHeader>

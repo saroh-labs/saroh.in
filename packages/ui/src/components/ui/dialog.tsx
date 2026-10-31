@@ -4,6 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { SheetHandle } from "./sheet";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -37,6 +38,25 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
  * (`e2e/tests/phone-reflow.spec.ts`).
  */
 /**
+ * On a phone (below `sm`) every dialog is a bottom sheet (DEC-202), in the
+ * bottom `FormSheet`'s look: the screen's width, pinned to the foot, top
+ * corners rounded, at most 92% of the screen tall, rising from the bottom
+ * at a sheet's pace. The bottom border is transparent and as thick as the
+ * home indicator's inset, so the sheet clears it whatever padding a caller
+ * sets (`p-0` too). Only `max-sm:` classes: they come after a caller's own
+ * unprefixed classes and never meet its `sm:` ones, so the desk dialog is
+ * untouched and no call site needs a patch. `AlertDialogContent` wears it
+ * too.
+ */
+export const SHEET_ON_PHONE =
+    "max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[18px] max-sm:border-x-0 max-sm:border-b-[length:env(safe-area-inset-bottom)] max-sm:border-b-transparent max-sm:duration-slow max-sm:data-[state=closed]:duration-base max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:slide-out-to-left-0 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:slide-in-from-left-0";
+
+/** The phone sheet's grab handle; it takes no room, so no caller re-pads. */
+export function DialogHandle() {
+    return <SheetHandle className="absolute inset-x-0 top-2 sm:hidden" />;
+}
+
+/**
  * The three widths a dialog comes in, by the size of its task: one field
  * or one choice (`sm`, 420px), two or three fields (`md`, 460px), a choice
  * between cards or a short list (`lg`, 560px). Anything bigger is a side
@@ -69,10 +89,12 @@ const DialogContent = React.forwardRef<
             className={cn(
                 "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto break-words border bg-card p-6 text-card-foreground shadow-lg duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-2xl",
                 size ? DIALOG_SIZE[size] : "max-w-lg",
+                SHEET_ON_PHONE,
                 className,
             )}
             {...props}
         >
+            <DialogHandle />
             {children}
             {closeButton ? (
                 /* A 30px target (44 on touch), as the sheet's: never a

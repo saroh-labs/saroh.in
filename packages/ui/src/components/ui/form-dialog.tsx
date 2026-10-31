@@ -107,15 +107,24 @@ export function FormDialog({
             {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
             <DialogContent
                 size={size}
-                className={className}
+                className={cn(
+                    // A phone's bottom sheet keeps its title and buttons in
+                    // view: only the form between them scrolls.
+                    "max-sm:flex max-sm:flex-col max-sm:overflow-hidden",
+                    className,
+                )}
                 {...frame.contentProps}
             >
-                <DialogHeader>
+                <DialogHeader className="max-sm:shrink-0">
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <OverlayProvider value={frame.context}>
-                    <form className="grid min-w-0" id={id} {...frame.formProps}>
+                    <form
+                        className="grid min-w-0 max-sm:-mx-1 max-sm:min-h-0 max-sm:overflow-y-auto max-sm:px-1"
+                        id={id}
+                        {...frame.formProps}
+                    >
                         {composed ? (
                             children
                         ) : (
@@ -145,8 +154,13 @@ export function FormDialog({
     );
 }
 
-/** A dialog's foot has no rule above it: the dialog is short. */
-const DIALOG_FOOT = "mt-5 border-t-0 pt-0";
+/**
+ * At a desk a dialog's foot has no rule above it: the dialog is short. On
+ * a phone it is the bottom sheet's foot, with its rule, pinned under the
+ * fields as they scroll.
+ */
+const DIALOG_FOOT =
+    "sm:mt-5 sm:border-t-0 sm:pt-0 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:bg-card";
 
 /** The foot of a dialog that draws its own parts. */
 export function FormDialogFoot(props: OverlayFootProps) {

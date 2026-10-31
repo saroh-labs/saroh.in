@@ -168,12 +168,29 @@ const SheetDescription = React.forwardRef<
 ));
 SheetDescription.displayName = SheetPrimitive.Description.displayName;
 
+/**
+ * The grab handle a phone bottom sheet wears at its top: the bottom
+ * `FormSheet` and every dialog on a phone (DEC-202), one look.
+ */
+function SheetHandle({ className }: { className?: string }) {
+    return (
+        <div
+            aria-hidden
+            className={cn(
+                "mx-auto h-[5px] w-10 shrink-0 rounded-full bg-border",
+                className,
+            )}
+        />
+    );
+}
+
 export {
     Sheet,
     SheetClose,
     SheetContent,
     SheetDescription,
     SheetFooter,
+    SheetHandle,
     SheetHeader,
     SheetOverlay,
     SheetPortal,

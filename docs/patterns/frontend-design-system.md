@@ -340,6 +340,11 @@
   stacks on a phone with `gap-2` and the main button on top. Never pass a
   footer its own gap or a title its own type. The app draws them through
   `FormSheet`, `FormDialog` and `ConfirmDialog` (`frontend-forms.md`).
+  **Below `sm` every dialog is a bottom sheet** (DEC-202): the bottom
+  `FormSheet`'s look, grab handle and safe-area clearance, baked into
+  `DialogContent` and `AlertDialogContent` as `max-sm:` classes
+  (`SHEET_ON_PHONE`). A caller never adds its own phone position or
+  size to a dialog; a dialog needs no `useNarrow` swap to be a sheet.
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu
