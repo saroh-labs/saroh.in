@@ -51,6 +51,30 @@ describe("ShotImage", () => {
         expect(hero.getAttribute("fetchpriority")).toBe("high");
     });
 
+    it("with priorityFrom, asks for it first only where the media query matches", () => {
+        render(
+            <ShotImage
+                shot={shot}
+                alt="Hero"
+                // Its own sizes: React keeps one preload per image and sizes.
+                sizes="100vw"
+                priority
+                priorityFrom="(min-width: 900px)"
+            />,
+        );
+        const img = screen.getByRole("img", { name: "Hero" });
+        expect(img.getAttribute("loading")).toBe("eager");
+        expect(img.getAttribute("fetchpriority")).toBeNull();
+        const link = document.querySelector(
+            'link[rel="preload"][as="image"][media]',
+        );
+        expect(link?.getAttribute("media")).toBe("(min-width: 900px)");
+        expect(link?.getAttribute("fetchpriority")).toBe("high");
+        expect(link?.getAttribute("imagesrcset")).toContain(
+            "/shots/v2/sized/s-home-640.webp 640w",
+        );
+    });
+
     it("draws a frame of the same shape for a shot not captured yet", () => {
         render(
             <ShotImage

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { buttonClasses } from "@/components/shared/buttons/button";
+import { IntentLink } from "@/components/shared/links/intent-link";
 import type { Consent } from "@/lib/consent";
 import { readChoices, subscribeConsent, writeChoices } from "@/lib/consent";
 import { browserTracking } from "@/lib/error-tracking-browser";
@@ -298,12 +298,12 @@ function CookieNotice({
                 {privacyHref ? (
                     <>
                         {" "}
-                        <Link
+                        <IntentLink
                             href={privacyHref}
                             className={`cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy ${ring()} active:text-muted-foreground`}
                         >
                             Privacy
-                        </Link>
+                        </IntentLink>
                     </>
                 ) : null}
             </p>

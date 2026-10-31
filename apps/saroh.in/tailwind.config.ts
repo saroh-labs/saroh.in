@@ -18,10 +18,46 @@ const shared = sharedConfig.theme?.extend ?? {};
 /** A `--mk-*` channel triple from app/site.css, as a Tailwind colour. */
 const mk = (name: string) => `hsl(var(--mk-${name}) / <alpha-value>)`;
 
+/**
+ * The @saroh/ui files saroh.in draws, rather than the preset's whole
+ * packages/ui glob: the workspace's components there added about 20 KB of
+ * styles this site never used (Lighthouse "unused CSS", 31 Oct 2026).
+ * `tailwind-content.test.ts` fails when saroh.in reaches a file not listed.
+ */
+export const UI_FILES = [
+    "components/ui/button.tsx",
+    "components/ui/command.tsx",
+    "components/ui/copy-button.tsx",
+    "components/ui/crash-page.tsx",
+    "components/ui/dialog.tsx",
+    "components/ui/error-page.tsx",
+    "components/ui/input.tsx",
+    "components/ui/not-found.tsx",
+    "components/ui/phone-input.tsx",
+    "components/ui/popover.tsx",
+    "components/ui/qr-art.tsx",
+    "components/ui/share-card.tsx",
+    "components/ui/wordmark.tsx",
+    "lib/crash-page.ts",
+    "lib/phone.ts",
+    "lib/qr-art.ts",
+    "lib/report-error.ts",
+    "lib/saroh-links.ts",
+    "lib/share-facts.ts",
+    "lib/utils.ts",
+    "lib/wordmark-geometry.ts",
+];
+
 const config: Config = {
     ...sharedConfig,
-    // lib/ring.ts spells out the focus ring's classes (DEC-195, C1).
-    content: [...(sharedConfig.content as string[]), "./lib/ring.ts"],
+    content: [
+        ...(sharedConfig.content as string[]).filter(
+            (glob) => !glob.startsWith("../../packages/ui/"),
+        ),
+        ...UI_FILES.map((file) => `../../packages/ui/src/${file}`),
+        // lib/ring.ts spells out the focus ring's classes (DEC-195, C1).
+        "./lib/ring.ts",
+    ],
     theme: {
         ...sharedConfig.theme,
         extend: {

@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { shots } from "@/content/shots";
+import { CAPTURED } from "@/content/shots.captured";
 
 import {
     SHOT_WIDTHS,
@@ -12,7 +13,16 @@ import {
 } from "./shot-sources";
 
 const PUBLIC = path.join(__dirname, "../public");
-const SIZED = path.join(PUBLIC, "shots/v2/sized");
+/** Every captured shot with sized copies: the pages' and Help's steps'. */
+const CAPTURES = [
+    ...Object.entries(shots).map(([key, shot]) => ({ key, dir: "v2", shot })),
+    ...Object.entries(CAPTURED)
+        .filter(([, shot]) => shot.src.startsWith("/shots/help/"))
+        .map(([key, shot]) => ({ key, dir: "help", shot })),
+];
+const SIZED_DIRS = ["v2", "help"].map((dir) =>
+    path.join(PUBLIC, "shots", dir, "sized"),
+);
 const REBUILD = "run `pnpm --filter web shots:sizes`";
 
 /**
@@ -44,10 +54,23 @@ describe("shotSources", () => {
         ).toEqual({ src: "/shots/v2/small.webp" });
     });
 
+    it("gives a Help step's shot its copies in shots/help/sized", () => {
+        expect(
+            shotSources({ src: "/shots/help/help-x-1.webp", width: 1000 }),
+        ).toEqual({
+            src: "/shots/help/help-x-1.webp",
+            srcSet: [
+                "/shots/help/sized/help-x-1-640.webp 640w",
+                "/shots/help/sized/help-x-1-960.webp 960w",
+                "/shots/help/help-x-1.webp 1000w",
+            ].join(", "),
+        });
+    });
+
     it("serves any other image as it is", () => {
         expect(
-            shotSources({ src: "/shots/help/help-x-1.webp", width: 2048 }),
-        ).toEqual({ src: "/shots/help/help-x-1.webp" });
+            shotSources({ src: "/templates/salon/cover.webp", width: 2048 }),
+        ).toEqual({ src: "/templates/salon/cover.webp" });
     });
 
     it("never points at the image optimizer", () => {
@@ -64,10 +87,10 @@ describe("shotSources", () => {
 
 describe("the sized copies on disk", () => {
     const expected = new Set<string>();
-    for (const [key, shot] of Object.entries(shots)) {
+    for (const { key, dir, shot } of CAPTURES) {
         if (!shot.src) continue;
         for (const w of sizedWidths(shot.width)) {
-            expected.add(path.basename(sizedShotSrc(key, w)));
+            expected.add(sizedShotSrc(key, w, dir));
         }
     }
 
@@ -81,25 +104,29 @@ describe("the sized copies on disk", () => {
 
     it(`has a file for every address a page can name (else ${REBUILD})`, () => {
         const missing = Array.from(expected).filter(
-            (name) => !fs.existsSync(path.join(SIZED, name)),
+            (src) => !fs.existsSync(path.join(PUBLIC, src)),
         );
         expect(missing, REBUILD).toEqual([]);
     });
 
     it(`has no copy left behind by a shot that is gone (else ${REBUILD})`, () => {
-        const extra = fs
-            .readdirSync(SIZED)
-            .filter((name) => !expected.has(name));
+        const extra = SIZED_DIRS.flatMap((dir) =>
+            fs
+                .readdirSync(dir)
+                .map(
+                    (name) => `/${path.relative(PUBLIC, path.join(dir, name))}`,
+                ),
+        ).filter((src) => !expected.has(src));
         expect(extra, REBUILD).toEqual([]);
     });
 
     it("each copy is lighter than its capture", () => {
-        for (const [key, shot] of Object.entries(shots)) {
+        for (const { key, dir, shot } of CAPTURES) {
             if (!shot.src) continue;
             const full = fs.statSync(path.join(PUBLIC, shot.src)).size;
             for (const w of sizedWidths(shot.width)) {
                 const copy = fs.statSync(
-                    path.join(PUBLIC, sizedShotSrc(key, w)),
+                    path.join(PUBLIC, sizedShotSrc(key, w, dir)),
                 ).size;
                 expect(copy, `${key} at ${w}`).toBeLessThan(full);
             }
