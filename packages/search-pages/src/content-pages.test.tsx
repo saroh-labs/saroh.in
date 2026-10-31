@@ -343,7 +343,32 @@ describe("hubs", () => {
         );
         expect(eyes).toContain("Excel · Word");
         expect(eyes).toContain("Excel · CSV");
+        expect(eyes).toContain("PDF · Word");
+        expect(eyes).toContain("Excel · PDF");
         expect(screen.getByText(/Free, no account needed\./)).toBeTruthy();
+    });
+
+    it("downloads: the sections in the board's order, an unlisted one last", () => {
+        const pages = embeddedDocs.list("downloads");
+        const [first] = pages;
+        if (!first) throw new Error("no download page");
+        const { container } = render(
+            <DownloadsHub
+                pages={[
+                    { ...first, slug: "new", group: "Something new" },
+                    ...pages,
+                ]}
+            />,
+        );
+        expect(
+            [...container.querySelectorAll(".sp-hc-h")].map(
+                (h) => h.textContent,
+            ),
+        ).toEqual([
+            "Bills and invoices",
+            "Running the business",
+            "Something new",
+        ]);
     });
 });
 

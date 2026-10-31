@@ -9,10 +9,12 @@
  * download page's slug and name to it, so keep one `"slug": "Name",` per line.
  */
 export const DOWNLOAD_NAMES: Readonly<Record<string, string>> = {
+    "appointment-book": "Appointment book",
     "bill-of-supply-format": "Bill of supply format",
     "customer-list-template": "Customer list",
     "gst-invoice-format": "GST invoice format",
     "receipt-format": "Receipt format",
+    "salon-rate-card": "Salon rate card",
 };
 
 /** The slugs the gate takes. */

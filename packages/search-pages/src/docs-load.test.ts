@@ -52,10 +52,12 @@ describe("docs content", () => {
             "/guides/your-first-website",
         ]);
         expect(paths.filter((p) => p.startsWith("/downloads/"))).toEqual([
+            "/downloads/appointment-book",
             "/downloads/bill-of-supply-format",
             "/downloads/customer-list-template",
             "/downloads/gst-invoice-format",
             "/downloads/receipt-format",
+            "/downloads/salon-rate-card",
         ]);
         expect(paths).toContain("/gst/salon-and-beauty-services");
     });

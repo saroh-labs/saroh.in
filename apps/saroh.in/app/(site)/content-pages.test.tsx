@@ -82,10 +82,17 @@ describe("/guides and /downloads", () => {
         ).toBeGreaterThan(0);
         cleanup();
         const download = await import("./downloads/[slug]/page");
-        const d = render(
-            await download.default(slug("customer-list-template")),
-        );
-        expect(d.container.querySelectorAll(".sp-dl-ben li").length).toBe(3);
+        for (const s of [
+            "customer-list-template",
+            "salon-rate-card",
+            "appointment-book",
+        ]) {
+            const d = render(await download.default(slug(s)));
+            expect(d.container.querySelectorAll(".sp-dl-ben li").length).toBe(
+                3,
+            );
+            cleanup();
+        }
     });
 
     it("each hub lists the pages this build has, noindex while none is live", async () => {

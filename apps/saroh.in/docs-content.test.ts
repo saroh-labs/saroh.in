@@ -78,10 +78,12 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
             expect(gen()).toContain(`"${slug}"`);
         expect(gen()).toContain("export const DOC_PARTIAL: boolean = false;");
         expect(downloads()).toEqual([
+            "appointment-book",
             "bill-of-supply-format",
             "customer-list-template",
             "gst-invoice-format",
             "receipt-format",
+            "salon-rate-card",
         ]);
     });
 

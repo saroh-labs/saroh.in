@@ -218,8 +218,9 @@ def col_num(letters):
 
 
 class Sheet:
-    def __init__(self, name, widths):
-        self.name, self.widths, self.cells = name, widths, {}
+    def __init__(self, name, widths, fit=False):
+        """`fit`: print on one page."""
+        self.name, self.widths, self.cells, self.fit = name, widths, {}, fit
 
     def put(self, ref, value, style=S_TEXT):
         self.cells[ref] = (value, style)
@@ -248,10 +249,12 @@ def sheet_xml(sheet, strings):
     cols = "".join(f'<col min="{i}" max="{i}" width="{w}" customWidth="1"/>'
                    for i, w in enumerate(sheet.widths, 1))
     footer = escape(f"&C{MADE_WITH}")
+    pr = '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' if sheet.fit else ""
+    fit = 'fitToWidth="1" fitToHeight="1"' if sheet.fit else 'fitToHeight="0"'
     return (f'{XML}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            f'<cols>{cols}</cols><sheetData>{"".join(out)}</sheetData>'
+            f'{pr}<cols>{cols}</cols><sheetData>{"".join(out)}</sheetData>'
             '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'
-            '<pageSetup paperSize="9" orientation="landscape" fitToHeight="0"/>'
+            f'<pageSetup paperSize="9" orientation="landscape" {fit}/>'
             f"<headerFooter><oddFooter>{footer}</oddFooter></headerFooter></worksheet>")
 
 
@@ -610,8 +613,8 @@ def pdf_text(s):
     return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def receipt_page(ex):
-    """One A4 receipt to print and fill in by hand (Helvetica, WinAnsi: "Rs." for ₹)."""
+def pdf_ops():
+    """A page's drawing list and the pens that add to it (Helvetica, WinAnsi: "Rs." for ₹)."""
     ops = []
 
     def text(x, y, s, size=10, bold=False, grey=False):
@@ -621,10 +624,16 @@ def receipt_page(ex):
     def line(x1, y1, x2, y2):
         ops.append(f"{x1} {y1} m {x2} {y2} l S")
 
-    def rtext(x, y, s, size=10):
+    def rtext(x, y, s, size=10, bold=False):
         # Helvetica digits are 0.556 em wide; close enough to right-align figures.
-        text(round(x - len(s) * size * 0.53, 1), y, s, size)
+        text(round(x - len(s) * size * 0.53, 1), y, s, size, bold)
 
+    return ops, text, line, rtext
+
+
+def receipt_page(ex):
+    """One A4 receipt to print and fill in by hand."""
+    ops, text, line, rtext = pdf_ops()
     ops.append("0.82 0.84 0.86 RG 0.75 w")
     text(50, 780, "Receipt", 24, bold=True)
     s = SALON if ex else {}
@@ -690,16 +699,16 @@ def receipt_page(ex):
     return "\n".join(ops)
 
 
-def write_pdf(path, pages):
+def write_pdf(path, pages, title="Receipt", size=(595, 842)):
     objs = ["<< /Type /Catalog /Pages 2 0 R >>", None,
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
-            "<< /Title (Receipt) /Creator (Saroh, saroh.in) >>"]
+            f"<< /Title ({pdf_text(title)}) /Creator (Saroh, saroh.in) >>"]
     kids = []
     for content in pages:
         data = content.encode("cp1252")
         objs.append(f"<< /Length {len(data)} >>\nstream\n{data.decode('cp1252')}\nendstream")
-        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {size[0]} {size[1]}] "
                     f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {len(objs)} 0 R >>")
         kids.append(f"{len(objs)} 0 R")
     objs[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
@@ -713,6 +722,154 @@ def write_pdf(path, pages):
     out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R /Info 5 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(bytes(out))
+
+
+# ---------------------------------------------------------------- rate card
+# A fixed, fill-in version of the salon rate card maker
+# (src/tools/salon-rate-card-maker): services by section, time and price.
+# The example's prices are the fictional salon's own, never Saroh's.
+
+RATE_CARD_SALON = {"name": "Lotus Hair Studio", "tag": "Hair, skin and nails in Indiranagar",
+                   "phone": "+91 90000 00010"}
+RATE_CARD = [
+    ("Hair", [("Haircut and blow-dry", "45 min", 600), ("Blow-dry", "30 min", 400),
+              ("Hair spa", "60 min", 1200), ("Root touch-up", "60 min", 1500),
+              ("Global colour", "120 min", 3500)]),
+    ("Skin", [("Clean-up", "40 min", 800), ("De-tan", "30 min", 700),
+              ("Hydrating facial", "60 min", 1800)]),
+    ("Hands and feet", [("Manicure", "30 min", 600), ("Pedicure", "45 min", 800),
+                        ("Gel polish", "45 min", 900)]),
+    ("Waxing and threading", [("Eyebrow threading", "10 min", 80), ("Full arms wax", "30 min", 450),
+                              ("Full legs wax", "45 min", 700)]),
+]
+OWN_LINES = 2  # empty lines under each section for their own services
+
+
+def rate_card_page(ex):
+    """One A4 rate card: printed names, blank times and prices (the example fills them)."""
+    ops, text, line, rtext = pdf_ops()
+    ops.append("0.82 0.84 0.86 RG 0.75 w")
+    if ex:
+        text(50, 780, RATE_CARD_SALON["name"], 24, bold=True)
+        text(50, 760, RATE_CARD_SALON["tag"], 11, grey=True)
+        text(50, 742, f"Bookings: {RATE_CARD_SALON['phone']}", 10)
+    else:
+        for i, label in enumerate(["Business name", "Line under the name", "Phone for bookings"]):
+            y = 785 - i * 26
+            text(50, y, label, 9, bold=True)
+            line(170, y - 3, 545, y - 3)
+    y = 708
+    text(50, y, "Service", 9, bold=True, grey=True)
+    text(380, y, "Time", 9, bold=True, grey=True)
+    rtext(545, y, "Price (Rs.)", 9, bold=True)
+    line(50, y - 6, 545, y - 6)
+    y -= 30
+    for section, services in RATE_CARD:
+        text(50, y, section, 12, bold=True)
+        y -= 21
+        for name, time, price in services + [("", "", 0)] * (0 if ex else OWN_LINES):
+            if name:
+                text(62, y, name, 10)
+            if ex:
+                text(380, y, time, 10)
+                rtext(545, y, f"Rs. {price:,}")
+            line(50, y - 6, 545, y - 6)
+            y -= 21
+        y -= 9
+    text(229, 30, MADE_WITH, 8, grey=True)
+    return "\n".join(ops)
+
+
+def rate_card_doc(ex):
+    head = ([para(RATE_CARD_SALON["name"], bold=True, size=20, after=40),
+             para(RATE_CARD_SALON["tag"], color=GREY, after=40),
+             para(f"Bookings: {RATE_CARD_SALON['phone']}", after=200)] if ex else
+            [para("Rate card", bold=True, size=20, after=200),
+             table([["Business name", ""], ["Line under the name", ""], ["Phone for bookings", ""]],
+                   [3000, PAGE_W - 3000], bold_cols=(0,)), para(after=80)])
+    out = list(head)
+    for section, services in RATE_CARD:
+        rows = [[name, time if ex else "", f"₹{price:,}" if ex else ""] for name, time, price in services]
+        rows += [] if ex else [["", "", ""]] * OWN_LINES
+        out += [para(section, bold=True, size=12, after=60),
+                table([["Service", "Time", "Price (₹)"]] + rows, [6038, 1800, 1800],
+                      head=True, right_cols=(2,), height=320),
+                para(after=80)]
+    return out
+
+
+# ---------------------------------------------------------------- appointment book
+
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+SLOTS = [f"{h}:{m:02d}" for h in range(9, 21) for m in (0, 30)]  # 9:00 to 20:30, ends 21:00
+assert len(SLOTS) == 24 and SLOTS[-1] == "20:30"
+BOOKINGS = [
+    ("Date", "Time", "Client", "Phone", "Service", "Notes"),
+    ("2026-11-03", "10:00", "Priya Nair", "+91 90000 00001", "Global colour", "Patch test done"),
+    ("2026-11-07", "17:30", "Rahul Menon", "+91 90000 00002", "Haircut and blow-dry", ""),
+]
+BOOKING_ROWS = 50
+S_BOX = S_OUT_MONEY  # bordered, no fill: its number format leaves text as typed
+
+
+def appointment_sheets():
+    week = Sheet("Week", [8] + [18] * len(DAYS), fit=True)
+    week.put("A1", "Appointment book", S_TITLE)
+    week.put("A2", "Write the client and the service in their slot. "
+                   "Their phone and notes go on the Bookings sheet.", S_GREY)
+    week.put("A4", "Week of", S_BOLD)
+    week.put("B4", None, S_IN)
+    week.put("A6", "Time", S_HEAD)
+    for i, day in enumerate(DAYS):
+        week.put(f"{chr(66 + i)}6", day, S_HEAD)
+    for r, slot in enumerate(SLOTS, 7):
+        week.put(f"A{r}", slot, S_BOLD)
+        for i in range(len(DAYS)):
+            week.put(f"{chr(66 + i)}{r}", None, S_BOX)
+    week.put(f"A{8 + len(SLOTS)}", MADE_WITH, S_GREY)
+    book = Sheet("Bookings", [12, 8, 22, 18, 24, 34])
+    for r in range(1, BOOKING_ROWS + 2):
+        row = BOOKINGS[r - 1] if r <= len(BOOKINGS) else ("",) * 6
+        for i, v in enumerate(row):
+            book.put(f"{chr(65 + i)}{r}", v or None, S_HEAD if r == 1 else S_IN)
+    about = Sheet("Read me", [90])
+    for r, (v, st) in enumerate([
+        ("Appointment book", S_TITLE),
+        ("Week: one sheet for each week, Monday to Sunday, in half-hour slots from 9:00 to 21:00.", S_TEXT),
+        ("Write the week's first date in Week of. For the next week, copy the sheet "
+         "(right-click its tab, then Move or Copy).", S_TEXT),
+        ("A longer service takes more than one slot: write it in each one.", S_TEXT),
+        ("Bookings: one row for each booking, with the client's phone and notes. "
+         "Replace the two example rows with your own.", S_TEXT),
+        ("To print a week, print the Week sheet. It fits on one A4 page, landscape.", S_TEXT),
+        (MADE_WITH, S_GREY),
+    ], 1):
+        about.put(f"A{r}", v, st)
+    return [week, book, about]
+
+
+def appointment_page():
+    """One A4 landscape week to print: time slots down, days across."""
+    ops, text, line, _ = pdf_ops()
+    ops.append("0.82 0.84 0.86 RG 0.75 w")
+    text(40, 552, "Appointment book", 18, bold=True)
+    text(560, 552, "Week of", 10, bold=True)
+    line(610, 549, 802, 549)
+    x0, tw, dw, top, hh, rh = 40, 50, 101, 525, 20, 19
+    right, bottom = x0 + tw + dw * len(DAYS), top - hh - rh * len(SLOTS)
+    ops.append(f"0.95 0.96 0.96 rg {x0} {top - hh} {right - x0} {hh} re f")
+    ops.append(f"{x0} {bottom} {right - x0} {top - bottom} re S")
+    text(x0 + 6, top - 14, "Time", 9, bold=True)
+    for i, day in enumerate(DAYS):
+        x = x0 + tw + dw * i
+        line(x, top, x, bottom)
+        text(x + 6, top - 14, day, 9, bold=True)
+    for i, slot in enumerate(SLOTS):
+        y = top - hh - rh * i
+        line(x0, y, right, y)
+        text(x0 + 6, y - 13, slot, 8, grey=slot.endswith(":30"))
+    text(353, 25, MADE_WITH, 8, grey=True)
+    return "\n".join(ops)
 
 
 # ---------------------------------------------------------------- checks
@@ -752,6 +909,13 @@ def main():
         "customer-list-template/customer-list.xlsx": lambda p: write_xlsx(p, customer_sheets()),
         "customer-list-template/customer-list.csv": lambda p: p.write_text(
             "".join(",".join(row) + "\r\n" for row in CUSTOMERS), encoding="utf-8"),
+        "salon-rate-card/salon-rate-card.pdf": lambda p: write_pdf(
+            p, [rate_card_page(False), rate_card_page(True)], title="Salon rate card"),
+        "salon-rate-card/salon-rate-card.docx": lambda p: write_docx(
+            p, rate_card_doc(False) + [PAGE_BREAK] + rate_card_doc(True)),
+        "appointment-book/appointment-book.xlsx": lambda p: write_xlsx(p, appointment_sheets()),
+        "appointment-book/appointment-book.pdf": lambda p: write_pdf(
+            p, [appointment_page()], title="Appointment book", size=(842, 595)),
     }
     for rel, make in out.items():
         path = FILES / rel

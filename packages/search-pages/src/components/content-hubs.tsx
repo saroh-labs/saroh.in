@@ -191,6 +191,14 @@ export type DownloadsHubPage = Pick<
     "slug" | "name" | "line" | "group" | "files"
 >;
 
+/** The hub's sections in the board's order; pages come sorted by slug, which would put "Running the business" first. */
+const DOWNLOAD_GROUPS = ["Bills and invoices", "Running the business"];
+/** A group not listed goes last. */
+const groupRank = (g: string) => {
+    const i = DOWNLOAD_GROUPS.indexOf(g);
+    return i === -1 ? DOWNLOAD_GROUPS.length : i;
+};
+
 export function DownloadsHub({
     pages,
     links = {},
@@ -208,7 +216,9 @@ export function DownloadsHub({
             title="Free templates for small businesses in India"
             lead="Excel, Word and PDF files you can use today. Free, no account needed."
             groups={grouped(
-                pages,
+                [...pages].sort(
+                    (a, b) => groupRank(a.group) - groupRank(b.group),
+                ),
                 (p) => p.group,
                 (p) => ({
                     name: p.name,
