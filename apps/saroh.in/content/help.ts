@@ -1,18 +1,15 @@
 import { formatDay } from "@/lib/format/day";
 
 import { SAROH_CONTACT_EMAIL } from "./contact";
-import type { HelpFrontmatter } from "./help-frontmatter";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
-
-export type { HelpFrontmatter, HelpStep } from "./help-frontmatter";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-10-31";
 
 /**
  * Help (Resources plan U5, design "Saroh Resources - Help" 1a and 2a): the
@@ -96,7 +93,8 @@ export interface HelpSummary {
     publishOn: IsoDay;
 }
 
-export function summarise(fm: HelpFrontmatter): HelpSummary {
+/** An article's summary, from its frontmatter (or anything with those fields). */
+export function summarise(fm: HelpSummary): HelpSummary {
     return {
         slug: fm.slug,
         title: fm.title,
