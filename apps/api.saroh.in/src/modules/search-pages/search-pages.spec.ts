@@ -90,6 +90,18 @@ describe("search page DTOs", () => {
         ).resolves.toBeDefined();
     });
 
+    it("takes the new page groups' paths too (plan 2026-10-31-002)", async () => {
+        await expect(
+            body({
+                action: "publish",
+                paths: ["/gst/x", "/guides/x", "/downloads/x"],
+            }),
+        ).resolves.toBeInstanceOf(SearchPageActionDto);
+        await expect(
+            body({ action: "publish", paths: ["/gst/"] }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it.each([
         ["no paths", { action: "publish", paths: [] }],
         [
@@ -99,7 +111,7 @@ describe("search page DTOs", () => {
                 paths: Array.from({ length: 101 }, (_, i) => `/for/p-${i}`),
             },
         ],
-        ["another kind", { action: "publish", paths: ["/guides/qr"] }],
+        ["another kind", { action: "publish", paths: ["/blog/qr"] }],
         ["a bare kind", { action: "publish", paths: ["/tools/"] }],
         ["capitals", { action: "publish", paths: ["/for/Salons"] }],
         ["a nested path", { action: "publish", paths: ["/for/a/b"] }],

@@ -158,6 +158,22 @@ describe("parseAnswer", () => {
     });
 });
 
+describe("parseAnswer and the page groups on the shared kit", () => {
+    it("takes /gst/, /guides/ and /downloads/ pages, as the API does, and still refuses any other group", () => {
+        const list = {
+            live: ["/gst/a", "/guides/b"],
+            takenOff: [{ path: "/downloads/c", at: "x" }],
+        };
+        expect(parseAnswer(list)).toEqual(list);
+        expect(() =>
+            parseAnswer({ live: ["/blog/x"], takenOff: [] }),
+        ).toThrow();
+        expect(() =>
+            parseAnswer({ live: ["/gst/a/b"], takenOff: [] }),
+        ).toThrow();
+    });
+});
+
 describe("toolExists", () => {
     it("finds a tool's content file, the app's own tools included", () => {
         expect(toolExists("no-show-cost-calculator")).toBe(true);

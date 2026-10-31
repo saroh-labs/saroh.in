@@ -11,12 +11,15 @@
     "types": "./src/index.ts",
     "files": [
         "src/**",
-        "content/**"
+        "content/**",
+        "kinds.js",
+        "kinds.d.ts"
     ],
     "exports": {
         ".": "./src/index.ts",
         "./checks": "./src/checks.tsx",
         "./download": "./src/tools/download.ts",
+        "./kinds": "./kinds.js",
         "./styles.css": "./src/styles.css"
     },
     "scripts": {

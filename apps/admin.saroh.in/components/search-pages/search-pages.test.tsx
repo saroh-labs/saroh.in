@@ -89,6 +89,34 @@ describe("SearchPagesTable (DEC-193)", () => {
         expect(screen.getByText("Section")).toBeTruthy();
     });
 
+    it("lists the new groups in the kind choice, and an empty one draws without a crash (plan 2026-10-31-002)", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                kindCounts={{ for: 34, tools: 3 }}
+                rows={[]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: /GST guides · \/gst\/ · 0/ })
+                .getAttribute("href"),
+        ).toBe("/search-pages?kind=gst");
+        expect(
+            screen.getByRole("link", { name: /Guides · \/guides\/ · 0/ }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("link", {
+                name: /Free downloads · \/downloads\/ · 0/,
+            }),
+        ).toBeTruthy();
+        expect(screen.getByText("No pages here")).toBeTruthy();
+    });
+
     it("lists every page that isn't archived, with its status", () => {
         table(false);
         expect(screen.getByRole("link", { name: /Salons/ })).toBeTruthy();

@@ -9,6 +9,7 @@ import {
     historyWords,
     inFilter,
     kindOf,
+    KINDS,
     matchesQuery,
     mergePages,
     refusalWords,
@@ -337,7 +338,53 @@ describe("free tools (#1253)", () => {
     it("reads the kind from the address, trade pages by default", () => {
         expect(kindOf("tools")).toBe("tools");
         expect(kindOf(undefined)).toBe("for");
-        expect(kindOf("guides")).toBe("for");
+        expect(kindOf("guides")).toBe("guides");
+        expect(kindOf("blog")).toBe("for");
+    });
+
+    it("chooses between every kind, the new groups with no pages yet (plan 2026-10-31-002)", () => {
+        expect(KINDS.map((k) => [k.kind, k.label, k.path])).toEqual([
+            ["for", "Trade pages", "/for/"],
+            ["tools", "Free tools", "/tools/"],
+            ["gst", "GST guides", "/gst/"],
+            ["guides", "Guides", "/guides/"],
+            ["downloads", "Free downloads", "/downloads/"],
+        ]);
+        expect(kindOf("gst")).toBe("gst");
+        expect(kindOf("downloads")).toBe("downloads");
+        // The API may hold a record for a new group's page the code lacks.
+        const rows = mergePages([entry("salons")], {
+            pages: [
+                {
+                    ...record("salons", "LIVE"),
+                    path: "/gst/composition-scheme",
+                },
+            ],
+            rebuild: idle,
+        });
+        expect(rows.filter((r) => r.kind === "gst")).toEqual([]);
+        expect(rows).toHaveLength(1);
+    });
+
+    it("says where a live page of a new group shows", () => {
+        expect(
+            whereItShows("live", "saroh.in", "gst").map((w) => w.label),
+        ).toContain("The /gst list, the menu and the footer");
+        const on = dialogWords(
+            "publish",
+            [
+                {
+                    name: "Composition scheme",
+                    slug: "composition-scheme",
+                    family: "",
+                    state: "draft",
+                    kind: "gst",
+                },
+            ],
+            "saroh.in",
+            "saroh.io",
+        );
+        expect(on.points.join(" ")).toContain("the /gst list");
     });
 
     it("says a tool taken off goes to /tools, and where a live one shows", () => {

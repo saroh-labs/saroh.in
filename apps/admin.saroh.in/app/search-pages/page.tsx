@@ -9,7 +9,7 @@ import { RebuildBanner } from "@/components/search-pages/rebuild-banner";
 import { SearchPagesTable } from "@/components/search-pages/search-pages-table";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { kindOf, rebuildWords } from "@/lib/search-page-words";
+import { KINDS, kindOf, rebuildWords } from "@/lib/search-page-words";
 import { readSearchPages, searchPagesGate, siteInfo } from "@/lib/search-pages";
 
 export const metadata = { title: "Search pages" };
@@ -82,14 +82,14 @@ export default async function SearchPagesPage({
                             <SearchPagesTable
                                 key={kind}
                                 kind={kind}
-                                kindCounts={{
-                                    for: data.rows.filter(
-                                        (r) => r.kind === "for",
-                                    ).length,
-                                    tools: data.rows.filter(
-                                        (r) => r.kind === "tools",
-                                    ).length,
-                                }}
+                                kindCounts={Object.fromEntries(
+                                    KINDS.map((k) => [
+                                        k.kind,
+                                        data.rows.filter(
+                                            (r) => r.kind === k.kind,
+                                        ).length,
+                                    ]),
+                                )}
                                 rows={data.rows.filter((r) => r.kind === kind)}
                                 site={site.host}
                                 reviewSite={site.reviewHost}

@@ -1,6 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { DOC_PAGE_PATH } = require("@saroh/search-pages/kinds");
+
 const buildState = require("./build-state.config");
 
 /**
@@ -35,6 +37,13 @@ const TOOLS_CONTENT = path.join(
     "../../packages/search-pages/content/tools",
 );
 const PAGE_PATH = /^\/(for|tools)\/[a-z0-9-]+$/;
+/**
+ * A path the publish list may hold: /for/ or /tools/, or a page of a group
+ * on the shared kit (`@saroh/search-pages/kinds`, the list the API's path
+ * rule copies), so a page the API accepts never fails a production build.
+ * @param {string} p
+ */
+const pagePath = (p) => PAGE_PATH.test(p) || DOC_PAGE_PATH.test(p);
 const TIMEOUT_MS = 5000;
 /** As `lib/build-retry.ts`: about a minute, to ride out an API restart. */
 const RETRY_DELAYS_MS = [3000, 8000, 15000, 30000];
@@ -49,14 +58,12 @@ function parseAnswer(body) {
     if (!b || !Array.isArray(b.live) || !Array.isArray(b.takenOff)) {
         throw new Error("the answer is not { live, takenOff }");
     }
-    const live = b.live.filter(
-        (p) => typeof p === "string" && PAGE_PATH.test(p),
-    );
+    const live = b.live.filter((p) => typeof p === "string" && pagePath(p));
     const takenOff = b.takenOff.filter(
         (t) =>
             t &&
             typeof t.path === "string" &&
-            PAGE_PATH.test(t.path) &&
+            pagePath(t.path) &&
             typeof t.at === "string",
     );
     if (
@@ -64,7 +71,7 @@ function parseAnswer(body) {
         takenOff.length !== b.takenOff.length
     ) {
         throw new Error(
-            "the answer has a path that isn't /for/<slug> or /tools/<slug>",
+            "the answer has a path that isn't a search page's (/for/<slug>, /tools/<slug>, /gst/<slug>…)",
         );
     }
     return {

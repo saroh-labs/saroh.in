@@ -74,7 +74,7 @@ export function SearchPagesTable({
     /** Which kind the rows are (`?kind=`): trade pages or free tools. */
     kind?: PageKind;
     /** How many pages of each kind, for the Kind choice; none hides it. */
-    kindCounts?: Record<PageKind, number>;
+    kindCounts?: Partial<Record<PageKind, number>>;
     rows: PageRow[];
     site: string;
     reviewSite: string;
@@ -177,11 +177,11 @@ export function SearchPagesTable({
                                     value={kind}
                                     options={KINDS.map((k) => ({
                                         value: k.kind,
-                                        label: `${k.label} · ${k.path} · ${kindCounts[k.kind]}`,
+                                        label: `${k.label} · ${k.path} · ${kindCounts[k.kind] ?? 0}`,
                                         href:
                                             k.kind === "for"
                                                 ? "/search-pages"
-                                                : "/search-pages?kind=tools",
+                                                : `/search-pages?kind=${k.kind}`,
                                     }))}
                                 />
                             </span>

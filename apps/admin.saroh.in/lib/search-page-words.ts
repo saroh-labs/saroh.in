@@ -1,4 +1,6 @@
 import type { SearchPageEntry } from "@saroh/search-pages";
+import type { DocKindId } from "@saroh/search-pages/kinds";
+import { DOC_KINDS } from "@saroh/search-pages/kinds";
 
 import { formatDate, formatDateTime } from "./format";
 
@@ -49,7 +51,8 @@ export type RowState =
     | "unpublished"
     | "archived";
 
-export type PageKind = "for" | "tools";
+/** /for/, tools, and the groups on the shared kit (`@saroh/search-pages/kinds`). */
+export type PageKind = "for" | "tools" | DocKindId;
 
 export interface PageRow {
     path: string;
@@ -314,15 +317,24 @@ export interface DialogPage {
 export const KINDS: { kind: PageKind; label: string; path: string }[] = [
     { kind: "for", label: "Trade pages", path: "/for/" },
     { kind: "tools", label: "Free tools", path: "/tools/" },
+    ...DOC_KINDS.map((k) => ({
+        kind: k.id,
+        label: k.hubLabel,
+        path: k.prefix,
+    })),
 ];
 
 export const kindOf = (asked: string | undefined): PageKind =>
-    asked === "tools" ? "tools" : "for";
+    KINDS.find((k) => k.kind === asked)?.kind ?? "for";
 
 /** Where a page of this kind is listed on the site. */
 const LIST_WORDS: Record<PageKind, string> = {
     for: "the /for/ list and the footer",
     tools: "the /tools list, the Tools menu and the footer",
+    ...(Object.fromEntries(DOC_KINDS.map((k) => [k.id, k.listWords])) as Record<
+        DocKindId,
+        string
+    >),
 };
 
 export interface DialogWords {
@@ -352,7 +364,11 @@ export function dialogWords(
     const these = one ? "this page" : "these pages";
     const count = one ? "page" : `${n} pages`;
     const tools = pages.length > 0 && pages.every((p) => p.kind === "tools");
-    const listed = LIST_WORDS[tools ? "tools" : "for"];
+    const kind = first?.kind ?? "for";
+    const listed =
+        LIST_WORDS[
+            pages.every((p) => (p.kind ?? "for") === kind) ? kind : "for"
+        ];
     switch (action) {
         case "publish":
             return {
@@ -501,7 +517,9 @@ export function whereItShows(
             label:
                 kind === "tools"
                     ? "The /tools list, the menu and the footer"
-                    : "The /for/ list and the footer",
+                    : kind === "for"
+                      ? "The /for/ list and the footer"
+                      : `The${LIST_WORDS[kind].slice("the".length)}`,
             on: live,
             value: live ? "Linked" : "Not linked",
         },
