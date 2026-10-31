@@ -24,6 +24,7 @@ export function ScreenshotFrame({
     variant = "shot",
     zoomable = false,
     priority = false,
+    priorityFrom,
     sizes = "(min-width: 1280px) 760px, 100vw",
     className,
 }: {
@@ -33,13 +34,21 @@ export function ScreenshotFrame({
     variant?: "shot" | "hero" | "home";
     zoomable?: boolean;
     priority?: boolean;
+    /** `ShotImage`'s: high priority only where this media query matches. */
+    priorityFrom?: string;
     sizes?: string;
     className?: string;
 }) {
     const entry = shots[shot];
     const text = alt ?? entry.alt;
     const image = (
-        <ShotImage shot={entry} alt={text} sizes={sizes} priority={priority} />
+        <ShotImage
+            shot={entry}
+            alt={text}
+            sizes={sizes}
+            priority={priority}
+            priorityFrom={priorityFrom}
+        />
     );
     return (
         <div

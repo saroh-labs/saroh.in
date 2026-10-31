@@ -1,8 +1,8 @@
-import Image from "next/image";
-
 import { stepId, stepNumber } from "@/content/help";
 import type { HelpStep as Step } from "@/content/help-frontmatter";
 import { CAPTURED } from "@/content/shots.captured";
+
+import { ShotImage } from "../shared/media/shot-image";
 
 /**
  * One step of a Help article (design 2a): its number and title, what to
@@ -40,17 +40,14 @@ export function HelpStep({ step, index }: { step: Step; index: number }) {
                     data-shot={step.shot}
                     className="relative overflow-hidden rounded-xl border border-border bg-card shadow-mk-lift"
                 >
-                    <Image
-                        src={shot.src}
+                    {/* Files, never the optimizer (it re-encoded on every
+                        request, and in CI one request could hang): the
+                        capture and its copies in shots/help/sized, so a phone
+                        fetches a 640 or 960 one, not the 2048 capture. */}
+                    <ShotImage
+                        shot={shot}
                         alt={shot.alt}
-                        width={shot.width}
-                        height={shot.height}
                         sizes="(min-width: 900px) 680px, 100vw"
-                        // Captured as WebP at their size already (≤ ~110 KB);
-                        // the optimizer only re-encodes them, and under `next
-                        // start` in CI one request in it can hang (DEV_LEARNINGS).
-                        unoptimized
-                        className="block h-auto w-full"
                     />
                     {mark ? (
                         <span

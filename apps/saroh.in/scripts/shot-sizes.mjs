@@ -11,7 +11,8 @@
  * widths a page can ask for are made here, once, and committed:
  * `public/shots/v2/<key>.webp` (the capture, `e2e/marketing-shots/capture.ts`)
  * gets `public/shots/v2/sized/<key>-<width>.webp` for every width in
- * `content/shot-widths.json` narrower than itself.
+ * `content/shot-widths.json` narrower than itself; Help's step shots
+ * (`public/shots/help/`) get theirs the same way, in `shots/help/sized/`.
  * `components/shared/media/shot-image.tsx` names them in a `srcset`
  * (`lib/shot-sources.ts`), and `public/_headers` lets a browser keep them.
  *
@@ -25,8 +26,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const APP = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SHOTS = path.join(APP, "public/shots/v2");
-const SIZED = path.join(SHOTS, "sized");
+const DIRS = ["v2", "help"].map((dir) => path.join(APP, "public/shots", dir));
 const WIDTHS = JSON.parse(
     fs.readFileSync(path.join(APP, "content/shot-widths.json"), "utf8"),
 );
@@ -39,36 +39,41 @@ const fromApp = createRequire(path.join(APP, "package.json"));
 const sharp = createRequire(fromApp.resolve("next/package.json"))("sharp");
 
 const force = process.argv.includes("--force");
-fs.mkdirSync(SIZED, { recursive: true });
-const wanted = new Set();
+let total = 0;
 let written = 0;
+let removed = 0;
 let bytes = 0;
 
-for (const file of fs.readdirSync(SHOTS).sort()) {
-    if (!file.endsWith(".webp")) continue;
-    const key = file.slice(0, -".webp".length);
-    const source = path.join(SHOTS, file);
-    const { width = 0 } = await sharp(source).metadata();
-    for (const w of WIDTHS) {
-        if (w >= width) continue;
-        const name = `${key}-${w}.webp`;
-        const out = path.join(SIZED, name);
-        wanted.add(name);
-        if (force || !fs.existsSync(out)) {
-            await sharp(source).resize({ width: w }).webp(WEBP).toFile(out);
-            written += 1;
+for (const SHOTS of DIRS) {
+    const SIZED = path.join(SHOTS, "sized");
+    fs.mkdirSync(SIZED, { recursive: true });
+    const wanted = new Set();
+    for (const file of fs.readdirSync(SHOTS).sort()) {
+        if (!file.endsWith(".webp")) continue;
+        const key = file.slice(0, -".webp".length);
+        const source = path.join(SHOTS, file);
+        const { width = 0 } = await sharp(source).metadata();
+        for (const w of WIDTHS) {
+            if (w >= width) continue;
+            const name = `${key}-${w}.webp`;
+            const out = path.join(SIZED, name);
+            wanted.add(name);
+            if (force || !fs.existsSync(out)) {
+                await sharp(source).resize({ width: w }).webp(WEBP).toFile(out);
+                written += 1;
+            }
+            bytes += fs.statSync(out).size;
         }
-        bytes += fs.statSync(out).size;
     }
-}
 
-let removed = 0;
-for (const file of fs.readdirSync(SIZED)) {
-    if (wanted.has(file)) continue;
-    fs.rmSync(path.join(SIZED, file));
-    removed += 1;
+    for (const file of fs.readdirSync(SIZED)) {
+        if (wanted.has(file)) continue;
+        fs.rmSync(path.join(SIZED, file));
+        removed += 1;
+    }
+    total += wanted.size;
 }
 
 console.log(
-    `${wanted.size} sized shots (${(bytes / 1024 / 1024).toFixed(2)} MB): ${written} written, ${removed} removed`,
+    `${total} sized shots (${(bytes / 1024 / 1024).toFixed(2)} MB): ${written} written, ${removed} removed`,
 );
