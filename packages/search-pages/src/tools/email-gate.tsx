@@ -16,8 +16,11 @@ import { createContext, useContext, useId, useState } from "react";
  * consent is the line under the field, and submitting is agreeing to it.
  */
 
+/** Whether an email went: `none` when the contact was a phone number (never messaged). */
+export type GateEmailed = "sent" | "limited" | "not-sent" | "none";
+
 export type GateResult =
-    | { ok: true; emailed?: "sent" | "limited" | "not-sent" }
+    | { ok: true; emailed?: GateEmailed }
     | { ok: false; reason: "bad-email" | "rate-limited" | "unavailable" };
 
 /** Sends the email (the only thing a tool sends) and says how it went. */
@@ -87,10 +90,49 @@ export function emailProblem(value: string): string | null {
         : GATE_WORDS.badEmail;
 }
 
-type State =
+export type GateState =
     | { at: "locked"; error: string | null }
     | { at: "sending" }
-    | { at: "sent"; emailed: "sent" | "limited" | "not-sent" };
+    | { at: "sent"; emailed?: GateEmailed };
+
+/**
+ * A gate's state and submit path, the one copy (DEC-195): `EmailGate` and
+ * the downloads' `DownloadGate`. `send` submits, and a refusal (or a throw,
+ * as `unavailable`) comes back locked with `words(reason)` under the field.
+ */
+export function useGate<T, R extends string>(
+    submit: (
+        value: T,
+    ) => Promise<
+        { ok: true; emailed?: GateEmailed } | { ok: false; reason: R }
+    >,
+    words: (reason: R | "unavailable") => string,
+) {
+    const [state, setState] = useState<GateState>({
+        at: "locked",
+        error: null,
+    });
+    async function send(value: T) {
+        setState({ at: "sending" });
+        let result:
+            | { ok: true; emailed?: GateEmailed }
+            | { ok: false; reason: R | "unavailable" };
+        try {
+            result = await submit(value);
+        } catch {
+            result = { ok: false, reason: "unavailable" };
+        }
+        setState(
+            result.ok
+                ? { at: "sent", emailed: result.emailed }
+                : { at: "locked", error: words(result.reason) },
+        );
+    }
+    /** Back to the form, with `error` under the field (null clears it). */
+    const lock = (error: string | null = null) =>
+        setState({ at: "locked", error });
+    return { state, send, lock };
+}
 
 export interface EmailGateProps {
     /** What the email gets them: "Get this working as a PDF". */
@@ -124,43 +166,27 @@ export function EmailGate({
     const ctx = useContext(GateContext);
     const submit = onSubmit ?? ctx.submit;
     const [email, setEmail] = useState("");
-    const [state, setState] = useState<State>({ at: "locked", error: null });
+    const { state, send, lock } = useGate(submit, (reason) =>
+        reason === "bad-email"
+            ? GATE_WORDS.badEmail
+            : reason === "rate-limited"
+              ? GATE_WORDS.rateLimited
+              : GATE_WORDS.failed,
+    );
     const id = useId();
-
-    async function send(value: string) {
-        setState({ at: "sending" });
-        let result: GateResult;
-        try {
-            result = await submit(value);
-        } catch {
-            result = { ok: false, reason: "unavailable" };
-        }
-        if (result.ok) {
-            setState({ at: "sent", emailed: result.emailed ?? "sent" });
-            return;
-        }
-        setState({
-            at: "locked",
-            error:
-                result.reason === "bad-email"
-                    ? GATE_WORDS.badEmail
-                    : result.reason === "rate-limited"
-                      ? GATE_WORDS.rateLimited
-                      : GATE_WORDS.failed,
-        });
-    }
 
     if (state.at === "sent") {
         const value = email.trim();
+        const emailed = state.emailed ?? "sent";
         return (
             <div className="tp-gate">
                 <p role="status" className="tp-gate-done">
-                    {state.emailed === "sent" ? (
+                    {emailed === "sent" ? (
                         <>
                             <span aria-hidden="true">✓ </span>
                             {GATE_WORDS.sentTo(value)}
                         </>
-                    ) : state.emailed === "limited" ? (
+                    ) : emailed === "limited" ? (
                         GATE_WORDS.limited
                     ) : (
                         GATE_WORDS.notSent
@@ -179,7 +205,7 @@ export function EmailGate({
                     <button
                         type="button"
                         className="tp-linkbtn"
-                        onClick={() => setState({ at: "locked", error: null })}
+                        onClick={() => lock()}
                     >
                         {GATE_WORDS.another}
                     </button>
@@ -198,7 +224,7 @@ export function EmailGate({
                 event.preventDefault();
                 const problem = emailProblem(email);
                 if (problem) {
-                    setState({ at: "locked", error: problem });
+                    lock(problem);
                     return;
                 }
                 void send(email.trim());
@@ -218,7 +244,7 @@ export function EmailGate({
                     aria-describedby={error ? `${id}-error` : `${id}-note`}
                     onChange={(event) => {
                         setEmail(event.target.value);
-                        if (error) setState({ at: "locked", error: null });
+                        if (error) lock();
                     }}
                     className="tp-input tp-gate-input"
                 />

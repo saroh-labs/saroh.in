@@ -39,7 +39,15 @@ const band = (links: HubLinks, title: string, line: string) => (
 
 export type GstHubPage = Pick<
     GstPage,
-    "slug" | "type" | "topic" | "name" | "line" | "search" | "forPage" | "rank"
+    | "slug"
+    | "type"
+    | "topic"
+    | "name"
+    | "line"
+    | "search"
+    | "forPage"
+    | "hubLabel"
+    | "rank"
 >;
 
 export function GstHub({
@@ -50,7 +58,7 @@ export function GstHub({
 }: {
     pages: readonly GstHubPage[];
     links?: HubLinks;
-    /** A trade page's eyebrow from its /for/ page ("Salons"); none leaves it bare. */
+    /** A trade page's eyebrow from its /for/ page ("Salons"), after its own `hubLabel`; none leaves it bare. */
     tradeOf?: (forPage: string) => string | undefined;
     draft?: boolean;
 }) {
@@ -77,9 +85,8 @@ export function GstHub({
                     eyebrow:
                         p.type === "concept"
                             ? "Basics"
-                            : p.forPage
-                              ? tradeOf?.(p.forPage)
-                              : undefined,
+                            : (p.hubLabel ??
+                              (p.forPage ? tradeOf?.(p.forPage) : undefined)),
                 }),
             )}
             footnote="Each page names the rate in force on the date it was checked. Not tax advice: each says when to ask your CA."

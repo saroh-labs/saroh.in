@@ -42,6 +42,7 @@ function wordsOf(p: DocPage): string {
             p.table.note ?? "",
             ...p.mistakes.flatMap((m) => [m.title, m.body]),
             p.differsFromSaroh ?? "",
+            p.hubLabel ?? "",
         ].join("\n");
     if (p.kind === "guides")
         return [...common, p.lead, p.group, p.hero?.alt ?? ""].join("\n");
@@ -81,6 +82,15 @@ export function docPageChecks(
         "No placeholders left",
         [...words.matchAll(/\[[^\]]*\]?/g)].map(
             (m) => `Placeholder left: ${m[0]}`,
+        ),
+    );
+    // A ” opening a quote or a “ closing one (31 Oct review: the salon page's H2).
+    add(
+        "quotes",
+        "Quote marks face the right way",
+        [...words.matchAll(/(?:^|[\s([])”|“(?=$|[\s.,;:!?)\]])/gm)].map(
+            (m) =>
+                `"${words.slice(Math.max(0, m.index - 20), m.index + 20).trim()}" has a quote mark facing the wrong way: use “ to open and ” to close.`,
         ),
     );
     add(

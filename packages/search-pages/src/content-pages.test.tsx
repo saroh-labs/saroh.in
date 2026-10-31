@@ -17,6 +17,7 @@ import {
 } from "./content-pages";
 import type { GstPage as GstData, GuidePage as GuideData } from "./docs";
 import { embeddedDocs } from "./docs-embedded";
+import { loadSearchPage } from "./load";
 import { unknownClasses } from "./test-classes";
 
 afterEach(cleanup);
@@ -273,6 +274,28 @@ describe("hubs", () => {
         expect(container.querySelector(".sp-lc-t")?.textContent).toBe(
             "How to reduce no-shows at your salon or clinic",
         );
+    });
+
+    it("GST: every trade card has its small label, its own or its /for/ page's", () => {
+        // As saroh.in's /gst route reads a /for/ page's name.
+        const tradeOf = (slug: string) => loadSearchPage(slug)?.plural;
+        const pages = embeddedDocs.list("gst");
+        render(<GstHub pages={pages} tradeOf={tradeOf} />);
+        const trades = pages.filter((p) => p.type === "trade");
+        const section = screen
+            .getByRole("heading", { level: 2, name: "By trade" })
+            .closest("section");
+        if (!section) throw new Error("no By trade section");
+        const cards = section.querySelectorAll(".sp-lc");
+        expect(cards).toHaveLength(trades.length);
+        for (const card of cards)
+            expect(card.querySelector(".sp-lc-eye")?.textContent).toBeTruthy();
+        expect(
+            trades
+                .filter((p) => p.hubLabel)
+                .map((p) => p.hubLabel)
+                .sort(),
+        ).toEqual(["Caterers", "Online courses", "Photographers"]);
     });
 
     it("lists only the pages it is given", () => {

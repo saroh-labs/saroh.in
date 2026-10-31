@@ -16,6 +16,17 @@ export type {
     GuidesHubPage,
     HubLinks,
 } from "./components/content-hubs";
+export {
+    DOWNLOAD_GATE_WORDS,
+    DownloadGate,
+    DownloadGateProvider,
+    phoneDigits,
+} from "./components/download-gate";
+export type {
+    DownloadContact,
+    DownloadResult,
+    DownloadSubmit,
+} from "./components/download-gate";
 export { DownloadPage } from "./components/download-page";
 export type { DownloadPageLinks } from "./components/download-page";
 export { GstPage, NOT_TAX_ADVICE } from "./components/gst-page";

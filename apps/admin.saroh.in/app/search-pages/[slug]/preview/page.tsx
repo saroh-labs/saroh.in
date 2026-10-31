@@ -1,7 +1,12 @@
 import "@saroh/search-pages/styles.css";
 
 import { SearchPage, ToolPage } from "@saroh/search-pages";
-import { DownloadPage, GstPage, GuidePage } from "@saroh/search-pages/pages";
+import {
+    DownloadGate,
+    DownloadPage,
+    GstPage,
+    GuidePage,
+} from "@saroh/search-pages/pages";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -24,7 +29,22 @@ const TEMPLATES: {
     tools: (p, draft) => <ToolPage page={p} draft={draft} />,
     gst: (p, draft) => <GstPage page={p} draft={draft} />,
     guides: (p, draft) => <GuidePage page={p} draft={draft} />,
-    downloads: (p, draft) => <DownloadPage page={p} draft={draft} />,
+    // The download form in preview: it opens, sends and fetches nothing.
+    downloads: (p, draft) => (
+        <DownloadPage
+            page={p}
+            draft={draft}
+            gate={
+                <DownloadGate
+                    slug={p.slug}
+                    files={p.files}
+                    title={p.gate?.title}
+                    line={p.gate?.line}
+                    preview
+                />
+            }
+        />
+    ),
 };
 
 const draw = (page: AnyPage, draft: boolean): ReactNode =>

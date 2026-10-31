@@ -86,4 +86,14 @@ describe("docPageChecks", () => {
                 ?.ok,
         ).toBe(true);
     });
+
+    it("fails a quote mark facing the wrong way, and passes curly quotes", () => {
+        const p = confirmed("gst");
+        p.name = "What “without input tax credit” means";
+        expect(errors(p)).toEqual([]);
+        p.name = "What ”without input tax credit” means";
+        expect(errors(p)).toEqual(["quotes"]);
+        p.name = "What “without input tax credit“ means";
+        expect(errors(p)).toEqual(["quotes"]);
+    });
 });

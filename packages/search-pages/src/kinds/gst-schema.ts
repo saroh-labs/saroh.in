@@ -66,6 +66,8 @@ export const gstFrontmatterSchema = z
         rank: z.number().int().positive().optional(),
         /** The /for/ page of the same trade, linked when it is live. */
         forPage: slug.optional(),
+        /** The small label over its /gst hub card ("Photographers"), where no /for/ page names the trade. */
+        hubLabel: text.optional(),
         /** Where this page's rate or code differs from Saroh's own data, and why. */
         differsFromSaroh: text.optional(),
         questions: z.array(question).min(1),

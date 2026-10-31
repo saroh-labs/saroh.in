@@ -1,8 +1,9 @@
 import "@saroh/search-pages/styles.css";
 
-import { DownloadPage } from "@saroh/search-pages/pages";
+import { DownloadGate, DownloadPage } from "@saroh/search-pages/pages";
 import { notFound } from "next/navigation";
 
+import { SiteDownloadGate } from "@/components/downloads/download-gate";
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { searchPageRoute } from "@/lib/search-page-route";
@@ -10,8 +11,8 @@ import { searchPageRoute } from "@/lib/search-page-route";
 /**
  * `/downloads/<file>` (#1206): one page per file in `content/downloads/`,
  * drawn by the package's `<DownloadPage>`; live pages only in production,
- * every page on a preview (Draft, `noindex`). The gate beside the title is
- * U9's DownloadGate. Any other slug is a 404.
+ * every page on a preview (Draft, `noindex`). The gate beside the title
+ * sends to `/api/downloads/unlock`. Any other slug is a 404.
  */
 export const dynamicParams = false;
 
@@ -36,6 +37,16 @@ export default async function DownloadRoute({
                     draft={route.draft(p)}
                     related={route.related(p)}
                     links={links}
+                    gate={
+                        <SiteDownloadGate slug={p.slug}>
+                            <DownloadGate
+                                slug={p.slug}
+                                files={p.files}
+                                title={p.gate?.title}
+                                line={p.gate?.line}
+                            />
+                        </SiteDownloadGate>
+                    }
                 />
             </CtaClickArea>
         </>

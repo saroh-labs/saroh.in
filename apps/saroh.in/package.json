@@ -24,6 +24,7 @@
         "@saroh/integrations": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
         "@saroh/search-pages": "workspace:*",
+        "@saroh/site-blocks": "workspace:*",
         "@saroh/templates": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",

@@ -13,9 +13,9 @@ import { Prose } from "./prose";
 
 /*
  * A download (#1206, boards project/downloads/Sample*): only the shared
- * blocks, in the board's order. The gate is a slot (`gate`): U9's
- * DownloadGate on the site, nothing in the admin preview. Every link is a
- * prop; absent, it goes nowhere.
+ * blocks, in the board's order. The gate is a slot (`gate`): a
+ * `DownloadGate`, under saroh.in's provider on the site and in `preview`
+ * in admin. Every link is a prop; absent, it goes nowhere.
  */
 
 const BAND = {
