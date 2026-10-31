@@ -91,3 +91,15 @@ main p a {
 html {
     overflow-x: clip;
 }
+
+/*
+ * Below the first screen, a block of the page is laid out and painted only
+ * as it comes near the screen (content-visibility), so a phone draws the
+ * hero first and not the whole page at once. `contain-intrinsic-size: auto`
+ * keeps each block's height once it has been drawn, so the scrollbar holds
+ * still. The hero and what sits under it are left alone.
+ */
+main#main > :nth-child(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 720px;
+}

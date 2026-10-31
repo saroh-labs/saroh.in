@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { IntentLink } from "../links/intent-link";
 import { textLinkClasses } from "../links/text-link";
 
 export interface Crumb {
@@ -49,14 +49,14 @@ export function Breadcrumbs({
                                     {crumb.name}
                                 </span>
                             ) : crumb.href ? (
-                                <Link
+                                <IntentLink
                                     href={crumb.href}
                                     className={textLinkClasses({
                                         tone: "quiet",
                                     })}
                                 >
                                     {crumb.name}
-                                </Link>
+                                </IntentLink>
                             ) : (
                                 <span>{crumb.name}</span>
                             )}
