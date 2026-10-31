@@ -12,7 +12,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { siteTagConfig } from "@/lib/site-tag-config";
 
 import { ReferralKeeper } from "./referral-keeper";
-import { LazySiteTags } from "./site-tags-lazy";
+import { SiteTags } from "./site-tags";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -123,7 +123,7 @@ export default function RootLayout({
             >
                 {/* With nothing to ask about, it would do nothing: not sent. */}
                 {asksConsent(tags) ? (
-                    <LazySiteTags config={tags} privacyHref={privacy?.href} />
+                    <SiteTags config={tags} privacyHref={privacy?.href} />
                 ) : null}
                 <ReferralKeeper />
                 <a
