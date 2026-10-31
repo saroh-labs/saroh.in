@@ -134,12 +134,7 @@ export function SearchPageDialog({
                     }
                     return { ok: false, error: result.error };
                 }
-                const said = successWords(
-                    action,
-                    paths.length,
-                    result.data.rebuildQueued,
-                    site,
-                );
+                const said = successWords(action, paths.length, site);
                 showSuccess(said.title, said.description);
                 router.refresh();
                 onDone?.();

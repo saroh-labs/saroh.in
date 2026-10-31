@@ -13,7 +13,8 @@ import { SearchPagesService } from "./search-pages.service";
  * Search pages in the console (DEC-193), under `/admin/search-pages`.
  * Registered by the admin module, so the console's guard stack and its
  * permission contract cover every route. Anyone who can read the console
- * sees the list and the history; only `search-pages:publish` acts. No
+ * sees the list and the history; only `search-pages:publish` stages
+ * changes and deploys them. No
  * support session: a search page belongs to no business.
  */
 @AdminRoutes()
@@ -45,5 +46,12 @@ export class SearchPagesController {
         @Body() dto: SearchPageActionDto,
     ) {
         return this.pages.act(staff, dto.action, dto.paths);
+    }
+
+    /** Deploy changes: one site rebuild for every staged change (R13). */
+    @Post("search-pages/deploy")
+    @RequireAdminPermission(AdminPermission.SearchPagesPublish)
+    deploy(@PlatformAdminContext() staff: PlatformAdminInfo) {
+        return this.pages.deploy(staff);
     }
 }

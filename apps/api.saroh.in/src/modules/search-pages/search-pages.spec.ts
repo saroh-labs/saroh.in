@@ -32,10 +32,13 @@ describe("who may use the console's search pages", () => {
             SearchPagesController.prototype[name],
         ) as unknown;
 
-    it("reads with the console read, acts with search-pages:publish", () => {
+    it("reads with the console read, acts and deploys with search-pages:publish", () => {
         expect(required("list")).toEqual([AdminPermission.PlatformRead]);
         expect(required("history")).toEqual([AdminPermission.PlatformRead]);
         expect(required("act")).toEqual([AdminPermission.SearchPagesPublish]);
+        expect(required("deploy")).toEqual([
+            AdminPermission.SearchPagesPublish,
+        ]);
     });
 });
 
@@ -147,8 +150,16 @@ describe("the web deploy a search page change queues", () => {
     }
     afterEach(() => configure(false));
 
+    const fakeTx = (waiting: unknown, updated = 1) => ({
+        job: {
+            create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn().mockResolvedValue(waiting),
+            updateMany: jest.fn().mockResolvedValue({ count: updated }),
+        },
+    });
+
     it("queues only when a web deploy can run", async () => {
-        const tx = { job: { create: jest.fn().mockResolvedValue({}) } };
+        const tx = fakeTx(null);
         expect(await enqueueWebDeploy(tx as never, ["/for/a"])).toBe(false);
         expect(tx.job.create).not.toHaveBeenCalled();
 
@@ -160,6 +171,26 @@ describe("the web deploy a search page change queues", () => {
                 payload: { paths: ["/for/a"] },
             },
         });
+    });
+
+    it("adds the paths to a deploy still waiting to start", async () => {
+        configure(true);
+        const tx = fakeTx({ id: "job_w", payload: { paths: ["/for/b"] } });
+        expect(await enqueueWebDeploy(tx as never, ["/for/a", "/for/b"])).toBe(
+            true,
+        );
+        expect(tx.job.updateMany).toHaveBeenCalledWith({
+            where: { id: "job_w", status: "PENDING" },
+            data: { payload: { paths: ["/for/a", "/for/b"] } },
+        });
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("queues its own when a worker claimed the waiting one first", async () => {
+        configure(true);
+        const tx = fakeTx({ id: "job_w", payload: { paths: [] } }, 0);
+        expect(await enqueueWebDeploy(tx as never, ["/for/a"])).toBe(true);
+        expect(tx.job.create).toHaveBeenCalledTimes(1);
     });
 
     it("dispatches deploy-frontends.yml for web in this environment", async () => {

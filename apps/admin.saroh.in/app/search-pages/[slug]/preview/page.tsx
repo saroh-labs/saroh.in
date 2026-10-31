@@ -3,7 +3,6 @@ import "@saroh/search-pages/styles.css";
 import { SearchPage, ToolPage } from "@saroh/search-pages";
 import { notFound } from "next/navigation";
 
-import { isLive } from "@/lib/search-page-words";
 import { loadPage, readSearchPages, searchPagesGate } from "@/lib/search-pages";
 
 export const metadata = {
@@ -41,12 +40,9 @@ export default async function SearchPagePreview({
             <style>{`html,body{background:#f5f2ec;color-scheme:light;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}`}</style>
             {page.kind === "tools" ? (
                 // The email gate has no provider here: it opens and sends nothing.
-                <ToolPage page={page.page} draft={!row || !isLive(row.state)} />
+                <ToolPage page={page.page} draft={!row?.onSite} />
             ) : (
-                <SearchPage
-                    page={page.page}
-                    draft={!row || !isLive(row.state)}
-                />
+                <SearchPage page={page.page} draft={!row?.onSite} />
             )}
         </>
     );

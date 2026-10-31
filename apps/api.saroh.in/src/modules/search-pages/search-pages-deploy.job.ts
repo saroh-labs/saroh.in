@@ -4,14 +4,14 @@ import type { Job, Prisma } from "@saroh/database";
 import { requestFor, revalidateHook } from "../pricing/revalidate-site.job";
 
 /**
- * Rebuild saroh.in after a search page goes live or comes off (DEC-193): a
+ * Rebuild saroh.in once Deploy changes releases staged pages (DEC-193, R13): a
  * `workflow_dispatch` of `deploy-frontends.yml` for the marketing site in
  * this API's environment — the dispatch pricing's publish and the console's
  * Deployments use (`revalidateHook`).
  *
  * Queued on the action's own transaction (the outbox), so the worker runs it
  * only once the change has committed, and a GitHub failure never undoes a
- * publish: the call throws and the queue retries it. Two builds are harmless.
+ * deploy: the call throws and the queue retries it. Two builds are harmless.
  * Only the deploy rebuilds `/for/` pages, so the older revalidate hook is
  * not a fallback here: with no deploy configured, nothing is queued.
  */
@@ -22,12 +22,39 @@ export function canDeployWeb(): boolean {
     return revalidateHook()?.kind === "deploy";
 }
 
-/** Queue one web deploy on the caller's transaction; false when none can run. */
+/** The paths a deploy job carries (its payload), or none. */
+export function pathsOf(payload: unknown): string[] {
+    const paths = (payload as { paths?: unknown } | null)?.paths;
+    return Array.isArray(paths)
+        ? paths.filter((p): p is string => typeof p === "string")
+        : [];
+}
+
+/**
+ * Queue one web deploy on the caller's transaction; false when none can
+ * run. A deploy still waiting to start takes these paths too, so a second
+ * Deploy changes never queues a second rebuild.
+ */
 export async function enqueueWebDeploy(
     tx: Pick<Prisma.TransactionClient, "job">,
     paths: string[],
 ): Promise<boolean> {
     if (!canDeployWeb()) return false;
+    const waiting = await tx.job.findFirst({
+        where: { type: SEARCH_PAGES_DEPLOY_TYPE, status: "PENDING" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, payload: true },
+    });
+    if (waiting) {
+        const all = [...new Set([...pathsOf(waiting.payload), ...paths])];
+        // Re-checked on write: a worker that claimed it meanwhile wins, and
+        // this deploy gets its own job.
+        const { count } = await tx.job.updateMany({
+            where: { id: waiting.id, status: "PENDING" },
+            data: { payload: { paths: all.sort() } },
+        });
+        if (count === 1) return true;
+    }
     await tx.job.create({
         data: { type: SEARCH_PAGES_DEPLOY_TYPE, payload: { paths } },
     });

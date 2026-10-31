@@ -12,7 +12,7 @@ import { SearchPageActions } from "@/components/search-pages/search-page-actions
 import { SearchPageTabs } from "@/components/search-pages/search-page-tabs";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { STATE_BADGE, STATE_LABEL, stateNote } from "@/lib/search-page-words";
+import { badgeOf, stateNote } from "@/lib/search-page-words";
 import {
     loadPage,
     readSearchPages,
@@ -75,8 +75,8 @@ export default async function SearchPageLayout({
                     ]}
                     title={row.name}
                     badge={
-                        <Badge variant={STATE_BADGE[row.state]}>
-                            {STATE_LABEL[row.state]}
+                        <Badge variant={badgeOf(row).variant}>
+                            {badgeOf(row).label}
                         </Badge>
                     }
                     description={

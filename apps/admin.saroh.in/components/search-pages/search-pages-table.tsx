@@ -29,17 +29,15 @@ import type {
     PageRow,
 } from "@/lib/search-page-words";
 import {
+    badgeOf,
     countBy,
     eligible,
     FILTER_LABEL,
     inFilter,
-    isLive,
     KINDS,
     matchesQuery,
     rowActions,
     statCards,
-    STATE_BADGE,
-    STATE_LABEL,
     stateNote,
 } from "@/lib/search-page-words";
 
@@ -89,7 +87,7 @@ export function SearchPagesTable({
 
     const counts = countBy(rows);
     const shown = rows.filter(
-        (r) => inFilter(r.state, filter) && matchesQuery(r, query),
+        (r) => inFilter(r, filter) && matchesQuery(r, query),
     );
     const picked = rows.filter((r) => ticked.has(r.path));
     const allOn = shown.length > 0 && shown.every((r) => ticked.has(r.path));
@@ -278,8 +276,8 @@ export function SearchPagesTable({
                                     {row.family}
                                 </span>
                                 <span className="col-start-2 grid justify-items-start gap-0.5 md:col-start-auto">
-                                    <Badge variant={STATE_BADGE[row.state]}>
-                                        {STATE_LABEL[row.state]}
+                                    <Badge variant={badgeOf(row).variant}>
+                                        {badgeOf(row).label}
                                     </Badge>
                                     <span className="text-[12px] text-muted-foreground">
                                         {stateNote(row)}
@@ -287,8 +285,7 @@ export function SearchPagesTable({
                                 </span>
                                 <span className="col-start-2 text-[13px] text-muted-foreground md:col-start-auto">
                                     {formatDate(row.updated)}
-                                    {isLive(row.state) &&
-                                        " · goes out with releases"}
+                                    {row.onSite && " · goes out with releases"}
                                 </span>
                                 <div className="col-start-3 row-start-1 justify-self-end md:col-start-auto md:row-start-auto">
                                     <RowMenu

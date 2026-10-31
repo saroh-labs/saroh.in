@@ -1,7 +1,6 @@
 "use client";
 
 import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -14,7 +13,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import type { PageAction, PageRow } from "@/lib/search-page-words";
-import { canDo, inFlight } from "@/lib/search-page-words";
+import { canDo } from "@/lib/search-page-words";
 
 import { failingCount, useChecks } from "./page-checks";
 import { SearchPageDialog } from "./search-page-dialog";
@@ -82,9 +81,6 @@ export function SearchPageActions({
                     {label[main]}
                 </Button>
             )}
-            {inFlight(row.state) && (
-                <Badge variant="warning">Rebuilding {site}…</Badge>
-            )}
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -100,7 +96,7 @@ export function SearchPageActions({
                     align="end"
                     onCloseAutoFocus={(event) => event.preventDefault()}
                 >
-                    {production && row.state === "live" && (
+                    {production && row.onSite && (
                         <DropdownMenuItem asChild>
                             <a
                                 href={`${siteUrl}${row.path}`}

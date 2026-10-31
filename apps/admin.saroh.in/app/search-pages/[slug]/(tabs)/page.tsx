@@ -4,7 +4,7 @@ import { Facts, Panel } from "@/components/panel";
 import { PageChecks } from "@/components/search-pages/page-checks";
 import { formatDate } from "@/lib/format";
 import { pageSections, toolSections } from "@/lib/search-page-content";
-import { familyPage, isLive, whereItShows } from "@/lib/search-page-words";
+import { familyPage, whereItShows } from "@/lib/search-page-words";
 import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
 export async function generateMetadata({
@@ -92,37 +92,33 @@ export default async function SearchPageOverview({
                 <Panel title={`Where it shows on ${site.host}`}>
                     {() => (
                         <ul className="grid">
-                            {whereItShows(row.state, site.host, row.kind).map(
-                                (w) => (
-                                    <li
-                                        key={w.label}
-                                        className="flex items-center gap-2.5 border-t py-2 text-sm first:border-t-0"
+                            {whereItShows(row, site.host, row.kind).map((w) => (
+                                <li
+                                    key={w.label}
+                                    className="flex items-center gap-2.5 border-t py-2 text-sm first:border-t-0"
+                                >
+                                    <span
+                                        aria-hidden
+                                        className={cn(
+                                            "size-2 rounded-full",
+                                            w.on
+                                                ? "bg-success"
+                                                : "bg-border-strong",
+                                        )}
+                                    />
+                                    <span className="flex-1">{w.label}</span>
+                                    <span
+                                        className={cn(
+                                            "text-[13px]",
+                                            w.on
+                                                ? "text-success-subtle-foreground"
+                                                : "text-muted-foreground",
+                                        )}
                                     >
-                                        <span
-                                            aria-hidden
-                                            className={cn(
-                                                "size-2 rounded-full",
-                                                w.on
-                                                    ? "bg-success"
-                                                    : "bg-border-strong",
-                                            )}
-                                        />
-                                        <span className="flex-1">
-                                            {w.label}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                "text-[13px]",
-                                                w.on
-                                                    ? "text-success-subtle-foreground"
-                                                    : "text-muted-foreground",
-                                            )}
-                                        >
-                                            {w.value}
-                                        </span>
-                                    </li>
-                                ),
-                            )}
+                                        {w.value}
+                                    </span>
+                                </li>
+                            ))}
                         </ul>
                     )}
                 </Panel>
@@ -153,7 +149,7 @@ export default async function SearchPageOverview({
                                     formatDate(page.updated),
                                 ],
                                 [
-                                    isLive(row.state)
+                                    row.onSite
                                         ? "Published by"
                                         : "Last changed by",
                                     row.record

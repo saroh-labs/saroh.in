@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import type { PageRow, SearchPageRecord } from "./search-page-words";
 import {
+    badgeOf,
     countBy,
+    deployedWords,
+    deployWords,
     dialogWords,
     eligible,
     historyWords,
@@ -12,8 +15,10 @@ import {
     KINDS,
     matchesQuery,
     mergePages,
+    rebuildWords,
     refusalWords,
     rowActions,
+    siteOf,
     stateNote,
     stateOf,
     successWords,
@@ -37,9 +42,11 @@ const record = (
     slug: string,
     status: SearchPageRecord["status"],
     changedAt = "2026-10-25T10:00:00.000Z",
+    releasedStatus: SearchPageRecord["status"] = status,
 ): SearchPageRecord => ({
     path: `/for/${slug}`,
     status,
+    releasedStatus,
     liveSince: status === "LIVE" ? changedAt : null,
     changedAt,
     changedBy: { name: "Mohit" },
@@ -69,33 +76,87 @@ describe("mergePages (DEC-193)", () => {
     });
 });
 
-describe("stateOf", () => {
-    const rebuild = { running: true, startedAt: "2026-10-26T09:00:00.000Z" };
-    it("says Publishing… and Coming off… for a change in the rebuild under way", () => {
-        expect(
-            stateOf(record("a", "LIVE", "2026-10-26T08:59:30.000Z"), rebuild),
-        ).toBe("publishing");
-        expect(
-            stateOf(
-                record("a", "UNPUBLISHED", "2026-10-26T09:01:00.000Z"),
-                rebuild,
-            ),
-        ).toBe("unpublishing");
+describe("staged and released (R13)", () => {
+    it("is the staged status, and waits for Deploy changes where the site differs", () => {
+        expect(stateOf(record("a", "LIVE"))).toBe("live");
+        expect(stateOf(record("a", "ARCHIVED"))).toBe("archived");
+        expect(stateOf(null)).toBe("draft");
+        expect(siteOf(record("a", "LIVE", undefined, "DRAFT"))).toEqual({
+            onSite: false,
+            pending: "on",
+        });
+        expect(siteOf(record("a", "ARCHIVED", undefined, "LIVE"))).toEqual({
+            onSite: true,
+            pending: "off",
+        });
+        expect(siteOf(record("a", "LIVE"))).toEqual({
+            onSite: true,
+            pending: null,
+        });
+        expect(siteOf(null)).toEqual({ onSite: false, pending: null });
     });
-    it("keeps the saved status for an older change, or when nothing rebuilds", () => {
+
+    it("labels a row that waits, and says when it changes", () => {
+        const [on, off, settled] = mergePages(
+            [entry("a"), entry("b"), entry("c")],
+            {
+                pages: [
+                    record("a", "LIVE", undefined, "DRAFT"),
+                    record("b", "UNPUBLISHED", undefined, "LIVE"),
+                    record("c", "LIVE"),
+                ],
+                rebuild: idle,
+            },
+        );
+        expect(badgeOf(on)).toEqual({
+            label: "Published · not deployed yet",
+            variant: "warning",
+        });
+        expect(badgeOf(off).label).toBe("Taken off · not deployed yet");
+        expect(badgeOf(settled)).toEqual({ label: "Live", variant: "success" });
+        expect(stateNote(on)).toBe("Goes live when changes are deployed");
+        expect(stateNote(off)).toBe("Stays live until changes are deployed");
+        // The chips go by the site: waiting to go on is not live yet.
+        expect(inFilter(on, "draft")).toBe(true);
+        expect(inFilter(on, "live")).toBe(false);
+        expect(inFilter(off, "live")).toBe(true);
+        // Waiting pages can be changed again before the deploy.
+        expect(eligible("unpublish", [on])).toEqual([on]);
+        expect(eligible("publish", [off])).toEqual([off]);
+    });
+
+    it("counts the deploy bar's changes and words its confirm", () => {
+        const w = deployWords(
+            [{ pending: "on" }, { pending: "on" }, { pending: "off" }],
+            "saroh.in",
+        );
+        expect(w.title).toBe("3 changes waiting to deploy");
+        expect(w.dialogTitle).toBe("Deploy 3 changes to saroh.in?");
+        expect(w.points).toEqual([
+            "saroh.in rebuilds once with every change below. It takes a few minutes.",
+            "2 pages go live, into the sitemap and the lists.",
+            "1 page comes off. Old links send people to the page above them, not an error.",
+        ]);
+        expect(deployWords([{ pending: "on" }], "saroh.in").title).toBe(
+            "1 change waiting to deploy",
+        );
+        expect(deployWords([], "saroh.in").title).toBe(
+            "No changes waiting to deploy",
+        );
+        expect(deployedWords(30, true, "saroh.in")).toEqual({
+            title: "Deploying 30 changes.",
+            description: "saroh.in is rebuilding.",
+        });
+        expect(deployedWords(1, false, "saroh.in").description).toMatch(
+            /can't rebuild from here/,
+        );
+    });
+
+    it("says how many pages the rebuild carries, when the API knows", () => {
         expect(
-            stateOf(record("a", "LIVE", "2026-10-20T09:00:00.000Z"), rebuild),
-        ).toBe("live");
-        expect(
-            stateOf(record("a", "LIVE", "2026-10-26T09:01:00.000Z"), idle),
-        ).toBe("live");
-        expect(
-            stateOf(
-                record("a", "ARCHIVED", "2026-10-26T09:01:00.000Z"),
-                rebuild,
-            ),
-        ).toBe("archived");
-        expect(stateOf(record("a", "DRAFT"), idle)).toBe("draft");
+            rebuildWords({ running: true, paths: ["/for/a", "/for/b"] }),
+        ).toBe("2 pages change in it.");
+        expect(rebuildWords({ running: true })).toBe("");
     });
 });
 
@@ -120,8 +181,6 @@ describe("filters and counts", () => {
             unpublished: 1,
             archived: 1,
         });
-        expect(inFilter("publishing", "draft")).toBe(true);
-        expect(inFilter("unpublishing", "live")).toBe(true);
     });
     it("searches the name and the search phrase", () => {
         expect(
@@ -150,8 +209,8 @@ describe("filters and counts", () => {
         expect(rowActions("draft", "saroh.in")[0]?.label).toBe(
             "Publish on saroh.in",
         );
-        expect(rowActions("publishing", "saroh.in")).toEqual([
-            { action: null, label: "Wait for the rebuild" },
+        expect(rowActions("archived", "saroh.in")).toEqual([
+            { action: "restore", label: "Restore" },
         ]);
     });
 });
@@ -166,6 +225,7 @@ describe("dialog words", () => {
         slug,
         family,
         state,
+        onSite: state === "live",
     });
     it("asks one page's publish with the tick", () => {
         const w = dialogWords(
@@ -178,7 +238,7 @@ describe("dialog words", () => {
         expect(w.confirm).toBe("Publish page");
         expect(w.tick).toBe("I've read this page on saroh.io");
         expect(w.points[0]).toBe(
-            "saroh.in rebuilds with this page. It takes a few minutes.",
+            "Nothing changes on saroh.in yet. It goes live when changes are deployed, with every other change waiting.",
         );
     });
     it("says when checks need the operator", () => {
@@ -232,7 +292,7 @@ describe("dialog words", () => {
             "saroh.io",
         );
         expect(live.points[0]).toBe(
-            "1 is live now. saroh.in rebuilds and takes it off first.",
+            "1 is live now. It comes off saroh.in when changes are deployed.",
         );
         expect(live.destructive).toBe(true);
         expect(live.tick).toBeNull();
@@ -255,15 +315,15 @@ describe("after the API answers", () => {
             "Spas can't be published from where it is now. Someone may have just changed it. Nothing was changed: close this to see the list as it is.",
         );
     });
-    it("says the site rebuilds, or that it can't from here", () => {
-        expect(successWords("publish", 1, true, "saroh.io")).toEqual({
-            title: "Publishing the page.",
-            description: "saroh.io is rebuilding.",
+    it("says a change waits for Deploy changes", () => {
+        expect(successWords("publish", 1, "saroh.io")).toEqual({
+            title: "Published the page.",
+            description: "Deploy changes to put it on saroh.io.",
         });
-        expect(
-            successWords("unpublish", 3, false, "saroh.io").description,
-        ).toMatch(/can't rebuild from here/);
-        expect(successWords("restore", 1, false, "saroh.io")).toEqual({
+        expect(successWords("unpublish", 3, "saroh.io").description).toBe(
+            "Deploy changes to take them off saroh.io.",
+        );
+        expect(successWords("restore", 1, "saroh.io")).toEqual({
             title: "Restored the page as a draft.",
         });
     });
@@ -279,7 +339,19 @@ describe("after the API answers", () => {
             "saroh.in",
         );
         expect(w.what).toBe("Published by Mohit");
-        expect(w.detail).toBe("Was a draft, now live. Put on saroh.in.");
+        expect(w.detail).toBe("Was a draft, now live.");
+        const deployed = historyWords(
+            {
+                action: "deploy",
+                fromStatus: "DRAFT",
+                toStatus: "LIVE",
+                by: { name: "Mohit" },
+                at: "2026-10-26T09:00:00.000Z",
+            },
+            "saroh.in",
+        );
+        expect(deployed.what).toBe("Deployed by Mohit");
+        expect(deployed.detail).toBe("Was a draft, now live. Put on saroh.in.");
         expect(
             historyWords(
                 {
@@ -318,6 +390,7 @@ describe("free tools (#1253)", () => {
                     {
                         path: "/tools/qr-code-maker",
                         status: "LIVE",
+                        releasedStatus: "LIVE",
                         liveSince: "2026-10-16T18:30:00Z",
                         changedAt: "2026-10-26T10:00:00Z",
                         changedBy: null,
@@ -368,7 +441,11 @@ describe("free tools (#1253)", () => {
 
     it("says where a live page of a new group shows", () => {
         expect(
-            whereItShows("live", "saroh.in", "gst").map((w) => w.label),
+            whereItShows(
+                { onSite: true, pending: null },
+                "saroh.in",
+                "gst",
+            ).map((w) => w.label),
         ).toContain("The /gst list, the menu and the footer");
         const on = dialogWords(
             "publish",
@@ -406,7 +483,11 @@ describe("free tools (#1253)", () => {
         );
         expect(on.points.join(" ")).toContain("the /tools list");
         expect(
-            whereItShows("live", "saroh.in", "tools").map((w) => w.label),
+            whereItShows(
+                { onSite: true, pending: null },
+                "saroh.in",
+                "tools",
+            ).map((w) => w.label),
         ).toContain("The /tools list, the menu and the footer");
     });
 
