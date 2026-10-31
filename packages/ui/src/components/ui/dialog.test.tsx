@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     AlertDialog,
@@ -7,12 +7,14 @@ import {
     AlertDialogDescription,
     AlertDialogTitle,
 } from "./alert-dialog";
+import { CommandDialog, CommandInput, CommandList } from "./command";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogTitle,
+    FULL_ON_PHONE,
     SHEET_ON_PHONE,
 } from "./dialog";
 
@@ -261,5 +263,57 @@ describe("a dialog on a phone is a bottom sheet (DEC-202)", () => {
         expect(handle).toHaveClass("sm:hidden");
         expect(handle).toHaveClass("absolute");
         expect(handle).toHaveClass("h-[5px]");
+    });
+});
+
+describe("the search palette is the full screen on a phone (owner, 31 Oct)", () => {
+    // cmdk measures its list; jsdom has no ResizeObserver or scrollIntoView.
+    beforeEach(() => {
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                observe() {
+                    return undefined;
+                }
+                unobserve() {
+                    return undefined;
+                }
+                disconnect() {
+                    return undefined;
+                }
+            },
+        );
+        Element.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("opens full screen, with no sheet classes and no grab handle", () => {
+        render(
+            <CommandDialog open label="Search" description="Find anything">
+                <CommandInput placeholder="Search" />
+                <CommandList />
+            </CommandDialog>,
+        );
+        const panel = screen.getByRole("dialog");
+        for (const c of FULL_ON_PHONE.split(" ")) expect(panel).toHaveClass(c);
+        expect(panel).not.toHaveClass("max-sm:rounded-t-[18px]");
+        expect(panel).not.toHaveClass("max-sm:bottom-0");
+        expect(
+            panel.querySelector('[aria-hidden="true"].sm\\:hidden'),
+        ).toBeNull();
+    });
+
+    it("leaves every other dialog a bottom sheet", () => {
+        render(
+            <Dialog open>
+                <DialogContent>
+                    <DialogTitle>Rename</DialogTitle>
+                    <DialogDescription>One field.</DialogDescription>
+                </DialogContent>
+            </Dialog>,
+        );
+        expect(screen.getByRole("dialog")).toHaveClass("max-sm:bottom-0");
     });
 });

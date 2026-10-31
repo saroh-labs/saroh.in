@@ -51,6 +51,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 export const SHEET_ON_PHONE =
     "max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[18px] max-sm:border-x-0 max-sm:border-b-[length:env(safe-area-inset-bottom)] max-sm:border-b-transparent max-sm:duration-slow max-sm:data-[state=closed]:duration-base max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:slide-out-to-left-0 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:slide-in-from-left-0";
 
+/**
+ * On a phone, a full-screen panel instead of a sheet: the search palette
+ * (owner, 31 Oct), where a results list wants the whole screen. Clear of
+ * the notch and the home indicator; no grab handle.
+ */
+export const FULL_ON_PHONE =
+    "max-sm:inset-0 max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)] max-sm:data-[state=closed]:slide-out-to-left-0 max-sm:data-[state=closed]:slide-out-to-top-0 max-sm:data-[state=open]:slide-in-from-left-0 max-sm:data-[state=open]:slide-in-from-top-0";
+
 /** The phone sheet's grab handle; it takes no room, so no caller re-pads. */
 export function DialogHandle() {
     return <SheetHandle className="absolute inset-x-0 top-2 sm:hidden" />;
@@ -76,37 +84,51 @@ interface DialogContentProps extends React.ComponentPropsWithoutRef<
     size?: DialogSize;
     /** False when nothing may close it but its own buttons. */
     closeButton?: boolean;
+    /** How it opens on a phone: a bottom sheet (DEC-202), or the full screen. */
+    phone?: "sheet" | "full";
 }
 
 const DialogContent = React.forwardRef<
     React.ElementRef<typeof DialogPrimitive.Content>,
     DialogContentProps
->(({ className, children, size, closeButton = true, ...props }, ref) => (
-    <DialogPortal>
-        <DialogOverlay />
-        <DialogPrimitive.Content
-            ref={ref}
-            className={cn(
-                "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto break-words border bg-card p-6 text-card-foreground shadow-lg duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-2xl",
-                size ? DIALOG_SIZE[size] : "max-w-lg",
-                SHEET_ON_PHONE,
-                className,
-            )}
-            {...props}
-        >
-            <DialogHandle />
-            {children}
-            {closeButton ? (
-                /* A 30px target (44 on touch), as the sheet's: never a
+>(
+    (
+        {
+            className,
+            children,
+            size,
+            closeButton = true,
+            phone = "sheet",
+            ...props
+        },
+        ref,
+    ) => (
+        <DialogPortal>
+            <DialogOverlay />
+            <DialogPrimitive.Content
+                ref={ref}
+                className={cn(
+                    "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto break-words border bg-card p-6 text-card-foreground shadow-lg duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-2xl",
+                    size ? DIALOG_SIZE[size] : "max-w-lg",
+                    phone === "full" ? FULL_ON_PHONE : SHEET_ON_PHONE,
+                    className,
+                )}
+                {...props}
+            >
+                {phone === "sheet" ? <DialogHandle /> : null}
+                {children}
+                {closeButton ? (
+                    /* A 30px target (44 on touch), as the sheet's: never a
                    bare 16px glyph. */
-                <DialogPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] cursor-pointer place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:pointer-events-none coarse:size-11">
-                    <X className="size-4" strokeWidth={2.1} />
-                    <span className="sr-only">Close</span>
-                </DialogPrimitive.Close>
-            ) : null}
-        </DialogPrimitive.Content>
-    </DialogPortal>
-));
+                    <DialogPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] cursor-pointer place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:pointer-events-none coarse:size-11">
+                        <X className="size-4" strokeWidth={2.1} />
+                        <span className="sr-only">Close</span>
+                    </DialogPrimitive.Close>
+                ) : null}
+            </DialogPrimitive.Content>
+        </DialogPortal>
+    ),
+);
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 function DialogHeader({
