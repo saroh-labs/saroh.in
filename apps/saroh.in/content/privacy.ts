@@ -13,7 +13,9 @@
  * manager's link cookie, 19 Oct (DEC-169), the owner agreed it in chat;
  * Saroh's own cookieless visit counting on customers' sites, 21 Oct
  * (DEC-181), the owner's agreed wording; the free tools' emails, 26 Oct
- * (DEC-194), the owner agreed it in chat). Published VERBATIM at
+ * (DEC-194), the owner agreed it in chat; the free downloads' email or
+ * WhatsApp number, 31 Oct (plan 2026-10-31-002 U9), NOT YET in the owner's
+ * doc: a minimal factual addition for the owner to review). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -52,6 +54,7 @@ Sites on Saroh also count visits for your business without cookies or personal d
 | Business | Business name, address, GSTIN, locations, team members | To run Saroh for your business and put the right details on invoices |
 | Billing | Your plan, invoices from Saroh, payment status | To bill you. Card and UPI details are handled by Razorpay; we never see or store full card numbers |
 | Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, the link report, or the link back to the free tool you used |
+| Free downloads | Your email or WhatsApp number | Only to give you the file you asked for, and to email you its link if you gave an email. Never for marketing, and we never message the number. Deleted after 12 months |
 | Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites set no tracking cookies of their own: they count visits only as totals, and run other tools only if you connect them. |
@@ -93,6 +96,7 @@ Our servers and database are in **India**. Some providers above may process data
 | Waitlist entries | 12 months after the launch invite, unless you sign up; at once if you ask |
 | A link-preview report | With the email it was sent to, 12 months |
 | An email given to a free tool | 12 months after you last used it |
+| An email or WhatsApp number given for a free download | 12 months after you last asked for it |
 | Security logs | 1 year |
 | A suspended account under investigation | As long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested |
 | Recordings of use | 30 days |

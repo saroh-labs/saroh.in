@@ -57,3 +57,41 @@ export async function claimToolEmail(
     });
     return newDay.count === 1 ? "ok" : "address";
 }
+
+/**
+ * The same caps for a free download's email (plan 2026-10-31-002 U9),
+ * read before the lead is written: `ok`, or which cap is spent. The day's
+ * budget counts the tools' and the downloads' emails together, and so does
+ * the address's. Read-only; the gate counts the send on the lead after.
+ * shortcut: two requests at the same moment may both pass a cap by one;
+ * make it a locked count if the downloads' volume ever makes that matter.
+ */
+export async function downloadEmailCap(
+    contactKey: string,
+    day: Date,
+): Promise<"ok" | "address" | "day"> {
+    const [tools, downloads, theirs, mine] = await Promise.all([
+        prisma.waitlistSignup.aggregate({
+            where: { reportEmailDay: day },
+            _sum: { reportEmailCount: true },
+        }),
+        prisma.downloadLead.aggregate({
+            where: { emailDay: day },
+            _sum: { emailCount: true },
+        }),
+        prisma.waitlistSignup.findFirst({
+            where: { emailKey: contactKey, reportEmailDay: day },
+            select: { reportEmailCount: true },
+        }),
+        prisma.downloadLead.aggregate({
+            where: { contactKey, emailDay: day },
+            _sum: { emailCount: true },
+        }),
+    ]);
+    const sent =
+        (tools._sum.reportEmailCount ?? 0) + (downloads._sum.emailCount ?? 0);
+    if (sent >= REPORT_EMAILS_PER_DAY) return "day";
+    const toThem =
+        (theirs?.reportEmailCount ?? 0) + (mine._sum.emailCount ?? 0);
+    return toThem >= EMAILS_PER_DAY ? "address" : "ok";
+}

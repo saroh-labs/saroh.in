@@ -80,8 +80,34 @@ export class WaitlistRetentionHandler {
         const cutoff = new Date(now.getTime() - WAITLIST_KEEP_DAYS * DAY_MS);
         return (
             (await this.sweepLinkReports(cutoff)) +
-            (await this.sweepInvited(cutoff))
+            (await this.sweepInvited(cutoff)) +
+            (await this.sweepDownloadLeads(cutoff))
         );
+    }
+
+    /**
+     * The free downloads' leads (plan 2026-10-31-002 U9; Privacy: deleted
+     * after 12 months): a lead goes 12 months after its last request.
+     */
+    private async sweepDownloadLeads(cutoff: Date): Promise<number> {
+        let total = 0;
+        for (;;) {
+            const due = await prisma.downloadLead.findMany({
+                where: { lastRequestedAt: { lt: cutoff } },
+                select: { id: true },
+                take: BATCH,
+            });
+            if (due.length === 0) return total;
+            const { count } = await prisma.downloadLead.deleteMany({
+                where: {
+                    id: { in: due.map((row) => row.id) },
+                    lastRequestedAt: { lt: cutoff },
+                },
+            });
+            total += count;
+            // A batch someone asked again for in between deletes nothing.
+            if (count === 0 || due.length < BATCH) return total;
+        }
     }
 
     /**
