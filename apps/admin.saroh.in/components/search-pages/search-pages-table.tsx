@@ -30,6 +30,7 @@ import type {
 } from "@/lib/search-page-words";
 import {
     badgeOf,
+    cantPublishWords,
     countBy,
     eligible,
     FILTER_LABEL,
@@ -322,6 +323,9 @@ export function SearchPagesTable({
                         type="button"
                         size="sm"
                         disabled={eligible("publish", picked).length === 0}
+                        aria-describedby={
+                            heldWords(picked) ? "publish-held-bulk" : undefined
+                        }
                         onClick={() => open("publish", picked)}
                     >
                         Publish {eligible("publish", picked).length}
@@ -345,7 +349,10 @@ export function SearchPagesTable({
                         Archive
                     </Button>
                     {heldWords(picked) && (
-                        <p className="basis-full text-[12.5px] text-muted-foreground">
+                        <p
+                            id="publish-held-bulk"
+                            className="basis-full text-[12.5px] text-muted-foreground"
+                        >
                             {heldWords(picked)}
                         </p>
                     )}
@@ -426,30 +433,33 @@ function RowMenu({
                 {canPublish && (
                     <>
                         <DropdownMenuSeparator />
-                        {rowActions(row.state, site).map((item) => (
-                            <DropdownMenuItem
-                                key={item.label}
-                                disabled={
-                                    !item.action ||
-                                    (item.action === "publish" &&
-                                        row.blocked.length > 0)
-                                }
-                                title={
-                                    item.action === "publish" &&
-                                    row.blocked.length
-                                        ? `Fails: ${row.blocked.join(", ")}`
-                                        : undefined
-                                }
-                                className={cn(
-                                    item.danger && "text-destructive",
-                                )}
-                                onSelect={() => {
-                                    if (item.action) onAction(item.action);
-                                }}
-                            >
-                                {item.label}
-                            </DropdownMenuItem>
-                        ))}
+                        {rowActions(row.state, site).map((item) => {
+                            // A disabled item can't be hovered on a phone: the reason is part of it.
+                            const why =
+                                item.action === "publish"
+                                    ? cantPublishWords(row)
+                                    : null;
+                            return (
+                                <DropdownMenuItem
+                                    key={item.label}
+                                    disabled={!item.action || !!why}
+                                    className={cn(
+                                        item.danger && "text-destructive",
+                                        why && "flex-col items-start gap-0.5",
+                                    )}
+                                    onSelect={() => {
+                                        if (item.action) onAction(item.action);
+                                    }}
+                                >
+                                    {item.label}
+                                    {why && (
+                                        <span className="max-w-64 text-xs leading-snug">
+                                            {why}
+                                        </span>
+                                    )}
+                                </DropdownMenuItem>
+                            );
+                        })}
                     </>
                 )}
             </DropdownMenuContent>

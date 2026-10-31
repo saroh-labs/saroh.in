@@ -81,6 +81,8 @@ export interface PageRow {
      * build (plan 2026-10-31-002, R9). Always empty for /for/ and tools.
      */
     blocked: string[];
+    /** The same checks in a few words each, with their counts (`checkWhy`). */
+    why?: string[];
     /** The search pages its words link to: each must be live before it is (U12). */
     links: string[];
     /** Links in its words to a search page that isn't in the code: a typo. */
@@ -98,6 +100,7 @@ export interface DocEntry {
     /** Its group on the hub: "By trade", "Bookings and no-shows". */
     group: string;
     blocked: string[];
+    why: string[];
     /** `docLinks`: what its words link to, and what the template draws only when live. */
     links: { required: string[]; optional: string[] };
 }
@@ -187,6 +190,7 @@ export function mergePages(
             family: entry.kind === "for" ? entry.family : entry.group,
             inApp: entry.kind === "tools" && entry.inApp,
             blocked: "blocked" in entry ? entry.blocked : [],
+            why: "why" in entry ? entry.why : [],
             search: entry.search,
             updated: entry.updated,
             record,
@@ -196,11 +200,67 @@ export function mergePages(
     });
 }
 
+const plural = (n: number, one: string, many: string) =>
+    `${n} ${n === 1 ? one : many}`;
+
+/** A failing check in a few words, with its count (`docPageChecks` ids). */
+export function checkWhy(check: {
+    id: string;
+    title: string;
+    count: number;
+}): string {
+    const n = check.count;
+    switch (check.id) {
+        case "to-confirm":
+            return plural(n, "fact to confirm", "facts to confirm");
+        case "placeholders":
+            return plural(n, "placeholder left", "placeholders left");
+        case "quotes":
+            return plural(
+                n,
+                "quote mark facing the wrong way",
+                "quote marks facing the wrong way",
+            );
+        case "no-price":
+            return "it names Saroh's price or plan";
+        case "claims":
+            return "it says something Saroh doesn't do";
+        case "checked-on":
+            return "the GST check date is too old";
+        case "files":
+            return plural(
+                n,
+                "problem with its files",
+                "problems with its files",
+            );
+        default:
+            return `"${check.title}" fails`;
+    }
+}
+
+/**
+ * Why a page can't be published, on one line: its first failing check and
+ * how many more (the Overview tab lists them all). Null when nothing fails.
+ */
+export function cantPublishWords(
+    row: Pick<PageRow, "blocked" | "why">,
+): string | null {
+    const n = row.blocked.length;
+    if (!n) return null;
+    const first = row.why?.[0];
+    if (!first)
+        return `Can't publish yet: ${plural(n, "check fails", "checks fail")}`;
+    const more = n - 1;
+    return `Can't publish yet: ${first}${more ? `, and ${plural(more, "more check", "more checks")}` : ""}`;
+}
+
 /** The line under a status: since when, or what Deploy changes does to it. */
 export function stateNote(row: PageRow): string {
     const r = row.record;
     if (row.onSite && row.state === "live" && row.blocked.length)
         return `Left out of the site until it passes: ${row.blocked.join(", ")}`;
+    if (canDo("publish", row.state) && row.blocked.length)
+        return "Can't publish yet";
     if (row.pending === "on") return "Goes live when changes are deployed";
     if (row.pending === "off") return "Stays live until changes are deployed";
     switch (row.state) {
@@ -319,17 +379,25 @@ export function eligible<T extends { state: RowState; blocked?: string[] }>(
     );
 }
 
-/** Why Publish is held back for these pages: each one's name and failing checks. */
+/**
+ * The bulk bar: how many ticked pages can't be published and why. Publish
+ * already takes only the rest (`eligible`), so it says so when there are any.
+ */
 export function heldWords(
-    rows: readonly Pick<PageRow, "name" | "state" | "blocked">[],
+    rows: readonly Pick<PageRow, "name" | "state" | "blocked" | "why">[],
 ): string | null {
     const held = rows.filter(
         (r) => canDo("publish", r.state) && r.blocked.length,
     );
     if (!held.length) return null;
-    return `Can't publish until its checks pass: ${held
-        .map((r) => `${r.name} (${r.blocked.join(", ")})`)
-        .join("; ")}.`;
+    const rest = eligible("publish", rows).length;
+    const names = held
+        .map(
+            (r) =>
+                `${r.name} (${r.why?.length ? r.why.join(", ") : r.blocked.join(", ")})`,
+        )
+        .join("; ");
+    return `${plural(held.length, "page can't", "pages can't")} be published yet: ${names}.${rest ? ` Publish ${rest} publishes the rest.` : ""}`;
 }
 
 /** A page a page being published links to, that isn't live (staged) and isn't in the same publish (U12). */

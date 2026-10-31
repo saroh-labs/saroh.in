@@ -386,6 +386,7 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
         kind: "gst",
         family: "By trade",
         blocked: ["Every fact is confirmed"],
+        why: ["2 facts to confirm"],
     });
 
     it("can't be published from a bulk selection, and the bar names the check", () => {
@@ -404,8 +405,66 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
         expect(
             within(bar).getByRole("button", { name: "Publish 1" }),
         ).toBeTruthy();
-        expect(bar.textContent).toContain("Salon (Every fact is confirmed)");
+        expect(bar.textContent).toContain(
+            "1 page can't be published yet: Salon (2 facts to confirm). Publish 1 publishes the rest.",
+        );
+        expect(
+            within(bar)
+                .getByRole("button", { name: "Publish 1" })
+                .getAttribute("aria-describedby"),
+        ).toBe("publish-held-bulk");
         expect(screen.getByText("Section")).toBeTruthy();
+    });
+
+    it("says Can't publish yet under Draft, and why in the row's menu (U14)", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "draft"), row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        const list = screen.getByRole("list", { name: "Pages" });
+        expect(within(list).getAllByText("Can't publish yet")).toHaveLength(1);
+        expect(within(list).getByText("Never published")).toBeTruthy();
+        fireEvent.keyDown(screen.getByLabelText("Actions for Salon"), {
+            key: "Enter",
+        });
+        // The menu opens at once on Enter; role queries over it are slow in jsdom.
+        const item = screen
+            .getByText("Can't publish yet: 2 facts to confirm")
+            .closest('[role="menuitem"]');
+        expect(item?.getAttribute("aria-disabled")).toBe("true");
+        // Part of the item's name, so a screen reader and a phone get it.
+        expect(item?.textContent).toBe(
+            "Publish on saroh.inCan't publish yet: 2 facts to confirm",
+        );
+        expect(item?.getAttribute("title")).toBeNull();
+    });
+
+    it("keeps a /for/ row's menu and status line as they were", () => {
+        render(
+            <SearchPagesTable
+                rows={[row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        expect(screen.getByText("Never published")).toBeTruthy();
+        expect(screen.queryByText(/Can't publish/)).toBeNull();
+        fireEvent.keyDown(screen.getByLabelText("Actions for Spas"), {
+            key: "Enter",
+        });
+        const item = screen
+            .getByText("Publish on saroh.in")
+            .closest('[role="menuitem"]');
+        expect(item?.getAttribute("aria-disabled")).toBeNull();
+        expect(item?.textContent).toBe("Publish on saroh.in");
     });
 
     it("shows Held by checks while live, and says why", () => {

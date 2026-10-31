@@ -36,6 +36,11 @@ describe("docEntries (plan 2026-10-31-002, U6)", () => {
         expect(salon?.group).toBe("By trade");
         // Unconfirmed facts hold it back.
         expect(salon?.blocked).toContain("Every fact is confirmed");
+        // The same checks in a few words, each with its count (U14).
+        expect(salon?.why).toHaveLength(salon?.blocked.length ?? -1);
+        expect(
+            salon?.why[salon.blocked.indexOf("Every fact is confirmed")],
+        ).toMatch(/^\d+ facts? to confirm$/);
         expect(gst.find((e) => e.slug === "composition-scheme")?.group).toBe(
             "The basics",
         );

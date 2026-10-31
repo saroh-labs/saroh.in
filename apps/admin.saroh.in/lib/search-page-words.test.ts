@@ -4,11 +4,14 @@ import { describe, expect, it } from "vitest";
 import type { DocEntry, PageRow, SearchPageRecord } from "./search-page-words";
 import {
     badgeOf,
+    cantPublishWords,
+    checkWhy,
     countBy,
     deployedWords,
     deployWords,
     dialogWords,
     eligible,
+    heldWords,
     historyWords,
     inFilter,
     kindOf,
@@ -523,6 +526,7 @@ describe("links (U12)", () => {
         updated: "2026-10-26",
         group: "Bills",
         blocked: [],
+        why: [],
         links: { required, optional },
     });
     const rows = mergePages(
@@ -607,5 +611,78 @@ describe("links (U12)", () => {
         ).toBe(
             "3 live pages link here (guide-a, guide-b, guide-c); their links will go to the GST guides list until you publish it again.",
         );
+    });
+});
+
+describe("why a page can't be published (U14)", () => {
+    const check = (id: string, count: number) =>
+        checkWhy({ id, title: "Some check", count });
+
+    it("names each failing check in a few words, with its count", () => {
+        expect(check("to-confirm", 2)).toBe("2 facts to confirm");
+        expect(check("to-confirm", 1)).toBe("1 fact to confirm");
+        expect(check("checked-on", 1)).toBe("the GST check date is too old");
+        expect(check("placeholders", 3)).toBe("3 placeholders left");
+        expect(check("files", 1)).toBe("1 problem with its files");
+        expect(check("something-new", 1)).toBe('"Some check" fails');
+    });
+
+    const held = {
+        name: "Salon",
+        state: "draft" as const,
+        blocked: ["Every fact is confirmed", "No placeholders left"],
+        why: ["2 facts to confirm", "1 placeholder left"],
+    };
+
+    it("says the first reason and how many more, on one line", () => {
+        expect(cantPublishWords(held)).toBe(
+            "Can't publish yet: 2 facts to confirm, and 1 more check",
+        );
+        expect(
+            cantPublishWords({
+                blocked: ["A"],
+                why: ["the GST check date is too old"],
+            }),
+        ).toBe("Can't publish yet: the GST check date is too old");
+        expect(cantPublishWords({ blocked: ["A", "B"] })).toBe(
+            "Can't publish yet: 2 checks fail",
+        );
+        expect(cantPublishWords({ blocked: [], why: [] })).toBeNull();
+    });
+
+    it("the bulk bar counts the held pages and offers the rest", () => {
+        const ok = { name: "Spa", state: "draft" as const, blocked: [] };
+        expect(heldWords([held, ok])).toBe(
+            "1 page can't be published yet: Salon (2 facts to confirm, 1 placeholder left). Publish 1 publishes the rest.",
+        );
+        expect(heldWords([held, { ...held, name: "Gym" }])).toBe(
+            "2 pages can't be published yet: Salon (2 facts to confirm, 1 placeholder left); Gym (2 facts to confirm, 1 placeholder left).",
+        );
+        expect(heldWords([ok])).toBeNull();
+    });
+
+    it("shows Can't publish yet as a draft's second line; a /for/ draft is unchanged", () => {
+        const [doc, forPage] = mergePages(
+            [
+                {
+                    kind: "gst",
+                    path: "/gst/salon",
+                    slug: "salon",
+                    name: "Salon",
+                    search: "salon gst",
+                    updated: "2026-10-26",
+                    group: "By trade",
+                    blocked: held.blocked,
+                    why: held.why,
+                    links: { required: [], optional: [] },
+                },
+                entry("spas"),
+            ],
+            { pages: [], rebuild: { running: false } },
+        );
+        expect(stateNote(doc)).toBe("Can't publish yet");
+        expect(doc.why).toEqual(held.why);
+        expect(stateNote(forPage)).toBe("Never published");
+        expect(forPage.why).toEqual([]);
     });
 });

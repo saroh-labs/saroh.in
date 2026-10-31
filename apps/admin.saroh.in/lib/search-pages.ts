@@ -24,7 +24,7 @@ import type {
     SearchPageEvent,
     SearchPagesRead,
 } from "./search-page-words";
-import { hostOf, mergePages } from "./search-page-words";
+import { checkWhy, hostOf, mergePages } from "./search-page-words";
 import { marketingSiteUrl } from "./team-member";
 
 /**
@@ -72,11 +72,16 @@ export function docEntries(): DocEntry[] {
                     ? "By trade"
                     : "The basics"
                 : p.group,
-        blocked: docPageChecks(p)
-            .filter((c) => !c.ok && c.severity === "error")
-            .map((c) => c.title),
+        ...failing(p),
         links: docLinks(p),
     }));
+}
+
+function failing(p: Parameters<typeof docPageChecks>[0]) {
+    const fails = docPageChecks(p).filter(
+        (c) => !c.ok && c.severity === "error",
+    );
+    return { blocked: fails.map((c) => c.title), why: fails.map(checkWhy) };
 }
 
 export function readSearchPageHistory(

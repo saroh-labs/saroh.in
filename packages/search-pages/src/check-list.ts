@@ -11,6 +11,8 @@ export interface SearchPageCheck {
     title: string;
     /** When it fails, what and where; empty when it passes. */
     detail: string;
+    /** How many problems it found: 0 when it passes. */
+    count: number;
     severity: "error" | "warning";
 }
 
@@ -28,6 +30,7 @@ export function checkList() {
             ok: problems.length === 0,
             title,
             detail: problems.join(" "),
+            count: problems.length,
             severity,
         });
     return { out, add };
