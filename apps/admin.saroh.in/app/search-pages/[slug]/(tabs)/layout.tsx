@@ -93,6 +93,7 @@ export default async function SearchPageLayout({
                     actions={
                         <SearchPageActions
                             row={row}
+                            rows={data.rows}
                             site={site.host}
                             siteUrl={site.url}
                             production={site.production}

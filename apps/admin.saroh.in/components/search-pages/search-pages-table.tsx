@@ -65,6 +65,7 @@ export function SearchPagesTable({
     kind = "for",
     kindCounts,
     rows,
+    allRows = rows,
     site,
     reviewSite,
     reviewUrl,
@@ -75,6 +76,8 @@ export function SearchPagesTable({
     /** How many pages of each kind, for the Kind choice; none hides it. */
     kindCounts?: Partial<Record<PageKind, number>>;
     rows: PageRow[];
+    /** Every kind's rows: what a page links to may be another kind (U12). */
+    allRows?: PageRow[];
     site: string;
     reviewSite: string;
     reviewUrl: string;
@@ -362,6 +365,7 @@ export function SearchPagesTable({
                 <SearchPageDialog
                     action={opened.action}
                     pages={opened.pages}
+                    rows={allRows}
                     skipped={opened.skipped}
                     site={site}
                     reviewSite={reviewSite}

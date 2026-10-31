@@ -99,6 +99,7 @@ export default async function SearchPagesPage({
                                     ]),
                                 )}
                                 rows={data.rows.filter((r) => r.kind === kind)}
+                                allRows={data.rows}
                                 site={site.host}
                                 reviewSite={site.reviewHost}
                                 reviewUrl={site.reviewUrl}

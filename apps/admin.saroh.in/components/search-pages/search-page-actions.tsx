@@ -30,6 +30,7 @@ const CODE_URL =
  */
 export function SearchPageActions({
     row,
+    rows,
     site,
     siteUrl,
     production,
@@ -39,6 +40,8 @@ export function SearchPageActions({
     page,
 }: {
     row: PageRow;
+    /** Every page, for what this one links to and what links to it (U12). */
+    rows?: PageRow[];
     site: string;
     siteUrl: string;
     production: boolean;
@@ -147,6 +150,7 @@ export function SearchPageActions({
                 <SearchPageDialog
                     action={opened}
                     pages={[row]}
+                    rows={rows}
                     site={site}
                     reviewSite={reviewSite}
                     checks={checks}

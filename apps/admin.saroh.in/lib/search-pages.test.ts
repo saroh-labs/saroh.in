@@ -42,6 +42,22 @@ describe("docEntries (plan 2026-10-31-002, U6)", () => {
     });
 });
 
+describe("every link in the code goes to a page (U12)", () => {
+    it("the no-shows guide needs the cancellation policy generator, and no page has a dead link", async () => {
+        const { listSearchPages } = await import("@saroh/search-pages");
+        const { docEntries } = await import("./search-pages");
+        const { mergePages } = await import("./search-page-words");
+        const rows = mergePages([...listSearchPages(), ...docEntries()], {
+            pages: [],
+            rebuild: { running: false },
+        });
+        expect(
+            rows.find((r) => r.path === "/guides/reduce-no-shows")?.links,
+        ).toEqual(["/tools/cancellation-policy-generator"]);
+        expect(rows.filter((r) => r.deadLinks.length)).toEqual([]);
+    });
+});
+
 describe("docWordBlocks", () => {
     it("lists a GST page's words in the template's order", async () => {
         const { docWordBlocks } = await import("./search-page-content");

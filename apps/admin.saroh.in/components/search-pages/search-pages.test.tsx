@@ -53,6 +53,8 @@ const row = (slug: string, state: PageRow["state"]): PageRow => ({
     pending: null,
     record: null,
     blocked: [],
+    links: [],
+    deadLinks: [],
 });
 
 const table = (canPublish: boolean) =>
@@ -446,6 +448,189 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
             screen.getByText(
                 /Publish waits until these checks pass: Every fact is confirmed/,
             ),
+        ).toBeTruthy();
+    });
+});
+
+describe("links to pages that aren't live (U12)", () => {
+    beforeEach(() => {
+        searchPageAction.mockReset();
+        searchPageAction.mockResolvedValue({ ok: true, data: { pages: [] } });
+    });
+    const TOOL = "/tools/cancellation-policy-generator";
+    const tool = (
+        state: PageRow["state"],
+        blocked: string[] = [],
+    ): PageRow => ({
+        ...row("cancellation-policy-generator", state),
+        path: TOOL,
+        kind: "tools",
+        name: "Cancellation policy generator",
+        blocked,
+    });
+    const guide = (
+        state: PageRow["state"],
+        extra: Partial<PageRow> = {},
+    ): PageRow => ({
+        ...row("reduce-no-shows", state),
+        path: "/guides/reduce-no-shows",
+        kind: "guides",
+        name: "Reduce no-shows",
+        links: [TOOL],
+        ...extra,
+    });
+    const dialog = (
+        action: "publish" | "unpublish" | "archive",
+        pages: PageRow[],
+        rows: PageRow[],
+    ) =>
+        render(
+            <SearchPageDialog
+                action={action}
+                pages={pages}
+                rows={rows}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                onOpenChange={() => undefined}
+            />,
+        );
+    const tick = () =>
+        fireEvent.click(screen.getByRole("checkbox", { name: /^I've read/ }));
+    const confirm = (name: RegExp) =>
+        screen.getByRole<HTMLButtonElement>("button", { name });
+
+    it("publishes a guide whose tool is live, with no warning", async () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("live")]);
+        expect(
+            screen.queryByText("Links to pages that aren't live"),
+        ).toBeNull();
+        tick();
+        fireEvent.click(confirm(/^Publish page$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("publish", [
+                "/guides/reduce-no-shows",
+            ]),
+        );
+    });
+
+    it("holds Publish while the tool isn't live, then Publish these too adds it to the same publish", async () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("draft")]);
+        expect(
+            screen.getByText("Links to pages that aren't live"),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                `Cancellation policy generator (${TOOL}) is not published. Reduce no-shows links to it.`,
+            ),
+        ).toBeTruthy();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+        fireEvent.click(
+            screen.getByRole("button", { name: "Publish these too" }),
+        );
+        expect(
+            screen.queryByText("Links to pages that aren't live"),
+        ).toBeNull();
+        expect(
+            screen.getByRole("list", { name: "Pages" }).textContent,
+        ).toContain(TOOL);
+        // The added page is read too before it goes out.
+        expect(confirm(/^Publish 2 pages$/).disabled).toBe(true);
+        tick();
+        fireEvent.click(confirm(/^Publish 2 pages$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("publish", [
+                "/guides/reduce-no-shows",
+                TOOL,
+            ]),
+        );
+    });
+
+    it("says a taken-off tool is taken off", () => {
+        dialog(
+            "publish",
+            [guide("draft")],
+            [guide("draft"), tool("unpublished")],
+        );
+        expect(
+            screen.getByText(/is taken off\. Reduce no-shows links to it\./),
+        ).toBeTruthy();
+    });
+
+    it("an archived tool can't be added: it says to restore it first, and Publish stays off", () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("archived")]);
+        expect(
+            screen.getByText(
+                `Cancellation policy generator (${TOOL}) is archived, and Reduce no-shows links to it. Restore it first, then publish it with this.`,
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Publish these too" }),
+        ).toBeNull();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+    });
+
+    it("a tool whose own checks fail can't be added, and says why", () => {
+        dialog(
+            "publish",
+            [guide("draft")],
+            [guide("draft"), tool("draft", ["Every fact is confirmed"])],
+        );
+        expect(
+            screen.getByText(
+                /It can't be published until its checks pass: Every fact is confirmed\. Fix them first\./,
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Publish these too" }),
+        ).toBeNull();
+    });
+
+    it("a link to a page that doesn't exist blocks, naming the page and the link", () => {
+        const typo = guide("draft", {
+            links: ["/tools/cancelation-policy"],
+            deadLinks: ["/tools/cancelation-policy"],
+        });
+        dialog("publish", [typo], [typo]);
+        expect(
+            screen.getByText(
+                "Reduce no-shows links to /tools/cancelation-policy. This link goes to a page that doesn't exist. Fix the link in the code, then publish.",
+            ),
+        ).toBeTruthy();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+    });
+
+    it("unpublishing a tool live pages link to warns, and doesn't block", async () => {
+        dialog("unpublish", [tool("live")], [guide("live"), tool("live")]);
+        expect(
+            screen.getByText(
+                "1 live page links here (Reduce no-shows); their links will go to the /tools list until you publish it again.",
+            ),
+        ).toBeTruthy();
+        fireEvent.click(confirm(/^Unpublish page$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("unpublish", [TOOL]),
+        );
+    });
+
+    it("the list's bulk Publish checks links across kinds", () => {
+        render(
+            <SearchPagesTable
+                kind="guides"
+                rows={[guide("draft")]}
+                allRows={[guide("draft"), tool("draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        fireEvent.click(screen.getByLabelText("Select every page shown"));
+        fireEvent.click(screen.getByRole("button", { name: "Publish 1" }));
+        expect(
+            screen.getByRole("button", { name: "Publish these too" }),
         ).toBeTruthy();
     });
 });

@@ -9,7 +9,7 @@ import type {
     GstPage,
     GuidePage,
 } from "@saroh/search-pages/docs";
-import { docPageChecks } from "@saroh/search-pages/docs";
+import { docLinks, docPageChecks } from "@saroh/search-pages/docs";
 import { embeddedDocs } from "@saroh/search-pages/docs-embedded";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -75,6 +75,7 @@ export function docEntries(): DocEntry[] {
         blocked: docPageChecks(p)
             .filter((c) => !c.ok && c.severity === "error")
             .map((c) => c.title),
+        links: docLinks(p),
     }));
 }
 

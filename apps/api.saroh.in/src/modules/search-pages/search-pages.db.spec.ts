@@ -112,6 +112,21 @@ describe("staging and deploying search pages", () => {
         });
     });
 
+    it("deploys a guide and the tool it links to, published together, in one job (U12)", async () => {
+        const guide = "/guides/reduce-no-shows";
+        const tool = "/tools/cancellation-policy-generator";
+        // Admin's "Publish these too" sends both in one publish.
+        await service.act(staff, "publish", [guide, tool]);
+        expect(await deploys()).toBe(0);
+
+        await service.deploy(staff);
+
+        const jobs = await deployJobs();
+        expect(jobs).toHaveLength(1);
+        expect(pathsOf(jobs[0]?.payload).sort()).toEqual([guide, tool]);
+        expect((await service.publicList()).live).toEqual([guide, tool]);
+    });
+
     it("publishes 3 and takes 1 off in one deploy", async () => {
         await service.act(staff, "publish", ["/for/salons"]);
         await service.deploy(staff);

@@ -362,7 +362,14 @@ recorded grant (the API refuses it otherwise).
   that fails them shows "Held by checks": the site build leaves it out
   ("Page held by checks" warning, `held` in `/_build/state.json`,
   DEC-201). /for/ and tools keep the confirm that only counts failing
-  checks. A page's tabs live under
+  checks. Publish also needs every search page a page's words link to
+  (`docLinks`, `PageRow.links`) to be live or in the same publish: the
+  confirm names each one and "Publish these too" adds them (their links
+  too); an archived or failing one, or a link to no page in the code,
+  holds Publish with how to fix it. Unpublish and Archive name the live
+  pages that link there, and don't block (DEC-201 item 9). The dialog
+  gets every kind's rows (`rows`/`allRows`), since a guide links to tools.
+  A page's tabs live under
   `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
   template, light, no console chrome, no links) has no shell; the Content
   tab frames it. `searchPageChecks` comes from

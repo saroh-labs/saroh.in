@@ -12,6 +12,8 @@ export {
 } from "./blocks/parse";
 export type { Block, Inline, OutlineItem } from "./blocks/types";
 export { GST_CHECKED_MAX_DAYS, docPageChecks } from "./docs-checks";
+export { docLinks } from "./docs-links";
+export type { DocLinks } from "./docs-links";
 export { createDocsLoader, parseDocPage } from "./docs-load";
 export type {
     DocFiles,

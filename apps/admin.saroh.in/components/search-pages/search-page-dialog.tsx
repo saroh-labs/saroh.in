@@ -1,7 +1,9 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
+import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -11,6 +13,9 @@ import { searchPageAction } from "@/lib/search-page-actions";
 import type { PageAction, PageRow } from "@/lib/search-page-words";
 import {
     dialogWords,
+    linkedFromWords,
+    linkWords,
+    publishLinks,
     refusalWords,
     successWords,
 } from "@/lib/search-page-words";
@@ -19,6 +24,8 @@ export interface SearchPageDialogProps {
     action: PageAction;
     /** The pages it acts on: those the action can be done to. */
     pages: PageRow[];
+    /** Every page in the code (all kinds): what the pages link to, and what links to them (U12). */
+    rows?: PageRow[];
     /** How many of the picked pages were left out, as the action can't be done to them. */
     skipped?: number;
     site: string;
@@ -38,7 +45,8 @@ export interface SearchPageDialogProps {
  */
 export function SearchPageDialog({
     action,
-    pages,
+    pages: picked,
+    rows = picked,
     skipped = 0,
     site,
     reviewSite,
@@ -50,7 +58,16 @@ export function SearchPageDialog({
     const id = useId();
     const router = useRouter();
     const [read, setRead] = useState(false);
+    // Pages added by "Publish these too": the linked pages that aren't live yet.
+    const [added, setAdded] = useState<PageRow[]>([]);
+    const pages = [...picked, ...added];
     const words = dialogWords(action, pages, site, reviewSite, checks);
+    const links = action === "publish" ? publishLinks(pages, rows) : null;
+    const linkNote = links ? linkWords(links, pages) : null;
+    const linkedFrom =
+        action === "unpublish" || action === "archive"
+            ? linkedFromWords(pages, rows)
+            : null;
 
     return (
         <OperatorDialog
@@ -60,7 +77,7 @@ export function SearchPageDialog({
             reasonRequired={false}
             destructive={words.destructive}
             submitLabel={words.confirm}
-            ready={!words.tick || read}
+            ready={(!words.tick || read) && !linkNote}
             effect={
                 <div className="grid gap-1.5">
                     <p className="font-medium text-foreground">What happens</p>
@@ -73,7 +90,39 @@ export function SearchPageDialog({
             }
             fields={
                 <div className="grid gap-3">
-                    {showPages && (
+                    {linkNote && links && (
+                        <Notice
+                            tone={links.blocking.length ? "error" : "warning"}
+                            title={linkNote.title}
+                            action={
+                                linkNote.button && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setAdded((was) => [
+                                                ...was,
+                                                ...links.add,
+                                            ]);
+                                            // They're read before they're published, like the rest.
+                                            setRead(false);
+                                        }}
+                                    >
+                                        {linkNote.button}
+                                    </Button>
+                                )
+                            }
+                        >
+                            <ul className="grid list-disc gap-1 pl-5">
+                                {linkNote.lines.map((line) => (
+                                    <li key={line}>{line}</li>
+                                ))}
+                            </ul>
+                        </Notice>
+                    )}
+                    {linkedFrom && <Notice tone="warning">{linkedFrom}</Notice>}
+                    {(showPages || added.length > 0) && (
                         <ul
                             aria-label="Pages"
                             className="max-h-56 overflow-y-auto rounded-md border"

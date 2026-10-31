@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { DocPage } from "@saroh/search-pages/docs";
-import { docPageChecks } from "@saroh/search-pages/docs";
+import { docLinks, docPageChecks } from "@saroh/search-pages/docs";
 import { embeddedDocs as embedText } from "@saroh/search-pages/embed-docs";
 import { DOC_PAGE_PATH } from "@saroh/search-pages/kinds";
 
@@ -21,6 +21,8 @@ import { loadPublishList } from "./search-pages.config.js";
  *   in neither the Worker nor the static files. A live page whose checks
  *   fail (unconfirmed facts, an old GST check date) is left out with a
  *   `::warning`; the build still goes out (an unrelated urgent deploy must).
+ *   So is a live page whose words link to a search page that would be a
+ *   404 here: neither live in this build nor taken off (which redirects).
  * - A preview, or a build without the list (`next dev`, tests), writes every
  *   page; those not live say Draft and `noindex`.
  *
@@ -32,6 +34,8 @@ import { loadPublishList } from "./search-pages.config.js";
 interface PublishList {
     preview: boolean;
     live: string[];
+    /** Were live, now redirect: a link to one still lands somewhere. */
+    takenOff?: { path: string }[];
 }
 
 export interface DocsPlan {
@@ -44,6 +48,9 @@ export interface DocsPlan {
 const SEARCH_PAGES = path.join(__dirname, "../../packages/search-pages");
 export const GEN_FILE = path.join(__dirname, "lib/docs-content.gen.ts");
 export const DOWNLOADS_DIR = path.join(__dirname, "public/downloads");
+
+/** The held reason for a page whose words link to a page that isn't live (admin's words). */
+export const LINKS_LIVE = "Every page it links to is live";
 
 /** Which pages this build carries, from the publish list and each live page's checks. */
 export function planDocs(
@@ -75,6 +82,30 @@ export function planDocs(
                 detail: failed.map((c) => c.detail),
             });
         else plan.built.push(path);
+    }
+    // Links: a held page isn't live either, so repeat until nothing more is held (U12).
+    const lands = new Set([
+        ...list.live.filter((p) => !DOC_PAGE_PATH.test(p)),
+        ...(list.takenOff ?? []).map((t) => t.path),
+    ]);
+    for (let changed = true; changed;) {
+        changed = false;
+        for (const path of plan.built) {
+            const page = pages.find((p) => p.path === path);
+            const dead = page
+                ? docLinks(page).required.filter(
+                      (l) => !lands.has(l) && !plan.built.includes(l),
+                  )
+                : [];
+            if (!dead.length) continue;
+            plan.built = plan.built.filter((p) => p !== path);
+            plan.held.push({
+                path,
+                why: [LINKS_LIVE],
+                detail: dead.map((l) => `It links to ${l}, which isn't live.`),
+            });
+            changed = true;
+        }
     }
     return plan;
 }

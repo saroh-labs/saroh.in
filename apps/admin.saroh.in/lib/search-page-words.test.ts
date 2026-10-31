@@ -1,7 +1,7 @@
 import type { ForPageEntry, ToolPageEntry } from "@saroh/search-pages";
 import { describe, expect, it } from "vitest";
 
-import type { PageRow, SearchPageRecord } from "./search-page-words";
+import type { DocEntry, PageRow, SearchPageRecord } from "./search-page-words";
 import {
     badgeOf,
     countBy,
@@ -13,8 +13,10 @@ import {
     inFilter,
     kindOf,
     KINDS,
+    linkedFromWords,
     matchesQuery,
     mergePages,
+    publishLinks,
     rebuildWords,
     refusalWords,
     rowActions,
@@ -504,5 +506,106 @@ describe("free tools (#1253)", () => {
                 "saroh.in",
             ).what,
         ).toBe("Live before publish control");
+    });
+});
+
+describe("links (U12)", () => {
+    const doc = (
+        slug: string,
+        required: string[],
+        optional: string[] = [],
+    ): DocEntry => ({
+        kind: "downloads",
+        path: `/downloads/${slug}`,
+        slug,
+        name: slug,
+        search: `${slug} search`,
+        updated: "2026-10-26",
+        group: "Bills",
+        blocked: [],
+        links: { required, optional },
+    });
+    const rows = mergePages(
+        [
+            doc("receipt", ["/downloads/invoice"]),
+            doc(
+                "invoice",
+                ["/for/salons", "/for/typo"],
+                ["/for/not-written-yet"],
+            ),
+            entry("salons"),
+            entry("spas"),
+        ],
+        { pages: [], rebuild: idle },
+    );
+    const at = (path: string): PageRow => {
+        const r = rows.find((x) => x.path === path);
+        if (!r) throw new Error(`no ${path}`);
+        return r;
+    };
+
+    it("keeps a page's required links, and names a required link to no page in the code as dead", () => {
+        expect(at("/downloads/receipt").links).toEqual(["/downloads/invoice"]);
+        expect(at("/downloads/invoice").deadLinks).toEqual(["/for/typo"]);
+        expect(at("/for/spas").links).toEqual([]);
+    });
+
+    it("adds what the added pages link to, as well", () => {
+        const { add, blocking } = publishLinks(
+            [at("/downloads/receipt")],
+            rows,
+        );
+        expect(add.map((r) => r.path)).toEqual([
+            "/downloads/invoice",
+            "/for/salons",
+        ]);
+        expect(blocking).toEqual([
+            { path: "/for/typo", row: null, from: ["invoice"] },
+        ]);
+    });
+
+    it("a page published with what it links to needs nothing more", () => {
+        const ok = mergePages(
+            [doc("receipt", ["/downloads/invoice"]), doc("invoice", [])],
+            { pages: [], rebuild: idle },
+        );
+        expect(publishLinks(ok, ok)).toEqual({ add: [], blocking: [] });
+    });
+
+    it("unpublishing a GST page names the live pages that link to it, and where their links go", () => {
+        const live = mergePages(
+            [
+                {
+                    ...doc("guide-a", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/a",
+                },
+                {
+                    ...doc("guide-b", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/b",
+                },
+                {
+                    ...doc("guide-c", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/c",
+                },
+                { ...doc("x", []), kind: "gst", path: "/gst/x" },
+            ],
+            {
+                pages: ["/guides/a", "/guides/b", "/guides/c", "/gst/x"].map(
+                    (path) => ({ ...record("x", "LIVE"), path }),
+                ),
+                rebuild: idle,
+            },
+        );
+        expect(
+            linkedFromWords(
+                live.filter((r) => r.kind === "gst"),
+                live,
+            ),
+        ).toBe(
+            "3 live pages link here (guide-a, guide-b, guide-c); their links will go to the GST guides list until you publish it again.",
+        );
     });
 });

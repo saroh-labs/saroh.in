@@ -7,7 +7,12 @@ import { embeddedDocs } from "@saroh/search-pages/docs-embedded";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { recordDocs } from "./build-state.config.js";
-import { heldWarning, planDocs, writeDocs } from "./docs-content.config";
+import {
+    heldWarning,
+    LINKS_LIVE,
+    planDocs,
+    writeDocs,
+} from "./docs-content.config";
 
 const TODAY = "2026-10-31";
 const pages = embeddedDocs.all();
@@ -153,6 +158,58 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
                 today: TODAY,
             }),
         ).toEqual({ all: false, built: [], held: [] });
+    });
+});
+
+describe("planDocs: links must land (U12)", () => {
+    const NO_SHOWS = "/guides/reduce-no-shows";
+    const TOOL = "/tools/cancellation-policy-generator";
+    const plan = (list: Parameters<typeof planDocs>[0]) =>
+        planDocs(list, confirmed, { production: true, today: TODAY });
+
+    it("a live guide whose tool is live builds", () => {
+        expect(plan(live(NO_SHOWS, TOOL)).built).toEqual([NO_SHOWS]);
+    });
+
+    it("a live guide whose tool isn't live is held, naming the link", () => {
+        const p = plan(live(NO_SHOWS));
+        expect(p.built).toEqual([]);
+        expect(p.held).toEqual([
+            {
+                path: NO_SHOWS,
+                why: [LINKS_LIVE],
+                detail: [`It links to ${TOOL}, which isn't live.`],
+            },
+        ]);
+        expect(heldWarning(p.held[0])).toMatch(
+            /^::warning title=Page held by checks::\/guides\/reduce-no-shows .*cancellation-policy-generator/,
+        );
+    });
+
+    it("a link to a taken-off page redirects, so it doesn't hold", () => {
+        expect(
+            plan({
+                preview: false,
+                live: [NO_SHOWS],
+                takenOff: [{ path: TOOL }],
+            }).built,
+        ).toEqual([NO_SHOWS]);
+    });
+
+    it("a page linking to a held page is held too", () => {
+        // The receipt format links to the GST invoice format, which links to the code finder.
+        const p = plan(
+            live("/downloads/receipt-format", "/downloads/gst-invoice-format"),
+        );
+        expect(p.built).toEqual([]);
+        expect(p.held.map((h) => h.path).sort()).toEqual([
+            "/downloads/gst-invoice-format",
+            "/downloads/receipt-format",
+        ]);
+    });
+
+    it("a GST page whose only links are its rail tools, trade page and related pins builds alone", () => {
+        expect(plan(live(GST)).built).toEqual([GST]);
     });
 });
 

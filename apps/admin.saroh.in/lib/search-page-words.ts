@@ -81,6 +81,10 @@ export interface PageRow {
      * build (plan 2026-10-31-002, R9). Always empty for /for/ and tools.
      */
     blocked: string[];
+    /** The search pages its words link to: each must be live before it is (U12). */
+    links: string[];
+    /** Links in its words to a search page that isn't in the code: a typo. */
+    deadLinks: string[];
 }
 
 /** A GST page, guide or download as the list has it, with its failing checks. */
@@ -94,6 +98,8 @@ export interface DocEntry {
     /** Its group on the hub: "By trade", "Bookings and no-shows". */
     group: string;
     blocked: string[];
+    /** `docLinks`: what its words link to, and what the template draws only when live. */
+    links: { required: string[]; optional: string[] };
 }
 
 export const STATE_LABEL: Record<RowState, string> = {
@@ -165,9 +171,15 @@ export function mergePages(
     read: SearchPagesRead,
 ): PageRow[] {
     const byPath = new Map(read.pages.map((r) => [r.path, r]));
+    const inCode = new Set(manifest.map((e) => e.path));
     return manifest.map((entry) => {
         const record = byPath.get(entry.path) ?? null;
+        const links =
+            "links" in entry ? entry.links : { required: [], optional: [] };
         return {
+            links: links.required,
+            // An optional link to no page is never drawn (a /for/ page not written yet).
+            deadLinks: links.required.filter((l) => !inCode.has(l)),
             path: entry.path,
             slug: entry.slug,
             kind: entry.kind,
@@ -318,6 +330,119 @@ export function heldWords(
     return `Can't publish until its checks pass: ${held
         .map((r) => `${r.name} (${r.blocked.join(", ")})`)
         .join("; ")}.`;
+}
+
+/** A page a page being published links to, that isn't live (staged) and isn't in the same publish (U12). */
+export interface MissingLink {
+    path: string;
+    /** Its row; null when no page in the code has this address (a typo). */
+    row: PageRow | null;
+    /** The pages being published that link to it. */
+    from: string[];
+}
+
+/**
+ * What Publish needs first: every page the pages being published link to
+ * must be live or published with them. `add` can join this publish (its own
+ * links followed too); `blocking` can't, and holds Publish back.
+ */
+export function publishLinks(
+    pages: readonly PageRow[],
+    rows: readonly PageRow[],
+): { add: PageRow[]; blocking: MissingLink[] } {
+    const going = new Set(pages.map((p) => p.path));
+    const queue = [...pages];
+    const add: PageRow[] = [];
+    const blocking: MissingLink[] = [];
+    const block = (path: string, row: PageRow | null, from: string) => {
+        const was = blocking.find((b) => b.path === path);
+        if (was) was.from.push(from);
+        else blocking.push({ path, row, from: [from] });
+    };
+    // The iterator also reaches pages pushed while it runs: what added pages link to.
+    for (const page of queue) {
+        for (const link of page.deadLinks) block(link, null, page.name);
+        for (const link of page.links) {
+            const row = rows.find((r) => r.path === link);
+            if (!row || row.state === "live" || going.has(link)) continue;
+            if (canDo("publish", row.state) && !row.blocked.length) {
+                going.add(link);
+                add.push(row);
+                queue.push(row);
+            } else block(link, row, page.name);
+        }
+    }
+    return { add, blocking };
+}
+
+const NOT_LIVE: Record<Exclude<RowState, "live">, string> = {
+    draft: "not published",
+    unpublished: "taken off",
+    archived: "archived",
+};
+
+/** The Publish dialog's warning: each page linked to that isn't live, with its state and the fix. */
+export function linkWords(
+    links: { add: readonly PageRow[]; blocking: readonly MissingLink[] },
+    pages: readonly PageRow[],
+): { title: string; lines: string[]; button: string | null } | null {
+    const { add, blocking } = links;
+    if (!add.length && !blocking.length) return null;
+    const linkedFrom = (path: string) =>
+        [...pages, ...add]
+            .filter((p) => p.links.includes(path))
+            .map((p) => p.name)
+            .join(", ");
+    const lines = [
+        ...add.map(
+            (r) =>
+                `${r.name} (${r.path}) is ${NOT_LIVE[r.state as Exclude<RowState, "live">]}. ${linkedFrom(r.path)} links to it.`,
+        ),
+        ...blocking.map((b) => {
+            const from = b.from.join(", ");
+            if (!b.row)
+                return `${from} links to ${b.path}. This link goes to a page that doesn't exist. Fix the link in the code, then publish.`;
+            const was = `${b.row.name} (${b.path}) is ${NOT_LIVE[b.row.state as Exclude<RowState, "live">]}, and ${from} links to it.`;
+            return b.row.state === "archived"
+                ? `${was} Restore it first, then publish it with this.`
+                : `${was} It can't be published until its checks pass: ${b.row.blocked.join(", ")}. Fix them first.`;
+        }),
+    ];
+    return {
+        title: "Links to pages that aren't live",
+        lines,
+        button: add.length ? "Publish these too" : null,
+    };
+}
+
+/** Where a taken-off page's links go meanwhile, in words. */
+function takenOffTo(kind: PageKind): string {
+    if (kind === "for") return "its family page";
+    if (kind === "tools") return "the /tools list";
+    return `the ${DOC_KINDS.find((k) => k.id === kind)?.hubLabel ?? "Saroh"} list`;
+}
+
+/** Unpublish and Archive: the live pages that link to these, and where their links go meanwhile. Never blocks. */
+export function linkedFromWords(
+    pages: readonly PageRow[],
+    rows: readonly PageRow[],
+): string | null {
+    const off = new Set(pages.map((p) => p.path));
+    const linking = rows.filter(
+        (r) =>
+            r.state === "live" &&
+            !off.has(r.path) &&
+            r.links.some((l) => off.has(l)),
+    );
+    if (!linking.length) return null;
+    const n = linking.length;
+    const one = pages.length === 1;
+    const kinds = new Set(pages.map((p) => p.kind));
+    const to =
+        kinds.size === 1
+            ? takenOffTo(pages[0].kind)
+            : "the list above each page";
+    return `${n === 1 ? "1 live page links" : `${n} live pages link`} here (${linking.map((r) => r.name).join(", ")}); their links will go to ${to} until you publish ${one ? "it" : "them"} again.`;
 }
 
 /** A row's ⋯ menu, past Open details and Read it: what can be done to it. */
