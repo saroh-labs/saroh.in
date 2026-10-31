@@ -68,6 +68,8 @@ export function HomeHero({ freeLine }: { freeLine: string }) {
                 shot={home.hero.shot}
                 variant="home"
                 priority
+                // Side by side from about 900px; below, the words come first.
+                priorityFrom="(min-width: 900px)"
                 sizes="(min-width: 1280px) 640px, 100vw"
                 className="flex-[1.2_1_440px]"
             />

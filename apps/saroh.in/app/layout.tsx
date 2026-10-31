@@ -19,9 +19,12 @@ import { SiteTags } from "./site-tags";
 // labels and eyebrows; Space Grotesk for display through H3, money and large
 // figures (never body copy); JetBrains Mono only where a value is measured
 // (the waitlist's opening date).
+// Geist limited to 400–700, the weights the site uses (29 KB to 21 KB), cut
+// from packages/ui's variable file with fontTools:
+// `instancer.instantiateVariableFont(font, {"wght": (400, 700)})`.
 const fontSans = localFont({
-    src: "../../../packages/ui/fonts/Geist-latin.woff2",
-    weight: "100 900",
+    src: "./fonts/Geist-latin-400-700.woff2",
+    weight: "400 700",
     style: "normal",
     display: "swap",
     variable: "--font-sans",
@@ -35,9 +38,12 @@ const fontDisplay = localFont({
     variable: "--font-display",
 });
 
+// Weight 400 only, cut from packages/ui's variable file (40 KB to 21 KB) with
+// fontTools: `instancer.instantiateVariableFont(font, {"wght": 400})`. Every
+// mono line on the site is regular weight (breadcrumbs, step numbers, dates).
 const fontMono = localFont({
-    src: "../../../packages/ui/fonts/JetBrainsMono-latin.woff2",
-    weight: "100 800",
+    src: "./fonts/JetBrainsMono-latin-400.woff2",
+    weight: "400",
     style: "normal",
     display: "swap",
     variable: "--font-mono",

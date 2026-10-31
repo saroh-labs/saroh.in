@@ -14,11 +14,12 @@ import WIDTHS from "@/content/shot-widths.json";
  */
 export const SHOT_WIDTHS: readonly number[] = WIDTHS;
 
-const CAPTURED_SHOT = /^\/shots\/v2\/([a-z0-9-]+)\.webp$/;
+/** A captured shot: a marketing page's (`v2`) or a Help step's (`help`). */
+const CAPTURED_SHOT = /^\/shots\/(v2|help)\/([a-z0-9-]+)\.webp$/;
 
 /** The sized copy of a captured shot at `width`, as the page addresses it. */
-export const sizedShotSrc = (key: string, width: number) =>
-    `/shots/v2/sized/${key}-${width}.webp`;
+export const sizedShotSrc = (key: string, width: number, dir = "v2") =>
+    `/shots/${dir}/sized/${key}-${width}.webp`;
 
 /** The widths a shot `width` pixels wide has a smaller copy at. */
 export function sizedWidths(width: number): number[] {
@@ -37,13 +38,13 @@ export interface ShotSources {
  * sized copies; any other address is served as it is.
  */
 export function shotSources(shot: { src: string; width: number }): ShotSources {
-    const key = CAPTURED_SHOT.exec(shot.src)?.[1];
+    const [, dir, key] = CAPTURED_SHOT.exec(shot.src) ?? [];
     const smaller = key ? sizedWidths(shot.width) : [];
-    if (!key || smaller.length === 0) return { src: shot.src };
+    if (!dir || !key || smaller.length === 0) return { src: shot.src };
     return {
         src: shot.src,
         srcSet: [
-            ...smaller.map((w) => `${sizedShotSrc(key, w)} ${w}w`),
+            ...smaller.map((w) => `${sizedShotSrc(key, w, dir)} ${w}w`),
             `${shot.src} ${shot.width}w`,
         ].join(", "),
     };

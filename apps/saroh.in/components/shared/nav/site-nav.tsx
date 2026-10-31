@@ -13,6 +13,7 @@ import { ring } from "@/lib/ring";
 import { nextIndex } from "@/lib/roving";
 
 import { CtaLink } from "../buttons/cta-link";
+import { IntentLink } from "../links/intent-link";
 import { MobileMenu } from "./mobile-menu";
 import type { NavItem, NavSection } from "./nav-section";
 import { sectionOf } from "./nav-section";
@@ -112,13 +113,13 @@ export function SiteNav({
             }}
             className="relative z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
         >
-            <Link
+            <IntentLink
                 href="/"
                 aria-label="Saroh home"
                 className={`flex shrink-0 rounded-lg text-foreground no-underline ${ring({ offset: 3 })}`}
             >
                 <Wordmark aria-hidden style={{ fontSize: 22 }} />
-            </Link>
+            </IntentLink>
 
             {/* From 760px wide. */}
             <div className="hidden items-center gap-1 text-mk-nav min-[760px]:flex">

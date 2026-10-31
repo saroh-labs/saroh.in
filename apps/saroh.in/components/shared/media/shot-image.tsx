@@ -14,7 +14,10 @@ import { shotSources } from "@/lib/shot-sources";
  * this place draws it. `width` and `height` hold its space before it
  * arrives. A `priority` shot (a page's hero, its largest thing on screen)
  * is fetched at once and preloaded from the document's head; every other
- * one waits until it is near the screen. Not `next/image`: on Cloudflare its
+ * one waits until it is near the screen. `priorityFrom` keeps that to wide
+ * screens (a media query): home's hero shot is the largest thing on a desk
+ * but sits under the words on a phone, where fetching it first held the
+ * words back. Not `next/image`: on Cloudflare its
  * `/_next/image` re-encodes on every request and sends nothing a browser
  * may keep.
  */
@@ -23,12 +26,15 @@ export function ShotImage({
     alt,
     sizes,
     priority = false,
+    priorityFrom,
     className,
 }: {
     shot: Shot;
     alt: string;
     sizes: string;
     priority?: boolean;
+    /** Preload it at high priority only where this media query matches. */
+    priorityFrom?: string;
     className?: string;
 }) {
     if (shot.src === null) {
@@ -51,6 +57,7 @@ export function ShotImage({
             imageSrcSet: srcSet,
             imageSizes: srcSet ? sizes : undefined,
             fetchPriority: "high",
+            media: priorityFrom,
         });
     }
     return (
@@ -65,7 +72,7 @@ export function ShotImage({
             width={shot.width}
             height={shot.height}
             loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : undefined}
+            fetchPriority={priority && !priorityFrom ? "high" : undefined}
             decoding="async"
             className={cn("block h-auto w-full", className)}
         />
