@@ -17,7 +17,7 @@ import { loadPublishList } from "./search-pages.config.js";
  *
  * - A build with the list and no preview (production) writes only live
  *   pages into `lib/docs-content.gen.ts` and copies only live downloads'
- *   files to `public/downloads/<slug>/`, so a draft's words and files are
+ *   files and preview pictures to `public/downloads/<slug>/`, so a draft's words and files are
  *   in neither the Worker nor the static files. A live page whose checks
  *   fail (unconfirmed facts, an old GST check date) is left out with a
  *   `::warning`; the build still goes out (an unrelated urgent deploy must).
@@ -124,15 +124,19 @@ export function writeDocs(
         `${text}\n/** Only some pages (a production build's live ones): a related pin to one left out is dropped. */\nexport const DOC_PARTIAL: boolean = ${!plan.all};\n`,
     );
     fs.rmSync(downloadsDir, { recursive: true, force: true });
-    const files = path.join(SEARCH_PAGES, "content/downloads/files");
+    // A download's files and its preview pictures, side by side at /downloads/<slug>/.
+    const sources = ["files", "previews"].map((d) =>
+        path.join(SEARCH_PAGES, "content/downloads", d),
+    );
     for (const p of plan.built.filter((p) => p.startsWith("/downloads/"))) {
         const slug = p.slice("/downloads/".length);
-        const from = path.join(files, slug);
-        if (!fs.existsSync(from)) continue;
-        fs.cpSync(from, path.join(downloadsDir, slug), {
-            recursive: true,
-            filter: (src) => !path.basename(src).startsWith("."),
-        });
+        for (const from of sources.map((d) => path.join(d, slug))) {
+            if (!fs.existsSync(from)) continue;
+            fs.cpSync(from, path.join(downloadsDir, slug), {
+                recursive: true,
+                filter: (src) => !path.basename(src).startsWith("."),
+            });
+        }
     }
 }
 

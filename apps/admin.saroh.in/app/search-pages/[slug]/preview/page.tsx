@@ -30,10 +30,12 @@ const TEMPLATES: {
     gst: (p, draft) => <GstPage page={p} draft={draft} />,
     guides: (p, draft) => <GuidePage page={p} draft={draft} />,
     // The download form in preview: it opens, sends and fetches nothing.
+    // The preview picture is saroh.in's file (/downloads/<slug>/): its words stand in.
     downloads: (p, draft) => (
         <DownloadPage
             page={p}
             draft={draft}
+            stubPreview
             gate={
                 <DownloadGate
                     slug={p.slug}

@@ -176,11 +176,12 @@ XLSX_STYLES = (
     f'{XML}<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
     # A zero shows as empty, so unused lines stay clean.
     '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00;-#,##0.00;&quot;&quot;"/></numFmts>'
+    # Arial: on Windows, macOS and in Google Sheets alike (a Mac has no Calibri, so it fell back to a serif).
     '<fonts count="4">'
-    '<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
-    '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
-    '<font><b/><sz val="18"/><name val="Calibri"/><family val="2"/></font>'
-    '<font><sz val="9"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>'
+    '<font><sz val="11"/><name val="Arial"/><family val="2"/></font>'
+    '<font><b/><sz val="11"/><name val="Arial"/><family val="2"/></font>'
+    '<font><b/><sz val="18"/><name val="Arial"/><family val="2"/></font>'
+    '<font><sz val="9"/><color rgb="FF6B7280"/><name val="Arial"/><family val="2"/></font>'
     "</fonts>"
     '<fills count="4"><fill><patternFill patternType="none"/></fill>'
     '<fill><patternFill patternType="gray125"/></fill>'
@@ -303,7 +304,8 @@ INVOICE_LINES = 10
 
 def gst_invoice_sheet(name, ex):
     """A tax invoice whose CGST, SGST, IGST and totals are formulas."""
-    sh = Sheet(name, [5, 30, 12, 8, 12, 15, 9, 12, 12, 12, 14])
+    # A holds the labels ("GSTIN (if they have one)") and the line numbers: wide enough for the labels.
+    sh = Sheet(name, [24, 30, 12, 8, 12, 15, 9, 12, 12, 12, 14], fit=True)
     sh.put("A1", "Tax invoice", S_TITLE)
     sh.put("A2", "Type in the yellow cells. The tax and the totals work themselves out.", S_GREY)
     seller, cust = (ex or {}).get("seller", {}), (ex or {}).get("customer", {})
@@ -368,7 +370,7 @@ def gst_invoice_sheet(name, ex):
 
 def bill_of_supply_sheet(name, ex):
     """A bill of supply: no GST, the total, and the line the rules ask for."""
-    sh = Sheet(name, [5, 32, 12, 8, 12, 15])
+    sh = Sheet(name, [24, 32, 12, 8, 12, 15], fit=True)
     sh.put("A1", "Bill of supply", S_TITLE)
     sh.put("A2", "Type in the yellow cells. The amounts and the total work themselves out.", S_GREY)
     seller, cust = (ex or {}).get("seller", {}), (ex or {}).get("customer", {})
@@ -848,13 +850,22 @@ def appointment_sheets():
     return [week, book, about]
 
 
-def appointment_page():
-    """One A4 landscape week to print: time slots down, days across."""
+# The Bookings sheet's examples in their slots: a service longer than a slot is
+# written in each one, as the Read me says (Global colour 2 hours, the haircut 45 minutes).
+WEEK_OF = "2 Nov 2026"  # a Monday; the bookings are on 3 and 7 November
+SAMPLE_WEEK = [("Tuesday", "10:00", 4, "Priya Nair", "Global colour"),
+               ("Saturday", "17:30", 2, "Rahul Menon", "Haircut and blow-dry")]
+
+
+def appointment_page(ex=False):
+    """One A4 landscape week to print: time slots down, days across; `ex`, the sample week."""
     ops, text, line, _ = pdf_ops()
     ops.append("0.82 0.84 0.86 RG 0.75 w")
     text(40, 552, "Appointment book", 18, bold=True)
     text(560, 552, "Week of", 10, bold=True)
     line(610, 549, 802, 549)
+    if ex:
+        text(614, 552, WEEK_OF, 10)
     x0, tw, dw, top, hh, rh = 40, 50, 101, 525, 20, 19
     right, bottom = x0 + tw + dw * len(DAYS), top - hh - rh * len(SLOTS)
     ops.append(f"0.95 0.96 0.96 rg {x0} {top - hh} {right - x0} {hh} re f")
@@ -868,6 +879,12 @@ def appointment_page():
         y = top - hh - rh * i
         line(x0, y, right, y)
         text(x0 + 6, y - 13, slot, 8, grey=slot.endswith(":30"))
+    for day, start, slots, client, service in SAMPLE_WEEK if ex else []:
+        x, first = x0 + tw + dw * DAYS.index(day), SLOTS.index(start)
+        for i in range(first, first + slots):
+            y = top - hh - rh * i
+            text(x + 5, y - 8, client, 7, bold=True)
+            text(x + 5, y - 16, service, 7)
     text(353, 25, MADE_WITH, 8, grey=True)
     return "\n".join(ops)
 
@@ -915,7 +932,7 @@ def main():
             p, rate_card_doc(False) + [PAGE_BREAK] + rate_card_doc(True)),
         "appointment-book/appointment-book.xlsx": lambda p: write_xlsx(p, appointment_sheets()),
         "appointment-book/appointment-book.pdf": lambda p: write_pdf(
-            p, [appointment_page()], title="Appointment book", size=(842, 595)),
+            p, [appointment_page(), appointment_page(True)], title="Appointment book", size=(842, 595)),
     }
     for rel, make in out.items():
         path = FILES / rel

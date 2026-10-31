@@ -54,7 +54,7 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
         expect(downloads()).toEqual([]);
     });
 
-    it("production: a live download's files are copied, and only its", () => {
+    it("production: a live download's files and preview are copied, and only its", () => {
         writeDocs(
             planDocs(live(DOWNLOAD), confirmed, {
                 production: true,
@@ -67,7 +67,14 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
             fs.readdirSync(
                 path.join(at.downloadsDir, "customer-list-template"),
             ),
-        ).toEqual(["customer-list.csv", "customer-list.xlsx"]);
+        ).toEqual([
+            "customer-list.csv",
+            "customer-list.xlsx",
+            "preview-1280.webp",
+            "preview-640.webp",
+            "preview-960.webp",
+            "preview.webp",
+        ]);
         expect(gen()).toContain('"customer-list.csv": 213');
     });
 

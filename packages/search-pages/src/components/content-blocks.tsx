@@ -322,6 +322,9 @@ export function Figure({
     height,
     ratio = "16/8",
     caption,
+    srcSet,
+    sizes,
+    stub = false,
 }: {
     src: string;
     alt: string;
@@ -331,19 +334,37 @@ export function Figure({
     /** The box's shape: 16/8 in a guide, 16/7 on a download. */
     ratio?: "16/8" | "16/7";
     caption?: ReactNode;
+    /** Narrower copies of the file, and how wide the page draws it. */
+    srcSet?: string;
+    sizes?: string;
+    /** Its words in the frame instead: where the file isn't served (admin's preview). */
+    stub?: boolean;
 }) {
     if (!alt.trim()) throw new Error(`Figure ${src} has no alt text`);
+    const wide = ratio === "16/7" ? "sp-fig-wide" : undefined;
     return (
         <figure className="sp-fig">
-            <img
-                className={ratio === "16/7" ? "sp-fig-wide" : undefined}
-                src={src}
-                alt={alt}
-                width={width}
-                height={height}
-                loading="lazy"
-                decoding="async"
-            />
+            {stub ? (
+                <div
+                    className={`sp-fig-stub ${wide ?? ""}`}
+                    role="img"
+                    aria-label={alt}
+                >
+                    {alt}
+                </div>
+            ) : (
+                <img
+                    className={wide}
+                    src={src}
+                    srcSet={srcSet}
+                    sizes={sizes}
+                    alt={alt}
+                    width={width}
+                    height={height}
+                    loading="lazy"
+                    decoding="async"
+                />
+            )}
             {caption ? <figcaption>{caption}</figcaption> : null}
         </figure>
     );

@@ -25,12 +25,32 @@ const BAND = {
 
 export type DownloadPageLinks = ContentLinks;
 
+/** preview.webp is 1920 wide, with narrower copies beside it (scripts/make-download-previews.mjs). */
+const PREVIEW_WIDTHS = [640, 960, 1280];
+
+/** The srcset for a made preview; any other picture is drawn as it is. */
+export function previewSources(src: string) {
+    if (!src.endsWith("/preview.webp")) return {};
+    const base = src.slice(0, -".webp".length);
+    return {
+        srcSet: [
+            ...PREVIEW_WIDTHS.map((w) => `${base}-${w}.webp ${w}w`),
+            `${src} 1920w`,
+        ].join(", "),
+        // The full-width column below the hero: 1280 less its side padding.
+        sizes: "(min-width: 1280px) 1168px, 100vw",
+        width: 1920,
+        height: 840,
+    };
+}
+
 export function DownloadPage({
     page: p,
     draft = false,
     links = {},
     related = [],
     gate,
+    stubPreview = false,
 }: {
     page: DownloadPageData;
     draft?: boolean;
@@ -39,6 +59,8 @@ export function DownloadPage({
     related?: readonly CardItem[];
     /** The form that gives the files, beside the title. */
     gate?: ReactNode;
+    /** The preview's words in its frame, not the picture: admin, where saroh.in's copy isn't served. */
+    stubPreview?: boolean;
 }) {
     const band = p.band ?? BAND;
     return (
@@ -54,6 +76,8 @@ export function DownloadPage({
                             src={p.preview.src}
                             alt={p.preview.alt}
                             ratio="16/7"
+                            stub={stubPreview}
+                            {...previewSources(p.preview.src)}
                         />
                     ) : null}
                     {p.questions.length ? (
