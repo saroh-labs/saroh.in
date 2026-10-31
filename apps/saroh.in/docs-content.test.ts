@@ -121,7 +121,9 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
         const warning = heldWarning(plan.held[0]);
         expect(warning).toMatch(/^::warning title=Page held by checks::/);
         expect(warning).toContain(GST);
-        expect(warning).toContain("the notification number for the 5% rate");
+        expect(warning).toContain(
+            "the CBIC notification number for the 5% rate",
+        );
         writeDocs(plan, at);
         expect(gen()).not.toContain("salon-and-beauty-services");
     });

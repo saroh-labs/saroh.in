@@ -38,29 +38,36 @@ describe("docs content", () => {
     });
 
     it("every page in the code loads, unique across every kind", () => {
-        expect(embeddedDocs.all().map((p) => p.path)).toEqual([
-            "/gst/salon-and-beauty-services",
+        const paths = embeddedDocs.all().map((p) => p.path);
+        expect(paths.filter((p) => p.startsWith("/gst/"))).toHaveLength(19);
+        expect(paths.filter((p) => p.startsWith("/guides/"))).toEqual([
             "/guides/booking-deposits",
             "/guides/reduce-no-shows",
             "/guides/waitlist-for-cancelled-slots",
-            "/downloads/customer-list-template",
         ]);
+        expect(paths).toEqual(
+            expect.arrayContaining([
+                "/gst/salon-and-beauty-services",
+                "/downloads/customer-list-template",
+            ]),
+        );
     });
 
     it("reads a GST trade page into facts, an invoice table, mistakes and questions", () => {
-        const p = embeddedDocs.list("gst")[0];
-        expect(p?.type).toBe("trade");
-        expect(p?.facts).toHaveLength(4);
-        expect(p?.table.kind).toBe("invoice");
-        expect(p?.table.rows).toHaveLength(2);
-        expect(p?.mistakes).toHaveLength(3);
-        expect(p?.questions).toHaveLength(3);
-        expect(p?.questions[0]?.answer).toHaveLength(1);
-        expect(p?.answer).toContainEqual({
+        const p = embeddedDocs.load("gst", "salon-and-beauty-services");
+        if (p?.kind !== "gst") throw new Error("no salon page");
+        expect(p.type).toBe("trade");
+        expect(p.facts).toHaveLength(4);
+        expect(p.table.kind).toBe("invoice");
+        expect(p.table.rows).toHaveLength(2);
+        expect(p.mistakes).toHaveLength(3);
+        expect(p.questions).toHaveLength(3);
+        expect(p.questions[0]?.answer).toHaveLength(1);
+        expect(p.answer).toContainEqual({
             t: "bold",
             text: "5% GST, without input tax credit",
         });
-        expect(p?.outline.map((o) => o.id)).toEqual([
+        expect(p.outline.map((o) => o.id)).toEqual([
             "what-without-input-tax-credit-means",
             "products-you-sell-are-taxed-on-their-own",
             "if-you-aren-t-registered",
@@ -120,7 +127,7 @@ describe("docs content", () => {
         ],
         [
             "a short table row",
-            GST.replace('- [D-Tan facial, "999722",', "- [D-Tan facial,"),
+            GST.replace('- ["D-Tan facial", "999722",', '- ["D-Tan facial",'),
             /table\.rows: a row has 5 cells/,
         ],
         [
@@ -193,7 +200,7 @@ describe("docs content", () => {
         expect(() =>
             loader({
                 guides: { "reduce-no-shows": pin("salon-and-beauty-services") },
-                gst: { "salon-and-beauty-services": GST },
+                gst: DOC_SOURCES.gst,
             }).all(),
         ).toThrow(/related names no guides page/);
         expect(() =>
