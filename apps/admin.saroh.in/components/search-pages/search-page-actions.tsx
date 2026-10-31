@@ -1,6 +1,5 @@
 "use client";
 
-import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -15,6 +14,7 @@ import { useState } from "react";
 import type { PageAction, PageRow } from "@/lib/search-page-words";
 import { canDo } from "@/lib/search-page-words";
 
+import type { AnyPageData } from "./page-checks";
 import { failingCount, useChecks } from "./page-checks";
 import { SearchPageDialog } from "./search-page-dialog";
 
@@ -46,7 +46,7 @@ export function SearchPageActions({
     reviewUrl: string;
     canPublish: boolean;
     /** The page's words, for the checks Publish counts. */
-    page: SearchPageData | ToolPageData;
+    page: AnyPageData;
 }) {
     const [opened, setOpened] = useState<PageAction | null>(null);
     // Run when Publish opens: its confirm says how many checks need you.

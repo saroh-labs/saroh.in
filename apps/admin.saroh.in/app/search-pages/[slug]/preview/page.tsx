@@ -29,6 +29,8 @@ export default async function SearchPagePreview({
     const page = loadPage(slug);
     // A tool with its own page in saroh.in has nothing to draw here.
     if (!page || (page.kind === "tools" && page.page.inApp)) notFound();
+    // GST pages, guides and downloads get their template here with U6 (plan 2026-10-31-002).
+    if (page.kind !== "for" && page.kind !== "tools") notFound();
     const data = await readSearchPages();
     const row =
         data.status === "ok"

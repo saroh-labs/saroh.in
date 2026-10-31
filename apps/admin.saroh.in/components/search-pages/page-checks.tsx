@@ -7,6 +7,8 @@ import type {
 } from "@saroh/search-pages";
 import { toolChecks } from "@saroh/search-pages";
 import { searchPageChecks } from "@saroh/search-pages/checks";
+import type { DocPage } from "@saroh/search-pages/docs";
+import { docPageChecks } from "@saroh/search-pages/docs";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { Check, CircleAlert, X } from "lucide-react";
@@ -14,20 +16,21 @@ import { useMemo } from "react";
 
 type Checks = SearchPageCheck[] | "loading" | "failed";
 
+/** Any search page's words: a /for/ page, a free tool, or a GST page, guide or download. */
+export type AnyPageData = SearchPageData | ToolPageData | DocPage;
+
 /**
  * A page's checks, run in a client component: they draw the page with
  * react-dom/server, which Next refuses anywhere on the server graph
  * (Server Components and route handlers alike). `enabled` false runs
  * nothing.
  */
-export function useChecks(
-    page: SearchPageData | ToolPageData,
-    enabled = true,
-): Checks {
+export function useChecks(page: AnyPageData, enabled = true): Checks {
     return useMemo(() => {
         if (!enabled) return "loading";
         try {
-            // A free tool's checks read its file (#1253); a /for/ page's draw it.
+            // A free tool's and a GST page's, guide's or download's checks read its file (#1253); a /for/ page's draw it.
+            if ("body" in page) return docPageChecks(page);
             return "scene" in page ? searchPageChecks(page) : toolChecks(page);
         } catch {
             return "failed";
@@ -41,7 +44,7 @@ export function failingCount(checks: Checks): number {
 }
 
 /** "Checked before you publish": a tick, a warning or a cross, and what each means. */
-export function PageChecks({ page }: { page: SearchPageData | ToolPageData }) {
+export function PageChecks({ page }: { page: AnyPageData }) {
     const checks = useChecks(page);
     if (checks === "loading") {
         return (

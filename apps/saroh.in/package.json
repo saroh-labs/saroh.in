@@ -3,9 +3,9 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "portless saroh next dev",
-        "dev:app": "next dev",
-        "build": "node search-pages.config.js && next build",
+        "dev": "tsx docs-content.config.ts && portless saroh next dev",
+        "dev:app": "tsx docs-content.config.ts && next dev",
+        "build": "node search-pages.config.js && tsx docs-content.config.ts && next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",

@@ -25,7 +25,10 @@ const path = require("node:path");
 /** `dataAsOf` is when the lists were last read from the API: a build that
  * fell back carries its snapshot's date forward, so a second fallback in a
  * row still names the real age of the data.
- * @typedef {{ v: 1; builtAt: string; dataAsOf?: string; commit: string | null; searchPages: Lists; pricing: unknown }} BuildState */
+ * `docs` is which GST pages, guides and downloads this build drew, and the
+ * live ones it held back for failing their checks (`docs-content.config.ts`).
+ * @typedef {{ built: string[]; held: { path: string; why: string[] }[] }} DocsBuilt
+ * @typedef {{ v: 1; builtAt: string; dataAsOf?: string; commit: string | null; searchPages: Lists; pricing: unknown; docs?: DocsBuilt }} BuildState */
 
 /** The live production site (`lib/seo.ts` SITE_URL); `LIVE_SITE_URL` overrides it, for a dry run. */
 const LIVE_SITE_URL = "https://www.saroh.in";
@@ -166,6 +169,19 @@ function writeBuildState(production, searchPages, pricing, env, at = {}) {
     fs.writeFileSync(pricingFile, `${JSON.stringify({ pricing })}\n`);
 }
 
+/**
+ * Add what the docs step built to this build's snapshot, so admin can show
+ * a live page the build held back. Only a production build has a snapshot;
+ * elsewhere this does nothing.
+ * @param {DocsBuilt} docs
+ * @param {string} [stateFile]
+ */
+function recordDocs(docs, stateFile = STATE_FILE) {
+    if (!fs.existsSync(stateFile)) return;
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    fs.writeFileSync(stateFile, `${JSON.stringify({ ...state, docs })}\n`);
+}
+
 module.exports = {
     STATE_FILE,
     PRICING_FILE,
@@ -173,4 +189,5 @@ module.exports = {
     fallbackWarning,
     readBuildPricing,
     writeBuildState,
+    recordDocs,
 };
