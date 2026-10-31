@@ -1,14 +1,10 @@
-"use client";
-
 import { cn } from "@/lib/cn";
-import { useState } from "react";
 
 import type { ShotKey } from "@/content/shots";
 import { shots } from "@/content/shots";
-import { ring } from "@/lib/ring";
 
-import { Lightbox } from "./lightbox";
 import { ShotImage } from "./shot-image";
+import { ZoomableShot } from "./zoomable-shot";
 
 /**
  * A product screenshot in the designs' frame: white, a hairline border and a
@@ -19,7 +15,8 @@ import { ShotImage } from "./shot-image";
  * - `home` — 16px corners and the deeper shadow (Home's hero).
  *
  * `zoomable` makes the image a button that opens the lightbox ("Click to
- * enlarge"); focus returns to it when the lightbox closes.
+ * enlarge"); focus returns to it when the lightbox closes. Drawn on the
+ * server, so the browser gets this one shot, never the whole manifest.
  */
 export function ScreenshotFrame({
     shot,
@@ -39,7 +36,6 @@ export function ScreenshotFrame({
     sizes?: string;
     className?: string;
 }) {
-    const [open, setOpen] = useState(false);
     const entry = shots[shot];
     const text = alt ?? entry.alt;
     const image = (
@@ -57,23 +53,9 @@ export function ScreenshotFrame({
             )}
         >
             {zoomable ? (
-                <>
-                    <button
-                        type="button"
-                        title="Click to enlarge"
-                        onClick={() => setOpen(true)}
-                        className={`block w-full cursor-zoom-in ${ring({ offset: "inset" })}`}
-                    >
-                        {image}
-                    </button>
-                    {open ? (
-                        <Lightbox
-                            shot={entry}
-                            alt={text}
-                            onClose={() => setOpen(false)}
-                        />
-                    ) : null}
-                </>
+                <ZoomableShot shot={entry} alt={text}>
+                    {image}
+                </ZoomableShot>
             ) : (
                 image
             )}

@@ -1,7 +1,7 @@
 import { trackedEnvironment } from "@saroh/error-tracking";
 import type { AppTrackingSettings } from "@saroh/error-tracking/server";
 
-import { env } from "@/env";
+import { browserEnv as env } from "@/lib/browser/env";
 
 /**
  * This app's PostHog settings (DEC-125), for saroh.in. Exceptions only.

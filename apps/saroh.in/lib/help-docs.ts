@@ -5,8 +5,8 @@ import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import { parse as parseYaml } from "yaml";
 
-import type { HelpFrontmatter } from "@/content/help";
-import { helpFrontmatter } from "@/content/help";
+import type { HelpFrontmatter } from "@/content/help-frontmatter";
+import { helpFrontmatter } from "@/content/help-frontmatter";
 import { CAPTURED } from "@/content/shots.captured";
 import { helpErrors } from "@/content/validate";
 

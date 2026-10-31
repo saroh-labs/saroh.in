@@ -1,8 +1,4 @@
-import { z } from "zod";
-
 import type { WaitlistKindId } from "@/content/waitlist";
-import { WAITLIST_KINDS } from "@/content/waitlist";
-import { EMAIL_SHAPE } from "@/lib/email-shape";
 import { formatDay } from "@/lib/format/day";
 import type { PlanId } from "@/lib/links";
 
@@ -26,36 +22,6 @@ export const WAITLIST_MESSAGES = {
 export const SEND_FAILED: Record<string, string> = {
     RATE_LIMITED: "Too many tries from here. Wait a minute, then try again.",
     default: "We couldn't add you just now. Try again in a minute.",
-};
-
-const KIND_IDS = WAITLIST_KINDS.map((k) => k.id) as [
-    WaitlistKindId,
-    ...WaitlistKindId[],
-];
-
-export const waitlistSchema = z.object({
-    business: z
-        .string()
-        .trim()
-        .min(1, WAITLIST_MESSAGES.business)
-        .max(120, WAITLIST_MESSAGES.business),
-    kind: z.enum(KIND_IDS, { error: WAITLIST_MESSAGES.kind }),
-    email: z
-        .string()
-        .trim()
-        .max(320, WAITLIST_MESSAGES.email)
-        .regex(EMAIL_SHAPE, WAITLIST_MESSAGES.email),
-    city: z.string().trim().max(80),
-});
-
-export type WaitlistValues = z.input<typeof waitlistSchema>;
-
-export const EMPTY_WAITLIST: WaitlistValues = {
-    business: "",
-    // An empty kind is "not picked yet"; the schema refuses it.
-    kind: "" as WaitlistKindId,
-    email: "",
-    city: "",
 };
 
 const PLANS: readonly PlanId[] = ["free", "grow", "pro"];

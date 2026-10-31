@@ -5,7 +5,8 @@ import { Controller } from "react-hook-form";
 import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import type { WaitlistTemplate } from "@/lib/waitlist";
-import { EMPTY_WAITLIST, openingDay, WAITLIST_MESSAGES } from "@/lib/waitlist";
+import { openingDay, WAITLIST_MESSAGES } from "@/lib/waitlist";
+import { EMPTY_WAITLIST } from "@/lib/waitlist-schema";
 
 import { Button } from "../shared/buttons/button";
 import { ChoiceChip } from "../shared/fields/choice-chips";

@@ -10,7 +10,14 @@ import {
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { NavItem } from "./nav-items";
+import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 import { SiteNav } from "./site-nav";
+
+/** The nav as the server hands it its Features and Solutions menus. */
+const Nav = (props: { resources?: NavItem[]; tools?: NavItem[] }) => (
+    <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} {...props} />
+);
 
 /**
  * The nav (plan U19): the current section underlined with the page marked
@@ -62,7 +69,7 @@ const button = (name: string) =>
 describe("SiteNav", () => {
     it("on /features/orders, underlines Features and marks Orders as the page", () => {
         pathname = "/features/orders";
-        render(<SiteNav />);
+        render(<Nav />);
         const features = button("Features");
         expect(features.className).toMatch(/(^| )underline( |$)/);
         expect(features.className).toContain("decoration-brand-500");
@@ -84,25 +91,25 @@ describe("SiteNav", () => {
     it("on /pricing, marks Pricing as the page, once the launch switch is open", () => {
         launch.mode = "open";
         pathname = "/pricing";
-        render(<SiteNav />);
+        render(<Nav />);
         const pricing = screen.getAllByRole("link", { name: "Pricing" })[0];
         expect(pricing.getAttribute("aria-current")).toBe("page");
         launch.mode = "waitlist";
     });
 
     it("draws no Pricing link before launch: it would only bounce to the waitlist", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         expect(screen.queryByRole("link", { name: "Pricing" })).toBeNull();
     });
 
     it("draws no Sign in before launch: accounts.saroh.in is closed until then", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
     });
 
     it("draws Sign in once the launch switch is open", () => {
         launch.mode = "open";
-        render(<SiteNav />);
+        render(<Nav />);
         expect(
             screen
                 .getAllByRole("link", { name: "Sign in" })[0]
@@ -112,7 +119,7 @@ describe("SiteNav", () => {
     });
 
     it("Features opens a menu of nine, focused on the first", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         const chevron = () =>
             button("Features").querySelector("[data-chevron]")?.classList;
         expect(chevron()?.contains("rotate-180")).toBe(false);
@@ -125,7 +132,7 @@ describe("SiteNav", () => {
     });
 
     it("Esc in the Solutions menu closes it and focuses the Solutions button", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         fireEvent.click(button("Solutions"));
         expect(screen.getAllByRole("menuitem")).toHaveLength(4);
         fireEvent.keyDown(document, { key: "Escape" });
@@ -137,7 +144,7 @@ describe("SiteNav", () => {
     it("a click outside the nav closes the open menu", () => {
         render(
             <>
-                <SiteNav />
+                <Nav />
                 <p>Elsewhere</p>
             </>,
         );
@@ -148,7 +155,7 @@ describe("SiteNav", () => {
     });
 
     it("arrow keys move within the menu and wrap", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         fireEvent.click(button("Solutions"));
         const [shops, salons, gyms, clinics] = screen.getAllByRole("menuitem");
         fireEvent.keyDown(shops, { key: "ArrowDown" });
@@ -164,7 +171,7 @@ describe("SiteNav", () => {
     });
 
     it("the start button comes from the CTA builder (waitlist by default)", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         const starts = screen.getAllByRole("link", {
             name: "Join the waitlist",
         });
@@ -183,14 +190,14 @@ const RESOURCES = [
 
 describe("SiteNav: Resources (plan U1)", () => {
     it("has no Resources menu while no Resources page is live", () => {
-        render(<SiteNav />);
+        render(<Nav />);
         expect(screen.queryAllByRole("button", { name: /^Resources/ })).toEqual(
             [],
         );
     });
 
     it("opens by keyboard on its first item; arrows move; Escape closes to its button", () => {
-        render(<SiteNav resources={RESOURCES} />);
+        render(<Nav resources={RESOURCES} />);
         const resources = button("Resources");
         resources.focus();
         // A <button>: Enter and Space click it.
@@ -219,7 +226,7 @@ describe("SiteNav: Resources (plan U1)", () => {
 
     it("on a changelog entry, underlines Resources", () => {
         pathname = "/changelog/saroh-is-open";
-        render(<SiteNav resources={RESOURCES} />);
+        render(<Nav resources={RESOURCES} />);
         expect(button("Resources").className).toContain("decoration-brand-500");
         expect(button("Features").className).not.toContain(
             "decoration-brand-500",
@@ -228,7 +235,7 @@ describe("SiteNav: Resources (plan U1)", () => {
 
     it("on /changelog, the menu marks Changelog as the page", () => {
         pathname = "/changelog";
-        render(<SiteNav resources={RESOURCES} />);
+        render(<Nav resources={RESOURCES} />);
         fireEvent.click(button("Resources"));
         expect(
             screen
@@ -237,11 +244,11 @@ describe("SiteNav: Resources (plan U1)", () => {
         ).toBe("page");
     });
 
-    it("the phone sheet has Resources, open on a Resources page", () => {
+    it("the phone sheet has Resources, open on a Resources page", async () => {
         pathname = "/changelog";
-        render(<SiteNav resources={RESOURCES} />);
+        render(<Nav resources={RESOURCES} />);
         fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
         const row = screen
             .getAllByRole("button", { name: /^Resources/ })
             .find((b) => sheet.contains(b));
@@ -261,12 +268,12 @@ const TOOLS = [
 
 describe("SiteNav: Tools, a menu of its own", () => {
     it("has no Tools menu while no tool is live", () => {
-        render(<SiteNav resources={RESOURCES} />);
+        render(<Nav resources={RESOURCES} />);
         expect(screen.queryAllByRole("button", { name: /^Tools/ })).toEqual([]);
     });
 
     it("lists the tools under Tools, and Resources never has them", () => {
-        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        render(<Nav resources={RESOURCES} tools={TOOLS} />);
         fireEvent.click(button("Tools"));
         expect(
             within(screen.getByRole("menu", { name: "Tools" }))
@@ -281,18 +288,18 @@ describe("SiteNav: Tools, a menu of its own", () => {
 
     it("on a tool, underlines Tools and not Resources", () => {
         pathname = "/tools/qr-code-maker";
-        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        render(<Nav resources={RESOURCES} tools={TOOLS} />);
         expect(button("Tools").className).toContain("decoration-brand-500");
         expect(button("Resources").className).not.toContain(
             "decoration-brand-500",
         );
     });
 
-    it("the phone sheet has Tools, open on a tool", () => {
+    it("the phone sheet has Tools, open on a tool", async () => {
         pathname = "/tools/link-preview";
-        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        render(<Nav resources={RESOURCES} tools={TOOLS} />);
         fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
         const row = screen
             .getAllByRole("button", { name: /^Tools/ })
             .find((b) => sheet.contains(b));
@@ -306,12 +313,12 @@ describe("SiteNav: Tools, a menu of its own", () => {
 });
 
 describe("MobileMenu (below 760px)", () => {
-    it("opens on a Solutions page with Solutions expanded and Features closed", () => {
+    it("opens on a Solutions page with Solutions expanded and Features closed", async () => {
         pathname = "/solutions/gyms";
-        render(<SiteNav />);
+        render(<Nav />);
         const menu = screen.getByRole("button", { name: "Menu" });
         fireEvent.click(menu);
-        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
         expect(sheet).toBeTruthy();
         const inSheet = (name: RegExp) =>
             screen
@@ -336,12 +343,14 @@ describe("MobileMenu (below 760px)", () => {
         expect(gyms?.getAttribute("aria-current")).toBe("page");
     });
 
-    it("Esc closes the sheet and returns focus to Menu", () => {
-        render(<SiteNav />);
+    it("Esc closes the sheet and returns focus to Menu", async () => {
+        render(<Nav />);
         const menu = screen.getByRole("button", { name: "Menu" });
         menu.focus();
         fireEvent.click(menu);
-        expect(screen.getByRole("dialog", { name: "Menu" })).toBeTruthy();
+        expect(
+            await screen.findByRole("dialog", { name: "Menu" }),
+        ).toBeTruthy();
         act(() => {
             fireEvent.keyDown(document, { key: "Escape" });
         });
@@ -349,10 +358,10 @@ describe("MobileMenu (below 760px)", () => {
         expect(document.activeElement).toBe(menu);
     });
 
-    it("keeps Tab inside the open sheet", () => {
-        render(<SiteNav />);
+    it("keeps Tab inside the open sheet", async () => {
+        render(<Nav />);
         fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
         const focusable = Array.from(
             sheet.querySelectorAll<HTMLElement>("a[href], button"),
         );

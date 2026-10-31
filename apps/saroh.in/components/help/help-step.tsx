@@ -1,7 +1,7 @@
 import Image from "next/image";
 
-import type { HelpStep as Step } from "@/content/help";
 import { stepId, stepNumber } from "@/content/help";
+import type { HelpStep as Step } from "@/content/help-frontmatter";
 import { CAPTURED } from "@/content/shots.captured";
 
 /**

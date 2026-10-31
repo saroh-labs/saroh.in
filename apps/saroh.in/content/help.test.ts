@@ -2,19 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import { helpArticles, helpFiles, parseHelpFile } from "@/lib/help-docs";
 
-import type { HelpFrontmatter, HelpSummary } from "./help";
+import type { HelpSummary } from "./help";
 import {
     areasWithArticles,
     groupsWithArticles,
     HELP_PUBLISH_ON,
     helpDate,
-    helpFrontmatter,
     liveArticles,
     namesPriceOrLimit,
     SEARCH_LIMIT,
     searchArticles,
     summarise,
 } from "./help";
+import type { HelpFrontmatter } from "./help-frontmatter";
+import { helpFrontmatter } from "./help-frontmatter";
 import { dayStartsAt } from "./resources";
 import { CAPTURED } from "./shots.captured";
 import { helpErrors } from "./validate";
