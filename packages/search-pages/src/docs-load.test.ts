@@ -40,7 +40,9 @@ describe("docs content", () => {
     it("every page in the code loads, unique across every kind", () => {
         expect(embeddedDocs.all().map((p) => p.path)).toEqual([
             "/gst/salon-and-beauty-services",
+            "/guides/booking-deposits",
             "/guides/reduce-no-shows",
+            "/guides/waitlist-for-cancelled-slots",
             "/downloads/customer-list-template",
         ]);
     });
@@ -66,12 +68,14 @@ describe("docs content", () => {
     });
 
     it("reads a guide's blocks and outline, and works out its reading time", () => {
-        const p = embeddedDocs.list("guides")[0];
+        const p = embeddedDocs
+            .list("guides")
+            .find((g) => g.slug === "reduce-no-shows");
         expect(p?.body.map((b) => b.type)).toEqual(
             expect.arrayContaining(["h2", "p", "table", "ul", "callout", "ol"]),
         );
         expect(p?.outline).toHaveLength(4);
-        expect(p?.readMinutes).toBe(1);
+        expect(p?.readMinutes).toBe(3);
         expect(
             parseDocPage(
                 "guides",
@@ -147,7 +151,7 @@ describe("docs content", () => {
         expect(() =>
             parseDocPage(
                 "guides",
-                GUIDE.replace("published: 2026-10-24", "published: 2026-10-25"),
+                GUIDE.replace("updated: 2026-10-31", "updated: 2026-10-23"),
                 "reduce-no-shows",
             ),
         ).toThrow(/updated: is before published/);
@@ -179,7 +183,7 @@ describe("docs content", () => {
 
     it("refuses a related pin to a page of its kind that doesn't exist, or to itself", () => {
         const pin = (slugs: string) =>
-            GUIDE.replace("group:", `related: [${slugs}]\ngroup:`);
+            GUIDE.replace(/^related: .*$/m, `related: [${slugs}]`);
         expect(() =>
             loader({
                 guides: { "reduce-no-shows": pin("bridal-studios") },
@@ -200,7 +204,7 @@ describe("docs content", () => {
     });
 
     it("drops a pin to a page left out of a live-only map", () => {
-        const pinned = GUIDE.replace("group:", "related: [waitlists]\ngroup:");
+        const pinned = GUIDE.replace(/^related: .*$/m, "related: [waitlists]");
         const [p] = loader(
             { guides: { "reduce-no-shows": pinned } },
             true,
