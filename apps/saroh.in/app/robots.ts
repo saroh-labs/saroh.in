@@ -6,7 +6,8 @@ import { CRAWL_DISALLOWED } from "@/lib/site-pages";
 /**
  * Crawl everything public but the staff-only and API routes (plan U26). No
  * `Host:` line: it is not part of the standard, and the one host is already
- * said by the redirect to www and every page's canonical.
+ * said by the redirect to www and every page's canonical. The sitemap is
+ * the index of one per group (`lib/sitemaps.ts`).
  */
 export default function robots(): MetadataRoute.Robots {
     return {

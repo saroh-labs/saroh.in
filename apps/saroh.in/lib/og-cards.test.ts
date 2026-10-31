@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import { INTEGRATION_SLUGS } from "@/content/integrations";
 
+import { docPages } from "./docs-pages";
 import { helpArticles } from "./help-docs";
 import { integrationMeta } from "./integration-docs";
 import { HELP_CARDS, INTEGRATION_CARDS } from "./og-cards.gen";
+import { searchPageRoute } from "./search-page-route";
 
 // The share cards draw from og-cards.gen.ts (a Worker can't read content/):
 // it must match the articles. Behind? Run `node og-cards.config.js`.
@@ -51,9 +53,28 @@ describe("share cards", () => {
         walk(join(__dirname, "../app"));
         expect(cards.length).toBeGreaterThan(5);
         const readers =
-            /from "@\/lib\/(help-docs|integration-docs|changelog-docs)"|from "node:fs"/;
+            /from "@\/lib\/(help-docs|integration-docs|changelog-docs)"|from "node:fs"|search-pages\/docs-embedded|\.mdx"/;
         expect(
             cards.filter((f) => readers.test(readFileSync(f, "utf8"))),
         ).toEqual([]);
+    });
+});
+
+// A GST page's, guide's or download's card reads the build's generated copy
+// (lib/docs-content.gen.ts, live pages only in production), never a file and
+// never og-cards.gen.ts, which is committed and would carry drafts' words.
+describe("GST, guide and download cards", () => {
+    it("has a card for every page this build carries, from the generated copy", () => {
+        const pages = docPages.all();
+        expect(pages.length).toBeGreaterThan(0);
+        for (const p of pages)
+            expect(searchPageRoute(p.kind).shareCard(p.slug), p.path).toEqual(
+                expect.objectContaining({ title: p.h1 }),
+            );
+    });
+
+    it("og-cards.gen.ts holds none of their words", () => {
+        const gen = readFileSync(join(__dirname, "og-cards.gen.ts"), "utf8");
+        for (const p of docPages.all()) expect(gen).not.toContain(p.h1);
     });
 });

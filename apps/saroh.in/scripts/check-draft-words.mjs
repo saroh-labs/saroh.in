@@ -7,7 +7,8 @@
 // cf:build`: the prebuild steps, `next build`, OpenNext), and fails if a sentence
 // of any of those pages, or a download's file, is anywhere in `.next`,
 // `.open-next` or `public/`. A /for/ page's words, live in the same list,
-// must be found: the scan proves it can see.
+// must be found: the scan proves it can see. The sitemap index and its
+// group sitemaps must be static files, with no group for the held page.
 //
 // Run: pnpm run check:draft-words (prepush --int/--e2e/--all, when saroh.in
 // or @saroh/search-pages changed). It rebuilds apps/saroh.in's .next, so
@@ -75,6 +76,9 @@ const run = (cmd, args, env = {}) =>
 const before = fs.existsSync(LIST) ? fs.readFileSync(LIST) : null;
 const api = http.createServer((req, res) => {
     res.setHeader("content-type", "application/json");
+    // Anything else is "nothing published" (no catalogue, no offer), as the
+    // API says it with a 404: a production build reads those too.
+    if (req.url !== "/public/search-pages") res.statusCode = 404;
     res.end(
         req.url === "/public/search-pages"
             ? JSON.stringify({ live: [LIVE_FOR, HELD], takenOff: [] })
@@ -94,6 +98,9 @@ try {
             env: {
                 ...process.env,
                 API_URL,
+                // A production deploy's build: only live pages, no preview.
+                VERCEL_ENV: "production",
+                SITE_RELAY_SECRET: "check-draft-words-not-a-real-secret",
                 RESOURCES_PREVIEW: "",
                 NEXT_TELEMETRY_DISABLED: "1",
             },
@@ -142,6 +149,19 @@ try {
         failed.push(
             `the live ${LIVE_FOR}'s words ("${seen}") are in no output: the scan can't see`,
         );
+    // The sitemap index and its groups are static files (plan U5): one per
+    // group with a live page (/for/salons here), none for the held GST page.
+    const out = (p) => path.join(APP, ".next/server/app", `${p}.body`);
+    for (const p of ["sitemap.xml", "sitemap/pages.xml", "sitemap/for.xml"])
+        if (!fs.existsSync(out(p)))
+            failed.push(`${p} wasn't built as a static file`);
+    if (fs.existsSync(out("sitemap/gst.xml")))
+        failed.push("sitemap/gst.xml was built with no live GST page");
+    if (
+        fs.existsSync(out("sitemap.xml")) &&
+        fs.readFileSync(out("sitemap.xml"), "utf8").includes("/sitemap/gst.xml")
+    )
+        failed.push("the sitemap index names gst.xml with no live GST page");
     const state = path.join(APP, ".open-next");
     if (!fs.existsSync(state)) failed.push(".open-next wasn't written");
 } finally {
