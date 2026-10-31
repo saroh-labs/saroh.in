@@ -35,9 +35,12 @@ const fontDisplay = localFont({
     variable: "--font-display",
 });
 
+// Weight 400 only, cut from packages/ui's variable file (40 KB to 21 KB) with
+// fontTools: `instancer.instantiateVariableFont(font, {"wght": 400})`. Every
+// mono line on the site is regular weight (breadcrumbs, step numbers, dates).
 const fontMono = localFont({
-    src: "../../../packages/ui/fonts/JetBrainsMono-latin.woff2",
-    weight: "100 800",
+    src: "./fonts/JetBrainsMono-latin-400.woff2",
+    weight: "400",
     style: "normal",
     display: "swap",
     variable: "--font-mono",
