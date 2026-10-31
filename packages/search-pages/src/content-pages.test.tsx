@@ -276,6 +276,37 @@ describe("hubs", () => {
         );
     });
 
+    it("guides: the board's groups and cards, in its order", () => {
+        const { container } = render(
+            <GuidesHub pages={embeddedDocs.list("guides")} />,
+        );
+        expect(
+            screen
+                .getAllByRole("heading", { level: 2 })
+                .map((h) => h.textContent)
+                .slice(0, 3),
+        ).toEqual([
+            "Bookings and no-shows",
+            "Getting paid",
+            "Customers who come back",
+        ]);
+        expect(
+            [...container.querySelectorAll(".sp-lc-t")].map(
+                (t) => t.textContent,
+            ),
+        ).toEqual([
+            "How to reduce no-shows at your salon or clinic",
+            "Should you take a deposit for bookings?",
+            "Running a waitlist that fills cancelled slots",
+            "How to collect payments on WhatsApp",
+            "Memberships that renew without chasing",
+            "When do you need a GST invoice?",
+            "Getting more Google reviews, politely",
+            "Bringing back customers who stopped coming",
+            "Your first website: what it needs on day one",
+        ]);
+    });
+
     it("GST: every trade card has its small label, its own or its /for/ page's", () => {
         // As saroh.in's /gst route reads a /for/ page's name.
         const tradeOf = (slug: string) => loadSearchPage(slug)?.plural;

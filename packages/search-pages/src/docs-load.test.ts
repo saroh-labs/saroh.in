@@ -42,8 +42,14 @@ describe("docs content", () => {
         expect(paths.filter((p) => p.startsWith("/gst/"))).toHaveLength(19);
         expect(paths.filter((p) => p.startsWith("/guides/"))).toEqual([
             "/guides/booking-deposits",
+            "/guides/collect-payments-on-whatsapp",
+            "/guides/memberships-that-renew",
+            "/guides/more-google-reviews",
             "/guides/reduce-no-shows",
             "/guides/waitlist-for-cancelled-slots",
+            "/guides/when-you-need-a-gst-invoice",
+            "/guides/win-back-customers",
+            "/guides/your-first-website",
         ]);
         expect(paths.filter((p) => p.startsWith("/downloads/"))).toEqual([
             "/downloads/bill-of-supply-format",

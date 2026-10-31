@@ -19,10 +19,9 @@ function confirmed(kind: DocPage["kind"]): DocPage {
 
 describe("docPageChecks", () => {
     it.each(embeddedDocs.all().map((p) => [p.path, p] as const))(
-        "%s is held back only by its facts to confirm",
+        "%s is held back only by its facts to confirm, if any",
         (_, p) => {
-            expect(p.toConfirm.length).toBeGreaterThan(0);
-            expect(errors(p)).toEqual(["to-confirm"]);
+            expect(errors(p)).toEqual(p.toConfirm.length ? ["to-confirm"] : []);
             const c = docPageChecks(p, { today: TODAY }).find(
                 (x) => x.id === "to-confirm",
             );

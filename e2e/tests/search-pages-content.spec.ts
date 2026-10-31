@@ -137,9 +137,16 @@ test.describe("GST pages, guides and downloads", () => {
             chips.getByRole("link", { name: "Clinics" }),
         ).toHaveAttribute("aria-current", "page");
         const clinics = all.filter((g) => g.trades.includes("clinics"));
+        // Some guides leave clinics out, so the chip really filters.
+        expect(clinics.length).toBeGreaterThan(0);
+        expect(clinics.length).toBeLessThan(all.length);
         await expect(cards).toHaveCount(clinics.length);
         for (const g of clinics)
             await expect(cards.getByRole("link", { name: g.h1 })).toBeVisible();
+        for (const g of all.filter((g) => !g.trades.includes("clinics")))
+            await expect(cards.getByRole("link", { name: g.h1 })).toHaveCount(
+                0,
+            );
 
         await page.goto(`${WEB}/guides?for=not-a-trade`);
         await expect(chips.getByRole("link", { name: "All" })).toHaveAttribute(
