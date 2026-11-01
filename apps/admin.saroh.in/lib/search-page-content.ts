@@ -364,9 +364,6 @@ export function docSections(p: DocPage): { k: string; v: string }[] {
             k: "Questions answered",
             v: `${p.questions.length}${first ? `, starting with “${first}”` : ""}`,
         },
-        {
-            k: "Facts to confirm",
-            v: p.toConfirm.length ? p.toConfirm.join(" · ") : "None",
-        },
+        // Facts to confirm are the failing check's list on the same tab (owner, 1 Nov).
     ];
 }
