@@ -88,15 +88,7 @@ export function SearchPageActions({
                     {label[main]}
                 </Button>
             )}
-            {canPublish && held && (
-                <p
-                    id="publish-held"
-                    className="basis-full text-[12.5px] text-muted-foreground"
-                >
-                    Publish waits until these checks pass:{" "}
-                    {row.blocked.join(", ")}.
-                </p>
-            )}
+            {/* Held: the header's line says why ("Can't publish yet: …", #publish-held), so the actions stay one row. */}
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                     <Button

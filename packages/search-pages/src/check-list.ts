@@ -13,6 +13,8 @@ export interface SearchPageCheck {
     detail: string;
     /** How many problems it found: 0 when it passes. */
     count: number;
+    /** Each problem on its own, for a list (`detail` is them joined). */
+    problems?: string[];
     severity: "error" | "warning";
 }
 
@@ -31,6 +33,7 @@ export function checkList() {
             title,
             detail: problems.join(" "),
             count: problems.length,
+            problems,
             severity,
         });
     return { out, add };

@@ -12,7 +12,15 @@ import { SearchPageActions } from "@/components/search-pages/search-page-actions
 import { SearchPageTabs } from "@/components/search-pages/search-page-tabs";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
-import { badgeOf, KINDS, stateNote } from "@/lib/search-page-words";
+import {
+    badgeOf,
+    canDo,
+    cantPublishWords,
+    inFilter,
+    KINDS,
+    sortRows,
+    stateNote,
+} from "@/lib/search-page-words";
 import {
     loadPage,
     readSearchPages,
@@ -52,6 +60,19 @@ export default async function SearchPageLayout({
     const page = loadPage(slug);
     if (!row || !page) notFound();
     const canPublish = can(staff, "search-pages:publish");
+    const listHref =
+        row.kind === "for" ? "/search-pages" : `/search-pages?kind=${row.kind}`;
+    const kindLabel = KINDS.find((k) => k.kind === row.kind)?.label ?? "";
+    // Previous and next in the list's own order (its kind, A to Z): a queue to review.
+    const queue = sortRows(
+        data.rows.filter((r) => r.kind === row.kind && inFilter(r, "all")),
+        "name",
+    );
+    const at = queue.findIndex((r) => r.path === row.path);
+    const prev = at > 0 ? queue[at - 1] : null;
+    const next = at >= 0 && at < queue.length - 1 ? queue[at + 1] : null;
+    // Held by checks: why, said to everyone (the buttons are only for publishers).
+    const held = canDo("publish", row.state) && row.blocked.length > 0;
 
     return (
         <AdminShell staff={staff}>
@@ -60,17 +81,12 @@ export default async function SearchPageLayout({
                     className="mb-5"
                     breadcrumb={[
                         "Product",
-                        <Link
-                            key="list"
-                            href={
-                                row.kind === "for"
-                                    ? "/search-pages"
-                                    : `/search-pages?kind=${row.kind}`
-                            }
-                        >
+                        <Link key="list" href="/search-pages">
                             Search pages
                         </Link>,
-                        KINDS.find((k) => k.kind === row.kind)?.label ?? "",
+                        <Link key="kind" href={listHref}>
+                            {kindLabel}
+                        </Link>,
                         row.name,
                     ]}
                     title={row.name}
@@ -85,10 +101,53 @@ export default async function SearchPageLayout({
                                 {site.host}
                                 {row.path}
                             </code>{" "}
-                            · {stateNote(row)}
+                            ·{" "}
+                            {held ? (
+                                <span id="publish-held">
+                                    {cantPublishWords(row)} ·{" "}
+                                    <a
+                                        href="#checks"
+                                        className="whitespace-nowrap font-medium text-foreground underline underline-offset-2"
+                                    >
+                                        See them
+                                    </a>
+                                </span>
+                            ) : (
+                                stateNote(row)
+                            )}
                             {!canPublish &&
                                 ". Read-only: your role doesn't include publishing search pages."}
                         </span>
+                    }
+                    meta={
+                        queue.length > 1 && (
+                            <nav
+                                aria-label={`Other ${kindLabel.toLowerCase()}`}
+                                className="flex items-center gap-1 text-[13px] text-muted-foreground"
+                            >
+                                {prev ? (
+                                    <Link
+                                        href={`/search-pages/${prev.slug}`}
+                                        aria-label={`Previous: ${prev.name}`}
+                                        className="rounded-md px-2 py-1 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                    >
+                                        ‹ Previous
+                                    </Link>
+                                ) : null}
+                                <span className="tabular-nums">
+                                    {at + 1} of {queue.length}
+                                </span>
+                                {next ? (
+                                    <Link
+                                        href={`/search-pages/${next.slug}`}
+                                        aria-label={`Next: ${next.name}`}
+                                        className="rounded-md px-2 py-1 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                    >
+                                        Next ›
+                                    </Link>
+                                ) : null}
+                            </nav>
+                        )
                     }
                     actions={
                         <SearchPageActions

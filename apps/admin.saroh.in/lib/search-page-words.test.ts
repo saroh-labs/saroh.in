@@ -5,6 +5,7 @@ import type { DocEntry, PageRow, SearchPageRecord } from "./search-page-words";
 import {
     badgeOf,
     cantPublishWords,
+    changedByWords,
     checkWhy,
     countBy,
     deployedWords,
@@ -15,6 +16,7 @@ import {
     heldWords,
     historyWords,
     inFilter,
+    KIND_NOUN,
     kindOf,
     KINDS,
     linkedFromWords,
@@ -35,6 +37,7 @@ import {
     stateNote,
     stateOf,
     successWords,
+    takenOffGoesTo,
     whereItShows,
 } from "./search-page-words";
 
@@ -882,5 +885,50 @@ describe("the list's address, order and groups (Search pages list, 1 Nov)", () =
                 search: "gym software",
             }),
         ).toBe(false);
+    });
+});
+
+describe("one page's facts (detail audit, 1 Nov)", () => {
+    const at = (
+        path: string,
+        kind: PageRow["kind"],
+        onSite: boolean,
+        family = "",
+    ) => ({ path, kind, onSite, family, slug: path.split("/").pop() ?? "" });
+
+    it("sends a taken-off page where the site's redirects do", () => {
+        const guide = at("/guides/cut-no-shows", "guides", false);
+        expect(takenOffGoesTo(guide, [guide])).toBe("Home");
+        expect(
+            takenOffGoesTo(guide, [guide, at("/guides/other", "guides", true)]),
+        ).toBe("/guides");
+        const tool = at("/tools/qr", "tools", true);
+        expect(takenOffGoesTo(tool, [tool])).toBe("Home");
+        expect(
+            takenOffGoesTo(tool, [tool, at("/tools/upi", "tools", true)]),
+        ).toBe("/tools");
+        const spa = at("/for/spas", "for", false, "Beauty");
+        expect(takenOffGoesTo(spa, [spa])).toBe("Home");
+        expect(
+            takenOffGoesTo(spa, [
+                spa,
+                at("/for/salons", "for", true, "Beauty"),
+            ]),
+        ).toBe("/for/salons");
+    });
+
+    it("says a draft is readable on a development site, and not on production", () => {
+        const draft = { onSite: false, pending: null };
+        expect(whereItShows(draft, "saroh.io", "guides", false)[0]?.value).toBe(
+            "Readable, marked Draft",
+        );
+        expect(whereItShows(draft, "saroh.in", "guides", true)[0]?.value).toBe(
+            "Not on saroh.in",
+        );
+    });
+
+    it("names each kind as one page, and never guesses who changed it", () => {
+        expect(KIND_NOUN.downloads).toBe("Free download");
+        expect(changedByWords(null)).toBe("not recorded");
     });
 });

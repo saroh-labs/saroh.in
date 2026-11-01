@@ -96,16 +96,31 @@ export function PageChecks({ page }: { page: AnyPageData }) {
                                           : "Fails:"}
                                 </span>
                             </span>
-                            <span className="grid gap-0.5">
+                            <div className="grid gap-1">
                                 <strong className="font-semibold">
                                     {c.title}
                                 </strong>
-                                {c.detail && (
-                                    <span className="text-[13px] text-muted-foreground">
-                                        {c.detail}
-                                    </span>
+                                {c.problems && c.problems.length > 1 ? (
+                                    // Several to work through (facts for the CA): one a line.
+                                    <ol className="list-decimal space-y-0.5 pl-5 text-[13px] text-muted-foreground">
+                                        {c.problems.map((p) => (
+                                            <li
+                                                key={p}
+                                                // "To confirm: the 5% rate…" reads as a list of "The 5% rate…".
+                                                className="first-letter:uppercase"
+                                            >
+                                                {p.replace(/^To confirm: /, "")}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                ) : (
+                                    c.detail && (
+                                        <span className="text-[13px] text-muted-foreground">
+                                            {c.detail}
+                                        </span>
+                                    )
                                 )}
-                            </span>
+                            </div>
                         </li>
                     );
                 })}

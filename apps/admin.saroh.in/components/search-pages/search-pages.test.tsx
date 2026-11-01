@@ -561,11 +561,8 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
             name: "Publish on saroh.in",
         });
         expect((publish as HTMLButtonElement).disabled).toBe(true);
-        expect(
-            screen.getByText(
-                /Publish waits until these checks pass: Every fact is confirmed/,
-            ),
-        ).toBeTruthy();
+        // Why is the header's line (#publish-held), said to every role, not a row in the actions.
+        expect(publish.getAttribute("aria-describedby")).toBe("publish-held");
     });
 });
 

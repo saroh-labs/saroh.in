@@ -1,4 +1,6 @@
+import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
+import Link from "next/link";
 
 import { Facts, Panel } from "@/components/panel";
 import { PageChecks } from "@/components/search-pages/page-checks";
@@ -8,7 +10,15 @@ import {
     pageSections,
     toolSections,
 } from "@/lib/search-page-content";
-import { familyPage, whereItShows } from "@/lib/search-page-words";
+import type { PageRow } from "@/lib/search-page-words";
+import {
+    badgeOf,
+    changedByWords,
+    KIND_NOUN,
+    KINDS,
+    takenOffGoesTo,
+    whereItShows,
+} from "@/lib/search-page-words";
 import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
 export async function generateMetadata({
@@ -17,7 +27,13 @@ export async function generateMetadata({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    return { title: `${loadPage(slug)?.page.path ?? slug} · Search pages` };
+    const page = loadPage(slug);
+    // The name, then its kind: tabs of several pages stay told apart.
+    return {
+        title: page
+            ? `${page.page.name} · ${KINDS.find((k) => k.kind === page.kind)?.label}`
+            : "Search pages",
+    };
 }
 
 /**
@@ -32,12 +48,21 @@ export default async function SearchPageOverview({
     const { slug } = await params;
     const data = await searchPageForTab(slug);
     if (!data) return null;
-    const { row, site } = data;
+    const { row, rows, site } = data;
     const page = data.page.page;
     const tool = data.page.kind === "tools" ? data.page.page : null;
-    const to =
-        data.page.kind === "for" ? familyPage(row.family, row.slug) : null;
-    const by = row.record?.changedBy?.name;
+    const by = changedByWords(row.record?.changedBy?.name);
+    // What its words link to, and the live pages that link here (U12).
+    const needs = [
+        ...row.links.map((path) => ({
+            path,
+            to: rows.find((r) => r.path === path) ?? null,
+        })),
+        ...row.deadLinks.map((path) => ({ path, to: null })),
+    ];
+    const linkedFrom = rows.filter(
+        (r) => r.onSite && r.links.includes(row.path),
+    );
 
     return (
         <div className="flex flex-wrap items-start gap-4">
@@ -66,9 +91,35 @@ export default async function SearchPageOverview({
                     )}
                 </Panel>
 
-                <Panel title="Checked before you publish">
-                    {() => <PageChecks page={page} />}
-                </Panel>
+                <div id="checks" className="scroll-mt-20">
+                    <Panel title="Checked before you publish">
+                        {() => <PageChecks page={page} />}
+                    </Panel>
+                </div>
+
+                {(needs.length > 0 || linkedFrom.length > 0) && (
+                    <Panel title="Links">
+                        {() => (
+                            <div className="grid gap-4">
+                                {needs.length > 0 && (
+                                    <LinkList
+                                        title="Its words link to these. Each must be live, or go live with it."
+                                        items={needs}
+                                    />
+                                )}
+                                {linkedFrom.length > 0 && (
+                                    <LinkList
+                                        title="Live pages that link here. Taking it off sends their readers elsewhere."
+                                        items={linkedFrom.map((r) => ({
+                                            path: r.path,
+                                            to: r,
+                                        }))}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </Panel>
+                )}
 
                 <Panel title="What's on the page">
                     {() => (
@@ -81,7 +132,7 @@ export default async function SearchPageOverview({
                             ).map((s) => (
                                 <div
                                     key={s.k}
-                                    className="grid gap-0.5 rounded-md bg-muted px-3.5 py-3"
+                                    className="grid content-start gap-0.5 rounded-md bg-muted px-3.5 py-3"
                                 >
                                     <dt className="label">{s.k}</dt>
                                     <dd className="text-sm">{s.v}</dd>
@@ -97,7 +148,12 @@ export default async function SearchPageOverview({
                 <Panel title={`Where it shows on ${site.host}`}>
                     {() => (
                         <ul className="grid">
-                            {whereItShows(row, site.host, row.kind).map((w) => (
+                            {whereItShows(
+                                row,
+                                site.host,
+                                row.kind,
+                                site.production,
+                            ).map((w) => (
                                 <li
                                     key={w.label}
                                     className="flex items-center gap-2.5 border-t py-2 text-sm first:border-t-0"
@@ -132,40 +188,96 @@ export default async function SearchPageOverview({
                         <Facts
                             rows={[
                                 ["Target search", `“${page.search}”`],
-                                tool
-                                    ? [
-                                          "Section",
-                                          `${tool.group} · old links go to /tools`,
-                                      ]
-                                    : [
-                                          "Family",
-                                          `${row.family} · old links go to ${to ?? "Home"}`,
-                                      ],
+                                [
+                                    row.kind === "for" ? "Family" : "Section",
+                                    row.family,
+                                ],
+                                [
+                                    "If taken off",
+                                    `Old links go to ${takenOffGoesTo(row, rows)}`,
+                                ],
                                 [
                                     "Kind",
-                                    tool
-                                        ? tool.inApp
-                                            ? "Free tool, with its own page in saroh.in"
-                                            : "Free tool"
-                                        : "Trade page",
+                                    tool?.inApp
+                                        ? "Free tool, with its own page in saroh.in"
+                                        : KIND_NOUN[row.kind],
                                 ],
                                 [
                                     "Words last changed",
                                     formatDate(page.updated),
                                 ],
-                                [
-                                    row.onSite
-                                        ? "Published by"
-                                        : "Last changed by",
-                                    row.record
-                                        ? `${by ?? "a former staff member"}, ${formatDate(row.record.changedAt)}`
-                                        : "—",
-                                ],
+                                ...(row.onSite
+                                    ? ([
+                                          [
+                                              "Live since",
+                                              formatDate(
+                                                  row.record?.liveSince ??
+                                                      row.record?.changedAt,
+                                              ),
+                                          ],
+                                      ] as [string, string][])
+                                    : []),
+                                // Nothing recorded yet: no row, rather than a dash.
+                                ...(row.record
+                                    ? ([
+                                          [
+                                              "Last change",
+                                              `${formatDate(row.record.changedAt)}, by ${by}`,
+                                          ],
+                                      ] as [string, string][])
+                                    : []),
                             ]}
                         />
                     )}
                 </Panel>
             </aside>
+        </div>
+    );
+}
+
+/** Pages listed with their status, each opening its own page here. */
+function LinkList({
+    title,
+    items,
+}: {
+    title: string;
+    items: { path: string; to: PageRow | null }[];
+}) {
+    return (
+        <div className="grid gap-1.5">
+            <p className="text-[13px] text-muted-foreground">{title}</p>
+            <ul className="grid">
+                {items.map(({ path, to }) => (
+                    <li
+                        key={path}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2 text-sm first:border-t-0"
+                    >
+                        {to ? (
+                            <Link
+                                href={`/search-pages/${to.slug}`}
+                                className="font-medium underline-offset-2 hover:underline"
+                            >
+                                {to.name}
+                            </Link>
+                        ) : (
+                            <span className="font-medium text-destructive">
+                                No page at this address: fix the link in the
+                                code
+                            </span>
+                        )}
+                        <code className="font-mono text-xs text-muted-foreground">
+                            {path}
+                        </code>
+                        {to && (
+                            <div className="ml-auto">
+                                <Badge variant={badgeOf(to).variant}>
+                                    {badgeOf(to).label}
+                                </Badge>
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }

@@ -14,7 +14,7 @@ export async function generateMetadata({
 }) {
     const { slug } = await params;
     return {
-        title: `${loadPage(slug)?.page.path ?? slug} · History · Search pages`,
+        title: `${loadPage(slug)?.page.name ?? slug} · History · Search pages`,
     };
 }
 

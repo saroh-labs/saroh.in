@@ -50,7 +50,6 @@ export function DownloadPage({
     links = {},
     related = [],
     gate,
-    stubPreview = false,
 }: {
     page: DownloadPageData;
     draft?: boolean;
@@ -59,8 +58,6 @@ export function DownloadPage({
     related?: readonly CardItem[];
     /** The form that gives the files, beside the title. */
     gate?: ReactNode;
-    /** The preview's words in its frame, not the picture: admin, where saroh.in's copy isn't served. */
-    stubPreview?: boolean;
 }) {
     const band = p.band ?? BAND;
     return (
@@ -76,7 +73,6 @@ export function DownloadPage({
                             src={p.preview.src}
                             alt={p.preview.alt}
                             ratio="16/7"
-                            stub={stubPreview}
                             {...previewSources(p.preview.src)}
                         />
                     ) : null}

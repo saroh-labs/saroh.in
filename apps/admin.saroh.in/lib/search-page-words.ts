@@ -687,6 +687,41 @@ const FAMILY_PAGE: Record<string, string> = {
     "Shops and food": "shops",
 };
 
+/** One page of a kind, as the console names it ("Free download"). */
+export const KIND_NOUN: Record<PageKind, string> = {
+    for: "Trade page",
+    tools: "Free tool",
+    gst: "GST guide",
+    guides: "Guide",
+    downloads: "Free download",
+};
+
+/**
+ * Where a page's old address sends people once it's taken off, as the
+ * site's `redirects.js` decides: a /for/ page to its family's page while
+ * that is live, a tool to /tools and a GST page, guide or download to its
+ * group's list while another of its kind is live; otherwise Home.
+ */
+export function takenOffGoesTo(
+    row: Pick<PageRow, "path" | "kind" | "family" | "slug">,
+    rows: readonly Pick<PageRow, "path" | "kind" | "onSite">[],
+): string {
+    const otherLive = rows.some(
+        (r) => r.kind === row.kind && r.path !== row.path && r.onSite,
+    );
+    if (row.kind === "for") {
+        const to = familyPage(row.family, row.slug);
+        return to && rows.some((r) => r.path === to && r.onSite) ? to : "Home";
+    }
+    if (!otherLive) return "Home";
+    if (row.kind === "tools") return "/tools";
+    return DOC_KINDS.find((k) => k.id === row.kind)?.hub ?? "Home";
+}
+
+/** Who last changed a page, when the record names nobody: never a guess. */
+export const changedByWords = (name: string | null | undefined) =>
+    name ?? "not recorded";
+
 export function familyPage(family: string, slug: string): string | null {
     const page = FAMILY_PAGE[family];
     return page && page !== slug ? `/for/${page}` : null;
@@ -1004,6 +1039,7 @@ export function whereItShows(
     row: Pick<PageRow, "onSite" | "pending">,
     site: string,
     kind: PageKind = "for",
+    production = true,
 ): { label: string; on: boolean; value: string }[] {
     const live = row.onSite;
     return [
@@ -1016,7 +1052,10 @@ export function whereItShows(
                     : "Live"
                 : row.pending === "on"
                   ? "After changes are deployed"
-                  : `Not on ${site}`,
+                  : // A development build draws every page, marked Draft (docs-content.config.ts).
+                    production
+                    ? `Not on ${site}`
+                    : "Readable, marked Draft",
         },
         { label: "Sitemap", on: live, value: live ? "Listed" : "Not listed" },
         {
