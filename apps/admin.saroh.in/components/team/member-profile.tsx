@@ -100,8 +100,8 @@ export function MemberProfile({
                             </dt>
                             <dd className="min-w-0 break-words text-sm">
                                 {row.value ?? (
-                                    <span className="font-medium text-warning-subtle-foreground">
-                                        Missing
+                                    <span className="text-muted-foreground">
+                                        Not added
                                     </span>
                                 )}
                             </dd>

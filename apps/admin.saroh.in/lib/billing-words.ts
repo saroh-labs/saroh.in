@@ -160,6 +160,8 @@ export interface SarohSubscriptionPage {
         mrrPaise: number;
         /** Ending, or moving plan, in the next 30 days. */
         endingSoon: number;
+        /** ACTIVE on a plan with a list price: Free is not counted. */
+        paying: number;
         currency: string;
     };
     plans: { key: string; name: string }[];
@@ -267,6 +269,7 @@ export const SUBSCRIPTION_VIEWS = [
     "ending-soon",
     "first-month",
     "past-due",
+    "paying",
 ] as const;
 export type SubscriptionView = (typeof SUBSCRIPTION_VIEWS)[number];
 
@@ -402,6 +405,7 @@ export const VIEW_LABEL: Record<SubscriptionView, string> = {
     "ending-soon": "Ending or moving in 30 days",
     "first-month": "In their first month",
     "past-due": "Payment failed",
+    paying: "On a paid plan",
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -534,11 +538,11 @@ export function nextChargeLine(row: SarohSubscriptionRow): string {
             ? `Paid for the year · ends ${istDate(ends)}`
             : "Paid for the year";
     }
-    if (row.status === "CANCELLED") return "None · ended";
+    if (row.status === "CANCELLED") return "No next charge · ended";
     if (row.cancelAtPeriodEnd && row.currentPeriodEnd) {
-        return `None · ends ${istDate(row.currentPeriodEnd)}`;
+        return `No next charge · ends ${istDate(row.currentPeriodEnd)}`;
     }
-    return "None";
+    return "No next charge";
 }
 
 /** The autopay's state, and whether it asks for a look (orange). */

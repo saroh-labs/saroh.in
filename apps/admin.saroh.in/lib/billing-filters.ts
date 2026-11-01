@@ -74,11 +74,13 @@ export function tabHref(tab: BillingTab, query: Query): string {
 // ── Subscriptions ────────────────────────────────────────────────────────
 
 /**
- * The five status cards (R26). Each is one of the API's filters: a status,
- * or the "ending soon" view. One is on at a time.
+ * The status chips (R26). Each is one of the API's filters: a status, or a
+ * view ("on a paid plan": Active on a plan with a price, so Free is not
+ * counted; "ending soon"). One is on at a time.
  */
 export const STATUS_CARDS = [
-    { key: "paying", label: "Paying", status: "ACTIVE" },
+    { key: "active", label: "Active", status: "ACTIVE" },
+    { key: "paying", label: "On a paid plan", view: "paying" },
     { key: "failed", label: "Payment failed", status: "PAST_DUE" },
     { key: "trial", label: "In trial", status: "TRIALING" },
     { key: "ending", label: "Ending soon", view: "ending-soon" },
@@ -175,6 +177,17 @@ const TAB_FILTERS: Record<BillingTab, readonly string[]> = {
 /** Whether anything narrows this tab: the search, or one of its filters. */
 export function isNarrowed(tab: BillingTab, query: Query): boolean {
     return ["q", ...TAB_FILTERS[tab]].some((key) => Boolean(query[key]));
+}
+
+/**
+ * What narrows the tab, for its Clear button and its empty panel, so both
+ * say the same: the search alone is "search", any tab filter "filters".
+ */
+export function narrowCause(
+    tab: BillingTab,
+    query: Query,
+): "search" | "filters" {
+    return isNarrowed(tab, { ...query, q: undefined }) ? "filters" : "search";
 }
 
 /** The tab with nothing narrowing it. */

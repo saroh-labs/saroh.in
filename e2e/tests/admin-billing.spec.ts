@@ -52,23 +52,23 @@ test.describe("Billing, one page", () => {
         ).toBeVisible();
     });
 
-    test("a status card filters as it is pressed, and clears when pressed again", async ({
+    test("a status chip filters as it is pressed, and clears when pressed again", async ({
         page,
     }) => {
         await page.goto(`${ADMIN}/billing/subscriptions`);
-        const paying = page.getByRole("button", { name: /^Paying/ });
-        await expect(paying).toHaveAttribute("aria-pressed", "false");
+        const active = page.getByRole("button", { name: /^Active/ });
+        await expect(active).toHaveAttribute("aria-pressed", "false");
 
-        await paying.click();
+        await active.click();
         await expect(page).toHaveURL(/status=ACTIVE/);
         await expect(
-            page.getByRole("button", { name: /^Paying/ }),
+            page.getByRole("button", { name: /^Active/ }),
         ).toHaveAttribute("aria-pressed", "true");
 
-        await page.getByRole("button", { name: /^Paying/ }).click();
+        await page.getByRole("button", { name: /^Active/ }).click();
         await expect(page).not.toHaveURL(/status=/);
         await expect(
-            page.getByRole("button", { name: /^Paying/ }),
+            page.getByRole("button", { name: /^Active/ }),
         ).toHaveAttribute("aria-pressed", "false");
     });
 

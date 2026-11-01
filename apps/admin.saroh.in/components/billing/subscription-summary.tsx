@@ -293,14 +293,44 @@ export function ProfileFacts({
             {profile.lastError ? (
                 <span className="text-destructive">Last sync failed.</span>
             ) : null}
-            <span className="text-muted-foreground">
-                {profile.otherBusinesses.length === 0
-                    ? "Bills only this business."
-                    : `Also bills ${profile.otherBusinesses
-                          .map((b) => b.name)
-                          .join(", ")}.`}
-            </span>
+            <AlsoBills names={profile.otherBusinesses.map((b) => b.name)} />
         </span>
+    );
+}
+
+/**
+ * The other businesses the profile bills: up to three by name, more as a
+ * count with Show, so a long list never pushes the sheet's ids and
+ * actions off screen.
+ */
+function AlsoBills({ names }: { names: string[] }) {
+    if (names.length === 0) {
+        return (
+            <span className="text-muted-foreground">
+                Bills only this business.
+            </span>
+        );
+    }
+    if (names.length <= 3) {
+        return (
+            <span className="text-muted-foreground">
+                Also bills {names.join(", ")}.
+            </span>
+        );
+    }
+    return (
+        <details className="group text-muted-foreground">
+            <summary className="cursor-pointer coarse:min-h-11">
+                Also bills {names.length} other businesses ·{" "}
+                <span className="underline underline-offset-4 group-open:hidden">
+                    Show
+                </span>
+                <span className="hidden underline underline-offset-4 group-open:inline">
+                    Hide
+                </span>
+            </summary>
+            <span className="mt-1 block">{names.join(", ")}.</span>
+        </details>
     );
 }
 

@@ -32,11 +32,11 @@ function useFilterNav() {
 }
 
 /**
- * The subscriptions' total and their five status cards (R26). The total is
- * "A month, at list price", with its fine print behind ⓘ. Each status card
- * is a toggle (`aria-pressed`): pressed, the list shows only that status;
- * pressed again, everything. One is on at a time; the search and the plan
- * stay as they are.
+ * The subscriptions' total and their status chips (R26). The total is the
+ * one card: "A month, at list price", with its fine print behind ⓘ. Each
+ * status is a chip toggle (`aria-pressed`) with its count, as Invoices'
+ * statuses are: pressed, the list shows only that status; pressed again,
+ * everything. One is on at a time; the search and the plan stay as they are.
  */
 export function StatusCards({
     mrrPaise,
@@ -51,8 +51,8 @@ export function StatusCards({
     const on = activeCard(query);
 
     return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="col-span-2 rounded-[11px] border bg-card px-4 py-3.5 sm:col-span-3 lg:col-span-1">
+        <>
+            <div className="rounded-[11px] border bg-card px-4 py-3.5 sm:max-w-xs">
                 <div className="flex items-center justify-between gap-2">
                     <p className="label">A month, at list price</p>
                     <Popover>
@@ -77,35 +77,40 @@ export function StatusCards({
                     {formatPaise(mrrPaise, currency)}
                 </p>
             </div>
-            {STATUS_CARDS.map((card) => {
-                const pressed = on === card.key;
-                const count = counts[card.key];
-                const attention = card.key === "failed" && count > 0;
-                return (
-                    <button
-                        key={card.key}
-                        type="button"
-                        aria-pressed={pressed}
-                        onClick={() => go(cardHref(pathname, query, card.key))}
-                        className={cn(
-                            "rounded-[11px] border bg-card px-4 py-3.5 text-left transition-colors duration-fast ease-out hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                            pressed &&
-                                "border-foreground shadow-[inset_0_0_0_1px_hsl(var(--foreground))]",
-                        )}
-                    >
-                        <span className="label block">{card.label}</span>
-                        <span
-                            className={cn(
-                                "mt-[7px] block font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]",
-                                attention && "text-warning-subtle-foreground",
-                            )}
+            <div
+                role="group"
+                aria-label="Status"
+                className="flex flex-wrap items-center gap-2"
+            >
+                {STATUS_CARDS.map((card) => {
+                    const pressed = on === card.key;
+                    const count = counts[card.key];
+                    const attention =
+                        card.key === "failed" && count > 0 && !pressed;
+                    return (
+                        <Chip
+                            key={card.key}
+                            as="toggle"
+                            on={pressed}
+                            onClick={() =>
+                                go(cardHref(pathname, query, card.key))
+                            }
                         >
-                            {figures.format(count)}
-                        </span>
-                    </button>
-                );
-            })}
-        </div>
+                            {card.label}
+                            <span
+                                className={cn(
+                                    "tabular-nums opacity-70",
+                                    attention &&
+                                        "font-semibold text-warning-subtle-foreground opacity-100",
+                                )}
+                            >
+                                {figures.format(count)}
+                            </span>
+                        </Chip>
+                    );
+                })}
+            </div>
+        </>
     );
 }
 

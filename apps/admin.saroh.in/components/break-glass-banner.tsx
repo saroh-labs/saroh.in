@@ -1,10 +1,6 @@
 "use client";
 
-import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
-
-import { OperatorDialog } from "@/components/operator-dialog";
-import { claimPlatformOwnerAction } from "@/lib/team-actions";
+import { ClaimPlatformOwnerDialog } from "@/components/claim-platform-owner-dialog";
 
 /**
  * One line at the top of the work area while someone is in through the
@@ -15,7 +11,6 @@ import { claimPlatformOwnerAction } from "@/lib/team-actions";
  * On every page, as decided; on a phone, one line.
  */
 export function BreakGlassBanner() {
-    const router = useRouter();
     return (
         <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-warning-subtle-foreground">
@@ -26,27 +21,7 @@ export function BreakGlassBanner() {
                     You&rsquo;re in through the emergency staff list, so this
                     access can&rsquo;t be taken back or traced to a role.
                 </span>
-                <OperatorDialog
-                    trigger="Make me Platform owner"
-                    triggerVariant="outline"
-                    triggerClassName="h-8"
-                    title="Make me Platform owner"
-                    effect="Records a Platform owner grant for you on the team, so your access can be taken back and every change you make is traced to it. The emergency list stays as it is."
-                    submitLabel="Make me Platform owner"
-                    quickReasons={["Recording my own access"]}
-                    onSubmit={async ({ reason, idempotencyKey }) => {
-                        const result = await claimPlatformOwnerAction({
-                            reason,
-                            idempotencyKey,
-                        });
-                        if (!result.ok) {
-                            return { ok: false, error: result.error };
-                        }
-                        showSuccess("You're a Platform owner on the record.");
-                        router.refresh();
-                        return { ok: true };
-                    }}
-                />
+                <ClaimPlatformOwnerDialog triggerClassName="h-8" />
             </div>
         </div>
     );

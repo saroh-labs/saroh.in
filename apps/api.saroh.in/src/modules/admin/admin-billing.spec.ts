@@ -10,6 +10,7 @@ import {
     csvCell,
     INVOICE_CSV_HEADER,
     invoicesCsv,
+    isPaying,
     istDay,
     istMonthRange,
     linkAt,
@@ -253,6 +254,22 @@ describe("subscriptionViewWhere", () => {
             status: "PAST_DUE",
         });
         expect(subscriptionViewWhere(undefined, now)).toEqual({});
+    });
+
+    it("paying is ACTIVE on a plan with a list price, so Free is left out", () => {
+        expect(subscriptionViewWhere("paying", now)).toEqual({
+            status: "ACTIVE",
+            plan: { priceCents: { gt: 0 } },
+        });
+        expect(
+            isPaying("ACTIVE", { priceCents: 22_200, interval: "month" }),
+        ).toBe(true);
+        expect(isPaying("ACTIVE", { priceCents: 0, interval: "month" })).toBe(
+            false,
+        );
+        expect(
+            isPaying("PAST_DUE", { priceCents: 22_200, interval: "month" }),
+        ).toBe(false);
     });
 });
 
