@@ -996,6 +996,9 @@ importers:
       '@saroh/search-pages':
         specifier: workspace:*
         version: link:../../packages/search-pages
+      '@saroh/site-blocks':
+        specifier: workspace:*
+        version: link:../../packages/site-blocks
       '@saroh/templates':
         specifier: workspace:*
         version: link:../../packages/templates

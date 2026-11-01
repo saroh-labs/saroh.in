@@ -1,0 +1,78 @@
+---
+slug: doctor-and-clinic-services
+type: trade
+name: Doctor and clinic services
+line: What is exempt, what isn't, and how to bill both.
+topic: doctor and clinic services
+search: gst on doctor consultation
+title: GST on doctor consultation and clinic services
+description: Is there GST on a doctor's consultation? What is exempt health care, what is taxable, and how a clinic bills both.
+h1: GST on doctor consultations and clinic services
+answer: Health care by a clinic, a doctor or paramedics is **exempt from GST**. Cosmetic procedures that don't restore a function are taxable at 18%, and medicines you sell go at their own rate.
+updated: 2026-10-24
+checkedOn: 2026-10-24
+author:
+  name: Yash Mehta
+  role: Founder at Saroh
+forPage: clinics
+related: [tax-invoice-or-bill-of-supply, do-i-need-gst, gst-on-advance-and-deposits]
+codes:
+  - kind: SAC
+    code: "999312"
+    label: human health services
+    rate: 0
+facts:
+  - label: Consultations
+    value: "0%"
+    note: exempt health care
+  - label: SAC
+    value: "999312"
+    note: human health services
+  - label: Cosmetic procedures
+    value: "18%"
+    note: when not restoring a function
+  - label: Medicines sold
+    value: by HSN
+    note: each at its own rate
+table:
+  kind: invoice
+  title: A sample invoice
+  head: ["Item", "SAC", "Value", "GST", "Total"]
+  rows:
+    - ["Doctor's consultation (GP)", "999312", "₹600.00", "₹0.00", "₹600.00"]
+  foot: ["Total", "", "₹600.00", "₹0.00", "₹600.00"]
+  note: "An exempt service: a registered clinic gives a bill of supply, with no GST on it."
+sources:
+  - label: the GST exemption list for services (health care services)
+    href: https://cbic-gst.gov.in/
+mistakes:
+  - title: Adding GST to a consultation.
+    body: Health care by a doctor or clinic is exempt.
+  - title: Treating cosmetic work as health care.
+    body: Aesthetic procedures that don't restore a function are taxable.
+  - title: Medicines on the consultation line.
+    body: Products sold go on their own line, at their own rate.
+questions:
+  - question: Is physiotherapy exempt?
+    answer: Physiotherapy by a recognised practitioner is health care, so it's exempt.
+  - question: Do I need a GSTIN for an exempt clinic?
+    answer: Not if everything you supply is exempt.
+  - question: What about a deposit for a procedure?
+    answer: An exempt service carries no GST, deposit or not.
+toConfirm:
+  - the notification number for the health care exemption
+  - that cosmetic procedures which don't restore a function are taxed at 18%
+  - that physiotherapy by a recognised practitioner is exempt
+band:
+  title: "Exempt care and taxable extras, billed right"
+  line: "Mark each service exempt or taxable once; every bill follows."
+rank: 4
+---
+
+## Do clinics need to register?
+
+A clinic giving only exempt health care doesn't need to register. If it also sells taxable things, like cosmetic treatments or products, and those cross the limit, it does.
+
+## Bill of supply for exempt care
+
+A registered clinic gives a bill of supply, not a tax invoice, for exempt consultations. Taxable items go on a tax invoice.

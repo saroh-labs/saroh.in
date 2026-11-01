@@ -1,7 +1,5 @@
 "use client";
 
-import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -14,8 +12,9 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import type { PageAction, PageRow } from "@/lib/search-page-words";
-import { canDo, inFlight } from "@/lib/search-page-words";
+import { canDo } from "@/lib/search-page-words";
 
+import type { AnyPageData } from "./page-checks";
 import { failingCount, useChecks } from "./page-checks";
 import { SearchPageDialog } from "./search-page-dialog";
 
@@ -31,6 +30,7 @@ const CODE_URL =
  */
 export function SearchPageActions({
     row,
+    rows,
     site,
     siteUrl,
     production,
@@ -40,6 +40,8 @@ export function SearchPageActions({
     page,
 }: {
     row: PageRow;
+    /** Every page, for what this one links to and what links to it (U12). */
+    rows?: PageRow[];
     site: string;
     siteUrl: string;
     production: boolean;
@@ -47,7 +49,7 @@ export function SearchPageActions({
     reviewUrl: string;
     canPublish: boolean;
     /** The page's words, for the checks Publish counts. */
-    page: SearchPageData | ToolPageData;
+    page: AnyPageData;
 }) {
     const [opened, setOpened] = useState<PageAction | null>(null);
     // Run when Publish opens: its confirm says how many checks need you.
@@ -55,6 +57,8 @@ export function SearchPageActions({
     const main = (["publish", "unpublish", "restore"] as const).find((a) =>
         canDo(a, row.state),
     );
+    // A GST page's, guide's or download's failing checks hold Publish back.
+    const held = main === "publish" && row.blocked.length > 0;
     const label = {
         publish: `Publish on ${site}`,
         unpublish: "Unpublish",
@@ -77,13 +81,21 @@ export function SearchPageActions({
                     type="button"
                     size="sm"
                     variant={main === "unpublish" ? "outline" : "default"}
+                    disabled={held}
+                    aria-describedby={held ? "publish-held" : undefined}
                     onClick={() => setOpened(main)}
                 >
                     {label[main]}
                 </Button>
             )}
-            {inFlight(row.state) && (
-                <Badge variant="warning">Rebuilding {site}…</Badge>
+            {canPublish && held && (
+                <p
+                    id="publish-held"
+                    className="basis-full text-[12.5px] text-muted-foreground"
+                >
+                    Publish waits until these checks pass:{" "}
+                    {row.blocked.join(", ")}.
+                </p>
             )}
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
@@ -100,7 +112,7 @@ export function SearchPageActions({
                     align="end"
                     onCloseAutoFocus={(event) => event.preventDefault()}
                 >
-                    {production && row.state === "live" && (
+                    {production && row.onSite && (
                         <DropdownMenuItem asChild>
                             <a
                                 href={`${siteUrl}${row.path}`}
@@ -138,6 +150,7 @@ export function SearchPageActions({
                 <SearchPageDialog
                     action={opened}
                     pages={[row]}
+                    rows={rows}
                     site={site}
                     reviewSite={reviewSite}
                     checks={checks}

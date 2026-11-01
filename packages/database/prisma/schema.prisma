@@ -2324,7 +2324,7 @@ model Post {
   currentPublication   Publication?  @relation("PostCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
   publications         Publication[] @relation("PostPublications")
 
-  comments Comment[]
+  comments    Comment[]
   // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
   reviewNotes SiteComment[]
 
@@ -6520,6 +6520,39 @@ model WaitlistSignup {
   @@index([reportEmailDay])
 }
 
+// A free download's lead on saroh.in (/downloads/<slug>, plan 2026-10-31-002
+// U9): the email or WhatsApp number given for the file, exactly one (a CHECK
+// in the migration), one row per contact and download. Used only to send
+// that file: no marketing consent, and an unverified number is never
+// messaged. Deleted 12 months after its last request (the waitlist
+// retention sweep). Platform-level, not a business.
+model DownloadLead {
+  id             String    @id @default(cuid())
+  email          String?
+  // E.164, an Indian mobile (DEC-198).
+  phone          String?
+  // The email's key (`normaliseEmail`) or the phone: what "the same person" is.
+  contactKey     String
+  slug           String
+  // `download:<slug>`.
+  source         String
+  purpose        String    @default("download")
+  // The version of the consent line the gate showed.
+  consentVersion String
+  ipHash         String?
+  // The download emails sent to this lead on one UTC day, for the tools'
+  // email caps (`waitlist/tool-email-cap.ts`).
+  emailDay       DateTime? @db.Date
+  emailCount     Int       @default(0)
+
+  createdAt       DateTime @default(now())
+  lastRequestedAt DateTime @default(now())
+
+  @@unique([contactKey, slug])
+  @@index([lastRequestedAt])
+  @@index([emailDay])
+}
+
 /// A record of a completed or in-flight idempotent operation.
 ///
 /// An idempotency key says "this is a retry". It does NOT say "this is the SAME
@@ -9225,18 +9258,26 @@ model OtpWidgetTokenUse {
 // organization, so no row-level security policy (named in
 // `packages/database/src/rls-coverage.test.ts`).
 model SearchPage {
-  id              String           @id @default(cuid())
+  id               String           @id @default(cuid())
   // `/for/<slug>`.
-  path            String           @unique
-  status          SearchPageStatus
+  path             String           @unique
+  status           SearchPageStatus
   // When it last went live; null while it isn't.
-  liveSince       DateTime?
+  liveSince        DateTime?
   // When it last stopped being live; null if it never was. A page taken
   // off redirects on the site, so a restored page keeps this.
-  takenOffAt      DateTime?
-  changedAt       DateTime         @default(now())
+  takenOffAt       DateTime?
+  changedAt        DateTime         @default(now())
   // The staff user (`User.id`) who made the last change.
-  changedByUserId String?
+  changedByUserId  String?
+  // What the last Deploy changes sent to the site (R13, owner 31 Oct):
+  // `status` is staged by publish, unpublish, archive and restore, and the
+  // site's build reads this. They differ only while a page waits to go on
+  // or come off; liveSince and takenOffAt follow this one.
+  releasedStatus   SearchPageStatus @default(DRAFT)
+  // When and by whom (`User.id`) this page was last deployed.
+  deployedAt       DateTime?
+  deployedByUserId String?
 }
 
 enum SearchPageStatus {

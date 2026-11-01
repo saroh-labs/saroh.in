@@ -6245,3 +6245,59 @@ made online when none is (`seed/showcase/pulse.ts`).
 **Rule**: a state the seed's own check requires is placed, never left to a
 roll; a roll only adds variety on top.
 **Category**: seed · tests
+
+## /sitemap.xml disappeared when sitemaps were split by group
+
+**Symptom**: 31 Oct, with `generateSitemaps` in `app/sitemap.ts`, the build
+served `/sitemap/<id>.xml` but no `/sitemap.xml`; robots.txt pointed at a 404.
+**Cause**: Next 16's `generateSitemaps` writes no index file.
+**Fix**: `/sitemap.xml` is a route that writes the index, and each group is
+`app/sitemap/[group]/route.ts`, from `lib/sitemaps.ts`.
+**Rule**: `docs/patterns/frontend-app-structure.md` → saroh.in and search;
+`lib/sitemaps.test.ts`.
+**Category**: next · seo
+
+## A committed generated file would have shipped draft pages' words
+
+**Symptom**: 31 Oct, review of the share cards for GST pages, guides and
+downloads: they were planned to read `lib/og-cards.gen.ts`.
+**Cause**: that file is committed, so it holds every page's words, drafts
+too, and goes into every production build.
+**Fix**: share cards read the build's live-only generated module
+(`lib/docs-content.gen.ts`); `og-cards.test.ts` fails an import of
+`docs-embedded` or an `.mdx`.
+**Rule**: words of a page that may be a draft come only from the live-only
+build output (DEC-201); `pnpm check:draft-words` scans the built site.
+**Category**: build · content
+
+## client-bundle.test missed what packages pulled into the browser
+
+**Symptom**: 31 Oct, the test passed while a client file reached a package
+entry that carried every page's words.
+**Cause**: it followed only relative imports, not `@saroh/*` package imports.
+**Fix**: it now follows package imports, and saroh.in may not import
+`@saroh/search-pages/docs-embedded`.
+**Rule**: `apps/saroh.in/client-bundle.test.ts`.
+**Category**: tests · build
+
+## Prisma refused an agent's `db push --force-reset`
+
+**Symptom**: 31 Oct, the download gate's db specs couldn't set up the test
+database from an agent: Prisma stopped on the reset.
+**Cause**: Prisma refuses destructive commands when it detects an AI agent.
+**Fix**: the db specs run with `TEST_RLS=on` against the already-migrated
+test database instead of resetting it.
+**Rule**: `.agents/skills/saroh-migrations/SKILL.md`; never force a reset
+from an agent.
+**Category**: tests · database
+
+## A canvas board claimed a feature Saroh doesn't have
+
+**Symptom**: 31 Oct, the guides' canvas board said Saroh sends booking
+reminders; it doesn't.
+**Cause**: board copy was written without checking the claims list.
+**Fix**: the guides' "In Saroh" notes name only claimed features
+(BK2/BK8/BK9).
+**Rule**: content is checked against `docs/architecture/MARKETING_CLAIMS.md` before it is
+built, whatever the design says (`docs/patterns/saroh-product.md`).
+**Category**: content · claims

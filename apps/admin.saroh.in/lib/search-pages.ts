@@ -4,6 +4,13 @@ import {
     loadSearchPage,
     loadToolPage,
 } from "@saroh/search-pages";
+import type {
+    DownloadPage,
+    GstPage,
+    GuidePage,
+} from "@saroh/search-pages/docs";
+import { docLinks, docPageChecks } from "@saroh/search-pages/docs";
+import { embeddedDocs } from "@saroh/search-pages/docs-embedded";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
@@ -12,11 +19,12 @@ import { env } from "@/env";
 import { can, requireStaff } from "./console";
 import { getJson } from "./control-plane";
 import type {
+    DocEntry,
     PageRow,
     SearchPageEvent,
     SearchPagesRead,
 } from "./search-page-words";
-import { hostOf, mergePages } from "./search-page-words";
+import { checkWhy, hostOf, mergePages } from "./search-page-words";
 import { marketingSiteUrl } from "./team-member";
 
 /**
@@ -38,12 +46,43 @@ export const readSearchPages = cache(async (): Promise<SearchPagesData> => {
         return {
             status: "ok",
             read,
-            rows: mergePages(listSearchPages(), read),
+            rows: mergePages([...listSearchPages(), ...docEntries()], read),
         };
     } catch {
         return { status: "failed" };
     }
 });
+
+/**
+ * The GST pages, guides and downloads in the code, drafts too, each with
+ * the checks that fail: what holds Publish back here and leaves a live page
+ * out of the site's build (the same checks, run on the same words).
+ */
+export function docEntries(): DocEntry[] {
+    return embeddedDocs.all().map((p) => ({
+        kind: p.kind,
+        path: p.path,
+        slug: p.slug,
+        name: p.name,
+        search: p.search,
+        updated: p.updated,
+        group:
+            p.kind === "gst"
+                ? p.type === "trade"
+                    ? "By trade"
+                    : "The basics"
+                : p.group,
+        ...failing(p),
+        links: docLinks(p),
+    }));
+}
+
+function failing(p: Parameters<typeof docPageChecks>[0]) {
+    const fails = docPageChecks(p).filter(
+        (c) => !c.ok && c.severity === "error",
+    );
+    return { blocked: fails.map((c) => c.title), why: fails.map(checkWhy) };
+}
 
 export function readSearchPageHistory(
     path: string,
@@ -51,16 +90,26 @@ export function readSearchPageHistory(
     return getJson(`/search-pages/history?path=${encodeURIComponent(path)}`);
 }
 
-/** A page's words: a /for/ page or a free tool (#1253); slugs are unique across both. */
+/**
+ * A page's words: a /for/ page, a free tool (#1253), or a GST page, guide
+ * or download (every one, drafts too, from `./docs-embedded`). Slugs are
+ * unique across every kind (the docs loader refuses a shared one), and
+ * each page comes back under its own kind, so one can't open as another.
+ */
 export type AnyPage =
     | { kind: "for"; page: SearchPageData }
-    | { kind: "tools"; page: ToolPageData };
+    | { kind: "tools"; page: ToolPageData }
+    | { kind: "gst"; page: GstPage }
+    | { kind: "guides"; page: GuidePage }
+    | { kind: "downloads"; page: DownloadPage };
 
 export const loadPage = cache((slug: string): AnyPage | null => {
     const forPage = loadSearchPage(slug);
     if (forPage) return { kind: "for", page: forPage };
     const tool = loadToolPage(slug);
-    return tool ? { kind: "tools", page: tool } : null;
+    if (tool) return { kind: "tools", page: tool };
+    const doc = embeddedDocs.all().find((p) => p.slug === slug);
+    return doc ? ({ kind: doc.kind, page: doc } as AnyPage) : null;
 });
 
 /** The development site, where pages are read before they're published. */

@@ -1,4 +1,6 @@
 import type { SearchPageEntry } from "@saroh/search-pages";
+import type { DocKindId } from "@saroh/search-pages/kinds";
+import { DOC_KINDS } from "@saroh/search-pages/kinds";
 
 import { formatDate, formatDateTime } from "./format";
 
@@ -15,16 +17,23 @@ export type PageAction = "publish" | "unpublish" | "archive" | "restore";
 /** One row of `GET /admin/search-pages`. */
 export interface SearchPageRecord {
     path: string;
+    /** What staff last chose: publish, unpublish, archive and restore stage it. */
     status: PageStatus;
+    /** What the last Deploy changes sent to the site (R13). */
+    releasedStatus: PageStatus;
     liveSince: string | null;
     changedAt: string;
     changedBy: { name: string | null } | null;
+    deployedAt?: string | null;
+    deployedBy?: { name: string | null } | null;
 }
 
 export interface Rebuild {
     running: boolean;
     startedAt?: string;
     url?: string;
+    /** The paths a deploy still waiting to start carries. */
+    paths?: string[];
 }
 
 export interface SearchPagesRead {
@@ -40,16 +49,14 @@ export interface SearchPageEvent {
     at: string;
 }
 
-/** What the screen shows: the saved status, or that it changes in the rebuild under way. */
-export type RowState =
-    | "live"
-    | "draft"
-    | "publishing"
-    | "unpublishing"
-    | "unpublished"
-    | "archived";
+/** The status staff last chose (staged). */
+export type RowState = "live" | "draft" | "unpublished" | "archived";
 
-export type PageKind = "for" | "tools";
+/** A staged change the site doesn't have yet: going on, or coming off. */
+export type Pending = "on" | "off";
+
+/** /for/, tools, and the groups on the shared kit (`@saroh/search-pages/kinds`). */
+export type PageKind = "for" | "tools" | DocKindId;
 
 export interface PageRow {
     path: string;
@@ -63,14 +70,44 @@ export interface PageRow {
     search: string;
     updated: string;
     state: RowState;
+    /** On the site now: what the last Deploy changes released. */
+    onSite: boolean;
+    /** Waiting for Deploy changes, or null. */
+    pending: Pending | null;
     record: SearchPageRecord | null;
+    /**
+     * A GST page's, guide's or download's checks that fail (their titles):
+     * it can't be published, and a live one is left out of the site's
+     * build (plan 2026-10-31-002, R9). Always empty for /for/ and tools.
+     */
+    blocked: string[];
+    /** The same checks in a few words each, with their counts (`checkWhy`). */
+    why?: string[];
+    /** The search pages its words link to: each must be live before it is (U12). */
+    links: string[];
+    /** Links in its words to a search page that isn't in the code: a typo. */
+    deadLinks: string[];
+}
+
+/** A GST page, guide or download as the list has it, with its failing checks. */
+export interface DocEntry {
+    kind: DocKindId;
+    path: string;
+    slug: string;
+    name: string;
+    search: string;
+    updated: string;
+    /** Its group on the hub: "By trade", "Bookings and no-shows". */
+    group: string;
+    blocked: string[];
+    why: string[];
+    /** `docLinks`: what its words link to, and what the template draws only when live. */
+    links: { required: string[]; optional: string[] };
 }
 
 export const STATE_LABEL: Record<RowState, string> = {
     live: "Live",
     draft: "Draft",
-    publishing: "Publishing…",
-    unpublishing: "Coming off…",
     unpublished: "Unpublished",
     archived: "Archived",
 };
@@ -81,40 +118,36 @@ export const STATE_BADGE: Record<
 > = {
     live: "success",
     draft: "draft",
-    publishing: "warning",
-    unpublishing: "warning",
     unpublished: "outline",
     archived: "neutral",
 };
 
-/**
- * A change counts as part of the rebuild under way when it was saved no
- * more than this long before the rebuild started: the deploy is queued in
- * the same save and GitHub starts it a little after, and the build reads
- * which pages are live once it runs.
- * shortcut: a time window, not the deploy's own list of paths; upgrade if
- * the API ever says which paths a run carries.
- */
-const IN_REBUILD_MS = 5 * 60_000;
+const PENDING_LABEL: Record<Pending, string> = {
+    on: "Published · not deployed yet",
+    off: "Taken off · not deployed yet",
+};
 
-function inRebuild(record: SearchPageRecord, rebuild: Rebuild): boolean {
-    if (!rebuild.running || !rebuild.startedAt) return false;
-    return (
-        new Date(record.changedAt).getTime() >=
-        new Date(rebuild.startedAt).getTime() - IN_REBUILD_MS
-    );
+/** A row's status badge: the staged status, or that it waits for Deploy changes. */
+export function badgeOf(
+    row: Pick<PageRow, "state" | "pending" | "onSite"> & { blocked?: string[] },
+): {
+    label: string;
+    variant: (typeof STATE_BADGE)[RowState] | "error";
+} {
+    // Live, but the site's build leaves it out until its checks pass.
+    if (row.onSite && row.state === "live" && row.blocked?.length)
+        return { label: "Held by checks", variant: "error" };
+    return row.pending
+        ? { label: PENDING_LABEL[row.pending], variant: "warning" }
+        : { label: STATE_LABEL[row.state], variant: STATE_BADGE[row.state] };
 }
 
-export function stateOf(
-    record: SearchPageRecord | null,
-    rebuild: Rebuild,
-): RowState {
-    if (!record) return "draft";
-    switch (record.status) {
+export function stateOf(record: SearchPageRecord | null): RowState {
+    switch (record?.status ?? "DRAFT") {
         case "LIVE":
-            return inRebuild(record, rebuild) ? "publishing" : "live";
+            return "live";
         case "UNPUBLISHED":
-            return inRebuild(record, rebuild) ? "unpublishing" : "unpublished";
+            return "unpublished";
         case "ARCHIVED":
             return "archived";
         case "DRAFT":
@@ -122,37 +155,115 @@ export function stateOf(
     }
 }
 
+/** Where the staged status and the released one put the page on and off the site. */
+export function siteOf(record: SearchPageRecord | null): {
+    onSite: boolean;
+    pending: Pending | null;
+} {
+    const onSite = record?.releasedStatus === "LIVE";
+    const staged = record?.status === "LIVE";
+    return {
+        onSite,
+        pending: staged === onSite ? null : staged ? "on" : "off",
+    };
+}
+
 /** The manifest, each page with its record (or none): the manifest's order, records for pages no longer in the code left out. */
 export function mergePages(
-    manifest: readonly SearchPageEntry[],
+    manifest: readonly (SearchPageEntry | DocEntry)[],
     read: SearchPagesRead,
 ): PageRow[] {
     const byPath = new Map(read.pages.map((r) => [r.path, r]));
+    const inCode = new Set(manifest.map((e) => e.path));
     return manifest.map((entry) => {
         const record = byPath.get(entry.path) ?? null;
+        const links =
+            "links" in entry ? entry.links : { required: [], optional: [] };
         return {
+            links: links.required,
+            // An optional link to no page is never drawn (a /for/ page not written yet).
+            deadLinks: links.required.filter((l) => !inCode.has(l)),
             path: entry.path,
             slug: entry.slug,
             kind: entry.kind,
             name: entry.name,
             family: entry.kind === "for" ? entry.family : entry.group,
             inApp: entry.kind === "tools" && entry.inApp,
+            blocked: "blocked" in entry ? entry.blocked : [],
+            why: "why" in entry ? entry.why : [],
             search: entry.search,
             updated: entry.updated,
             record,
-            state: stateOf(record, read.rebuild),
+            state: stateOf(record),
+            ...siteOf(record),
         };
     });
 }
 
-/** The line under a status: since when, or what the rebuild does to it. */
+const plural = (n: number, one: string, many: string) =>
+    `${n} ${n === 1 ? one : many}`;
+
+/** A failing check in a few words, with its count (`docPageChecks` ids). */
+export function checkWhy(check: {
+    id: string;
+    title: string;
+    count: number;
+}): string {
+    const n = check.count;
+    switch (check.id) {
+        case "to-confirm":
+            return plural(n, "fact to confirm", "facts to confirm");
+        case "placeholders":
+            return plural(n, "placeholder left", "placeholders left");
+        case "quotes":
+            return plural(
+                n,
+                "quote mark facing the wrong way",
+                "quote marks facing the wrong way",
+            );
+        case "no-price":
+            return "it names Saroh's price or plan";
+        case "claims":
+            return "it says something Saroh doesn't do";
+        case "checked-on":
+            return "the GST check date is too old";
+        case "files":
+            return plural(
+                n,
+                "problem with its files",
+                "problems with its files",
+            );
+        default:
+            return `"${check.title}" fails`;
+    }
+}
+
+/**
+ * Why a page can't be published, on one line: its first failing check and
+ * how many more (the Overview tab lists them all). Null when nothing fails.
+ */
+export function cantPublishWords(
+    row: Pick<PageRow, "blocked" | "why">,
+): string | null {
+    const n = row.blocked.length;
+    if (!n) return null;
+    const first = row.why?.[0];
+    if (!first)
+        return `Can't publish yet: ${plural(n, "check fails", "checks fail")}`;
+    const more = n - 1;
+    return `Can't publish yet: ${first}${more ? `, and ${plural(more, "more check", "more checks")}` : ""}`;
+}
+
+/** The line under a status: since when, or what Deploy changes does to it. */
 export function stateNote(row: PageRow): string {
     const r = row.record;
+    if (row.onSite && row.state === "live" && row.blocked.length)
+        return `Left out of the site until it passes: ${row.blocked.join(", ")}`;
+    if (canDo("publish", row.state) && row.blocked.length)
+        return "Can't publish yet";
+    if (row.pending === "on") return "Goes live when changes are deployed";
+    if (row.pending === "off") return "Stays live until changes are deployed";
     switch (row.state) {
-        case "publishing":
-            return "Going live in this rebuild";
-        case "unpublishing":
-            return "Coming off in this rebuild";
         case "live":
             return `Live since ${formatDate(r?.liveSince ?? r?.changedAt)}`;
         case "unpublished":
@@ -166,23 +277,25 @@ export function stateNote(row: PageRow): string {
     }
 }
 
-export const isLive = (state: RowState) =>
-    state === "live" || state === "unpublishing";
-
 export type Filter = "all" | "live" | "draft" | "unpublished" | "archived";
 
-export function inFilter(state: RowState, filter: Filter): boolean {
+/** The chips go by the site: a page waiting to come off still counts as live. */
+export function inFilter(
+    row: Pick<PageRow, "state" | "onSite">,
+    filter: Filter,
+): boolean {
+    const { state, onSite } = row;
     switch (filter) {
         case "all":
-            return state !== "archived";
+            return onSite || state !== "archived";
         case "live":
-            return isLive(state);
+            return onSite;
         case "draft":
-            return state === "draft" || state === "publishing";
+            return !onSite && (state === "draft" || state === "live");
         case "unpublished":
-            return state === "unpublished";
+            return !onSite && state === "unpublished";
         case "archived":
-            return state === "archived";
+            return !onSite && state === "archived";
     }
 }
 
@@ -195,7 +308,7 @@ export const FILTER_LABEL: Record<Filter, string> = {
 };
 
 export function countBy(rows: readonly PageRow[]): Record<Filter, number> {
-    const n = (f: Filter) => rows.filter((r) => inFilter(r.state, f)).length;
+    const n = (f: Filter) => rows.filter((r) => inFilter(r, f)).length;
     return {
         all: n("all"),
         live: n("live"),
@@ -248,21 +361,156 @@ export function canDo(action: PageAction, state: RowState): boolean {
         case "unpublish":
             return state === "live";
         case "archive":
-            return state !== "archived" && !inFlight(state);
+            return state !== "archived";
         case "restore":
             return state === "archived";
     }
 }
 
-/** A page the rebuild under way is putting on or taking off: wait for it. */
-export const inFlight = (state: RowState) =>
-    state === "publishing" || state === "unpublishing";
-
-export function eligible<T extends { state: RowState }>(
+/** Which pages an action can be done to; Publish leaves out a page whose checks fail. */
+export function eligible<T extends { state: RowState; blocked?: string[] }>(
     action: PageAction,
     rows: readonly T[],
 ): T[] {
-    return rows.filter((r) => canDo(action, r.state));
+    return rows.filter(
+        (r) =>
+            canDo(action, r.state) &&
+            !(action === "publish" && r.blocked?.length),
+    );
+}
+
+/**
+ * The bulk bar: how many ticked pages can't be published and why. Publish
+ * already takes only the rest (`eligible`), so it says so when there are any.
+ */
+export function heldWords(
+    rows: readonly Pick<PageRow, "name" | "state" | "blocked" | "why">[],
+): string | null {
+    const held = rows.filter(
+        (r) => canDo("publish", r.state) && r.blocked.length,
+    );
+    if (!held.length) return null;
+    const rest = eligible("publish", rows).length;
+    const names = held
+        .map(
+            (r) =>
+                `${r.name} (${r.why?.length ? r.why.join(", ") : r.blocked.join(", ")})`,
+        )
+        .join("; ");
+    return `${plural(held.length, "page can't", "pages can't")} be published yet: ${names}.${rest ? ` Publish ${rest} publishes the rest.` : ""}`;
+}
+
+/** A page a page being published links to, that isn't live (staged) and isn't in the same publish (U12). */
+export interface MissingLink {
+    path: string;
+    /** Its row; null when no page in the code has this address (a typo). */
+    row: PageRow | null;
+    /** The pages being published that link to it. */
+    from: string[];
+}
+
+/**
+ * What Publish needs first: every page the pages being published link to
+ * must be live or published with them. `add` can join this publish (its own
+ * links followed too); `blocking` can't, and holds Publish back.
+ */
+export function publishLinks(
+    pages: readonly PageRow[],
+    rows: readonly PageRow[],
+): { add: PageRow[]; blocking: MissingLink[] } {
+    const going = new Set(pages.map((p) => p.path));
+    const queue = [...pages];
+    const add: PageRow[] = [];
+    const blocking: MissingLink[] = [];
+    const block = (path: string, row: PageRow | null, from: string) => {
+        const was = blocking.find((b) => b.path === path);
+        if (was) was.from.push(from);
+        else blocking.push({ path, row, from: [from] });
+    };
+    // The iterator also reaches pages pushed while it runs: what added pages link to.
+    for (const page of queue) {
+        for (const link of page.deadLinks) block(link, null, page.name);
+        for (const link of page.links) {
+            const row = rows.find((r) => r.path === link);
+            if (!row || row.state === "live" || going.has(link)) continue;
+            if (canDo("publish", row.state) && !row.blocked.length) {
+                going.add(link);
+                add.push(row);
+                queue.push(row);
+            } else block(link, row, page.name);
+        }
+    }
+    return { add, blocking };
+}
+
+const NOT_LIVE: Record<Exclude<RowState, "live">, string> = {
+    draft: "not published",
+    unpublished: "taken off",
+    archived: "archived",
+};
+
+/** The Publish dialog's warning: each page linked to that isn't live, with its state and the fix. */
+export function linkWords(
+    links: { add: readonly PageRow[]; blocking: readonly MissingLink[] },
+    pages: readonly PageRow[],
+): { title: string; lines: string[]; button: string | null } | null {
+    const { add, blocking } = links;
+    if (!add.length && !blocking.length) return null;
+    const linkedFrom = (path: string) =>
+        [...pages, ...add]
+            .filter((p) => p.links.includes(path))
+            .map((p) => p.name)
+            .join(", ");
+    const lines = [
+        ...add.map(
+            (r) =>
+                `${r.name} (${r.path}) is ${NOT_LIVE[r.state as Exclude<RowState, "live">]}. ${linkedFrom(r.path)} links to it.`,
+        ),
+        ...blocking.map((b) => {
+            const from = b.from.join(", ");
+            if (!b.row)
+                return `${from} links to ${b.path}. This link goes to a page that doesn't exist. Fix the link in the code, then publish.`;
+            const was = `${b.row.name} (${b.path}) is ${NOT_LIVE[b.row.state as Exclude<RowState, "live">]}, and ${from} links to it.`;
+            return b.row.state === "archived"
+                ? `${was} Restore it first, then publish it with this.`
+                : `${was} It can't be published until its checks pass: ${b.row.blocked.join(", ")}. Fix them first.`;
+        }),
+    ];
+    return {
+        title: "Links to pages that aren't live",
+        lines,
+        button: add.length ? "Publish these too" : null,
+    };
+}
+
+/** Where a taken-off page's links go meanwhile, in words. */
+function takenOffTo(kind: PageKind): string {
+    if (kind === "for") return "its family page";
+    if (kind === "tools") return "the /tools list";
+    return `the ${DOC_KINDS.find((k) => k.id === kind)?.hubLabel ?? "Saroh"} list`;
+}
+
+/** Unpublish and Archive: the live pages that link to these, and where their links go meanwhile. Never blocks. */
+export function linkedFromWords(
+    pages: readonly PageRow[],
+    rows: readonly PageRow[],
+): string | null {
+    const off = new Set(pages.map((p) => p.path));
+    const linking = rows.filter(
+        (r) =>
+            r.state === "live" &&
+            !off.has(r.path) &&
+            r.links.some((l) => off.has(l)),
+    );
+    if (!linking.length) return null;
+    const n = linking.length;
+    const one = pages.length === 1;
+    const kinds = new Set(pages.map((p) => p.kind));
+    const to =
+        kinds.size === 1
+            ? takenOffTo(pages[0].kind)
+            : "the list above each page";
+    return `${n === 1 ? "1 live page links" : `${n} live pages link`} here (${linking.map((r) => r.name).join(", ")}); their links will go to ${to} until you publish ${one ? "it" : "them"} again.`;
 }
 
 /** A row's ⋯ menu, past Open details and Read it: what can be done to it. */
@@ -270,8 +518,6 @@ export function rowActions(
     state: RowState,
     site: string,
 ): { action: PageAction | null; label: string; danger?: boolean }[] {
-    if (inFlight(state))
-        return [{ action: null, label: "Wait for the rebuild" }];
     if (state === "archived") return [{ action: "restore", label: "Restore" }];
     if (state === "live")
         return [
@@ -306,6 +552,8 @@ export interface DialogPage {
     slug: string;
     family: string;
     state: RowState;
+    /** On the site now (released). */
+    onSite?: boolean;
     /** Free tools (#1253) go to the /tools list, and back to it when taken off. */
     kind?: PageKind;
 }
@@ -314,15 +562,24 @@ export interface DialogPage {
 export const KINDS: { kind: PageKind; label: string; path: string }[] = [
     { kind: "for", label: "Trade pages", path: "/for/" },
     { kind: "tools", label: "Free tools", path: "/tools/" },
+    ...DOC_KINDS.map((k) => ({
+        kind: k.id,
+        label: k.hubLabel,
+        path: k.prefix,
+    })),
 ];
 
 export const kindOf = (asked: string | undefined): PageKind =>
-    asked === "tools" ? "tools" : "for";
+    KINDS.find((k) => k.kind === asked)?.kind ?? "for";
 
 /** Where a page of this kind is listed on the site. */
 const LIST_WORDS: Record<PageKind, string> = {
     for: "the /for/ list and the footer",
     tools: "the /tools list, the Tools menu and the footer",
+    ...(Object.fromEntries(DOC_KINDS.map((k) => [k.id, k.listWords])) as Record<
+        DocKindId,
+        string
+    >),
 };
 
 export interface DialogWords {
@@ -352,14 +609,18 @@ export function dialogWords(
     const these = one ? "this page" : "these pages";
     const count = one ? "page" : `${n} pages`;
     const tools = pages.length > 0 && pages.every((p) => p.kind === "tools");
-    const listed = LIST_WORDS[tools ? "tools" : "for"];
+    const kind = first?.kind ?? "for";
+    const listed =
+        LIST_WORDS[
+            pages.every((p) => (p.kind ?? "for") === kind) ? kind : "for"
+        ];
     switch (action) {
         case "publish":
             return {
                 title: `Publish ${what} on ${site}?`,
                 confirm: `Publish ${count}`,
                 points: [
-                    `${site} rebuilds with ${these}. It takes a few minutes.`,
+                    `Nothing changes on ${site} yet. ${one ? "It goes" : "They go"} live when changes are deployed, with every other change waiting.`,
                     `${one ? "It goes" : "They go"} into the sitemap, ${listed}, so Google can find ${one ? "it" : "them"}.`,
                     checks > 0
                         ? `${checks === 1 ? "One check needs" : `${checks} checks need`} you: see "Checked before you publish".`
@@ -377,7 +638,7 @@ export function dialogWords(
                 title: `Take ${what} off ${site}?`,
                 confirm: `Unpublish ${count}`,
                 points: [
-                    `${site} rebuilds without ${one ? "it" : "them"}, and ${one ? "it leaves" : "they leave"} the sitemap and ${tools ? "the /tools list" : "the /for/ list"}.`,
+                    `${one ? "It stays" : "They stay"} on ${site} until changes are deployed. Then ${one ? "it leaves" : "they leave"} the sitemap and ${tools ? "the /tools list" : "the /for/ list"}.`,
                     tools
                         ? `Anyone opening ${one ? "the old link" : "an old link"} is sent to /tools (or Home while no tool is live), not an error.`
                         : one
@@ -390,15 +651,15 @@ export function dialogWords(
             };
         }
         case "archive": {
-            const live = pages.filter((p) => isLive(p.state)).length;
+            const live = pages.filter((p) => p.onSite).length;
             return {
                 title: `Archive ${what}?`,
                 confirm: `Archive ${count}`,
                 points: [
                     live > 0
                         ? one
-                            ? `It's live now. ${site} rebuilds and takes it off first.`
-                            : `${live} ${live === 1 ? "is" : "are"} live now. ${site} rebuilds and takes ${live === 1 ? "it" : "them"} off first.`
+                            ? `It's live now. It comes off ${site} when changes are deployed.`
+                            : `${live} ${live === 1 ? "is" : "are"} live now. ${live === 1 ? "It comes" : "They come"} off ${site} when changes are deployed.`
                         : `Nothing changes on ${site}. ${one ? "It isn't" : "They aren't"} live.`,
                     `${one ? "It leaves" : "Archived pages leave"} this list and can't be published until you restore ${one ? "it" : "them"}.`,
                     "The words stay in the code; nothing is deleted.",
@@ -421,11 +682,12 @@ export function dialogWords(
     }
 }
 
-const PAST: Record<PageAction, string> = {
+const PAST: Record<PageAction | "deploy", string> = {
     publish: "published",
     unpublish: "unpublished",
     archive: "archived",
     restore: "restored",
+    deploy: "deployed",
 };
 
 /**
@@ -442,58 +704,103 @@ export function refusalWords(
     return `${names.join(", ")} can't be ${PAST[action]} from where ${one ? "it is" : "they are"} now. Someone may have just changed ${one ? "it" : "them"}. Nothing was changed: close this to see the list as it is.`;
 }
 
-/** The toast after an action worked. */
+/** The toast after an action worked: staged, waiting for Deploy changes. */
 export function successWords(
     action: PageAction,
     n: number,
-    rebuildQueued: boolean,
     site: string,
 ): { title: string; description?: string } {
     const pages = n === 1 ? "the page" : `${n} pages`;
-    const rebuilding = rebuildQueued
-        ? `${site} is rebuilding.`
-        : `${site} can't rebuild from here (no deploy is set up), so it changes with the next deploy.`;
     switch (action) {
         case "publish":
-            return { title: `Publishing ${pages}.`, description: rebuilding };
-        case "unpublish":
-            return { title: `Taking ${pages} off.`, description: rebuilding };
-        case "archive":
             return {
-                title: `Archived ${pages}.`,
-                description: rebuildQueued ? rebuilding : undefined,
+                title: `Published ${pages}.`,
+                description: `Deploy changes to put ${n === 1 ? "it" : "them"} on ${site}.`,
             };
+        case "unpublish":
+            return {
+                title: `Took ${pages} off.`,
+                description: `Deploy changes to take ${n === 1 ? "it" : "them"} off ${site}.`,
+            };
+        case "archive":
+            return { title: `Archived ${pages}.` };
         case "restore":
             return { title: `Restored ${pages} as a draft.` };
     }
 }
 
-/** The rebuild banner's middle sentence: how many go live or come off. */
-export function rebuildWords(rows: readonly PageRow[]): string {
-    const on = rows.filter((r) => r.state === "publishing").length;
-    const off = rows.filter((r) => r.state === "unpublishing").length;
-    const parts = [
-        on ? `${on} ${on === 1 ? "page is" : "pages are"} going live` : "",
-        off ? `${off} coming off` : "",
-    ].filter(Boolean);
-    return parts.length ? `${parts.join(", ")}.` : "";
+/** The rebuild banner's middle sentence: how many pages it carries, when known. */
+export function rebuildWords(rebuild: Rebuild): string {
+    const n = rebuild.paths?.length ?? 0;
+    if (n === 0) return "";
+    return `${n} ${n === 1 ? "page changes" : "pages change"} in it.`;
 }
 
-/** "Where it shows on <site>": four places, each on or off. */
+/** The deploy bar and its confirm (R13): every staged change, in one rebuild. */
+export function deployWords(
+    rows: readonly Pick<PageRow, "pending">[],
+    site: string,
+): {
+    title: string;
+    on: number;
+    off: number;
+    dialogTitle: string;
+    points: string[];
+} {
+    const on = rows.filter((r) => r.pending === "on").length;
+    const off = rows.filter((r) => r.pending === "off").length;
+    const n = on + off;
+    const changes = `${n} ${n === 1 ? "change" : "changes"}`;
+    return {
+        title: n
+            ? `${changes} waiting to deploy`
+            : "No changes waiting to deploy",
+        on,
+        off,
+        dialogTitle: `Deploy ${changes} to ${site}?`,
+        points: [
+            `${site} rebuilds once with every change below. It takes a few minutes.`,
+            on
+                ? `${on} ${on === 1 ? "page goes" : "pages go"} live, into the sitemap and the lists.`
+                : "",
+            off
+                ? `${off} ${off === 1 ? "page comes" : "pages come"} off. Old links send people to the page above them, not an error.`
+                : "",
+        ].filter(Boolean),
+    };
+}
+
+/** The toast after Deploy changes worked. */
+export function deployedWords(
+    n: number,
+    rebuildQueued: boolean,
+    site: string,
+): { title: string; description: string } {
+    return {
+        title: `Deploying ${n} ${n === 1 ? "change" : "changes"}.`,
+        description: rebuildQueued
+            ? `${site} is rebuilding.`
+            : `${site} can't rebuild from here (no deploy is set up), so they go out with the next deploy.`,
+    };
+}
+
+/** "Where it shows on <site>": four places, each on or off, as released. */
 export function whereItShows(
-    state: RowState,
+    row: Pick<PageRow, "onSite" | "pending">,
     site: string,
     kind: PageKind = "for",
 ): { label: string; on: boolean; value: string }[] {
-    const live = isLive(state);
+    const live = row.onSite;
     return [
         {
             label: "The page itself",
             on: live,
             value: live
-                ? "Live"
-                : state === "publishing"
-                  ? "After this rebuild"
+                ? row.pending === "off"
+                    ? "Live until changes are deployed"
+                    : "Live"
+                : row.pending === "on"
+                  ? "After changes are deployed"
                   : `Not on ${site}`,
         },
         { label: "Sitemap", on: live, value: live ? "Listed" : "Not listed" },
@@ -501,7 +808,9 @@ export function whereItShows(
             label:
                 kind === "tools"
                     ? "The /tools list, the menu and the footer"
-                    : "The /for/ list and the footer",
+                    : kind === "for"
+                      ? "The /for/ list and the footer"
+                      : `The${LIST_WORDS[kind].slice("the".length)}`,
             on: live,
             value: live ? "Linked" : "Not linked",
         },
@@ -536,11 +845,16 @@ export function historyWords(
     const who =
         event.by?.name ?? (event.by ? "someone" : "a former staff member");
     const verb =
-        event.action in PAST ? PAST[event.action as PageAction] : event.action;
+        event.action in PAST
+            ? PAST[event.action as keyof typeof PAST]
+            : event.action;
     const what = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} by ${who}`;
     let detail = `Was ${STATUS_WORD[event.fromStatus]}, now ${STATUS_WORD[event.toStatus]}.`;
-    if (event.toStatus === "LIVE") detail += ` Put on ${site}.`;
-    else if (event.fromStatus === "LIVE") detail += ` Taken off ${site}.`;
+    // Since R13 only a deploy changes the site; older rows are left unsaid.
+    if (event.action === "deploy") {
+        if (event.toStatus === "LIVE") detail += ` Put on ${site}.`;
+        else if (event.fromStatus === "LIVE") detail += ` Taken off ${site}.`;
+    }
     return { when: formatDateTime(event.at), what, detail };
 }
 

@@ -1,3 +1,4 @@
+import { checkList } from "./check-list";
 import type { SearchPageCheck } from "./checks";
 import { emailsIn, NOT_AVAILABLE } from "./checks";
 import type { ToolPageData } from "./tool-schema";
@@ -45,20 +46,7 @@ const TOOL_BAND_NOT_AVAILABLE = [
 ];
 
 export function toolChecks(p: ToolPageData): SearchPageCheck[] {
-    const out: SearchPageCheck[] = [];
-    const add = (
-        id: string,
-        title: string,
-        problems: string[],
-        severity: SearchPageCheck["severity"] = "error",
-    ) =>
-        out.push({
-            id,
-            ok: problems.length === 0,
-            title,
-            detail: problems.join(" "),
-            severity,
-        });
+    const { out, add } = checkList();
 
     add("intro", "It has a headline and a line under it", [
         ...(p.h1.trim() ? [] : ["The h1 is empty."]),

@@ -1,6 +1,5 @@
-import { parse as parseYaml } from "yaml";
-
 import { SOURCES, TOOL_SOURCES } from "./content.gen";
+import { splitFile } from "./frontmatter";
 import type {
     ForPageEntry,
     Question,
@@ -12,8 +11,7 @@ import type {
 import { frontmatterSchema } from "./schema";
 import type { ToolPageData } from "./tool-schema";
 import { toolFrontmatterSchema } from "./tool-schema";
-
-const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+import { checkUnique } from "./unique";
 
 /**
  * The questions under the frontmatter: `## question`, then the answer's
@@ -67,37 +65,6 @@ export function parseQuestions(
     return questions;
 }
 
-/** A file's frontmatter checked against `schema` (its slug must be the file's name), and the body under it. */
-function splitFile<T extends { slug: string }>(
-    file: string,
-    source: string,
-    schema: {
-        safeParse: (v: unknown) =>
-            | { success: true; data: T }
-            | {
-                  success: false;
-                  error: {
-                      issues: { path: PropertyKey[]; message: string }[];
-                  };
-              };
-    },
-): { data: T; body: string } {
-    const match = FENCE.exec(source);
-    if (!match) throw new Error(`${file}: no frontmatter`);
-    const parsed = schema.safeParse(parseYaml(match[1] ?? ""));
-    if (!parsed.success) {
-        const lines = parsed.error.issues.map(
-            (i) =>
-                `  ${i.path.map(String).join(".") || "(root)"}: ${i.message}`,
-        );
-        throw new Error(`${file}: frontmatter is wrong\n${lines.join("\n")}`);
-    }
-    const name = file.replace(/^.*\//, "").replace(/\.mdx$/, "");
-    if (parsed.data.slug !== name)
-        throw new Error(`${file}: slug says ${parsed.data.slug}`);
-    return { data: parsed.data, body: source.slice(match[0].length) };
-}
-
 /** One file's text, checked: its frontmatter against the schema, its questions. */
 export function parseSearchPage(file: string, source: string): SearchPageData {
     const { data, body } = splitFile(file, source, frontmatterSchema);
@@ -145,28 +112,6 @@ export function allToolPages(): ToolPageData[] {
 
 export const familySlug = (family: string) =>
     family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-/**
- * Pages of every kind must not share a slug (the admin's detail address is
- * `/search-pages/<slug>`) nor a search (two pages would compete for it).
- */
-function checkUnique(entries: readonly SearchPageEntry[]): void {
-    const slugs = new Map<string, string>();
-    const searches = new Map<string, string>();
-    for (const p of entries) {
-        const otherSlug = slugs.get(p.slug);
-        if (otherSlug)
-            throw new Error(
-                `${p.path} and ${otherSlug} share the slug "${p.slug}"`,
-            );
-        slugs.set(p.slug, p.path);
-        const key = p.search.toLowerCase();
-        const other = searches.get(key);
-        if (other)
-            throw new Error(`${p.path} and ${other} both answer "${p.search}"`);
-        searches.set(key, p.path);
-    }
-}
 
 function forEntries(): ForPageEntry[] {
     return allSearchPages().map((p) => ({
