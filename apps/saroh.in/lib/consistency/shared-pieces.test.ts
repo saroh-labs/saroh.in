@@ -376,8 +376,6 @@ const RULES: Rule[] = [
             /\bsp-(?:hp|hc|fchips?)(?:-[\w-]+)?\b|\b(?:sp|tp)-hub-(?:list|grid)\b/,
         home: ["src/components/hub-page.tsx"],
         allow: {
-            "src/components/for-hub.tsx":
-                "follow-up (plan 2026-10-31-002, Deferred): /for moves onto HubCards once the owner has seen the look change",
             "src/components/tools-hub.tsx":
                 "follow-up (plan 2026-10-31-002, Deferred): /tools moves onto HubCards once the owner has seen the look change",
         },

@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@saroh/ui/wordmark";
-import { ArrowRight, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,6 +18,7 @@ import { ring } from "@/lib/ring";
 import { ButtonLink, buttonClasses } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { useFocusTrap } from "../layout/use-focus-trap";
+import { TextLink } from "../links/text-link";
 import { ColumnHeading } from "./column-heading";
 import type { MenuLink, NavItem, NavSection } from "./nav-section";
 import { ABOUT_LINKS, menuColumns } from "./nav-section";
@@ -170,14 +171,14 @@ export function MobileSheet({
                             Back
                         </button>
                         {opened.seeAll ? (
-                            <Link
+                            <TextLink
                                 href={opened.seeAll.href}
+                                arrow
                                 onClick={onClose}
-                                className={`flex h-11 items-center gap-1 rounded-lg font-semibold text-brand-700 no-underline hover:text-brand-700 ${ring()}`}
+                                className="flex h-11 items-center gap-1 font-semibold"
                             >
                                 {opened.seeAll.name}
-                                <ArrowRight aria-hidden className="size-4" />
-                            </Link>
+                            </TextLink>
                         ) : null}
                     </div>
                     <div
@@ -225,14 +226,15 @@ export function MobileSheet({
                         {opened.links ? (
                             <div className="flex flex-wrap gap-x-1 border-t border-border pt-2">
                                 {opened.links.map((link) => (
-                                    <Link
+                                    <TextLink
                                         key={link.href}
                                         href={link.href}
+                                        tone="quiet"
                                         onClick={onClose}
-                                        className={`flex h-11 items-center rounded-lg px-2.5 text-mk-note text-muted-foreground no-underline first:-ml-2.5 hover:text-foreground ${ring()}`}
+                                        className="flex h-11 items-center px-2.5 text-mk-note first:-ml-2.5"
                                     >
                                         {link.name}
-                                    </Link>
+                                    </TextLink>
                                 ))}
                             </div>
                         ) : null}

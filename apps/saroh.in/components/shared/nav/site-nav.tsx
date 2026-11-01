@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@saroh/ui/wordmark";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
@@ -22,6 +22,7 @@ import { nextIndex } from "@/lib/roving";
 import { ButtonLink } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { IntentLink } from "../links/intent-link";
+import { TextLink } from "../links/text-link";
 import { ColumnHeading } from "./column-heading";
 import { MobileMenu } from "./mobile-menu";
 import type { MenuLink, NavItem, NavMenus, NavSection } from "./nav-section";
@@ -416,29 +417,26 @@ function Menu({
                     {seeAll || links.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-2.5 pb-0.5 pt-2.5 text-mk-note">
                             {seeAll ? (
-                                <Link
+                                <TextLink
                                     role="menuitem"
                                     href={seeAll.href}
-                                    className={`inline-flex items-center gap-1 rounded font-semibold text-brand-700 no-underline hover:text-brand-700 hover:underline ${ring()}`}
+                                    arrow
+                                    className="inline-flex items-center gap-1 font-semibold"
                                 >
                                     {seeAll.name}
-                                    <ArrowRight
-                                        aria-hidden
-                                        className="size-3.5"
-                                    />
-                                </Link>
+                                </TextLink>
                             ) : null}
                             {links.length > 0 ? (
                                 <span className="ml-auto flex flex-wrap gap-x-5">
                                     {links.map((link) => (
-                                        <Link
+                                        <TextLink
                                             key={link.href}
                                             role="menuitem"
                                             href={link.href}
-                                            className={`rounded text-muted-foreground no-underline hover:text-foreground ${ring()}`}
+                                            tone="quiet"
                                         >
                                             {link.name}
-                                        </Link>
+                                        </TextLink>
                                     ))}
                                 </span>
                             ) : null}
