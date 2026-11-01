@@ -6317,3 +6317,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the dialog no longer calls `router.refresh()`; the action's revalidation redraws the list (`components/invoices/details/invoice-actions.tsx`).
 **Rule**: after a server action that revalidates the page, don't also call `router.refresh()`. About 170 files in app.saroh.in call it; the ones paired with a revalidating action are a follow-up sweep. To reproduce such races, throttle the CPU (CDP) in a throwaway spec.
 **Category**: frontend · Next navigation
+
+## A new loading.tsx made browser specs see every control twice
+
+**Symptom**: 1 Nov, the batch gate failed five admin specs (Users' search, Team's "Show permission codes", and a flaky "Not authorized") with "strict mode violation: … resolved to 2 elements". Only on the production build; dev never showed it.
+**Cause**: the console-wide audit fix added `loading.tsx` to every admin section and the root. With a loading boundary, Next streams the page, and React 19.2 keeps the finished page in a hidden container for a moment before revealing it (and may draw a client copy beside it). The specs found controls by placeholder, label or text, which count hidden elements, so they saw two.
+**Fix**: the specs find them by role (`getByRole("searchbox" | "switch" | "heading", { name })`), which leaves hidden elements out. People never see the hidden copy.
+**Rule**: in browser specs, find a control by its role and name; placeholder, label and text lookups also match the hidden copy of a streaming page. Reproduce on a production build (`next build && portless <name> next start`), not `next dev`.
+**Category**: testing · Next streaming

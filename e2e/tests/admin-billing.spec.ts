@@ -110,7 +110,7 @@ test("a business's owner is refused Billing", async ({ page }) => {
     await useSession(page, "owner");
     await page.goto(`${ADMIN}/billing/subscriptions`);
     await expect(
-        page.getByText("Not authorized", { exact: true }),
+        page.getByRole("heading", { name: "Not authorized", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("searchbox")).toHaveCount(0);
 });

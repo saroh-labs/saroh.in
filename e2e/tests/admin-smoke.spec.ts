@@ -62,7 +62,7 @@ test.describe("the operator console", () => {
         await page.goto(`${ADMIN}/`);
 
         await expect(
-            page.getByText("Not authorized", { exact: true }),
+            page.getByRole("heading", { name: "Not authorized", exact: true }),
         ).toBeVisible();
         await expect(
             page.getByText(
