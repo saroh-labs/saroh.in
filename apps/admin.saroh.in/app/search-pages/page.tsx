@@ -1,7 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
-import { Notice } from "@saroh/ui/notice";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
+import { TabStrip } from "@saroh/ui/tabs";
 
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
@@ -10,6 +10,7 @@ import { RebuildBanner } from "@/components/search-pages/rebuild-banner";
 import { SearchPagesTable } from "@/components/search-pages/search-pages-table";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { can } from "@/lib/console";
+import type { PageKind } from "@/lib/search-page-words";
 import { KINDS, kindOf, rebuildWords } from "@/lib/search-page-words";
 import { readSearchPages, searchPagesGate, siteInfo } from "@/lib/search-pages";
 
@@ -48,7 +49,7 @@ export default async function SearchPagesPage({
                 <PageHeader
                     breadcrumb={["Product", "Search pages"]}
                     title="Search pages"
-                    description={`Pages written for people who search Google: software for their trade, or a free tool. A page is on ${site.host} only after you publish it here and deploy the changes. Only published pages go in the sitemap.${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
+                    description={`Pages for people who search Google. Publish, then deploy the changes, to put one on ${site.host} and its sitemap.${site.production ? "" : " Development: every page shows here with a Draft label, and production is never touched."}${canPublish ? "" : " Read-only: your role doesn't include publishing them."}`}
                     meta={
                         <Badge
                             dot
@@ -59,17 +60,47 @@ export default async function SearchPagesPage({
                         </Badge>
                     }
                 />
-                <div className="grid gap-4">
-                    {!site.production && (
-                        <Notice
-                            tone="info"
-                            title="This is the development site."
-                        >
-                            Every page shows on {site.host} so you can read it,
-                            with a Draft label until it&apos;s published.
-                            Publishing here changes {site.host} only, never
-                            production.
-                        </Notice>
+                {/* One shrinkable column: the tabs scroll on a phone instead of widening the page. */}
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+                    {data.status === "ok" && (
+                        <TabStrip<PageKind>
+                            label="Kind of page"
+                            className="min-w-0"
+                            value={kind}
+                            tabs={KINDS.map((k) => {
+                                const mine = data.rows.filter(
+                                    (r) => r.kind === k.kind,
+                                );
+                                const live = mine.filter(
+                                    (r) => r.onSite,
+                                ).length;
+                                return {
+                                    value: k.kind,
+                                    label: k.label,
+                                    href:
+                                        k.kind === "for"
+                                            ? "/search-pages"
+                                            : `/search-pages?kind=${k.kind}`,
+                                    count: mine.length,
+                                    extra: (
+                                        <>
+                                            {live > 0 && (
+                                                <span className="text-[11.5px] font-medium text-success-subtle-foreground">
+                                                    {live} live
+                                                </span>
+                                            )}
+                                            {mine.some((r) => r.pending) && (
+                                                <span
+                                                    aria-label="Changes waiting to deploy"
+                                                    title="Changes waiting to deploy"
+                                                    className="size-1.5 rounded-full bg-warning"
+                                                />
+                                            )}
+                                        </>
+                                    ),
+                                };
+                            })}
+                        />
                     )}
                     {data.status === "failed" ? (
                         <FailedPanel things="search pages" />
@@ -101,14 +132,6 @@ export default async function SearchPagesPage({
                             <SearchPagesTable
                                 key={kind}
                                 kind={kind}
-                                kindCounts={Object.fromEntries(
-                                    KINDS.map((k) => [
-                                        k.kind,
-                                        data.rows.filter(
-                                            (r) => r.kind === k.kind,
-                                        ).length,
-                                    ]),
-                                )}
                                 rows={data.rows.filter((r) => r.kind === kind)}
                                 allRows={data.rows}
                                 site={site.host}

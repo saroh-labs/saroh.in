@@ -11,20 +11,27 @@ import {
     deployWords,
     dialogWords,
     eligible,
+    groupRows,
     heldWords,
     historyWords,
     inFilter,
     kindOf,
     KINDS,
     linkedFromWords,
+    listHref,
     listWordsFor,
     matchesQuery,
     mergePages,
+    nextAction,
     publishLinks,
+    readListQuery,
     rebuildWords,
     refusalWords,
     rowActions,
+    rowNote,
+    searchRepeatsName,
     siteOf,
+    sortRows,
     stateNote,
     stateOf,
     successWords,
@@ -759,5 +766,121 @@ describe("why a page can't be published (U14)", () => {
         expect(doc.why).toEqual(held.why);
         expect(stateNote(forPage)).toBe("Never published");
         expect(forPage.why).toEqual([]);
+    });
+});
+
+describe("the list's address, order and groups (Search pages list, 1 Nov)", () => {
+    const at = (
+        name: string,
+        family: string,
+        extra: Partial<PageRow> = {},
+    ): PageRow => ({
+        path: `/tools/${name}`,
+        slug: name,
+        kind: "tools",
+        name,
+        family,
+        inApp: false,
+        search: name,
+        updated: "2026-10-26",
+        state: "draft",
+        onSite: false,
+        pending: null,
+        record: null,
+        blocked: [],
+        links: [],
+        deadLinks: [],
+        ...extra,
+    });
+
+    it("reads the filters from the address and writes back only what isn't the default", () => {
+        const q = readListQuery((k) =>
+            new URLSearchParams(
+                "status=draft&q=qr&section=QR+codes&group=none&sort=bogus",
+            ).get(k),
+        );
+        expect(q).toEqual({
+            status: "draft",
+            q: "qr",
+            section: "QR codes",
+            group: "none",
+            sort: "name",
+        });
+        expect(listHref("tools", q)).toBe(
+            "/search-pages?kind=tools&status=draft&q=qr&section=QR+codes&group=none",
+        );
+        expect(
+            listHref(
+                "for",
+                readListQuery(() => null),
+            ),
+        ).toBe("/search-pages");
+    });
+
+    it("sorts by name, not by address, and newest change first on asking", () => {
+        const rows = [
+            at("Menu QR", "QR"),
+            at("Google review QR", "QR", { updated: "2026-10-30" }),
+        ];
+        expect(sortRows(rows, "name").map((r) => r.name)).toEqual([
+            "Google review QR",
+            "Menu QR",
+        ]);
+        expect(sortRows(rows, "changed")[0]?.name).toBe("Google review QR");
+    });
+
+    it("groups by section A to Z, or by status with waiting first", () => {
+        const rows = [
+            at("a", "QR codes", { state: "live", onSite: true }),
+            at("b", "Money", { pending: "on" }),
+            at("c", "QR codes"),
+        ];
+        expect(groupRows(rows, "section").map((g) => g.label)).toEqual([
+            "Money",
+            "QR codes",
+        ]);
+        expect(
+            groupRows(rows, "status").map((g) => [g.label, g.rows.length]),
+        ).toEqual([
+            ["Waiting to deploy", 1],
+            ["Live", 1],
+            ["Draft", 1],
+        ]);
+        expect(groupRows(rows, "none")).toHaveLength(1);
+    });
+
+    it("says only what's worth saying under a status, and offers one next step", () => {
+        expect(rowNote(at("a", "x"))).toBeNull();
+        const held = at("b", "x", {
+            blocked: ["Every fact is confirmed"],
+            why: ["6 facts to confirm"],
+        });
+        expect(rowNote(held)).toBe("Can't publish yet: 6 facts to confirm");
+        expect(nextAction(held)).toBeNull();
+        expect(nextAction(at("c", "x"))?.action).toBe("publish");
+        expect(nextAction(at("d", "x", { pending: "on" }))?.action).toBe(
+            "cancel",
+        );
+        expect(nextAction(at("e", "x", { state: "archived" }))?.action).toBe(
+            "restore",
+        );
+        expect(
+            nextAction(at("f", "x", { state: "live", onSite: true })),
+        ).toBeNull();
+    });
+
+    it("knows when the search phrase only repeats the name", () => {
+        expect(
+            searchRepeatsName({
+                name: "GST calculator",
+                search: "gst calculator",
+            }),
+        ).toBe(true);
+        expect(
+            searchRepeatsName({
+                name: "Gyms & studios",
+                search: "gym software",
+            }),
+        ).toBe(false);
     });
 });

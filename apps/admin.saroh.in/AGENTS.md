@@ -388,6 +388,15 @@ recorded grant (the API refuses it otherwise).
   this change (row ⋯, page ⋯, each bar row; `cancel` on `POST …/actions`,
   DEC-201 amendment 1 Nov) puts a staged page back to its released status. While the API says a rebuild runs,
   the bar says so, Deploy changes waits, and the screen re-reads every 20s.
+  The list (owner's Mock 1, 1 Nov): kinds are page tabs (count, "N live",
+  a dot when changes wait), then status chips, a Section select, Group
+  (Section · Status · None) and Sort (Name A–Z · Recently changed), all in
+  the address (`readListQuery`/`listHref`, replaceState) so Back and a
+  reload keep them. Rows group by section, A–Z by name (the code's order
+  is by address), each group folding and ticking as one; a row shows Read ↗
+  and its one next step (`nextAction`) on hover or focus, always on a
+  phone; the line under a status is left out when it would only say
+  "Never published", and a blocked page says why (`rowNote`).
   For GST pages, guides and downloads, Publish is disabled (one page or a
   selection) while an error-level check fails, naming it, and a live page
   that fails them shows "Held by checks": the site build leaves it out

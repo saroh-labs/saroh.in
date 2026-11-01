@@ -55,6 +55,27 @@ export function DeployBar({
     const [cancelling, setCancelling] = useState<PageRow | null>(null);
     useRebuildPoll(rebuilding);
     if (rows.length === 0 && !canPublish) return null;
+    // Nothing waiting and nothing building: one quiet line, so the list starts sooner.
+    if (rows.length === 0 && !rebuilding)
+        return (
+            <section
+                id={DEPLOY_BAR_ID}
+                tabIndex={-1}
+                aria-label="Deploy changes"
+                className="flex scroll-mt-20 items-center gap-3 rounded-xl border bg-card py-1.5 pl-4 pr-1.5 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <span>No changes waiting to deploy</span>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto"
+                    disabled
+                >
+                    Deploy changes
+                </Button>
+            </section>
+        );
     const words = deployWords(rows, site);
     const list = (
         <ul aria-label="Changes waiting" className="grid">

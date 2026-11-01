@@ -28,7 +28,10 @@ vi.mock("@/lib/search-page-actions", () => ({
     deploySearchPages: () => deploySearchPages() as unknown,
 }));
 const refresh = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh }),
+    useSearchParams: () => new URLSearchParams(),
+}));
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
@@ -73,36 +76,61 @@ const table = (canPublish: boolean) =>
     );
 
 describe("SearchPagesTable (DEC-193)", () => {
-    it("chooses between trade pages and free tools by address, with a count each (#1253)", () => {
+    it("groups the rows by section, A to Z by name, and folds a group", () => {
+        const tool = (slug: string, name: string, family: string): PageRow => ({
+            ...row(slug, "draft"),
+            kind: "tools",
+            path: `/tools/${slug}`,
+            name,
+            family,
+        });
         render(
             <SearchPagesTable
                 kind="tools"
-                kindCounts={{ for: 34, tools: 3 }}
-                rows={[{ ...row("no-show", "draft"), kind: "tools" }]}
+                rows={[
+                    tool("review-qr", "Google review QR", "QR codes"),
+                    tool("bill", "Bill of supply", "Billing and GST"),
+                    tool("menu-qr", "Menu QR", "QR codes"),
+                ]}
                 site="saroh.in"
                 reviewSite="saroh.io"
                 reviewUrl="https://saroh.io"
-                canPublish={false}
+                canPublish
             />,
         );
+        const list = screen.getByRole("list", { name: "Pages" });
+        const names = within(list)
+            .getAllByRole("link")
+            .filter((a) => a.getAttribute("href")?.startsWith("/search-pages/"))
+            .map((a) => a.textContent);
+        expect(names).toEqual([
+            "Bill of supply",
+            "Google review QR",
+            "Menu QR",
+        ]);
+        // The section is the group's header, not a column.
+        expect(screen.queryByText("Section")).toBeNull();
+        const qr = screen.getByRole("button", { name: /QR codes/ });
+        expect(qr.textContent).toContain("2 pages · none live");
+        fireEvent.click(qr);
+        expect(qr.getAttribute("aria-expanded")).toBe("false");
+        // Kept for the next visit, per kind.
         expect(
-            screen
-                .getByRole("link", { name: /Free tools · \/tools\/ · 3/ })
-                .getAttribute("href"),
-        ).toBe("/search-pages?kind=tools");
+            window.localStorage.getItem("saroh:search-pages:folded:tools"),
+        ).toBe('["QR codes"]');
+        expect(screen.queryByRole("link", { name: "Menu QR" })).toBeNull();
+        fireEvent.click(
+            screen.getByLabelText("Select every page in Billing and GST"),
+        );
         expect(
-            screen
-                .getByRole("link", { name: /Trade pages · \/for\/ · 34/ })
-                .getAttribute("href"),
-        ).toBe("/search-pages");
-        expect(screen.getByText("Section")).toBeTruthy();
+            screen.getByRole("region", { name: "Selected pages" }).textContent,
+        ).toContain("1 selected");
     });
 
-    it("lists the new groups in the kind choice, and an empty one draws without a crash (plan 2026-10-31-002)", () => {
+    it("an empty kind draws without a crash (plan 2026-10-31-002)", () => {
         render(
             <SearchPagesTable
                 kind="gst"
-                kindCounts={{ for: 34, tools: 3 }}
                 rows={[]}
                 site="saroh.in"
                 reviewSite="saroh.io"
@@ -110,33 +138,19 @@ describe("SearchPagesTable (DEC-193)", () => {
                 canPublish
             />,
         );
-        expect(
-            screen
-                .getByRole("link", { name: /GST guides · \/gst\/ · 0/ })
-                .getAttribute("href"),
-        ).toBe("/search-pages?kind=gst");
-        expect(
-            screen.getByRole("link", { name: /Guides · \/guides\/ · 0/ }),
-        ).toBeTruthy();
-        expect(
-            screen.getByRole("link", {
-                name: /Free downloads · \/downloads\/ · 0/,
-            }),
-        ).toBeTruthy();
         expect(screen.getByText("No pages here")).toBeTruthy();
     });
 
     it("lists every page that isn't archived, with its status", () => {
         table(false);
-        expect(screen.getByRole("link", { name: /Salons/ })).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Salons" })).toBeTruthy();
         expect(
             within(screen.getByRole("list", { name: "Pages" })).getByText(
                 "Live",
             ),
         ).toBeTruthy();
-        expect(
-            screen.getByText("Never published", { exact: false }),
-        ).toBeTruthy();
+        // Said on nearly every draft, so not said at all.
+        expect(screen.queryByText("Never published")).toBeNull();
         expect(screen.queryByText("Old")).toBeNull();
     });
 
@@ -455,7 +469,6 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
                 .getByRole("button", { name: "Publish 1" })
                 .getAttribute("aria-describedby"),
         ).toBe("publish-held-bulk");
-        expect(screen.getByText("Section")).toBeTruthy();
     });
 
     it("says Can't publish yet under Draft, and why in the row's menu (U14)", () => {
@@ -470,15 +483,19 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
             />,
         );
         const list = screen.getByRole("list", { name: "Pages" });
-        expect(within(list).getAllByText("Can't publish yet")).toHaveLength(1);
-        expect(within(list).getByText("Never published")).toBeTruthy();
+        expect(
+            within(list).getAllByText("Can't publish yet: 2 facts to confirm"),
+        ).toHaveLength(1);
+        expect(within(list).queryByText("Never published")).toBeNull();
         fireEvent.keyDown(screen.getByLabelText("Actions for Salon"), {
             key: "Enter",
         });
         // The menu opens at once on Enter; role queries over it are slow in jsdom.
+        // The row says it too; the menu's copy is the one inside a menu item.
         const item = screen
-            .getByText("Can't publish yet: 2 facts to confirm")
-            .closest('[role="menuitem"]');
+            .getAllByText("Can't publish yet: 2 facts to confirm")
+            .map((el) => el.closest('[role="menuitem"]'))
+            .find(Boolean);
         expect(item?.getAttribute("aria-disabled")).toBe("true");
         // Part of the item's name, so a screen reader and a phone get it.
         expect(item?.textContent).toBe(
@@ -497,7 +514,6 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
                 canPublish
             />,
         );
-        expect(screen.getByText("Never published")).toBeTruthy();
         expect(screen.queryByText(/Can't publish/)).toBeNull();
         fireEvent.keyDown(screen.getByLabelText("Actions for Spas"), {
             key: "Enter",

@@ -337,30 +337,137 @@ export function countBy(rows: readonly PageRow[]): Record<Filter, number> {
     };
 }
 
-/** The stat cards over the list: the same filters as the chips, with a hint each. */
-export function statCards(site: string): {
-    filter: Exclude<Filter, "all">;
-    label: string;
-    hint: string;
-}[] {
-    return [
-        { filter: "live", label: `Live on ${site}`, hint: "In the sitemap" },
-        {
-            filter: "draft",
-            label: "Draft",
-            hint: "Readable on the development site",
-        },
-        {
-            filter: "unpublished",
-            label: "Unpublished",
-            hint: "Taken off, or held back before they went live",
-        },
-        {
-            filter: "archived",
-            label: "Archived",
-            hint: "Hidden, kept in the code",
-        },
-    ];
+export type Grouping = "section" | "status" | "none";
+export type Sorting = "name" | "changed";
+
+/** The list's filters, kept in the address so Back and a reload keep them. */
+export interface ListQuery {
+    status: Filter;
+    q: string;
+    /** One section (a /for/ family, a tool's or doc's hub group); "" is all. */
+    section: string;
+    group: Grouping;
+    sort: Sorting;
+}
+
+const FILTERS_KNOWN: readonly Filter[] = [
+    "all",
+    "live",
+    "waiting",
+    "draft",
+    "unpublished",
+    "archived",
+];
+
+const pickOf = <T extends string>(
+    known: readonly T[],
+    v: string | null,
+    or: T,
+) => known.find((k) => k === v) ?? or;
+
+export function readListQuery(get: (key: string) => string | null): ListQuery {
+    return {
+        status: pickOf(FILTERS_KNOWN, get("status"), "all"),
+        q: get("q") ?? "",
+        section: get("section") ?? "",
+        group: pickOf(["section", "status", "none"], get("group"), "section"),
+        sort: pickOf(["name", "changed"], get("sort"), "name"),
+    };
+}
+
+/** The list's address for a kind and its filters; defaults are left out. */
+export function listHref(kind: PageKind, q: ListQuery): string {
+    const p = new URLSearchParams();
+    if (kind !== "for") p.set("kind", kind);
+    if (q.status !== "all") p.set("status", q.status);
+    if (q.q) p.set("q", q.q);
+    if (q.section) p.set("section", q.section);
+    if (q.group !== "section") p.set("group", q.group);
+    if (q.sort !== "name") p.set("sort", q.sort);
+    const s = p.toString();
+    return `/search-pages${s ? `?${s}` : ""}`;
+}
+
+const byName = (a: PageRow, b: PageRow) =>
+    a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+
+/** By name (the code's order is by address: "Google review QR" sat under R), or newest change first. */
+export function sortRows(rows: readonly PageRow[], sort: Sorting): PageRow[] {
+    return [...rows].sort((a, b) =>
+        sort === "changed"
+            ? b.updated.localeCompare(a.updated) || byName(a, b)
+            : byName(a, b),
+    );
+}
+
+/** Status groups, what needs a deploy first. */
+const STATUS_GROUPS: Exclude<Filter, "all">[] = [
+    "waiting",
+    "live",
+    "draft",
+    "unpublished",
+    "archived",
+];
+
+/** Rows in groups, each group keeping the rows' order; `none` is one group with no name. */
+export function groupRows(
+    rows: readonly PageRow[],
+    group: Grouping,
+): { key: string; label: string | null; rows: PageRow[] }[] {
+    if (group === "none") return [{ key: "all", label: null, rows: [...rows] }];
+    const keyOf = (r: PageRow) =>
+        group === "section"
+            ? r.family
+            : FILTER_LABEL[
+                  r.pending
+                      ? "waiting"
+                      : (STATUS_GROUPS.find(
+                            (f) => f !== "waiting" && inFilter(r, f),
+                        ) ?? "archived")
+              ];
+    const order =
+        group === "status"
+            ? STATUS_GROUPS.map((f) => FILTER_LABEL[f])
+            : [...new Set(rows.map(keyOf))].sort((a, b) =>
+                  a.localeCompare(b, "en"),
+              );
+    return order
+        .map((key) => ({
+            key,
+            label: key,
+            rows: rows.filter((r) => keyOf(r) === key),
+        }))
+        .filter((g) => g.rows.length > 0);
+}
+
+/** The line under a row's status, or null when it would say only "Never published". */
+export function rowNote(row: PageRow): string | null {
+    if (canDo("publish", row.state) && row.blocked.length)
+        return cantPublishWords(row);
+    const note = stateNote(row);
+    return note === "Never published" ? null : note;
+}
+
+const plain = (s: string) =>
+    s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+/** The search phrase only repeats the page's name ("GST calculator", “gst calculator”). */
+export const searchRepeatsName = (row: Pick<PageRow, "name" | "search">) =>
+    plain(row.name) === plain(row.search);
+
+/** The one step a row offers beside its ⋯, or none. */
+export function nextAction(
+    row: PageRow,
+): { action: PageAction; label: string } | null {
+    if (row.pending) return { action: "cancel", label: "Cancel change" };
+    if (row.state === "archived")
+        return { action: "restore", label: "Restore" };
+    if (canDo("publish", row.state) && !row.blocked.length)
+        return { action: "publish", label: "Publish" };
+    return null;
 }
 
 /** A search over the name, the search phrase and the address. */
