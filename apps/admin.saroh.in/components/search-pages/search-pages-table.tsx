@@ -46,7 +46,7 @@ import {
 import { SearchPageDialog } from "./search-page-dialog";
 
 const COLUMNS =
-    "md:grid md:grid-cols-[2.25rem_minmax(0,2fr)_minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1.3fr)_2.5rem] md:items-center md:gap-3";
+    "md:grid md:grid-cols-[2.25rem_minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_10rem_11rem_2.5rem] md:items-center md:gap-3";
 
 const FILTERS: Filter[] = ["all", "live", "draft", "unpublished", "archived"];
 

@@ -61,6 +61,12 @@ recorded grant (the API refuses it otherwise).
   suspension, Cancel deletion or Schedule deletion: the API refuses them. A
   deleted business's deletion trail opens with "Data kept until ‹date›"
   (180 days after it was deleted, `lib/deletion-words.ts`).
+- **Loading and 404 are one piece each** (audits, 1 Nov). A `loading.tsx`
+  above a layout or page that draws `AdminShell` re-exports
+  `components/states/console-loading.tsx` (the frame plus a list, board or
+  record shape picked from the address, `skeletonFor`); one under a layout
+  that already drew the header takes `PanelSkeleton`. A section's
+  `not-found.tsx` passes its words and its list to `ConsoleNotFound`.
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,

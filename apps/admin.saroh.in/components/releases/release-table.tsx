@@ -36,7 +36,7 @@ type Show = ReleaseState | "all";
 
 /** Name · State · Businesses · Last change · the row's ⋯ menu. */
 const COLUMNS =
-    "md:grid md:grid-cols-[minmax(0,2fr)_9rem_8rem_minmax(0,1.4fr)_2.5rem] md:items-center md:gap-4";
+    "md:grid md:grid-cols-[minmax(0,1fr)_9rem_8rem_13rem_2.5rem] md:items-center md:gap-4";
 
 /**
  * Every release as a table (R11): the name a business sees first with the

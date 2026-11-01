@@ -6,6 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { AttentionToggle, ListToolbar } from "@saroh/ui/list-toolbar";
 import { Segmented } from "@saroh/ui/segmented";
+import { StatCard } from "@saroh/ui/stat-card";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -236,7 +237,11 @@ function mergeCards(
 
 function Summary({ board, openCount }: { board: Board; openCount: number }) {
     return (
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div
+            role="group"
+            aria-label="Leads in numbers"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        >
             <Stat term="Open leads" value={openCount} />
             <Stat
                 term="Follow-ups overdue"
@@ -250,7 +255,7 @@ function Summary({ board, openCount }: { board: Board; openCount: number }) {
                     warn={board.unowned > 0}
                 />
             ) : null}
-        </dl>
+        </div>
     );
 }
 
@@ -263,18 +268,13 @@ function Stat({
     value: number;
     warn?: boolean;
 }) {
+    // The console's one stat tile, so its label reads as every other
+    // tile's (help audit, 1 Nov).
     return (
-        <div className="rounded-lg border border-border bg-card px-3 py-2">
-            <dt className="text-xs text-muted-foreground">{term}</dt>
-            <dd
-                className={cn(
-                    "text-lg font-semibold tabular-nums",
-                    warn && "text-warning",
-                )}
-            >
-                {value}
-            </dd>
-        </div>
+        <StatCard
+            label={term}
+            value={<span className={cn(warn && "text-warning")}>{value}</span>}
+        />
     );
 }
 

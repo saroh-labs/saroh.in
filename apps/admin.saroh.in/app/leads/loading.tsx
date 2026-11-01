@@ -1,11 +1,2 @@
-import { PageContainer } from "@saroh/ui/page-container";
-
-import { PanelSkeleton } from "@/components/states/panel-skeleton";
-
-export default function LeadsLoading() {
-    return (
-        <PageContainer width="full">
-            <PanelSkeleton label="Loading leads" rows={5} />
-        </PageContainer>
-    );
-}
+/** The console frame and this page's shape while it loads. */
+export { default } from "@/components/states/console-loading";
