@@ -5,9 +5,16 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
-import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
+import type { Visitor } from "@/lib/browser/session";
+import {
+    ACCOUNT_URL,
+    DASHBOARD_URL,
+    LAUNCH_MODE,
+    SIGN_IN_URL,
+} from "@/lib/links";
 import { ring } from "@/lib/ring";
 
+import { ButtonLink } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { useFocusTrap } from "../layout/use-focus-trap";
 import type { NavItem, NavSection } from "./nav-section";
@@ -26,6 +33,8 @@ export function MobileSheet({
     tools,
     featureItems,
     solutionItems,
+    visitor = null,
+    onSignOut,
     onClose,
 }: {
     section: NavSection;
@@ -34,6 +43,9 @@ export function MobileSheet({
     tools: NavItem[];
     featureItems: NavItem[];
     solutionItems: NavItem[];
+    /** Signed in: who, in place of Sign in, and "Open dashboard". */
+    visitor?: Visitor | null;
+    onSignOut?: () => void;
     onClose: () => void;
 }) {
     const root = useRef<HTMLDivElement>(null);
@@ -112,16 +124,48 @@ export function MobileSheet({
                     Pricing
                 </Link>
             ) : null}
-            {LAUNCH_MODE === "open" ? (
-                <a href={SIGN_IN_URL} className={ROW}>
-                    Sign in
-                </a>
-            ) : null}
-            <CtaLink
-                src="nav-sheet"
-                onNavigate={onClose}
-                className="mt-3 w-full"
-            />
+            {visitor ? (
+                <>
+                    {/* Masked in a session recording. */}
+                    <div
+                        data-ph-mask=""
+                        className="grid gap-0.5 border-t border-border py-3"
+                    >
+                        <span className="truncate text-lg font-semibold">
+                            {visitor.name}
+                        </span>
+                        <span className="truncate text-mk-note text-muted-foreground">
+                            {visitor.email}
+                        </span>
+                    </div>
+                    <a href={ACCOUNT_URL} className={ROW}>
+                        Account
+                    </a>
+                    <button
+                        type="button"
+                        onClick={onSignOut}
+                        className={cn(ROW, "bg-transparent p-0")}
+                    >
+                        Sign out
+                    </button>
+                    <ButtonLink href={DASHBOARD_URL} className="mt-3 w-full">
+                        Open dashboard
+                    </ButtonLink>
+                </>
+            ) : (
+                <>
+                    {LAUNCH_MODE === "open" ? (
+                        <a href={SIGN_IN_URL} className={ROW}>
+                            Sign in
+                        </a>
+                    ) : null}
+                    <CtaLink
+                        src="nav-sheet"
+                        onNavigate={onClose}
+                        className="mt-3 w-full"
+                    />
+                </>
+            )}
         </div>
     );
 }

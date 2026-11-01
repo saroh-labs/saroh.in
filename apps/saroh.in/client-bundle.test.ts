@@ -40,8 +40,10 @@ const CONTENT_MAPS = [
 const NEVER_IN_THE_BROWSER = ["components/shared/nav/nav-items.ts"];
 /** The waitlist form checks its fields with zod in the browser, by design. */
 const ZOD_ON_PURPOSE = new Set(["lib/waitlist-schema.ts"]);
+// An auth library too (1 Nov): the header's session check is a plain fetch
+// (`lib/browser/session.ts`), never Better Auth's client.
 const SERVER_ONLY_PACKAGES =
-    /^import (?!type )[^;]*?from "(zod|@t3-oss\/[^"]+)"/m;
+    /^import (?!type )[^;]*?from "(zod|@t3-oss\/[^"]+|better-auth[^"]*|@saroh\/auth[^"]*)"/m;
 
 function sources(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -160,7 +162,7 @@ function clientEntries(): string[] {
 }
 
 describe("saroh.in's browser JS", () => {
-    it("never loads zod, createEnv or the nav's page copy", () => {
+    it("never loads zod, createEnv, an auth library or the nav's page copy", () => {
         const entries = clientEntries();
         expect(entries.length).toBeGreaterThan(10);
         const found = entries.flatMap((entry) =>

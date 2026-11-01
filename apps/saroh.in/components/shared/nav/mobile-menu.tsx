@@ -4,8 +4,11 @@ import { cn } from "@/lib/cn";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
+import type { Visitor } from "@/lib/browser/session";
+import { DASHBOARD_URL } from "@/lib/links";
 import { ring } from "@/lib/ring";
 
+import { ButtonLink } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import type { NavItem, NavSection } from "./nav-section";
 
@@ -20,7 +23,8 @@ const MobileSheet = dynamic(
  * any page is live) Resources and Tools as accordions — the section the page is in
  * starts open — then Pricing and Sign in (once the launch switch is open)
  * and the start button. Esc or × closes it and returns focus to Menu; while
- * it is open, focus stays inside.
+ * it is open, focus stays inside. Signed in, the start button is "Open
+ * dashboard" and the sheet's Sign in is the visitor, Account and Sign out.
  */
 export function MobileMenu({
     section,
@@ -29,6 +33,8 @@ export function MobileMenu({
     solutions,
     resources = [],
     tools = [],
+    visitor = null,
+    onSignOut,
     className,
 }: {
     section: NavSection;
@@ -37,6 +43,8 @@ export function MobileMenu({
     solutions: NavItem[];
     resources?: NavItem[];
     tools?: NavItem[];
+    visitor?: Visitor | null;
+    onSignOut?: () => Promise<void>;
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -63,12 +71,22 @@ export function MobileMenu({
                 className,
             )}
         >
-            <CtaLink
-                src="nav"
-                size="sm"
-                short
-                className="px-4 max-[399px]:px-3.5"
-            />
+            {visitor ? (
+                <ButtonLink
+                    href={DASHBOARD_URL}
+                    size="sm"
+                    className="px-4 max-[399px]:px-3.5"
+                >
+                    Open dashboard
+                </ButtonLink>
+            ) : (
+                <CtaLink
+                    src="nav"
+                    size="sm"
+                    short
+                    className="px-4 max-[399px]:px-3.5"
+                />
+            )}
             <button
                 type="button"
                 aria-label="Menu"
@@ -91,6 +109,11 @@ export function MobileMenu({
                     tools={tools}
                     featureItems={features}
                     solutionItems={solutions}
+                    visitor={visitor}
+                    onSignOut={async () => {
+                        close();
+                        await onSignOut?.();
+                    }}
                     onClose={close}
                 />
             ) : null}
