@@ -261,7 +261,12 @@ business's own trackers would need listing first.
   answer paragraphs. After editing one, run
   `pnpm --filter @saroh/search-pages content`: the files are embedded in
   `src/content.gen.ts` because the admin preview runs on Workers (no file
-  system, no eval), and a test fails while that copy is stale.
+  system, no eval), and a test fails while that copy is stale. That copy
+  is `@saroh/search-pages/embedded`, admin's only: the package's root has
+  no words (`createSearchPagesLoader`), and saroh.in reads its build's own
+  copy, live pages only in production (`lib/search-pages.ts`
+  `searchPages`, written by `docs-content.config.ts`; DEC-193 amendment,
+  1 Nov).
   `searchPageChecks` (gen.py's data checks) must pass for every page. Both
   apps draw it with `<SearchPage>` and import
   `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
@@ -272,7 +277,13 @@ business's own trackers would need listing first.
   (name, group, line, search, title, description, updated, h1, lead,
   phoneLead, how/howPhone, ctaTitle/ctaLine, then the questions) and a
   default-exported client component in `src/tools/<slug>/index.tsx`,
-  one line in `src/tools/registry.ts`. Build it from `src/tools/parts.tsx`
+  one line in `src/tools/registry.ts` (admin's, `EveryToolSlot`).
+  `<ToolPage>` takes the tool as its `tool` prop: saroh.in passes
+  `SiteToolSlot`, which draws from the registry its build writes
+  (`lib/tool-registry.gen.ts`, one `@saroh/search-pages/tools/<slug>`
+  import per tool it carries), so a draft tool's code is in no
+  production chunk. A component never imports another tool's
+  `index.tsx`. Build it from `src/tools/parts.tsx`
   and put the file behind the one `<EmailGate>` (the email is all that
   leaves the browser; saroh.in sends it to the QR code maker's unlock
   route through `SiteToolGate`). `toolChecks` must pass. saroh.in draws it

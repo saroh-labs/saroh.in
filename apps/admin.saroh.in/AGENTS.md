@@ -374,7 +374,9 @@ recorded grant (the API refuses it otherwise).
   `console-nav.test.ts` pins every address the menu reached before the
   redesign: a redesign never drops one.
 - **Search pages (`/search-pages`, DEC-193, #1251)** lists every page in
-  `@saroh/search-pages` merged with `GET /admin/search-pages` (no record
+  `@saroh/search-pages` (drafts too: /for/ pages and tools from
+  `@saroh/search-pages/embedded`, the rest from `./docs-embedded`; the
+  preview draws a tool with `EveryToolSlot` from `./tools`) merged with `GET /admin/search-pages` (no record
   is a draft), read with `platform:read`; Publish, Unpublish, Archive and
   Restore (one page or ticked ones) are `search-pages:publish` (Platform
   owner), one `POST …/actions` per confirm, all or none (a 409 names the
