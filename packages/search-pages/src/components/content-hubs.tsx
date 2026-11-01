@@ -53,13 +53,10 @@ export type GstHubPage = Pick<
 export function GstHub({
     pages,
     links = {},
-    tradeOf,
     draft,
 }: {
     pages: readonly GstHubPage[];
     links?: HubLinks;
-    /** A trade page's eyebrow from its /for/ page ("Salons"), after its own `hubLabel`; none leaves it bare. */
-    tradeOf?: (forPage: string) => string | undefined;
     draft?: boolean;
 }) {
     const order = [...pages].sort(
@@ -82,11 +79,7 @@ export function GstHub({
                     name: gstCardName(p),
                     line: p.line,
                     href: links.page?.(p.slug),
-                    eyebrow:
-                        p.type === "concept"
-                            ? "Basics"
-                            : (p.hubLabel ??
-                              (p.forPage ? tradeOf?.(p.forPage) : undefined)),
+                    eyebrow: p.type === "concept" ? "Basics" : p.hubLabel,
                 }),
             )}
             footnote="Each page names the rate in force on the date it was checked. Not tax advice: each says when to ask your CA."
