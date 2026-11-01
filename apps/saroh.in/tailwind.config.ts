@@ -37,6 +37,8 @@ export const UI_FILES = [
     "components/ui/popover.tsx",
     "components/ui/qr-art.tsx",
     "components/ui/share-card.tsx",
+    // The dialog's phone sheet borrows its grab handle (DEC-202).
+    "components/ui/sheet.tsx",
     "components/ui/wordmark.tsx",
     "lib/crash-page.ts",
     "lib/phone.ts",
