@@ -1,6 +1,5 @@
 import "@saroh/search-pages/styles.css";
 
-import { loadSearchPage } from "@saroh/search-pages";
 import { GstHub } from "@saroh/search-pages/pages";
 import { notFound } from "next/navigation";
 
@@ -17,14 +16,6 @@ const hub = hubRoute("gst", {
 });
 export const generateMetadata = hub.generateMetadata;
 
-/** A trade's eyebrow: its /for/ page's name, "Salons". */
-const tradeOf = (slug: string) => {
-    const plural = loadSearchPage(slug)?.plural;
-    return plural
-        ? plural.charAt(0).toUpperCase() + plural.slice(1)
-        : undefined;
-};
-
 export default function GstHubRoute() {
     const pages = docPages.list("gst");
     if (pages.length === 0) notFound();
@@ -32,7 +23,7 @@ export default function GstHubRoute() {
         <>
             <JsonLd data={hub.jsonLd()} />
             <CtaClickArea src={hub.src} mode={hub.mode}>
-                <GstHub pages={pages} links={hub.links} tradeOf={tradeOf} />
+                <GstHub pages={pages} links={hub.links} />
             </CtaClickArea>
         </>
     );

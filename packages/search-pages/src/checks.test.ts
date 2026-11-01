@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { emailsIn, searchPageChecks, textOf } from "./checks";
-import { allSearchPages, loadSearchPage } from "./load";
+import { allSearchPages, loadSearchPage } from "./embedded";
 import type { SearchPageData } from "./schema";
 
 const failing = (p: SearchPageData) => searchPageChecks(p).filter((c) => !c.ok);

@@ -1,9 +1,4 @@
 import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
-import {
-    listSearchPages,
-    loadSearchPage,
-    loadToolPage,
-} from "@saroh/search-pages";
 import type {
     DownloadPage,
     GstPage,
@@ -11,6 +6,12 @@ import type {
 } from "@saroh/search-pages/docs";
 import { docLinks, docPageChecks } from "@saroh/search-pages/docs";
 import { embeddedDocs } from "@saroh/search-pages/docs-embedded";
+// Every /for/ page and tool, drafts too: admin previews them (saroh.in carries only its build's).
+import {
+    listSearchPages,
+    loadSearchPage,
+    loadToolPage,
+} from "@saroh/search-pages/embedded";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 

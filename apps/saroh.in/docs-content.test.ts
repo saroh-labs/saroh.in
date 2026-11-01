@@ -11,7 +11,9 @@ import {
     heldWarning,
     LINKS_LIVE,
     planDocs,
+    searchPagesLive,
     writeDocs,
+    writeSearchContent,
 } from "./docs-content.config";
 
 const TODAY = "2026-10-31";
@@ -217,6 +219,72 @@ describe("planDocs: links must land (U12)", () => {
 
     it("a GST page whose only links are its rail tools, trade page and related pins builds alone", () => {
         expect(plan(live(GST)).built).toEqual([GST]);
+    });
+});
+
+describe("searchPagesLive + writeSearchContent (plan 2026-11-01-001, U2, U3)", () => {
+    const LIVE = ["/for/salons", "/for/gyms", "/tools/gst-calculator"];
+    const write = (list: Parameters<typeof searchPagesLive>[0]) => {
+        const genFile = path.join(dir, "search-content.gen.ts");
+        const toolsFile = path.join(dir, "tool-registry.gen.ts");
+        writeSearchContent(searchPagesLive(list), { genFile, toolsFile });
+        const text = fs.readFileSync(genFile, "utf8");
+        const [forPart, toolPart] = text.split("TOOL_SOURCES");
+        const slugs = (part = "") =>
+            [...part.matchAll(/^ {4}"([a-z0-9-]+)":/gm)].map((m) => m[1]);
+        const registry = fs.readFileSync(toolsFile, "utf8");
+        // Each entry imports its own tool, and nothing else does.
+        const imports = [
+            ...registry.matchAll(
+                /import\("@saroh\/search-pages\/tools\/([a-z0-9-]+)"\)/g,
+            ),
+        ].map((m) => m[1]);
+        expect(slugs(registry)).toEqual(imports);
+        return {
+            for: slugs(forPart),
+            tools: slugs(toolPart),
+            code: imports,
+        };
+    };
+    const every = (kind: string) =>
+        fs
+            .readdirSync(
+                path.join(
+                    __dirname,
+                    "../../packages/search-pages/content",
+                    kind,
+                ),
+            )
+            .filter((f) => f.endsWith(".mdx"))
+            .map((f) => f.slice(0, -4))
+            .sort();
+
+    it("production: only the live /for/ pages' and tools' words", () => {
+        expect(
+            write({
+                ...live(...LIVE, GST),
+                takenOff: [{ path: "/for/cafes" }],
+            }),
+        ).toEqual({
+            for: ["gyms", "salons"],
+            tools: ["gst-calculator"],
+            code: ["gst-calculator"],
+        });
+    });
+
+    it("a preview, or no list (next dev, tests): every page", () => {
+        // The two app tools have their own routes: no component here.
+        const all = {
+            for: every("for"),
+            tools: every("tools"),
+            code: every("tools").filter(
+                (t) => t !== "link-preview" && t !== "qr-code-maker",
+            ),
+        };
+        expect(all.for).toHaveLength(34);
+        expect(all.code).toHaveLength(25);
+        expect(write({ preview: true, live: LIVE })).toEqual(all);
+        expect(write(null)).toEqual(all);
     });
 });
 

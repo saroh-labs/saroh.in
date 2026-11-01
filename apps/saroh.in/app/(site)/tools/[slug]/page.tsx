@@ -1,18 +1,20 @@
 import "@saroh/search-pages/styles.css";
 
 import type { ToolPageData } from "@saroh/search-pages";
-import { loadToolPage, ToolPage } from "@saroh/search-pages";
+import { ToolPage } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { SiteToolGate } from "@/components/tools/tool-gate";
+import { SiteToolSlot } from "@/components/tools/tool-slot";
 import { cta } from "@/lib/links";
 import {
     builtTools,
     isPublished,
     questionsLd,
+    searchPages,
     TOOLS_HUB,
 } from "@/lib/search-pages";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
@@ -21,7 +23,7 @@ import { breadcrumbLd, toolLd } from "@/lib/structured-data";
 /**
  * `/tools/<tool>` (#1253, DEC-193): one page per tool in
  * `@saroh/search-pages`, drawn by its `<ToolPage>` with the tool from the
- * package's registry. Production builds the live tools only; a preview
+ * build's registry (`lib/tool-registry.gen.ts`). Production builds the live tools only; a preview
  * builds them all, a tool not live with a Draft label and `noindex`
  * (`lib/search-pages.ts`). The two app tools keep their own routes beside
  * this one. Any other slug is a 404.
@@ -40,7 +42,9 @@ interface Props {
 }
 
 function builtTool(slug: string): ToolPageData | null {
-    return built().some((t) => t.slug === slug) ? loadToolPage(slug) : null;
+    return built().some((t) => t.slug === slug)
+        ? searchPages.loadToolPage(slug)
+        : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -94,6 +98,7 @@ export default async function ToolRoute({ params }: Props) {
                             startFree: start.href,
                             startFreeLabel: start.label,
                         }}
+                        tool={<SiteToolSlot slug={p.slug} />}
                     />
                 </CtaClickArea>
             </SiteToolGate>

@@ -22,6 +22,13 @@ describe("loadPage (plan 2026-10-31-002, U3)", () => {
         expect(page?.page.path).toBe(`/${kind}/${slug}`);
     });
 
+    it("lists every /for/ page and tool in the code, drafts too (plan 2026-11-01-001)", async () => {
+        const { listSearchPages } =
+            await import("@saroh/search-pages/embedded");
+        expect(listSearchPages({ kind: "for" })).toHaveLength(34);
+        expect(listSearchPages({ kind: "tools" })).toHaveLength(27);
+    });
+
     it("a slug no page has opens nothing", () => {
         expect(loadPage("not-a-page")).toBeNull();
     });
@@ -49,7 +56,8 @@ describe("docEntries (plan 2026-10-31-002, U6)", () => {
 
 describe("every link in the code goes to a page (U12)", () => {
     it("the no-shows guide needs the cancellation policy generator, and no page has a dead link", async () => {
-        const { listSearchPages } = await import("@saroh/search-pages");
+        const { listSearchPages } =
+            await import("@saroh/search-pages/embedded");
         const { docEntries } = await import("./search-pages");
         const { mergePages } = await import("./search-page-words");
         const rows = mergePages([...listSearchPages(), ...docEntries()], {

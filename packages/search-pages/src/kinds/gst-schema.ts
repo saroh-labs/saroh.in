@@ -66,7 +66,7 @@ export const gstFrontmatterSchema = z
         rank: z.number().int().positive().optional(),
         /** The /for/ page of the same trade, linked when it is live. */
         forPage: slug.optional(),
-        /** The small label over its /gst hub card ("Photographers"), where no /for/ page names the trade. */
+        /** The small label over its /gst hub card ("Photographers"): a trade page must have one, since production carries only live /for/ pages (DEC-193, 1 Nov). */
         hubLabel: text.optional(),
         /** Where this page's rate or code differs from Saroh's own data, and why. */
         differsFromSaroh: text.optional(),
@@ -74,6 +74,12 @@ export const gstFrontmatterSchema = z
     })
     .strict()
     .superRefine((fm, ctx) => {
+        if (fm.type === "trade" && !fm.hubLabel)
+            ctx.addIssue({
+                code: "custom",
+                path: ["hubLabel"],
+                message: "a trade page needs its hub card's small label",
+            });
         const n = fm.table.head.length;
         [...fm.table.rows, ...(fm.table.foot ? [fm.table.foot] : [])].forEach(
             (r, i) => {

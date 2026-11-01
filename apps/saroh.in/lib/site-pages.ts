@@ -59,9 +59,9 @@ import {
     liveSearchPages,
     liveTools,
     publishList,
+    searchPages,
     TOOLS_HUB,
 } from "@/lib/search-pages";
-import { listSearchPages } from "@saroh/search-pages";
 import { DOC_KINDS, docKindOf } from "@saroh/search-pages/kinds";
 
 /**
@@ -226,9 +226,9 @@ export function lastModified(
     if (provider) return dayInIndia(integrationMeta(provider).updated);
     // A /for/ page or a package tool: its own `updated`; a hub, its newest
     // live page's. The app's two tools keep their content modules' days.
-    const forPage = listSearchPages().find(
-        (p) => p.path === path && !(p.kind === "tools" && p.inApp),
-    );
+    const forPage = searchPages
+        .listSearchPages()
+        .find((p) => p.path === path && !(p.kind === "tools" && p.inApp));
     if (forPage) return dayInIndia(forPage.updated);
     if (path === TOOLS_HUB.path) {
         const day = liveTools()

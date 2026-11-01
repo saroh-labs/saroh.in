@@ -3,7 +3,7 @@ import type {
     Question,
     ToolPageEntry,
 } from "@saroh/search-pages";
-import { listSearchPages } from "@saroh/search-pages";
+import { createSearchPagesLoader } from "@saroh/search-pages";
 
 import type { PublishContext } from "@/content/resources";
 import { routeExists, shownTools } from "@/content/resources";
@@ -11,6 +11,8 @@ import { solutionHref } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 import { env } from "@/env";
 import { faqPageLd } from "@/lib/structured-data";
+
+import { SOURCES, TOOL_SOURCES } from "./search-content.gen";
 
 /**
  * The /for/ pages and free tools this build has (DEC-193, #1253). `search-pages.config.js` reads
@@ -23,6 +25,17 @@ import { faqPageLd } from "@/lib/structured-data";
  * - A preview build (dev, CI, local) builds every page in the code; a page
  *   not live says Draft and `noindex`, and is in no sitemap or list.
  */
+/**
+ * The /for/ pages' and tools' words this build carries: every page on a
+ * preview, only live ones in production (`docs-content.config.ts` writes
+ * `lib/search-content.gen.ts`; plan 2026-11-01-001). Server only, like the
+ * rest of this module.
+ */
+export const searchPages = createSearchPagesLoader({
+    sources: SOURCES,
+    toolSources: TOOL_SOURCES,
+});
+
 export interface PublishList {
     preview: boolean;
     live: string[];
@@ -77,9 +90,9 @@ export function builtSearchPages(
     list: PublishList = publishList(),
 ): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "for" }).filter(
-        (p) => list.preview || live.has(p.path),
-    );
+    return searchPages
+        .listSearchPages({ kind: "for" })
+        .filter((p) => list.preview || live.has(p.path));
 }
 
 /** The live /for/ pages in the code: the sitemap's, `/llms.txt`'s and the hub's on production. */
@@ -87,7 +100,9 @@ export function liveSearchPages(
     list: PublishList = publishList(),
 ): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "for" }).filter((p) => live.has(p.path));
+    return searchPages
+        .listSearchPages({ kind: "for" })
+        .filter((p) => live.has(p.path));
 }
 
 /**
@@ -116,15 +131,17 @@ export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
  */
 export function builtTools(list: PublishList = publishList()): ToolPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "tools" }).filter(
-        (p) => list.preview || live.has(p.path),
-    );
+    return searchPages
+        .listSearchPages({ kind: "tools" })
+        .filter((p) => list.preview || live.has(p.path));
 }
 
 /** The live tools in the code: the menus', the sitemap's and `/llms.txt`'s. */
 export function liveTools(list: PublishList = publishList()): ToolPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "tools" }).filter((p) => live.has(p.path));
+    return searchPages
+        .listSearchPages({ kind: "tools" })
+        .filter((p) => live.has(p.path));
 }
 
 /**

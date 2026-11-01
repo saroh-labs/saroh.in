@@ -1,4 +1,3 @@
-import { listSearchPages } from "@saroh/search-pages";
 import { describe, expect, it, vi } from "vitest";
 
 import { llmsText } from "./llms";
@@ -9,6 +8,7 @@ import {
     liveSearchPages,
     liveTools,
     parsePublishList,
+    searchPages,
     shownToolLinks,
     solutionLink,
     tradesHubLinks,
@@ -17,7 +17,7 @@ import { indexedPaths, lastModified } from "./site-pages";
 
 vi.mock("@/env", () => ({ env: {} }));
 
-const ALL = listSearchPages({ kind: "for" });
+const ALL = searchPages.listSearchPages({ kind: "for" });
 const salons = ALL.find((p) => p.slug === "salons");
 const draft = ALL.find((p) => p.slug !== "salons");
 if (!salons || !draft) throw new Error("the pilot pages are missing");

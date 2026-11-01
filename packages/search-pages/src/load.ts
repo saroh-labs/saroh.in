@@ -1,4 +1,3 @@
-import { SOURCES, TOOL_SOURCES } from "./content.gen";
 import { splitFile } from "./frontmatter";
 import type {
     ForPageEntry,
@@ -85,92 +84,118 @@ export function parseToolPage(file: string, source: string): ToolPageData {
     };
 }
 
-let cache: SearchPageData[] | null = null;
-let toolCache: ToolPageData[] | null = null;
-
-/** Every /for/ page in the code, parsed once; throws naming the file that's wrong. */
-export function allSearchPages(): SearchPageData[] {
-    if (cache) return cache;
-    cache = Object.entries(SOURCES)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([slug, source]) =>
-            parseSearchPage(`content/for/${slug}.mdx`, source),
-        );
-    return cache;
-}
-
-/** Every free tool in the code (#1253), parsed once. */
-export function allToolPages(): ToolPageData[] {
-    if (toolCache) return toolCache;
-    toolCache = Object.entries(TOOL_SOURCES)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([slug, source]) =>
-            parseToolPage(`content/tools/${slug}.mdx`, source),
-        );
-    return toolCache;
-}
-
 export const familySlug = (family: string) =>
     family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-function forEntries(): ForPageEntry[] {
-    return allSearchPages().map((p) => ({
-        path: p.path,
-        slug: p.slug,
-        kind: "for",
-        name: p.name,
-        family: p.family,
-        familySlug: familySlug(p.family),
-        search: p.search,
-        title: p.title,
-        description: p.description,
-        updated: p.updated,
-    }));
+/** The /for/ pages' and tools' files, by slug: the full copy (`./embedded`) or a site's live-only one. */
+export interface SearchPageSources {
+    sources: Readonly<Record<string, string>>;
+    toolSources: Readonly<Record<string, string>>;
 }
 
-function toolEntries(): ToolPageEntry[] {
-    return allToolPages().map((p) => ({
-        path: p.path,
-        slug: p.slug,
-        kind: "tools",
-        name: p.name,
-        group: p.group,
-        line: p.line,
-        inApp: p.inApp === true,
-        search: p.search,
-        title: p.title,
-        description: p.description,
-        updated: p.updated,
-    }));
+export interface SearchPagesLoader {
+    /** Every /for/ page in `sources`, parsed once; throws naming the file that's wrong. */
+    allSearchPages: () => SearchPageData[];
+    /** Every free tool in `toolSources` (#1253), parsed once. */
+    allToolPages: () => ToolPageData[];
+    /**
+     * The manifest: every page the loader has, live or not (whether it's
+     * live is the API's, DEC-193), /for/ pages first, then the tools;
+     * `kind` narrows it.
+     */
+    listSearchPages: {
+        (opts: { kind: "for" }): ForPageEntry[];
+        (opts: { kind: "tools" }): ToolPageEntry[];
+        (opts?: { kind?: SearchPageKind }): SearchPageEntry[];
+    };
+    /** One /for/ page, ready for `<SearchPage>`, or null when there is no such file. */
+    loadSearchPage: (slug: string) => SearchPageData | null;
+    /** One tool page, ready for `<ToolPage>`, or null when there is no such file. */
+    loadToolPage: (slug: string) => ToolPageData | null;
 }
-
-let manifest: SearchPageEntry[] | null = null;
 
 /**
- * The manifest: every page in the code, live or not (whether it's live is
- * the API's, DEC-193), /for/ pages first, then the tools; `kind` narrows it.
+ * A loader over the given words, as `createDocsLoader` is for the GST
+ * pages, guides and downloads: the package's root carries none, so a site
+ * that builds from its own live-only copy ships no draft's words.
  */
-export function listSearchPages(opts: { kind: "for" }): ForPageEntry[];
-export function listSearchPages(opts: { kind: "tools" }): ToolPageEntry[];
-export function listSearchPages(opts?: {
-    kind?: SearchPageKind;
-}): SearchPageEntry[];
-export function listSearchPages(
-    opts: { kind?: SearchPageKind } = {},
-): SearchPageEntry[] {
-    if (!manifest) {
-        manifest = [...forEntries(), ...toolEntries()];
-        checkUnique(manifest);
+export function createSearchPagesLoader({
+    sources,
+    toolSources,
+}: SearchPageSources): SearchPagesLoader {
+    let cache: SearchPageData[] | null = null;
+    let toolCache: ToolPageData[] | null = null;
+    let manifest: SearchPageEntry[] | null = null;
+
+    function allSearchPages(): SearchPageData[] {
+        if (cache) return cache;
+        cache = Object.entries(sources)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([slug, source]) =>
+                parseSearchPage(`content/for/${slug}.mdx`, source),
+            );
+        return cache;
     }
-    return opts.kind ? manifest.filter((p) => p.kind === opts.kind) : manifest;
-}
 
-/** One /for/ page, ready for `<SearchPage>`, or null when there is no such file. */
-export function loadSearchPage(slug: string): SearchPageData | null {
-    return allSearchPages().find((p) => p.slug === slug) ?? null;
-}
+    function allToolPages(): ToolPageData[] {
+        if (toolCache) return toolCache;
+        toolCache = Object.entries(toolSources)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([slug, source]) =>
+                parseToolPage(`content/tools/${slug}.mdx`, source),
+            );
+        return toolCache;
+    }
 
-/** One tool page, ready for `<ToolPage>`, or null when there is no such file. */
-export function loadToolPage(slug: string): ToolPageData | null {
-    return allToolPages().find((p) => p.slug === slug) ?? null;
+    const forEntries = (): ForPageEntry[] =>
+        allSearchPages().map((p) => ({
+            path: p.path,
+            slug: p.slug,
+            kind: "for",
+            name: p.name,
+            family: p.family,
+            familySlug: familySlug(p.family),
+            search: p.search,
+            title: p.title,
+            description: p.description,
+            updated: p.updated,
+        }));
+
+    const toolEntries = (): ToolPageEntry[] =>
+        allToolPages().map((p) => ({
+            path: p.path,
+            slug: p.slug,
+            kind: "tools",
+            name: p.name,
+            group: p.group,
+            line: p.line,
+            inApp: p.inApp === true,
+            search: p.search,
+            title: p.title,
+            description: p.description,
+            updated: p.updated,
+        }));
+
+    function listSearchPages(
+        opts: { kind?: SearchPageKind } = {},
+    ): SearchPageEntry[] {
+        if (!manifest) {
+            manifest = [...forEntries(), ...toolEntries()];
+            checkUnique(manifest);
+        }
+        return opts.kind
+            ? manifest.filter((p) => p.kind === opts.kind)
+            : manifest;
+    }
+
+    return {
+        allSearchPages,
+        allToolPages,
+        listSearchPages:
+            listSearchPages as SearchPagesLoader["listSearchPages"],
+        loadSearchPage: (slug) =>
+            allSearchPages().find((p) => p.slug === slug) ?? null,
+        loadToolPage: (slug) =>
+            allToolPages().find((p) => p.slug === slug) ?? null,
+    };
 }

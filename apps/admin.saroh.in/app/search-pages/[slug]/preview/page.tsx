@@ -7,6 +7,7 @@ import {
     GstPage,
     GuidePage,
 } from "@saroh/search-pages/pages";
+import { EveryToolSlot } from "@saroh/search-pages/tools";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -31,7 +32,13 @@ const TEMPLATES: {
 } = {
     for: (p, draft) => <SearchPage page={p} draft={draft} />,
     // The email gate has no provider here: it opens and sends nothing.
-    tools: (p, draft) => <ToolPage page={p} draft={draft} />,
+    tools: (p, draft) => (
+        <ToolPage
+            page={p}
+            draft={draft}
+            tool={<EveryToolSlot slug={p.slug} />}
+        />
+    ),
     gst: (p, draft) => <GstPage page={p} draft={draft} />,
     guides: (p, draft) => <GuidePage page={p} draft={draft} />,
     // The download form in preview: it opens, sends and fetches nothing.

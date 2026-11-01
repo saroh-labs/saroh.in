@@ -1223,9 +1223,10 @@ fi
 bg_report
 [ "$E2E" = 1 ] && e2e_finish
 
-# A production-like build of saroh.in carries no word or file of a GST page,
-# guide or download that isn't live (plan 2026-10-31-002, R3). A whole site
-# build, so not in the quick run; after the browser run, never beside it.
+# A production-like build of saroh.in carries no word or file of a page that
+# isn't live, nor a draft tool's code (plans 2026-10-31-002 R3, 2026-11-01-001
+# U4). A whole site build, so not in the quick run; after the browser run,
+# never beside it.
 if [ "$QUICK" = 0 ] && affected web; then
     step draft-words pnpm run check:draft-words
 fi
