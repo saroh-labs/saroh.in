@@ -6,11 +6,11 @@
  * where a page is drawn; the app must set --font-sans (Geist) and
  * --font-display (Space Grotesk) from packages/ui/fonts.
  */
-// `searchPageChecks` and `toolChecks` are `@saroh/search-pages/checks`: it
-// draws the page with react-dom/server, which Next refuses in a Server
-// Component's imports, so the index stays importable from one. The tool
-// registry (`./tools`) isn't here either: a site imports only its build's
-// tools (`./tools/<slug>`).
+// `searchPageChecks` is `@saroh/search-pages/checks`: it draws the page
+// with react-dom/server, which Next refuses in a Server Component's
+// imports, so the index stays importable from one. `toolChecks` is
+// `./tool-checks` and the tool registry `./tools`, so the index reaches no
+// tool's code: a site imports only its build's tools (`./tools/<slug>`).
 export type { SearchPageCheck } from "./checks";
 export {
     AnswerBox,
