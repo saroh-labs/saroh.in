@@ -1,4 +1,4 @@
-// @covers web:/gst web:/guides web:/downloads web:/api/downloads/unlock api:tools pkg:search-pages
+// @covers web:/for web:/gst web:/guides web:/downloads web:/api/downloads/unlock api:tools pkg:search-pages
 import fs from "node:fs";
 import path from "node:path";
 
@@ -136,6 +136,29 @@ test.describe("GST pages, guides and downloads", () => {
             // A desk: the rail ends above the band. A phone: it stacks below.
             expect(r.y + r.height <= b.y || r.y >= b.y + b.height).toBe(true);
         }
+    });
+
+    test("/for: search, filters in the address, Back, and no dead end", async ({
+        page,
+    }) => {
+        await page.goto(`${WEB}/for`);
+        const links = page.locator('main a[href^="/for/"]');
+        await expect(links).toHaveCount(34);
+        await page.getByRole("button", { name: /^Learning/ }).click();
+        await expect(page).toHaveURL(/\?family=learning/);
+        await expect(page.getByText("4 of 34 trades")).toBeVisible();
+        await page.goBack();
+        await expect(page.getByText("All 34 trades")).toBeVisible();
+
+        const search = page.getByRole("searchbox", { name: "Search trades" });
+        await search.fill("dentist");
+        await expect(page.getByText("1 of 34 trades")).toBeVisible();
+        await search.fill("pet groomers");
+        await expect(
+            page.getByRole("heading", {
+                name: 'No page for "pet groomers" yet',
+            }),
+        ).toBeVisible();
     });
 
     test("/gst renders, noindex, its trail from Home", async ({ page }) => {

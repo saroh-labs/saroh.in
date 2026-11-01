@@ -220,6 +220,8 @@ export const frontmatterSchema = z
         family: z.enum(FAMILIES),
         /** The one search this page answers; no two pages share one. */
         search: text,
+        /** The owner's other words for this trade, for the /for search: "dentist teeth". */
+        searchWords: text,
         /** The <title> before " · Saroh". */
         title: text,
         description: text,
@@ -309,6 +311,12 @@ export interface ForPageEntry extends EntryBase {
     kind: "for";
     family: Family;
     familySlug: string;
+    /** The promise the /for hub shows under its name. */
+    h1: string;
+    shape: Shape;
+    searchWords: string;
+    /** Its example day, for the hub's lead tile. */
+    hero: Scene["hero"];
 }
 
 /** A /tools/ row of `listSearchPages()` (#1253). */

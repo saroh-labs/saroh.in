@@ -258,7 +258,8 @@ business's own trackers would need listing first.
 - **A /for/ trade page is one file in `@saroh/search-pages`** (DEC-193):
   `content/for/<slug>.mdx`, YAML frontmatter (the words, then the sample
   business under `scene`) and the questions as `## question` + plain
-  answer paragraphs. After editing one, run
+  answer paragraphs. `searchWords` holds the owner's other words for the trade
+  ("dentist teeth"), which the `/for` hub's search reads. After editing one, run
   `pnpm --filter @saroh/search-pages content`: the files are embedded in
   `src/content.gen.ts` because the admin preview runs on Workers (no file
   system, no eval), and a test fails while that copy is stale. That copy

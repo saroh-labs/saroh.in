@@ -123,18 +123,77 @@ describe("<SearchPage>", () => {
 });
 
 describe("<ForHub>", () => {
-    it("lists every page under its family", () => {
+    afterEach(() => window.history.replaceState(null, "", "/"));
+    const hub = () =>
         render(<ForHub pages={listSearchPages({ kind: "for" })} />);
-        const beauty = screen
-            .getByRole("heading", { name: "Beauty" })
-            .closest("section");
-        if (!beauty) throw new Error("no Beauty section");
+    const href = (name: RegExp) =>
+        screen.getByRole("link", { name }).getAttribute("href");
+
+    it("has every trade's link, with its promise and not its search phrase", () => {
+        const pages = listSearchPages({ kind: "for" });
+        const { container } = hub();
+        const links = Array.from(
+            container.querySelectorAll("a[href^='/for/']"),
+        );
+        expect(links.map((a) => a.getAttribute("href")).sort()).toEqual(
+            pages.map((p) => p.path).sort(),
+        );
         expect(
-            within(beauty)
-                .getByRole("link", { name: /Salons/ })
-                .getAttribute("href"),
-        ).toBe("/for/salons");
-        expect(screen.getByRole("heading", { name: "Health" })).toBeTruthy();
+            screen.getByText("Every chair booked, and no one waiting."),
+        ).toBeTruthy();
+        expect(screen.queryByText("barber shop booking app")).toBeNull();
+        expect(screen.getByRole("heading", { name: "Beauty" })).toBeTruthy();
+    });
+
+    it("finds a trade by the owner's own word, and a family keeps its main trade first", () => {
+        hub();
+        fireEvent.change(screen.getByRole("searchbox"), {
+            target: { value: "dentist" },
+        });
+        expect(href(/^Dental clinics/)).toBe("/for/dental-clinics");
+        expect(screen.queryByRole("link", { name: /^Barbers/ })).toBeNull();
+        expect(window.location.search).toBe("?q=dentist");
+        fireEvent.click(screen.getByRole("button", { name: "Reset all" }));
+        fireEvent.click(screen.getByRole("button", { name: /^Beauty/ }));
+        expect(window.location.search).toBe("?family=beauty");
+        const first = document.querySelector(".sp-fh-big");
+        expect(first?.getAttribute("href")).toBe("/for/salons");
+        expect(first?.textContent).toContain("Today");
+        expect(screen.queryByRole("link", { name: /^Gift shops/ })).toBeNull();
+    });
+
+    it("can't reach an empty list by filters, and says so when a search finds nothing", () => {
+        hub();
+        fireEvent.click(screen.getByRole("button", { name: /^Learning/ }));
+        expect(
+            screen
+                .getByRole("button", { name: /^They place an order/ })
+                .hasAttribute("disabled"),
+        ).toBe(true);
+        fireEvent.click(screen.getByRole("button", { name: "Reset all" }));
+        fireEvent.change(screen.getByRole("searchbox"), {
+            target: { value: "pet groomers" },
+        });
+        expect(
+            screen.getByRole("heading", {
+                name: 'No page for "pet groomers" yet',
+            }),
+        ).toBeTruthy();
+    });
+
+    it("reads its filters from the address, ignoring ones it doesn't know", () => {
+        window.history.replaceState(
+            null,
+            "",
+            "/for?family=health&how=nonsense",
+        );
+        hub();
+        expect(
+            screen
+                .getByRole("button", { name: /^Health/ })
+                .getAttribute("aria-pressed"),
+        ).toBe("true");
+        expect(screen.getByText("9 of 34 trades")).toBeTruthy();
     });
 });
 
