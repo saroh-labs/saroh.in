@@ -13,7 +13,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ForHub } from "./components/for-hub";
 import { SearchPage } from "./components/search-page";
-import { allSearchPages, listSearchPages, loadSearchPage } from "./load";
+import { allSearchPages, listSearchPages, loadSearchPage } from "./embedded";
 
 beforeAll(() => {
     Element.prototype.scrollTo = () => undefined; // jsdom has no element scrolling

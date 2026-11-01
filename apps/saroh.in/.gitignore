@@ -50,3 +50,5 @@ next-env.d.ts
 # The GST pages', guides' and downloads' words and files this build carries (docs-content.config.ts)
 /lib/docs-content.gen.ts
 /public/downloads/
+# The /for/ pages' and tools' words this build carries (docs-content.config.ts)
+/lib/search-content.gen.ts

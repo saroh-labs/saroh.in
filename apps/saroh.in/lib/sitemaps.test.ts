@@ -1,10 +1,10 @@
-import { listSearchPages } from "@saroh/search-pages";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PublishContext } from "@/content/resources";
 
 import { docPages } from "./docs-pages";
 import type { PublishList } from "./search-pages";
+import { searchPages } from "./search-pages";
 import { indexedPaths, lastModified } from "./site-pages";
 import { sitemapGroups, sitemapIndexXml, urlsetXml } from "./sitemaps";
 
@@ -19,7 +19,7 @@ const EVERYTHING: PublishContext = {
 const gst = docPages.list("gst")[0];
 const guide = docPages.list("guides")[0];
 
-const FOR_AND_TOOLS = listSearchPages().map((p) => p.path);
+const FOR_AND_TOOLS = searchPages.listSearchPages().map((p) => p.path);
 
 /** A production list with `live` live; the env says the same, as a build's would. */
 const listOf = (live: string[], preview = false): PublishList => {

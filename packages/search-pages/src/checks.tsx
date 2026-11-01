@@ -17,6 +17,7 @@ import { SearchPage } from "./components/search-page";
 import type { SearchPageData } from "./schema";
 
 export { docPageChecks, GST_CHECKED_MAX_DAYS } from "./docs-checks";
+export { toolChecks } from "./tool-checks";
 export { NOT_AVAILABLE };
 export type { SearchPageCheck };
 

@@ -9,7 +9,7 @@ import {
     docKindOf,
     takenOffDestination,
 } from "../kinds";
-import { allSearchPages, allToolPages } from "./load";
+import { allSearchPages, allToolPages } from "./embedded";
 
 /**
  * The API keeps its own copy of the groups' ids (it runs built JS, and this

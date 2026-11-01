@@ -6,9 +6,9 @@
  * where a page is drawn; the app must set --font-sans (Geist) and
  * --font-display (Space Grotesk) from packages/ui/fonts.
  */
-// `searchPageChecks` is `@saroh/search-pages/checks`: it draws the page with
-// react-dom/server, which Next refuses in a Server Component's imports, so
-// the index stays importable from one.
+// `searchPageChecks` and `toolChecks` are `@saroh/search-pages/checks`: it
+// draws the page with react-dom/server, which Next refuses in a Server
+// Component's imports, so the index stays importable from one.
 export type { SearchPageCheck } from "./checks";
 export {
     AnswerBox,
@@ -54,16 +54,15 @@ export { ToolPage } from "./components/tool-page";
 export type { ToolPageLinks, ToolPageProps } from "./components/tool-page";
 export { ToolsHub } from "./components/tools-hub";
 export type { ToolsHubProps } from "./components/tools-hub";
+// The loader takes the words: `./embedded` has every page (admin, checks,
+// tests); saroh.in builds its own live-only copy. The index holds none.
 export {
-    allSearchPages,
-    allToolPages,
+    createSearchPagesLoader,
     familySlug,
-    listSearchPages,
-    loadSearchPage,
-    loadToolPage,
     parseSearchPage,
     parseToolPage,
 } from "./load";
+export type { SearchPageSources, SearchPagesLoader } from "./load";
 export { FAMILIES, SHAPES } from "./schema";
 export type {
     Family,
@@ -75,7 +74,6 @@ export type {
     Shape,
     ToolPageEntry,
 } from "./schema";
-export { toolChecks } from "./tool-checks";
 export { TOOL_GROUPS } from "./tool-schema";
 export type { ToolGroup, ToolPageData } from "./tool-schema";
 export {
@@ -89,4 +87,3 @@ export type {
     GateResult,
     GateSubmit,
 } from "./tools/email-gate";
-export { TOOLS, hasTool } from "./tools/registry";

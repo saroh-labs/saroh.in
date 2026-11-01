@@ -1,6 +1,5 @@
 import "@saroh/search-pages/styles.css";
 
-import { loadSearchPage } from "@saroh/search-pages";
 import { GstHub } from "@saroh/search-pages/pages";
 import { notFound } from "next/navigation";
 
@@ -8,6 +7,7 @@ import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { docPages } from "@/lib/docs-pages";
 import { hubRoute } from "@/lib/search-page-route";
+import { searchPages } from "@/lib/search-pages";
 
 /** `/gst`: the GST pages this build has, by trade and the basics. None (production before the first publish): a 404. */
 const hub = hubRoute("gst", {
@@ -19,7 +19,7 @@ export const generateMetadata = hub.generateMetadata;
 
 /** A trade's eyebrow: its /for/ page's name, "Salons". */
 const tradeOf = (slug: string) => {
-    const plural = loadSearchPage(slug)?.plural;
+    const plural = searchPages.loadSearchPage(slug)?.plural;
     return plural
         ? plural.charAt(0).toUpperCase() + plural.slice(1)
         : undefined;

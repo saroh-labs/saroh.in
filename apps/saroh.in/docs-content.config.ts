@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { DocPage } from "@saroh/search-pages/docs";
 import { docLinks, docPageChecks } from "@saroh/search-pages/docs";
+import { embedded as embedSearchText } from "@saroh/search-pages/embed-content";
 import { embeddedDocs as embedText } from "@saroh/search-pages/embed-docs";
 import { DOC_PAGE_PATH } from "@saroh/search-pages/kinds";
 
@@ -28,6 +29,11 @@ import { loadPublishList } from "./search-pages.config.js";
  *
  * What it built, and what it held, goes in the production snapshot
  * (`build-state.config.js`), so admin can show "Held by checks".
+ *
+ * The /for/ pages and free tools follow the same list (plan 2026-11-01-001,
+ * U2): `lib/search-content.gen.ts` holds their words, every page on a
+ * preview, only live ones in production. No checks hold these back; a live
+ * page is built as it is today.
  */
 
 /** What search-pages.config.js wrote (its PublishList). */
@@ -48,6 +54,10 @@ export interface DocsPlan {
 const SEARCH_PAGES = path.join(__dirname, "../../packages/search-pages");
 export const GEN_FILE = path.join(__dirname, "lib/docs-content.gen.ts");
 export const DOWNLOADS_DIR = path.join(__dirname, "public/downloads");
+export const SEARCH_GEN_FILE = path.join(
+    __dirname,
+    "lib/search-content.gen.ts",
+);
 
 /** The held reason for a page whose words link to a page that isn't live (admin's words). */
 export const LINKS_LIVE = "Every page it links to is live";
@@ -140,6 +150,23 @@ export function writeDocs(
     }
 }
 
+/** The /for/ pages and tools this build carries: every one (undefined) on a preview or without a list, else the live ones. */
+export function searchPagesLive(
+    list: PublishList | null,
+): string[] | undefined {
+    return !list || list.preview
+        ? undefined
+        : list.live.filter((p) => /^\/(for|tools)\//.test(p));
+}
+
+/** `lib/search-content.gen.ts`: the words of the pages in `live`. */
+export function writeSearchContent(
+    live: readonly string[] | undefined,
+    { genFile = SEARCH_GEN_FILE } = {},
+) {
+    fs.writeFileSync(genFile, embedSearchText({ live }));
+}
+
 /** The GitHub Actions annotation for a live page left out. */
 export function heldWarning(h: DocsPlan["held"][number]): string {
     return `::warning title=Page held by checks::${h.path} is live but left out of this build: ${h.detail.join(" ")} Fix it, then deploy again.`;
@@ -153,22 +180,26 @@ async function codePages(): Promise<DocPage[]> {
 
 /** The unit tests' copy (vitest globalSetup): every page, written only when no build has written one. */
 export async function ensureDocs() {
+    if (!fs.existsSync(SEARCH_GEN_FILE)) writeSearchContent(undefined);
     if (fs.existsSync(GEN_FILE)) return;
     writeDocs(planDocs(null, await codePages(), { production: false }));
 }
 
 async function main() {
-    const plan = planDocs(loadPublishList(), await codePages(), {
+    const list = loadPublishList();
+    const plan = planDocs(list, await codePages(), {
         production: process.env.VERCEL_ENV === "production",
     });
     writeDocs(plan);
+    const live = searchPagesLive(list);
+    writeSearchContent(live);
     for (const h of plan.held) console.log(heldWarning(h));
     recordDocs({
         built: plan.built,
         held: plan.held.map(({ path, why }) => ({ path, why })),
     });
     console.log(
-        `[docs-content] ${plan.all ? "every page (preview)" : `${plan.built.length} live`}${plan.held.length ? `, ${plan.held.length} held by checks` : ""}`,
+        `[docs-content] ${plan.all ? "every page (preview)" : `${plan.built.length} live`}${plan.held.length ? `, ${plan.held.length} held by checks` : ""}; /for/ and tools: ${live ? `${live.length} live` : "every page"}`,
     );
 }
 

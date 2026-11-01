@@ -1,13 +1,12 @@
 import "@saroh/search-pages/styles.css";
 
-import { loadSearchPage } from "@saroh/search-pages";
 import { GstPage } from "@saroh/search-pages/pages";
 import { notFound } from "next/navigation";
 
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { searchPageRoute } from "@/lib/search-page-route";
-import { builtSearchPages, builtTools } from "@/lib/search-pages";
+import { builtSearchPages, builtTools, searchPages } from "@/lib/search-pages";
 
 /**
  * `/gst/<topic>` (#1204): one page per file in `content/gst/`, drawn by
@@ -37,7 +36,7 @@ export default async function GstRoute({
     const { mode, links } = route.links(p);
     const trade =
         p.forPage && builtSearchPages().some((f) => f.slug === p.forPage)
-            ? loadSearchPage(p.forPage)
+            ? searchPages.loadSearchPage(p.forPage)
             : null;
     return (
         <>

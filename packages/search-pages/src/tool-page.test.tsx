@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ToolPage } from "./components/tool-page";
 import { ToolsHub } from "./components/tools-hub";
-import { allToolPages, listSearchPages, loadToolPage } from "./load";
+import { allToolPages, listSearchPages, loadToolPage } from "./embedded";
 import { unknownClasses } from "./test-classes";
 import { toolChecks } from "./tool-checks";
 import { TOOL_GROUPS } from "./tool-schema";

@@ -5,8 +5,7 @@ import type {
     SearchPageData,
     ToolPageData,
 } from "@saroh/search-pages";
-import { toolChecks } from "@saroh/search-pages";
-import { searchPageChecks } from "@saroh/search-pages/checks";
+import { searchPageChecks, toolChecks } from "@saroh/search-pages/checks";
 import type { DocPage } from "@saroh/search-pages/docs";
 import { docPageChecks } from "@saroh/search-pages/docs";
 import { cn } from "@saroh/ui/lib/utils";

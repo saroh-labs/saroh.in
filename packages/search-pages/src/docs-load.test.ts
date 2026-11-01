@@ -7,7 +7,7 @@ import { DOC_FILES, DOC_SOURCES } from "./docs-content.gen";
 import { embeddedDocs } from "./docs-embedded";
 import type { DocSources } from "./docs-load";
 import { createDocsLoader, parseDocPage } from "./docs-load";
-import { listSearchPages } from "./load";
+import { listSearchPages } from "./embedded";
 
 const GST = DOC_SOURCES.gst?.["salon-and-beauty-services"] ?? "";
 const GUIDE = DOC_SOURCES.guides?.["reduce-no-shows"] ?? "";

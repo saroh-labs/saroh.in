@@ -17,7 +17,7 @@ import {
 } from "./content-pages";
 import type { GstPage as GstData, GuidePage as GuideData } from "./docs";
 import { embeddedDocs } from "./docs-embedded";
-import { loadSearchPage } from "./load";
+import { loadSearchPage } from "./embedded";
 import { unknownClasses } from "./test-classes";
 
 afterEach(cleanup);

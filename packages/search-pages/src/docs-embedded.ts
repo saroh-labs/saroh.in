@@ -1,6 +1,6 @@
 import { DOC_FILES, DOC_SOURCES } from "./docs-content.gen";
 import { createDocsLoader } from "./docs-load";
-import { listSearchPages } from "./load";
+import { listSearchPages } from "./embedded";
 
 /**
  * Every GST page, guide and download in the code, drafts too: for admin,

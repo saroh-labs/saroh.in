@@ -1,6 +1,5 @@
-import { loadToolPage } from "@saroh/search-pages";
-
 import { OG_CONTENT_TYPE, OG_SIZE, ogCard } from "@/lib/og-card";
+import { searchPages } from "@/lib/search-pages";
 
 /** Each free tool's share card: "Free tools" and its headline. */
 export const size = OG_SIZE;
@@ -12,7 +11,7 @@ export async function generateImageMetadata({
     params: { slug: string } | Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const p = loadToolPage(slug);
+    const p = searchPages.loadToolPage(slug);
     return [
         {
             id: "card",
@@ -29,7 +28,7 @@ export default async function Image({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const p = loadToolPage(slug);
+    const p = searchPages.loadToolPage(slug);
     if (!p) return ogCard({ title: "Saroh" });
     return ogCard({ eyebrow: "Free tools", title: p.h1 });
 }

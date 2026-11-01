@@ -1,7 +1,7 @@
 import "@saroh/search-pages/styles.css";
 
 import type { ToolPageData } from "@saroh/search-pages";
-import { loadToolPage, ToolPage } from "@saroh/search-pages";
+import { ToolPage } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -13,6 +13,7 @@ import {
     builtTools,
     isPublished,
     questionsLd,
+    searchPages,
     TOOLS_HUB,
 } from "@/lib/search-pages";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
@@ -40,7 +41,9 @@ interface Props {
 }
 
 function builtTool(slug: string): ToolPageData | null {
-    return built().some((t) => t.slug === slug) ? loadToolPage(slug) : null;
+    return built().some((t) => t.slug === slug)
+        ? searchPages.loadToolPage(slug)
+        : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

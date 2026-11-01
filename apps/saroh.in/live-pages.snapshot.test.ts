@@ -1,7 +1,9 @@
-import { listSearchPages } from "@saroh/search-pages";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+
+// Every page in the code: the build's copy holds them all here (vitest's globalSetup).
+import { searchPages } from "./lib/search-pages";
 
 /**
  * The live /for/ and /tools/ pages, pinned (plan 2026-10-31-002 R12).
@@ -21,8 +23,8 @@ vi.mock("next/navigation", () => ({
     },
 }));
 
-const forPages = listSearchPages({ kind: "for" });
-const tools = listSearchPages({ kind: "tools" });
+const forPages = searchPages.listSearchPages({ kind: "for" });
+const tools = searchPages.listSearchPages({ kind: "tools" });
 
 beforeAll(() => {
     vi.useFakeTimers({ toFake: ["Date"] });

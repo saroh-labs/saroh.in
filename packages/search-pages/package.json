@@ -12,6 +12,7 @@
     "files": [
         "src/**",
         "content/**",
+        "scripts/embed-content.mjs",
         "scripts/embed-docs.mjs",
         "kinds.js",
         "kinds.d.ts"
@@ -21,7 +22,9 @@
         "./checks": "./src/checks.tsx",
         "./docs": "./src/docs.ts",
         "./docs-embedded": "./src/docs-embedded.ts",
+        "./embedded": "./src/embedded.ts",
         "./embed-docs": "./scripts/embed-docs.mjs",
+        "./embed-content": "./scripts/embed-content.mjs",
         "./download": "./src/tools/download.ts",
         "./pages": "./src/content-pages.ts",
         "./kinds": "./kinds.js",

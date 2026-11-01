@@ -11,7 +11,9 @@ import {
     heldWarning,
     LINKS_LIVE,
     planDocs,
+    searchPagesLive,
     writeDocs,
+    writeSearchContent,
 } from "./docs-content.config";
 
 const TODAY = "2026-10-31";
@@ -217,6 +219,47 @@ describe("planDocs: links must land (U12)", () => {
 
     it("a GST page whose only links are its rail tools, trade page and related pins builds alone", () => {
         expect(plan(live(GST)).built).toEqual([GST]);
+    });
+});
+
+describe("searchPagesLive + writeSearchContent (plan 2026-11-01-001, U2)", () => {
+    const LIVE = ["/for/salons", "/for/gyms", "/tools/gst-calculator"];
+    const write = (list: Parameters<typeof searchPagesLive>[0]) => {
+        const genFile = path.join(dir, "search-content.gen.ts");
+        writeSearchContent(searchPagesLive(list), { genFile });
+        const text = fs.readFileSync(genFile, "utf8");
+        const [forPart, toolPart] = text.split("TOOL_SOURCES");
+        const slugs = (part = "") =>
+            [...part.matchAll(/^ {4}"([a-z0-9-]+)":/gm)].map((m) => m[1]);
+        return { for: slugs(forPart), tools: slugs(toolPart) };
+    };
+    const every = (kind: string) =>
+        fs
+            .readdirSync(
+                path.join(
+                    __dirname,
+                    "../../packages/search-pages/content",
+                    kind,
+                ),
+            )
+            .filter((f) => f.endsWith(".mdx"))
+            .map((f) => f.slice(0, -4))
+            .sort();
+
+    it("production: only the live /for/ pages' and tools' words", () => {
+        expect(
+            write({
+                ...live(...LIVE, GST),
+                takenOff: [{ path: "/for/cafes" }],
+            }),
+        ).toEqual({ for: ["gyms", "salons"], tools: ["gst-calculator"] });
+    });
+
+    it("a preview, or no list (next dev, tests): every page", () => {
+        const all = { for: every("for"), tools: every("tools") };
+        expect(all.for).toHaveLength(34);
+        expect(write({ preview: true, live: LIVE })).toEqual(all);
+        expect(write(null)).toEqual(all);
     });
 });
 
