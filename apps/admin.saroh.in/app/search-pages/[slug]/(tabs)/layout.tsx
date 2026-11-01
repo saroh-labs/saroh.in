@@ -42,7 +42,7 @@ export default async function SearchPageLayout({
     if (data.status === "failed") {
         return (
             <AdminShell staff={staff}>
-                <PageContainer>
+                <PageContainer width="full">
                     <FailedPanel things="this search page" />
                 </PageContainer>
             </AdminShell>
@@ -55,7 +55,7 @@ export default async function SearchPageLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     className="mb-5"
                     breadcrumb={[

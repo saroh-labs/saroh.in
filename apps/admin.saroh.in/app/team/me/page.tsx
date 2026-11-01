@@ -22,7 +22,7 @@ export default async function YourPage() {
     }
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <EmptyPanel
                     title="No page yet"
                     description="Your access comes from the emergency staff list, not a recorded grant, so you have no page on the Team. Make yourself Platform owner from the banner to get one."

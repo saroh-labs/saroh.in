@@ -36,7 +36,7 @@ export default async function UserLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Users", name]}
                     title={name}

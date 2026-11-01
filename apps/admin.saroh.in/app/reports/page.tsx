@@ -47,7 +47,7 @@ export default async function ReportsPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Reports"]}
                     title="Reports"

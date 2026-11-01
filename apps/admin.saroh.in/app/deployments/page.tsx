@@ -38,7 +38,7 @@ export default async function DeploymentsPage() {
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Deployments"]}
                     title="Deployments"

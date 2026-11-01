@@ -4,7 +4,7 @@ import { PanelSkeleton } from "@/components/states/panel-skeleton";
 
 export default function LeadsLoading() {
     return (
-        <PageContainer>
+        <PageContainer width="full">
             <PanelSkeleton label="Loading leads" rows={5} />
         </PageContainer>
     );

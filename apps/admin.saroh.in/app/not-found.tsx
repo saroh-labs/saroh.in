@@ -33,7 +33,7 @@ export default async function NotFoundPage() {
     if (staff) {
         return (
             <AdminShell staff={staff}>
-                <PageContainer>{page}</PageContainer>
+                <PageContainer width="full">{page}</PageContainer>
             </AdminShell>
         );
     }

@@ -65,7 +65,7 @@ export default async function WaitlistPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Waitlist"]}
                     title="Waitlist"

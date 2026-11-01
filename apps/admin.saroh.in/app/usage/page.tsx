@@ -48,7 +48,7 @@ export default async function UsagePage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Usage"]}
                     title="Usage"

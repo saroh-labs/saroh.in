@@ -33,7 +33,7 @@ export default async function LeadsPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Leads"]}
                     title="Leads"

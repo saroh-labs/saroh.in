@@ -97,7 +97,7 @@ export default async function OperationPage({
 
     return (
         <AdminShell staff={gate.staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <AutoRefresh active={running} />
                 <PageHeader
                     breadcrumb={["Keep it running", title]}

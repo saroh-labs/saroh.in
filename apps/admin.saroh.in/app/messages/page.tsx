@@ -43,7 +43,7 @@ export default async function MessagesPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Messages"]}
                     title="Messages"

@@ -32,7 +32,7 @@ export default async function ReleaseLayout({
     if (read.status === "failed") {
         return (
             <AdminShell staff={staff}>
-                <PageContainer>
+                <PageContainer width="full">
                     <FailedPanel things="this release" />
                 </PageContainer>
             </AdminShell>
@@ -43,7 +43,7 @@ export default async function ReleaseLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <ReleaseHeader
                     flag={flag}
                     organizations={read.organizations}

@@ -25,7 +25,7 @@ export default async function TeamLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Team"]}
                     title="Team"

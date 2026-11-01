@@ -28,7 +28,7 @@ export default async function ProvidersPage() {
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Providers"]}
                     title="Providers"

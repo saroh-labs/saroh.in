@@ -39,7 +39,7 @@ export default async function SearchPagesPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Search pages"]}
                     title="Search pages"
