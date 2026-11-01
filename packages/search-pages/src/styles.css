@@ -3793,8 +3793,12 @@
     grid-area: main;
     gap: 32px;
 }
+/* Sticky on the inner box: a grid item sticks to the whole grid, so the rail ran down over the band. Stretched, the aside ends where the main column does. */
 .sp-cl-rail .sp-cl-aside {
     grid-area: aside;
+    align-self: stretch;
+}
+.sp-cl-rail .sp-cl-aside-in {
     position: sticky;
     top: 24px;
 }
@@ -4538,6 +4542,8 @@
     }
     .sp-cl-rail .sp-cl-aside {
         order: 2;
+    }
+    .sp-cl-rail .sp-cl-aside-in {
         position: static;
     }
     .sp-cl-hero .sp-cl-grid {

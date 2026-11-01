@@ -110,6 +110,34 @@ test.describe("GST pages, guides and downloads", () => {
         });
     }
 
+    test("a GST page's rail never sits on the closing band, wherever you scroll", async ({
+        page,
+    }) => {
+        await page.goto(`${WEB}/gst/cakes-and-bakery`);
+        const rail = page.locator(".sp-cl-aside-in");
+        const band = page.locator(".sp-cl-band");
+        await expect(rail).toBeVisible();
+        await expect(band).toBeVisible();
+
+        // The band's top at the middle of the screen: where a stuck rail overlapped it.
+        await band.evaluate((el) =>
+            window.scrollBy(
+                0,
+                el.getBoundingClientRect().top - window.innerHeight / 2,
+            ),
+        );
+        for (const scroll of [0, 200, 400]) {
+            await page.evaluate((y) => window.scrollBy(0, y), scroll);
+            const [r, b] = await Promise.all([
+                rail.boundingBox(),
+                band.boundingBox(),
+            ]);
+            if (!r || !b) throw new Error("the rail or the band isn't drawn");
+            // A desk: the rail ends above the band. A phone: it stacks below.
+            expect(r.y + r.height <= b.y || r.y >= b.y + b.height).toBe(true);
+        }
+    });
+
     test("/gst renders, noindex, its trail from Home", async ({ page }) => {
         await page.goto(`${WEB}/gst`);
         await expect(page.getByRole("heading", { level: 1 })).toHaveText(

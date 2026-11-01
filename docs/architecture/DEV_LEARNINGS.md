@@ -6326,3 +6326,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Rule**: in browser specs, find a control by its role and name; placeholder, label and text lookups also match the hidden copy of a streaming page. Reproduce on a production build (`next build && portless <name> next start`), not `next dev`.
 **Then**: the next gate (1 Nov) hit four more admin specs the same way (Billing, a business's page, Modules, the owner refusal), at random: patching specs one by one can't keep up. `useSession` (`e2e/fixtures/sessions.ts`) now makes every `page.goto` wait until no `<div hidden id="S:…">` is left, so every spec that signs in meets the revealed page.
 **Category**: testing · Next streaming
+
+---
+
+## A GST page's side rail slid over the closing band
+
+**Symptom**: 1 Nov, the owner saw a GST page's cards ride down over the dark "Bills with the right rate" band, with the "More GST guides" links dark on dark. 239px of overlap at a 1800px wide window.
+**Cause**: `.sp-cl-aside` was a sticky grid item, and the band is a second row of the same grid (so a phone can put it between the main column and the rail). A sticky grid item here stopped at the bottom of the whole grid, not at the end of its own row, so it kept sticking past the main column.
+**Fix**: the aside stretches to its row and an inner `.sp-cl-aside-in` is the sticky box, so the rail stops where the main column ends.
+**Rule**: when a grid has a row below a sticky column, make an inner box sticky inside a stretched cell. Held by "a GST page's rail never sits on the closing band" in `e2e/tests/search-pages-content.spec.ts`, desk and phone.
+**Category**: frontend · CSS
