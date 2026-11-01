@@ -140,6 +140,20 @@ describe("WaitlistInvitesService.sendOne", () => {
         expect(signups.updateMany).not.toHaveBeenCalled();
     });
 
+    it.each(["qr-maker", "link-preview", "tool:gst-calculator"])(
+        "never invites a free tool's email gate (%s): it isn't waiting for Saroh",
+        async (source) => {
+            signups.findMany!.mockResolvedValue([{ ...waiting, source }]);
+            const [item] = await invites.classify(["w1"], NOW);
+            expect(item).toMatchObject({ verdict: "skip" });
+            expect(item?.detail).toContain("free tool");
+            await expect(invites.sendOne("w1", NOW)).resolves.toMatchObject({
+                status: "SKIPPED",
+            });
+            expect(send).not.toHaveBeenCalled();
+        },
+    );
+
     it("skips an entry another batch claimed between the dry run and now", async () => {
         signups.findMany!.mockResolvedValue([waiting]);
         signups.updateMany!.mockResolvedValue({ count: 0 });

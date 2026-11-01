@@ -8909,6 +8909,10 @@ model ContactMessage {
   // A digest of the writer's address, as the waitlist keeps one; never the address.
   ipHash    String?
   createdAt DateTime @default(now())
+  // When staff marked it handled (they replied from the team's mailbox), and
+  // who; null while it is open. Set from the console's Messages screen.
+  handledAt       DateTime?
+  handledByUserId String?
 
   @@index([createdAt])
 }

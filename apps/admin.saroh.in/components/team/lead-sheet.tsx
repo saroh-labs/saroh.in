@@ -35,6 +35,7 @@ import {
 } from "@/lib/saroh-lead-words";
 
 import { phoneLabel } from "@saroh/ui/lib/phone";
+import { LeadCameFrom } from "./lead-came-from";
 import { LeadDetailsForm } from "./lead-details";
 import { LeadStageControl } from "./lead-stage";
 import { LogCallSheet } from "./log-call-sheet";
@@ -186,7 +187,7 @@ export function LeadSheet({
                                     }}
                                 />
                             ) : (
-                                <DetailList lead={lead} />
+                                <DetailList lead={lead} allScope={allScope} />
                             )}
                         </section>
 
@@ -267,7 +268,13 @@ function Facts({ lead, today }: { lead: LeadDetail; today: string }) {
     );
 }
 
-function DetailList({ lead }: { lead: LeadDetail }) {
+function DetailList({
+    lead,
+    allScope,
+}: {
+    lead: LeadDetail;
+    allScope: boolean;
+}) {
     return (
         <dl className="grid gap-1.5 text-sm">
             <Row term="Email">{lead.email ?? "Not known"}</Row>
@@ -281,7 +288,9 @@ function DetailList({ lead }: { lead: LeadDetail }) {
             <Row term="Follow up on">
                 {lead.followUpOn ? formatDate(lead.followUpOn) : "Not set"}
             </Row>
-            <Row term="Came in">{formatDate(lead.createdAt)}</Row>
+            <Row term="Came in">
+                <LeadCameFrom lead={lead} links={allScope} />
+            </Row>
             {lead.notes ? (
                 <Row term="Notes">
                     <span className="whitespace-pre-line">{lead.notes}</span>

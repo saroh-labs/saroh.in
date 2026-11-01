@@ -90,7 +90,11 @@ export function LeadsBoard({
 
     return (
         <div className="grid min-w-0 gap-4">
-            <Summary board={board} openCount={openCount} />
+            <Summary
+                board={board}
+                openCount={openCount}
+                searched={q.trim() !== ""}
+            />
 
             <ListToolbar
                 search={
@@ -235,22 +239,36 @@ function mergeCards(
     return [...added, ...leads.map((lead) => changed[lead.id] ?? lead)];
 }
 
-function Summary({ board, openCount }: { board: Board; openCount: number }) {
+/**
+ * The board's counts. Every one follows the search (the API counts them all
+ * under it), and says so while a search is on (admin audit F14).
+ */
+function Summary({
+    board,
+    openCount,
+    searched,
+}: {
+    board: Board;
+    openCount: number;
+    searched: boolean;
+}) {
+    const forSearch = (term: string) =>
+        searched ? `${term}, for this search` : term;
     return (
         <div
             role="group"
             aria-label="Leads in numbers"
             className="grid grid-cols-2 gap-3 sm:grid-cols-3"
         >
-            <Stat term="Open leads" value={openCount} />
+            <Stat term={forSearch("Open leads")} value={openCount} />
             <Stat
-                term="Follow-ups overdue"
+                term={forSearch("Follow-ups overdue")}
                 value={board.overdue}
                 warn={board.overdue > 0}
             />
             {board.unowned !== null ? (
                 <Stat
-                    term="Not given out"
+                    term={forSearch("Not given out")}
                     value={board.unowned}
                     warn={board.unowned > 0}
                 />
@@ -323,21 +341,26 @@ function StageColumn({
                 </span>
             </h3>
             {leads.length === 0 ? (
-                <p className="text-sm text-muted-foreground">None here.</p>
+                <p className="text-sm text-muted-foreground">
+                    None yet. Move a lead here from its sheet.
+                </p>
             ) : (
-                <ul className="grid gap-2">
+                // `grid-cols-1` and `min-w-0` hold each card to its column:
+                // a long email no longer pushes it over the next stage (F3).
+                <ul className="grid min-w-0 grid-cols-1 gap-2">
                     {leads.map((lead) => {
                         const due = followUpWords(lead, today);
                         return (
                             <li
                                 key={lead.id}
+                                className="min-w-0"
                                 {...changedRowProps(highlighted(lead.id))}
                             >
                                 <button
                                     type="button"
                                     data-lead={lead.id}
                                     onClick={() => onOpen(lead.id)}
-                                    className="grid w-full gap-0.5 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="grid w-full min-w-0 grid-cols-1 gap-0.5 break-words rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition-colors duration-fast [overflow-wrap:anywhere] hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                     <span className="font-semibold">
                                         {lead.name}

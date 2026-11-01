@@ -75,6 +75,15 @@ export function isToolGateSource(source: string | null | undefined): boolean {
     );
 }
 
+/**
+ * An entry any free tool's email gate made, the link preview's included:
+ * not someone waiting for Saroh, so it makes no lead, isn't counted as
+ * waiting and is never in a batch invite.
+ */
+export function isFreeToolSource(source: string | null | undefined): boolean {
+    return source === LINK_PREVIEW_SOURCE || isToolGateSource(source);
+}
+
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
 /**

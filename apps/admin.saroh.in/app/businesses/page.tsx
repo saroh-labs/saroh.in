@@ -7,6 +7,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin-shell";
 import { BusinessTable } from "@/components/business/business-table";
 import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
+import { FailedPanel } from "@/components/states/failed-panel";
 import type { BusinessQuery } from "@/lib/businesses";
 import { listBusinesses, listPlans } from "@/lib/businesses";
 import { can, requireStaff } from "@/lib/console";
@@ -45,6 +46,8 @@ export default async function BusinessesPage({
         legalHold: raw.legalHold === "on" ? "on" : undefined,
         cursor: clean(raw.cursor),
     };
+    // Which page this is, carried beside the cursor so the range is true.
+    const pageNumber = query.cursor ? Math.max(2, Number(raw.p) || 2) : 1;
 
     const [page, plans] = await Promise.all([
         listBusinesses(query).catch(() => undefined),
@@ -70,17 +73,22 @@ export default async function BusinessesPage({
                     description="Every business on Saroh. A row opens everything about that one."
                 />
 
-                <FilterBar action="/businesses" active={filtered}>
-                    <FilterText
-                        label="Search"
-                        name="q"
-                        defaultValue={query.q}
-                        placeholder={
-                            canSearchEmail
-                                ? "Name, web address, id or a member's email"
-                                : "Name, web address or id"
-                        }
-                    />
+                <FilterBar
+                    action="/businesses"
+                    active={filtered}
+                    search={
+                        <FilterText
+                            label="Search"
+                            name="q"
+                            defaultValue={query.q}
+                            placeholder={
+                                canSearchEmail
+                                    ? "Name, web address, id or a member's email"
+                                    : "Name, web address or id"
+                            }
+                        />
+                    }
+                >
                     <FilterSelect
                         label="State"
                         name="lifecycle"
@@ -127,10 +135,7 @@ export default async function BusinessesPage({
                 </FilterBar>
 
                 {page === undefined ? (
-                    <FailedState
-                        title="The directory could not be loaded"
-                        description="The API did not answer. Nothing has changed; try again in a moment."
-                    />
+                    <FailedPanel things="businesses" />
                 ) : page === null ? (
                     <FailedState
                         title="That search was refused"
@@ -142,7 +147,10 @@ export default async function BusinessesPage({
                     />
                 ) : (
                     <>
-                        <BusinessTable rows={page.items} />
+                        <BusinessTable
+                            rows={page.items}
+                            range={rangeWords(pageNumber, page.items.length)}
+                        />
                         <nav
                             aria-label="Pages"
                             className="flex flex-wrap items-center justify-end gap-2"
@@ -160,7 +168,11 @@ export default async function BusinessesPage({
                             )}
                             {page.nextCursor && (
                                 <Link
-                                    href={pageHref(query, page.nextCursor)}
+                                    href={pageHref(
+                                        query,
+                                        page.nextCursor,
+                                        pageNumber + 1,
+                                    )}
                                     className={buttonVariants({
                                         variant: "outline",
                                         size: "sm",
@@ -182,11 +194,26 @@ function clean(value?: string): string | undefined {
     return trimmed === "" ? undefined : trimmed;
 }
 
-function pageHref(query: BusinessQuery, cursor: string | undefined): string {
+/** The API's page: 25 businesses (`admin-organizations.service.ts`). */
+const PAGE_SIZE = 25;
+
+/** "Showing 26–50": which of the directory this page holds. */
+function rangeWords(pageNumber: number, count: number): string {
+    if (count === 0) return "None showing";
+    const first = (pageNumber - 1) * PAGE_SIZE + 1;
+    return `Showing ${first}–${first + count - 1}`;
+}
+
+function pageHref(
+    query: BusinessQuery,
+    cursor: string | undefined,
+    pageNumber?: number,
+): string {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries({ ...query, cursor })) {
         if (value) search.set(key, value);
     }
+    if (cursor && pageNumber) search.set("p", String(pageNumber));
     return search.size > 0 ? `/businesses?${search.toString()}` : "/businesses";
 }
 

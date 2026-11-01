@@ -9,6 +9,12 @@ import { prisma } from "@saroh/database";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { deleteWebsiteLeadOnRequest } from "../saroh-leads/lead-retention";
 import { WaitlistInvitesService } from "../waitlist/invites.service";
+import {
+    LINK_PREVIEW_SOURCE,
+    normaliseEmail,
+    QR_MAKER_SOURCE,
+    TOOL_SOURCE_PREFIX,
+} from "../waitlist/waitlist-keys";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
 
@@ -16,13 +22,32 @@ const PAGE_SIZE = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface WaitlistQuery {
-    state?: "waiting" | "invited";
+    state?: "waiting" | "invited" | "tools";
+    email?: string;
     source?: string;
     kind?: string;
     city?: string;
     country?: string;
     cursor?: string;
 }
+
+/**
+ * Entries a free tool's email gate made (the link preview, the QR code
+ * maker, `tool:<slug>`). The public join makes no lead for them: they are
+ * not people waiting for Saroh, so Waiting, its counts and a batch invite
+ * leave them out, and "Came from a free tool" lists them.
+ */
+const TOOL_GATE: Prisma.WaitlistSignupWhereInput = {
+    OR: [
+        { source: { in: [LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE] } },
+        { source: { startsWith: TOOL_SOURCE_PREFIX } },
+    ],
+};
+// A null source is a person (the form records none on old entries); `NOT`
+// alone would drop those, as SQL's NOT does with NULL.
+const NOT_TOOL_GATE: Prisma.WaitlistSignupWhereInput = {
+    OR: [{ source: null }, { NOT: TOOL_GATE }],
+};
 
 /** How many cities and referrers the summary names. */
 const TOP_CITIES = 12;
@@ -47,7 +72,11 @@ export class AdminWaitlistService {
 
     async summary() {
         const now = Date.now();
-        const waitingOnly = { invitedAt: null };
+        // Waiting for Saroh: not invited, and not a free tool's email gate.
+        const waitingOnly: Prisma.WaitlistSignupWhereInput = {
+            invitedAt: null,
+            ...NOT_TOOL_GATE,
+        };
         const [
             waiting,
             invited,
@@ -59,6 +88,7 @@ export class AdminWaitlistService {
             oldest,
             lastWeek,
             joined,
+            fromTools,
         ] = await Promise.all([
             prisma.waitlistSignup.count({ where: waitingOnly }),
             prisma.waitlistSignup.count({
@@ -100,9 +130,15 @@ export class AdminWaitlistService {
                 orderBy: { createdAt: "asc" },
             }),
             prisma.waitlistSignup.count({
-                where: { createdAt: { gte: new Date(now - 7 * DAY_MS) } },
+                where: {
+                    createdAt: { gte: new Date(now - 7 * DAY_MS) },
+                    ...NOT_TOOL_GATE,
+                },
             }),
             prisma.waitlistSignup.count({ where: { joinedAt: { not: null } } }),
+            prisma.waitlistSignup.count({
+                where: { invitedAt: null, ...TOOL_GATE },
+            }),
         ]);
         const referrerIds = referrers.flatMap((row) =>
             row.referredById ? [row.referredById] : [],
@@ -158,6 +194,8 @@ export class AdminWaitlistService {
             }),
             // U31: invited people who made their business with the invite.
             joined,
+            // Free-tool email gates, kept apart from Waiting.
+            fromTools,
             ...inviteState(this.invites.readiness()),
         };
     }
@@ -166,7 +204,12 @@ export class AdminWaitlistService {
         const where: Prisma.WaitlistSignupWhereInput = {
             ...(query.state === "invited"
                 ? { invitedAt: { not: null } }
-                : { invitedAt: null }),
+                : query.state === "tools"
+                  ? { invitedAt: null, ...TOOL_GATE }
+                  : { invitedAt: null, ...NOT_TOOL_GATE }),
+            ...(query.email
+                ? { emailKey: normaliseEmail(query.email).key }
+                : {}),
             ...(query.source === "none"
                 ? { source: null }
                 : query.source
@@ -200,6 +243,7 @@ export class AdminWaitlistService {
                 plan: true,
                 position: true,
                 source: true,
+                emailKey: true,
                 createdAt: true,
                 invitedAt: true,
                 inviteSentAt: true,
@@ -213,10 +257,28 @@ export class AdminWaitlistService {
         });
         const hasMore = rows.length > PAGE_SIZE;
         const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+        // Which of them are also one of Saroh's leads (the Lead link).
+        const keys = page.map((row) => row.emailKey);
+        const leads =
+            keys.length === 0
+                ? []
+                : await prisma.sarohLead.findMany({
+                      where: {
+                          OR: [
+                              { emailKey: { in: keys } },
+                              { signUpEmailKey: { in: keys } },
+                          ],
+                      },
+                      select: { emailKey: true, signUpEmailKey: true },
+                  });
+        const leadKeys = new Set(
+            leads.flatMap((lead) => [lead.emailKey, lead.signUpEmailKey]),
+        );
         return {
-            items: page.map(({ _count, ...row }) => ({
+            items: page.map(({ _count, emailKey, ...row }) => ({
                 ...row,
                 referrals: _count.referrals,
+                isLead: leadKeys.has(emailKey),
             })),
             nextCursor: hasMore ? page[page.length - 1]?.id : undefined,
         };

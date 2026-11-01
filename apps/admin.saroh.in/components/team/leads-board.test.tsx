@@ -161,7 +161,11 @@ describe("LeadsBoard", () => {
         ).toBeTruthy();
         expect(within(column("TALKED")).getByText("City Physio")).toBeTruthy();
         expect(within(column("WON")).getByText("Leafy Cafe")).toBeTruthy();
-        expect(within(column("DEMO")).getByText("None here.")).toBeTruthy();
+        expect(
+            within(column("DEMO")).getByText(
+                "None yet. Move a lead here from its sheet.",
+            ),
+        ).toBeTruthy();
         expect(
             within(column("NEW")).getByText("Enquiry · gym · Rohtak"),
         ).toBeTruthy();

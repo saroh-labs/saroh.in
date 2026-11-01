@@ -468,6 +468,14 @@ export class SearchPeopleDto {
     @ArrayMaxSize(PEOPLE_FILTERS.length)
     @IsIn(PEOPLE_FILTERS, { each: true })
     filter?: PeopleFilter[];
+
+    /** Which page of the list, from 1 (`LIST_LIMIT` a page). Text: converted. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(1000)
+    page?: number;
 }
 
 /** Change a person's sign-in email (U9). */
@@ -554,9 +562,20 @@ export class ExplainFlagDto {
 }
 
 export class ListWaitlistDto {
+    /**
+     * Waiting (the default) leaves out free-tool email gates, which are not
+     * people waiting for Saroh; "tools" lists only those.
+     */
     @IsOptional()
-    @IsIn(["waiting", "invited"])
-    state?: "waiting" | "invited";
+    @IsIn(["waiting", "invited", "tools"])
+    state?: "waiting" | "invited" | "tools";
+
+    /** One person's entry, by their address (the Leads and Messages links). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(320)
+    email?: string;
 
     @IsOptional()
     @IsString()
@@ -612,10 +631,28 @@ export class ListContactMessagesDto {
     @IsIn(CONTACT_TOPICS)
     topic?: ContactTopic;
 
+    /** Open (not handled yet) or handled; both when unset. */
+    @IsOptional()
+    @IsIn(["open", "handled"])
+    state?: "open" | "handled";
+
+    /** One person's messages, by their address (the Leads link). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(320)
+    email?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(200)
     cursor?: string;
+}
+
+/** Mark a message handled, or open again (the team replied from its mailbox). */
+export class MarkContactMessageDto {
+    @IsBoolean()
+    handled!: boolean;
 }
 
 /**

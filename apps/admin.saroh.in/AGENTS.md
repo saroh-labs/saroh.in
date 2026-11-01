@@ -81,12 +81,31 @@ recorded grant (the API refuses it otherwise).
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
   `lib/roles-matrix.ts`, `lib/commission-words.ts`,
   `lib/own-rate-words.ts`, `lib/team-member-words.ts`,
-  `lib/search-page-words.ts`.
+  `lib/search-page-words.ts`, `lib/waitlist-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
-  saroh.in/contact, newest first, by topic on asking. Read-only: the reply
-  goes from the team's mailbox. Every row is personal data, so the screen
-  and its `GET /admin/contact-messages` need `organization:pii:read`; it
-  adds no permission.
+  saroh.in/contact, newest first, by topic, Open / Handled and address on
+  asking. The reply goes from the team's mailbox; Mark handled / Open again
+  (`POST /admin/contact-messages/:id/handled`, `organization:pii:read` and
+  `reports:resolve`, on the admin ledger; a toggle, no dialog: it goes
+  straight back) records that someone did (DEC-137 amended 1 Nov). Each row
+  links to the same person's lead, waitlist entry and account when there
+  is one, read-only. Every row is personal data, so the screen and its
+  `GET /admin/contact-messages` need `organization:pii:read`.
+- **Waitlist (`/waitlist`)**: free-tool email gates (`link-preview`,
+  `qr-maker`, `tool:*`) are not people waiting for Saroh. Waiting, its
+  counts, breakdowns and Invite leave them out (the API's
+  `admin-waitlist.service.ts`; a batch invite skips them in its dry run);
+  Showing › Came from a free tool lists them. Invite stays in the header,
+  disabled with the API's reason, while invites can't go. The rows are a
+  `DataView` (stacked on a phone, Remove beside each), with the breakdowns
+  after the list.
+- **`FilterBar`** (Businesses, Waitlist, Messages, Jobs, Webhooks,
+  Reports) applies a dropdown as it is picked and the search on Enter,
+  drops empty fields from the address, and keeps Apply (the no-script
+  path). On a phone the `search` slot stays and the rest folds behind
+  "Filters (n)". Server-paged lists that use `DataView` pass a `paging`
+  whose total is 0, so the view's own footer never contradicts the
+  server's pager.
 - **Usage (`/usage`, #798)** lists every business by the storage its
   photos and videos use (READY media, as the plan's `storageGb` counts
   it, shown in KB, MB or GB), beside its plan's storage limit and the

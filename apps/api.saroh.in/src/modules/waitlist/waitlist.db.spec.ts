@@ -278,6 +278,40 @@ describe("the console's read", () => {
         ]);
     });
 
+    it("leaves free-tool email gates out of Waiting, and lists them apart", async () => {
+        for (const source of ["qr-maker", "link-preview", "tool:gst"]) {
+            await prisma.waitlistSignup.create({
+                data: {
+                    email: mail(source),
+                    emailKey: mail(source),
+                    source,
+                    newsConsent: false,
+                },
+            });
+        }
+        const summary = await admin.summary();
+        expect(summary.waiting).toBe(4);
+        expect(summary.joinedLastWeek).toBe(4);
+        expect(summary.fromTools).toBe(3);
+        expect(summary.bySource.map((row) => row.source)).not.toContain(
+            "qr-maker",
+        );
+        const waiting = await admin.list({});
+        expect(waiting.items).toHaveLength(4);
+        const tools = await admin.list({ state: "tools" });
+        expect(tools.items.map((row) => row.source).sort()).toEqual([
+            "link-preview",
+            "qr-maker",
+            "tool:gst",
+        ]);
+    });
+
+    it("finds one person's entry by their address, whatever its case", async () => {
+        const found = await admin.list({ email: mail("c").toUpperCase() });
+        expect(found.items.map((row) => row.businessName)).toEqual(["C"]);
+        expect(found.items[0]?.isLead).toBe(true);
+    });
+
     it("filters by country, and by none", async () => {
         const us = await admin.list({ country: "us" });
         expect(us.items.map((r) => [r.businessName, r.country])).toEqual([
