@@ -42,6 +42,7 @@ export class AdminPeopleController {
         const rows = await this.people.search({
             q: query.q,
             filters: query.filter,
+            page: query.page,
         });
         await this.adminAudit.recordRead({
             actorUserId: staff.userId,
@@ -50,7 +51,8 @@ export class AdminPeopleController {
             targetType: "user",
             outcome: AdminAuditOutcome.Success,
             metadata: {
-                resultCount: rows.length,
+                resultCount: rows.items.length,
+                page: query.page ?? 1,
                 searched: Boolean(query.q),
                 filters: query.filter ?? [],
             },

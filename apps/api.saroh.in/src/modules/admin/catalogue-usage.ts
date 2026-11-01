@@ -8,7 +8,12 @@ export type UsageNote =
     /** Locations at 0 because every storefront it has sells online only. */
     | "online-only"
     /** A cap inside each product (variants, DEC-158): there is no total. */
-    | "per-product";
+    | "per-product"
+    /**
+     * Team members are seats (DEC-155): people, invitations still open and
+     * bookable staff with no sign-in, so it can be more than its people.
+     */
+    | "seats";
 
 export interface CatalogueUsage {
     /** Metering's count by catalogue row id, for the metered rows asked for. */
@@ -53,6 +58,7 @@ export function usageNote(
     storefronts: number,
 ): UsageNote | null {
     if (limitWithin(moduleId) === "product") return "per-product";
+    if (meteredKeyOf(moduleId) === "teamMembers") return "seats";
     return meteredKeyOf(moduleId) === "shopLocations" &&
         usage === 0 &&
         storefronts > 0

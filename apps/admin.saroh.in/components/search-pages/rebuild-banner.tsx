@@ -10,6 +10,16 @@ import { formatDateTime } from "@/lib/format";
 /** The API caches GitHub's answer for 15s: never ask faster than this. */
 export const POLL_MS = 20_000;
 
+/** Reads the screen again every 20 seconds while a rebuild runs. */
+export function useRebuildPoll(running: boolean): void {
+    const router = useRouter();
+    useEffect(() => {
+        if (!running) return;
+        const timer = setInterval(() => router.refresh(), POLL_MS);
+        return () => clearInterval(timer);
+    }, [running, router]);
+}
+
 /**
  * "<site> is rebuilding." while the API says a rebuild runs, read again
  * every 20 seconds until it's done; then the statuses settle. Nothing
@@ -30,12 +40,7 @@ export function RebuildBanner({
     /** /deployments, for staff who can open it. */
     deploymentsHref?: string;
 }) {
-    const router = useRouter();
-    useEffect(() => {
-        if (!running) return;
-        const timer = setInterval(() => router.refresh(), POLL_MS);
-        return () => clearInterval(timer);
-    }, [running, router]);
+    useRebuildPoll(running);
     if (!running) return null;
     return (
         <Notice

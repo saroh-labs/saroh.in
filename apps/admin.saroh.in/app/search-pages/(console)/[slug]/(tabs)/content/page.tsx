@@ -19,7 +19,7 @@ export async function generateMetadata({
 }) {
     const { slug } = await params;
     return {
-        title: `${loadPage(slug)?.page.path ?? slug} · Content · Search pages`,
+        title: `${loadPage(slug)?.page.name ?? slug} · Content · Search pages`,
     };
 }
 

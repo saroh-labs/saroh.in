@@ -58,6 +58,19 @@ export function userListHref(query: UserListQuery): string {
     return suffix ? `/users?${suffix}` : "/users";
 }
 
+/** Which page of the list an address asks for, from 1. */
+export function readUserPage(value: string | string[] | undefined): number {
+    const n = Number(Array.isArray(value) ? value[0] : value);
+    return Number.isInteger(n) && n > 1 && n <= 1000 ? n : 1;
+}
+
+/** The list's address for a query on one page. Page 1 has no `page`. */
+export function userPageHref(query: UserListQuery, page: number): string {
+    const base = userListHref(query);
+    if (page <= 1) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}page=${page}`;
+}
+
 /** The query with one chip turned on or off. */
 export function toggleChip(
     query: UserListQuery,

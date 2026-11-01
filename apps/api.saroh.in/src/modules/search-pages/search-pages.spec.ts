@@ -17,7 +17,7 @@ import { validationPipeOptions } from "../../common/validation";
 import { AdminPermission } from "../admin/admin-permissions";
 import { SearchPageActionDto, SearchPageHistoryQueryDto } from "./dto";
 import type { SearchPageAction, SearchPageStatus } from "./search-page-rules";
-import { changesLive, nextStatus } from "./search-page-rules";
+import { cancelStatus, changesLive, nextStatus } from "./search-page-rules";
 import {
     enqueueWebDeploy,
     SEARCH_PAGES_DEPLOY_TYPE,
@@ -55,12 +55,24 @@ describe("search page transitions (DEC-193)", () => {
         unpublish: [null, null, null, "UNPUBLISHED", null],
         archive: ["ARCHIVED", "ARCHIVED", "ARCHIVED", "ARCHIVED", null],
         restore: [null, null, null, null, "DRAFT"],
+        // Cancel reads the released status too: `cancelStatus`.
+        cancel: [null, null, null, null, null],
     };
 
     it.each(Object.entries(table))("%s from each status", (action, to) => {
         expect(
             from.map((f) => nextStatus(action as SearchPageAction, f)),
         ).toEqual(to);
+    });
+
+    it("cancels a staged change back to the released status, and nothing else", () => {
+        expect(cancelStatus("LIVE", "DRAFT")).toBe("DRAFT");
+        expect(cancelStatus("LIVE", null)).toBe("DRAFT");
+        expect(cancelStatus("LIVE", "UNPUBLISHED")).toBe("UNPUBLISHED");
+        expect(cancelStatus("ARCHIVED", "LIVE")).toBe("LIVE");
+        expect(cancelStatus("UNPUBLISHED", "LIVE")).toBe("LIVE");
+        expect(cancelStatus("LIVE", "LIVE")).toBeNull();
+        expect(cancelStatus(null, null)).toBeNull();
     });
 
     it("counts only a move onto or off the site as a live change", () => {

@@ -1,9 +1,7 @@
-import { Wordmark } from "@saroh/ui/wordmark";
-import Link from "next/link";
-
 import { AppsMenu } from "@/components/apps-menu";
 import { BreakGlassBanner } from "@/components/break-glass-banner";
 import { ConsoleDrawer } from "@/components/console-drawer";
+import { ConsoleFrame } from "@/components/console-frame";
 import { ConsoleRail } from "@/components/console-rail";
 import { ConsoleSearch } from "@/components/console-search";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -32,47 +30,38 @@ export async function AdminShell({
     const instance = await instanceApps();
 
     return (
-        <div className="flex min-h-screen flex-col">
-            {/* Sticky, at a fixed 56px from 640px up, so the rail (from
-                760px) can sit exactly below it and only the work area moves
-                with the page. On a phone, where there is no rail, the search
-                takes a second row of its own. */}
-            <header className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-background px-3 py-2 sm:h-14 sm:flex-nowrap sm:px-4 sm:py-0">
-                <ConsoleDrawer permissions={staff.permissions} />
-                <Link href="/" className="shrink-0">
-                    <Wordmark suffix="console" />
-                </Link>
-                {/* Search finds a business, a user or a Razorpay id from
-                    any screen (U10, R15). */}
-                <div className="order-last flex min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto">
-                    <ConsoleSearch />
-                </div>
-                <div className="ml-auto flex min-w-0 items-center gap-3">
+        <ConsoleFrame
+            drawer={<ConsoleDrawer permissions={staff.permissions} />}
+            // Search finds a business, a user or a Razorpay id from any
+            // screen (U10, R15).
+            search={<ConsoleSearch />}
+            account={
+                <>
                     <p className="hidden min-w-0 truncate text-[12px] text-muted-foreground md:block">
                         {staff.email}
                         <span aria-hidden> · </span>
                         <span className="sr-only">, </span>
-                        {staff.roles
-                            .map((role) => ROLE_LABEL[role])
-                            .join(" · ")}
+                        {/* Someone in through the allow-list borrows the
+                            permissions, not a role on the record (audits
+                            M2/F7, 1 Nov). */}
+                        {staff.viaBootstrap ? (
+                            <span className="text-warning">
+                                Emergency access
+                            </span>
+                        ) : (
+                            staff.roles
+                                .map((role) => ROLE_LABEL[role])
+                                .join(" · ")
+                        )}
                     </p>
                     {instance && <AppsMenu instance={instance} />}
                     <SignOutButton />
-                </div>
-            </header>
-
-            <div className="flex min-h-0 flex-1">
-                <ConsoleRail permissions={staff.permissions} />
-                {/* The work area steps up from the ground in dark, which is
-                    the design system's rule read in the console's direction.
-                    Not a <main>: each screen's `PageContainer` is that. */}
-                <div className="min-w-0 flex-1 bg-card/40">
-                    {/* In the work area rather than across the top, so the
-                        header and rail keep one fixed height to stick at. */}
-                    {staff.viaBootstrap && <BreakGlassBanner />}
-                    {children}
-                </div>
-            </div>
-        </div>
+                </>
+            }
+            rail={<ConsoleRail permissions={staff.permissions} />}
+            banner={staff.viaBootstrap ? <BreakGlassBanner /> : null}
+        >
+            {children}
+        </ConsoleFrame>
     );
 }

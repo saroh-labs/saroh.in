@@ -47,7 +47,7 @@ export default async function WebhooksPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Webhooks"]}
                     title="Webhooks"

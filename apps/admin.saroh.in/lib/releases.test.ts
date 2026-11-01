@@ -7,7 +7,10 @@ import {
     flagsRedirect,
     globalChange,
     globalImpact,
+    haveItLabel,
     inverseOf,
+    matchesBusiness,
+    passesWho,
     releaseCounts,
     releaseState,
     reviewOverdue,
@@ -242,5 +245,42 @@ describe("inverseOf", () => {
     it("records an Undo with the original reason", () => {
         expect(undoReason("Rolling out")).toBe("Undo: Rolling out");
         expect(undoReason("x".repeat(600))).toHaveLength(500);
+    });
+});
+
+describe("haveItLabel, matchesBusiness and passesWho", () => {
+    it("says a module is allowed, not had", () => {
+        expect(haveItLabel(payments, 19, 100)).toBe("Allowed for 19");
+        expect(haveItLabel(payments, 3, 3)).toBe("Allowed for all 3");
+        expect(haveItLabel(shop, 1, 3)).toBe("1 business");
+        expect(haveItLabel(shop, 3, 3)).toBe("All 3 businesses");
+    });
+
+    it("finds a business by name or web address", () => {
+        const row = { name: "Asha Rao Studio", slug: "asha-rao-2" };
+        expect(matchesBusiness(row, "")).toBe(true);
+        expect(matchesBusiness(row, "studio")).toBe(true);
+        expect(matchesBusiness(row, "RAO-2")).toBe(true);
+        expect(matchesBusiness({ name: "Gone", slug: null }, "rao")).toBe(
+            false,
+        );
+    });
+
+    it("narrows Who has it by what each business gets", () => {
+        const f = flag("MODULE_PAYMENTS", "Payments", "module", {
+            enabledByDefault: false,
+            overrides: [
+                {
+                    organizationId: "o1",
+                    organizationName: "Org 1",
+                    enabled: true,
+                },
+            ],
+        });
+        const rows = whoHasIt(f, orgs(3));
+        expect(rows.filter((r) => passesWho(r, "on"))).toHaveLength(1);
+        expect(rows.filter((r) => passesWho(r, "off"))).toHaveLength(2);
+        expect(rows.filter((r) => passesWho(r, "own"))).toHaveLength(1);
+        expect(rows.filter((r) => passesWho(r, "all"))).toHaveLength(3);
     });
 });

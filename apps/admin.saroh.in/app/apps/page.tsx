@@ -23,7 +23,7 @@ export default async function AppsPage() {
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Saroh's apps"]}
                     title="Saroh's apps"

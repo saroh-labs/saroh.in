@@ -42,6 +42,13 @@ export interface RecentSignup {
     businesses: { id: string; name: string }[];
 }
 
+/** One page of the Users list, and whether another follows it. */
+export interface PeoplePage {
+    items: PersonRow[];
+    /** The next page's number, when there is one. */
+    nextPage?: number;
+}
+
 export interface PersonDetail extends PersonRow {
     memberships: {
         organizationId: string;
@@ -82,27 +89,38 @@ export class AdminPeopleService {
 
     /**
      * The Users list (U9): a search, the chips, or both. With neither, the
-     * newest accounts first; with a search, by email. At most
-     * {@link LIST_LIMIT} rows.
+     * newest accounts first; with a search, by email. {@link LIST_LIMIT}
+     * rows a page, numbered from 1, so nobody past the 50th is out of reach.
      */
     async search(
-        input: { q?: string; filters?: readonly PeopleFilter[] } = {},
-    ): Promise<PersonRow[]> {
+        input: {
+            q?: string;
+            filters?: readonly PeopleFilter[];
+            page?: number;
+        } = {},
+    ): Promise<PeoplePage> {
         const term = input.q?.trim() ?? "";
         if (term.length === 1) {
             throw new BadRequestException(
                 "Search with at least two characters.",
             );
         }
+        const page = input.page ?? 1;
         const users = await prisma.user.findMany({
             where: peopleWhere(term, input.filters ?? []),
             select: personSelect,
             orderBy: term
                 ? [{ email: "asc" }]
                 : [{ createdAt: "desc" }, { id: "desc" }],
-            take: LIST_LIMIT,
+            skip: (page - 1) * LIST_LIMIT,
+            // One more than a page: whether a next page exists.
+            take: LIST_LIMIT + 1,
         });
-        return Promise.all(users.map((user) => personRow(user)));
+        const rows = users.slice(0, LIST_LIMIT);
+        return {
+            items: await Promise.all(rows.map((user) => personRow(user))),
+            nextPage: users.length > LIST_LIMIT ? page + 1 : undefined,
+        };
     }
 
     /** What staff did to this person (the History tab). */

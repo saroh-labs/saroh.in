@@ -93,7 +93,7 @@ import { PlatformPermissionGuard } from "../../common/guards/platform-permission
 import type { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminPeopleController } from "./admin-people.controller";
-import { AdminPeopleService } from "./admin-people.service";
+import { AdminPeopleService, LIST_LIMIT } from "./admin-people.service";
 import type { AdminRole } from "./admin-permissions";
 import { AdminRole as Roles, permissionsFor } from "./admin-permissions";
 import {
@@ -238,7 +238,7 @@ describe("the Users list's chips (U9)", () => {
         await member(unverified.id, shop.id, "MEMBER");
 
         const ids = async (filters: Parameters<typeof people.search>[0]) =>
-            (await people.search({ q: `chips-`, ...filters }))
+            (await people.search({ q: `chips-`, ...filters })).items
                 .map((row) => row.id)
                 .sort();
 
@@ -254,7 +254,9 @@ describe("the Users list's chips (U9)", () => {
         ).toEqual([loner.id]);
         expect(await ids({ filters: ["owners", "unverified"] })).toEqual([]);
 
-        const [row] = await people.search({
+        const {
+            items: [row],
+        } = await people.search({
             q: owner.email,
             filters: ["owners"],
         });
@@ -269,10 +271,26 @@ describe("the Users list's chips (U9)", () => {
     it("lists the newest accounts with no search, and refuses a one-letter search", async () => {
         const newest = await person("newest");
         const rows = await people.search({});
-        expect(rows[0]?.id).toBe(newest.id);
+        expect(rows.items[0]?.id).toBe(newest.id);
         await expect(people.search({ q: "a" })).rejects.toBeInstanceOf(
             BadRequestException,
         );
+    });
+});
+
+describe("Users list paging", () => {
+    it("pages past the first LIST_LIMIT, so nobody is out of reach", async () => {
+        for (let i = 0; i < LIST_LIMIT + 1; i += 1) await person(`paging-${i}`);
+        const first = await people.search({ q: "paging-" });
+        expect(first.items).toHaveLength(LIST_LIMIT);
+        expect(first.nextPage).toBe(2);
+        const second = await people.search({ q: "paging-", page: 2 });
+        expect(second.items).toHaveLength(1);
+        expect(second.nextPage).toBeUndefined();
+        const seen = new Set(
+            [...first.items, ...second.items].map((row) => row.id),
+        );
+        expect(seen.size).toBe(LIST_LIMIT + 1);
     });
 });
 

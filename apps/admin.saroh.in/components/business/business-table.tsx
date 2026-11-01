@@ -3,14 +3,16 @@
 import { Badge } from "@saroh/ui/badge";
 import type { DataColumn } from "@saroh/ui/data-view";
 import { DataView } from "@saroh/ui/data-view";
+import type { MouseEvent } from "react";
 
 import type { BusinessRow } from "@/lib/businesses";
-import { formatRelative, plural } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import { moduleLabel } from "@/lib/modules";
 import { planNote } from "@/lib/plan-words";
+import { SERVER_PAGED } from "@/lib/server-paged";
 
 import {
-    ATTENTION_LABEL,
+    attentionLabel,
     LegalHoldBadge,
     LifecycleBadge,
 } from "./lifecycle-badge";
@@ -40,7 +42,7 @@ const COLUMNS: DataColumn<BusinessRow>[] = [
                 {row.legalHold && <LegalHoldBadge />}
                 {row.attention.map((reason) => (
                     <Badge key={reason} variant="warning">
-                        {ATTENTION_LABEL[reason]}
+                        {attentionLabel(reason, row.lastActiveAt)}
                     </Badge>
                 ))}
             </div>
@@ -108,26 +110,56 @@ function PlanCell({ row }: { row: BusinessRow }) {
 }
 
 /**
+ * A click anywhere on a table row opens the business, as its name does
+ * (admin audit F2). The name stays the row's one link, so keyboard and
+ * screen-reader users reach it as before; a click on any other link or
+ * control in the row, a modified click, or a click that ends a text
+ * selection is left alone.
+ */
+function openRow(event: MouseEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        return;
+    const target = event.target as Element;
+    if (target.closest("a, button, input, select, textarea, label")) return;
+    if (window.getSelection()?.toString()) return;
+    target
+        .closest("tbody tr")
+        ?.querySelector<HTMLAnchorElement>("a[href]")
+        ?.click();
+}
+
+/**
  * The directory's rows. Searching and paging are the server's — the query
  * string drives them — so this table only lays out the page it is given.
  */
-export function BusinessTable({ rows }: { rows: BusinessRow[] }) {
+export function BusinessTable({
+    rows,
+    range,
+}: {
+    rows: BusinessRow[];
+    /** Which of the directory these are: "Showing 1–25". */
+    range: string;
+}) {
     return (
-        <DataView
-            viewId="console-businesses"
-            rows={rows}
-            columns={COLUMNS}
-            rowKey={(row) => row.id}
-            rowHref={(row) => `/businesses/${row.id}`}
-            modes={["table", "list"]}
-            noun={{ one: "business", other: "businesses" }}
-            countLabel={(visible) =>
-                `${plural(visible, "business", "businesses")} on this page`
-            }
-            emptyState={{
-                title: "No business matches",
-                note: "Change the search or clear the filters.",
-            }}
-        />
+        // Delegated, not a handler per row: DataView draws the rows. The
+        // keyboard's way in is the name's link, so no key handler here.
+        <div onClick={openRow} className="[&_tbody_tr]:cursor-pointer">
+            <DataView
+                viewId="console-businesses"
+                rows={rows}
+                columns={COLUMNS}
+                rowKey={(row) => row.id}
+                rowHref={(row) => `/businesses/${row.id}`}
+                modes={["table", "list"]}
+                noun={{ one: "business", other: "businesses" }}
+                countLabel={() => range}
+                paging={SERVER_PAGED}
+                emptyState={{
+                    title: "No business matches",
+                    note: "Change the search or clear the filters.",
+                }}
+            />
+        </div>
     );
 }

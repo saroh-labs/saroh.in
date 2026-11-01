@@ -115,7 +115,7 @@ export function AddLeadSheet({
                     <Field
                         label="Email"
                         optional
-                        hint="The first teammate to record an email owns the lead."
+                        hint="Recording an email first claims the lead for whoever it's given to."
                         error={errors.email}
                     >
                         <Input

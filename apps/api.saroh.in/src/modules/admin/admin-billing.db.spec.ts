@@ -703,6 +703,42 @@ describe("Admin › Billing: one page (R25, R26)", () => {
         expect(both).toEqual([one.trial]);
     });
 
+    it("Paying counts and lists ACTIVE on a priced plan only, never Free (DEC-179 follow-up)", async () => {
+        const free = await prisma.plan.create({
+            data: {
+                key: `spec.${tag}.free`,
+                version: 1,
+                name: "Plan F",
+                priceCents: 0,
+                interval: "month",
+                entitlements: {},
+            },
+        });
+        const onFree = await org("OnFree");
+        await prisma.subscription.create({
+            data: { organizationId: onFree, planId: free.id, status: "ACTIVE" },
+        });
+
+        const res = await get(
+            "/billing/subscriptions?view=paying",
+            people.billing,
+        );
+        expect(res.status).toBe(200);
+        const page = (await res.json()) as {
+            items: SubRow[];
+            total: number;
+            summary: { paying: number };
+        };
+        const listed = orgsOf(page.items);
+        expect(listed).toContain(one.autopay);
+        expect(listed).not.toContain(onFree);
+        expect(listed).not.toContain(one.trial);
+        expect(listed).not.toContain(one.ended);
+        expect(page.items.every((r) => r.status === "ACTIVE")).toBe(true);
+        // The count is the list it filters to.
+        expect(page.summary.paying).toBe(page.total);
+    });
+
     it("finds the business by its pay_, sub_ and cust_ ids", async () => {
         expect(orgsOf((await list(`?q=${ids.pay}`)).items)).toEqual([
             one.autopay,

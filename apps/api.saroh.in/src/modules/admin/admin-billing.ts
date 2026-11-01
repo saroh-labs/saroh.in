@@ -289,6 +289,7 @@ export const SUBSCRIPTION_VIEWS = [
     "ending-soon",
     "first-month",
     "past-due",
+    "paying",
 ] as const;
 export type SubscriptionView = (typeof SUBSCRIPTION_VIEWS)[number];
 
@@ -307,6 +308,8 @@ export function subscriptionViewWhere(
 ): Prisma.SubscriptionWhereInput {
     if (view === "first-month") return { status: "TRIALING" };
     if (view === "past-due") return { status: "PAST_DUE" };
+    // Active on a plan with a list price: Free is not paying (DEC-179 follow-up).
+    if (view === "paying") return PAYING_WHERE;
     if (view === "ending-soon") {
         const until = new Date(now.getTime() + ENDING_SOON_DAYS * DAY_MS);
         return {
@@ -321,6 +324,17 @@ export function subscriptionViewWhere(
         };
     }
     return {};
+}
+
+/** "Paying": ACTIVE on a plan whose list price is above nothing. */
+export const PAYING_WHERE: Prisma.SubscriptionWhereInput = {
+    status: "ACTIVE",
+    plan: { priceCents: { gt: 0 } },
+};
+
+/** Whether a group counts as paying, by the same rule as `PAYING_WHERE`. */
+export function isPaying(status: string, plan: PlanPrice): boolean {
+    return status === "ACTIVE" && plan.priceCents > 0;
 }
 
 /** A plan's price as the summary reads it, from its database row. */

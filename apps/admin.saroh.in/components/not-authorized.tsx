@@ -35,7 +35,7 @@ export function NotAuthorized({
     if (staff) {
         return (
             <AdminShell staff={staff}>
-                <PageContainer>
+                <PageContainer width="full">
                     <NoAccessPanel email={staff.email} />
                 </PageContainer>
             </AdminShell>

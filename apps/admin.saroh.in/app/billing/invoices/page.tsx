@@ -11,7 +11,11 @@ import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { listSarohInvoices } from "@/lib/billing";
 import { RAZORPAY_LINK_HINT } from "@/lib/billing-action-words";
-import { clearHref, invoicesExportHref } from "@/lib/billing-filters";
+import {
+    clearHref,
+    invoicesExportHref,
+    narrowCause,
+} from "@/lib/billing-filters";
 import type { GstinFilter, InvoiceStatus } from "@/lib/billing-words";
 import {
     billingHref,
@@ -99,7 +103,8 @@ export default async function BillingInvoicesPage({
                     <EmptyPanel
                         kind="no-results"
                         things="invoices"
-                        cause="filters"
+                        cause={narrowCause("invoices", raw)}
+                        query={q}
                         clearHref={clearHref("invoices")}
                     />
                 ) : (

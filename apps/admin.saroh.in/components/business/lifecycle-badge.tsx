@@ -44,3 +44,17 @@ export const ATTENTION_LABEL: Record<AttentionReason, string> = {
     // Inactivity signals the daily sweep keeps (#1199).
     ...SIGNAL_LABEL,
 };
+
+/**
+ * An attention reason in words. "No team activity in 7 days" beside "last
+ * active Never" reads as two facts; a business nobody has ever used says
+ * "Never active" (admin audit F9).
+ */
+export function attentionLabel(
+    reason: AttentionReason,
+    lastActiveAt: string | null | undefined,
+): string {
+    return reason === "NO_ACTIVITY" && !lastActiveAt
+        ? "Never active"
+        : ATTENTION_LABEL[reason];
+}

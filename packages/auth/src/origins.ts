@@ -30,6 +30,8 @@ export function getTrustedOrigins(): string[] {
         "https://help.saroh.in",
         "https://ui.saroh.in",
         "https://saroh.in",
+        // The site itself: its header asks get-session and signs out (1 Nov).
+        "https://www.saroh.in",
     ];
 }
 

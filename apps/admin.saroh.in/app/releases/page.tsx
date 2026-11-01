@@ -28,7 +28,7 @@ export default async function ReleasesPage() {
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Releases"]}
                     title="Releases"

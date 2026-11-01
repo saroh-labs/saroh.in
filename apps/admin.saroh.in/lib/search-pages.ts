@@ -151,6 +151,8 @@ export const siteInfo = cache(async (): Promise<SiteInfo> => {
 export async function searchPageForTab(slug: string): Promise<{
     canPublish: boolean;
     row: PageRow;
+    /** Every page, for what this one links to and what links here. */
+    rows: PageRow[];
     page: AnyPage;
     site: SiteInfo;
 } | null> {
@@ -164,6 +166,7 @@ export async function searchPageForTab(slug: string): Promise<{
     return {
         canPublish: can(gate.staff, "search-pages:publish"),
         row,
+        rows: data.rows,
         page,
         site: await siteInfo(),
     };

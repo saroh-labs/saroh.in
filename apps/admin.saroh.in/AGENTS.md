@@ -61,6 +61,12 @@ recorded grant (the API refuses it otherwise).
   suspension, Cancel deletion or Schedule deletion: the API refuses them. A
   deleted business's deletion trail opens with "Data kept until ‹date›"
   (180 days after it was deleted, `lib/deletion-words.ts`).
+- **Loading and 404 are one piece each** (audits, 1 Nov). A `loading.tsx`
+  above a layout or page that draws `AdminShell` re-exports
+  `components/states/console-loading.tsx` (the frame plus a list, board or
+  record shape picked from the address, `skeletonFor`); one under a layout
+  that already drew the header takes `PanelSkeleton`. A section's
+  `not-found.tsx` passes its words and its list to `ConsoleNotFound`.
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,
@@ -75,17 +81,40 @@ recorded grant (the API refuses it otherwise).
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
   `lib/roles-matrix.ts`, `lib/commission-words.ts`,
   `lib/own-rate-words.ts`, `lib/team-member-words.ts`,
-  `lib/search-page-words.ts`.
+  `lib/search-page-words.ts`, `lib/waitlist-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
-  saroh.in/contact, newest first, by topic on asking. Read-only: the reply
-  goes from the team's mailbox. Every row is personal data, so the screen
-  and its `GET /admin/contact-messages` need `organization:pii:read`; it
-  adds no permission.
+  saroh.in/contact, newest first, by topic, Open / Handled and address on
+  asking. The reply goes from the team's mailbox; Mark handled / Open again
+  (`POST /admin/contact-messages/:id/handled`, `organization:pii:read` and
+  `reports:resolve`, on the admin ledger; a toggle, no dialog: it goes
+  straight back) records that someone did (DEC-137 amended 1 Nov). Each row
+  links to the same person's lead, waitlist entry and account when there
+  is one, read-only. Every row is personal data, so the screen and its
+  `GET /admin/contact-messages` need `organization:pii:read`.
+- **Waitlist (`/waitlist`)**: free-tool email gates (`link-preview`,
+  `qr-maker`, `tool:*`) are not people waiting for Saroh. Waiting, its
+  counts, breakdowns and Invite leave them out (the API's
+  `admin-waitlist.service.ts`; a batch invite skips them in its dry run);
+  Showing › Came from a free tool lists them. Invite stays in the header,
+  disabled with the API's reason, while invites can't go. The rows are a
+  `DataView` (stacked on a phone, Remove beside each), with the breakdowns
+  after the list.
+- **`FilterBar`** (Businesses, Waitlist, Messages, Jobs, Webhooks,
+  Reports) applies a dropdown as it is picked and the search on Enter,
+  drops empty fields from the address, and keeps Apply (the no-script
+  path). On a phone the `search` slot stays and the rest folds behind
+  "Filters (n)". Server-paged lists that use `DataView` pass a `paging`
+  whose total is 0, so the view's own footer never contradicts the
+  server's pager.
 - **Usage (`/usage`, #798)** lists every business by the storage its
-  photos and videos use (READY media, in GB as the plan's `storageGb`
-  counts it), sorted by the API across all businesses (Most / Least) and
-  paged by number. It reads with `organization:read`, the directory's
-  permission, so it adds none (DEC-039).
+  photos and videos use (READY media, as the plan's `storageGb` counts
+  it, shown in KB, MB or GB), beside its plan's storage limit and the
+  share used (`limitGb`, `usedPercent`, from `CatalogueAccessService`; a
+  dash when the plan has no cap or can't be read). The API sorts across
+  all businesses (Most / Least / Closest to limit; Closest resolves every
+  business's limit, then pages) and it is paged by number. It reads with
+  `organization:read`, the directory's permission, so it adds none
+  (DEC-039).
 - **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-179)** shows
   every invoice Saroh issued (with the filtered set's totals, each PDF and a
   month's CSV for GST) and every business's Saroh subscription (a row opens
@@ -354,9 +383,20 @@ recorded grant (the API refuses it otherwise).
   (R13, owner 31 Oct): the list's deploy bar ("N changes waiting to
   deploy", `components/search-pages/deploy-bar.tsx`) lists them and its
   Deploy changes (`POST …/deploy`, same permission) rebuilds the site once
-  for all of them; a row shows "Published · not deployed yet" or "Taken
-  off · not deployed yet" until then. While the API says a rebuild runs,
+  for all of them; a row shows "Waiting to deploy" (and a chip filters
+  them) until then, and the bar says "Goes live" or "Comes off". Cancel
+  this change (row ⋯, page ⋯, each bar row; `cancel` on `POST …/actions`,
+  DEC-201 amendment 1 Nov) puts a staged page back to its released status. While the API says a rebuild runs,
   the bar says so, Deploy changes waits, and the screen re-reads every 20s.
+  The list (owner's Mock 1, 1 Nov): kinds are page tabs (count, "N live",
+  a dot when changes wait), then status chips, a Section select, Group
+  (Section · Status · None) and Sort (Name A–Z · Recently changed), all in
+  the address (`readListQuery`/`listHref`, replaceState) so Back and a
+  reload keep them. Rows group by section, A–Z by name (the code's order
+  is by address), each group folding and ticking as one; a row shows Read ↗
+  and its one next step (`nextAction`) on hover or focus, always on a
+  phone; the line under a status is left out when it would only say
+  "Never published", and a blocked page says why (`rowNote`).
   For GST pages, guides and downloads, Publish is disabled (one page or a
   selection) while an error-level check fails, naming it, and a live page
   that fails them shows "Held by checks": the site build leaves it out
@@ -369,10 +409,16 @@ recorded grant (the API refuses it otherwise).
   holds Publish with how to fix it. Unpublish and Archive name the live
   pages that link there, and don't block (DEC-201 item 9). The dialog
   gets every kind's rows (`rows`/`allRows`), since a guide links to tools.
-  A page's tabs live under
-  `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
-  template, light, no console chrome, no links) has no shell; the Content
-  tab frames it. `searchPageChecks` comes from
+  The list and each page live under `app/search-pages/(console)/`, whose
+  layout draws the console once (owner, 1 Nov): ‹ Previous / Next › and
+  opening a row swap only the page, under its grey shape
+  (`(console)/loading.tsx` picks the page's or the list's shape by
+  address), never the whole screen. A page's tabs are
+  `(console)/[slug]/(tabs)/`; `app/search-pages/[slug]/preview` (the shared
+  template, light, no console chrome, no links) stays outside, with no
+  shell; the Content tab frames it. While a page isn't live its link reads
+  "Read the draft ↗": the review site draws every page, marked Draft
+  (locally that is saroh.in's own `pnpm dev`, which `dev:apps` doesn't run). `searchPageChecks` comes from
   `@saroh/search-pages/checks` and runs only in a client component: it
   uses react-dom/server, which Next refuses in Server Components and route
   handlers. The site and its environment come from `marketingSiteUrl()` and

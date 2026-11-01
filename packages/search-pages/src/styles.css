@@ -4139,19 +4139,6 @@
     border: 1px solid var(--sp-line);
     background: var(--sp-white);
 }
-.sp-fig .sp-fig-stub {
-    aspect-ratio: 16 / 8;
-    border-radius: 16px;
-    border: 1px solid var(--sp-line);
-    background: var(--sp-white);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    text-align: center;
-    font-size: 14px;
-    color: var(--sp-muted-2);
-}
 .sp-fig .sp-fig-wide {
     aspect-ratio: 16 / 7;
 }

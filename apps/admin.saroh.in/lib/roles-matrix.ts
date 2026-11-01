@@ -72,7 +72,7 @@ export const MATRIX_AREAS: readonly MatrixAreaDef[] = [
             },
             {
                 key: "reports",
-                label: "Close reports people send about a business",
+                label: "Close reports about a business, and mark messages handled",
                 change: ["reports:resolve"],
             },
             {

@@ -8,20 +8,32 @@ import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
+import type { Visitor } from "@/lib/browser/session";
+import { useVisitor } from "@/lib/browser/session";
+import {
+    ACCOUNT_URL,
+    DASHBOARD_URL,
+    LAUNCH_MODE,
+    SIGN_IN_URL,
+} from "@/lib/links";
 import { ring } from "@/lib/ring";
 import { nextIndex } from "@/lib/roving";
 
+import { ButtonLink } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { IntentLink } from "../links/intent-link";
 import { MobileMenu } from "./mobile-menu";
 import type { NavItem, NavSection } from "./nav-section";
 import { sectionOf } from "./nav-section";
 
-type MenuId = "features" | "solutions" | "resources" | "tools";
+type MenuId = "features" | "solutions" | "resources" | "tools" | "account";
 
 /** A top-level control: 36px, 9px corners, Paper-dark on hover. */
 const TOP = `flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
+
+/** A menu's panel, under its button (the nav's menus and the account menu). */
+const PANEL =
+    "absolute top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu";
 
 /** The current section: underlined in Saffron, 8px below the word. */
 const CURRENT =
@@ -45,6 +57,11 @@ const CURRENT =
  * carries `aria-current="page"` in its menu. A menu closes on Escape (focus
  * returns to its button), on a click outside, and when focus leaves the nav;
  * arrow keys move within it.
+ *
+ * Signed in (owner, 1 Nov; `useVisitor`, asked once the page is idle), Sign
+ * in and the start button become the visitor's initial, which opens their
+ * name, email, Account and Sign out, and "Open dashboard". The page's HTML is
+ * always the signed-out nav; the swap happens in the browser.
  */
 export function SiteNav({
     features,
@@ -67,6 +84,8 @@ export function SiteNav({
     const solutionsButton = useRef<HTMLButtonElement>(null);
     const resourcesButton = useRef<HTMLButtonElement>(null);
     const toolsButton = useRef<HTMLButtonElement>(null);
+    const accountButton = useRef<HTMLButtonElement>(null);
+    const { visitor, signOut } = useVisitor();
 
     // A new page closes whatever menu was open (state adjusted while
     // rendering, not in an effect: https://react.dev/learn/you-might-not-need-an-effect).
@@ -90,6 +109,7 @@ export function SiteNav({
                 solutions: solutionsButton,
                 resources: resourcesButton,
                 tools: toolsButton,
+                account: accountButton,
             }[open];
             setOpen(null);
             button.current?.focus();
@@ -191,9 +211,32 @@ export function SiteNav({
                     />
                 ) : null}
             </div>
+            {visitor ? (
+                <>
+                    <AccountMenu
+                        visitor={visitor}
+                        open={open === "account"}
+                        onToggle={() =>
+                            setOpen(open === "account" ? null : "account")
+                        }
+                        onSignOut={() => {
+                            setOpen(null);
+                            void signOut();
+                        }}
+                        buttonRef={accountButton}
+                    />
+                    <ButtonLink
+                        href={DASHBOARD_URL}
+                        size="sm"
+                        className="hidden min-[760px]:inline-flex"
+                    >
+                        Open dashboard
+                    </ButtonLink>
+                </>
+            ) : null}
             {/* Sign in waits for early access, as Pricing does: until then
                 accounts.saroh.in is closed to anyone without the key. */}
-            {LAUNCH_MODE === "open" ? (
+            {!visitor && LAUNCH_MODE === "open" ? (
                 <a
                     href={SIGN_IN_URL}
                     className={cn(
@@ -204,14 +247,16 @@ export function SiteNav({
                     Sign in
                 </a>
             ) : null}
-            <CtaLink
-                src="nav"
-                size="sm"
-                className={cn(
-                    "hidden min-[760px]:inline-flex",
-                    LAUNCH_MODE !== "open" && "ml-auto",
-                )}
-            />
+            {visitor ? null : (
+                <CtaLink
+                    src="nav"
+                    size="sm"
+                    className={cn(
+                        "hidden min-[760px]:inline-flex",
+                        LAUNCH_MODE !== "open" && "ml-auto",
+                    )}
+                />
+            )}
 
             {/* Below 760px wide. */}
             <MobileMenu
@@ -221,6 +266,8 @@ export function SiteNav({
                 features={features}
                 solutions={solutions}
                 tools={tools}
+                visitor={visitor}
+                onSignOut={signOut}
                 className="ml-auto min-[760px]:hidden"
             />
         </nav>
@@ -291,7 +338,8 @@ function Menu({
                     aria-label={label}
                     onKeyDown={(e) => moveWithArrows(e)}
                     className={cn(
-                        "absolute left-0 top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu",
+                        PANEL,
+                        "left-0",
                         columns === 2
                             ? "w-[662px] grid-cols-2"
                             : "w-[362px] grid-cols-1",
@@ -321,10 +369,89 @@ function Menu({
     );
 }
 
+/**
+ * The signed-in visitor's initial and its menu: who they are, then Account
+ * and Sign out. Their name and email are masked in a session recording.
+ */
+function AccountMenu({
+    visitor,
+    open,
+    onToggle,
+    onSignOut,
+    buttonRef,
+}: {
+    visitor: Visitor;
+    open: boolean;
+    onToggle: () => void;
+    onSignOut: () => void;
+    buttonRef: RefObject<HTMLButtonElement | null>;
+}) {
+    const menu = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (open)
+            menu.current
+                ?.querySelector<HTMLElement>('[role="menuitem"]')
+                ?.focus();
+    }, [open]);
+    const item = `flex h-11 w-full cursor-pointer items-center rounded-[10px] border-none bg-transparent px-3.5 text-left text-[15px] font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`;
+
+    return (
+        <div
+            data-ph-mask=""
+            className="relative ml-auto hidden min-[760px]:block"
+        >
+            <button
+                ref={buttonRef}
+                type="button"
+                aria-label="Your account"
+                aria-haspopup="true"
+                aria-expanded={open}
+                aria-controls={open ? "nav-menu-account" : undefined}
+                onClick={onToggle}
+                className={`grid size-9 cursor-pointer place-items-center rounded-full border border-border-strong bg-card text-[15px] font-semibold uppercase text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring({ offset: 2 })}`}
+            >
+                <span aria-hidden>{visitor.name.trim().charAt(0)}</span>
+            </button>
+            {open ? (
+                <div
+                    ref={menu}
+                    id="nav-menu-account"
+                    role="menu"
+                    aria-label="Your account"
+                    onKeyDown={(e) => moveWithArrows(e)}
+                    className={cn(PANEL, "right-0 w-[280px]")}
+                >
+                    <div className="mb-1 grid gap-[3px] border-b border-border px-3.5 pb-3 pt-2">
+                        <span className="truncate text-[15px] font-semibold">
+                            {visitor.name}
+                        </span>
+                        <span className="truncate text-mk-note text-muted-foreground">
+                            {visitor.email}
+                        </span>
+                    </div>
+                    <a role="menuitem" href={ACCOUNT_URL} className={item}>
+                        Account
+                    </a>
+                    <button
+                        role="menuitem"
+                        type="button"
+                        onClick={onSignOut}
+                        className={item}
+                    >
+                        Sign out
+                    </button>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 /** Arrow keys move through a menu's items, wrapping at either end. */
 function moveWithArrows(e: KeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(e.currentTarget.querySelectorAll("a"));
-    const at = items.indexOf(document.activeElement as HTMLAnchorElement);
+    const items = Array.from(
+        e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    );
+    const at = items.indexOf(document.activeElement as HTMLElement);
     const next = nextIndex(e.key, at, items.length);
     if (next === null) return;
     e.preventDefault();

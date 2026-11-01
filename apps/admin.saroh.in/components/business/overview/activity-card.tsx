@@ -5,7 +5,8 @@ import { activityLabel } from "@/lib/overview-words";
 import { CardLink, OverviewCard } from "./overview-card";
 
 /**
- * Recent activity and notes (U3, R2): what happened and when, without who
+ * Account changes and notes (U3, R2): changes to the business's account,
+ * not its sales or bookings,: what happened and when, without who
  * or why, and how many notes there are and when the last was written. The
  * reasons and the notes themselves stay behind a support session, on the
  * History and Notes tabs.
@@ -22,14 +23,14 @@ export function ActivityCard({
     return (
         <OverviewCard
             id="activity"
-            title="Recent activity and notes"
+            title="Account changes and notes"
             data={activity}
         >
             {(rows) => (
                 <div className="grid gap-3 text-sm">
                     {rows.length === 0 ? (
                         <p className="text-muted-foreground">
-                            Nothing has happened here yet.
+                            No account changes yet.
                         </p>
                     ) : (
                         <ul className="grid gap-1.5">
@@ -62,10 +63,10 @@ export function ActivityCard({
                     </p>
                     <div className="flex flex-wrap gap-4">
                         <CardLink organizationId={organizationId} tab="history">
-                            Open History
+                            Open History (support access)
                         </CardLink>
                         <CardLink organizationId={organizationId} tab="notes">
-                            Open Notes
+                            Open Notes (support access)
                         </CardLink>
                     </div>
                 </div>

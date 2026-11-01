@@ -59,7 +59,10 @@ function CommandDialog({
              * app where a raw browser ring is guaranteed to be seen, since it
              * appears every single time the palette opens.
              */}
-            <DialogContent className="overflow-hidden p-0 shadow-lg focus:outline-none">
+            <DialogContent
+                phone="full"
+                className="overflow-hidden p-0 shadow-lg focus:outline-none"
+            >
                 {/*
                  * Radix errors without a title and warns without a description,
                  * and both warnings are right: a dialog that opens with no
@@ -74,7 +77,7 @@ function CommandDialog({
                 <Command
                     shouldFilter={shouldFilter}
                     label={label}
-                    className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+                    className="max-sm:rounded-none [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 max-sm:[&_[cmdk-list]]:max-h-none max-sm:[&_[cmdk-list]]:flex-1"
                 >
                     {children}
                 </Command>

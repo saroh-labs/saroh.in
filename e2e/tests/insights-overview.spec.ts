@@ -123,8 +123,9 @@ test("the period is the page's: it changes every figure, keeps the tab, and surv
         });
         const sheet = page.getByRole("dialog", { name: "Show figures for" });
         await pressUntil(button, sheet);
+        // "19 to 25 Oct" in one month, "26 Oct to 1 Nov" across two.
         await expect(sheet).toContainText(
-            /\d+ to \d+ \w{3}, against \d+ to \d+ \w{3}/,
+            /\d+ (\w{3} )?to \d+ \w{3}, against \d+ (\w{3} )?to \d+ \w{3}/,
         );
         await expect(sheet).toContainText(
             "Every figure on Insights follows this choice.",

@@ -7,8 +7,10 @@ import { z } from "zod";
  * Access env through this module (`import { env } from "@/env"`) — never
  * `process.env`.
  *
- * `API_URL` is server-only on purpose: only the /api/waitlist route handler
- * talks to api.saroh.in, and the browser has no reason to know that origin.
+ * `API_URL` is server-only, with one exception: next.config.js writes it
+ * into the browser as `SAROH_API_URL`, so the header can ask the API's
+ * get-session who is signed in (`lib/browser/session.ts`). Every other call
+ * goes through this site's own /api routes.
  *
  * `NEXT_PUBLIC_ACCOUNTS_URL` is where "Sign in" goes — for people already
  * invited into a business while signup is still gated behind the waitlist

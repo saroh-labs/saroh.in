@@ -31,6 +31,7 @@ import {
     INVOICE_STATUSES,
     invoicesCsv,
     invoicesCsvFileName,
+    isPaying,
     istMonthRange,
     linkAt,
     mrrPaise,
@@ -201,6 +202,8 @@ export interface SubscriptionSummary {
     mrrPaise: number;
     /** Ending, or moving to another plan, in the next 30 days. */
     endingSoon: number;
+    /** ACTIVE on a plan with a list price above nothing: Free is not counted. */
+    paying: number;
     currency: string;
 }
 
@@ -961,12 +964,14 @@ export class AdminBillingService {
             { key: string; name: string; count: number }
         >();
         const priced: Parameters<typeof mrrPaise>[0] = [];
+        let paying = 0;
         for (const g of groups) {
             const count = g._count._all;
             byStatus.set(g.status, (byStatus.get(g.status) ?? 0) + count);
             const plan = planById.get(g.planId);
             if (!plan) continue;
             priced.push({ status: g.status, count, plan });
+            if (isPaying(g.status, plan)) paying += count;
             if (g.status === "CANCELLED") continue;
             const entry = byPlan.get(plan.key) ?? {
                 key: plan.key,
@@ -984,6 +989,7 @@ export class AdminBillingService {
             byPlan: [...byPlan.values()].sort((a, b) => b.count - a.count),
             mrrPaise: mrrPaise(priced),
             endingSoon,
+            paying,
             currency: plans[0]?.currency ?? "INR",
         };
     }

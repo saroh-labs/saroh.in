@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
@@ -19,6 +20,7 @@ import {
     refusalWords,
     successWords,
 } from "@/lib/search-page-words";
+import { DEPLOY_BAR_ID, showDeployBar } from "./deploy-bar-anchor";
 
 export interface SearchPageDialogProps {
     action: PageAction;
@@ -30,6 +32,8 @@ export interface SearchPageDialogProps {
     skipped?: number;
     site: string;
     reviewSite: string;
+    /** The review site's address, for each page's Read link. */
+    reviewUrl?: string;
     /** Checks that didn't pass (one page). */
     checks?: number;
     /** List the pages in the dialog (the list's dialog does; a page's own doesn't). */
@@ -50,6 +54,7 @@ export function SearchPageDialog({
     skipped = 0,
     site,
     reviewSite,
+    reviewUrl,
     checks = 0,
     showPages = true,
     onOpenChange,
@@ -121,6 +126,14 @@ export function SearchPageDialog({
                             </ul>
                         </Notice>
                     )}
+                    {added.length > 0 && !linkNote && (
+                        <Notice tone="success">
+                            Added {added.length} linked{" "}
+                            {added.length === 1 ? "page" : "pages"}. Read{" "}
+                            {added.length === 1 ? "it" : "them"} before you
+                            publish.
+                        </Notice>
+                    )}
                     {linkedFrom && <Notice tone="warning">{linkedFrom}</Notice>}
                     {(showPages || added.length > 0) && (
                         <ul
@@ -135,9 +148,23 @@ export function SearchPageDialog({
                                     <span className="flex-1 font-medium">
                                         {page.name}
                                     </span>
+                                    {added.includes(page) && (
+                                        <Badge variant="info">Linked</Badge>
+                                    )}
                                     <code className="font-mono text-xs text-muted-foreground">
                                         {page.path}
                                     </code>
+                                    {reviewUrl && words.tick && (
+                                        <a
+                                            href={`${reviewUrl}${page.path}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label={`Read ${page.name} on ${reviewSite}`}
+                                            className="text-xs font-medium underline underline-offset-2"
+                                        >
+                                            Read ↗
+                                        </a>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -183,8 +210,23 @@ export function SearchPageDialog({
                     }
                     return { ok: false, error: result.error };
                 }
-                const said = successWords(action, paths.length, site);
-                showSuccess(said.title, said.description);
+                const said = successWords(action, pages, site);
+                showSuccess(
+                    said.title,
+                    said.description,
+                    said.staged
+                        ? {
+                              label: "Show waiting changes",
+                              onClick: () => {
+                                  if (!showDeployBar()) {
+                                      router.push(
+                                          `/search-pages${pages[0]?.kind === "for" ? "" : `?kind=${pages[0]?.kind}`}#${DEPLOY_BAR_ID}`,
+                                      );
+                                  }
+                              },
+                          }
+                        : undefined,
+                );
                 router.refresh();
                 onDone?.();
                 return { ok: true };

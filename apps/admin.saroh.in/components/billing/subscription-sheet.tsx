@@ -65,7 +65,7 @@ export function SubscriptionSheet({
 }: {
     /** Null when the read failed or was refused (`failed` says which). */
     detail: SarohSubscriptionDetail | null;
-    failed?: "error" | "refused";
+    failed?: "error" | "refused" | "not-found";
     /** The list's path, and its query with the sheet open in it. */
     base: string;
     query: Query;
@@ -148,7 +148,9 @@ export function SubscriptionSheet({
                                     ? `${sub.plan.name} · ${cycleLabel(sub.billingCycle)} · since ${istDate(detail.since)}`
                                     : failed === "refused"
                                       ? "Your access does not cover Saroh's subscriptions."
-                                      : "It could not be loaded. Nothing has changed; try again in a moment."}
+                                      : failed === "not-found"
+                                        ? "No subscription with this id. It may have been removed."
+                                        : "It could not be loaded. Nothing has changed; try again in a moment."}
                             </SheetDescription>
                             {sub && canViewAs ? (
                                 <Link

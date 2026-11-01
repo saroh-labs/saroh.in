@@ -4,6 +4,8 @@ import type { Block, DocPage } from "@saroh/search-pages/docs";
 import { gstCardName } from "@saroh/search-pages/docs";
 import { DOC_KINDS } from "@saroh/search-pages/kinds";
 
+import { formatDate } from "./format";
+
 /**
  * A search page's words, built from its data for the Overview's "What's on
  * the page" and the Content tab's "Words only". Read on the server only (the
@@ -254,7 +256,7 @@ export function docWordBlocks(p: DocPage): WordBlock[] {
             { k: "In short", v: p.answer.map((x) => x.text).join("") },
             {
                 k: "Checked on",
-                v: `${p.checkedOn} against ${p.sources[0]?.label ?? ""}`,
+                v: `${formatDate(p.checkedOn)} against ${p.sources[0]?.label ?? ""}`,
             },
         );
         blocks.push(
@@ -356,15 +358,12 @@ export function docSections(p: DocPage): { k: string; v: string }[] {
         { k: "Headline", v: p.h1 },
         { k: "On the hub", v: p.line },
         ...(p.kind === "gst"
-            ? [{ k: "Checked on", v: p.checkedOn }]
+            ? [{ k: "Checked on", v: formatDate(p.checkedOn) }]
             : [{ k: "Section", v: p.group }]),
         {
             k: "Questions answered",
             v: `${p.questions.length}${first ? `, starting with “${first}”` : ""}`,
         },
-        {
-            k: "Facts to confirm",
-            v: p.toConfirm.length ? p.toConfirm.join(" · ") : "None",
-        },
+        // Facts to confirm are the failing check's list on the same tab (owner, 1 Nov).
     ];
 }

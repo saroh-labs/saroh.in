@@ -75,9 +75,12 @@ export class SarohLeadsService {
             }),
             scope.kind === "all"
                 ? prisma.sarohLead.count({
+                      // Follows the search, as every other count does,
+                      // so no tile is half-filtered (admin audit F14).
                       where: {
                           ownerPlatformAdminId: null,
                           stage: { in: [...OPEN_STAGES] },
+                          ...searchFilter(query.q),
                       },
                   })
                 : Promise.resolve(null),

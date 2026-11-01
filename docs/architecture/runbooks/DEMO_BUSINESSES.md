@@ -57,7 +57,12 @@ notes, never in this repository.
 | `<env-file>` | the API container's environment, written to a temp file |
 | `<database>` | the production database's name, as in its URL           |
 
-1. Take a snapshot of the database first.
+1. Take a snapshot of the database first. Take the database **host** and name
+   from the target API container's `DATABASE_URL`, check the host is the one you
+   mean (each environment has its own database server, and the database names
+   can be the same), and run `pg_dump -Fc` inside that host's container as its
+   admin user. The app's role is under row-level security, so a dump made as the
+   app role fails or comes out partial (DEV_LEARNINGS, 1 Nov).
 2. Write the API container's environment to a mode-600 temp file and remove it
    when done (`trap 'rm -f "$ENV_FILE"' EXIT`). Never print it.
 3. Dry run, the run, then a dry run again that must write 0:

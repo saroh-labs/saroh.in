@@ -37,7 +37,14 @@ vi.mock("next/link", () => ({
     ),
 }));
 
-const COUNTS = { paying: 4, failed: 1, trial: 2, ending: 1, ended: 3 };
+const COUNTS = {
+    active: 9,
+    paying: 4,
+    failed: 1,
+    trial: 2,
+    ending: 1,
+    ended: 3,
+};
 
 beforeEach(() => {
     nav.path = "/billing/subscriptions";
@@ -52,7 +59,7 @@ describe("Billing's status cards", () => {
         const { rerender } = render(
             <StatusCards mrrPaise={10_000} currency="INR" counts={COUNTS} />,
         );
-        const paying = screen.getByRole("button", { name: /Paying/ });
+        const paying = screen.getByRole("button", { name: /^Active/ });
         expect(paying.getAttribute("aria-pressed")).toBe("false");
         fireEvent.click(paying);
         expect(push).toHaveBeenLastCalledWith(
@@ -65,7 +72,7 @@ describe("Billing's status cards", () => {
         rerender(
             <StatusCards mrrPaise={10_000} currency="INR" counts={COUNTS} />,
         );
-        const on = screen.getByRole("button", { name: /Paying/ });
+        const on = screen.getByRole("button", { name: /^Active/ });
         expect(on.getAttribute("aria-pressed")).toBe("true");
         expect(
             screen
@@ -76,6 +83,20 @@ describe("Billing's status cards", () => {
         expect(push).toHaveBeenLastCalledWith("/billing/subscriptions", {
             scroll: false,
         });
+    });
+
+    it("On a paid plan is its own toggle, by the paying view (Free left out)", () => {
+        render(
+            <StatusCards mrrPaise={10_000} currency="INR" counts={COUNTS} />,
+        );
+        const paying = screen.getByRole("button", { name: /^On a paid plan/ });
+        expect(paying.textContent).toContain("4");
+        fireEvent.click(paying);
+        expect(push).toHaveBeenLastCalledWith(
+            "/billing/subscriptions?view=paying",
+            { scroll: false },
+        );
+        expect(screen.getByRole("group", { name: "Status" })).toBeTruthy();
     });
 
     it("shows the month's total with its fine print behind ⓘ", () => {

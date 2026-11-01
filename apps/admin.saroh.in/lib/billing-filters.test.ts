@@ -5,6 +5,7 @@ import {
     cardHref,
     clearHref,
     isNarrowed,
+    narrowCause,
     planHref,
     searchHref,
     tabHref,
@@ -36,7 +37,10 @@ describe("billing filters as addresses", () => {
     });
 
     it("a status card sets its filter, replacing another card's", () => {
-        expect(cardHref(SUBS, {}, "paying")).toBe(`${SUBS}?status=ACTIVE`);
+        expect(cardHref(SUBS, {}, "active")).toBe(`${SUBS}?status=ACTIVE`);
+        expect(cardHref(SUBS, { status: "ACTIVE" }, "paying")).toBe(
+            `${SUBS}?view=paying`,
+        );
         expect(cardHref(SUBS, { status: "ACTIVE" }, "ending")).toBe(
             `${SUBS}?view=ending-soon`,
         );
@@ -61,7 +65,19 @@ describe("billing filters as addresses", () => {
         expect(activeCard({ view: "ending-soon" })).toBe("ending");
         expect(activeCard({ view: "past-due" })).toBe("failed");
         expect(activeCard({ view: "first-month" })).toBe("trial");
+        expect(activeCard({ view: "paying" })).toBe("paying");
+        expect(activeCard({ status: "ACTIVE" })).toBe("active");
         expect(activeCard({})).toBeUndefined();
+    });
+
+    it("Clear and the empty panel name the same cause", () => {
+        expect(narrowCause("subscriptions", { q: "zzqx" })).toBe("search");
+        expect(narrowCause("subscriptions", { q: "zzqx", plan: "pro" })).toBe(
+            "filters",
+        );
+        expect(narrowCause("events", { filter: "not-applied" })).toBe(
+            "filters",
+        );
     });
 
     it("plan and search combine, each keeping the other", () => {

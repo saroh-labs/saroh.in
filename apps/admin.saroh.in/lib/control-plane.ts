@@ -280,11 +280,18 @@ export function explainFlag(
     );
 }
 
-export function flagHistory(flagKey: string): Promise<FlagChange[] | null> {
+/** One page of a flag's changes, newest first, {@link HISTORY_PAGE} a page. */
+export function flagHistory(
+    flagKey: string,
+    page = 1,
+): Promise<FlagChange[] | null> {
     return getJson<FlagChange[]>(
-        `/flags/${encodeURIComponent(flagKey)}/history`,
+        `/flags/${encodeURIComponent(flagKey)}/history${page > 1 ? `?page=${page}` : ""}`,
     );
 }
+
+/** The API's page of a flag's history (`admin-flags.service.ts`). */
+export const HISTORY_PAGE = 20;
 
 export function listAudit(
     query: AdminAuditQuery = {},

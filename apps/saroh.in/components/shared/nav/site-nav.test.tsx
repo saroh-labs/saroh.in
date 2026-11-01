@@ -15,7 +15,11 @@ import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 import { SiteNav } from "./site-nav";
 
 /** The nav as the server hands it its Features and Solutions menus. */
-const Nav = (props: { resources?: NavItem[]; tools?: NavItem[] }) => (
+const Nav = (props: {
+    resources?: NavItem[];
+    tools?: NavItem[];
+    solutions?: NavItem[];
+}) => (
     <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} {...props} />
 );
 
@@ -370,5 +374,36 @@ describe("MobileMenu (below 760px)", () => {
         expect(document.activeElement).toBe(focusable[0]);
         fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
         expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+    });
+});
+
+describe("SiteNav: See all trades", () => {
+    const TRADES = [
+        ...SOLUTION_ITEMS,
+        { name: "See all trades", line: "Find.", href: "/for" },
+    ];
+
+    it("ends the desk Solutions menu with it when given, and not otherwise", () => {
+        const { unmount } = render(<Nav />);
+        fireEvent.click(button("Solutions"));
+        expect(
+            screen.queryByRole("menuitem", { name: /See all trades/ }),
+        ).toBeNull();
+        unmount();
+        render(<Nav solutions={TRADES} />);
+        fireEvent.click(button("Solutions"));
+        const items = screen.getAllByRole("menuitem");
+        expect(items.at(-1)?.getAttribute("href")).toBe("/for");
+    });
+
+    it("is in the phone sheet's Solutions", async () => {
+        pathname = "/solutions/gyms";
+        render(<Nav solutions={TRADES} />);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
+        const links = Array.from(
+            sheet.querySelectorAll("#nav-sheet-solutions a"),
+        ).map((a) => a.getAttribute("href"));
+        expect(links.at(-1)).toBe("/for");
     });
 });

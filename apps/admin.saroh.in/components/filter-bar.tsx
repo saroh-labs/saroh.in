@@ -1,42 +1,109 @@
+"use client";
+
 import { Button, buttonVariants } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import type { FormEvent, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * A list screen's search and filters, as a plain GET form: the query string
- * is the state, so a filtered view is a link an operator can paste to a
- * colleague, and the back button works. No client script needed.
+ * A list screen's search and filters, as a GET form: the query string is
+ * the state, so a filtered view is a link an operator can paste to a
+ * colleague, and the back button works.
+ *
+ * A dropdown applies as it is picked and the search on Enter (admin audit
+ * F8), the same as Billing; Apply stays for anyone who wants it, and is
+ * what works with no script. Empty fields are left out of the address. On
+ * a phone the search stays and the other fields fold behind "Filters (n)",
+ * so the list is on the first screen (F13); every field stays.
  */
 export function FilterBar({
     action,
     active,
+    search,
     children,
 }: {
     action: string;
     /** Whether anything is filtered — shows "Clear" when it is. */
     active: boolean;
+    /** The list's search: shown on a phone without opening Filters. */
+    search?: ReactNode;
     children: ReactNode;
 }) {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [picked, setPicked] = useState(0);
+    const formRef = useRef<HTMLFormElement>(null);
+
+    const submit = (form: HTMLFormElement) => {
+        const params = new URLSearchParams();
+        for (const [key, value] of new FormData(form)) {
+            if (typeof value === "string" && value.trim() !== "")
+                params.set(key, value.trim());
+        }
+        const query = params.toString();
+        router.push(query ? `${action}?${query}` : action);
+    };
+    const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        submit(event.currentTarget);
+    };
+    const onChange = (event: FormEvent<HTMLFormElement>) => {
+        if (event.target instanceof HTMLSelectElement) {
+            recount();
+            submit(event.currentTarget);
+        }
+    };
+    // How many dropdowns are set, for the phone's "Filters (n)".
+    const recount = () =>
+        setPicked(
+            [...(formRef.current?.querySelectorAll("select") ?? [])].filter(
+                (field) => field.value !== "",
+            ).length,
+        );
+    useEffect(recount, []);
+
     return (
         <form
             action={action}
-            className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
+            onSubmit={onSubmit}
+            onChange={onChange}
+            ref={formRef}
+            className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(160px,320px))]"
         >
-            {children}
-            <div className="flex items-end gap-2">
-                <Button type="submit" className="flex-1 sm:flex-none">
-                    Apply
-                </Button>
-                {active && (
-                    <Link
-                        href={action}
-                        className={buttonVariants({ variant: "ghost" })}
-                    >
-                        Clear
-                    </Link>
+            {search}
+            <Button
+                type="button"
+                variant="outline"
+                aria-expanded={open}
+                onClick={() => setOpen((was) => !was)}
+                className="sm:hidden"
+            >
+                {picked ? `Filters (${picked})` : "Filters"}
+            </Button>
+            <div
+                className={cn(
+                    "contents",
+                    !open && "max-sm:[&>*:not([data-filter-actions])]:hidden",
                 )}
+            >
+                {children}
+                <div data-filter-actions="" className="flex items-end gap-2">
+                    <Button type="submit" className="flex-1 sm:flex-none">
+                        Apply
+                    </Button>
+                    {active && (
+                        <Link
+                            href={action}
+                            className={buttonVariants({ variant: "ghost" })}
+                        >
+                            Clear
+                        </Link>
+                    )}
+                </div>
             </div>
         </form>
     );

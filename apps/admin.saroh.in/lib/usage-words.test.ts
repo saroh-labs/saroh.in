@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    formatGb,
+    formatLimit,
+    formatStorage,
     pageCount,
     readOrder,
     readPage,
@@ -9,18 +10,28 @@ import {
 } from "./usage-words";
 
 describe("usage words (#798)", () => {
-    it("says storage in GB, nothing as 0 GB", () => {
-        expect(formatGb(0)).toBe("0 GB");
-        expect(formatGb(-1)).toBe("0 GB");
-        expect(formatGb(Number.NaN)).toBe("0 GB");
-        expect(formatGb(0.01)).toBe("0.01 GB");
-        expect(formatGb(2.35)).toBe("2.35 GB");
-        expect(formatGb(1234.5)).toBe("1,234.50 GB");
+    it("says storage in the unit that shows it, MB below a GB", () => {
+        expect(formatStorage(0)).toBe("0 MB");
+        expect(formatStorage(-1)).toBe("0 MB");
+        expect(formatStorage(Number.NaN)).toBe("0 MB");
+        expect(formatStorage(10)).toBe("1 KB");
+        expect(formatStorage(640_000)).toBe("640 KB");
+        expect(formatStorage(12_440_000)).toBe("12.4 MB");
+        expect(formatStorage(999_000_000)).toBe("999 MB");
+        expect(formatStorage(2_345_000_000)).toBe("2.35 GB");
+        expect(formatStorage(1_234_500_000_000)).toBe("1,234.5 GB");
+    });
+
+    it("says a plan's limit, or a dash with none", () => {
+        expect(formatLimit(4)).toBe("4 GB");
+        expect(formatLimit(0.5)).toBe("500 MB");
+        expect(formatLimit(null)).toBe("—");
     });
 
     it("reads the order and page from the query string, defaulting safely", () => {
         expect(readOrder(undefined)).toBe("most");
         expect(readOrder("least")).toBe("least");
+        expect(readOrder("closest")).toBe("closest");
         expect(readOrder("biggest")).toBe("most");
         expect(readPage(undefined)).toBe(1);
         expect(readPage("3")).toBe(3);

@@ -6301,3 +6301,27 @@ reminders; it doesn't.
 **Rule**: content is checked against `docs/architecture/MARKETING_CLAIMS.md` before it is
 built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Category**: content · claims
+
+## A dev database snapshot copied production's instead
+
+**Symptom**: 1 Nov, snapshotting saroh.io's database before the demo-businesses run, the dump came from production's database server. It only read data, nothing was written, and the copy was deleted at once.
+**Cause**: the two environments' databases share a name on different database servers. The step took the name from the dev API's connection string but ran `pg_dump` in a hard-coded database container.
+**Fix**: the snapshot takes the host from the target API's connection string, refuses unless it is the expected one, and runs `pg_dump` inside that host's container as its admin user (the app's role is under row-level security, so a dump as the app role fails or comes out partial).
+**Rule**: `docs/architecture/runbooks/DEMO_BUSINESSES.md` step 1; any server step that touches a database checks the host, never only the name.
+**Category**: operations · databases
+
+## A double refresh wiped a toast under load
+
+**Symptom**: 1 Nov, deleting a draft invoice sometimes showed no "Draft deleted." toast: the page reloaded instead. It failed the gate twice, and development failed 4 of 20 runs under CPU throttling.
+**Cause**: the dialog called `router.refresh()` while the delete server action's own `revalidatePath` was already refreshing the page. On a slow browser the two raced, Next gave up the soft navigation and reloaded the document, and the reload took the toast with it.
+**Fix**: the dialog no longer calls `router.refresh()`; the action's revalidation redraws the list (`components/invoices/details/invoice-actions.tsx`).
+**Rule**: after a server action that revalidates the page, don't also call `router.refresh()`. About 170 files in app.saroh.in call it; the ones paired with a revalidating action are a follow-up sweep. To reproduce such races, throttle the CPU (CDP) in a throwaway spec.
+**Category**: frontend · Next navigation
+
+## A new loading.tsx made browser specs see every control twice
+
+**Symptom**: 1 Nov, the batch gate failed five admin specs (Users' search, Team's "Show permission codes", and a flaky "Not authorized") with "strict mode violation: … resolved to 2 elements". Only on the production build; dev never showed it.
+**Cause**: the console-wide audit fix added `loading.tsx` to every admin section and the root. With a loading boundary, Next streams the page, and React 19.2 keeps the finished page in a hidden container for a moment before revealing it (and may draw a client copy beside it). The specs found controls by placeholder, label or text, which count hidden elements, so they saw two.
+**Fix**: the specs find them by role (`getByRole("searchbox" | "switch" | "heading", { name })`), which leaves hidden elements out. People never see the hidden copy.
+**Rule**: in browser specs, find a control by its role and name; placeholder, label and text lookups also match the hidden copy of a streaming page. Reproduce on a production build (`next build && portless <name> next start`), not `next dev`.
+**Category**: testing · Next streaming

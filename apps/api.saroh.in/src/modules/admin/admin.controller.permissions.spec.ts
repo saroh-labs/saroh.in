@@ -316,6 +316,16 @@ describe("Contact message permissions", () => {
             AdminPermission.OrganizationPiiRead,
         ]);
     });
+
+    it("marks one handled with personal data access and reports resolve", () => {
+        const route = routeHandlers().find(
+            (r) => r.name === "markContactMessage",
+        );
+        expect(route ? permissionsOf(route.handler) : undefined).toEqual([
+            AdminPermission.OrganizationPiiRead,
+            AdminPermission.ReportsResolve,
+        ]);
+    });
 });
 
 describe("Pricing permissions", () => {

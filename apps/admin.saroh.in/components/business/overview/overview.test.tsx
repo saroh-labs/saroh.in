@@ -245,7 +245,7 @@ describe("a business's Overview (U3)", () => {
             "Modules",
             "Website and payments",
             "Team",
-            "Recent activity and notes",
+            "Account changes and notes",
         ]) {
             expect(screen.getByRole("heading", { name: title })).toBeTruthy();
         }

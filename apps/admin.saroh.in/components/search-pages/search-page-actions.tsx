@@ -25,8 +25,8 @@ const CODE_URL =
 /**
  * A search page's header actions (DEC-193): Read on the development site,
  * then Publish / Unpublish / Restore as its state allows, and ⋯ with Open on
- * the live site (when live, production only), the words in the code and
- * Archive. Only `search-pages:publish` sees the writes.
+ * the live site (when live, production only), the words in the code,
+ * Cancel this change (while one waits to deploy) and Archive. Only `search-pages:publish` sees the writes.
  */
 export function SearchPageActions({
     row,
@@ -72,8 +72,16 @@ export function SearchPageActions({
                     href={`${reviewUrl}${row.path}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    // A draft is readable there, marked Draft: reading it is the step before Publish.
+                    title={
+                        row.onSite
+                            ? undefined
+                            : `Opens on ${reviewSite}, marked Draft`
+                    }
                 >
-                    Read on {reviewSite} ↗
+                    {row.onSite
+                        ? `Read on ${reviewSite} ↗`
+                        : "Read the draft ↗"}
                 </a>
             </Button>
             {canPublish && main && (
@@ -88,15 +96,7 @@ export function SearchPageActions({
                     {label[main]}
                 </Button>
             )}
-            {canPublish && held && (
-                <p
-                    id="publish-held"
-                    className="basis-full text-[12.5px] text-muted-foreground"
-                >
-                    Publish waits until these checks pass:{" "}
-                    {row.blocked.join(", ")}.
-                </p>
-            )}
+            {/* Held: the header's line says why ("Can't publish yet: …", #publish-held), so the actions stay one row. */}
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -135,6 +135,13 @@ export function SearchPageActions({
                     {canPublish && (
                         <>
                             <DropdownMenuSeparator />
+                            {row.pending && (
+                                <DropdownMenuItem
+                                    onSelect={() => setOpened("cancel")}
+                                >
+                                    Cancel this change
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 className="text-destructive"
                                 disabled={!canDo("archive", row.state)}
@@ -153,6 +160,7 @@ export function SearchPageActions({
                     rows={rows}
                     site={site}
                     reviewSite={reviewSite}
+                    reviewUrl={reviewUrl}
                     checks={checks}
                     showPages={false}
                     onOpenChange={(next) => {

@@ -8,16 +8,13 @@ import { SubscriptionTable } from "@/components/billing/subscription-table";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import {
-    getSarohSubscription,
     getSubscriptionHistory,
     listSarohSubscriptions,
+    readSarohSubscription,
 } from "@/lib/billing";
 import type { StatusCardKey } from "@/lib/billing-filters";
-import { clearHref, isNarrowed } from "@/lib/billing-filters";
-import type {
-    SarohSubscriptionDetail,
-    SarohSubscriptionPage,
-} from "@/lib/billing-words";
+import { clearHref, isNarrowed, narrowCause } from "@/lib/billing-filters";
+import type { SarohSubscriptionPage } from "@/lib/billing-words";
 import {
     billingHref,
     readPage,
@@ -35,7 +32,7 @@ const BASE = "/billing/subscriptions";
 
 /**
  * Every business's Saroh plan subscription (R26, DEC-179): the month's
- * total at list price, five status cards and the plan chips that filter
+ * total at list price, the status chips and the plan chips that filter
  * as they are pressed, and a row per business with who it is billed to,
  * its plan and note, its status, its next charge and how it is paid, its
  * autopay and its last invoice. A row opens the subscription sheet
@@ -64,15 +61,27 @@ export default async function BillingSubscriptionsPage({
     const historyShow = readHistoryShow(raw.history);
     const historyPage = readPage(raw.hpage);
     const filters = { q, status, plan, view };
-    const here = { ...filters, page };
+    const list = (f: typeof filters) =>
+        listSarohSubscriptions({ ...f, page }).catch(() => undefined);
 
-    const [result, sheet, history] = await Promise.all([
-        listSarohSubscriptions({ ...filters, page }).catch(() => undefined),
-        open ? readDetail(open) : Promise.resolve(undefined),
+    const [listed, sheet, history] = await Promise.all([
+        list(filters),
+        open ? readSarohSubscription(open) : Promise.resolve(undefined),
         open && sheetTab === "history"
             ? readHistory(open, historyShow, historyPage)
             : Promise.resolve(undefined),
     ]);
+    // A plan key no plan has (an old or mistyped link) is ignored, not
+    // read as "nothing matches".
+    const unknownPlan =
+        plan !== undefined &&
+        Boolean(listed) &&
+        !listed?.plans.some((p) => p.key === plan);
+    const result = unknownPlan
+        ? await list({ ...filters, plan: undefined })
+        : listed;
+    const query = unknownPlan ? { ...raw, plan: undefined } : raw;
+    const shown = unknownPlan ? { ...filters, plan: undefined } : filters;
 
     return (
         <SubscriptionChangesProvider>
@@ -88,9 +97,13 @@ export default async function BillingSubscriptionsPage({
                 <Subscriptions
                     result={result}
                     page={page}
-                    narrowed={isNarrowed("subscriptions", raw)}
-                    openHref={(id) => billingHref(BASE, { ...here, open: id })}
-                    pageHref={(p) => billingHref(BASE, { ...filters, page: p })}
+                    narrowed={isNarrowed("subscriptions", query)}
+                    cause={narrowCause("subscriptions", query)}
+                    q={q}
+                    openHref={(id) =>
+                        billingHref(BASE, { ...shown, page, open: id })
+                    }
+                    pageHref={(p) => billingHref(BASE, { ...shown, page: p })}
                 />
             )}
 
@@ -99,7 +112,7 @@ export default async function BillingSubscriptionsPage({
                     detail={sheet.detail}
                     failed={sheet.failed}
                     base={BASE}
-                    query={raw}
+                    query={query}
                     tab={sheetTab}
                     history={history}
                     historyShow={historyShow}
@@ -115,12 +128,16 @@ function Subscriptions({
     result,
     page,
     narrowed,
+    cause,
+    q,
     openHref,
     pageHref,
 }: {
     result: SarohSubscriptionPage;
     page: number;
     narrowed: boolean;
+    cause: "search" | "filters";
+    q: string | undefined;
     openHref: (id: string) => string;
     pageHref: (page: number) => string;
 }) {
@@ -128,7 +145,8 @@ function Subscriptions({
     const byStatus = (s: string) =>
         summary.byStatus.find((row) => row.status === s)?.count ?? 0;
     const counts: Record<StatusCardKey, number> = {
-        paying: byStatus("ACTIVE"),
+        active: byStatus("ACTIVE"),
+        paying: summary.paying,
         failed: byStatus("PAST_DUE"),
         trial: byStatus("TRIALING"),
         ending: summary.endingSoon,
@@ -149,13 +167,25 @@ function Subscriptions({
                     count: planCounts.get(p.key) ?? 0,
                 }))}
             />
+            {narrowed ? (
+                <p className="text-[13px] text-muted-foreground">
+                    The counts are for all subscriptions, not only the ones
+                    shown.
+                </p>
+            ) : null}
 
             {result.items.length === 0 && page === 1 ? (
                 narrowed ? (
                     <EmptyPanel
                         kind="no-results"
                         things="subscriptions"
-                        cause="filters"
+                        cause={cause}
+                        query={q}
+                        description={
+                            q
+                                ? "Search looks at business names, invoice numbers and Razorpay ids. Plans are the chips above."
+                                : undefined
+                        }
                         clearHref={clearHref("subscriptions")}
                     />
                 ) : (
@@ -188,18 +218,6 @@ function Subscriptions({
             )}
         </>
     );
-}
-
-async function readDetail(id: string): Promise<{
-    detail: SarohSubscriptionDetail | null;
-    failed?: "error" | "refused";
-}> {
-    try {
-        const detail = await getSarohSubscription(id);
-        return detail ? { detail } : { detail: null, failed: "refused" };
-    } catch {
-        return { detail: null, failed: "error" };
-    }
 }
 
 /** The History tab's page; undefined when the read failed. */

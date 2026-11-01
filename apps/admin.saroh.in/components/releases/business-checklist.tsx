@@ -4,6 +4,8 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
 
+import { matchesBusiness } from "@/lib/releases";
+
 /**
  * A searchable list of businesses to tick, read back from the form by
  * `name`. A business the search hides keeps its tick (it is hidden, not
@@ -14,12 +16,12 @@ export function BusinessChecklist({
     options,
 }: {
     name: string;
-    options: { id: string; name: string }[];
+    /** `slug` (its web address) tells apart businesses that share a name. */
+    options: { id: string; name: string; slug: string | null }[];
 }) {
     const id = useId();
     const [query, setQuery] = useState("");
     const [picked, setPicked] = useState<Set<string>>(new Set());
-    const q = query.trim().toLowerCase();
 
     return (
         <fieldset className="grid gap-2">
@@ -32,19 +34,16 @@ export function BusinessChecklist({
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search businesses"
+                placeholder="Search by name or web address"
                 autoComplete="off"
             />
             <ul className="grid max-h-56 gap-0.5 overflow-y-auto rounded-md border p-1">
                 {options.map((option) => (
                     <li
                         key={option.id}
-                        hidden={
-                            q.length > 0 &&
-                            !option.name.toLowerCase().includes(q)
-                        }
+                        hidden={!matchesBusiness(option, query)}
                     >
-                        <label className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded px-2 text-sm hover:bg-muted">
+                        <label className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded px-2 py-1 text-sm hover:bg-muted">
                             <input
                                 type="checkbox"
                                 name={name}
@@ -57,8 +56,26 @@ export function BusinessChecklist({
                                     setPicked(next);
                                 }}
                                 className="size-4 accent-primary"
+                                aria-label={option.name}
+                                aria-describedby={
+                                    option.slug
+                                        ? `${id}-${option.id}-slug`
+                                        : undefined
+                                }
                             />
-                            <span className="truncate">{option.name}</span>
+                            <span className="min-w-0">
+                                <span className="block truncate">
+                                    {option.name}
+                                </span>
+                                {option.slug && (
+                                    <span
+                                        id={`${id}-${option.id}-slug`}
+                                        className="block truncate font-mono text-[12px] text-muted-foreground"
+                                    >
+                                        {option.slug}
+                                    </span>
+                                )}
+                            </span>
                         </label>
                     </li>
                 ))}
