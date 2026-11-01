@@ -409,10 +409,16 @@ recorded grant (the API refuses it otherwise).
   holds Publish with how to fix it. Unpublish and Archive name the live
   pages that link there, and don't block (DEC-201 item 9). The dialog
   gets every kind's rows (`rows`/`allRows`), since a guide links to tools.
-  A page's tabs live under
-  `app/search-pages/[slug]/(tabs)/`, so `[slug]/preview` (the shared
-  template, light, no console chrome, no links) has no shell; the Content
-  tab frames it. `searchPageChecks` comes from
+  The list and each page live under `app/search-pages/(console)/`, whose
+  layout draws the console once (owner, 1 Nov): ‹ Previous / Next › and
+  opening a row swap only the page, under its grey shape
+  (`(console)/loading.tsx` picks the page's or the list's shape by
+  address), never the whole screen. A page's tabs are
+  `(console)/[slug]/(tabs)/`; `app/search-pages/[slug]/preview` (the shared
+  template, light, no console chrome, no links) stays outside, with no
+  shell; the Content tab frames it. While a page isn't live its link reads
+  "Read the draft ↗": the review site draws every page, marked Draft
+  (locally that is saroh.in's own `pnpm dev`, which `dev:apps` doesn't run). `searchPageChecks` comes from
   `@saroh/search-pages/checks` and runs only in a client component: it
   uses react-dom/server, which Next refuses in Server Components and route
   handlers. The site and its environment come from `marketingSiteUrl()` and

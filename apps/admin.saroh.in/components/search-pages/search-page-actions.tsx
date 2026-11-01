@@ -72,8 +72,16 @@ export function SearchPageActions({
                     href={`${reviewUrl}${row.path}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    // A draft is readable there, marked Draft: reading it is the step before Publish.
+                    title={
+                        row.onSite
+                            ? undefined
+                            : `Opens on ${reviewSite}, marked Draft`
+                    }
                 >
-                    Read on {reviewSite} ↗
+                    {row.onSite
+                        ? `Read on ${reviewSite} ↗`
+                        : "Read the draft ↗"}
                 </a>
             </Button>
             {canPublish && main && (
