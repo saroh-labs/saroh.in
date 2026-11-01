@@ -38,6 +38,8 @@ const CONTENT_MAPS = [
     join(ROOT, "lib/docs-content.gen.ts"),
     join(ROOT, "lib/search-content.gen.ts"),
 ];
+/** Every free tool's code, drafts too (admin's): saroh.in draws from its build's own registry. */
+const EVERY_TOOL = join(PACKAGE, "src/tools/registry.ts");
 const NEVER_IN_THE_BROWSER = ["components/shared/nav/nav-items.ts"];
 /** The waitlist form checks its fields with zod in the browser, by design. */
 const ZOD_ON_PURPOSE = new Set(["lib/waitlist-schema.ts"]);
@@ -227,14 +229,26 @@ describe("saroh.in's browser JS", () => {
 });
 
 describe("saroh.in carries only its build's pages (plan 2026-11-01-001)", () => {
-    it("the package's index reaches no page's words", () => {
+    it("the package's index reaches no page's words and no tool's code", () => {
         const reached = [...reach(join(PACKAGE, "src/index.ts"))];
-        expect(reached.filter((p) => CONTENT_MAPS.includes(p))).toEqual([]);
+        expect(
+            reached.filter((p) => CONTENT_MAPS.includes(p) || p === EVERY_TOOL),
+        ).toEqual([]);
+    });
+
+    it("no saroh.in file reaches the package's every-tool registry", () => {
+        // A server file counts too: Next builds a chunk for every client
+        // component the server's code can reach.
+        const found = ["app", "components", "lib", "content"]
+            .flatMap((dir) => sources(join(ROOT, dir)))
+            .filter((entry) => reach(entry).has(EVERY_TOOL))
+            .map((entry) => relative(ROOT, entry));
+        expect(found).toEqual([]);
     });
 });
 
-describe("@saroh/search-pages/docs-embedded and ./embedded", () => {
-    it("are admin's: no saroh.in file imports them (every draft's words)", () => {
+describe("@saroh/search-pages/docs-embedded, ./embedded and ./tools", () => {
+    it("are admin's: no saroh.in file imports them (every draft's words and tools)", () => {
         // docs-content.config.ts reads it at build time, in Node, to pick the live pages: never bundled.
         const files = [
             ...["app", "components", "lib", "content"].flatMap((dir) =>
@@ -247,7 +261,7 @@ describe("@saroh/search-pages/docs-embedded and ./embedded", () => {
                 .map((f) => join(ROOT, f)),
         ];
         const importers = files.filter((f) =>
-            /["']@saroh\/search-pages\/(docs-embedded|embedded)["']/.test(
+            /["']@saroh\/search-pages\/(docs-embedded|embedded|tools)["']/.test(
                 readFileSync(f, "utf8"),
             ),
         );

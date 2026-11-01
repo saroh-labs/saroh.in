@@ -222,16 +222,29 @@ describe("planDocs: links must land (U12)", () => {
     });
 });
 
-describe("searchPagesLive + writeSearchContent (plan 2026-11-01-001, U2)", () => {
+describe("searchPagesLive + writeSearchContent (plan 2026-11-01-001, U2, U3)", () => {
     const LIVE = ["/for/salons", "/for/gyms", "/tools/gst-calculator"];
     const write = (list: Parameters<typeof searchPagesLive>[0]) => {
         const genFile = path.join(dir, "search-content.gen.ts");
-        writeSearchContent(searchPagesLive(list), { genFile });
+        const toolsFile = path.join(dir, "tool-registry.gen.ts");
+        writeSearchContent(searchPagesLive(list), { genFile, toolsFile });
         const text = fs.readFileSync(genFile, "utf8");
         const [forPart, toolPart] = text.split("TOOL_SOURCES");
         const slugs = (part = "") =>
             [...part.matchAll(/^ {4}"([a-z0-9-]+)":/gm)].map((m) => m[1]);
-        return { for: slugs(forPart), tools: slugs(toolPart) };
+        const registry = fs.readFileSync(toolsFile, "utf8");
+        // Each entry imports its own tool, and nothing else does.
+        const imports = [
+            ...registry.matchAll(
+                /import\("@saroh\/search-pages\/tools\/([a-z0-9-]+)"\)/g,
+            ),
+        ].map((m) => m[1]);
+        expect(slugs(registry)).toEqual(imports);
+        return {
+            for: slugs(forPart),
+            tools: slugs(toolPart),
+            code: imports,
+        };
     };
     const every = (kind: string) =>
         fs
@@ -252,12 +265,24 @@ describe("searchPagesLive + writeSearchContent (plan 2026-11-01-001, U2)", () =>
                 ...live(...LIVE, GST),
                 takenOff: [{ path: "/for/cafes" }],
             }),
-        ).toEqual({ for: ["gyms", "salons"], tools: ["gst-calculator"] });
+        ).toEqual({
+            for: ["gyms", "salons"],
+            tools: ["gst-calculator"],
+            code: ["gst-calculator"],
+        });
     });
 
     it("a preview, or no list (next dev, tests): every page", () => {
-        const all = { for: every("for"), tools: every("tools") };
+        // The two app tools have their own routes: no component here.
+        const all = {
+            for: every("for"),
+            tools: every("tools"),
+            code: every("tools").filter(
+                (t) => t !== "link-preview" && t !== "qr-code-maker",
+            ),
+        };
         expect(all.for).toHaveLength(34);
+        expect(all.code).toHaveLength(25);
         expect(write({ preview: true, live: LIVE })).toEqual(all);
         expect(write(null)).toEqual(all);
     });

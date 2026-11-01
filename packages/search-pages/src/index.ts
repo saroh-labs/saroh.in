@@ -8,7 +8,9 @@
  */
 // `searchPageChecks` and `toolChecks` are `@saroh/search-pages/checks`: it
 // draws the page with react-dom/server, which Next refuses in a Server
-// Component's imports, so the index stays importable from one.
+// Component's imports, so the index stays importable from one. The tool
+// registry (`./tools`) isn't here either: a site imports only its build's
+// tools (`./tools/<slug>`).
 export type { SearchPageCheck } from "./checks";
 export {
     AnswerBox,

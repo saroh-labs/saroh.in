@@ -26,6 +26,9 @@
         "./embed-docs": "./scripts/embed-docs.mjs",
         "./embed-content": "./scripts/embed-content.mjs",
         "./download": "./src/tools/download.ts",
+        "./tool-slot": "./src/tools/tool-slot.tsx",
+        "./tools": "./src/tools/every-tool-slot.tsx",
+        "./tools/*": "./src/tools/*/index.tsx",
         "./pages": "./src/content-pages.ts",
         "./kinds": "./kinds.js",
         "./styles.css": "./src/styles.css"

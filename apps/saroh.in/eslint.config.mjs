@@ -8,7 +8,7 @@ export default [
         // .open-next and .wrangler are the Cloudflare build output (cf:build).
         // worker.ts imports the Cloudflare build output (cf:build), so it
         // is outside tsconfig and the typed lint, as in saroh.app.
-        // lib/{docs-content,search-content}.gen.* are generated
+        // lib/{docs-content,search-content,tool-registry}.gen.* are generated
         // (docs-content.config.ts); the project sees only one of each pair at a time.
         ignores: [
             ".next/**",
@@ -19,6 +19,8 @@ export default [
             "lib/docs-content.gen.d.ts",
             "lib/search-content.gen.ts",
             "lib/search-content.gen.d.ts",
+            "lib/tool-registry.gen.ts",
+            "lib/tool-registry.gen.d.ts",
         ],
     },
     ...baseConfig,
