@@ -11,6 +11,7 @@ import {
     parsePublishList,
     shownToolLinks,
     solutionLink,
+    tradesHubLinks,
 } from "./search-pages";
 import { indexedPaths, lastModified } from "./site-pages";
 
@@ -79,6 +80,14 @@ describe("which /for/ pages are built", () => {
             "/solutions/salons",
         );
         expect(solutionLink("gyms", list(false))).toBe("/solutions/gyms");
+    });
+
+    it("adds See all trades to Solutions once a /for/ page is live, on a preview too only then", () => {
+        expect(tradesHubLinks(list(false)).map((l) => l.href)).toEqual([
+            "/for",
+        ]);
+        expect(tradesHubLinks(list(false, []))).toEqual([]);
+        expect(tradesHubLinks(list(true, []))).toEqual([]);
     });
 });
 

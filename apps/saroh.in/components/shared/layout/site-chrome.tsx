@@ -12,7 +12,12 @@ import { env } from "@/env";
 import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
 import { docHubLinks } from "@/lib/search-page-route";
-import { publishList, shownToolLinks, solutionLink } from "@/lib/search-pages";
+import {
+    publishList,
+    shownToolLinks,
+    solutionLink,
+    tradesHubLinks,
+} from "@/lib/search-pages";
 import { siteTagConfig } from "@/lib/site-tag-config";
 import { whatsappNumber } from "@/lib/whatsapp";
 
@@ -59,7 +64,10 @@ export function SiteChrome({
     ];
     // The app's tools and the package's, each once published (#1253).
     const tools = shownToolLinks(ctx, published);
-    const solutions = solutionItems((slug) => solutionLink(slug, published));
+    const solutions = [
+        ...solutionItems((slug) => solutionLink(slug, published)),
+        ...tradesHubLinks(published),
+    ];
     // "Cookie choices" shows wherever the notice can ask: Google Analytics,
     // an advertising tag (DEC-127) or the recorder (DEC-125).
     const analytics = asksConsent(siteTagConfig());

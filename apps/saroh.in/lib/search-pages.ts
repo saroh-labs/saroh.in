@@ -90,6 +90,22 @@ export function liveSearchPages(
     return listSearchPages({ kind: "for" }).filter((p) => live.has(p.path));
 }
 
+/**
+ * "See all trades" under the Solutions menus and footer column, once a /for/
+ * page is live: the same rule as the Resources hubs (`docHubLinks`).
+ */
+export function tradesHubLinks(list: PublishList = publishList()) {
+    return liveSearchPages(list).length > 0
+        ? [
+              {
+                  name: "See all trades",
+                  line: "Find the page for your trade.",
+                  href: FOR_HUB.path,
+              },
+          ]
+        : [];
+}
+
 /** The /tools hub: the menus' "Free tools" and every tool's breadcrumb. */
 export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
 
