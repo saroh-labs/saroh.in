@@ -6301,3 +6301,11 @@ reminders; it doesn't.
 **Rule**: content is checked against `docs/architecture/MARKETING_CLAIMS.md` before it is
 built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Category**: content · claims
+
+## A dev database snapshot copied production's instead
+
+**Symptom**: 1 Nov, snapshotting saroh.io's database before the demo-businesses run, the dump came from production's database server. It only read data, nothing was written, and the copy was deleted at once.
+**Cause**: the two environments' databases share a name on different database servers. The step took the name from the dev API's connection string but ran `pg_dump` in a hard-coded database container.
+**Fix**: the snapshot takes the host from the target API's connection string, refuses unless it is the expected one, and runs `pg_dump` inside that host's container as its admin user (the app's role is under row-level security, so a dump as the app role fails or comes out partial).
+**Rule**: `docs/architecture/runbooks/DEMO_BUSINESSES.md` step 1; any server step that touches a database checks the host, never only the name.
+**Category**: operations · databases
