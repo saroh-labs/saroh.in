@@ -2,6 +2,7 @@
 
 import { formatCount } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -14,8 +15,9 @@ import { usePlansNav } from "./plans-nav";
 import { usePreview } from "./preview/preview-state";
 
 /**
- * The page's heading (admin redesign U13, R18): "Plans and modules", one
- * status line under it, and the previews' buttons beside it. The page draws
+ * The page's heading (admin redesign U13, R18): the console's one page
+ * header, with "Product › Plans and modules" above it like its neighbours,
+ * one status line under it, and the previews' buttons beside it. The page draws
  * the bare heading at once (`PlansHeader`); once the catalogue is read the
  * shell draws it again with its line and buttons (`PlansLiveHeader`).
  */
@@ -29,26 +31,23 @@ export function PlansHeader({
     actions?: ReactNode;
 }) {
     return (
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <div className="grid min-w-0 flex-[1_1_320px] gap-1">
-                <h1 className="font-display text-[22px] font-semibold tracking-[-0.01em]">
-                    Plans and modules
-                </h1>
-                {line && (
-                    <p className="text-[13px] text-muted-foreground">{line}</p>
-                )}
-                {hint && (
-                    <p className="text-[12.5px] text-muted-foreground">
-                        {hint}
-                    </p>
-                )}
-            </div>
-            {actions && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {actions}
-                </div>
-            )}
-        </header>
+        <PageHeader
+            // The shell spaces its own blocks.
+            className="mb-0"
+            breadcrumb={["Product", "Plans and modules"]}
+            title="Plans and modules"
+            description={
+                line || hint ? (
+                    <>
+                        {line && <span className="block">{line}</span>}
+                        {hint && (
+                            <span className="block text-[12.5px]">{hint}</span>
+                        )}
+                    </>
+                ) : undefined
+            }
+            actions={actions}
+        />
     );
 }
 

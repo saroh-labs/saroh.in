@@ -406,9 +406,9 @@ describe("the plan sheet", () => {
         expect(pencil.getAttribute("tabindex")).toBe("0");
         pencil.focus();
         fireEvent.click(pencil);
-        expect(
-            screen.getByRole("dialog", { name: "Edit Plan B" }),
-        ).toBeTruthy();
+        const dialog = screen.getByRole("dialog", { name: "Edit Plan B" });
+        // Opened to read: the sheet has focus, Name isn't focused or selected.
+        expect(document.activeElement).toBe(dialog);
     });
 
     it("updates the card live as the fields are typed, and autosaves", async () => {

@@ -69,9 +69,7 @@ export function ReleaseActions({
         ...(!turnsOn
             ? [{ label: "Turn off for everyone…", onSelect: open("global") }]
             : []),
-        ...(header
-            ? [{ label: "Copy code name", onSelect: () => copyKey(flag.key) }]
-            : []),
+        { label: "Copy code name", onSelect: () => copyKey(flag.key) },
     ];
 
     return (
@@ -227,7 +225,7 @@ export function SomeBusinessesAction({
 }: {
     flag: AdminFlag;
     enabled: boolean;
-    candidates: { organizationId: string; name: string }[];
+    candidates: { organizationId: string; name: string; slug: string | null }[];
 } & Controlled) {
     const keys = useRef(new Map<string, string>());
     const feedback = useReleaseFeedback(flag);
@@ -261,6 +259,7 @@ export function SomeBusinessesAction({
                     options={candidates.map((row) => ({
                         id: row.organizationId,
                         name: row.name,
+                        slug: row.slug,
                     }))}
                 />
             }

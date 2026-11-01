@@ -57,8 +57,9 @@ export default async function ReleaseOverviewPage({
             </dl>
             <p className="text-sm text-muted-foreground">
                 {counts.have} of {counts.total}{" "}
-                {counts.total === 1 ? "business has" : "businesses have"} it
-                now.{" "}
+                {flag.metadata.group === "module"
+                    ? `${counts.total === 1 ? "business is" : "businesses are"} allowed it now.`
+                    : `${counts.total === 1 ? "business has" : "businesses have"} it now.`}{" "}
                 <Link
                     href={releaseHref(flag.key, "who")}
                     className="text-foreground underline underline-offset-2"

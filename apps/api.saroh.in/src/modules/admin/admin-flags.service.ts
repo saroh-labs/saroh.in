@@ -46,7 +46,8 @@ export interface AdminFlagChange {
     createdAt: Date;
 }
 
-const HISTORY_LIMIT = 20;
+/** One page of a flag's history; the console pages past it (`?page=`). */
+export const HISTORY_LIMIT = 20;
 
 /**
  * The flag control surface for admin.saroh.in (S1-012, DEC feature-flags).
@@ -149,17 +150,18 @@ export class AdminFlagsService {
     }
 
     /**
-     * The last changes to one flag, newest first, for the Releases screen's
-     * History tab (R9). Read from the flag's own ledger, which `flags:read`
+     * The changes to one flag, newest first, {@link HISTORY_LIMIT} a page,
+     * for the Releases screen's History tab (R9). Read from the flag's own ledger, which `flags:read`
      * already opens: the platform audit list needs `audit:read`, which a
      * release manager does not hold. Names are joined here so the console
      * says who changed what, not two ids.
      */
-    async history(key: FlagKey): Promise<AdminFlagChange[]> {
+    async history(key: FlagKey, page = 1): Promise<AdminFlagChange[]> {
         const rows = await prisma.featureFlagAudit.findMany({
             where: { flagKey: key },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: HISTORY_LIMIT,
+            skip: (Math.max(1, Math.trunc(page)) - 1) * HISTORY_LIMIT,
             select: {
                 id: true,
                 organizationId: true,

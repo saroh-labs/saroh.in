@@ -1,4 +1,5 @@
 import { buttonVariants } from "@saroh/ui/button";
+import { chipClass } from "@saroh/ui/chip";
 import { FailedState } from "@saroh/ui/data-state";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -11,7 +12,7 @@ import { plural } from "@/lib/format";
 import { listStorageUsage } from "@/lib/usage";
 import type { StorageOrder } from "@/lib/usage-words";
 import {
-    formatGb,
+    formatStorage,
     pageCount,
     readOrder,
     readPage,
@@ -23,12 +24,14 @@ export const metadata = { title: "Usage" };
 const ORDERS: { value: StorageOrder; label: string }[] = [
     { value: "most", label: "Most storage" },
     { value: "least", label: "Least storage" },
+    { value: "closest", label: "Closest to limit" },
 ];
 
 /**
  * What each business uses of the instance (#798): the storage its photos
- * and videos take, counted as the plan's storage limit counts it, sorted
- * across every business and read a page at a time.
+ * and videos take, counted as the plan's storage limit counts it, beside
+ * that limit and the share used, sorted across every business (Closest to
+ * limit finds who is about to hit it) and read a page at a time.
  */
 export default async function UsagePage({
     searchParams,
@@ -52,7 +55,7 @@ export default async function UsagePage({
                 <PageHeader
                     breadcrumb={["Product", "Usage"]}
                     title="Usage"
-                    description="Storage each business's photos and videos take, as its plan counts it. A row opens that business."
+                    description="Storage each business's photos and videos use, against its plan's limit. A row opens that business."
                 />
 
                 <nav
@@ -66,10 +69,7 @@ export default async function UsagePage({
                                 key={option.value}
                                 href={usageHref(option.value, 1)}
                                 aria-current={on ? "page" : undefined}
-                                className={buttonVariants({
-                                    variant: on ? "secondary" : "ghost",
-                                    size: "sm",
-                                })}
+                                className={chipClass(on)}
                             >
                                 {option.label}
                             </Link>
@@ -90,10 +90,14 @@ export default async function UsagePage({
                 ) : (
                     <>
                         <p className="text-sm text-muted-foreground">
-                            {formatGb(usage.totalGb)} stored across{" "}
+                            {formatStorage(usage.totalBytes)} stored across{" "}
                             {plural(usage.total, "business", "businesses")}.
                         </p>
-                        <StorageTable rows={usage.items} />
+                        <StorageTable
+                            rows={usage.items}
+                            order={order}
+                            pages={pageCount(usage.total, usage.limit)}
+                        />
                         <UsagePager
                             order={order}
                             page={usage.page}

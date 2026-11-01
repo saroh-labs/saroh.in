@@ -79,7 +79,9 @@ export function PlansTabs() {
         >
             <TabsList
                 aria-label="Plans and modules"
-                className="flex h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
+                // On a phone the row scrolls: its right edge fades to say so,
+                // over padding, so the last tab is clear once scrolled to.
+                className="flex h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 max-sm:pr-12 max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]"
             >
                 {PLANS_TABS.map((key) => (
                     <TabsTrigger
@@ -93,10 +95,13 @@ export function PlansTabs() {
                                 {" "}
                                 <span
                                     className={cn(
-                                        "ml-1.5 rounded-full px-2 py-px text-[11.5px] font-semibold",
+                                        "ml-1.5 text-[11.5px] font-semibold",
                                         key === "plans"
-                                            ? "bg-highlight-subtle text-highlight-subtle-foreground"
-                                            : "bg-secondary text-muted-foreground",
+                                            ? "rounded-full bg-highlight-subtle px-2 py-px text-highlight-subtle-foreground"
+                                            : key === "versions"
+                                              ? // A count, not something waiting on you.
+                                                "font-normal tabular-nums text-muted-foreground"
+                                              : "rounded-full bg-secondary px-2 py-px text-muted-foreground",
                                     )}
                                 >
                                     {labels[key].badge}

@@ -283,10 +283,20 @@ export class ListOrganizationsDto {
 }
 
 /** Storage used per business (#798): sorted by size, one page at a time. */
+/** A page of one flag's history (`?page=`, from 1). */
+export class FlagHistoryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(10_000)
+    page?: number;
+}
+
 export class ListStorageUsageDto {
     @IsOptional()
-    @IsIn(["most", "least"])
-    order?: "most" | "least";
+    @IsIn(["most", "least", "closest"])
+    order?: "most" | "least" | "closest";
 
     @IsOptional()
     @Type(() => Number)

@@ -1,17 +1,19 @@
 "use client";
 
+import { buttonVariants } from "@saroh/ui/button";
 import type { DataColumn } from "@saroh/ui/data-view";
 import { DataView } from "@saroh/ui/data-view";
+import Link from "next/link";
 
 import { LifecycleBadge } from "@/components/business/lifecycle-badge";
 import { plural } from "@/lib/format";
-import type { StorageUsageRow } from "@/lib/usage-words";
-import { formatGb } from "@/lib/usage-words";
+import type { StorageOrder, StorageUsageRow } from "@/lib/usage-words";
+import { formatLimit, formatStorage, usageHref } from "@/lib/usage-words";
 
 /*
  * No column sorts here: the order is the server's, across every business
- * (Most / Least above the table). Sorting one page in the browser would
- * read as a sort of the whole list.
+ * (Most / Least / Closest to limit above the table). Sorting one page in
+ * the browser would read as a sort of the whole list.
  */
 const COLUMNS: DataColumn<StorageUsageRow>[] = [
     {
@@ -48,12 +50,41 @@ const COLUMNS: DataColumn<StorageUsageRow>[] = [
         priority: "primary",
         width: "140px",
         numeric: true,
-        cell: (row) => formatGb(row.gb),
+        cell: (row) => formatStorage(row.bytes),
+    },
+    {
+        id: "limit",
+        header: "Plan limit",
+        priority: "detail",
+        width: "120px",
+        numeric: true,
+        cell: (row) => formatLimit(row.limitGb),
+    },
+    {
+        id: "used",
+        header: "Used",
+        priority: "secondary",
+        width: "90px",
+        numeric: true,
+        cell: (row) =>
+            row.usedPercent === null ? (
+                <span className="text-muted-foreground">—</span>
+            ) : (
+                `${row.usedPercent}%`
+            ),
     },
 ];
 
 /** One page of businesses by the storage their photos and videos use. */
-export function StorageTable({ rows }: { rows: StorageUsageRow[] }) {
+export function StorageTable({
+    rows,
+    order,
+    pages,
+}: {
+    rows: StorageUsageRow[];
+    order: StorageOrder;
+    pages: number;
+}) {
     return (
         <DataView
             viewId="console-usage-storage"
@@ -68,7 +99,18 @@ export function StorageTable({ rows }: { rows: StorageUsageRow[] }) {
             }
             emptyState={{
                 title: "No businesses on this page",
-                note: "Go back to the first page.",
+                note: `There ${pages === 1 ? "is only 1 page" : `are only ${pages} pages`}.`,
+                action: (
+                    <Link
+                        href={usageHref(order, 1)}
+                        className={buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                        })}
+                    >
+                        Go to page 1
+                    </Link>
+                ),
             }}
         />
     );

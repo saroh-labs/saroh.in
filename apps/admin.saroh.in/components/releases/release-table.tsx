@@ -13,12 +13,13 @@ import { changedRowProps } from "@/components/changed-row";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import type { AdminFlag, AdminOrganization } from "@/lib/control-plane";
 import { formatDateTime } from "@/lib/format";
-import type { ReleaseState } from "@/lib/releases";
+import type { ReleaseGroup, ReleaseState } from "@/lib/releases";
 import {
-    businesses,
     chipIsOn,
     groupLabel,
+    GROUPS,
     haveItCount,
+    haveItLabel,
     passesFilter,
     releaseHref,
     releaseState,
@@ -60,22 +61,28 @@ export function ReleaseTable({
     today: string;
 }) {
     const [show, setShow] = useState<Show>("all");
+    const [kind, setKind] = useState<ReleaseGroup | "all">("all");
     const [query, setQuery] = useState("");
     // Bumped to empty the search field from outside it.
     const [searchKey, setSearchKey] = useState(0);
-    const feedback = useChangeFeedback({ filterKey: `${show}|${query}` });
+    const feedback = useChangeFeedback({
+        filterKey: `${show}|${kind}|${query}`,
+    });
     const sorted = sortReleases(flags);
     const { rows, highlighted } = feedback.keep(sorted, {
         id: (flag) => flag.key,
-        passes: (flag) => passesFilter(flag, show, query),
+        passes: (flag) =>
+            passesFilter(flag, show, query) &&
+            (kind === "all" || flag.metadata.group === kind),
     });
     const count = (value: Show) =>
         value === "all"
             ? flags.length
             : flags.filter((flag) => releaseState(flag) === value).length;
-    const narrowed = show !== "all" || query !== "";
+    const narrowed = show !== "all" || kind !== "all" || query !== "";
     const clear = () => {
         setShow("all");
+        setKind("all");
         setQuery("");
         setSearchKey((n) => n + 1);
     };
@@ -93,35 +100,81 @@ export function ReleaseTable({
                     />
                 }
                 filters={
-                    <div
-                        role="group"
-                        aria-label="Show"
-                        className="flex flex-wrap gap-2"
-                    >
-                        {STATE_FILTERS.map((chip) => (
-                            <Chip
-                                key={chip.value}
-                                as="toggle"
-                                on={show === chip.value}
-                                onClick={() => setShow(chip.value)}
-                            >
-                                {chip.label}
-                                <span className="tabular-nums opacity-70">
-                                    {count(chip.value)}
-                                </span>
-                            </Chip>
-                        ))}
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                        <div
+                            role="group"
+                            aria-label="Show"
+                            className="flex flex-wrap gap-2"
+                        >
+                            {STATE_FILTERS.map((chip) => (
+                                <Chip
+                                    key={chip.value}
+                                    as="toggle"
+                                    on={show === chip.value}
+                                    onClick={() => setShow(chip.value)}
+                                >
+                                    {chip.label}
+                                    <span className="tabular-nums opacity-70">
+                                        {count(chip.value)}
+                                    </span>
+                                </Chip>
+                            ))}
+                        </div>
+                        <div
+                            role="group"
+                            aria-label="Kind"
+                            className="flex flex-wrap gap-2"
+                        >
+                            {[
+                                { group: "all" as const, label: "Every kind" },
+                                ...GROUPS,
+                            ]
+                                .filter(
+                                    ({ group }) =>
+                                        group === "all" ||
+                                        flags.some(
+                                            (f) => f.metadata.group === group,
+                                        ),
+                                )
+                                .map(({ group, label }) => (
+                                    <Chip
+                                        key={group}
+                                        as="toggle"
+                                        on={kind === group}
+                                        onClick={() => setKind(group)}
+                                    >
+                                        {label}
+                                        <span className="tabular-nums opacity-70">
+                                            {group === "all"
+                                                ? flags.length
+                                                : flags.filter(
+                                                      (f) =>
+                                                          f.metadata.group ===
+                                                          group,
+                                                  ).length}
+                                        </span>
+                                    </Chip>
+                                ))}
+                        </div>
                     </div>
                 }
                 onClear={narrowed ? clear : undefined}
-                clearLabel={show === "all" ? "Clear search" : "Clear filters"}
+                clearLabel={
+                    show === "all" && kind === "all"
+                        ? "Clear search"
+                        : "Clear filters"
+                }
             />
 
             {rows.length === 0 ? (
                 <EmptyPanel
                     kind="no-results"
                     things="releases"
-                    cause={query && show === "all" ? "search" : "filters"}
+                    cause={
+                        query && show === "all" && kind === "all"
+                            ? "search"
+                            : "filters"
+                    }
                     query={query}
                     onClear={clear}
                 />
@@ -202,10 +255,10 @@ function ReleaseRow({
                 </Badge>
             </div>
             <div className="col-span-2 text-[13px] tabular-nums text-muted-foreground md:col-span-1 md:text-foreground">
-                <span className="md:hidden">Has it: </span>
-                {organizations.length > 0 && have === organizations.length
-                    ? `All ${businesses(have)}`
-                    : businesses(have)}
+                {flag.metadata.group !== "module" && (
+                    <span className="md:hidden">Has it: </span>
+                )}
+                {haveItLabel(flag, have, organizations.length)}
             </div>
             <div className="col-span-2 min-w-0 text-[13px] text-muted-foreground md:col-span-1">
                 {last ? (

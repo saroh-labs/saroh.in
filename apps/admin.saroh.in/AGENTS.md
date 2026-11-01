@@ -88,10 +88,14 @@ recorded grant (the API refuses it otherwise).
   and its `GET /admin/contact-messages` need `organization:pii:read`; it
   adds no permission.
 - **Usage (`/usage`, #798)** lists every business by the storage its
-  photos and videos use (READY media, in GB as the plan's `storageGb`
-  counts it), sorted by the API across all businesses (Most / Least) and
-  paged by number. It reads with `organization:read`, the directory's
-  permission, so it adds none (DEC-039).
+  photos and videos use (READY media, as the plan's `storageGb` counts
+  it, shown in KB, MB or GB), beside its plan's storage limit and the
+  share used (`limitGb`, `usedPercent`, from `CatalogueAccessService`; a
+  dash when the plan has no cap or can't be read). The API sorts across
+  all businesses (Most / Least / Closest to limit; Closest resolves every
+  business's limit, then pages) and it is paged by number. It reads with
+  `organization:read`, the directory's permission, so it adds none
+  (DEC-039).
 - **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-179)** shows
   every invoice Saroh issued (with the filtered set's totals, each PDF and a
   month's CSV for GST) and every business's Saroh subscription (a row opens

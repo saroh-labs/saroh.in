@@ -26,6 +26,7 @@ import { AdminRoutes } from "./admin-routes.decorator";
 import {
     ClearFlagOverrideDto,
     ExplainFlagDto,
+    FlagHistoryDto,
     ListAdminAuditDto,
     SetFlagDto,
 } from "./dto";
@@ -87,8 +88,11 @@ export class AdminController {
 
     @Get("flags/:flagKey/history")
     @RequireAdminPermission(AdminPermission.FlagsRead)
-    async history(@Param("flagKey") flagKey: string) {
-        return this.adminFlags.history(assertKnownFlag(flagKey));
+    async history(
+        @Param("flagKey") flagKey: string,
+        @Query() query: FlagHistoryDto,
+    ) {
+        return this.adminFlags.history(assertKnownFlag(flagKey), query.page);
     }
 
     /**

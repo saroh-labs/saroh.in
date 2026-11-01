@@ -68,7 +68,16 @@ export function PlanSheet({
                 if (!open) onClose();
             }}
         >
-            <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[820px]">
+            <SheetContent
+                className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[820px]"
+                // Most opens are to read: focus the sheet, not Name, so a
+                // stray key can't rename the plan in the shared draft (and
+                // a phone opens no keyboard). Name is the next Tab.
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLElement).focus();
+                }}
+            >
                 <SheetHeader className="border-b border-border px-6 pb-3.5 pt-5">
                     <SheetTitle>Edit {name}</SheetTitle>
                     <SheetDescription>
