@@ -13,9 +13,13 @@ import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
 import { docHubLinks } from "@/lib/search-page-route";
 import {
+    footerToolLinks,
+    liveTools,
     publishList,
     shownToolLinks,
     solutionLink,
+    solutionMenuItems,
+    TOOLS_HUB,
     tradesHubLinks,
 } from "@/lib/search-pages";
 import { siteTagConfig } from "@/lib/site-tag-config";
@@ -64,9 +68,14 @@ export function SiteChrome({
     ];
     // The app's tools and the package's, each once published (#1253).
     const tools = shownToolLinks(ctx, published);
+    const toolsHub =
+        liveTools(published).length > 0
+            ? { name: "See all free tools", href: TOOLS_HUB.path }
+            : undefined;
+    const tradesHub = tradesHubLinks(published);
     const solutions = [
         ...solutionItems((slug) => solutionLink(slug, published)),
-        ...tradesHubLinks(published),
+        ...tradesHub,
     ];
     // "Cookie choices" shows wherever the notice can ask: Google Analytics,
     // an advertising tag (DEC-127) or the recorder (DEC-125).
@@ -89,11 +98,21 @@ export function SiteChrome({
                 resources={resources}
                 tools={tools}
                 solutions={solutions}
+                solutionMenu={solutionMenuItems(published) ?? undefined}
+                allTrades={
+                    tradesHub[0]
+                        ? { name: tradesHub[0].name, href: tradesHub[0].href }
+                        : undefined
+                }
+                allTools={toolsHub}
             />
             <main id="main">{children}</main>
             <SiteFooter
                 resources={resources}
-                tools={tools}
+                tools={[
+                    ...footerToolLinks(tools),
+                    ...(toolsHub ? [{ ...toolsHub, line: "" }] : []),
+                ]}
                 solutions={solutions}
                 legal={shownLegal(ctx)}
                 cookieChoices={analytics}

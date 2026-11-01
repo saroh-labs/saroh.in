@@ -312,7 +312,7 @@ test.describe("nav menus by keyboard", () => {
             )
             .toBe(true);
 
-        // Each section opens and closes from the keyboard.
+        // Each section is a level, in and out from the keyboard.
         for (const [label, count] of [
             ["Features", FEATURES.length],
             ["Solutions", SOLUTIONS.length],
@@ -320,10 +320,13 @@ test.describe("nav menus by keyboard", () => {
             const row = sheet.getByRole("button", { name: label });
             await row.focus();
             await page.keyboard.press("Enter");
-            await expect(row).toHaveAttribute("aria-expanded", "true");
+            const back = sheet.getByRole("button", { name: "Back" });
+            await expect(back).toBeFocused();
             await expect(
                 sheet.locator(`#nav-sheet-${label.toLowerCase()} a`),
             ).toHaveCount(count);
+            await page.keyboard.press("Enter");
+            await expect(row).toBeFocused();
         }
 
         const axe = await new AxeBuilder({ page })

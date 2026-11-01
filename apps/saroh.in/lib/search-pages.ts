@@ -7,7 +7,7 @@ import { createSearchPagesLoader } from "@saroh/search-pages";
 
 import type { PublishContext } from "@/content/resources";
 import { routeExists, shownTools } from "@/content/resources";
-import { solutionHref } from "@/content/solutions";
+import { solutionHref, solutionList } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 import { env } from "@/env";
 import { faqPageLd } from "@/lib/structured-data";
@@ -158,11 +158,73 @@ export function solutionLink(
         : solutionHref(slug);
 }
 
+/** Which /for/ family each solution's own page sits in: its column in the Solutions menu. */
+const SOLUTION_FAMILY: Record<SolutionSlug, string> = {
+    shops: "Shops and food",
+    salons: "Beauty",
+    gyms: "Fitness and classes",
+    clinics: "Health",
+};
+
+/**
+ * The desk Solutions menu: once a /for/ page is live, every trade under its
+ * family, the solutions first, names only (a trade's name says what it is).
+ * Before that, the solutions alone with their lines. The footer and the phone
+ * sheet keep the short list (`solutionItems`).
+ */
+export function solutionMenuItems(list: PublishList = publishList()) {
+    const trades = liveSearchPages(list);
+    if (trades.length === 0) return null;
+    const own = solutionList.map((s) => ({
+        name: s.name,
+        line: "",
+        href: solutionLink(s.slug, list),
+        group: SOLUTION_FAMILY[s.slug],
+    }));
+    const hrefs = new Set(own.map((i) => i.href));
+    return [
+        ...own,
+        ...trades
+            .filter((p) => !hrefs.has(p.path))
+            .map((p) => ({
+                name: p.name,
+                line: "",
+                href: p.path,
+                group: p.family,
+            })),
+    ];
+}
+
+/** The tools the footer names first: the ones most businesses come for. */
+const FOOTER_TOOLS = [
+    "/tools/gst-calculator",
+    "/tools/gst-invoice-generator",
+    "/tools/qr-code-maker",
+    "/tools/upi-qr-code-generator",
+    "/tools/whatsapp-link-generator",
+];
+
+/**
+ * The footer's Tools column: five tools, then the hub that lists them all, so
+ * the column stays as short as its neighbours however many are live.
+ */
+export function footerToolLinks<T extends { href: string }>(
+    tools: readonly T[],
+): T[] {
+    const rank = (t: T) => {
+        const at = FOOTER_TOOLS.indexOf(t.href);
+        return at === -1 ? FOOTER_TOOLS.length : at;
+    };
+    return [...tools].sort((a, b) => rank(a) - rank(b)).slice(0, 5);
+}
+
 /** A tool as the menus, the footer and `/llms.txt` list it. */
 export interface ToolLink {
     name: string;
     line: string;
     href: string;
+    /** The Tools menu's column. */
+    group?: string;
 }
 
 /**
@@ -175,14 +237,21 @@ export function shownToolLinks(
     ctx: PublishContext,
     list: PublishList = publishList(),
 ): ToolLink[] {
+    const live = liveTools(list);
     return [
         ...shownTools(ctx).map((p) => ({
             name: p.name,
             line: p.line,
             href: p.href,
+            group: live.find((t) => t.path === p.href)?.group,
         })),
-        ...liveTools(list)
+        ...live
             .filter((t) => !t.inApp && routeExists(t.path, ctx.routes))
-            .map((t) => ({ name: t.name, line: t.line, href: t.path })),
+            .map((t) => ({
+                name: t.name,
+                line: t.line,
+                href: t.path,
+                group: t.group,
+            })),
     ];
 }

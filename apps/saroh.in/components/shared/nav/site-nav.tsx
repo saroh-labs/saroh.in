@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@saroh/ui/wordmark";
-import { ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
@@ -22,9 +22,10 @@ import { nextIndex } from "@/lib/roving";
 import { ButtonLink } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { IntentLink } from "../links/intent-link";
+import { ColumnHeading } from "./column-heading";
 import { MobileMenu } from "./mobile-menu";
-import type { NavItem, NavSection } from "./nav-section";
-import { sectionOf } from "./nav-section";
+import type { MenuLink, NavItem, NavMenus, NavSection } from "./nav-section";
+import { ABOUT_LINKS, menuColumns, sectionOf } from "./nav-section";
 
 type MenuId = "features" | "solutions" | "resources" | "tools" | "account";
 
@@ -34,6 +35,9 @@ const TOP = `flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-f
 /** A menu's panel, under its button (the nav's menus and the account menu). */
 const PANEL =
     "absolute top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu";
+
+/** A desk menu's column, at its widest; the columns wrap on a narrower window. */
+const COLUMN_WIDTH = 232;
 
 /** The current section: underlined in Saffron, 8px below the word. */
 const CURRENT =
@@ -53,6 +57,13 @@ const CURRENT =
  * published and built (`content/resources.ts`) and passes them in, so the
  * browser never judges a date.
  *
+ * It stays at the top of the window as the page scrolls (owner, 1 Nov), and
+ * `--mk-nav-h` is its height, for whatever else sticks below it.
+ *
+ * A desk menu opens across the nav (owner, 1 Nov): columns ruled apart, under
+ * family or group headings where the items have them, and a strip below with
+ * the "see all" and the quieter links.
+ *
  * The section the page is in is underlined in Saffron, and the page itself
  * carries `aria-current="page"` in its menu. A menu closes on Escape (focus
  * returns to its button), on a click outside, and when focus leaves the nav;
@@ -66,16 +77,12 @@ const CURRENT =
 export function SiteNav({
     features,
     solutions,
+    solutionMenu,
+    allTrades,
+    allTools,
     resources = [],
     tools = [],
-}: {
-    /** The Features menu (`FEATURE_ITEMS`), from the server. */
-    features: NavItem[];
-    /** The Solutions menu, as the server links it (`solutionLink`). */
-    solutions: NavItem[];
-    resources?: NavItem[];
-    tools?: NavItem[];
-}) {
+}: NavMenus) {
     const pathname = usePathname();
     const section = sectionOf(pathname, features, solutions, resources, tools);
     const [open, setOpen] = useState<MenuId | null>(null);
@@ -131,7 +138,7 @@ export function SiteNav({
                     setOpen(null);
                 }
             }}
-            className="relative z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
+            className="sticky top-0 z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
         >
             <IntentLink
                 href="/"
@@ -147,7 +154,7 @@ export function SiteNav({
                     id="features"
                     label="Features"
                     items={features}
-                    columns={2}
+                    columns={3}
                     current={section === "features"}
                     pathname={pathname}
                     open={open === "features"}
@@ -159,8 +166,12 @@ export function SiteNav({
                 <Menu
                     id="solutions"
                     label="Solutions"
-                    items={solutions}
-                    columns={1}
+                    items={
+                        solutionMenu ??
+                        solutions.filter((i) => i.href !== allTrades?.href)
+                    }
+                    columns={2}
+                    seeAll={allTrades}
                     current={section === "solutions"}
                     pathname={pathname}
                     open={open === "solutions"}
@@ -185,7 +196,8 @@ export function SiteNav({
                         id="resources"
                         label="Resources"
                         items={resources}
-                        columns={1}
+                        columns={3}
+                        links={ABOUT_LINKS}
                         current={section === "resources"}
                         pathname={pathname}
                         open={open === "resources"}
@@ -200,7 +212,8 @@ export function SiteNav({
                         id="tools"
                         label="Tools"
                         items={tools}
-                        columns={1}
+                        columns={2}
+                        seeAll={allTools}
                         current={section === "tools"}
                         pathname={pathname}
                         open={open === "tools"}
@@ -265,6 +278,9 @@ export function SiteNav({
                 resources={resources}
                 features={features}
                 solutions={solutions}
+                solutionMenu={solutionMenu}
+                allTrades={allTrades}
+                allTools={allTools}
                 tools={tools}
                 visitor={visitor}
                 onSignOut={signOut}
@@ -279,6 +295,8 @@ function Menu({
     label,
     items,
     columns,
+    seeAll,
+    links = [],
     current,
     pathname,
     open,
@@ -288,7 +306,12 @@ function Menu({
     id: MenuId;
     label: string;
     items: NavItem[];
-    columns: 1 | 2;
+    /** How many columns when the items have no groups. */
+    columns: number;
+    /** The strip under the columns: its one strong link, on the left. */
+    seeAll?: MenuLink;
+    /** The strip's quieter links, on the right. */
+    links?: MenuLink[];
     current: boolean;
     pathname: string;
     open: boolean;
@@ -303,8 +326,10 @@ function Menu({
         if (open) menu.current?.querySelector<HTMLElement>("a")?.focus();
     }, [open]);
 
+    const shown = open ? menuColumns(items, columns) : [];
+
     return (
-        <div className="relative">
+        <div>
             <button
                 ref={buttonRef}
                 type="button"
@@ -316,6 +341,7 @@ function Menu({
                 className={cn(
                     TOP,
                     "gap-1.5 border-none bg-transparent",
+                    open && "bg-mk-hover",
                     current && CURRENT,
                 )}
             >
@@ -331,38 +357,93 @@ function Menu({
                 />
             </button>
             {open ? (
+                // Across the nav, not under its button: the nav is what's `relative`.
                 <div
                     ref={menu}
                     id={`nav-menu-${id}`}
                     role="menu"
                     aria-label={label}
                     onKeyDown={(e) => moveWithArrows(e)}
-                    className={cn(
-                        PANEL,
-                        "left-0",
-                        columns === 2
-                            ? "w-[662px] grid-cols-2"
-                            : "w-[362px] grid-cols-1",
-                    )}
+                    style={{ width: shown.length * COLUMN_WIDTH + 22 }}
+                    className="absolute inset-x-0 top-[calc(100%-8px)] mx-auto max-w-[calc(100%-32px)] rounded-mk-card border border-border bg-background p-2.5 shadow-mk-menu"
                 >
-                    {items.map((item) => (
-                        <Link
-                            key={item.href}
-                            role="menuitem"
-                            href={item.href}
-                            aria-current={
-                                item.href === pathname ? "page" : undefined
-                            }
-                            className={`grid cursor-pointer gap-[3px] rounded-[10px] px-3.5 py-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`}
-                        >
-                            <span className="text-[15px] font-semibold">
-                                {item.name}
-                            </span>
-                            <span className="text-mk-note leading-[1.45] text-muted-foreground">
-                                {item.line}
-                            </span>
-                        </Link>
-                    ))}
+                    <div className="max-h-[calc(100dvh-160px)] overflow-y-auto overflow-x-hidden rounded-[10px] border border-border bg-card">
+                        {/* The last column's and row's rules are clipped, under the box's own. */}
+                        <div className="overflow-hidden">
+                            <div className="-mb-px -mr-px flex flex-wrap">
+                                {shown.map((column) => (
+                                    <div
+                                        key={
+                                            column.heading ??
+                                            column.items[0]?.href
+                                        }
+                                        role={
+                                            column.heading ? "group" : undefined
+                                        }
+                                        aria-label={column.heading}
+                                        className="flex min-w-0 grow basis-[200px] flex-col gap-0.5 border-b border-r border-border p-3"
+                                    >
+                                        <ColumnHeading className="m-0 px-2.5 pb-2 pt-1 text-mk-note text-muted-foreground">
+                                            {column.heading}
+                                        </ColumnHeading>
+                                        {column.items.map((item) => (
+                                            <Link
+                                                key={item.href}
+                                                role="menuitem"
+                                                href={item.href}
+                                                aria-current={
+                                                    item.href === pathname
+                                                        ? "page"
+                                                        : undefined
+                                                }
+                                                className={`grid cursor-pointer gap-[3px] rounded-lg px-2.5 py-2 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`}
+                                            >
+                                                <span className="text-[15px] font-semibold">
+                                                    {item.name}
+                                                </span>
+                                                {item.line ? (
+                                                    <span className="text-mk-note leading-[1.4] text-muted-foreground">
+                                                        {item.line}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {seeAll || links.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-2.5 pb-0.5 pt-2.5 text-mk-note">
+                            {seeAll ? (
+                                <Link
+                                    role="menuitem"
+                                    href={seeAll.href}
+                                    className={`inline-flex items-center gap-1 rounded font-semibold text-brand-700 no-underline hover:text-brand-700 hover:underline ${ring()}`}
+                                >
+                                    {seeAll.name}
+                                    <ArrowRight
+                                        aria-hidden
+                                        className="size-3.5"
+                                    />
+                                </Link>
+                            ) : null}
+                            {links.length > 0 ? (
+                                <span className="ml-auto flex flex-wrap gap-x-5">
+                                    {links.map((link) => (
+                                        <Link
+                                            key={link.href}
+                                            role="menuitem"
+                                            href={link.href}
+                                            className={`rounded text-muted-foreground no-underline hover:text-foreground ${ring()}`}
+                                        >
+                                            {link.name}
+                                        </Link>
+                                    ))}
+                                </span>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </div>

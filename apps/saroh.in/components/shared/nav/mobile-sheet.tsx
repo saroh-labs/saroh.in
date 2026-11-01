@@ -1,9 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { ChevronDown } from "lucide-react";
+import { Wordmark } from "@saroh/ui/wordmark";
+import { ArrowRight, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Visitor } from "@/lib/browser/session";
 import {
@@ -14,13 +15,27 @@ import {
 } from "@/lib/links";
 import { ring } from "@/lib/ring";
 
-import { ButtonLink } from "../buttons/button";
+import { ButtonLink, buttonClasses } from "../buttons/button";
 import { CtaLink } from "../buttons/cta-link";
 import { useFocusTrap } from "../layout/use-focus-trap";
-import type { NavItem, NavSection } from "./nav-section";
+import { ColumnHeading } from "./column-heading";
+import type { MenuLink, NavItem, NavSection } from "./nav-section";
+import { ABOUT_LINKS, menuColumns } from "./nav-section";
 
-/** A row on the sheet: 52px, 18px Geist 600, a hairline above. */
-const ROW = `flex h-[52px] w-full cursor-pointer items-center border-t border-border text-lg font-semibold text-foreground no-underline hover:text-foreground ${ring()}`;
+/** A row on the sheet's first level: 60px, a hairline below. */
+const ROW = `flex h-[60px] w-full cursor-pointer items-center justify-between border-b border-border bg-transparent p-0 text-xl font-semibold text-foreground no-underline hover:text-foreground ${ring({ offset: "inset" })}`;
+
+/** The current section: underlined in Saffron, as on the desk. */
+const CURRENT =
+    "underline decoration-brand-500 decoration-2 underline-offset-8";
+
+interface Level {
+    id: "features" | "solutions" | "resources" | "tools";
+    label: string;
+    items: NavItem[];
+    seeAll?: MenuLink;
+    links?: MenuLink[];
+}
 
 /**
  * The phone nav's full-screen sheet (`MobileMenu`), in its own file so it is
@@ -33,6 +48,9 @@ export function MobileSheet({
     tools,
     featureItems,
     solutionItems,
+    solutionMenu,
+    allTrades,
+    allTools,
     visitor = null,
     onSignOut,
     onClose,
@@ -43,17 +61,73 @@ export function MobileSheet({
     tools: NavItem[];
     featureItems: NavItem[];
     solutionItems: NavItem[];
+    /** Every live trade by family, in place of `solutionItems`. */
+    solutionMenu?: NavItem[];
+    allTrades?: MenuLink;
+    allTools?: MenuLink;
     /** Signed in: who, in place of Sign in, and "Open dashboard". */
     visitor?: Visitor | null;
     onSignOut?: () => void;
     onClose: () => void;
 }) {
     const root = useRef<HTMLDivElement>(null);
+    const back = useRef<HTMLButtonElement>(null);
     useFocusTrap(root, true, onClose);
-    const [features, setFeatures] = useState(section === "features");
-    const [solutions, setSolutions] = useState(section === "solutions");
-    const [resourcesOpen, setResourcesOpen] = useState(section === "resources");
-    const [toolsOpen, setToolsOpen] = useState(section === "tools");
+    const [openId, setOpenId] = useState<Level["id"] | null>(null);
+    const cameFrom = useRef<Level["id"] | null>(null);
+
+    // Focus follows the level: into it on Back, out of it on the row it came from.
+    useEffect(() => {
+        if (openId) {
+            cameFrom.current = openId;
+            back.current?.focus();
+        } else if (cameFrom.current) {
+            root.current
+                ?.querySelector<HTMLElement>(
+                    `[data-level="${cameFrom.current}"]`,
+                )
+                ?.focus();
+        }
+    }, [openId]);
+
+    const levels: Level[] = [
+        { id: "features", label: "Features", items: featureItems },
+        {
+            id: "solutions",
+            label: "Solutions",
+            items:
+                solutionMenu ??
+                solutionItems.filter((i) => i.href !== allTrades?.href),
+            seeAll: allTrades,
+        },
+        {
+            id: "resources",
+            label: "Resources",
+            items: resources,
+            links: ABOUT_LINKS,
+        },
+        { id: "tools", label: "Tools", items: tools, seeAll: allTools },
+    ];
+    const opened = levels.find((l) => l.id === openId);
+    const row = (level: Level) =>
+        level.items.length > 0 ? (
+            <button
+                key={level.id}
+                type="button"
+                data-level={level.id}
+                aria-current={section === level.id ? "true" : undefined}
+                onClick={() => setOpenId(level.id)}
+                className={ROW}
+            >
+                <span className={cn(section === level.id && CURRENT)}>
+                    {level.label}
+                </span>
+                <ChevronRight
+                    aria-hidden
+                    className="size-5 text-muted-foreground"
+                />
+            </button>
+        ) : null;
 
     return (
         <div
@@ -62,176 +136,205 @@ export function MobileSheet({
             role="dialog"
             aria-modal="true"
             aria-label="Menu"
-            className="fixed inset-0 z-50 grid content-start gap-2 overflow-y-auto bg-background px-mk-nav pb-8 pt-5"
+            className="fixed inset-0 z-50 flex flex-col bg-background"
         >
-            <div className="flex items-center justify-between border-b border-border pb-3">
-                <span className="font-wordmark text-[22px] font-semibold tracking-[-0.025em]">
-                    Menu
-                </span>
+            <div className="flex shrink-0 items-center justify-between px-mk-nav py-3">
+                <Link
+                    href="/"
+                    onClick={onClose}
+                    aria-label="Saroh home"
+                    className={`flex rounded-lg text-foreground no-underline ${ring({ offset: 3 })}`}
+                >
+                    <Wordmark aria-hidden style={{ fontSize: 22 }} />
+                </Link>
                 <button
                     type="button"
                     onClick={onClose}
                     aria-label="Close menu"
-                    className={`size-11 cursor-pointer rounded-[10px] border border-border-strong bg-transparent text-xl text-foreground hover:bg-mk-hover ${ring()}`}
+                    className={`grid size-11 cursor-pointer place-items-center rounded-[10px] border-none bg-transparent text-foreground hover:bg-mk-hover ${ring()}`}
                 >
-                    ×
+                    <X aria-hidden className="size-5" />
                 </button>
             </div>
-            <Accordion
-                id="features"
-                label="Features"
-                items={featureItems}
-                pathname={pathname}
-                open={features}
-                onToggle={() => setFeatures(!features)}
-                first
-            />
-            <Accordion
-                id="solutions"
-                label="Solutions"
-                items={solutionItems}
-                pathname={pathname}
-                open={solutions}
-                onToggle={() => setSolutions(!solutions)}
-            />
-            {resources.length > 0 ? (
-                <Accordion
-                    id="resources"
-                    label="Resources"
-                    items={resources}
-                    pathname={pathname}
-                    open={resourcesOpen}
-                    onToggle={() => setResourcesOpen(!resourcesOpen)}
-                />
-            ) : null}
-            {tools.length > 0 ? (
-                <Accordion
-                    id="tools"
-                    label="Tools"
-                    items={tools}
-                    pathname={pathname}
-                    open={toolsOpen}
-                    onToggle={() => setToolsOpen(!toolsOpen)}
-                />
-            ) : null}
-            {LAUNCH_MODE === "open" ? (
-                <Link
-                    href="/pricing"
-                    onClick={onClose}
-                    aria-current={pathname === "/pricing" ? "page" : undefined}
-                    className={ROW}
-                >
-                    Pricing
-                </Link>
-            ) : null}
-            {visitor ? (
+
+            {opened ? (
                 <>
-                    {/* Masked in a session recording. */}
-                    <div
-                        data-ph-mask=""
-                        className="grid gap-0.5 border-t border-border py-3"
-                    >
-                        <span className="truncate text-lg font-semibold">
-                            {visitor.name}
-                        </span>
-                        <span className="truncate text-mk-note text-muted-foreground">
-                            {visitor.email}
-                        </span>
+                    <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-mk-nav pb-2">
+                        <button
+                            ref={back}
+                            type="button"
+                            onClick={() => setOpenId(null)}
+                            className={`-ml-1 flex h-11 cursor-pointer items-center gap-1 rounded-lg border-none bg-transparent pl-0 pr-2 font-semibold text-brand-700 ${ring()}`}
+                        >
+                            <ChevronLeft aria-hidden className="size-5" />
+                            Back
+                        </button>
+                        {opened.seeAll ? (
+                            <Link
+                                href={opened.seeAll.href}
+                                onClick={onClose}
+                                className={`flex h-11 items-center gap-1 rounded-lg font-semibold text-brand-700 no-underline hover:text-brand-700 ${ring()}`}
+                            >
+                                {opened.seeAll.name}
+                                <ArrowRight aria-hidden className="size-4" />
+                            </Link>
+                        ) : null}
                     </div>
-                    <a href={ACCOUNT_URL} className={ROW}>
-                        Account
-                    </a>
-                    <button
-                        type="button"
-                        onClick={onSignOut}
-                        className={cn(ROW, "bg-transparent p-0")}
+                    <div
+                        key={opened.id}
+                        id={`nav-sheet-${opened.id}`}
+                        className="min-h-0 flex-1 overflow-y-auto px-mk-nav pb-8 pt-4"
                     >
-                        Sign out
-                    </button>
-                    <ButtonLink href={DASHBOARD_URL} className="mt-3 w-full">
-                        Open dashboard
-                    </ButtonLink>
+                        <h2 className="m-0 pb-2 text-xl font-semibold">
+                            {opened.label}
+                        </h2>
+                        {menuColumns(opened.items, 1).map((column) => (
+                            <div
+                                key={column.heading ?? "all"}
+                                role={column.heading ? "group" : undefined}
+                                aria-label={column.heading}
+                                className="grid gap-0.5 pb-3"
+                            >
+                                <ColumnHeading className="m-0 pb-1 pt-3 text-mk-note text-muted-foreground">
+                                    {column.heading}
+                                </ColumnHeading>
+                                {column.items.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={onClose}
+                                        aria-current={
+                                            item.href === pathname
+                                                ? "page"
+                                                : undefined
+                                        }
+                                        className={`-mx-2.5 grid min-h-11 cursor-pointer content-center gap-0.5 rounded-lg px-2.5 py-2 text-foreground no-underline hover:bg-mk-hover hover:text-foreground aria-[current=page]:bg-card ${ring({ offset: "inset" })}`}
+                                    >
+                                        <span className="text-base font-semibold">
+                                            {item.name}
+                                        </span>
+                                        {item.line ? (
+                                            <span className="text-mk-note leading-[1.4] text-muted-foreground">
+                                                {item.line}
+                                            </span>
+                                        ) : null}
+                                    </Link>
+                                ))}
+                            </div>
+                        ))}
+                        {opened.links ? (
+                            <div className="flex flex-wrap gap-x-1 border-t border-border pt-2">
+                                {opened.links.map((link) => (
+                                    <Link
+                                        key={link.href}
+                                        href={link.href}
+                                        onClick={onClose}
+                                        className={`flex h-11 items-center rounded-lg px-2.5 text-mk-note text-muted-foreground no-underline first:-ml-2.5 hover:text-foreground ${ring()}`}
+                                    >
+                                        {link.name}
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
                 </>
             ) : (
                 <>
-                    {LAUNCH_MODE === "open" ? (
-                        <a href={SIGN_IN_URL} className={ROW}>
-                            Sign in
-                        </a>
-                    ) : null}
-                    <CtaLink
-                        src="nav-sheet"
-                        onNavigate={onClose}
-                        className="mt-3 w-full"
-                    />
+                    <div className="min-h-0 flex-1 overflow-y-auto px-mk-nav">
+                        {levels
+                            .filter(
+                                (l) =>
+                                    l.id === "features" || l.id === "solutions",
+                            )
+                            .map(row)}
+                        {LAUNCH_MODE === "open" ? (
+                            <Link
+                                href="/pricing"
+                                onClick={onClose}
+                                aria-current={
+                                    pathname === "/pricing" ? "page" : undefined
+                                }
+                                className={ROW}
+                            >
+                                <span
+                                    className={cn(
+                                        section === "pricing" && CURRENT,
+                                    )}
+                                >
+                                    Pricing
+                                </span>
+                            </Link>
+                        ) : null}
+                        {levels
+                            .filter(
+                                (l) => l.id === "resources" || l.id === "tools",
+                            )
+                            .map(row)}
+                    </div>
+                    <div className="grid shrink-0 gap-2.5 px-mk-nav pb-5 pt-3">
+                        {visitor ? (
+                            <>
+                                {/* Masked in a session recording. */}
+                                <div
+                                    data-ph-mask=""
+                                    className="grid gap-0.5 pb-1"
+                                >
+                                    <span className="truncate text-lg font-semibold">
+                                        {visitor.name}
+                                    </span>
+                                    <span className="truncate text-mk-note text-muted-foreground">
+                                        {visitor.email}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <ButtonLink
+                                        href={ACCOUNT_URL}
+                                        variant="secondary"
+                                        className="w-full"
+                                    >
+                                        Account
+                                    </ButtonLink>
+                                    <button
+                                        type="button"
+                                        onClick={onSignOut}
+                                        className={cn(
+                                            buttonClasses({
+                                                variant: "secondary",
+                                            }),
+                                            "w-full cursor-pointer bg-transparent",
+                                        )}
+                                    >
+                                        Sign out
+                                    </button>
+                                </div>
+                                <ButtonLink
+                                    href={DASHBOARD_URL}
+                                    className="w-full"
+                                >
+                                    Open dashboard
+                                </ButtonLink>
+                            </>
+                        ) : (
+                            <>
+                                {LAUNCH_MODE === "open" ? (
+                                    <ButtonLink
+                                        href={SIGN_IN_URL}
+                                        variant="secondary"
+                                        className="w-full"
+                                    >
+                                        Sign in
+                                    </ButtonLink>
+                                ) : null}
+                                <CtaLink
+                                    src="nav-sheet"
+                                    onNavigate={onClose}
+                                    className="w-full"
+                                />
+                            </>
+                        )}
+                    </div>
                 </>
             )}
         </div>
-    );
-}
-
-function Accordion({
-    id,
-    label,
-    items,
-    pathname,
-    open,
-    onToggle,
-    first = false,
-}: {
-    id: string;
-    label: string;
-    items: NavItem[];
-    pathname: string;
-    open: boolean;
-    onToggle: () => void;
-    first?: boolean;
-}) {
-    return (
-        <>
-            <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={open ? `nav-sheet-${id}` : undefined}
-                onClick={onToggle}
-                className={cn(
-                    ROW,
-                    "justify-between bg-transparent p-0",
-                    first && "border-t-0",
-                )}
-            >
-                {label}
-                <ChevronDown
-                    aria-hidden
-                    data-chevron
-                    strokeWidth={2.25}
-                    className={cn(
-                        "size-[18px] text-muted-foreground transition-transform duration-fast ease-out motion-reduce:transition-none",
-                        open && "rotate-180",
-                    )}
-                />
-            </button>
-            {open ? (
-                <div id={`nav-sheet-${id}`} className="grid gap-0.5 pb-2">
-                    {items.map((item) => (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            aria-current={
-                                item.href === pathname ? "page" : undefined
-                            }
-                            className={`grid cursor-pointer gap-0.5 rounded-[10px] border border-mk-line-soft bg-card px-3 py-2.5 text-foreground no-underline hover:border-border-strong hover:text-foreground ${ring()}`}
-                        >
-                            <span className="text-[15.5px] font-semibold">
-                                {item.name}
-                            </span>
-                            <span className="text-mk-note text-muted-foreground">
-                                {item.line}
-                            </span>
-                        </Link>
-                    ))}
-                </div>
-            ) : null}
-        </>
     );
 }
