@@ -203,6 +203,61 @@ describe("staging and deploying search pages", () => {
         expect(await service.publicList()).toEqual({ live: [], takenOff: [] });
     });
 
+    it("cancels staged changes back to what the site has, with history and audit (DEC-201 amendment)", async () => {
+        const since = new Date();
+        await service.act(staff, "publish", ["/for/florists"]);
+        await service.act(staff, "publish", ["/for/bakers"]);
+        await service.deploy(staff);
+        await finishDeploys();
+        await service.act(staff, "archive", ["/for/bakers"]);
+
+        const out = await service
+            .act(staff, "cancel", ["/for/florists", "/for/bakers"])
+            .catch((e: unknown) => e);
+        // florists was deployed: nothing waits for it, so the call is refused whole.
+        expect(out).toBeInstanceOf(ConflictException);
+        expect(await statusOf("/for/bakers")).toBe("ARCHIVED");
+
+        await service.act(staff, "publish", ["/for/opticians"]);
+        await service.act(staff, "cancel", ["/for/bakers", "/for/opticians"]);
+        expect(
+            await prisma.searchPage.findMany({
+                where: { path: { in: ["/for/bakers", "/for/opticians"] } },
+                select: { path: true, status: true, releasedStatus: true },
+                orderBy: { path: "asc" },
+            }),
+        ).toEqual([
+            { path: "/for/bakers", status: "LIVE", releasedStatus: "LIVE" },
+            {
+                path: "/for/opticians",
+                status: "DRAFT",
+                releasedStatus: "DRAFT",
+            },
+        ]);
+        await expect(service.deploy(staff)).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(
+            await prisma.searchPageEvent.findMany({
+                where: { action: "cancel" },
+                select: { path: true, fromStatus: true, toStatus: true },
+                orderBy: { path: "asc" },
+            }),
+        ).toEqual([
+            { path: "/for/bakers", fromStatus: "ARCHIVED", toStatus: "LIVE" },
+            { path: "/for/opticians", fromStatus: "LIVE", toStatus: "DRAFT" },
+        ]);
+        expect(
+            await prisma.adminAuditEvent.count({
+                where: {
+                    action: "search-page.cancel",
+                    permission: "search-pages:publish",
+                    createdAt: { gte: since },
+                },
+            }),
+        ).toBe(2);
+    });
+
     it("adds to a rebuild still waiting to start instead of queueing another", async () => {
         await service.act(staff, "publish", ["/for/a"]);
         await service.deploy(staff);

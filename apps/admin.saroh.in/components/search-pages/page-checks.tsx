@@ -62,46 +62,53 @@ export function PageChecks({ page }: { page: AnyPageData }) {
             </p>
         );
     }
+    // What fails first, then what's worth a look, then the passes (F10).
+    const rank = (c: SearchPageCheck) =>
+        c.ok ? 2 : c.severity === "warning" ? 1 : 0;
     return (
         <ul className="grid">
-            {checks.map((c) => {
-                const warn = !c.ok && c.severity === "warning";
-                const Icon = c.ok ? Check : warn ? CircleAlert : X;
-                return (
-                    <li
-                        key={c.id}
-                        className="flex items-start gap-3 border-t py-2.5 first:border-t-0"
-                    >
-                        <span
-                            className={cn(
-                                "mt-0.5 inline-flex size-[22px] shrink-0 items-center justify-center rounded-full",
-                                c.ok
-                                    ? "bg-success-subtle text-success-subtle-foreground"
-                                    : warn
-                                      ? "bg-warning-subtle text-warning-subtle-foreground"
-                                      : "bg-destructive-subtle text-destructive-subtle-foreground",
-                            )}
+            {[...checks]
+                .sort((a, b) => rank(a) - rank(b))
+                .map((c) => {
+                    const warn = !c.ok && c.severity === "warning";
+                    const Icon = c.ok ? Check : warn ? CircleAlert : X;
+                    return (
+                        <li
+                            key={c.id}
+                            className="flex items-start gap-3 border-t py-2.5 first:border-t-0"
                         >
-                            <Icon className="size-3.5" aria-hidden />
-                            <span className="sr-only">
-                                {c.ok
-                                    ? "Passes:"
-                                    : warn
-                                      ? "Worth a look:"
-                                      : "Fails:"}
-                            </span>
-                        </span>
-                        <span className="grid gap-0.5">
-                            <strong className="font-semibold">{c.title}</strong>
-                            {c.detail && (
-                                <span className="text-[13px] text-muted-foreground">
-                                    {c.detail}
+                            <span
+                                className={cn(
+                                    "mt-0.5 inline-flex size-[22px] shrink-0 items-center justify-center rounded-full",
+                                    c.ok
+                                        ? "bg-success-subtle text-success-subtle-foreground"
+                                        : warn
+                                          ? "bg-warning-subtle text-warning-subtle-foreground"
+                                          : "bg-destructive-subtle text-destructive-subtle-foreground",
+                                )}
+                            >
+                                <Icon className="size-3.5" aria-hidden />
+                                <span className="sr-only">
+                                    {c.ok
+                                        ? "Passes:"
+                                        : warn
+                                          ? "Worth a look:"
+                                          : "Fails:"}
                                 </span>
-                            )}
-                        </span>
-                    </li>
-                );
-            })}
+                            </span>
+                            <span className="grid gap-0.5">
+                                <strong className="font-semibold">
+                                    {c.title}
+                                </strong>
+                                {c.detail && (
+                                    <span className="text-[13px] text-muted-foreground">
+                                        {c.detail}
+                                    </span>
+                                )}
+                            </span>
+                        </li>
+                    );
+                })}
         </ul>
     );
 }

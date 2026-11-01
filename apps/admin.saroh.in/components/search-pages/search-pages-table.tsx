@@ -34,6 +34,7 @@ import {
     countBy,
     eligible,
     FILTER_LABEL,
+    heldCount,
     heldWords,
     inFilter,
     KINDS,
@@ -48,7 +49,20 @@ import { SearchPageDialog } from "./search-page-dialog";
 const COLUMNS =
     "md:grid md:grid-cols-[2.25rem_minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_10rem_11rem_2.5rem] md:items-center md:gap-3";
 
-const FILTERS: Filter[] = ["all", "live", "draft", "unpublished", "archived"];
+const FILTERS: Filter[] = [
+    "all",
+    "live",
+    "waiting",
+    "draft",
+    "unpublished",
+    "archived",
+];
+
+const BULK_LABEL = {
+    publish: "Publish",
+    unpublish: "Unpublish",
+    archive: "Archive",
+} as const;
 
 interface Opened {
     action: PageAction;
@@ -128,12 +142,13 @@ export function SearchPagesTable({
                         aria-pressed={filter === card.filter}
                         onClick={() => pick(card.filter)}
                         className={cn(
-                            "grid content-start gap-1 rounded-[11px] border bg-card px-4 py-3.5 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            // Half height on a phone, so the list starts sooner (F8).
+                            "grid content-start gap-0.5 rounded-[11px] border bg-card px-3 py-2 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-1 sm:px-4 sm:py-3.5",
                             filter === card.filter && "border-foreground",
                         )}
                     >
                         <span className="label">{card.label}</span>
-                        <span className="font-display text-[25px] font-semibold tabular-nums leading-none">
+                        <span className="font-display text-xl font-semibold tabular-nums leading-none sm:text-[25px]">
                             {counts[card.filter]}
                         </span>
                         <span className="text-[11.5px] text-muted-foreground">
@@ -311,61 +326,71 @@ export function SearchPagesTable({
             )}
 
             {canPublish && picked.length > 0 && (
-                <div
-                    role="region"
-                    aria-label="Selected pages"
-                    className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border bg-popover p-2 pl-4 shadow-lg"
-                >
-                    <strong className="mr-2 font-semibold">
-                        {picked.length} selected
-                    </strong>
-                    <Button
-                        type="button"
-                        size="sm"
-                        disabled={eligible("publish", picked).length === 0}
-                        aria-describedby={
-                            heldWords(picked) ? "publish-held-bulk" : undefined
-                        }
-                        onClick={() => open("publish", picked)}
+                <>
+                    {/* Room under the list, so the bar never sits on the rows it acts on (F5). */}
+                    <div aria-hidden className="h-28" />
+                    <div
+                        role="region"
+                        aria-label="Selected pages"
+                        className="fixed bottom-6 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border bg-popover p-2 pl-4 shadow-lg"
                     >
-                        Publish {eligible("publish", picked).length}
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={eligible("unpublish", picked).length === 0}
-                        onClick={() => open("unpublish", picked)}
-                    >
-                        Unpublish {eligible("unpublish", picked).length}
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={eligible("archive", picked).length === 0}
-                        onClick={() => open("archive", picked)}
-                    >
-                        Archive
-                    </Button>
-                    {heldWords(picked) && (
-                        <p
-                            id="publish-held-bulk"
-                            className="basis-full text-[12.5px] text-muted-foreground"
+                        <strong className="mr-2 font-semibold">
+                            {picked.length} selected
+                        </strong>
+                        {(["publish", "unpublish", "archive"] as const).map(
+                            (action) => {
+                                const n = eligible(action, picked).length;
+                                return (
+                                    <Button
+                                        key={action}
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                            action === "publish"
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        disabled={n === 0}
+                                        aria-describedby={
+                                            action === "publish" &&
+                                            heldWords(picked)
+                                                ? "publish-held-bulk"
+                                                : undefined
+                                        }
+                                        onClick={() => open(action, picked)}
+                                    >
+                                        {BULK_LABEL[action]}
+                                        {/* A disabled button's count would read 0: its reason speaks instead. */}
+                                        {n > 0 && ` ${n}`}
+                                    </Button>
+                                );
+                            },
+                        )}
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Clear selection"
+                            onClick={() => setTicked(new Set())}
                         >
-                            {heldWords(picked)}
-                        </p>
-                    )}
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        aria-label="Clear selection"
-                        onClick={() => setTicked(new Set())}
-                    >
-                        <X className="size-4" aria-hidden />
-                    </Button>
-                </div>
+                            <X className="size-4" aria-hidden />
+                        </Button>
+                        {heldWords(picked) && (
+                            <details
+                                id="publish-held-bulk"
+                                className="basis-full text-[12.5px] text-muted-foreground"
+                            >
+                                <summary className="cursor-pointer">
+                                    {heldCount(picked)} held by checks · Show
+                                    why
+                                </summary>
+                                <p className="mt-1 max-w-prose">
+                                    {heldWords(picked)}
+                                </p>
+                            </details>
+                        )}
+                    </div>
+                </>
             )}
 
             {opened && (
@@ -376,6 +401,7 @@ export function SearchPagesTable({
                     skipped={opened.skipped}
                     site={site}
                     reviewSite={reviewSite}
+                    reviewUrl={reviewUrl}
                     onOpenChange={(next) => {
                         if (!next) setOpened(null);
                     }}
@@ -433,33 +459,37 @@ function RowMenu({
                 {canPublish && (
                     <>
                         <DropdownMenuSeparator />
-                        {rowActions(row.state, site).map((item) => {
-                            // A disabled item can't be hovered on a phone: the reason is part of it.
-                            const why =
-                                item.action === "publish"
-                                    ? cantPublishWords(row)
-                                    : null;
-                            return (
-                                <DropdownMenuItem
-                                    key={item.label}
-                                    disabled={!item.action || !!why}
-                                    className={cn(
-                                        item.danger && "text-destructive",
-                                        why && "flex-col items-start gap-0.5",
-                                    )}
-                                    onSelect={() => {
-                                        if (item.action) onAction(item.action);
-                                    }}
-                                >
-                                    {item.label}
-                                    {why && (
-                                        <span className="max-w-64 text-xs leading-snug">
-                                            {why}
-                                        </span>
-                                    )}
-                                </DropdownMenuItem>
-                            );
-                        })}
+                        {rowActions(row.state, site, row.pending).map(
+                            (item) => {
+                                // A disabled item can't be hovered on a phone: the reason is part of it.
+                                const why =
+                                    item.action === "publish"
+                                        ? cantPublishWords(row)
+                                        : null;
+                                return (
+                                    <DropdownMenuItem
+                                        key={item.label}
+                                        disabled={!item.action || !!why}
+                                        className={cn(
+                                            item.danger && "text-destructive",
+                                            why &&
+                                                "flex-col items-start gap-0.5",
+                                        )}
+                                        onSelect={() => {
+                                            if (item.action)
+                                                onAction(item.action);
+                                        }}
+                                    >
+                                        {item.label}
+                                        {why && (
+                                            <span className="max-w-64 text-xs leading-snug">
+                                                {why}
+                                            </span>
+                                        )}
+                                    </DropdownMenuItem>
+                                );
+                            },
+                        )}
                     </>
                 )}
             </DropdownMenuContent>

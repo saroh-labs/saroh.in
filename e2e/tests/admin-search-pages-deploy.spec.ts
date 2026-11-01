@@ -9,13 +9,14 @@ import { urls } from "../playwright.config";
 /**
  * Search pages' deploy bar on the operator console (plan 2026-10-31-002,
  * R13): Publish only stages a page, the bar counts it and the row says it
- * isn't deployed yet; Unpublish before deploying takes it out of the count.
+ * waits to deploy; Cancel this change before deploying (DEC-201
+ * amendment, 1 Nov) puts it back as a draft and empties the bar.
  *
  * Signed in as Sam (staff), a Platform owner, who holds
  * `search-pages:publish`. Deploy changes is never pressed: it would queue
  * a real rebuild job. Search pages are one list every console reader sees,
  * and the bar counts every staged page, so this is @serial; it ends with
- * nothing staged (the page reads Unpublished, which the site never saw).
+ * nothing staged (the page is back to what the site has).
  */
 const ADMIN = urls.ADMIN_URL;
 const PATH = "/for/tattoo-studios";
@@ -27,7 +28,7 @@ interface StagedRecord {
     releasedStatus: string;
 }
 
-/** Takes the page back off if a failed run left it staged to go live. */
+/** Cancels the change if a failed run left the page staged to go live. */
 async function unstage(page: Page) {
     const res = await page.request.get(`${urls.API_URL}/admin/search-pages`);
     const pages = ((await res.json()) as { pages: StagedRecord[] }).pages;
@@ -37,7 +38,7 @@ async function unstage(page: Page) {
         `${urls.API_URL}/admin/search-pages/actions`,
         {
             headers: { origin: urls.APP_URL },
-            data: { action: "unpublish", paths: [PATH] },
+            data: { action: "cancel", paths: [PATH] },
         },
     );
     expect(off.ok()).toBe(true);
@@ -53,7 +54,7 @@ test.describe("Search pages: publish, then deploy", () => {
     });
 
     test(
-        "publishing stages a page for the bar; unpublishing it empties the bar",
+        "publishing stages a page for the bar; cancelling the change empties the bar",
         { tag: "@serial" },
         async ({ page }) => {
             await page.goto(`${ADMIN}/search-pages`);
@@ -92,24 +93,26 @@ test.describe("Search pages: publish, then deploy", () => {
                 page.getByRole("list", { name: "Changes waiting" }),
             ).toContainText(PATH);
             await expect(
-                row.getByText("Published · not deployed yet", { exact: true }),
+                row.getByText("Waiting to deploy", { exact: true }),
             ).toBeVisible();
             await expect(
                 page.getByRole("button", { name: "Deploy changes" }),
             ).toBeEnabled();
 
-            // Unpublish before deploying: nothing is left to deploy.
+            // Cancel this change before deploying: nothing is left to deploy.
             await actions.click();
-            await page.getByRole("menuitem", { name: "Unpublish" }).click();
+            await page
+                .getByRole("menuitem", { name: "Cancel this change" })
+                .click();
             await dialog
-                .getByRole("button", { name: "Unpublish page" })
+                .getByRole("button", { name: "Cancel the change" })
                 .click();
             await expect(dialog).toHaveCount(0);
 
             await expect(
                 page.getByText("No changes waiting to deploy", { exact: true }),
             ).toBeVisible();
-            await expect(row.getByText(/not deployed yet/)).toHaveCount(0);
+            await expect(row.getByText("Waiting to deploy")).toHaveCount(0);
             await expect(
                 page.getByRole("button", { name: "Deploy changes" }),
             ).toBeDisabled();

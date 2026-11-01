@@ -36,6 +36,11 @@ export default async function SearchPagesPage({
         return <NotAuthorized email={staff.email} staff={staff} />;
     }
     const canPublish = can(staff, "search-pages:publish");
+    const waiting =
+        data.status === "ok" ? data.rows.filter((r) => r.pending) : [];
+    const deploymentsHref = can(staff, "deployments:run")
+        ? "/deployments"
+        : undefined;
 
     return (
         <AdminShell staff={staff}>
@@ -70,21 +75,27 @@ export default async function SearchPagesPage({
                         <FailedPanel things="search pages" />
                     ) : (
                         <>
-                            <RebuildBanner
-                                running={data.read.rebuild.running}
-                                startedAt={data.read.rebuild.startedAt}
-                                site={site.host}
-                                words={rebuildWords(data.read.rebuild)}
-                                deploymentsHref={
-                                    can(staff, "deployments:run")
-                                        ? "/deployments"
-                                        : undefined
-                                }
-                            />
+                            {/* The deploy bar carries the rebuild; the banner only when there's no bar (F9). */}
+                            {!canPublish && waiting.length === 0 && (
+                                <RebuildBanner
+                                    running={data.read.rebuild.running}
+                                    startedAt={data.read.rebuild.startedAt}
+                                    site={site.host}
+                                    words={rebuildWords(data.read.rebuild)}
+                                    deploymentsHref={deploymentsHref}
+                                />
+                            )}
                             <DeployBar
-                                rows={data.rows.filter((r) => r.pending)}
+                                rows={waiting}
+                                allRows={data.rows}
                                 site={site.host}
+                                reviewSite={site.reviewHost}
                                 rebuilding={data.read.rebuild.running}
+                                rebuild={{
+                                    startedAt: data.read.rebuild.startedAt,
+                                    words: rebuildWords(data.read.rebuild),
+                                    deploymentsHref,
+                                }}
                                 canPublish={canPublish}
                             />
                             <SearchPagesTable

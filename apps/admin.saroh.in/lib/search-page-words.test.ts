@@ -17,6 +17,7 @@ import {
     kindOf,
     KINDS,
     linkedFromWords,
+    listWordsFor,
     matchesQuery,
     mergePages,
     publishLinks,
@@ -114,20 +115,32 @@ describe("staged and released (R13)", () => {
             },
         );
         expect(badgeOf(on)).toEqual({
-            label: "Published · not deployed yet",
+            label: "Waiting to deploy",
             variant: "warning",
         });
-        expect(badgeOf(off).label).toBe("Taken off · not deployed yet");
+        expect(badgeOf(off).label).toBe("Waiting to deploy");
         expect(badgeOf(settled)).toEqual({ label: "Live", variant: "success" });
         expect(stateNote(on)).toBe("Goes live when changes are deployed");
-        expect(stateNote(off)).toBe("Stays live until changes are deployed");
-        // The chips go by the site: waiting to go on is not live yet.
-        expect(inFilter(on, "draft")).toBe(true);
+        expect(stateNote(off)).toBe("Comes off when changes are deployed");
+        // The chips go by the site: waiting to go on is not live yet, nor a draft.
+        expect(inFilter(on, "draft")).toBe(false);
+        expect(inFilter(on, "waiting")).toBe(true);
+        expect(inFilter(off, "waiting")).toBe(true);
+        expect(inFilter(settled, "waiting")).toBe(false);
         expect(inFilter(on, "live")).toBe(false);
         expect(inFilter(off, "live")).toBe(true);
         // Waiting pages can be changed again before the deploy.
         expect(eligible("unpublish", [on])).toEqual([on]);
         expect(eligible("publish", [off])).toEqual([off]);
+        // Only a waiting page's change can be cancelled (DEC-201 amendment).
+        expect(eligible("cancel", [on, off, settled])).toEqual([on, off]);
+        expect(rowActions(on.state, "saroh.io", on.pending)[0]).toEqual({
+            action: "cancel",
+            label: "Cancel this change",
+        });
+        expect(
+            rowActions(settled.state, "saroh.io").map((a) => a.action),
+        ).toEqual(["unpublish", "archive"]);
     });
 
     it("counts the deploy bar's changes and words its confirm", () => {
@@ -182,6 +195,7 @@ describe("filters and counts", () => {
         expect(countBy(rows)).toEqual({
             all: 4,
             live: 1,
+            waiting: 0,
             draft: 2,
             unpublished: 1,
             archived: 1,
@@ -320,16 +334,26 @@ describe("after the API answers", () => {
             "Spas can't be published from where it is now. Someone may have just changed it. Nothing was changed: close this to see the list as it is.",
         );
     });
-    it("says a change waits for Deploy changes", () => {
-        expect(successWords("publish", 1, "saroh.io")).toEqual({
-            title: "Published the page.",
+    it("says a change waits for Deploy changes, by name, and offers the bar", () => {
+        expect(
+            successWords("publish", [{ name: "Tattoo studios" }], "saroh.io"),
+        ).toEqual({
+            title: "Tattoo studios waits to deploy.",
             description: "Deploy changes to put it on saroh.io.",
+            staged: true,
         });
-        expect(successWords("unpublish", 3, "saroh.io").description).toBe(
+        const three = [{ name: "A" }, { name: "B" }, { name: "C" }];
+        expect(successWords("unpublish", three, "saroh.io").description).toBe(
             "Deploy changes to take them off saroh.io.",
         );
-        expect(successWords("restore", 1, "saroh.io")).toEqual({
+        expect(successWords("restore", [{ name: "A" }], "saroh.io")).toEqual({
             title: "Restored the page as a draft.",
+            staged: false,
+        });
+        expect(successWords("cancel", [{ name: "A" }], "saroh.io")).toEqual({
+            title: "Cancelled the change to A.",
+            description: "Nothing changes on saroh.io.",
+            staged: false,
         });
     });
     it("says a history row in words", () => {
@@ -344,7 +368,10 @@ describe("after the API answers", () => {
             "saroh.in",
         );
         expect(w.what).toBe("Published by Mohit");
-        expect(w.detail).toBe("Was a draft, now live.");
+        // Publishing only stages it: never "now live" (F2).
+        expect(w.detail).toBe(
+            "Was a draft, set to go live at the next deploy.",
+        );
         const deployed = historyWords(
             {
                 action: "deploy",
@@ -355,8 +382,23 @@ describe("after the API answers", () => {
             },
             "saroh.in",
         );
-        expect(deployed.what).toBe("Deployed by Mohit");
-        expect(deployed.detail).toBe("Was a draft, now live. Put on saroh.in.");
+        expect(deployed.what).toBe("Went live on saroh.in · deployed by Mohit");
+        expect(deployed.detail).toBe("Was a draft, now live.");
+        expect(
+            historyWords(
+                {
+                    action: "cancel",
+                    fromStatus: "LIVE",
+                    toStatus: "DRAFT",
+                    by: { name: "Mohit" },
+                    at: "2026-10-26T09:00:00.000Z",
+                },
+                "saroh.in",
+            ),
+        ).toMatchObject({
+            what: "Change cancelled by Mohit",
+            detail: "Back to a draft, as the site has it. Nothing changed on saroh.in.",
+        });
         expect(
             historyWords(
                 {
@@ -494,6 +536,39 @@ describe("free tools (#1253)", () => {
                 "tools",
             ).map((w) => w.label),
         ).toContain("The /tools list, the menu and the footer");
+    });
+
+    it("names every kind's list for a mixed set, never one kind's (F4)", () => {
+        expect(listWordsFor([{ kind: "tools" }])).toBe(
+            "the /tools list, the Tools menu and the footer",
+        );
+        expect(
+            listWordsFor([
+                { kind: "guides" },
+                { kind: "tools" },
+                { kind: "tools" },
+            ]),
+        ).toBe("the /guides and /tools lists, the menu and the footer");
+    });
+
+    it("words Unpublish truthfully for a page that never went live, and Cancel", () => {
+        const page = {
+            name: "Tattoo studios",
+            slug: "tattoo-studios",
+            family: "Beauty",
+            state: "live" as const,
+            onSite: false,
+            pending: "on" as const,
+        };
+        const off = dialogWords("unpublish", [page], "saroh.in", "saroh.io");
+        expect(off.points[0]).toBe(
+            "It isn't on saroh.in yet, so nothing changes there.",
+        );
+        expect(off.points.join(" ")).not.toContain("Google");
+        const cancel = dialogWords("cancel", [page], "saroh.in", "saroh.io");
+        expect(cancel.title).toBe("Cancel the change to Tattoo studios?");
+        expect(cancel.confirm).toBe("Cancel the change");
+        expect(cancel.points[0]).toContain("doesn't go live");
     });
 
     it("words the seeded record of the app's two tools", () => {

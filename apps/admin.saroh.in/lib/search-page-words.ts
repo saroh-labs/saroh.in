@@ -12,7 +12,13 @@ import { formatDate, formatDateTime } from "./format";
  */
 
 export type PageStatus = "LIVE" | "UNPUBLISHED" | "ARCHIVED" | "DRAFT";
-export type PageAction = "publish" | "unpublish" | "archive" | "restore";
+export type PageAction =
+    | "publish"
+    | "unpublish"
+    | "archive"
+    | "restore"
+    /** Cancel this change: a staged change goes back to what the site has (DEC-201 amendment). */
+    | "cancel";
 
 /** One row of `GET /admin/search-pages`. */
 export interface SearchPageRecord {
@@ -122,9 +128,13 @@ export const STATE_BADGE: Record<
     archived: "neutral",
 };
 
-const PENDING_LABEL: Record<Pending, string> = {
-    on: "Published · not deployed yet",
-    off: "Taken off · not deployed yet",
+/** The one name for a staged change, everywhere (audit F3). */
+export const WAITING_LABEL = "Waiting to deploy";
+
+/** What Deploy changes does to a staged page: the deploy bar and its confirm. */
+export const PENDING_LABEL: Record<Pending, string> = {
+    on: "Goes live",
+    off: "Comes off",
 };
 
 /** A row's status badge: the staged status, or that it waits for Deploy changes. */
@@ -138,7 +148,7 @@ export function badgeOf(
     if (row.onSite && row.state === "live" && row.blocked?.length)
         return { label: "Held by checks", variant: "error" };
     return row.pending
-        ? { label: PENDING_LABEL[row.pending], variant: "warning" }
+        ? { label: WAITING_LABEL, variant: "warning" }
         : { label: STATE_LABEL[row.state], variant: STATE_BADGE[row.state] };
 }
 
@@ -262,7 +272,7 @@ export function stateNote(row: PageRow): string {
     if (canDo("publish", row.state) && row.blocked.length)
         return "Can't publish yet";
     if (row.pending === "on") return "Goes live when changes are deployed";
-    if (row.pending === "off") return "Stays live until changes are deployed";
+    if (row.pending === "off") return "Comes off when changes are deployed";
     switch (row.state) {
         case "live":
             return `Live since ${formatDate(r?.liveSince ?? r?.changedAt)}`;
@@ -271,17 +281,22 @@ export function stateNote(row: PageRow): string {
         case "archived":
             return `Archived ${formatDate(r?.changedAt)}`;
         case "draft":
+            // Restored from the archive, or a staged change cancelled.
             return r
-                ? `Restored ${formatDate(r.changedAt)}`
+                ? `Back to draft ${formatDate(r.changedAt)}`
                 : "Never published";
     }
 }
 
-export type Filter = "all" | "live" | "draft" | "unpublished" | "archived";
+export type Filter =
+    "all" | "live" | "waiting" | "draft" | "unpublished" | "archived";
 
-/** The chips go by the site: a page waiting to come off still counts as live. */
+/**
+ * The chips go by the site: a page waiting to come off still counts as
+ * live. Waiting to deploy is every staged change, on or off.
+ */
 export function inFilter(
-    row: Pick<PageRow, "state" | "onSite">,
+    row: Pick<PageRow, "state" | "onSite"> & { pending?: Pending | null },
     filter: Filter,
 ): boolean {
     const { state, onSite } = row;
@@ -290,8 +305,10 @@ export function inFilter(
             return onSite || state !== "archived";
         case "live":
             return onSite;
+        case "waiting":
+            return !!row.pending;
         case "draft":
-            return !onSite && (state === "draft" || state === "live");
+            return !onSite && state === "draft";
         case "unpublished":
             return !onSite && state === "unpublished";
         case "archived":
@@ -302,7 +319,8 @@ export function inFilter(
 export const FILTER_LABEL: Record<Filter, string> = {
     all: "All",
     live: "Live",
-    draft: "Not live yet",
+    waiting: WAITING_LABEL,
+    draft: "Draft",
     unpublished: "Unpublished",
     archived: "Archived",
 };
@@ -312,6 +330,7 @@ export function countBy(rows: readonly PageRow[]): Record<Filter, number> {
     return {
         all: n("all"),
         live: n("live"),
+        waiting: n("waiting"),
         draft: n("draft"),
         unpublished: n("unpublished"),
         archived: n("archived"),
@@ -328,13 +347,13 @@ export function statCards(site: string): {
         { filter: "live", label: `Live on ${site}`, hint: "In the sitemap" },
         {
             filter: "draft",
-            label: "Not live yet",
+            label: "Draft",
             hint: "Readable on the development site",
         },
         {
             filter: "unpublished",
             label: "Unpublished",
-            hint: "Were live, taken off",
+            hint: "Taken off, or held back before they went live",
         },
         {
             filter: "archived",
@@ -364,18 +383,21 @@ export function canDo(action: PageAction, state: RowState): boolean {
             return state !== "archived";
         case "restore":
             return state === "archived";
+        case "cancel":
+            // Goes by the staged change, not the state: see `eligible`.
+            return false;
     }
 }
 
-/** Which pages an action can be done to; Publish leaves out a page whose checks fail. */
-export function eligible<T extends { state: RowState; blocked?: string[] }>(
-    action: PageAction,
-    rows: readonly T[],
-): T[] {
-    return rows.filter(
-        (r) =>
-            canDo(action, r.state) &&
-            !(action === "publish" && r.blocked?.length),
+/** Which pages an action can be done to; Publish leaves out a page whose checks fail, Cancel takes only staged ones. */
+export function eligible<
+    T extends { state: RowState; blocked?: string[]; pending?: Pending | null },
+>(action: PageAction, rows: readonly T[]): T[] {
+    return rows.filter((r) =>
+        action === "cancel"
+            ? !!r.pending
+            : canDo(action, r.state) &&
+              !(action === "publish" && r.blocked?.length),
     );
 }
 
@@ -398,6 +420,14 @@ export function heldWords(
         )
         .join("; ");
     return `${plural(held.length, "page can't", "pages can't")} be published yet: ${names}.${rest ? ` Publish ${rest} publishes the rest.` : ""}`;
+}
+
+/** The bulk bar's one line before the reasons open (audit F5): "3 held by checks". */
+export function heldCount(
+    rows: readonly Pick<PageRow, "state" | "blocked">[],
+): number {
+    return rows.filter((r) => canDo("publish", r.state) && r.blocked.length)
+        .length;
 }
 
 /** A page a page being published links to, that isn't live (staged) and isn't in the same publish (U12). */
@@ -517,14 +547,22 @@ export function linkedFromWords(
 export function rowActions(
     state: RowState,
     site: string,
+    pending: Pending | null = null,
 ): { action: PageAction | null; label: string; danger?: boolean }[] {
-    if (state === "archived") return [{ action: "restore", label: "Restore" }];
+    // A staged change can be taken back before it ships (DEC-201 amendment).
+    const cancel = pending
+        ? [{ action: "cancel" as const, label: "Cancel this change" }]
+        : [];
+    if (state === "archived")
+        return [...cancel, { action: "restore", label: "Restore" }];
     if (state === "live")
         return [
+            ...cancel,
             { action: "unpublish", label: "Unpublish" },
             { action: "archive", label: "Archive", danger: true },
         ];
     return [
+        ...cancel,
         { action: "publish", label: `Publish on ${site}` },
         { action: "archive", label: "Archive", danger: true },
     ];
@@ -554,6 +592,8 @@ export interface DialogPage {
     state: RowState;
     /** On the site now (released). */
     onSite?: boolean;
+    /** Waiting for Deploy changes. */
+    pending?: Pending | null;
     /** Free tools (#1253) go to the /tools list, and back to it when taken off. */
     kind?: PageKind;
 }
@@ -582,6 +622,28 @@ const LIST_WORDS: Record<PageKind, string> = {
     >),
 };
 
+/** Each kind's list on the site, for a set of several kinds. */
+const LIST_NAME: Record<PageKind, string> = {
+    for: "/for/",
+    tools: "/tools",
+    ...(Object.fromEntries(
+        DOC_KINDS.map((k) => [k.id, k.prefix.replace(/\/$/, "")]),
+    ) as Record<DocKindId, string>),
+};
+
+/**
+ * Where these pages are listed: one kind's own words, or every kind's list
+ * named ("the /guides and /tools lists, the menu and the footer"), never
+ * one kind's words for a mixed set (audit F4).
+ */
+export function listWordsFor(pages: readonly { kind?: PageKind }[]): string {
+    const kinds = [...new Set(pages.map((p) => p.kind ?? "for"))];
+    if (kinds.length <= 1) return LIST_WORDS[kinds[0] ?? "for"];
+    const names = kinds.map((k) => LIST_NAME[k]);
+    const menu = kinds.some((k) => k !== "for") ? ", the menu" : "";
+    return `the ${names.slice(0, -1).join(", ")} and ${names.at(-1)} lists${menu} and the footer`;
+}
+
 export interface DialogWords {
     title: string;
     confirm: string;
@@ -609,11 +671,9 @@ export function dialogWords(
     const these = one ? "this page" : "these pages";
     const count = one ? "page" : `${n} pages`;
     const tools = pages.length > 0 && pages.every((p) => p.kind === "tools");
-    const kind = first?.kind ?? "for";
-    const listed =
-        LIST_WORDS[
-            pages.every((p) => (p.kind ?? "for") === kind) ? kind : "for"
-        ];
+    const listed = listWordsFor(pages);
+    // Staged to go live and never on the site: Unpublish changes nothing there.
+    const neverLive = n > 0 && pages.every((p) => p.pending === "on");
     switch (action) {
         case "publish":
             return {
@@ -634,11 +694,22 @@ export function dialogWords(
                 one && first && !tools
                     ? familyPage(first.family, first.slug)
                     : null;
+            if (neverLive)
+                return {
+                    title: `Take ${what} off ${site}?`,
+                    confirm: `Unpublish ${count}`,
+                    points: [
+                        `${one ? "It isn't" : "They aren't"} on ${site} yet, so nothing changes there.`,
+                        `${one ? "It's" : "They're"} marked Unpublished. To leave ${one ? "it" : "them"} as ${one ? "it was" : "they were"}, use Cancel this change instead.`,
+                    ],
+                    tick: null,
+                    destructive: false,
+                };
             return {
                 title: `Take ${what} off ${site}?`,
                 confirm: `Unpublish ${count}`,
                 points: [
-                    `${one ? "It stays" : "They stay"} on ${site} until changes are deployed. Then ${one ? "it leaves" : "they leave"} the sitemap and ${tools ? "the /tools list" : "the /for/ list"}.`,
+                    `${one ? "It stays" : "They stay"} on ${site} until changes are deployed. Then ${one ? "it leaves" : "they leave"} the sitemap and ${listWordsFor(pages)}.`,
                     tools
                         ? `Anyone opening ${one ? "the old link" : "an old link"} is sent to /tools (or Home while no tool is live), not an error.`
                         : one
@@ -668,6 +739,23 @@ export function dialogWords(
                 destructive: true,
             };
         }
+        case "cancel": {
+            const on = pages.filter((p) => p.pending === "on").length;
+            return {
+                title: `Cancel the change to ${what}?`,
+                confirm: one ? "Cancel the change" : `Cancel ${n} changes`,
+                points: [
+                    on === n
+                        ? `${one ? "It doesn't go" : "They don't go"} live at the next deploy. ${one ? "It goes" : "They go"} back to where ${one ? "it was" : "they were"} before.`
+                        : on === 0
+                          ? `${one ? "It stays" : "They stay"} live. ${one ? "It doesn't come" : "They don't come"} off at the next deploy.`
+                          : `Each one goes back to where it was before: what's live stays live, the rest stay off.`,
+                    `Nothing changes on ${site}, and nothing is left waiting to deploy for ${these}.`,
+                ],
+                tick: null,
+                destructive: false,
+            };
+        }
         case "restore":
             return {
                 title: `Restore ${what}?`,
@@ -687,6 +775,7 @@ const PAST: Record<PageAction | "deploy", string> = {
     unpublish: "unpublished",
     archive: "archived",
     restore: "restored",
+    cancel: "cancelled",
     deploy: "deployed",
 };
 
@@ -704,28 +793,47 @@ export function refusalWords(
     return `${names.join(", ")} can't be ${PAST[action]} from where ${one ? "it is" : "they are"} now. Someone may have just changed ${one ? "it" : "them"}. Nothing was changed: close this to see the list as it is.`;
 }
 
-/** The toast after an action worked: staged, waiting for Deploy changes. */
+/**
+ * The toast after an action worked. `staged` is how many of the pages now
+ * wait for Deploy changes; the toast then offers to go to the bar (F6).
+ */
 export function successWords(
     action: PageAction,
-    n: number,
+    pages: readonly { name: string }[],
     site: string,
-): { title: string; description?: string } {
-    const pages = n === 1 ? "the page" : `${n} pages`;
+): { title: string; description?: string; staged: boolean } {
+    const n = pages.length;
+    const one = n === 1;
+    const what = one ? (pages[0]?.name ?? "The page") : `${n} pages`;
     switch (action) {
         case "publish":
             return {
-                title: `Published ${pages}.`,
-                description: `Deploy changes to put ${n === 1 ? "it" : "them"} on ${site}.`,
+                title: `${what} ${one ? "waits" : "wait"} to deploy.`,
+                description: `Deploy changes to put ${one ? "it" : "them"} on ${site}.`,
+                staged: true,
             };
         case "unpublish":
             return {
-                title: `Took ${pages} off.`,
-                description: `Deploy changes to take ${n === 1 ? "it" : "them"} off ${site}.`,
+                title: `${what} ${one ? "waits" : "wait"} to come off.`,
+                description: `Deploy changes to take ${one ? "it" : "them"} off ${site}.`,
+                staged: true,
+            };
+        case "cancel":
+            return {
+                title: `Cancelled the change to ${what}.`,
+                description: `Nothing changes on ${site}.`,
+                staged: false,
             };
         case "archive":
-            return { title: `Archived ${pages}.` };
+            return {
+                title: `Archived ${one ? "the page" : what}.`,
+                staged: false,
+            };
         case "restore":
-            return { title: `Restored ${pages} as a draft.` };
+            return {
+                title: `Restored ${one ? "the page" : what} as a draft.`,
+                staged: false,
+            };
     }
 }
 
@@ -808,9 +916,7 @@ export function whereItShows(
             label:
                 kind === "tools"
                     ? "The /tools list, the menu and the footer"
-                    : kind === "for"
-                      ? "The /for/ list and the footer"
-                      : `The${LIST_WORDS[kind].slice("the".length)}`,
+                    : `The${LIST_WORDS[kind].slice("the".length)}`,
             on: live,
             value: live ? "Linked" : "Not linked",
         },
@@ -848,14 +954,40 @@ export function historyWords(
         event.action in PAST
             ? PAST[event.action as keyof typeof PAST]
             : event.action;
-    const what = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} by ${who}`;
-    let detail = `Was ${STATUS_WORD[event.fromStatus]}, now ${STATUS_WORD[event.toStatus]}.`;
-    // Since R13 only a deploy changes the site; older rows are left unsaid.
+    const when = formatDateTime(event.at);
+    const from = STATUS_WORD[event.fromStatus];
+    const to = STATUS_WORD[event.toStatus];
+    // Since R13 only a deploy changes the site (audit F2).
     if (event.action === "deploy") {
-        if (event.toStatus === "LIVE") detail += ` Put on ${site}.`;
-        else if (event.fromStatus === "LIVE") detail += ` Taken off ${site}.`;
+        const went =
+            event.toStatus === "LIVE"
+                ? `Went live on ${site}`
+                : event.fromStatus === "LIVE"
+                  ? `Came off ${site}`
+                  : `Deployed to ${site}`;
+        return {
+            when,
+            what: `${went} · deployed by ${who}`,
+            detail: `Was ${from}, now ${to}.`,
+        };
     }
-    return { when: formatDateTime(event.at), what, detail };
+    if (event.action === "cancel") {
+        return {
+            when,
+            what: `Change cancelled by ${who}`,
+            detail: `Back to ${to}, as the site has it. Nothing changed on ${site}.`,
+        };
+    }
+    const what = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} by ${who}`;
+    const staged =
+        (event.fromStatus === "LIVE") !== (event.toStatus === "LIVE");
+    return {
+        when,
+        what,
+        detail: staged
+            ? `Was ${from}, set to ${event.toStatus === "LIVE" ? "go live" : "come off"} at the next deploy.`
+            : `Was ${from}, now ${to}. Nothing changes on ${site}.`,
+    };
 }
 
 /** "saroh.in" from "https://saroh.in/". */

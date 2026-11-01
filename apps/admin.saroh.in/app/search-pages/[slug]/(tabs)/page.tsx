@@ -92,7 +92,8 @@ export default async function SearchPageOverview({
                 </Panel>
             </div>
 
-            <aside className="grid min-w-0 flex-[1_1_320px] gap-4">
+            {/* On a phone the page's state comes before its checks (F10). */}
+            <aside className="order-first grid min-w-0 flex-[1_1_320px] gap-4 lg:order-none">
                 <Panel title={`Where it shows on ${site.host}`}>
                     {() => (
                         <ul className="grid">

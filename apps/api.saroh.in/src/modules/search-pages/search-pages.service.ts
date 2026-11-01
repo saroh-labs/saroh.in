@@ -10,7 +10,7 @@ import {
 import type { DeploymentRun } from "../admin/admin-deployments";
 import { AdminPermission } from "../admin/admin-permissions";
 import type { SearchPageAction, SearchPageStatus } from "./search-page-rules";
-import { changesLive, nextStatus } from "./search-page-rules";
+import { cancelStatus, changesLive, nextStatus } from "./search-page-rules";
 import {
     enqueueWebDeploy,
     pathsOf,
@@ -139,7 +139,11 @@ export class SearchPagesService {
             const changes = paths.map((path) => {
                 const row = existing.get(path);
                 const from = row?.status ?? null;
-                return { path, row, from, to: nextStatus(action, from) };
+                const to =
+                    action === "cancel"
+                        ? cancelStatus(from, row?.releasedStatus ?? null)
+                        : nextStatus(action, from);
+                return { path, row, from, to };
             });
             const refused = changes
                 .filter((c) => c.to === null)
@@ -302,6 +306,7 @@ const PAST: Record<SearchPageAction, string> = {
     unpublish: "unpublished",
     archive: "archived",
     restore: "restored",
+    cancel: "cancelled",
 };
 
 async function namesOf(ids: string[]): Promise<Map<string, string | null>> {

@@ -360,8 +360,10 @@ recorded grant (the API refuses it otherwise).
   (R13, owner 31 Oct): the list's deploy bar ("N changes waiting to
   deploy", `components/search-pages/deploy-bar.tsx`) lists them and its
   Deploy changes (`POST …/deploy`, same permission) rebuilds the site once
-  for all of them; a row shows "Published · not deployed yet" or "Taken
-  off · not deployed yet" until then. While the API says a rebuild runs,
+  for all of them; a row shows "Waiting to deploy" (and a chip filters
+  them) until then, and the bar says "Goes live" or "Comes off". Cancel
+  this change (row ⋯, page ⋯, each bar row; `cancel` on `POST …/actions`,
+  DEC-201 amendment 1 Nov) puts a staged page back to its released status. While the API says a rebuild runs,
   the bar says so, Deploy changes waits, and the screen re-reads every 20s.
   For GST pages, guides and downloads, Publish is disabled (one page or a
   selection) while an error-level check fails, naming it, and a live page

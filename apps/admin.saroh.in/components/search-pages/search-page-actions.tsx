@@ -25,8 +25,8 @@ const CODE_URL =
 /**
  * A search page's header actions (DEC-193): Read on the development site,
  * then Publish / Unpublish / Restore as its state allows, and ⋯ with Open on
- * the live site (when live, production only), the words in the code and
- * Archive. Only `search-pages:publish` sees the writes.
+ * the live site (when live, production only), the words in the code,
+ * Cancel this change (while one waits to deploy) and Archive. Only `search-pages:publish` sees the writes.
  */
 export function SearchPageActions({
     row,
@@ -135,6 +135,13 @@ export function SearchPageActions({
                     {canPublish && (
                         <>
                             <DropdownMenuSeparator />
+                            {row.pending && (
+                                <DropdownMenuItem
+                                    onSelect={() => setOpened("cancel")}
+                                >
+                                    Cancel this change
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 className="text-destructive"
                                 disabled={!canDo("archive", row.state)}
@@ -153,6 +160,7 @@ export function SearchPageActions({
                     rows={rows}
                     site={site}
                     reviewSite={reviewSite}
+                    reviewUrl={reviewUrl}
                     checks={checks}
                     showPages={false}
                     onOpenChange={(next) => {

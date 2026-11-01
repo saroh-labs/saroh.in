@@ -211,8 +211,9 @@ describe("SearchPageDialog", () => {
         );
         await waitFor(() =>
             expect(showSuccess).toHaveBeenCalledWith(
-                "Published the page.",
+                "Spas waits to deploy.",
                 "Deploy changes to put it on saroh.in.",
+                expect.objectContaining({ label: "Show waiting changes" }),
             ),
         );
         expect(refresh).toHaveBeenCalled();
@@ -274,8 +275,14 @@ describe("DeployBar (R13)", () => {
         );
         expect(screen.getByText("3 changes waiting to deploy")).toBeTruthy();
         const list = screen.getByRole("list", { name: "Changes waiting" });
-        expect(within(list).getAllByText("Published")).toHaveLength(2);
-        expect(within(list).getByText("Taken off")).toBeTruthy();
+        expect(within(list).getAllByText("Goes live")).toHaveLength(2);
+        expect(within(list).getByText("Comes off")).toBeTruthy();
+        // Each waiting change can be cancelled from the bar (DEC-201 amendment).
+        expect(
+            within(list).getAllByRole("button", {
+                name: /^Cancel this change to /,
+            }),
+        ).toHaveLength(3);
 
         fireEvent.click(screen.getByRole("button", { name: "Deploy changes" }));
         expect(
@@ -309,6 +316,40 @@ describe("DeployBar (R13)", () => {
         ).toBe(true);
     });
 
+    it("cancels one waiting change from the bar, with its own confirm", async () => {
+        searchPageAction.mockResolvedValue({ ok: true, data: { pages: [] } });
+        render(
+            <DeployBar
+                rows={waiting}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: "Cancel this change to Spas" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        expect(
+            within(dialog).getByText(/Nothing changes on saroh.in/),
+        ).toBeTruthy();
+        fireEvent.click(
+            within(dialog).getByRole("button", { name: "Cancel the change" }),
+        );
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("cancel", [
+                "/for/spas",
+            ]),
+        );
+        await waitFor(() =>
+            expect(showSuccess).toHaveBeenCalledWith(
+                "Cancelled the change to Spas.",
+                "Nothing changes on saroh.in.",
+                undefined,
+            ),
+        );
+    });
+
     it("keeps Deploy changes off with nothing waiting", () => {
         render(
             <DeployBar
@@ -338,6 +379,12 @@ describe("DeployBar (R13)", () => {
         expect(screen.getByText("3 changes waiting to deploy")).toBeTruthy();
         expect(
             screen.queryByRole("button", { name: "Deploy changes" }),
+        ).toBeNull();
+        expect(
+            screen.getByText(/A Platform owner deploys these\./),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: /^Cancel this change/ }),
         ).toBeNull();
         const { container } = render(
             <DeployBar
@@ -370,12 +417,7 @@ describe("a row waiting for Deploy changes", () => {
             />,
         );
         const list = screen.getByRole("list", { name: "Pages" });
-        expect(
-            within(list).getByText("Published · not deployed yet"),
-        ).toBeTruthy();
-        expect(
-            within(list).getByText("Taken off · not deployed yet"),
-        ).toBeTruthy();
+        expect(within(list).getAllByText("Waiting to deploy")).toHaveLength(2);
     });
 });
 
@@ -593,6 +635,20 @@ describe("links to pages that aren't live (U12)", () => {
         expect(
             screen.getByRole("list", { name: "Pages" }).textContent,
         ).toContain(TOOL);
+        // It says what it added, tags it, and words the lists for both kinds (F4).
+        expect(
+            screen.getByText(
+                /Added 1 linked page\. Read it before you publish\./,
+            ),
+        ).toBeTruthy();
+        expect(
+            within(screen.getByRole("list", { name: "Pages" })).getByText(
+                "Linked",
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(/the \/guides and \/tools lists, the menu/),
+        ).toBeTruthy();
         // The added page is read too before it goes out.
         expect(confirm(/^Publish 2 pages$/).disabled).toBe(true);
         tick();

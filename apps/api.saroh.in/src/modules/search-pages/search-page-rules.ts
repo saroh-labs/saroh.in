@@ -11,6 +11,7 @@ export const SEARCH_PAGE_ACTIONS = [
     "unpublish",
     "archive",
     "restore",
+    "cancel",
 ] as const;
 export type SearchPageAction = (typeof SEARCH_PAGE_ACTIONS)[number];
 
@@ -56,7 +57,23 @@ export function nextStatus(
             return current === "ARCHIVED" ? null : "ARCHIVED";
         case "restore":
             return current === "ARCHIVED" ? "DRAFT" : null;
+        case "cancel":
+            // Needs the released status too: `cancelStatus`.
+            return null;
     }
+}
+
+/**
+ * Cancel this change (DEC-201 amendment, 1 Nov): a staged change goes back
+ * to what the site has, the released status. Null when nothing is staged.
+ */
+export function cancelStatus(
+    status: SearchPageStatus | null,
+    released: SearchPageStatus | null,
+): SearchPageStatus | null {
+    const staged = status ?? "DRAFT";
+    const onSite = released ?? "DRAFT";
+    return staged === onSite ? null : onSite;
 }
 
 /** True when the change puts a page on the site or takes it off. */
