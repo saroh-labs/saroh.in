@@ -6309,3 +6309,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the snapshot takes the host from the target API's connection string, refuses unless it is the expected one, and runs `pg_dump` inside that host's container as its admin user (the app's role is under row-level security, so a dump as the app role fails or comes out partial).
 **Rule**: `docs/architecture/runbooks/DEMO_BUSINESSES.md` step 1; any server step that touches a database checks the host, never only the name.
 **Category**: operations · databases
+
+## A double refresh wiped a toast under load
+
+**Symptom**: 1 Nov, deleting a draft invoice sometimes showed no "Draft deleted." toast: the page reloaded instead. It failed the gate twice, and development failed 4 of 20 runs under CPU throttling.
+**Cause**: the dialog called `router.refresh()` while the delete server action's own `revalidatePath` was already refreshing the page. On a slow browser the two raced, Next gave up the soft navigation and reloaded the document, and the reload took the toast with it.
+**Fix**: the dialog no longer calls `router.refresh()`; the action's revalidation redraws the list (`components/invoices/details/invoice-actions.tsx`).
+**Rule**: after a server action that revalidates the page, don't also call `router.refresh()`. About 170 files in app.saroh.in call it; the ones paired with a revalidating action are a follow-up sweep. To reproduce such races, throttle the CPU (CDP) in a throwaway spec.
+**Category**: frontend · Next navigation
