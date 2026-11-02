@@ -79,3 +79,30 @@ export function pageSchema(page: SitePage): Ld[] {
             return breadcrumbs(page);
     }
 }
+
+export const faqSchema = (
+    items: readonly { question: string; answer: string }[],
+): Ld => ({
+    "@context": context,
+    "@type": "FAQPage",
+    mainEntity: items.map((f) => ({
+        "@type": "Question",
+        name: f.question,
+        acceptedAnswer: { "@type": "Answer", text: f.answer },
+    })),
+});
+
+export const howToSchema = (
+    name: string,
+    steps: readonly { title: string; text: string }[],
+): Ld => ({
+    "@context": context,
+    "@type": "HowTo",
+    name,
+    step: steps.map((s, i) => ({
+        "@type": "HowToStep",
+        position: i + 1,
+        name: s.title,
+        text: s.text,
+    })),
+});

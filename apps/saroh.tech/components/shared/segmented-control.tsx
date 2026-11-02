@@ -16,16 +16,21 @@ export function SegmentedControl<T extends string>({
 }) {
     const name = useId();
     return (
-        <fieldset className="m-0 inline-flex border-0 p-0">
+        <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="sr-only">{legend}</legend>
-            <div className="inline-flex gap-1 rounded-button border border-control bg-surface p-1">
+            <div
+                className="grid gap-1 rounded-button bg-[#EAE6DE] p-1"
+                style={{
+                    gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+                }}
+            >
                 {options.map((o) => (
                     <label
                         key={o.value}
-                        className={`inline-flex min-h-11 cursor-pointer items-center rounded-control px-3 text-sm font-semibold has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink md:min-h-9 ${
+                        className={`flex min-h-11 cursor-pointer items-center justify-center rounded-control px-2 text-center text-[14.5px] font-semibold has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink md:min-h-10 ${
                             value === o.value
-                                ? "bg-ink text-paper"
-                                : "text-ink hover:bg-black/5"
+                                ? "bg-surface shadow-[0_1px_2px_rgba(28,28,26,.18)]"
+                                : ""
                         }`}
                     >
                         <input

@@ -17,6 +17,8 @@
     "dependencies": {
         "@saroh/edition": "workspace:*",
         "@saroh/ui": "workspace:*",
+        "jspdf": "4.2.1",
+        "lucide-react": "catalog:",
         "next": "^16.4.2",
         "react": "catalog:react19",
         "react-dom": "catalog:react19"

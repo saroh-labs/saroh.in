@@ -9,7 +9,7 @@ export const dynamicParams = false;
 
 /** Every page without a route of its own yet; a built page gets its own folder. */
 export function generateStaticParams() {
-    return PAGES.filter((p) => p.path !== "/").map((p) => ({
+    return PAGES.filter((p) => p.stub && p.path !== "/").map((p) => ({
         path: p.path.slice(1).split("/"),
     }));
 }

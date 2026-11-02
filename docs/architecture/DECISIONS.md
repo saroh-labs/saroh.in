@@ -2709,5 +2709,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     3. **India is offered, never forced**: the Worker shows a bar to visitors Cloudflare places in India, and no one is redirected.
     4. **A page out of its phase stays noindex and out of the sitemap** until it is really built.
     5. **`packages/edition/hreflang.json`** holds the pages that do the same job on both sites. A pair must point both ways, so saroh.in's side goes in once saroh.tech is live.
-    6. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
+    6. **Search (owner, 2 Nov):** merchant sites on `*.saroh.app` are indexed, the bare `saroh.app` is not, and `app.saroh.tech` is noindex as `app.saroh.in` is.
+    7. **Performance comes after the build (owner, 2 Nov):** the plan's 100 KB JavaScript limit on tool pages is set aside for now: standard Next, optimised later.
+    8. **Until the USD catalogue exists, the plans shown are the ones the catalogue already has**, as placeholders.
+    9. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
 - Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.

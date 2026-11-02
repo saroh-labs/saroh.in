@@ -1,5 +1,8 @@
 import type { ComponentProps, ReactNode } from "react";
 
+export const INPUT_CLASS =
+    "h-11 w-full rounded-control border border-control bg-surface px-3 text-base text-ink md:h-10 md:text-[15px]";
+
 /** A label and its input, always together. 44px on a phone, 40px on a desk. */
 export function Field({
     label,
@@ -15,10 +18,7 @@ export function Field({
                     <span className="font-normal text-quiet"> {hint}</span>
                 ) : null}
             </span>
-            <input
-                className="h-11 w-full rounded-control border border-control bg-surface px-3 text-base text-ink md:h-10 md:text-[15px]"
-                {...props}
-            />
+            <input className={INPUT_CLASS} {...props} />
         </label>
     );
 }

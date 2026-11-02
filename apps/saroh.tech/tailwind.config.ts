@@ -1,17 +1,20 @@
+// The shared @saroh/tailwind-config preset, as saroh.in uses it, extended with
+// the boards' colour names. Every board colour is defined in app/tech.css.
 import type { Config } from "tailwindcss";
 
-/**
- * Its own small theme, not the workspace preset: saroh.tech draws the design
- * system's values from `app/tech.css` and must stay light (the tool pages have
- * a JavaScript and CSS budget). The logo is the one piece taken from @saroh/ui.
- */
+import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
+
+const shared = sharedConfig.theme?.extend ?? {};
 const c = (name: string) => `hsl(var(--st-${name}) / <alpha-value>)`;
 
 const config: Config = {
-    content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+    ...sharedConfig,
     theme: {
+        ...sharedConfig.theme,
         extend: {
+            ...shared,
             colors: {
+                ...(shared.colors as Record<string, unknown>),
                 paper: c("paper"),
                 ink: c("ink"),
                 body: c("body"),
@@ -26,14 +29,19 @@ const config: Config = {
                 strong: "rgba(28, 28, 26, 0.25)",
             },
             fontFamily: {
+                ...(shared.fontFamily as Record<string, string[]> | undefined),
                 sans: ["var(--font-sans)", "system-ui", "sans-serif"],
                 display: ["var(--font-display)", "system-ui", "sans-serif"],
                 mono: ["var(--font-mono)", "ui-monospace", "monospace"],
             },
-            borderRadius: { control: "9px", button: "12px", card: "16px" },
+            borderRadius: {
+                ...(shared.borderRadius as Record<string, string> | undefined),
+                control: "9px",
+                button: "12px",
+                card: "16px",
+            },
         },
     },
-    plugins: [],
 };
 
 export default config;

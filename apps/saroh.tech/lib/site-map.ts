@@ -56,7 +56,7 @@ const tool = (
     description,
     h1,
     crumb: under("Tools", "/tools", name),
-    stub: true,
+    updated: "2026-11-02",
 });
 
 const DOCUMENTS = [
@@ -155,8 +155,8 @@ export const PAGES: SitePage[] = [
     hub(
         "/pricing",
         "pricing",
-        "Pricing: price locked for 12 months, 0% fees | Saroh",
-        "Five plans, Free included. Your price stays the same for 12 months. We never hold your money. Cancel any time.",
+        "Pricing and plans, with 0% fees | Saroh",
+        "See Saroh's plans. Start free, no card needed. We never hold your money. Cancel any time.",
         "We never hold your money.",
         "Pricing",
     ),
@@ -179,9 +179,9 @@ export const PAGES: SitePage[] = [
     hub(
         "/referral",
         "referral",
-        "Give a month, get a month | Saroh",
-        "Share your link. When a friend starts a paid plan, you both get a month free.",
-        "Give a month, get a month.",
+        "Refer a friend | Saroh",
+        "Share Saroh with a friend. The rules are on this page.",
+        "Refer a friend",
         "Referral",
     ),
     hub(
@@ -243,21 +243,21 @@ export const PAGES: SitePage[] = [
         "vat-calculator",
         "VAT calculator",
         "VAT calculator: add or remove VAT | Saroh",
-        "Add VAT to a price or take it out, in your browser. No sign-up.",
+        "Add VAT to a price or take it out of a total, in your browser. No sign-up. Rates are examples you can change.",
         "VAT calculator",
     ),
     tool(
         "sales-tax-calculator",
         "Sales tax calculator",
         "Sales tax calculator: add or remove sales tax | Saroh",
-        "Add sales tax to a price or take it out, in your browser. No sign-up.",
+        "Add sales tax to a price or take it out of a total, in your browser. No sign-up. Enter your own combined rate.",
         "Sales tax calculator",
     ),
     tool(
         "gst-calculator",
         "GST calculator",
         "GST calculator: add or remove GST | Saroh",
-        "Add GST to a price or take it out, in your browser. No sign-up.",
+        "Add GST to a price or take it out of a total, in your browser. No sign-up. Rates are examples you can change.",
         "GST calculator",
     ),
     hub(

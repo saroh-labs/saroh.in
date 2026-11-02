@@ -6,7 +6,14 @@ export const placeholders = {
     /** Search terms on the page specs: all unverified in a keyword tool. */
     searchTermsChecked: false,
     /** USD plans and limits: from the new USD catalogue, phase 3. */
-    prices: "[confirm: USD catalogue]",
+    prices: "[confirm: USD catalogue; until then the plans saroh.in reads]",
+    /** Board words held out of this public repo until launch. */
+    pricePromise:
+        "[confirm: the pricing promise line on tool bands, /pricing and home]",
+    referralOffer: "[confirm: the referral offer's headline]",
+    /** The boards leave most questions closed: these answers were written for them. */
+    toolAnswers:
+        "[confirm: the tool pages' question answers in content/tools.tsx]",
     planLimits: "[confirm: plan limits]",
     referralRules: "[confirm: referral rules and the founding member extra]",
     competitorFacts: "[confirm: facts with links and dates]",

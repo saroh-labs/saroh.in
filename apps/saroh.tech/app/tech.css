@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* The boards' colours (design system: Ink, Saffron once per screen, Paper). Light only. */
 :root {
     color-scheme: light;
@@ -28,8 +24,11 @@ body {
     font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* A link looks like one, unless it's a button, a card or a menu item. */
 a {
     color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 /* The one focus ring: 2px Ink, 2px off, on everything a keyboard can reach. */
@@ -40,4 +39,24 @@ a {
 
 [hidden] {
     display: none !important;
+}
+
+/* Print is the document alone, whichever tab a phone was on. */
+@media print {
+    @page {
+        margin: 12mm;
+    }
+    body * {
+        visibility: hidden;
+    }
+    [data-print],
+    [data-print] * {
+        visibility: visible;
+    }
+    [data-print] {
+        position: absolute;
+        inset: 0 0 auto;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
 }

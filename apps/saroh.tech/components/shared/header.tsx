@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { signInHref, signupHref } from "@/site.config";
 
-import { ButtonLink } from "./button";
+import { HeaderStart } from "./header-start";
 import { PhoneMenu } from "./phone-menu";
 
 export const NAV = [
@@ -49,13 +49,7 @@ export function Header() {
                     >
                         Sign in
                     </a>
-                    <ButtonLink
-                        look="compact"
-                        href={signupHref("header")}
-                        data-cta="start-free"
-                    >
-                        Start free
-                    </ButtonLink>
+                    <HeaderStart href={signupHref("header")} />
                     <PhoneMenu items={NAV} signIn={signInHref} />
                 </div>
             </div>

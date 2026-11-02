@@ -7,6 +7,7 @@ import { Header } from "@/components/shared/header";
 import { RegionBar } from "@/components/shared/region-bar";
 import { site } from "@/site.config";
 
+import "@saroh/ui/globals.css";
 import "./tech.css";
 
 const fontSans = localFont({
@@ -31,6 +32,13 @@ const fontMono = localFont({
     preload: false,
 });
 
+const fontWordmark = localFont({
+    src: "./fonts/PlusJakartaSans-latin.woff2",
+    weight: "600",
+    display: "swap",
+    variable: "--font-wordmark",
+});
+
 export const metadata: Metadata = {
     metadataBase: new URL(site.url),
     title: site.name,
@@ -51,7 +59,7 @@ export default function RootLayout({
     return (
         <html
             lang="en"
-            className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable}`}
+            className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable}`}
         >
             <body className="min-h-screen bg-paper text-ink antialiased">
                 <RegionBar />
