@@ -43,7 +43,7 @@ export function SideNav({
     return (
         <nav
             aria-label={label}
-            className="min-w-0 min-[900px]:sticky min-[900px]:top-6 min-[900px]:max-h-[calc(100dvh-3rem)] min-[900px]:overflow-y-auto min-[900px]:overscroll-contain min-[900px]:pb-6"
+            className="min-w-0 min-[900px]:sticky min-[900px]:top-[calc(var(--mk-nav-h)+1.5rem)] min-[900px]:max-h-[calc(100dvh-var(--mk-nav-h)-3rem)] min-[900px]:overflow-y-auto min-[900px]:overscroll-contain min-[900px]:pb-6"
         >
             <button
                 type="button"

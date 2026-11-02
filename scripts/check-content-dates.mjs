@@ -5,7 +5,9 @@
 // frontmatter. `lib/site-pages.ts` dates the page by it, never by the build.
 // This fails when such a file changed since the merge base with
 // origin/development (or the base passed) but its date didn't, so the
-// sitemap can't go on saying the old day. A file with no date is left alone.
+// sitemap can't go on saying the old day. A file with no date is left alone,
+// and so is a /for/ page where only `searchWords` changed: the hub's search
+// reads them, the page doesn't show them, so its date mustn't move.
 // Skipped where the base isn't fetched.
 //
 // `node scripts/check-content-dates.mjs [base]`, run from inside the repo.
@@ -47,6 +49,13 @@ function dateOf(source) {
     return m ? m[1] : null;
 }
 
+const withoutSearchWords = (source) => source.replace(/^searchWords:.*\n/m, "");
+const onlyHiddenWords = (file, before) =>
+    before !== null &&
+    // `git show` here comes back trimmed.
+    withoutSearchWords(readFileSync(file, "utf8")).trim() ===
+        withoutSearchWords(before).trim();
+
 // Against the working tree, so an uncommitted edit counts too.
 const changed = git(
     "diff",
@@ -69,7 +78,7 @@ for (const path of changed) {
     if (now === null && then === null) continue;
     if (now === null) {
         stale.push(`${path}: its date was removed (was ${then})`);
-    } else if (now === then) {
+    } else if (now === then && !onlyHiddenWords(file, before)) {
         stale.push(`${path}: its words changed, its date is still ${now}`);
     }
 }

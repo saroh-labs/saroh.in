@@ -8,6 +8,9 @@
  * and scrollbars light whatever the visitor's system asks for.
  */
 :root {
+    /* The sticky nav's height (site-nav.tsx), for what sticks or lands below it. */
+    --mk-nav-h: 85px;
+
     color-scheme: light;
 
     /*
@@ -88,6 +91,13 @@ main p a {
     text-decoration-thickness: 1px;
 }
 
+@media (min-width: 760px) {
+    :root {
+        --mk-nav-h: 81px;
+    }
+}
+
 html {
+    scroll-padding-top: var(--mk-nav-h);
     overflow-x: clip;
 }

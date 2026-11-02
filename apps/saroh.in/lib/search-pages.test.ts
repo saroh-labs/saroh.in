@@ -5,6 +5,7 @@ import type { PublishList } from "./search-pages";
 import {
     builtSearchPages,
     builtTools,
+    footerToolLinks,
     liveSearchPages,
     liveTools,
     parsePublishList,
@@ -185,5 +186,28 @@ describe("free tools (#1253)", () => {
         const noshow = liveTools(list(true, [NOSHOW]))[0];
         expect(lastModified(NOSHOW)).toBe(`${noshow.updated}T00:00:00+05:30`);
         expect(lastModified(QR)).toBe("2026-10-27T00:00:00+05:30");
+    });
+});
+
+describe("footerToolLinks", () => {
+    const tool = (slug: string) => ({ href: `/tools/${slug}` });
+    it("names five, the ones most come for first, then others to fill", () => {
+        const links = footerToolLinks(
+            [
+                "link-preview",
+                "qr-code-maker",
+                "receipt-maker",
+                "gst-calculator",
+                "quotation-maker",
+                "gift-voucher-maker",
+            ].map(tool),
+        );
+        expect(links.map((t) => t.href)).toEqual([
+            "/tools/gst-calculator",
+            "/tools/qr-code-maker",
+            "/tools/link-preview",
+            "/tools/receipt-maker",
+            "/tools/quotation-maker",
+        ]);
     });
 });

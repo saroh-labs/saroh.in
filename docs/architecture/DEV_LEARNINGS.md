@@ -6326,3 +6326,23 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Rule**: in browser specs, find a control by its role and name; placeholder, label and text lookups also match the hidden copy of a streaming page. Reproduce on a production build (`next build && portless <name> next start`), not `next dev`.
 **Then**: the next gate (1 Nov) hit four more admin specs the same way (Billing, a business's page, Modules, the owner refusal), at random: patching specs one by one can't keep up. `useSession` (`e2e/fixtures/sessions.ts`) now makes every `page.goto` wait until no `<div hidden id="S:…">` is left, so every spec that signs in meets the revealed page.
 **Category**: testing · Next streaming
+
+---
+
+## A GST page's side rail slid over the closing band
+
+**Symptom**: 1 Nov, the owner saw a GST page's cards ride down over the dark "Bills with the right rate" band, with the "More GST guides" links dark on dark. 239px of overlap at a 1800px wide window.
+**Cause**: `.sp-cl-aside` was a sticky grid item, and the band is a second row of the same grid (so a phone can put it between the main column and the rail). A sticky grid item here stopped at the bottom of the whole grid, not at the end of its own row, so it kept sticking past the main column.
+**Fix**: the aside stretches to its row and an inner `.sp-cl-aside-in` is the sticky box, so the rail stops where the main column ends.
+**Rule**: when a grid has a row below a sticky column, make an inner box sticky inside a stretched cell. Held by "a GST page's rail never sits on the closing band" in `e2e/tests/search-pages-content.spec.ts`, desk and phone.
+**Category**: frontend · CSS
+
+---
+
+## A rebuilt gate served no download files after a cached web build
+
+**Symptom**: 2 Nov, the gate's download spec waited 15s for a file and the page said "Your files are ready" with no download. `/downloads/<slug>/<file>` was a 404, on both desk and phone, though nothing about downloads had changed.
+**Cause**: `docs-content.config.ts` copies the files to `public/downloads` during `web:build`, and that folder wasn't one of the build's Turbo outputs. A rerun with the same code hit the cache: Turbo restored `.next` and replayed the logs, including the `[docs-content]` line, but the copy never ran, and the gate's worktree had been cleaned.
+**Fix**: `public/downloads/**` is a build output in `turbo.json`, so a cache hit restores it.
+**Rule**: a file a build writes outside `.next` and needs at run time is a Turbo output. "cache hit, replaying logs" means the build's scripts did not run, whatever the log says.
+**Category**: tooling · Turbo cache

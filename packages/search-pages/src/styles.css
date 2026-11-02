@@ -948,52 +948,480 @@
     }
 }
 
-/* ---- the /for/ list (ForHub) */
-.sp-hub-head {
+/* ---- the /for/ list (ForHub, for-hub-finder.tsx) */
+.sp-fh {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 56px clamp(20px, 5vw, 56px) 72px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    padding-top: 32px;
+    gap: 40px;
 }
-.sp-hub-group {
+.sp-fh-head {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
-.sp-hub-list {
-    list-style: none;
-    padding: 0;
+.sp .sp-fh-h1 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 56px;
+    line-height: 1.03;
+    letter-spacing: -0.045em;
+}
+.sp-fh-lead {
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--sp-body);
+}
+.sp-fh-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    border-top: 1px solid var(--sp-line);
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
 }
-.sp .sp-hub-list a {
+/* Stays beside the list as it scrolls; a short window scrolls the rail itself. */
+.sp-fh-rail {
+    position: sticky;
+    top: calc(var(--mk-nav-h, 0px) + 16px);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-height: calc(100dvh - var(--mk-nav-h, 0px) - 32px);
+    margin: -4px -10px;
+    padding: 4px 10px;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+}
+.sp-fh-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.sp-fh-search {
+    position: relative;
+}
+.sp-fh-search svg,
+.sp-fh-chev {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.sp-fh-search svg {
+    position: absolute;
+    left: 12px;
+    top: 13px;
+    width: 18px;
+    height: 18px;
+    color: var(--sp-muted);
+    pointer-events: none;
+}
+.sp-fh-search input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px 0 38px;
+    border-radius: 11px;
+    border: 1px solid var(--sp-line-strong);
+    background: var(--sp-white);
+    color: var(--sp-ink);
+    font: inherit;
+    font-size: 16px;
+}
+.sp-fh-search input::placeholder {
+    color: var(--sp-muted);
+}
+.sp-fh-search input:focus-visible,
+.sp-fh-opt:focus-visible,
+.sp-fh-more:focus-visible,
+.sp-fh-status button:focus-visible,
+.sp .sp-fh-tile:focus-visible,
+.sp .sp-fh-card:focus-visible {
+    outline: 2px solid var(--sp-ink);
+    outline-offset: 2px;
+}
+.sp-fh-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.sp .sp-fh-opts-h {
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sp-muted);
+}
+.sp-fh-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: calc(100% + 20px);
+    min-height: 40px;
+    margin: 0 -10px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--sp-ink);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+}
+.sp-fh-opt:hover:not(:disabled) {
+    background: var(--sp-sand);
+}
+.sp-fh-opt[aria-pressed="true"] {
+    background: var(--sp-sand);
+    font-weight: 600;
+}
+.sp-fh-opt:disabled {
+    color: var(--sp-muted);
+    cursor: default;
+}
+.sp-fh-opt-n {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--sp-muted);
+}
+.sp-fh-more {
+    display: none;
+}
+.sp-fh-results {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    min-width: 0;
+}
+.sp-fh-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 28px;
+    margin-bottom: -14px;
+    font-size: 14px;
+    color: var(--sp-muted);
+}
+.sp-fh-status button {
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: var(--sp-amber-dark);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.sp-fh-bento {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 12px;
+}
+.sp-fh-side {
+    display: grid;
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.sp .sp-fh-tile {
+    display: flex;
+    flex-direction: column;
+    border-radius: 18px;
+    background: var(--sp-sand);
+    color: var(--sp-ink);
+    text-decoration: none;
+    overflow: hidden;
+    outline: 1px solid transparent;
+    transition: outline-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sp .sp-fh-tile:hover {
+    outline-color: var(--sp-ink);
+}
+.sp .sp-fh-big {
+    gap: 16px;
+    padding: 24px 24px 0;
+}
+.sp .sp-fh-small {
+    justify-content: center;
+    padding: 18px 20px;
+}
+.sp-fh-tile-copy {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-height: 44px;
-    padding: 16px 16px 16px 0;
-    border-bottom: 1px solid var(--sp-line);
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.sp-fh-tile-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+.sp-fh-tile .sp-fh-tile-name {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 21px;
+    letter-spacing: -0.025em;
+}
+.sp-fh-big .sp-fh-tile-name {
+    font-size: 30px;
+    letter-spacing: -0.03em;
+}
+.sp-fh-tile-line {
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--sp-muted);
+}
+.sp-fh-tile .sp-fh-tile-line {
+    color: var(--sp-body);
+}
+.sp-fh-big .sp-fh-tile-line {
+    font-size: 15px;
+}
+.sp-fh-go {
+    flex: none;
+    font-family: var(--font-sans, Geist, system-ui, sans-serif);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0;
+    transition: transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sp a:hover .sp-fh-go {
+    transform: translateX(3px);
+}
+.sp-fh-chev {
+    display: none;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    color: var(--sp-muted);
+}
+.sp-fh-day {
+    display: block;
+    padding: 16px 16px 12px;
+    border: 1px solid var(--sp-line);
+    border-bottom: 0;
+    border-radius: 14px 14px 0 0;
+    background: var(--sp-white);
+    font-size: 14px;
+}
+.sp-fh-day-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 2px 12px;
+    color: var(--sp-muted);
+}
+.sp-fh-day-top b {
+    color: var(--sp-ink);
+    font-weight: 600;
+}
+.sp-fh-day-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 2px;
+    border-top: 1px solid var(--sp-line-soft);
+    color: var(--sp-muted);
+}
+.sp-fh-day-row b {
+    overflow: hidden;
+    color: var(--sp-ink);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sp-fh-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sp .sp-fh-group-h {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+}
+.sp-fh-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.sp .sp-fh-card {
+    display: flex;
+    min-height: 104px;
+    padding: 14px 16px;
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    background: var(--sp-white);
     color: var(--sp-ink);
     text-decoration: none;
+    transition: border-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.sp .sp-hub-list a[href]:hover .sp-hub-name {
-    color: var(--sp-amber-text);
+.sp .sp-fh-card:hover {
+    border-color: var(--sp-ink);
 }
-.sp-hub-name {
-    font-weight: 600;
-    font-size: 16px;
+@media (prefers-reduced-motion: reduce) {
+    .sp a:hover .sp-fh-go {
+        transform: none;
+    }
 }
-.sp-hub-search {
-    font-size: 14px;
-    color: var(--sp-muted-2);
+@media (max-width: 1099.98px) {
+    .sp-fh-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .sp-fh-bento {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 @media (max-width: 899.98px) {
-    .sp-hub-head {
-        padding-top: 20px;
+    .sp-fh {
+        padding: 28px 16px 40px;
+        gap: 16px;
     }
-    .sp-hub-list {
-        grid-template-columns: 1fr;
+    .sp .sp-fh-h1 {
+        font-size: 40px;
+        letter-spacing: -0.04em;
+    }
+    .sp-fh-lead {
+        font-size: 16px;
+    }
+    .sp-fh-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+    .sp-fh-rail {
+        position: static;
+        gap: 12px;
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+    }
+    .sp-fh-search svg {
+        top: 15px;
+    }
+    .sp-fh-search input {
+        height: 48px;
+    }
+    /* The rail's options become chips, and the second filter waits a tap. */
+    .sp-fh-opts {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .sp .sp-fh-opts-h,
+    .sp-fh-opt-n {
+        display: none;
+    }
+    .sp-fh-opt {
+        width: auto;
+        min-height: 44px;
+        margin: 0;
+        padding: 0 14px;
+        border: 1px solid var(--sp-line-strong);
+        border-radius: 999px;
+        font-weight: 500;
+    }
+    .sp-fh-opt[aria-pressed="true"] {
+        border-color: var(--sp-ink);
+        background: var(--sp-ink);
+        color: var(--sp-paper);
+        font-weight: 500;
+    }
+    .sp-fh-opt:disabled {
+        border-style: dashed;
+    }
+    .sp-fh-more {
+        display: block;
+        align-self: flex-start;
+        min-height: 44px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--sp-amber-dark);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+    }
+    .sp-fh-ways[data-open="false"] {
+        display: none;
+    }
+    .sp-fh-results {
+        gap: 16px;
+    }
+    .sp-fh-status {
+        margin-bottom: 0;
+    }
+    .sp-fh-status button {
+        min-height: 44px;
+    }
+    .sp-fh-side,
+    .sp-fh-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    .sp .sp-fh-big {
+        padding: 18px 18px 0;
+        border-radius: 16px;
+    }
+    .sp-fh-big .sp-fh-tile-name {
+        font-size: 24px;
+    }
+    /* Every other trade is a row: a hairline, a chevron and a pressed state. */
+    .sp .sp-fh-small,
+    .sp .sp-fh-card {
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        min-height: 52px;
+        margin: 0 -10px;
+        padding: 8px 10px;
+        border: 0;
+        border-top: 1px solid var(--sp-line);
+        border-radius: 0;
+        background: transparent;
+    }
+    .sp .sp-fh-small:active,
+    .sp .sp-fh-card:active {
+        background: var(--sp-sand);
+    }
+    .sp-fh-small .sp-fh-tile-name {
+        font-family: var(--font-sans, Geist, system-ui, sans-serif);
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0;
+    }
+    .sp-fh-small .sp-fh-go,
+    .sp-fh-card .sp-fh-go {
+        display: none;
+    }
+    .sp-fh-chev {
+        display: block;
+    }
+    /* The All view is names only, or it runs too long; a filter brings the promises. */
+    .sp-fh-results[data-lines="false"] .sp-fh-small .sp-fh-tile-line,
+    .sp-fh-results[data-lines="false"] .sp-fh-card .sp-fh-tile-line {
+        display: none;
+    }
+    .sp-fh-group {
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .sp .sp-fh-group-h {
+        font-size: 20px;
+    }
+    .sp .sp-fh-band {
+        margin-top: 16px;
     }
 }
 
@@ -2305,7 +2733,7 @@
 /* the preview: a sheet of paper */
 .td-aside {
     position: sticky;
-    top: 24px;
+    top: calc(var(--mk-nav-h, 0px) + 24px);
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -3793,10 +4221,14 @@
     grid-area: main;
     gap: 32px;
 }
+/* Sticky on the inner box: a grid item sticks to the whole grid, so the rail ran down over the band. Stretched, the aside ends where the main column does. */
 .sp-cl-rail .sp-cl-aside {
     grid-area: aside;
+    align-self: stretch;
+}
+.sp-cl-rail .sp-cl-aside-in {
     position: sticky;
-    top: 24px;
+    top: calc(var(--mk-nav-h, 0px) + 24px);
 }
 .sp-cl-rail .sp-cl-band {
     grid-area: band;
@@ -4538,6 +4970,8 @@
     }
     .sp-cl-rail .sp-cl-aside {
         order: 2;
+    }
+    .sp-cl-rail .sp-cl-aside-in {
         position: static;
     }
     .sp-cl-hero .sp-cl-grid {

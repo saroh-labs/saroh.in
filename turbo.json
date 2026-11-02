@@ -184,7 +184,7 @@
                 "!**/vitest.config.*",
                 "!**/jest.config.*"
             ],
-            "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+            "outputs": ["dist/**", ".next/**", "!.next/cache/**", "public/downloads/**"]
         },
         "db:migrate:deploy": {},
         "db:push": {},

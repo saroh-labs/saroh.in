@@ -43,7 +43,9 @@ export function ContentLayout({
                         {layout === "solo" ? band : null}
                     </Main>
                     {aside ? (
-                        <aside className="sp-cl-aside">{aside}</aside>
+                        <aside className="sp-cl-aside">
+                            <div className="sp-cl-aside-in">{aside}</div>
+                        </aside>
                     ) : null}
                     {band && layout !== "solo" ? (
                         <div className="sp-cl-band">{band}</div>
