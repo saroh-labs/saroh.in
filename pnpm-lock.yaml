@@ -1096,6 +1096,9 @@ importers:
       '@saroh/edition':
         specifier: workspace:*
         version: link:../../packages/edition
+      '@saroh/pricing-catalog':
+        specifier: workspace:^
+        version: link:../../packages/pricing-catalog
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1139,6 +1142,9 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 3.4.19(tsx@4.23.11)(yaml@2.9.1)
+      tsx:
+        specifier: ^4.23.11
+        version: 4.23.11
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

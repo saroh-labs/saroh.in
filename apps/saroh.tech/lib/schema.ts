@@ -12,6 +12,7 @@ const organization: Ld = {
     "@type": "Organization",
     name: site.name,
     url: site.url,
+    logo: `${site.url}/apple-icon.png`,
     parentOrganization: { "@type": "Organization", name: site.company },
 };
 
@@ -74,11 +75,42 @@ export function pageSchema(page: SitePage): Ld[] {
         case "tools-hub":
         case "templates":
         case "guides":
+        case "compare":
             return [collection(page), ...breadcrumbs(page)];
         default:
             return breadcrumbs(page);
     }
 }
+
+export const itemListSchema = (
+    name: string,
+    items: readonly { name: string; path: string }[],
+): Ld => ({
+    "@context": context,
+    "@type": "ItemList",
+    name,
+    itemListElement: items.map((item, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        name: item.name,
+        url: canonicalOf(item.path),
+    })),
+});
+
+/** Author and dates stay the organisation and the real edit day until a person signs the page. */
+export const articleSchema = (page: SitePage): Ld => ({
+    "@context": context,
+    "@type": "Article",
+    headline: page.h1,
+    description: page.description,
+    url: canonicalOf(page.path),
+    author: { "@type": "Organization", name: site.name, url: site.url },
+    publisher: { "@type": "Organization", name: site.name, url: site.url },
+    ...(page.updated && {
+        datePublished: page.updated,
+        dateModified: page.updated,
+    }),
+});
 
 export const faqSchema = (
     items: readonly { question: string; answer: string }[],

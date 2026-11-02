@@ -33,8 +33,12 @@ const LINE = "#D9D6CC";
 const clean = (s: string) => s.replace(/−/g, "-");
 
 /** Draws one document on an A4 page, and on more if the items run over. */
-export function drawPdf(Pdf: typeof JsPdf, v: DocumentView): JsPdf {
-    const doc = new Pdf({ unit: "pt", format: "a4", compress: false });
+export function drawPdf(
+    Pdf: typeof JsPdf,
+    v: DocumentView,
+    format: "a4" | "letter" = "a4",
+): JsPdf {
+    const doc = new Pdf({ unit: "pt", format, compress: false });
     const width = doc.internal.pageSize.getWidth();
     const height = doc.internal.pageSize.getHeight();
     const right = width - MARGIN;
@@ -111,9 +115,9 @@ export function drawPdf(Pdf: typeof JsPdf, v: DocumentView): JsPdf {
     const header = () => {
         font("bold");
         doc.text("Description", MARGIN, y);
-        doc.text("Qty", qtyAt, y);
-        doc.text("Rate", rateAt, y, { align: "right" });
-        doc.text("Amount", right, y, { align: "right" });
+        doc.text(v.headers?.qty ?? "Qty", qtyAt, y);
+        doc.text(v.headers?.rate ?? "Rate", rateAt, y, { align: "right" });
+        doc.text(v.headers?.amount ?? "Amount", right, y, { align: "right" });
         y += 6;
         doc.setDrawColor(INK);
         doc.line(MARGIN, y, right, y);

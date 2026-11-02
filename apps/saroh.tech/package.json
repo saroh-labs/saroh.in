@@ -5,17 +5,21 @@
     "scripts": {
         "dev": "portless tech.saroh next dev",
         "dev:app": "next dev",
+        "prebuild": "tsx scripts/make-template-files.ts && tsx scripts/check-templates.ts",
         "build": "next build",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "check:hreflang": "node scripts/check-hreflang.mjs",
+        "check:templates": "tsx scripts/check-templates.ts",
+        "make:templates": "tsx scripts/make-template-files.ts",
         "cf:preview": "wrangler dev",
         "cf:deploy": "wrangler deploy"
     },
     "portless": "tech.saroh",
     "dependencies": {
         "@saroh/edition": "workspace:*",
+        "@saroh/pricing-catalog": "workspace:^",
         "@saroh/ui": "workspace:*",
         "jspdf": "4.2.1",
         "lucide-react": "catalog:",
@@ -32,6 +36,7 @@
         "eslint": "catalog:",
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
+        "tsx": "^4.23.11",
         "typescript": "catalog:",
         "vitest": "^4.1.12",
         "wrangler": "4.148.0"

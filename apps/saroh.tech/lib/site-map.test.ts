@@ -22,14 +22,12 @@ describe("the site map", () => {
         }
     });
 
-    it("keeps an unbuilt page out of search and the sitemap", () => {
-        const stub = PAGES.find((p) => p.stub);
-        if (!stub) throw new Error("no stub left: drop this test");
-        expect(pageMetadata(stub).robots).toEqual({
+    it("keeps an unreviewed page out of search and the sitemap", () => {
+        expect(pageMetadata({ ...PAGES[0], unreviewed: true }).robots).toEqual({
             index: false,
             follow: true,
         });
-        expect(indexedPages()).not.toContain(stub);
+        expect(indexedPages().filter((p) => p.unreviewed)).toEqual([]);
     });
 
     it("canonicals name no trailing slash", () => {

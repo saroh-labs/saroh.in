@@ -20,6 +20,8 @@ export function pageMetadata(page: SitePage): Metadata {
             siteName: site.name,
             type: "website",
         },
-        ...(page.stub && { robots: { index: false, follow: true } }),
+        ...(page.unreviewed && {
+            robots: { index: false, follow: true },
+        }),
     };
 }

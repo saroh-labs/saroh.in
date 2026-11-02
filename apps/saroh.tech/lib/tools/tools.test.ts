@@ -8,8 +8,13 @@ import { carryHref, decodeDraft, encodeDraft, importHref } from "./handoff";
 import { lateFee } from "./late-fee";
 import { formatMoney, parseNumber, toCents } from "./money";
 import { canDrawPdf, drawPdf } from "./pdf";
-import { receiptView, taxIncluded } from "./receipt";
-import { daysOverdue, openHref, reminderMessage } from "./reminder";
+import { applyReceiptCarry, receiptView, taxIncluded } from "./receipt";
+import {
+    applyReminderCarry,
+    daysOverdue,
+    openHref,
+    reminderMessage,
+} from "./reminder";
 import { taxBreakdown } from "./tax";
 
 const draft = (over: Partial<DocDraft> = {}): DocDraft => ({
@@ -418,6 +423,32 @@ describe("carrying into the invoice generator", () => {
         expect(Object.keys(patch)).toEqual(["taxes"]);
         expect(patch.taxes?.[0].rate).toBe("");
         expect(applyCarry(draft(), "nope")).toEqual({});
+    });
+
+    it("takes a template's estimate flag and deposit", () => {
+        expect(
+            applyCarry(draft(), { estimate: true, depositPaid: "600" }),
+        ).toEqual({ estimate: true, depositPaid: "600" });
+    });
+});
+
+describe("carrying into the receipt and reminder tools", () => {
+    it("takes only known fields, as text", () => {
+        expect(
+            applyReceiptCarry({
+                amount: "460.00",
+                currency: "GBP",
+                paidFor: "Classes",
+                number: 7,
+                hacked: "x",
+            }),
+        ).toEqual({ amount: "460.00", currency: "GBP", paidFor: "Classes" });
+        expect(applyReceiptCarry({ currency: "XXX" })).toEqual({});
+        expect(applyReceiptCarry(null)).toEqual({});
+        expect(
+            applyReminderCarry({ client: "Rosa", tone: "final", amount: 5 }),
+        ).toEqual({ client: "Rosa" });
+        expect(applyReminderCarry("nope")).toEqual({});
     });
 });
 

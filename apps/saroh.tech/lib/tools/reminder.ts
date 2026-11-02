@@ -15,6 +15,18 @@ export interface ReminderDraft {
     channel: Channel;
 }
 
+/** What a template page hands over: only known fields, as text. */
+export function applyReminderCarry(carry: unknown): Partial<ReminderDraft> {
+    if (!carry || typeof carry !== "object") return {};
+    const c = carry as Record<string, unknown>;
+    const patch: Partial<ReminderDraft> = {};
+    for (const key of ["client", "sender", "number", "amount"] as const) {
+        const value = c[key];
+        if (typeof value === "string") patch[key] = value;
+    }
+    return patch;
+}
+
 export const daysOverdue = (wasDue: string, today: string) =>
     isDate(wasDue) ? Math.max(0, daysBetween(wasDue, today)) : 0;
 

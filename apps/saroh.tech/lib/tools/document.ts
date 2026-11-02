@@ -165,6 +165,8 @@ export interface DocumentView {
     parties: { label: string; lines: string[] }[];
     facts: { label: string; value: string }[];
     rows: { description: string; qty: string; rate: string; amount: string }[];
+    /** A price list's columns; else Qty, Rate, Amount. */
+    headers?: { qty: string; rate: string; amount: string };
     extras: { description: string; amount: string }[];
     totals: { label: string; value: string; strong?: boolean }[];
     blocks: { label: string; lines: string[] }[];
@@ -327,5 +329,7 @@ export function applyCarry(d: DocDraft, carry: unknown): Partial<DocDraft> {
     if (typeof c.currency === "string" && c.currency in CURRENCIES) {
         patch.currency = c.currency as Currency;
     }
+    if (c.estimate === true) patch.estimate = true;
+    if (typeof c.depositPaid === "string") patch.depositPaid = c.depositPaid;
     return patch;
 }

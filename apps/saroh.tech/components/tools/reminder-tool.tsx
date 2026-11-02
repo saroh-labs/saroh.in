@@ -1,14 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { buttonClass } from "@/components/shared/button";
 import { Field } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { todayIso } from "@/lib/tools/dates";
 import { useDraft } from "@/lib/tools/draft-store";
+import { decodeDraft } from "@/lib/tools/handoff";
 import type { Channel, ReminderDraft, Tone } from "@/lib/tools/reminder";
-import { daysOverdue, openHref, reminderMessage } from "@/lib/tools/reminder";
+import {
+    applyReminderCarry,
+    daysOverdue,
+    openHref,
+    reminderMessage,
+} from "@/lib/tools/reminder";
 
 import { CopyButton, DateField, Section } from "./fields";
 import type { MomentCopy } from "./signup-moment";
@@ -46,6 +52,13 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
         () => SERVER,
         TOOL,
     );
+    // A template's example, once, then out of the address.
+    useEffect(() => {
+        const hash = location.hash;
+        if (!hash.startsWith("#carry=")) return;
+        history.replaceState(null, "", location.pathname);
+        set(applyReminderCarry(decodeDraft(hash.slice("#carry=".length))));
+    }, [set]);
     // The same on the server and the first paint: nothing here shows until a date is picked.
     const [today] = useState(todayIso);
     const message = useMemo(() => reminderMessage(d, today), [d, today]);

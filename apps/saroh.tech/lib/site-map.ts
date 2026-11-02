@@ -1,9 +1,15 @@
 import hreflang from "@saroh/edition/hreflang";
 
+import { templateEntries } from "./templates/pages";
+
+import { CHANGELOG, changelogPath } from "@/content/changelog";
+
+import { HELP } from "@/content/help";
+
 /**
  * Every page, as the site map and page-spec boards list them. Title,
- * description and H1 are the specs' own words. A page is `stub` until its
- * phase builds it: a stub is noindex and out of the sitemap. The pricing line
+ * description and H1 are the specs' own words. An `unreviewed` page is noindex
+ * and out of the sitemap. The pricing line
  * names no price until the USD catalogue reads them in (phase 3).
  */
 export type PageType =
@@ -32,7 +38,8 @@ export interface SitePage {
     h1: string;
     /** Trail above the H1; the page itself is last and has no link. */
     crumb?: { name: string; path?: string }[];
-    stub?: boolean;
+    /** Built, but no person has read it yet: noindex and out of the sitemap. */
+    unreviewed?: boolean;
     /** The day the words really changed: the sitemap's lastmod. */
     updated?: string;
 }
@@ -59,54 +66,52 @@ const tool = (
     updated: "2026-11-02",
 });
 
-const DOCUMENTS = [
-    ["invoice", "Invoice"],
-    ["estimate", "Estimate"],
-    ["quote", "Quote"],
-    ["receipt", "Receipt"],
-    ["proforma-invoice", "Proforma invoice"],
-    ["credit-note", "Credit note"],
-    ["payment-reminder-letter", "Payment reminder letter"],
-    ["price-list", "Price list"],
-] as const;
-
-const TRADES = [
-    ["photographer", "Photographer"],
-    ["graphic-designer", "Graphic designer"],
-    ["web-developer", "Web developer"],
-    ["cleaner", "Cleaner"],
-    ["contractor", "Contractor"],
-    ["plumber", "Plumber"],
-    ["electrician", "Electrician"],
-    ["tutor", "Tutor"],
-    ["personal-trainer", "Personal trainer"],
-    ["consultant", "Consultant"],
-    ["makeup-artist", "Makeup artist"],
-    ["event-planner", "Event planner"],
-    ["landscaper", "Landscaper"],
-    ["salon", "Salon"],
-] as const;
-
-const COUNTRIES = [
-    ["uk", "UK"],
-    ["us", "US"],
-    ["canada", "Canada"],
-    ["australia", "Australia"],
-    ["uae", "UAE"],
-    ["singapore", "Singapore"],
-] as const;
-
 const GUIDES = [
-    ["how-to-write-an-invoice", "How to write an invoice"],
-    ["quote-vs-estimate", "Quote vs estimate"],
-    ["ask-client-for-payment", "How to ask a client for payment"],
-    ["payment-terms", "Net 30 and other payment terms"],
-    ["charge-a-deposit", "How to charge a deposit"],
-    ["set-your-rate", "How to set your freelance rate"],
-    ["vat-and-sales-tax-basics", "VAT and sales tax basics"],
+    [
+        "how-to-write-an-invoice",
+        "How to write an invoice",
+        "How to write an invoice: 8 steps and an example | Saroh",
+        "Put your details, your client's, the dates, the items, any tax, the total and how to pay. Plus 8 steps, an example and mistakes to avoid.",
+    ],
+    [
+        "quote-vs-estimate",
+        "Quote vs estimate",
+        "Quote vs estimate: which one to send | Saroh",
+        "A quote is a set price. An estimate is your best guess. Plus when to send each one, and an example of both.",
+    ],
+    [
+        "ask-client-for-payment",
+        "How to ask a client for payment",
+        "How to ask a client for payment: with examples | Saroh",
+        "Ask early, ask clearly and make paying easy. Plus four messages you can copy, from a friendly nudge to a final notice.",
+    ],
+    [
+        "payment-terms",
+        "Net 30 and other payment terms",
+        "Net 30 and other payment terms, explained | Saroh",
+        "Net 30 means the invoice is due 30 days after its date. Plus other common terms and how to pick yours.",
+    ],
+    [
+        "charge-a-deposit",
+        "How to charge a deposit",
+        "How to charge a deposit: what to ask and when | Saroh",
+        "Agree it in your quote, ask for it before you start and take it off the final invoice. Plus 5 steps and an example.",
+    ],
+    [
+        "set-your-rate",
+        "How to set your freelance rate",
+        "How to set your freelance rate: a simple sum | Saroh",
+        "Add the pay you need, your costs and tax, then divide by the hours you can really bill. Plus a worked example.",
+    ],
+    [
+        "vat-and-sales-tax-basics",
+        "VAT and sales tax basics",
+        "VAT and sales tax basics, in plain words | Saroh",
+        "VAT is generally charged at each step of a sale, sales tax once at the end. Plus where to find the rules for your country.",
+    ],
 ] as const;
 
-const ALTERNATIVES = [
+export const ALTERNATIVES = [
     ["invoice-simple", "Invoice Simple"],
     ["joist", "Joist"],
     ["honeybook", "HoneyBook"],
@@ -115,14 +120,17 @@ const ALTERNATIVES = [
     ["freshbooks", "FreshBooks"],
 ] as const;
 
-const legal = (slug: string, name: string): SitePage => ({
+const CONTENT_BUILT = { unreviewed: true, updated: "2026-11-02" };
+
+const legal = (slug: string, name: string, description: string): SitePage => ({
     path: `/legal/${slug}`,
     type: "legal",
     title: `${name} | Saroh`,
-    description: `${name} for Saroh, the global edition.`,
+    description,
     h1: name,
     crumb: [{ name: "Home", path: "/" }, { name }],
-    stub: true,
+    unreviewed: true,
+    updated: "2026-11-02",
 });
 
 const hub = (
@@ -139,7 +147,6 @@ const hub = (
     description,
     h1,
     crumb: [{ name: "Home", path: "/" }, { name }],
-    stub: true,
 });
 
 export const PAGES: SitePage[] = [
@@ -150,60 +157,117 @@ export const PAGES: SitePage[] = [
         description:
             "Send quotes and invoices, get paid through your own Stripe, PayPal or bank link, and give every client one page. Free plan, no card needed.",
         h1: "Quotes, invoices and one page for every client.",
-        stub: true,
+        updated: "2026-11-02",
     },
-    hub(
-        "/pricing",
-        "pricing",
-        "Pricing and plans, with 0% fees | Saroh",
-        "See Saroh's plans. Start free, no card needed. We never hold your money. Cancel any time.",
-        "We never hold your money.",
-        "Pricing",
+    {
+        ...hub(
+            "/pricing",
+            "pricing",
+            "Pricing and plans, with 0% fees | Saroh",
+            "See Saroh's plans. Start free, no card needed. We never hold your money. Cancel any time.",
+            "We never hold your money.",
+            "Pricing",
+        ),
+        unreviewed: true,
+        updated: "2026-11-02",
+    },
+    {
+        ...hub(
+            "/changelog",
+            "changelog",
+            "What's new in Saroh | Changelog",
+            "Every change to Saroh, newest first. Tagged Global or Both so you know what reached saroh.tech.",
+            "What's new",
+            "Changelog",
+        ),
+        ...CONTENT_BUILT,
+    },
+    ...CHANGELOG.map((e) => ({
+        path: changelogPath(e),
+        type: "changelog" as const,
+        title: `${e.title} (${new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(e.date))}) | Saroh changelog`,
+        description: `${e.title}: what changed in Saroh, and how to try it.`,
+        h1: e.title,
+        crumb: under("Changelog", "/changelog", e.title),
+        ...CONTENT_BUILT,
+    })),
+    {
+        ...hub(
+            "/about",
+            "about",
+            "About Saroh: let's rise together",
+            "Saroh (सारोह) means rising together. A small team building simple tools for freelancers and small businesses, with no fees on your money.",
+            "Let's rise together.",
+            "About",
+        ),
+        unreviewed: true,
+        updated: "2026-11-02",
+    },
+    {
+        ...hub(
+            "/referral",
+            "referral",
+            "Refer a friend | Saroh",
+            "Share Saroh with a friend. The rules are on this page.",
+            "Refer a friend",
+            "Referral",
+        ),
+        unreviewed: true,
+        updated: "2026-11-02",
+    },
+    {
+        ...hub(
+            "/help",
+            "help",
+            "Saroh help",
+            "Step by step answers for setting up and using Saroh.",
+            "How can we help?",
+            "Help",
+        ),
+        unreviewed: true,
+        updated: "2026-11-02",
+    },
+    ...HELP.map(({ slug, task, minutes }): SitePage => ({
+        path: `/help/${slug}`,
+        type: "help",
+        title: `${task} | Saroh help`,
+        description: `Step by step: ${task[0].toLowerCase()}${task.slice(1)}. Takes about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+        h1: task,
+        crumb: under("Help", "/help", task),
+        unreviewed: true,
+        updated: "2026-11-02",
+    })),
+    legal(
+        "terms",
+        "Terms of service",
+        "The terms for using Saroh and its free tools. We never hold or move your clients' money.",
     ),
-    hub(
-        "/changelog",
-        "changelog",
-        "What's new in Saroh | Changelog",
-        "Every change to Saroh, newest first. Tagged Global or Both so you know what reached saroh.tech.",
-        "What's new",
-        "Changelog",
+    legal(
+        "privacy",
+        "Privacy",
+        "What Saroh collects, where it is stored, and what stays in your browser.",
     ),
-    hub(
-        "/about",
-        "about",
-        "About Saroh: let's rise together",
-        "Saroh (सारोह) means rising together. A small team building simple tools for freelancers and small businesses, with no fees on your money.",
-        "Let's rise together.",
-        "About",
+    legal(
+        "cookies",
+        "Cookies",
+        "The cookies and browser storage saroh.tech uses. No analytics cookies.",
     ),
-    hub(
-        "/referral",
-        "referral",
-        "Refer a friend | Saroh",
-        "Share Saroh with a friend. The rules are on this page.",
-        "Refer a friend",
-        "Referral",
+    legal(
+        "billing",
+        "Billing and cancelling",
+        "How paying for Saroh works: prepaid plans, tax, cancelling and refunds.",
     ),
-    hub(
-        "/help",
-        "help",
-        "Saroh help",
-        "Step by step answers for setting up and using Saroh.",
-        "How can we help?",
-        "Help",
-    ),
-    legal("terms", "Terms of service"),
-    legal("privacy", "Privacy"),
-    legal("cookies", "Cookies"),
-    legal("billing", "Billing and cancelling"),
-    hub(
-        "/tools",
-        "tools-hub",
-        "Free invoice, quote and tax tools, no sign-up | Saroh",
-        "Free tools that run in your browser: invoices, quotes, receipts, reminders, late fees and tax. No account, no watermark.",
-        "Free tools for getting paid",
-        "Tools",
-    ),
+    {
+        ...hub(
+            "/tools",
+            "tools-hub",
+            "Free invoice, quote and tax tools, no sign-up | Saroh",
+            "Eight free tools that run in your browser: invoices, quotes, receipts, reminders, late fees and tax. No account, no watermark.",
+            "Free tools for getting paid",
+            "Tools",
+        ),
+        updated: "2026-11-02",
+    },
     tool(
         "invoice-generator",
         "Invoice generator",
@@ -260,74 +324,58 @@ export const PAGES: SitePage[] = [
         "Add GST to a price or take it out of a total, in your browser. No sign-up. Rates are examples you can change.",
         "GST calculator",
     ),
-    hub(
-        "/templates",
-        "templates",
-        "Free invoice and quote templates: PDF, Word, Docs, Sheets | Saroh",
-        "Free invoice, quote and receipt templates for your trade and country. Download them or fill them in online.",
-        "Free templates for every trade",
-        "Templates",
-    ),
-    ...DOCUMENTS.map(([slug, name]) => ({
-        path: `/templates/${slug}`,
-        type: "template" as const,
-        title: `${name} template, with example items | Saroh`,
-        description: `Free ${name.toLowerCase()} template with real example line items. Download as PDF, Word, Google Docs or Sheets, or fill it online.`,
-        h1: `${name} template`,
-        crumb: under("Templates", "/templates", name),
-        stub: true,
-    })),
-    ...TRADES.map(([slug, name]) => ({
-        path: `/templates/for/${slug}`,
-        type: "templates" as const,
-        title: `Free templates for ${name.toLowerCase()}s | Saroh`,
-        description: `Free invoice, quote and receipt templates for ${name.toLowerCase()}s, with real example line items.`,
-        h1: `Templates for ${name.toLowerCase()}s`,
-        crumb: under("Templates", "/templates", name),
-        stub: true,
-    })),
-    ...COUNTRIES.map(([slug, name]) => ({
-        path: `/templates/in/${slug}`,
-        type: "templates" as const,
-        title: `Free ${name} invoice and quote templates | Saroh`,
-        description: `Free invoice and quote templates for ${name}, in the local currency and format.`,
-        h1: `Templates for ${name}`,
-        crumb: under("Templates", "/templates", name),
-        stub: true,
-    })),
-    hub(
-        "/guides",
-        "guides",
-        "Guides to quotes, invoices and getting paid | Saroh",
-        "Plain answers on writing invoices and quotes, asking for payment and setting your rate.",
-        "Guides",
-        "Guides",
-    ),
-    ...GUIDES.map(([slug, name]) => ({
+    {
+        ...hub(
+            "/templates",
+            "templates",
+            "Free invoice and quote templates: PDF, Word, Docs, Sheets | Saroh",
+            "Free invoice, quote and receipt templates for your trade and country. Download them or fill them in online.",
+            "Free templates for every trade",
+            "Templates",
+        ),
+        unreviewed: true,
+        updated: "2026-11-02",
+    },
+    ...templateEntries(),
+    {
+        ...hub(
+            "/guides",
+            "guides",
+            "Guides to quotes, invoices and getting paid | Saroh",
+            "Plain answers on writing invoices and quotes, asking for payment and setting your rate.",
+            "Guides",
+            "Guides",
+        ),
+        ...CONTENT_BUILT,
+    },
+    ...GUIDES.map(([slug, name, title, description]) => ({
         path: `/guides/${slug}`,
         type: "guide" as const,
-        title: `${name} | Saroh`,
-        description: `${name}, in plain words.`,
+        title,
+        description,
         h1: name,
         crumb: under("Guides", "/guides", name),
-        stub: true,
+        ...CONTENT_BUILT,
     })),
-    hub(
-        "/compare",
-        "compare",
-        "Compare Saroh with other invoice apps | Saroh",
-        "Honest comparisons of Saroh and other invoice apps: prices, fees and client pages.",
-        "Compare Saroh",
-        "Compare",
-    ),
+    {
+        ...hub(
+            "/compare",
+            "compare",
+            "Compare Saroh with other invoice apps | Saroh",
+            "Honest comparisons of Saroh and other invoice apps: prices, fees and client pages.",
+            "Compare Saroh",
+            "Compare",
+        ),
+        ...CONTENT_BUILT,
+    },
     ...ALTERNATIVES.map(([slug, name]) => ({
         path: `/compare/${slug}-alternative`,
         type: "alternative" as const,
         title: `${name} alternative with no payment fees | Saroh`,
         description: `An honest look at Saroh and ${name}: prices, fees, client pages and where ${name} is still the better pick.`,
-        h1: `Looking for a ${name} alternative?`,
-        crumb: under("Compare", "/compare", name),
-        stub: true,
+        h1: `Looking for ${/^[aeiou]/i.test(name) ? "an" : "a"} ${name} alternative?`,
+        crumb: under("Compare", "/compare", `${name} alternative`),
+        ...CONTENT_BUILT,
     })),
 ];
 
@@ -341,7 +389,7 @@ export function pageOf(path: string): SitePage {
 }
 
 /** Only pages that are built go in the sitemap. */
-export const indexedPages = () => PAGES.filter((p) => !p.stub);
+export const indexedPages = () => PAGES.filter((p) => !p.unreviewed);
 
 /** The saroh.in page that does the same job, or null. */
 export function indiaPair(path: string): string | null {

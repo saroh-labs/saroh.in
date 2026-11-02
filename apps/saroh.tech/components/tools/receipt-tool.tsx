@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
@@ -8,9 +8,10 @@ import { Field } from "@/components/shared/field";
 import { todayIso } from "@/lib/tools/dates";
 import type { FromDetails } from "@/lib/tools/document";
 import { useDraft } from "@/lib/tools/draft-store";
+import { decodeDraft } from "@/lib/tools/handoff";
 import { CURRENCY_OPTIONS } from "@/lib/tools/money";
 import type { ReceiptDraft } from "@/lib/tools/receipt";
-import { PAID_BY, receiptView } from "@/lib/tools/receipt";
+import { applyReceiptCarry, PAID_BY, receiptView } from "@/lib/tools/receipt";
 
 import { DownloadProblem, useDownload } from "./document-actions";
 import { FROM_KEY } from "./document-editor";
@@ -47,6 +48,13 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
         NO_FROM,
         () => NO_FROM,
     );
+    // A template's example, once, then out of the address.
+    useEffect(() => {
+        const hash = location.hash;
+        if (!hash.startsWith("#carry=")) return;
+        history.replaceState(null, "", location.pathname);
+        set(applyReceiptCarry(decodeDraft(hash.slice("#carry=".length))));
+    }, [set]);
     const view = useMemo(() => receiptView(d, from), [d, from]);
     const handoff = useMemo(
         () => ({ tool: TOOL, kind: "receipt", draft: d, from }),

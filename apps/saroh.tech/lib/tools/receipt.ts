@@ -2,7 +2,7 @@ import { formatDate } from "./dates";
 import type { DocumentView, FromDetails } from "./document";
 import { fromLines } from "./document";
 import type { Currency } from "./money";
-import { formatMoney, parseNumber, toCents } from "./money";
+import { CURRENCIES, formatMoney, parseNumber, toCents } from "./money";
 
 export const PAID_BY = ["Card", "Bank transfer", "Cash", "PayPal", "Other"];
 
@@ -17,6 +17,27 @@ export interface ReceiptDraft {
     showTax: boolean;
     taxName: string;
     taxRate: string;
+}
+
+/** What a template page hands over: only known fields, as text. */
+export function applyReceiptCarry(carry: unknown): Partial<ReceiptDraft> {
+    if (!carry || typeof carry !== "object") return {};
+    const c = carry as Record<string, unknown>;
+    const patch: Partial<ReceiptDraft> = {};
+    for (const key of [
+        "number",
+        "receivedFrom",
+        "amount",
+        "paidFor",
+        "paidBy",
+    ] as const) {
+        const value = c[key];
+        if (typeof value === "string") patch[key] = value;
+    }
+    if (typeof c.currency === "string" && c.currency in CURRENCIES) {
+        patch.currency = c.currency as Currency;
+    }
+    return patch;
 }
 
 /** The tax inside an amount that already includes it. */
