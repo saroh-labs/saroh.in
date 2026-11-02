@@ -2712,5 +2712,6 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     6. **Search (owner, 2 Nov):** merchant sites on `*.saroh.app` are indexed, the bare `saroh.app` is not, and `app.saroh.tech` is noindex as `app.saroh.in` is.
     7. **Performance comes after the build (owner, 2 Nov):** the plan's 100 KB JavaScript limit on tool pages is set aside for now: standard Next, optimised later.
     8. **Until the USD catalogue exists, the plans shown are the ones the catalogue already has**, as placeholders.
-    9. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
+    9. **It presents the whole product, in saroh.in's style (owner, 2 Nov):** the same features and solutions, the same tokens and components, its own header and its own wording. It claims only what works outside India at the date of a private ledger, re-checked before launch; every feature keeps its page, marked Full, Limited or Coming soon. Words the product doesn't back, such as client quote acceptance and approvals, stay off the site (`apps/saroh.tech/scripts/check-claims.mjs`). This replaces the first build's quote and invoice positioning.
+    10. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
 - Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.

@@ -7,6 +7,10 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
-        include: ["lib/**/*.test.ts", "worker/**/*.test.ts"],
+        include: [
+            "lib/**/*.test.ts",
+            "worker/**/*.test.ts",
+            "scripts/**/*.test.ts",
+        ],
     },
 });
