@@ -1,0 +1,37 @@
+{
+    "name": "tech",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "portless tech.saroh next dev",
+        "dev:app": "next dev",
+        "build": "next build",
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "check:hreflang": "node scripts/check-hreflang.mjs",
+        "cf:preview": "wrangler dev",
+        "cf:deploy": "wrangler deploy"
+    },
+    "portless": "tech.saroh",
+    "dependencies": {
+        "@saroh/edition": "workspace:*",
+        "@saroh/ui": "workspace:*",
+        "next": "^16.4.2",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "autoprefixer": "catalog:",
+        "eslint": "catalog:",
+        "postcss": "catalog:",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "^4.1.12",
+        "wrangler": "4.148.0"
+    }
+}

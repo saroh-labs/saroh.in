@@ -1,0 +1,28 @@
+// saroh.tech: static files from `next build` (out/), behind worker/index.ts.
+// Not deployed yet: no routes until the owner says so.
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-tech-dev",
+    "main": "worker/index.ts",
+    "compatibility_date": "2026-10-01",
+    "assets": {
+        "directory": "out",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "html_handling": "auto-trailing-slash",
+        "not_found_handling": "404-page"
+    },
+    "observability": { "enabled": true },
+    "env": {
+        "production": {
+            "name": "saroh-tech",
+            "assets": {
+                "directory": "out",
+                "binding": "ASSETS",
+                "run_worker_first": true,
+                "html_handling": "auto-trailing-slash",
+                "not_found_handling": "404-page"
+            }
+        }
+    }
+}

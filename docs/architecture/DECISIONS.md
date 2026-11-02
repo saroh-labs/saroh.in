@@ -2697,3 +2697,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Not affected: merchant sites (`saroh.app`, `site-blocks`) draw their own overlays in `--site-*` tokens and use none of these components.
 - Why `sm` and not `desk` (760px): Tailwind emits `max-desk:` before `sm:`, so a caller's `sm:max-w-lg` or `sm:rounded-xl` would win between 640 and 759px and pin a half-width sheet to the left; the dialog's own phone rules (stacked footer, rounded corners) already switch at `sm`.
 - Rules: `docs/patterns/frontend-design-system.md` → "Overlays come in fixed sizes"; `packages/ui/src/components/ui/dialog.test.tsx`.
+
+## DEC-203 The global edition is its own marketing app, static, on its own catalogue
+
+**Status: Accepted — 2026-11-02** · owner ("everything will follow the same structure as we have", "we can create a new similar object/api for that, in order to make things clean")
+
+- Context: Saroh gets a global edition on saroh.tech beside the India edition on saroh.in. Its plan is private (saroh-internal); only what the code needs is here.
+- Decision:
+    1. **`apps/saroh.tech` is a separate app**, static HTML from Next's export, behind a small Worker. saroh.in stays India only. The other apps are refactored for two editions after this site is done.
+    2. **Its prices come from a USD catalogue**, a new object and API beside the existing one, read the way saroh.in reads its catalogue. Prices and the design boards are never committed.
+    3. **India is offered, never forced**: the Worker shows a bar to visitors Cloudflare places in India, and no one is redirected.
+    4. **A page out of its phase stays noindex and out of the sitemap** until it is really built.
+    5. **`packages/edition/hreflang.json`** holds the pages that do the same job on both sites. A pair must point both ways, so saroh.in's side goes in once saroh.tech is live.
+    6. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
+- Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.

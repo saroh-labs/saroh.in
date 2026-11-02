@@ -1,0 +1,12 @@
+{
+    "name": "@saroh/edition",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        "./hreflang": "./hreflang.json"
+    },
+    "files": [
+        "hreflang.json"
+    ]
+}

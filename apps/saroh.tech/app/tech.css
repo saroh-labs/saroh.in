@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The boards' colours (design system: Ink, Saffron once per screen, Paper). Light only. */
+:root {
+    color-scheme: light;
+    --st-paper: 40 29% 94%; /* #F5F2EC */
+    --st-ink: 60 4% 11%; /* #1C1C1A */
+    --st-body: 45 5% 22%; /* #3A3935 */
+    --st-quiet: 52 4% 32%; /* #55544E */
+    --st-saffron: 36 82% 47%; /* #D98A15 */
+    --st-saffron-text: 27 82% 27%; /* #7A3E0C */
+    --st-surface: 0 0% 100%;
+    /* The sticky header's height: what sticks or lands below it reads this. */
+    --st-header-h: 77px;
+}
+
+html {
+    background: hsl(var(--st-paper));
+    color: hsl(var(--st-ink));
+    scroll-padding-top: var(--st-header-h);
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+a {
+    color: inherit;
+}
+
+/* The one focus ring: 2px Ink, 2px off, on everything a keyboard can reach. */
+:focus-visible {
+    outline: 2px solid hsl(var(--st-ink));
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
