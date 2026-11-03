@@ -34,6 +34,7 @@ export interface SettingsRow {
         gstState?: string | null;
         invoicePrefix?: string | null;
         invoiceNumberFormat?: unknown;
+        yearStartMonth?: number | null;
         deliveryGstRate?: { toString(): string } | null;
         deliverySacCode?: string | null;
         gstPriceMode?: string | null;
@@ -74,6 +75,7 @@ function numberExample(
             kind: "INVOICE",
             at,
             timezone: p.timezone,
+            yearStartMonth: p.yearStartMonth,
             format: p.invoiceNumberFormat,
         });
         const { restart } = numberFormatFor(p.invoiceNumberFormat, registered);

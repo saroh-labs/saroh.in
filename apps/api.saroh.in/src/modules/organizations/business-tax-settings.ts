@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import {
     bpsToRate,
@@ -45,6 +46,11 @@ export interface TaxSettingsView {
      * the business says GST is added. Read only while it is registered.
      */
     priceMode: GstPriceMode;
+    /** A Global business's tax line (DEC-204); null until it's set. */
+    taxName: string | null;
+    taxRate: string | null;
+    /** The month its numbering year starts: April, unless it chose January. */
+    yearStartMonth: number;
     /** How invoice numbers are built, and where their counters stand. */
     invoiceNumber: InvoiceNumberView;
 }
@@ -87,6 +93,9 @@ export type TaxData = Partial<{
     deliveryGstRate: string;
     deliverySacCode: string | null;
     gstPriceMode: GstPriceMode;
+    taxName: string | null;
+    taxRate: string | null;
+    yearStartMonth: number;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -98,6 +107,9 @@ export interface TaxProfileColumns {
     invoiceNumberFormat?: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    taxName?: string | null;
+    taxRate?: { toString(): string } | null;
+    yearStartMonth?: number | null;
     /** As stored; absent on a profile read without it: INCLUDED. */
     gstPriceMode?: string | null;
     addressLine1: string | null;
@@ -205,6 +217,9 @@ export function taxView(
         deliveryRate: bpsToRate(bps),
         deliverySac: p?.deliverySacCode ?? null,
         priceMode: businessPriceMode(p?.gstPriceMode),
+        taxName: p?.taxName ?? null,
+        taxRate: p?.taxRate == null ? null : String(Number(p.taxRate)),
+        yearStartMonth: p?.yearStartMonth ?? 4,
         invoiceNumber: {
             ...format,
             custom: readNumberFormat(p?.invoiceNumberFormat) !== null,
@@ -288,7 +303,11 @@ export function touchesTax(sent: TaxSent): boolean {
  * first line, a city and a PIN (CGST rule 46), and an Indian business's
  * PIN is six digits. Its state is `gstState`, registered or not.
  */
-export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
+export function taxChanges(
+    current: TaxCurrent | null,
+    sent: TaxSent,
+    edition: Edition = "INDIA",
+): TaxData {
     const { tax } = sent;
     const addressData = reduceAddress(sent.address);
     const data: TaxData = { ...addressData };
@@ -302,6 +321,23 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
             if (!state) taxError("That is not a state we know", "gstState");
         }
         data.gstState = state;
+    }
+    // GST is India's, and a tax line is Global's (DEC-204). Neither edition
+    // stores the other's for a day it would never come.
+    if (edition === "GLOBAL") {
+        if (tax?.registered)
+            taxError("GST is for businesses in India.", "gstRegistered");
+        if (tax?.taxName !== undefined) data.taxName = tax.taxName || null;
+        if (tax?.taxRate !== undefined) data.taxRate = tax.taxRate || null;
+        if (tax?.yearStartMonth !== undefined) {
+            data.yearStartMonth = tax.yearStartMonth;
+        }
+    } else if (
+        tax?.taxName !== undefined ||
+        tax?.taxRate !== undefined ||
+        tax?.yearStartMonth !== undefined
+    ) {
+        taxError("Set by GST law for businesses in India.", "yearStartMonth");
     }
     const registered = tax?.registered ?? current?.gstRegistered ?? false;
     if (tax?.registered !== undefined) data.gstRegistered = registered;

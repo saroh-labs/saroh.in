@@ -10,6 +10,7 @@ import {
     rowActions,
     Saved,
 } from "@/components/organizations/business-settings/business-row-parts";
+import { EDITION } from "@/lib/edition";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
@@ -63,20 +64,37 @@ export function BusinessTaxRows({
                 </>
             }
         >
-            <Row
-                id={BUSINESS_ROW_ID.gst}
-                label="GST"
-                action={edit("gst", "Change", "Change GST registration")}
-            >
-                <span className="block">
-                    {registered ? "Registered" : "Not registered"}
-                </span>
-                <Follows>
-                    {registered
-                        ? "Orders and invoices are tax invoices with your GSTIN."
-                        : "Orders and invoices are receipts, with no GST on them."}
-                </Follows>
-            </Row>
+            {EDITION === "GLOBAL" ? (
+                <Row
+                    id={BUSINESS_ROW_ID.gst}
+                    label="Tax"
+                    action={edit("gst", "Change", "Change tax")}
+                >
+                    <Saved
+                        text={
+                            saved.taxName && saved.taxRate
+                                ? `${saved.taxName} ${saved.taxRate}%`
+                                : ""
+                        }
+                        empty="None on your invoices"
+                    />
+                </Row>
+            ) : (
+                <Row
+                    id={BUSINESS_ROW_ID.gst}
+                    label="GST"
+                    action={edit("gst", "Change", "Change GST registration")}
+                >
+                    <span className="block">
+                        {registered ? "Registered" : "Not registered"}
+                    </span>
+                    <Follows>
+                        {registered
+                            ? "Orders and invoices are tax invoices with your GSTIN."
+                            : "Orders and invoices are receipts, with no GST on them."}
+                    </Follows>
+                </Row>
+            )}
             <Row
                 id={BUSINESS_ROW_ID.taxId}
                 label={registered ? "GSTIN" : "Tax ID"}
@@ -110,13 +128,21 @@ export function BusinessTaxRows({
                 </Row>
             ) : null}
             <Row label="Financial year">
-                <span className="flex flex-wrap items-baseline gap-2">
-                    {/* India's financial year, which invoices are
-                        numbered by. GST law fixes it for every
-                        business, so it is said rather than offered. */}
-                    <span>April to March</span>
-                    <Locked>Set by GST law</Locked>
-                </span>
+                {EDITION === "GLOBAL" ? (
+                    <span>
+                        {saved.yearStartMonth === "1"
+                            ? "January to December"
+                            : "April to March"}
+                    </span>
+                ) : (
+                    <span className="flex flex-wrap items-baseline gap-2">
+                        {/* India's financial year, which invoices are
+                            numbered by. GST law fixes it for every
+                            business, so it is said rather than offered. */}
+                        <span>April to March</span>
+                        <Locked>Set by GST law</Locked>
+                    </span>
+                )}
             </Row>
             <Row
                 id={BUSINESS_ROW_ID.numbers}

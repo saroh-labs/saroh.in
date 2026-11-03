@@ -63,6 +63,9 @@ export async function loadTaxProfile(
             invoicePrefix: true,
             invoiceNumberFormat: true,
             timezone: true,
+            yearStartMonth: true,
+            taxName: true,
+            taxRate: true,
             deliveryGstRate: true,
             deliverySacCode: true,
             gstPriceMode: true,
@@ -87,6 +90,8 @@ export async function loadTaxProfile(
         state: p?.gstState ?? null,
         prefix: p?.invoicePrefix ?? null,
         timezone: p?.timezone ?? null,
+        yearStartMonth: p?.yearStartMonth ?? null,
+        taxLine: taxLineOf(p?.taxName, p?.taxRate),
         numberFormat: p?.invoiceNumberFormat ?? null,
         deliveryRateBps: rateToBps(p?.deliveryGstRate ?? "18") ?? 1800,
         deliverySac: p?.deliverySacCode ?? null,
@@ -130,9 +135,28 @@ export async function numberFor(
             kind,
             at,
             timezone: profile.timezone,
+            yearStartMonth: profile.yearStartMonth,
             format: profile.numberFormat,
         }),
     );
+}
+
+/**
+ * A named tax line, as a paper prints it ("VAT 20%"), from what the business
+ * set; null until it has both. Rates in percent, to two places.
+ */
+export function taxLineOf(
+    name: string | null | undefined,
+    rate: { toString(): string } | null | undefined,
+): { label: string; rateBps: number } | null {
+    const bps = rate == null ? null : rateToBps(rate);
+    if (!name?.trim() || !bps || bps <= 0) {
+        return null;
+    }
+    return {
+        label: `${name.trim()} ${Number(rate?.toString())}%`,
+        rateBps: bps,
+    };
 }
 
 /** The header columns a built document writes. */
@@ -140,6 +164,8 @@ export function documentColumns(doc: BuiltDocument) {
     return {
         subtotal: fromCents(doc.subtotalCents),
         tax: fromCents(doc.taxCents),
+        taxLabel: doc.taxLabel ?? null,
+        sellerTaxId: doc.sellerTaxId ?? null,
         total: fromCents(doc.totalCents),
         cgst: fromCents(doc.cgstCents),
         sgst: fromCents(doc.sgstCents),
@@ -650,6 +676,7 @@ export async function previewCreditNote(
             kind: "CREDIT_NOTE",
             at: new Date(),
             timezone: profile.timezone,
+            yearStartMonth: profile.yearStartMonth,
             format: profile.numberFormat,
         }),
     );

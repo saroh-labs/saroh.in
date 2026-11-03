@@ -79,7 +79,9 @@ export function SetupCountryFields() {
                                     {/* The value by hand: one set while the
                                         list is shut wouldn't otherwise show. */}
                                     <SelectValue placeholder="Choose a currency">
-                                        {field.value || undefined}
+                                        {field.value === ""
+                                            ? undefined
+                                            : field.value}
                                     </SelectValue>
                                 </SelectTrigger>
                             </FormControl>

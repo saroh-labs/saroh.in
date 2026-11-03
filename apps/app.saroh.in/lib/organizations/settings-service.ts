@@ -56,6 +56,10 @@ export interface TaxSettings {
     state: string | null;
     stateName: string | null;
     invoicePrefix: string | null;
+    /** A Global business's tax line, and when its numbering year starts. */
+    taxName?: string | null;
+    taxRate?: string | null;
+    yearStartMonth?: number;
     /** Percent, e.g. "18". */
     deliveryRate: string;
     deliverySac: string | null;
@@ -223,6 +227,9 @@ export interface TaxSettingsInput {
     registered?: boolean;
     state?: string;
     invoicePrefix?: string;
+    taxName?: string;
+    taxRate?: string;
+    yearStartMonth?: number;
     deliveryRate?: string;
     deliverySac?: string;
     /** Refused for a business that isn't GST-registered. */

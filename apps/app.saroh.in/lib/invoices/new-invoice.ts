@@ -315,6 +315,8 @@ export interface PreviewSeller {
     /** The registered address as it prints; null when not set or unread. */
     address: string | null;
     gstin: string | null;
+    /** A Global business's tax number, printed once it charges tax. */
+    taxId?: string | null;
     /** "Karnataka (29)". */
     state: string | null;
     logo: string | null;
@@ -323,6 +325,8 @@ export interface PreviewSeller {
 /** The business as New invoice needs it, read with the page. */
 export interface InvoiceFormBusiness {
     seller: PreviewSeller;
+    /** A Global business's named tax, added on top (DEC-204). */
+    taxLine?: { label: string; rate: number } | null;
     /** Its GST state code: the place of supply when the buyer's isn't set. */
     state: string | null;
     /** How its prices carry GST, for a product picked; null when unread. */

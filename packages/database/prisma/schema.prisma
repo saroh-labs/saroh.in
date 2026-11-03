@@ -559,6 +559,11 @@ model BusinessProfile {
   // `gstState` is also the state of the registered address below, registered
   // or not — one field, so the address and the GSTIN can never disagree.
   gstRegistered Boolean @default(false)
+  // A Global business's tax line (DEC-204): what it's called, its rate in
+  // percent, and the month its numbering year starts (1 or 4; null is 4).
+  taxName        String?
+  taxRate        Decimal? @db.Decimal(5, 2)
+  yearStartMonth Int?
   gstState      String?
 
   // The registered address (CGST rule 46: a tax invoice names the supplier's
@@ -7108,6 +7113,10 @@ model Invoice {
 
   currency String
   subtotal Decimal @db.Decimal(12, 2)
+  // What the tax line prints as ("VAT 20%"), frozen on the paper; null is "Tax".
+  taxLabel String?
+  // The tax number printed beside it. A GST seller's is `sellerGstin`.
+  sellerTaxId String?
   tax      Decimal @default(0) @db.Decimal(12, 2)
   total    Decimal @db.Decimal(12, 2)
 

@@ -117,6 +117,8 @@ export interface PreviewLine {
 }
 
 export interface PreviewSums {
+    /** A Global business's tax line; null where it has none. */
+    added?: { label: string; cents: number } | null;
     lines: PreviewLine[];
     /** Whether any line carries a rate: no GST rows otherwise (DEC-072). */
     taxed: boolean;
@@ -157,7 +159,12 @@ export function splitInclusive(
  */
 export function previewSums(
     values: Pick<InvoiceFormValues, "lines" | "billToGstin" | "billToState">,
-    ctx: { registered: boolean; businessState: string | null },
+    ctx: {
+        registered: boolean;
+        businessState: string | null;
+        /** A Global business's named tax (DEC-204), added on top. */
+        taxLine?: { label: string; rate: number } | null;
+    },
 ): PreviewSums {
     const lines: PreviewLine[] = values.lines.flatMap((l, index) => {
         if (!isGoodLine(l)) return [];
@@ -191,12 +198,21 @@ export function previewSums(
         sums.igstCents += split.igst;
         sums.totalCents += l.amountCents;
     }
+    // As the API works it out: a rounded share of the lines, added on top.
+    const added = ctx.taxLine
+        ? {
+              label: ctx.taxLine.label,
+              cents: Math.round((sums.totalCents * ctx.taxLine.rate) / 100),
+          }
+        : null;
+    if (added) sums.totalCents += added.cents;
     const rated = lines.filter((l) => l.rate !== null);
     const rates = new Set(
         rated.filter((l) => bps(l.rate) > 0).map((l) => l.rate),
     );
     return {
         lines,
+        added,
         taxed: rated.length > 0,
         inter,
         ...sums,

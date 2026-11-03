@@ -10,6 +10,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { productEditHref } from "@/lib/products/links";
+import { MRP_LABEL } from "@/lib/products/mrp-label";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { optionNoun } from "@/lib/products/overview-words";
 import type { SheetSize, SheetValues } from "@/lib/products/stock-sheet";
@@ -326,7 +327,7 @@ export function StockSheet({
                             }
                         />
                     </Field>
-                    <Field label="MRP" optional>
+                    <Field label={MRP_LABEL} optional>
                         <MoneyInput
                             currency={product.currency}
                             value={draft.mrp}
@@ -337,7 +338,7 @@ export function StockSheet({
                     </Field>
                 </div>
             ) : may.canWrite ? (
-                <Field label="MRP" optional className="mt-4 max-w-[50%]">
+                <Field label={MRP_LABEL} optional className="mt-4 max-w-[50%]">
                     <MoneyInput
                         currency={product.currency}
                         value={draft.mrp}

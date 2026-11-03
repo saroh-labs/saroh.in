@@ -1,3 +1,4 @@
+import { EDITION } from "@/lib/edition";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { PRICE_MODE_ROW, PRICE_MODE_SAVED } from "@/lib/gst/price-mode";
 
@@ -82,6 +83,13 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
                 description: `Where ${words.people} can find you. Your website shows the ones you add.`,
             };
         case "gst":
+            if (EDITION === "GLOBAL") {
+                return {
+                    title: "Tax",
+                    description:
+                        "What your invoices call your tax, its rate, and your numbering year.",
+                };
+            }
             return {
                 title: "GST registration",
                 description: "Whether your invoices are tax invoices.",

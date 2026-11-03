@@ -456,7 +456,7 @@ export function paperView(
         : typedTax
           ? [
                 ["Subtotal", money(i.subtotal)],
-                ["Tax", money(i.tax)],
+                [i.taxLabel ?? "Tax", money(i.tax)],
             ]
           : [];
 
@@ -477,7 +477,12 @@ export function paperView(
             ),
             tax: gst
                 ? `GSTIN ${gst.sellerGstin}${sellerState ? ` · ${sellerState}` : ""}`
-                : "Not registered for GST",
+                : i.sellerTaxId
+                  ? `Tax ID ${i.sellerTaxId}`
+                  : // GST is only ever about rupees (DEC-204).
+                    i.currency === "INR"
+                    ? "Not registered for GST"
+                    : "",
         },
         billedTo: {
             name: who.name,

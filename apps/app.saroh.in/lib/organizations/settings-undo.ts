@@ -54,10 +54,15 @@ export interface SettingsUndo {
 
 type TaxKey = keyof TaxSettingsInput;
 
-const TAX_READ: Record<Exclude<TaxKey, "invoiceNumber">, TaxField> = {
+const TAX_READ: Record<
+    Exclude<TaxKey, "invoiceNumber" | "yearStartMonth">,
+    TaxField
+> = {
     registered: "registered",
     state: "state",
     invoicePrefix: "invoicePrefix",
+    taxName: "taxName",
+    taxRate: "taxRate",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
     priceMode: "priceMode",
@@ -66,6 +71,8 @@ type TaxField =
     | "registered"
     | "state"
     | "invoicePrefix"
+    | "taxName"
+    | "taxRate"
     | "deliveryRate"
     | "deliverySac"
     | "priceMode";
@@ -103,7 +110,9 @@ export function touchedFields(
         out[`tax.${key}`] =
             key === "invoiceNumber"
                 ? chosenFormat(settings)
-                : (settings.tax?.[TAX_READ[key]] ?? null);
+                : key === "yearStartMonth"
+                  ? (settings.tax?.yearStartMonth ?? null)
+                  : (settings.tax?.[TAX_READ[key]] ?? null);
     }
     for (const key of keysOf(sent.registeredAddress)) {
         out[`registeredAddress.${key}`] =
@@ -155,6 +164,8 @@ export function settingsUndo(
             if (key === "registered") back.registered = tax.registered;
             else if (key === "invoiceNumber") {
                 back.invoiceNumber = chosenFormat(before) ?? undefined;
+            } else if (key === "yearStartMonth") {
+                back.yearStartMonth = tax.yearStartMonth;
             } else if (key === "priceMode") {
                 // An older read sent none: prices included GST.
                 back.priceMode = businessModeOf(tax.priceMode);

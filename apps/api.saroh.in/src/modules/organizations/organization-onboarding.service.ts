@@ -199,6 +199,7 @@ export class OrganizationOnboardingService {
                 data: {
                     organizationId: organization.id,
                     ...this.buildProfileData(dto),
+                    ...(edition === "GLOBAL" ? { yearStartMonth: 1 } : {}),
                     timezone: startingZone(
                         dto.profile?.timezone,
                         dto.profile?.country,
