@@ -75,6 +75,9 @@ const table = (canPublish: boolean) =>
         />,
     );
 
+// Whole tables with their menus: over 5s beside a full gate and on CI.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("SearchPagesTable (DEC-193)", () => {
     it("groups the rows by section, A to Z by name, and folds a group", () => {
         const tool = (slug: string, name: string, family: string): PageRow => ({
@@ -523,8 +526,7 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
             .closest('[role="menuitem"]');
         expect(item?.getAttribute("aria-disabled")).toBeNull();
         expect(item?.textContent).toBe("Publish on saroh.in");
-        // A whole table with its menus: over 5s beside a full gate.
-    }, 30_000);
+    });
 
     it("shows Held by checks while live, and says why", () => {
         render(

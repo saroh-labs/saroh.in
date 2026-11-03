@@ -6363,6 +6363,6 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 
 **Symptom**: 2 Nov, saroh.tech's template gate test passed alone and hit Vitest's 5s limit during `prepush --all`.
 **Cause**: it audits all pages at once, which took over 6s with the integration and browser runs on the same machine.
-**Fix**: that test has its own 30s limit.
-**Rule**: a test that walks all of a site's content sets its own timeout. A pass alone says little about the same test under the gate's load.
+**Fix**: that test has its own 30s limit. Admin's search pages table hit the same limit on two different tests, on the gate and on CI, so that file sets 30s for all of its tests.
+**Rule**: a test that walks all of a site's content, or draws a whole table with its menus, sets its own timeout, per file when it's more than one test. A pass alone says little about the same test under the gate's load.
 **Category**: testing · timeouts
