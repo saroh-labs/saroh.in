@@ -131,6 +131,11 @@ export function BusinessTaxRows({
                 label={
                     EDITION === "GLOBAL" ? "Numbering year" : "Financial year"
                 }
+                action={
+                    EDITION === "GLOBAL"
+                        ? edit("gst", "Change", "Change numbering year")
+                        : undefined
+                }
             >
                 {EDITION === "GLOBAL" ? (
                     <span>
