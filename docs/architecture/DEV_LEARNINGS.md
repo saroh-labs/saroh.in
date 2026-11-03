@@ -6366,3 +6366,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: that test has its own 30s limit. Admin's search pages table hit the same limit on two different tests, on the gate and on CI, so that file sets 30s for all of its tests.
 **Rule**: a test that walks all of a site's content, or draws a whole table with its menus, sets its own timeout, per file when it's more than one test. A pass alone says little about the same test under the gate's load.
 **Category**: testing · timeouts
+
+---
+
+## A shared builder's new behaviour reached every caller
+
+**Symptom**: 3 Nov, code review found a Global desk payment of 100 writing an invoice total of 120, against a payment of 100. Tests and the full gate were green, and the change had been described as affecting manual invoices only.
+**Cause**: the tax line was put on the profile that `buildManualInvoice` reads, and six other callers (bookings, plans, packs, renewals) share that builder and profile.
+**Fix**: the tax line is now an argument only the manual invoice path passes, with a test that a caller without it adds nothing.
+**Rule**: before changing a shared function's behaviour, grep every caller. New behaviour for one caller is an explicit argument, not something read from shared data.
+**Category**: backend · invoices

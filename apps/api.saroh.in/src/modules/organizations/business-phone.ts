@@ -58,6 +58,13 @@ export function phoneWrite(
     phone?: string | null;
 } {
     if (raw === undefined) return {};
+    // Without a +, the shared rule reads ten digits as Indian (DEC-204).
+    if (edition !== "INDIA" && raw.trim() && !raw.trim().startsWith("+")) {
+        throw new BadRequestException({
+            message: "Start with + and your country code.",
+            details: { field: "phone" },
+        });
+    }
     const result =
         edition === "INDIA"
             ? normaliseIndianPhone(raw)

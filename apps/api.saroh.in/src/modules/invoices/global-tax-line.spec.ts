@@ -41,13 +41,10 @@ describe("a Global business's tax line", () => {
     it("is added on top of the lines, and frozen on the paper", () => {
         const doc = buildManualInvoice(
             lines,
-            {
-                ...profile,
-                gstin: "GB123456789",
-                taxLine: { label: "VAT 20%", rateBps: 2000 },
-            },
+            { ...profile, gstin: "GB123456789" },
             null,
             999,
+            { label: "VAT 20%", rateBps: 2000 },
         );
         expect(doc.subtotalCents).toBe(20_000);
         expect(doc.taxCents).toBe(4000);
@@ -55,6 +52,23 @@ describe("a Global business's tax line", () => {
         expect(doc.taxLabel).toBe("VAT 20%");
         expect(doc.sellerGstin).toBeNull();
         expect(doc.sellerTaxId).toBe("GB123456789");
+    });
+
+    it("isn't added for callers recording money already agreed", () => {
+        const doc = buildManualInvoice(
+            lines,
+            {
+                ...profile,
+                gstin: "GB123456789",
+                taxLine: { label: "VAT 20%", rateBps: 2000 },
+            },
+            null,
+            0,
+        );
+        expect(doc.taxCents).toBe(0);
+        expect(doc.totalCents).toBe(20_000);
+        expect(doc.taxLabel).toBeNull();
+        expect(doc.sellerTaxId).toBeNull();
     });
 
     it("leaves a typed tax alone without one, as India's receipts have it", () => {

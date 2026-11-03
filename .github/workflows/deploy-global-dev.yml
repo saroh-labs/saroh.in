@@ -38,8 +38,9 @@ jobs:
             - uses: ./.github/actions/setup
               with:
                   prisma: "false"
-                  turbo-cache: cf-global-${{ matrix.dir }}
-                  next-cache: "true"
+                  # No caches: a pull request can restore them, and the build
+                  # holds the domain.
+                  next-cache: "false"
 
             - name: Global's settings and the access key
               env:
@@ -47,7 +48,7 @@ jobs:
               run: |
                   set -euo pipefail
                   [ -n "$GLOBAL_DEV_DOMAIN" ] || { echo "::error::GLOBAL_DEV_DOMAIN is missing"; exit 1; }
-                  [ -n "$DEV_ACCESS_KEY" ] || { echo "::error::DEV_ACCESS_KEY is missing: the app would be open to anyone"; exit 1; }
+                  [ -n "$(echo "$DEV_ACCESS_KEY" | tr -d '[:space:]')" ] || { echo "::error::DEV_ACCESS_KEY is missing: the app would be open to anyone"; exit 1; }
                   node scripts/cf-global-dev.mjs "${{ matrix.dir }}"
                   node scripts/cf-env.mjs "${{ matrix.dir }}" development >> "$GITHUB_ENV"
                   echo "DEV_ACCESS_KEY=$DEV_ACCESS_KEY" >> "$GITHUB_ENV"
@@ -71,4 +72,5 @@ jobs:
 
             - name: Deploy
               working-directory: ${{ matrix.dir }}
-              run: pnpm cf:deploy
+              # Its output cuts values short, past what GitHub's mask can match.
+              run: pnpm cf:deploy > /dev/null

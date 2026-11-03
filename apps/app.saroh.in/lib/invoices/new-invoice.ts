@@ -298,6 +298,7 @@ export function nextNumberOf(
         samePrefix: true,
         now,
         timezone,
+        yearStartMonth: tax.yearStartMonth,
     });
 }
 

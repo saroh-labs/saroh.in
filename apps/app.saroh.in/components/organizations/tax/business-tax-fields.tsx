@@ -202,6 +202,7 @@ export function BusinessTaxFields({
                         )}
                     />
                     <InvoiceNumberFields
+                        yearStartMonth={Number(v.yearStartMonth)}
                         format={formatOf(v)}
                         prefix={prefixOf(v.invoicePrefix)}
                         registered={registered}

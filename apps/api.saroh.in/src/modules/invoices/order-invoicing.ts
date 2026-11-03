@@ -389,6 +389,8 @@ const ORIGINAL_SELECT = {
     orderId: true,
     currency: true,
     status: true,
+    taxLabel: true,
+    sellerTaxId: true,
     sellerGstin: true,
     sellerState: true,
     sellerAddress: true,

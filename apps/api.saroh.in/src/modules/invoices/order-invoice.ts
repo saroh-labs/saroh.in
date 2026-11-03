@@ -356,6 +356,8 @@ export interface IssuedLine {
 
 /** What a correction is against: the original's GST standing and lines. */
 export interface Original extends SellerParticulars {
+    taxLabel?: string | null;
+    sellerTaxId?: string | null;
     sellerGstin: string | null;
     sellerState: string | null;
     sellerAddress: string | null;
@@ -372,6 +374,8 @@ export interface Original extends SellerParticulars {
 
 function gstOf(original: Original) {
     return {
+        taxLabel: original.taxLabel ?? null,
+        sellerTaxId: original.sellerTaxId ?? null,
         placeOfSupply: original.placeOfSupply,
         taxType: (original.taxType as TaxType | null) ?? null,
         sellerGstin: original.sellerGstin,
@@ -609,15 +613,20 @@ export function buildManualInvoice(
     }[],
     profile: Pick<
         TaxProfile,
-        "registered" | "gstin" | "state" | "address" | "seller" | "taxLine"
+        "registered" | "gstin" | "state" | "address" | "seller"
     >,
     billToState: string | null,
     typedTaxCents: number,
+    /**
+     * A Global business's named tax (DEC-204). Only a manual invoice passes it:
+     * every other caller records money already agreed or paid, and adding to
+     * it would leave the paper disagreeing with what was charged.
+     */
+    taxLine: TaxProfile["taxLine"] = null,
 ): BuiltDocument {
     if (!profile.registered) {
         const taxed = taxLines(lines, { registered: false, taxType: "INTRA" });
         // A named rate decides the tax; a typed one stands only without it.
-        const taxLine = profile.taxLine ?? null;
         const taxCents = taxLine
             ? Math.round(
                   (taxed.lines.reduce((n, l) => n + l.amountCents, 0) *

@@ -354,6 +354,7 @@ export function nextNumberOf(
 ): string {
     return nextInvoiceNumber(formatOf(x), {
         prefix: prefixOf(x.invoicePrefix),
+        yearStartMonth: Number(x.yearStartMonth),
         last: settings.tax?.invoiceNumber?.counters,
         samePrefix:
             prefixOf(x.invoicePrefix) ===

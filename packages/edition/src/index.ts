@@ -23,7 +23,9 @@ export interface EditionHosts {
  * this public repo. Unset, they're a name that can't resolve.
  */
 const globalDevelopmentHosts = (): EditionHosts => {
-    const domain = process.env.GLOBAL_DEV_DOMAIN ?? "global-dev.invalid";
+    const domain = process.env.GLOBAL_DEV_DOMAIN?.trim()
+        ? process.env.GLOBAL_DEV_DOMAIN.trim()
+        : "global-dev.invalid";
     return {
         site: domain,
         app: `app.${domain}`,
@@ -102,6 +104,7 @@ export function editionForCountry(country: string): Edition {
  */
 export function editionOfHost(host: string): Edition | null {
     const name = host.trim().toLowerCase().replace(/:\d+$/, "");
+    if (!name) return null;
     for (const edition of EDITIONS) {
         for (const environment of ["production", "development"] as const) {
             const hosts = hostsFor(edition, environment);
