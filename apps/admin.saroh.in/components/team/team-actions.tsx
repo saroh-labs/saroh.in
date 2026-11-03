@@ -2,8 +2,13 @@
 
 import { DateInput, isoFromDate } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
+import { useState } from "react";
+
+import type { Edition } from "@saroh/edition";
+import { EDITIONS } from "@saroh/edition";
 
 import type { AdminRole } from "@/lib/control-plane";
+import { EDITION_LABEL } from "@/lib/edition";
 import { formatDate } from "@/lib/format";
 import { ROLE_LABEL, ROLE_PURPOSE } from "@/lib/roles";
 import type { StaffInvite, StaffMember } from "@/lib/staff";
@@ -13,6 +18,7 @@ import {
     revokeStaffAction,
     withdrawInviteAction,
 } from "@/lib/team-actions";
+import { grantEditions } from "@/lib/team-words";
 
 import { OperatorDialog } from "../operator-dialog";
 
@@ -78,6 +84,69 @@ export function RolePicker({
     );
 }
 
+/**
+ * Which consoles someone may open. A Platform owner opens every one, so that
+ * role shows "All" and sends nothing. Uncontrolled with `selected` (Change);
+ * controlled with `value` and `onChange` (Add a teammate).
+ */
+export function EditionPicker({
+    roles,
+    selected = [],
+    value,
+    onChange,
+}: {
+    roles: AdminRole[];
+    selected?: Edition[];
+    value?: Edition[];
+    onChange?: (editions: Edition[]) => void;
+}) {
+    if (roles.includes("PLATFORM_OWNER")) {
+        return (
+            <div className="grid gap-1">
+                <p className="text-sm font-medium">Editions</p>
+                <p className="text-[13px] text-muted-foreground">
+                    All. A Platform owner opens every console.
+                </p>
+            </div>
+        );
+    }
+    const controlled = value !== undefined;
+    return (
+        <fieldset className="grid gap-2">
+            <legend className="mb-1 text-sm font-medium">Editions</legend>
+            {EDITIONS.map((edition) => (
+                <label
+                    key={edition}
+                    className="flex items-start gap-2.5 text-sm coarse:min-h-11"
+                >
+                    <input
+                        type="checkbox"
+                        name="editions"
+                        value={edition}
+                        {...(controlled
+                            ? {
+                                  checked: value.includes(edition),
+                                  onChange: (e) =>
+                                      onChange?.(
+                                          e.target.checked
+                                              ? [...value, edition]
+                                              : value.filter(
+                                                    (it) => it !== edition,
+                                                ),
+                                      ),
+                              }
+                            : { defaultChecked: selected.includes(edition) })}
+                        className="mt-0.5 size-4 accent-foreground"
+                    />
+                    <span className="font-medium">
+                        {EDITION_LABEL[edition]}
+                    </span>
+                </label>
+            ))}
+        </fieldset>
+    );
+}
+
 /** Today, as the date picker writes it. */
 export function todayIsoLocal(): string {
     return isoFromDate(new Date());
@@ -110,37 +179,53 @@ export function endOfDay(value: string | undefined): string | undefined {
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function rolesFrom(form: FormData): string[] {
+function ticked(form: FormData, name: string): string[] {
     return form
-        .getAll("roles")
+        .getAll(name)
         .filter((value): value is string => typeof value === "string");
 }
 
-export function AmendStaff({ member }: { member: StaffMember }) {
+/** Change's fields. Mounted with the dialog, so each opening starts from what they hold. */
+function AccessFields({ member }: { member: StaffMember }) {
+    const [roles, setRoles] = useState(() =>
+        member.roles.map((role) => role.role),
+    );
     const expiry = member.roles.find((role) => role.expiresAt)?.expiresAt;
+    return (
+        <>
+            <RolePicker value={roles} onChange={setRoles} />
+            <EditionPicker roles={roles} selected={grantEditions(member)} />
+            <ExpiryField defaultValue={expiry?.slice(0, 10)} />
+        </>
+    );
+}
+
+export function AmendStaff({ member }: { member: StaffMember }) {
     return (
         <OperatorDialog
             trigger="Change"
             triggerVariant="ghost"
             title={`Change ${member.name ?? member.email}'s access`}
             effect="Roles you untick end now; roles you tick start now. The last Platform Owner cannot be removed or given an end date."
-            fields={
-                <>
-                    <RolePicker
-                        selected={member.roles.map((role) => role.role)}
-                    />
-                    <ExpiryField defaultValue={expiry?.slice(0, 10)} />
-                </>
-            }
+            fields={<AccessFields member={member} />}
             submitLabel="Save access"
-            onSubmit={({ reason, idempotencyKey, values, form }) =>
-                amendStaffAction(member.platformAdminId, {
-                    roles: rolesFrom(form),
+            onSubmit={async ({ reason, idempotencyKey, values, form }) => {
+                const roles = ticked(form, "roles");
+                const editions = ticked(form, "editions");
+                if (
+                    !roles.includes("PLATFORM_OWNER") &&
+                    editions.length === 0
+                ) {
+                    return { ok: false, error: "Tick at least one edition." };
+                }
+                return amendStaffAction(member.platformAdminId, {
+                    roles,
                     reason,
                     expiresAt: endOfDay(values.expiresOn),
+                    ...(editions.length > 0 ? { editions } : {}),
                     idempotencyKey,
-                })
-            }
+                });
+            }}
         />
     );
 }

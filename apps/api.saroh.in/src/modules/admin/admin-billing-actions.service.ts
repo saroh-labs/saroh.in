@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
@@ -8,6 +9,7 @@ import type { ActionState, EventFilter } from "./admin-billing-controls.dto";
 import { assertSarohBillingActor } from "./admin-billing-controls.service";
 import { searchedOrganizationIds } from "./admin-billing-search";
 import { assertSarohBillingReader } from "./admin-billing.service";
+import { byBusinessIds, viaBusinessOrNone } from "./admin-edition";
 import { requireReason } from "./admin-lifecycle.service";
 import { AdminPermission } from "./admin-permissions";
 
@@ -91,11 +93,14 @@ export class AdminBillingActionsService {
     async list(
         staff: PlatformAdminInfo,
         query: { state?: ActionState; q?: string; page?: number },
+        edition: Edition | null = null,
     ): Promise<AdminBillingActionPage> {
         assertSarohBillingReader(staff);
         const resolved = query.state === "resolved";
-        const searched = await searchedOrganizationIds(query.q);
+        const searched = await searchedOrganizationIds(query.q, edition);
+        const inEdition = await byBusinessIds(edition);
         const where: Prisma.BillingActionWhereInput = {
+            ...inEdition,
             ...(resolved
                 ? { resolvedAt: { not: null } }
                 : { resolvedAt: null }),
@@ -112,9 +117,15 @@ export class AdminBillingActionsService {
                 take: ACTIONS_PAGE_SIZE,
             }),
             prisma.billingAction.count({ where }),
-            prisma.billingAction.count({ where: { resolvedAt: null } }),
+            prisma.billingAction.count({
+                where: { resolvedAt: null, ...inEdition },
+            }),
             prisma.job.findMany({
-                where: { type: { startsWith: "billing." }, status: "FAILED" },
+                where: {
+                    type: { startsWith: "billing." },
+                    status: "FAILED",
+                    ...viaBusinessOrNone(edition),
+                },
                 orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
                 take: FAILED_BILLING_JOBS,
                 select: {
@@ -214,12 +225,14 @@ export class AdminBillingActionsService {
     async events(
         staff: PlatformAdminInfo,
         query: { filter?: EventFilter; q?: string; page?: number },
+        edition: Edition | null = null,
     ): Promise<ProviderEventPage> {
         assertSarohBillingReader(staff);
         const q = query.q?.trim();
-        const searched = await searchedOrganizationIds(q);
+        const searched = await searchedOrganizationIds(q, edition);
         const where: Prisma.BillingWebhookEventWhereInput = {
             AND: [
+                await byBusinessIds(edition),
                 query.filter === "not-applied"
                     ? { processedAt: null }
                     : query.filter === "no-business"

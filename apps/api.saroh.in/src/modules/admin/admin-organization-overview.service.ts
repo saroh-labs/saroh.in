@@ -157,6 +157,9 @@ export interface OverviewBadges {
  */
 export interface OrganizationOverview {
     organizationId: string;
+    /** Its edition (DEC-204) and currency; null before it chose one. */
+    edition: string;
+    currency: string | null;
     plan: Panel<OverviewPlan>;
     /**
      * Null: the caller may not see who pays. `name` null: no billing
@@ -195,6 +198,8 @@ export class AdminOrganizationOverviewService {
             where: { id: organizationId },
             select: {
                 id: true,
+                edition: true,
+                currency: true,
                 billingProfile: caller.canReadBilling
                     ? { select: { legalName: true } }
                     : false,
@@ -240,6 +245,8 @@ export class AdminOrganizationOverviewService {
 
         return {
             organizationId,
+            edition: org.edition,
+            currency: org.currency,
             plan,
             billedTo: caller.canReadBilling
                 ? { name: org.billingProfile?.legalName ?? null }

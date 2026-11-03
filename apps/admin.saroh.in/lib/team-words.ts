@@ -1,4 +1,7 @@
+import type { Edition } from "@saroh/edition";
+
 import type { AdminPermission, AdminRole } from "./control-plane";
+import { EDITION_LABEL } from "./edition";
 
 /**
  * The Team screen in words (DEC-169, admin console U17). Client-safe: the
@@ -173,4 +176,20 @@ export function teamTabOf(pathname: string): TeamTab {
     if (rest === "roles") return "roles";
     if (rest === "payouts") return "payouts";
     return "teammates";
+}
+
+/** The consoles on a grant; every grant was India's before there were two. */
+export function grantEditions(person: { editions?: Edition[] }): Edition[] {
+    return person.editions ?? ["INDIA"];
+}
+
+/** A teammate's editions in words. A Platform owner opens every console. */
+export function editionsWords(
+    roles: readonly AdminRole[],
+    editions: Edition[] | undefined,
+): string {
+    if (roles.includes("PLATFORM_OWNER")) return "All";
+    return grantEditions({ editions })
+        .map((edition) => EDITION_LABEL[edition])
+        .join(", ");
 }

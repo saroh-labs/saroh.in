@@ -205,7 +205,7 @@ export function TeamPeople({
 }
 
 const COLUMNS =
-    "md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.1fr)_11rem] md:items-start md:gap-4";
+    "md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.1fr)_11rem] md:items-start md:gap-4";
 
 /**
  * The table layout: a header and one row per person on a wide screen; on
@@ -229,6 +229,7 @@ export function PeopleTable({
                 <span>Person</span>
                 <span>Works as</span>
                 <span>Console role</span>
+                <span>Editions</span>
                 <span>Since</span>
                 <span>Businesses</span>
                 <span className="sr-only">Actions</span>
@@ -268,6 +269,7 @@ export function PeopleTable({
                                     ? facts.roles.map((r) => r.text).join(", ")
                                     : "None"}
                             </Cell>
+                            <Cell label="Editions">{facts.editions}</Cell>
                             <Cell label="Since">
                                 <span className="grid gap-0.5">
                                     <span>{facts.since}</span>

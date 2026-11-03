@@ -1,3 +1,4 @@
+import { siteUrlOf } from "@saroh/edition";
 import { PageContainer } from "@saroh/ui/page-container";
 import { Suspense } from "react";
 
@@ -10,6 +11,7 @@ import { PlansSkeleton } from "@/components/plans/plans-skeleton";
 import { env } from "@/env";
 import { can, requireStaff } from "@/lib/console";
 import type { StaffIdentity } from "@/lib/control-plane";
+import { EDITION } from "@/lib/edition";
 import { getPricing, getPricingImpact, listCoupons } from "@/lib/pricing";
 import type { PlansTab } from "@/lib/pricing-draft";
 import { tabFrom } from "@/lib/pricing-draft";
@@ -90,7 +92,7 @@ async function PlansLoaded({
     const siteUrl = (
         env.MARKETING_SITE_URL ??
         instance?.apps.find((app) => app.key === "website")?.href ??
-        "https://www.saroh.in"
+        siteUrlOf(EDITION)
     ).replace(/\/+$/, "");
 
     return (

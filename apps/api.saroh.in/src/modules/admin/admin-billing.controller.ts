@@ -1,4 +1,5 @@
 import { Get, Header, Param, Query, StreamableFile } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -12,6 +13,7 @@ import {
     SubscriptionHistoryDto,
 } from "./admin-billing.dto";
 import { AdminBillingService } from "./admin-billing.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 
@@ -38,8 +40,11 @@ export class AdminBillingController {
      */
     @Get("billing/counts")
     @RequireAdminPermission(AdminPermission.SarohBillingRead)
-    counts(@PlatformAdminContext() staff: PlatformAdminInfo) {
-        return this.billing.counts(staff);
+    counts(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.billing.counts(staff, edition);
     }
 
     @Get("billing/invoices")
@@ -47,8 +52,9 @@ export class AdminBillingController {
     async listInvoices(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListSarohInvoicesDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const page = await this.billing.listInvoices(staff, query);
+        const page = await this.billing.listInvoices(staff, query, edition);
         await this.read(staff, "billing.invoices.list", "saroh_invoice", {
             metadata: { ...filters(query), resultCount: page.items.length },
         });
@@ -62,10 +68,12 @@ export class AdminBillingController {
     async exportInvoices(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ExportSarohInvoicesDto,
+        @ServedEdition() edition: Edition | null,
     ): Promise<StreamableFile> {
         const { csv, fileName, count } = await this.billing.exportInvoices(
             staff,
             query,
+            edition,
         );
         await this.read(staff, "billing.invoices.export", "saroh_invoice", {
             metadata: { ...filters(query), resultCount: count },
@@ -88,10 +96,12 @@ export class AdminBillingController {
     async exportAttribution(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ExportAttributionDto,
+        @ServedEdition() edition: Edition | null,
     ): Promise<StreamableFile> {
         const { csv, fileName, count } = await this.billing.exportAttribution(
             staff,
             query,
+            edition,
         );
         await this.read(
             staff,
@@ -132,8 +142,13 @@ export class AdminBillingController {
     async listSubscriptions(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListSarohSubscriptionsDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const page = await this.billing.listSubscriptions(staff, query);
+        const page = await this.billing.listSubscriptions(
+            staff,
+            query,
+            edition,
+        );
         await this.read(staff, "billing.subscriptions.list", "subscription", {
             metadata: { ...filters(query), resultCount: page.items.length },
         });

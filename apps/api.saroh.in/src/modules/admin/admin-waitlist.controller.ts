@@ -1,13 +1,18 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminOperationsService } from "./admin-operations.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
-import { AdminWaitlistService } from "./admin-waitlist.service";
+import {
+    AdminWaitlistService,
+    assertWaitlistInEdition,
+} from "./admin-waitlist.service";
 import {
     DeleteWaitlistDto,
     ListWaitlistDto,
@@ -35,14 +40,17 @@ export class AdminWaitlistController {
 
     @Get("waitlist/summary")
     @RequireAdminPermission(AdminPermission.WaitlistRead)
-    waitlistSummary() {
-        return this.waitlist.summary();
+    waitlistSummary(@ServedEdition() edition: Edition | null) {
+        return this.waitlist.summary(edition);
     }
 
     @Get("waitlist")
     @RequireAdminPermission(AdminPermission.WaitlistRead)
-    listWaitlist(@Query() query: ListWaitlistDto) {
-        return this.waitlist.list(query);
+    listWaitlist(
+        @Query() query: ListWaitlistDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.waitlist.list(query, edition);
     }
 
     /** What inviting these entries would do, changing nothing. */
@@ -51,7 +59,11 @@ export class AdminWaitlistController {
         AdminPermission.WaitlistRead,
         AdminPermission.WaitlistInvite,
     )
-    planInvite(@Body() dto: OperationTargetsDto) {
+    async planInvite(
+        @Body() dto: OperationTargetsDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        await assertWaitlistInEdition(dto.ids, edition);
         return this.operations.plan("waitlist.invite", dto.ids);
     }
 
@@ -61,10 +73,12 @@ export class AdminWaitlistController {
         AdminPermission.WaitlistRead,
         AdminPermission.WaitlistInvite,
     )
-    invite(
+    async invite(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Body() dto: StartOperationDto,
+        @ServedEdition() edition: Edition | null,
     ) {
+        await assertWaitlistInEdition(dto.ids, edition);
         return this.operations.start({
             staff,
             kind: "waitlist.invite",
@@ -84,6 +98,7 @@ export class AdminWaitlistController {
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("id") id: string,
         @Body() dto: DeleteWaitlistDto,
+        @ServedEdition() edition: Edition | null,
     ) {
         return this.idempotency.run(
             {
@@ -92,7 +107,7 @@ export class AdminWaitlistController {
                 actorUserId: staff.userId,
             },
             { id, reason: dto.reason },
-            () => this.waitlist.remove(staff, id, dto.reason),
+            () => this.waitlist.remove(staff, id, dto.reason, edition),
         );
     }
 }

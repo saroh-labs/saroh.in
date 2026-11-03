@@ -16,8 +16,14 @@ interface EditionRequest {
 async function editionBehindPath(
     params: Record<string, string | undefined>,
 ): Promise<string | null | undefined> {
-    const { organizationId, invoiceId, subscriptionId, actionId, domainId } =
-        params;
+    const {
+        organizationId,
+        invoiceId,
+        subscriptionId,
+        actionId,
+        domainId,
+        leadId,
+    } = params;
     const edition = { select: { edition: true } } as const;
     if (organizationId) {
         const row = await prisma.organization.findUnique({
@@ -47,6 +53,14 @@ async function editionBehindPath(
         });
         return row?.organization.edition;
     }
+    // A lead has its own edition, and belongs to no business.
+    if (leadId) {
+        const row = await prisma.sarohLead.findUnique({
+            where: { id: leadId },
+            select: { edition: true },
+        });
+        return row?.edition;
+    }
     if (actionId) {
         const action = await prisma.billingAction.findUnique({
             where: { id: actionId },
@@ -71,14 +85,14 @@ async function editionBehindPath(
 export class AdminEditionGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<EditionRequest>();
-        const served = request.platformAdmin?.edition;
+        const served = request.platformAdmin.edition;
         if (!served || !request.params) return true;
         const params = request.params;
         const edition = await outsideOrgContext(() =>
             editionBehindPath(params),
         );
         if (edition && edition !== served) {
-            throw new NotFoundException("Business not found");
+            throw new NotFoundException("Not found");
         }
         return true;
     }

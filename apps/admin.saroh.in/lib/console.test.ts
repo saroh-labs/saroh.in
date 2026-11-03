@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StaffIdentity } from "./control-plane";
 
 const getStaffIdentity = vi.fn<() => Promise<StaffIdentity | null>>();
+const editionNotGranted = vi.fn<() => Promise<boolean>>();
 
 vi.mock("./session", () => ({
     requireSession: () =>
@@ -10,6 +11,7 @@ vi.mock("./session", () => ({
 }));
 vi.mock("./control-plane", () => ({
     getStaffIdentity: () => getStaffIdentity(),
+    editionNotGranted: () => editionNotGranted(),
 }));
 vi.mock("@/components/not-authorized", () => ({
     NotAuthorized: () => null,
@@ -26,7 +28,11 @@ const support: StaffIdentity = {
     viaBootstrap: false,
 };
 
-beforeEach(() => getStaffIdentity.mockReset());
+beforeEach(() => {
+    getStaffIdentity.mockReset();
+    editionNotGranted.mockReset();
+    editionNotGranted.mockResolvedValue(false);
+});
 
 describe("requireStaff", () => {
     it("lets staff holding the permission through", async () => {
@@ -54,5 +60,17 @@ describe("requireStaff", () => {
         if (gate.ok) return;
         expect(gate.screen.type).toBe(NotAuthorized);
         expect(gate.screen.props).toEqual({ email: "caller@example.com" });
+    });
+
+    it("says it's the console, when the grant leaves out this edition", async () => {
+        getStaffIdentity.mockResolvedValue(null);
+        editionNotGranted.mockResolvedValue(true);
+        const gate = await requireStaff("audit:read");
+        expect(gate.ok).toBe(false);
+        if (gate.ok) return;
+        expect(gate.screen.props).toEqual({
+            email: "caller@example.com",
+            wrongConsole: true,
+        });
     });
 });

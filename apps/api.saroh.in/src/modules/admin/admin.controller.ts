@@ -7,6 +7,7 @@ import {
     Put,
     Query,
 } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { IdentityOnly } from "../../common/decorators/identity-only.decorator";
@@ -19,6 +20,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminPermission } from "./admin-permissions";
@@ -75,15 +77,15 @@ export class AdminController {
     /** Platform dashboard: aggregate counts only, never a tenant record. */
     @Get("metrics")
     @RequireAdminPermission(AdminPermission.PlatformRead)
-    getMetrics() {
-        return this.metrics.summary();
+    getMetrics(@ServedEdition() edition: Edition | null) {
+        return this.metrics.summary(edition);
     }
 
     /** Every registered flag with its global default and per-org overrides. */
     @Get("flags")
     @RequireAdminPermission(AdminPermission.FlagsRead)
-    listFlags() {
-        return this.adminFlags.list();
+    listFlags(@ServedEdition() edition: Edition | null) {
+        return this.adminFlags.list(edition);
     }
 
     @Get("flags/:flagKey/history")
@@ -91,8 +93,13 @@ export class AdminController {
     async history(
         @Param("flagKey") flagKey: string,
         @Query() query: FlagHistoryDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        return this.adminFlags.history(assertKnownFlag(flagKey), query.page);
+        return this.adminFlags.history(
+            assertKnownFlag(flagKey),
+            query.page,
+            edition,
+        );
     }
 
     /**

@@ -78,7 +78,7 @@ export function WaitlistBreakdowns({ summary }: { summary: WaitlistSummary }) {
             />
             <CountPanel
                 title="Countries"
-                description="Where people joined from, as saroh.in saw their connection. Not recorded before 5 Oct 2026."
+                description="Where people joined from, as the website saw their connection. Not recorded before 5 Oct 2026."
                 rows={summary.byCountry.map((row) => ({
                     key: row.country ?? "none",
                     label: row.country

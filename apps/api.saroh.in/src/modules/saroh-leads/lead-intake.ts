@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { maskEmail } from "../waitlist/waitlist-keys";
@@ -16,6 +17,8 @@ export interface WebsiteLeadInput {
     name?: string | null;
     kind?: string | null;
     city?: string | null;
+    /** The website's edition, from the address it wrote through. */
+    edition?: Edition;
     now?: Date;
 }
 
@@ -26,7 +29,8 @@ export type WebsiteLeadOutcome = "created" | "merged" | "failed";
  * (DEC-169, U20), one per person: an email that is already on a lead (as its
  * email or its sign-up email) is merged into it, which only marks when the
  * website last saw it and fills what the lead didn't know. A new one is
- * unowned, in New, until Support or a Platform owner assigns it.
+ * unowned, in New, until Support or a Platform owner assigns it. One email
+ * holds one lead across editions (`emailKey`): a merge keeps the first's edition.
  *
  * Called after the enquiry or the waitlist entry is saved, and **never
  * throws**: a lead that couldn't be written is logged (the email masked) and
@@ -74,6 +78,7 @@ export async function recordWebsiteLead(
                         stage: "NEW",
                         stagedAt: now,
                         websiteSeenAt: now,
+                        edition: input.edition,
                         ...fill,
                     },
                     select: { id: true },

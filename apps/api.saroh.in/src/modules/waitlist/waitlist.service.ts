@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { businessByReferralCode } from "../organizations/referral";
@@ -18,6 +19,8 @@ import {
 
 export interface JoinWaitlistInput {
     email: string;
+    /** The website's edition, from the address it wrote through. */
+    edition?: Edition;
     /** The V2 form's fields; absent from the V1 form, which asks for an email only. */
     business?: string;
     kind?: WaitlistKind;
@@ -102,6 +105,7 @@ export class WaitlistService {
             referredById,
             referredByOrganizationId,
             ipHash: input.ipHash ?? null,
+            edition: input.edition,
         };
 
         for (let attempt = 0; attempt < REF_CODE_ATTEMPTS; attempt += 1) {
@@ -129,6 +133,7 @@ export class WaitlistService {
                         name: businessName,
                         kind: data.kind,
                         city: data.city,
+                        edition: input.edition,
                     }).catch(() => "failed" as const);
                 }
                 return {

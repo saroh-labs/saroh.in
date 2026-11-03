@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { siteRootDomain } from "../sites/site-host-mode";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { organizationSearch } from "./admin-billing-search";
 import { PROVIDER_ID } from "./admin-billing.service";
+import { editionWhere, peopleWhere } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import {
     domainSearchTerms,
@@ -78,6 +80,7 @@ export class AdminSearchService {
     async search(
         staff: Staff,
         raw: string | undefined,
+        edition: Edition | null = null,
     ): Promise<ConsoleSearch> {
         const q = (raw ?? "").trim();
         if (q.length < SEARCH_MIN_LENGTH) return { results: [], note: null };
@@ -95,7 +98,7 @@ export class AdminSearchService {
                     };
                 }
                 return {
-                    results: await this.byProviderId(q, scope),
+                    results: await this.byProviderId(q, scope, edition),
                     note: null,
                 };
             }
@@ -104,21 +107,32 @@ export class AdminSearchService {
                     return { results: [], note: "email-needs-pii" as const };
                 }
                 return {
-                    results: await this.users({
-                        email: { contains: q, mode: "insensitive" },
-                    }),
+                    results: await this.users(
+                        { email: { contains: q, mode: "insensitive" } },
+                        edition,
+                    ),
                     note: null,
                 };
             }
             const [businesses, users] = await Promise.all([
-                scope ? this.businesses(q, scope) : Promise.resolve([]),
+                scope
+                    ? this.businesses(q, scope, edition)
+                    : Promise.resolve([]),
                 may(AdminPermission.OrganizationPiiRead)
-                    ? this.users({
-                          OR: [
-                              { id: q },
-                              { name: { contains: q, mode: "insensitive" } },
-                          ],
-                      })
+                    ? this.users(
+                          {
+                              OR: [
+                                  { id: q },
+                                  {
+                                      name: {
+                                          contains: q,
+                                          mode: "insensitive",
+                                      },
+                                  },
+                              ],
+                          },
+                          edition,
+                      )
                     : Promise.resolve([]),
             ]);
             return { results: [...businesses, ...users], note: null };
@@ -146,9 +160,11 @@ export class AdminSearchService {
     private async businesses(
         q: string,
         scope: StaffScope,
+        edition: Edition | null,
     ): Promise<ConsoleSearchResult[]> {
         const rows = await prisma.organization.findMany({
             where: {
+                ...editionWhere(edition),
                 OR: [
                     { id: q },
                     { name: { contains: q, mode: "insensitive" } },
@@ -170,9 +186,10 @@ export class AdminSearchService {
 
     private async users(
         where: Prisma.UserWhereInput,
+        edition: Edition | null,
     ): Promise<ConsoleSearchResult[]> {
         const rows = await prisma.user.findMany({
-            where,
+            where: { AND: [where, peopleWhere(edition)] },
             orderBy: [{ createdAt: "desc" }, { id: "asc" }],
             take: SEARCH_LIMIT,
             select: { id: true, name: true, email: true },
@@ -194,9 +211,10 @@ export class AdminSearchService {
     private async byProviderId(
         q: string,
         scope: StaffScope | null,
+        edition: Edition | null,
     ): Promise<ConsoleSearchResult[]> {
         const rows = await prisma.organization.findMany({
-            where: organizationSearch(q),
+            where: { AND: [organizationSearch(q), editionWhere(edition)] },
             orderBy: [{ name: "asc" }, { id: "asc" }],
             take: SEARCH_LIMIT,
             select: {

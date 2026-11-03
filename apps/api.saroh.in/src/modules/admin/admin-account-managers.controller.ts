@@ -1,4 +1,5 @@
 import { Body, Delete, Get, Param, Post } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -6,6 +7,7 @@ import { RequireAdminPermission } from "../../common/decorators/require-admin-pe
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { AssignManagerDto, ShareOutDto } from "./account-manager.dto";
 import { AdminAccountManagersService } from "./admin-account-managers.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { OperatorReasonDto } from "./dto";
@@ -31,8 +33,11 @@ export class AdminAccountManagersController {
      */
     @Get("team/unassigned")
     @RequireAdminPermission(AdminPermission.AccountsRead)
-    unassigned(@PlatformAdminContext() staff: PlatformAdminInfo) {
-        return this.managers.unassigned(staff);
+    unassigned(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.managers.unassigned(staff, edition);
     }
 
     /** Who the business can be given to, fewest businesses first. */
@@ -93,6 +98,7 @@ export class AdminAccountManagersController {
     shareOut(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Body() dto: ShareOutDto,
+        @ServedEdition() edition: Edition | null,
     ) {
         const { idempotencyKey, ...input } = dto;
         return this.idempotency.run(
@@ -102,7 +108,7 @@ export class AdminAccountManagersController {
                 actorUserId: staff.userId,
             },
             input,
-            () => this.managers.shareOut(staff, input),
+            () => this.managers.shareOut(staff, input, edition),
         );
     }
 }

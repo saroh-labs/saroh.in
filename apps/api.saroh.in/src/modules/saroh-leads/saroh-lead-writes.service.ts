@@ -124,6 +124,7 @@ export class SarohLeadWritesService {
                     source: "ADDED",
                     stage: "NEW",
                     stagedAt: now,
+                    edition: staff.edition ?? "INDIA",
                     ...(own
                         ? {
                               ownerPlatformAdminId: own,

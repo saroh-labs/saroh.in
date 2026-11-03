@@ -19,6 +19,7 @@ import { env } from "@/env";
 
 import { can, requireStaff } from "./console";
 import { getJson } from "./control-plane";
+import { EDITION, websiteOf } from "./edition";
 import type {
     DocEntry,
     PageRow,
@@ -114,7 +115,7 @@ export const loadPage = cache((slug: string): AnyPage | null => {
 });
 
 /** The development site, where pages are read before they're published. */
-const DEVELOPMENT_SITE = "https://saroh.io";
+const DEVELOPMENT_SITE = websiteOf(EDITION, "development");
 
 export interface SiteInfo {
     /** This console's own site: admin.saroh.in → saroh.in, admin.saroh.io → saroh.io. */

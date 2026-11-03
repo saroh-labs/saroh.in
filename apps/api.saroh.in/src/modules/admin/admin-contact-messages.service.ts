@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { ContactTopic } from "../contact-messages/dto";
 import { normaliseEmail } from "../waitlist/waitlist-keys";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { editionWhere } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -52,13 +54,17 @@ export interface ContactMessagePage {
 export class AdminContactMessagesService {
     constructor(private readonly audit: AdminAuditService) {}
 
-    async list(query: {
-        topic?: ContactTopic;
-        state?: "open" | "handled";
-        email?: string;
-        cursor?: string;
-    }): Promise<ContactMessagePage> {
+    async list(
+        query: {
+            topic?: ContactTopic;
+            state?: "open" | "handled";
+            email?: string;
+            cursor?: string;
+        },
+        edition: Edition | null = null,
+    ): Promise<ContactMessagePage> {
         const where: Prisma.ContactMessageWhereInput = {
+            ...editionWhere(edition),
             ...(query.topic ? { topic: query.topic } : {}),
             ...(query.state === "open"
                 ? { handledAt: null }
@@ -103,10 +109,11 @@ export class AdminContactMessagesService {
         staff: PlatformAdminInfo,
         id: string,
         handled: boolean,
+        edition: Edition | null = null,
     ): Promise<{ id: string; handledAt: Date | null }> {
         return prisma.$transaction(async (tx) => {
             const { count } = await tx.contactMessage.updateMany({
-                where: { id },
+                where: { id, ...editionWhere(edition) },
                 data: handled
                     ? { handledAt: new Date(), handledByUserId: staff.userId }
                     : { handledAt: null, handledByUserId: null },

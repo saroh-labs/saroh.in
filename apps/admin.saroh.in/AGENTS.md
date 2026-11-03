@@ -21,6 +21,18 @@ recorded grant (the API refuses it otherwise).
 
 ## Rules that bite here
 
+- **Each console serves one edition** (DEC-204 item 6). `NEXT_PUBLIC_EDITION`
+  (`lib/edition.ts`; unset is India) is what the shell's quiet "India" or
+  "Global" label by the wordmark says, what Add a teammate ticks first and
+  which addresses `lib/saroh-apps.ts`, `lib/control-plane.ts` and
+  `lib/admin-access.ts` fall back to, through `@saroh/edition`. The API takes
+  the edition from the address it was called on. A grant says which consoles
+  someone may open (`PlatformAdmin.editions`): Add a teammate and Change set
+  it (`staff:grant`, with a reason, on the ledger; no new permission). A
+  Platform owner opens all, shown as "All". A grant without this console's
+  edition gets 403 `edition_not_granted`, and `requireStaff` shows "Your
+  access doesn't include this console" instead of "Not authorized". Saroh's
+  own money stays India-only until Global's billing exists.
 - **Every screen opens with `requireStaff(permission)`** (`lib/console.ts`)
   and hides what the operator cannot do with `can(...)`. That is a courtesy:
   the API refuses regardless. Staff refused a screen see "Not authorized"

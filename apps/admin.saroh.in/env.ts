@@ -32,6 +32,8 @@ export const env = createEnv({
     },
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
+        /** The edition this console serves (DEC-204). Unset is India. */
+        NEXT_PUBLIC_EDITION: z.enum(["INDIA", "GLOBAL"]).optional(),
         // api.saroh.in origin — admin reads the control plane (/admin/*) over
         // HTTP like every other frontend; it never imports @saroh/database.
         NEXT_PUBLIC_API_URL: z.url().optional(),
@@ -54,6 +56,7 @@ export const env = createEnv({
     runtimeEnv: {
         MARKETING_SITE_URL: process.env.MARKETING_SITE_URL,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
+        NEXT_PUBLIC_EDITION: process.env.NEXT_PUBLIC_EDITION,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,

@@ -52,6 +52,7 @@ const owner: PlatformAdminInfo = {
     roles: ["PLATFORM_OWNER"],
     permissions: [],
     viaBootstrap: false,
+    edition: null,
 };
 
 function service() {
@@ -136,7 +137,11 @@ describe("AdminStaffService — the last owner", () => {
 describe("AdminStaffService — granting", () => {
     it("lets an instance with only break-glass access grant its first owner", async () => {
         userFind.mockResolvedValue({ id: "user_2" });
-        adminUpsert.mockResolvedValue({ id: "pa_2", revokedAt: null });
+        adminUpsert.mockResolvedValue({
+            id: "pa_2",
+            revokedAt: null,
+            editions: ["INDIA"],
+        });
         ownerCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
         const { service: staff, audit } = service();
 
@@ -162,7 +167,11 @@ describe("AdminStaffService — granting", () => {
 
     it("writes the reason and expiry onto each new role", async () => {
         userFind.mockResolvedValue({ id: "user_3" });
-        adminUpsert.mockResolvedValue({ id: "pa_3", revokedAt: null });
+        adminUpsert.mockResolvedValue({
+            id: "pa_3",
+            revokedAt: null,
+            editions: ["INDIA"],
+        });
         ownerCount.mockResolvedValue(1);
         const expiresAt = new Date(Date.now() + 7 * 86_400_000);
         const { service: staff } = service();
@@ -244,5 +253,156 @@ describe("AdminStaffService — amending", () => {
         expect(createMany).toHaveBeenCalledWith({
             data: [expect.objectContaining({ role: "BILLING" })],
         });
+    });
+});
+
+describe("AdminStaffService — editions (DEC-204)", () => {
+    const adminUpdate = prisma.platformAdmin.update as jest.Mock;
+    const grantInput = {
+        email: "new@example.test",
+        roles: ["SUPPORT"],
+        reason: "Joining support",
+    };
+
+    beforeEach(() => {
+        userFind.mockResolvedValue({ id: "user_9" });
+        ownerCount.mockResolvedValue(1);
+    });
+
+    it("grants the console's own edition by default, India where it has none", async () => {
+        adminUpsert.mockImplementation(({ create }) =>
+            Promise.resolve({
+                id: "pa_9",
+                revokedAt: null,
+                editions: create.editions,
+            }),
+        );
+        const { service: staff, audit } = service();
+
+        await staff.grant({
+            ...grantInput,
+            staff: { ...owner, edition: "GLOBAL" },
+        });
+        expect(adminUpsert.mock.calls[0][0].create.editions).toEqual([
+            "GLOBAL",
+        ]);
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                metadata: expect.objectContaining({ editions: ["GLOBAL"] }),
+            }),
+        );
+
+        await staff.grant({ ...grantInput, staff: owner });
+        expect(adminUpsert.mock.calls[1][0].create.editions).toEqual(["INDIA"]);
+        expect(adminUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses an empty or unknown choice before anything is written", async () => {
+        const { service: staff } = service();
+        await expect(
+            staff.grant({ ...grantInput, staff: owner, editions: [] }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            staff.grant({ ...grantInput, staff: owner, editions: ["MARS"] }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(adminUpsert).not.toHaveBeenCalled();
+    });
+
+    it("adds to a teammate's editions, and a reopened grant starts over", async () => {
+        const { service: staff } = service();
+        adminUpsert.mockResolvedValue({
+            id: "pa_9",
+            revokedAt: null,
+            editions: ["INDIA"],
+        });
+        await staff.grant({
+            ...grantInput,
+            staff: owner,
+            editions: ["GLOBAL"],
+        });
+        expect(adminUpdate).toHaveBeenLastCalledWith({
+            where: { id: "pa_9" },
+            data: { editions: ["INDIA", "GLOBAL"] },
+        });
+
+        adminUpsert.mockResolvedValue({
+            id: "pa_9",
+            revokedAt: new Date(),
+            editions: ["INDIA"],
+        });
+        await staff.grant({
+            ...grantInput,
+            staff: owner,
+            editions: ["GLOBAL"],
+        });
+        expect(adminUpdate).toHaveBeenLastCalledWith({
+            where: { id: "pa_9" },
+            data: expect.objectContaining({ editions: ["GLOBAL"] }),
+        });
+    });
+
+    it("Change sets them exactly, on the ledger, with no role change needed", async () => {
+        adminFind.mockResolvedValue({
+            id: "pa_9",
+            revokedAt: null,
+            editions: ["INDIA"],
+        });
+        assignments.mockResolvedValue([
+            { id: "a1", role: "SUPPORT", expiresAt: null },
+        ]);
+        const { service: staff, audit } = service();
+
+        await expect(
+            staff.amend({
+                staff: owner,
+                platformAdminId: "pa_9",
+                roles: ["SUPPORT"],
+                reason: "Moved to Global",
+                editions: ["GLOBAL"],
+            }),
+        ).resolves.toEqual({ platformAdminId: "pa_9", changed: true });
+        expect(adminUpdate).toHaveBeenCalledWith({
+            where: { id: "pa_9" },
+            data: { editions: ["GLOBAL"] },
+        });
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: "staff.amended",
+                reason: "Moved to Global",
+                metadata: expect.objectContaining({
+                    editions: ["GLOBAL"],
+                    editionsBefore: ["INDIA"],
+                }),
+            }),
+        );
+    });
+
+    it("Change with the same editions, or none sent, changes nothing", async () => {
+        adminFind.mockResolvedValue({
+            id: "pa_9",
+            revokedAt: null,
+            editions: ["INDIA", "GLOBAL"],
+        });
+        assignments.mockResolvedValue([
+            { id: "a1", role: "SUPPORT", expiresAt: null },
+        ]);
+        const { service: staff } = service();
+        const change = {
+            staff: owner,
+            platformAdminId: "pa_9",
+            roles: ["SUPPORT"],
+            reason: "No change",
+        };
+
+        await expect(
+            staff.amend({ ...change, editions: ["GLOBAL", "INDIA"] }),
+        ).resolves.toEqual({ platformAdminId: "pa_9", changed: false });
+        await expect(staff.amend(change)).resolves.toEqual({
+            platformAdminId: "pa_9",
+            changed: false,
+        });
+        expect(adminUpdate).not.toHaveBeenCalled();
     });
 });

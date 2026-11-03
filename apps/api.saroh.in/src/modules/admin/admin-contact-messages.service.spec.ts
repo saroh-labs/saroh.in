@@ -172,6 +172,16 @@ describe("handled state and links", () => {
         });
     });
 
+    it("finds nothing to mark on another edition's message", async () => {
+        db.contactMessage.updateMany.mockResolvedValue({ count: 0 });
+        await expect(service.mark(staff, "m1", true, "GLOBAL")).rejects.toThrow(
+            "Message not found",
+        );
+        expect(db.contactMessage.updateMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ where: { id: "m1", edition: "GLOBAL" } }),
+        );
+    });
+
     it("refuses a message that isn't there", async () => {
         db.contactMessage.updateMany.mockResolvedValue({ count: 0 });
         await expect(service.mark(staff, "gone", true)).rejects.toThrow(

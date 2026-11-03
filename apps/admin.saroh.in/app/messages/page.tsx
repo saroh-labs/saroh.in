@@ -59,7 +59,7 @@ export default async function MessagesPage({
                 <PageHeader
                     breadcrumb={["Help customers", "Messages"]}
                     title="Messages"
-                    description="What people wrote from saroh.in/contact. Reply from the team's mailbox, then mark it handled. Each is deleted 12 months after it arrived."
+                    description="What people wrote from the website's contact page. Reply from the team's mailbox, then mark it handled. Each is deleted 12 months after it arrived."
                 />
 
                 <FilterBar
@@ -103,7 +103,7 @@ export default async function MessagesPage({
                                   ? "No messages match"
                                   : "No messages yet"
                         }
-                        description="Messages people send from saroh.in/contact appear here."
+                        description="Messages people send from the website's contact page appear here."
                     />
                 ) : (
                     <>

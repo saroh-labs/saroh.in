@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { sendLinkReportEmail } from "../../common/email";
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -63,6 +64,8 @@ export class QrMakerGateService {
         /** The tool's slug, already one of `TOOL_SLUGS`; none: the QR code maker. */
         tool?: string;
         ipHash?: string;
+        /** The website's edition, from the address it wrote through. */
+        edition?: Edition;
         now?: Date;
     }): Promise<QrMakerUnlock> {
         const mail = toolEmail(input.tool);
@@ -74,6 +77,7 @@ export class QrMakerGateService {
             source: toolGateSource(input.tool),
             usedAt: now,
             ipHash: input.ipHash,
+            edition: input.edition,
         });
 
         const claim = await claimToolEmail(id, utcDay(now));
@@ -108,6 +112,7 @@ export class QrMakerGateService {
         source: string;
         usedAt: Date;
         ipHash?: string;
+        edition?: Edition;
     }): Promise<string> {
         const where = {
             emailKey_businessKey: {
@@ -145,6 +150,7 @@ export class QrMakerGateService {
                     checkedAt: row.usedAt,
                     newsConsent: false,
                     ipHash: row.ipHash ?? null,
+                    edition: row.edition,
                 },
                 select: { id: true },
             });

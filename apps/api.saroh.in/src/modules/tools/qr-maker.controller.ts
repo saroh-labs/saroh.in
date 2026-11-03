@@ -1,12 +1,14 @@
 import {
     Body,
     Controller,
+    Headers,
     HttpCode,
     HttpException,
     HttpStatus,
     Post,
     UseGuards,
 } from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { SiteRelay } from "../site-accounts/site-relay";
@@ -43,6 +45,7 @@ export class QrMakerController {
     async unlock(
         @Body() dto: UnlockQrMakerDto,
         @RelayContext() relay: SiteRelay,
+        @Headers("host") host?: string,
     ): Promise<QrMakerUnlock> {
         const key = relay.clientHash;
         if (!(this.perMinute.take(key) && this.perHour.take(key))) {
@@ -55,6 +58,7 @@ export class QrMakerController {
             email: dto.email,
             tool: dto.tool,
             ipHash: key,
+            edition: editionOfHost(host ?? "") ?? "INDIA",
         });
     }
 }

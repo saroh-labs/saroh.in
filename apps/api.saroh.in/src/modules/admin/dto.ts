@@ -1,3 +1,5 @@
+import type { Edition } from "@saroh/edition";
+import { EDITIONS } from "@saroh/edition";
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
@@ -345,6 +347,14 @@ export class GrantStaffDto {
     @IsBoolean()
     onCommission?: boolean;
 
+    /** Which consoles they may open. Left out: see the service. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(EDITIONS.length)
+    @IsIn(EDITIONS, { each: true })
+    editions?: Edition[];
+
     @Transform(trim)
     @IsString()
     @MinLength(8)
@@ -364,6 +374,14 @@ export class AmendStaffDto extends OperatorReasonDto {
     @IsOptional()
     @IsISO8601()
     expiresAt?: string;
+
+    /** Which consoles they may open, exactly. Left out: unchanged. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(EDITIONS.length)
+    @IsIn(EDITIONS, { each: true })
+    editions?: Edition[];
 }
 
 /**

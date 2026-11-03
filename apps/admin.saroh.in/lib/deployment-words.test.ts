@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     anyInFlight,
@@ -86,5 +86,20 @@ describe("ownEnvironmentPanel (DEC-107)", () => {
 
     it("shows no panel when the API names no environment", () => {
         expect(ownEnvironmentPanel(view(null))).toBeNull();
+    });
+});
+
+describe("on Global", () => {
+    it("names production's console and never makes up development's", async () => {
+        vi.resetModules();
+        vi.stubEnv("NEXT_PUBLIC_EDITION", "GLOBAL");
+        const words = await import("./deployment-words");
+        expect(words.ENVIRONMENT_WORDS.production.console).toBe(
+            "admin.saroh.tech",
+        );
+        expect(words.ENVIRONMENT_WORDS.development.console).toBe(
+            "the development console",
+        );
+        vi.unstubAllEnvs();
     });
 });

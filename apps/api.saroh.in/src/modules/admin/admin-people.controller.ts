@@ -1,10 +1,12 @@
 import { Body, Delete, Get, Param, Post, Put, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
@@ -38,12 +40,16 @@ export class AdminPeopleController {
     async search(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: SearchPeopleDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const rows = await this.people.search({
-            q: query.q,
-            filters: query.filter,
-            page: query.page,
-        });
+        const rows = await this.people.search(
+            {
+                q: query.q,
+                filters: query.filter,
+                page: query.page,
+            },
+            edition,
+        );
         await this.adminAudit.recordRead({
             actorUserId: staff.userId,
             permission: AdminPermission.OrganizationPiiRead,
@@ -68,8 +74,11 @@ export class AdminPeopleController {
      */
     @Get("people/recent")
     @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
-    async recent(@PlatformAdminContext() staff: PlatformAdminInfo) {
-        const rows = await this.people.recent();
+    async recent(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        const rows = await this.people.recent(edition);
         await this.adminAudit.recordRead({
             actorUserId: staff.userId,
             permission: AdminPermission.OrganizationPiiRead,
@@ -86,8 +95,9 @@ export class AdminPeopleController {
     async detail(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("userId") userId: string,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const person = await this.people.detail(userId);
+        const person = await this.people.detail(userId, edition);
         await this.adminAudit.recordRead({
             actorUserId: staff.userId,
             permission: AdminPermission.OrganizationPiiRead,

@@ -1,4 +1,5 @@
 import { Get, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 import { Transform } from "class-transformer";
 import { IsOptional, IsString, MaxLength } from "class-validator";
 
@@ -6,6 +7,7 @@ import { IdentityOnly } from "../../common/decorators/identity-only.decorator";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
+import { ServedEdition } from "./admin-edition";
 import { AdminHomeService } from "./admin-home.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
@@ -39,8 +41,11 @@ export class AdminConsoleController {
      */
     @Get("home")
     @RequireAdminPermission(AdminPermission.PlatformRead)
-    home(@PlatformAdminContext() staff: PlatformAdminInfo) {
-        return this.homeService.home(staff);
+    home(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.homeService.home(staff, edition);
     }
 
     /**
@@ -55,7 +60,8 @@ export class AdminConsoleController {
     consoleSearch(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ConsoleSearchDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        return this.searchService.search(staff, query.q);
+        return this.searchService.search(staff, query.q, edition);
     }
 }

@@ -1,7 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import {
+    byBusinessIds,
+    editionWhere,
+    viaBusiness,
+    viaBusinessOrNone,
+} from "./admin-edition";
 import type { AdminPermission } from "./admin-permissions";
 import { AdminPermission as P } from "./admin-permissions";
 
@@ -76,6 +83,7 @@ export const STUCK_FOR_DAYS = 30;
 export class AdminHomeService {
     async home(
         staff: Pick<PlatformAdminInfo, "permissions">,
+        edition: Edition | null = null,
         now: Date = new Date(),
     ): Promise<ConsoleHome> {
         const may = (permission: AdminPermission) =>
@@ -93,7 +101,11 @@ export class AdminHomeService {
         return outsideOrgContext(async () => {
             const items = await Promise.all(
                 checked.map((kind) =>
-                    this.needs(kind, { recent, stuckFrom, stuckUntil }),
+                    this.needs(
+                        kind,
+                        { recent, stuckFrom, stuckUntil },
+                        edition,
+                    ),
                 ),
             );
             const [
@@ -103,14 +115,18 @@ export class AdminHomeService {
                 paying,
                 jobsFailedToday,
             ] = await Promise.all([
-                prisma.organization.count(),
+                prisma.organization.count({ where: editionWhere(edition) }),
                 prisma.organization.count({
-                    where: { createdAt: { gte: week } },
+                    where: {
+                        createdAt: { gte: week },
+                        ...editionWhere(edition),
+                    },
                 }),
+                // No business yet: on neither edition, so shown on both.
                 prisma.user.count({ where: { memberships: { none: {} } } }),
                 may(P.SarohBillingRead)
                     ? prisma.subscription.count({
-                          where: { status: "ACTIVE" },
+                          where: { status: "ACTIVE", ...viaBusiness(edition) },
                       })
                     : Promise.resolve(null),
                 may(P.JobsRead)
@@ -118,6 +134,7 @@ export class AdminHomeService {
                           where: {
                               status: "FAILED",
                               processedAt: { gte: day },
+                              ...viaBusinessOrNone(edition),
                           },
                       })
                     : Promise.resolve(null),
@@ -139,10 +156,14 @@ export class AdminHomeService {
     private async needs(
         kind: NeedsKind,
         at: { recent: Date; stuckFrom: Date; stuckUntil: Date },
+        edition: Edition | null,
     ): Promise<NeedsYouItem> {
         switch (kind) {
             case "billing": {
-                const where = { resolvedAt: null };
+                const where = {
+                    resolvedAt: null,
+                    ...(await byBusinessIds(edition)),
+                };
                 const [count, oldest] = await Promise.all([
                     prisma.billingAction.count({ where }),
                     prisma.billingAction.findFirst({
@@ -154,7 +175,10 @@ export class AdminHomeService {
                 return item(kind, count, oldest?.createdAt);
             }
             case "reports": {
-                const where = { status: "OPEN" as const };
+                const where = {
+                    status: "OPEN" as const,
+                    ...viaBusinessOrNone(edition),
+                };
                 const [count, oldest] = await Promise.all([
                     prisma.businessReport.count({ where }),
                     prisma.businessReport.findFirst({
@@ -169,6 +193,7 @@ export class AdminHomeService {
                 const where = {
                     topic: "help",
                     createdAt: { gte: at.recent },
+                    ...editionWhere(edition),
                 };
                 const [count, newest] = await Promise.all([
                     prisma.contactMessage.count({ where }),
@@ -180,6 +205,7 @@ export class AdminHomeService {
                 ]);
                 return item(kind, count, newest?.createdAt);
             }
+            // No business yet: on neither edition, so shown on both.
             case "sign-ups": {
                 const where = {
                     emailVerified: false,
@@ -200,6 +226,7 @@ export class AdminHomeService {
                 const where = {
                     status: "FAILED",
                     processedAt: { gte: at.recent },
+                    ...viaBusinessOrNone(edition),
                 };
                 const [count, newest] = await Promise.all([
                     prisma.job.count({ where }),

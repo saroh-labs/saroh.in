@@ -165,7 +165,7 @@ export function LeadsBoard({
                         title="No leads yet"
                         description={
                             allScope
-                                ? "Questions from saroh.in and the waitlist arrive here, and so do the leads your team adds."
+                                ? "Questions from the website and the waitlist arrive here, and so do the leads your team adds."
                                 : "Leads you add, and the ones Support gives you, show here."
                         }
                     />

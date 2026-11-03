@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -21,6 +22,7 @@ import {
 import { teammateName } from "../saroh-leads/lead-views";
 import { SHARE_OUT_MAX } from "./account-manager.dto";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { editionWhere } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { requireReason } from "./admin-staff.service";
 import { activeManagerWhere, MANAGER_ENDED_ACTION } from "./manager-links";
@@ -144,13 +146,14 @@ export class AdminAccountManagersService {
      */
     async unassigned(
         staff: PlatformAdminInfo,
+        edition: Edition | null = null,
     ): Promise<{ businesses: UnassignedBusiness[]; total: number }> {
         if (scopeForStaff(staff, AdminPermission.AccountsRead).kind !== "all") {
             throw new ForbiddenException(
                 "Businesses without a manager are for Support, Billing and Platform owner.",
             );
         }
-        const all = await unassignedBusinesses(prisma, null, null);
+        const all = await unassignedBusinesses(prisma, null, null, edition);
         const shown = all.slice(0, UNASSIGNED_SHOWN);
         const rows = await prisma.organization.findMany({
             where: { id: { in: shown.map((b) => b.organizationId) } },
@@ -348,6 +351,7 @@ export class AdminAccountManagersService {
     async shareOut(
         staff: PlatformAdminInfo,
         input: { reason: string; organizationIds?: string[] },
+        edition: Edition | null = null,
     ): Promise<ShareOutResult> {
         assertAssigner(staff);
         const reason = requireReason(input.reason);
@@ -364,7 +368,12 @@ export class AdminAccountManagersService {
                     "Nobody is both an Account manager and on commission, so there is nobody to share out to.",
                 );
             }
-            const businesses = await unassignedBusinesses(tx, named);
+            const businesses = await unassignedBusinesses(
+                tx,
+                named,
+                undefined,
+                edition,
+            );
             const plan = planShareOut(businesses, managers);
 
             const assigned: ShareOutResult["assigned"] = [];
@@ -621,9 +630,11 @@ async function unassignedBusinesses(
     tx: Pick<Tx, "organization">,
     named: string[] | null,
     max: number | null = SHARE_OUT_MAX,
+    edition: Edition | null = null,
 ): Promise<ShareOutBusiness[]> {
     const rows = await tx.organization.findMany({
         where: {
+            ...editionWhere(edition),
             lifecycleStatus: { in: BILLING_STATES },
             accountManagerLinks: { none: { endedAt: null } },
             ...(named ? { id: { in: named } } : {}),

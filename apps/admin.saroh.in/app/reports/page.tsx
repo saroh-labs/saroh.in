@@ -53,8 +53,8 @@ export default async function ReportsPage({
                     title="Reports"
                     description={
                         page
-                            ? `What customers reported about a business at saroh.in/customers. ${plural(page.open, "report")} open.`
-                            : "What customers reported about a business at saroh.in/customers."
+                            ? `What customers reported about a business from the website. ${plural(page.open, "report")} open.`
+                            : "What customers reported about a business from the website."
                     }
                 />
 
@@ -84,7 +84,7 @@ export default async function ReportsPage({
                                   ? "No reports yet"
                                   : "No open reports"
                         }
-                        description="Reports customers send from saroh.in/customers appear here."
+                        description="Reports customers send from the website appear here."
                     />
                 ) : (
                     <>

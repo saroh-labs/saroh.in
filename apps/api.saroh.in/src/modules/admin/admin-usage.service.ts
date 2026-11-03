@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { BusinessAccess } from "../billing/catalogue-access.service";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
@@ -87,7 +88,10 @@ export class AdminUsageService {
         private readonly access: CatalogueAccessService = new CatalogueAccessService(),
     ) {}
 
-    async storage(query: StorageUsageQuery): Promise<StorageUsagePage> {
+    async storage(
+        query: StorageUsageQuery,
+        edition: Edition | null = null,
+    ): Promise<StorageUsagePage> {
         const order: StorageOrder =
             query.order === "least" || query.order === "closest"
                 ? query.order
@@ -98,6 +102,9 @@ export class AdminUsageService {
         // "Closest" ranks by a limit only the resolver knows, so it reads
         // every business and pages after sorting.
         const paged = order !== "closest";
+        const inEdition = edition
+            ? Prisma.sql`o."edition" = ${edition}::"Edition"`
+            : Prisma.sql`TRUE`;
 
         const [rows, totals] = await Promise.all([
             prisma.$queryRaw<RawRow[]>(Prisma.sql`
@@ -107,6 +114,7 @@ export class AdminUsageService {
                 FROM "Organization" o
                 LEFT JOIN "Media" m
                     ON m."organizationId" = o."id" AND m."status" = ${STORED}
+                WHERE ${inEdition}
                 GROUP BY o."id"
                 ORDER BY "bytes" ${direction}, o."name" ASC, o."id" ASC
                 ${paged ? Prisma.sql`LIMIT ${limit} OFFSET ${(page - 1) * limit}` : Prisma.empty}`),
@@ -115,9 +123,11 @@ export class AdminUsageService {
             >(
                 Prisma.sql`
                 SELECT
-                    (SELECT COUNT(*) FROM "Organization") AS "total",
-                    (SELECT COALESCE(SUM("sizeBytes"), 0) FROM "Media"
-                        WHERE "status" = ${STORED}) AS "bytes"`,
+                    (SELECT COUNT(*) FROM "Organization" o
+                        WHERE ${inEdition}) AS "total",
+                    (SELECT COALESCE(SUM(m."sizeBytes"), 0) FROM "Media" m
+                        JOIN "Organization" o ON o."id" = m."organizationId"
+                        WHERE m."status" = ${STORED} AND ${inEdition}) AS "bytes"`,
             ),
         ]);
 

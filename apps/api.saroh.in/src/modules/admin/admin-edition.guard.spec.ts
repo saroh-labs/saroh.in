@@ -9,6 +9,7 @@ jest.mock("@saroh/database", () => ({
         subscription: { findUnique: jest.fn() },
         domain: { findUnique: jest.fn() },
         billingAction: { findUnique: jest.fn() },
+        sarohLead: { findUnique: jest.fn() },
     },
 }));
 
@@ -59,6 +60,16 @@ describe("AdminEditionGuard", () => {
         await expect(run("GLOBAL", { actionId: "a" })).rejects.toBeInstanceOf(
             NotFoundException,
         );
+    });
+
+    it("hides another edition's lead", async () => {
+        const lead = prisma.sarohLead.findUnique as jest.Mock;
+        lead.mockResolvedValue({ edition: "INDIA" });
+        await expect(run("GLOBAL", { leadId: "l" })).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        lead.mockResolvedValue({ edition: "GLOBAL" });
+        await expect(run("GLOBAL", { leadId: "l" })).resolves.toBe(true);
     });
 
     it("leaves a missing row to the route's own 404", async () => {

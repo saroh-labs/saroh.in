@@ -1,10 +1,12 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { AdminContactMessagesService } from "./admin-contact-messages.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { ListContactMessagesDto, MarkContactMessageDto } from "./dto";
@@ -22,8 +24,11 @@ export class AdminContactMessagesController {
 
     @Get("contact-messages")
     @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
-    listContactMessages(@Query() query: ListContactMessagesDto) {
-        return this.messages.list(query);
+    listContactMessages(
+        @Query() query: ListContactMessagesDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.messages.list(query, edition);
     }
 
     @Post("contact-messages/:id/handled")
@@ -35,7 +40,8 @@ export class AdminContactMessagesController {
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("id") id: string,
         @Body() dto: MarkContactMessageDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        return this.messages.mark(staff, id, dto.handled);
+        return this.messages.mark(staff, id, dto.handled, edition);
     }
 }

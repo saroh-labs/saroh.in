@@ -1,9 +1,12 @@
+import { hostsFor } from "@saroh/edition";
+
 import type {
     DeployEnvironment,
     DeploymentRow,
     DeploymentsView,
     RunState,
 } from "./deployments";
+import { EDITION } from "./edition";
 
 /**
  * Deploy states in words, for client and server components alike (#886).
@@ -24,6 +27,12 @@ export const RUN_STATE: Record<
     cancelled: { label: "Cancelled", variant: "neutral" },
 };
 
+/** Global's development address isn't in this code; a console without it says so in words. */
+function developmentConsole(): string {
+    const { admin } = hostsFor(EDITION, "development");
+    return admin.endsWith(".invalid") ? "the development console" : admin;
+}
+
 /** Each environment in words: its name, the branch it builds from, its console. */
 export const ENVIRONMENT_WORDS: Record<
     DeployEnvironment,
@@ -32,12 +41,12 @@ export const ENVIRONMENT_WORDS: Record<
     production: {
         title: "Production",
         from: "main",
-        console: "admin.saroh.in",
+        console: hostsFor(EDITION, "production").admin,
     },
     development: {
         title: "Development",
         from: "development",
-        console: "admin.saroh.io",
+        console: developmentConsole(),
     },
 };
 

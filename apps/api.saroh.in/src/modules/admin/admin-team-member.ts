@@ -8,6 +8,7 @@ import { OPEN_STAGES } from "../saroh-leads/lead-rules";
 import type { LeadCard } from "../saroh-leads/lead-views";
 import { LEAD_SELECT, leadCard, teammateName } from "../saroh-leads/lead-views";
 import { istDay } from "./admin-billing";
+import { editionWhere, viaBusiness } from "./admin-edition";
 import type { AdminRole } from "./admin-permissions";
 import { AdminPermission, isAdminRole } from "./admin-permissions";
 import type { OpenSignal } from "./inactivity-signals";
@@ -154,6 +155,9 @@ export async function readTeamMember(input: {
     const leadWork = seesLeadWork(input.staff, id);
     const today = istDay(now);
     const open = { in: [...OPEN_STAGES] };
+    // The route's own edition: this read is a page's, never a sweep's.
+    const { edition } = input.staff;
+    const ownLeads = editionWhere(edition);
 
     return outsideOrgContext(async () => {
         const admin = await prisma.platformAdmin.findUnique({
@@ -188,7 +192,7 @@ export async function readTeamMember(input: {
                   })
                 : null,
             prisma.accountManagerLink.findMany({
-                where: { platformAdminId: id },
+                where: { platformAdminId: id, ...viaBusiness(edition) },
                 select: {
                     id: true,
                     organizationId: true,
@@ -203,7 +207,11 @@ export async function readTeamMember(input: {
             }),
             leadWork
                 ? prisma.sarohLead.findMany({
-                      where: { ownerPlatformAdminId: id, stage: open },
+                      where: {
+                          ownerPlatformAdminId: id,
+                          stage: open,
+                          ...ownLeads,
+                      },
                       select: LEAD_SELECT,
                       orderBy: [
                           { followUpOn: { sort: "asc", nulls: "last" } },
@@ -214,13 +222,18 @@ export async function readTeamMember(input: {
                 : null,
             Promise.all([
                 prisma.sarohLead.count({
-                    where: { ownerPlatformAdminId: id, stage: open },
+                    where: {
+                        ownerPlatformAdminId: id,
+                        stage: open,
+                        ...ownLeads,
+                    },
                 }),
                 prisma.sarohLead.count({
                     where: {
                         ownerPlatformAdminId: id,
                         stage: open,
                         followUpOn: { lt: new Date(`${today}T00:00:00.000Z`) },
+                        ...ownLeads,
                     },
                 }),
                 prisma.sarohLead.count({
@@ -228,11 +241,22 @@ export async function readTeamMember(input: {
                         ownerPlatformAdminId: id,
                         stage: "WON",
                         wonAt: { gte: istMonthStart(now) },
+                        ...ownLeads,
                     },
                 }),
             ]),
             prisma.sarohContactLog.findMany({
-                where: { platformAdminId: id },
+                where: {
+                    platformAdminId: id,
+                    ...(edition
+                        ? {
+                              OR: [
+                                  { lead: { edition } },
+                                  { organization: { edition } },
+                              ],
+                          }
+                        : {}),
+                },
                 select: {
                     id: true,
                     kind: true,

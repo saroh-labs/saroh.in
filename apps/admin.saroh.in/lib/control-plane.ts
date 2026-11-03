@@ -1,7 +1,10 @@
 import { requestOrigin } from "@saroh/auth/origins";
+import { hostsFor, urlOf } from "@saroh/edition";
 import { headers } from "next/headers";
 
 import { env } from "@/env";
+
+import { EDITION } from "./edition";
 
 /**
  * Data access for the Saroh control plane (`/admin/*` on api.saroh.in).
@@ -14,7 +17,7 @@ import { env } from "@/env";
 const API_URL =
     env.NEXT_PUBLIC_API_URL ??
     env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
+    urlOf(hostsFor(EDITION, "production").api);
 
 export interface PlatformMetrics {
     organizations: { total: number; createdLast30Days: number };
@@ -220,6 +223,19 @@ export async function getJson<T>(
  */
 export function getStaffIdentity(): Promise<StaffIdentity | null> {
     return getJson<StaffIdentity>("/me");
+}
+
+/**
+ * Whether `/me` was refused because the caller's grant leaves out this
+ * console's edition, rather than because they aren't staff.
+ */
+export async function editionNotGranted(): Promise<boolean> {
+    const res = await adminFetch("/me");
+    if (res.status !== 403) return false;
+    const body = (await res.json().catch(() => null)) as {
+        error?: { details?: { reason?: unknown } };
+    } | null;
+    return body?.error?.details?.reason === "edition_not_granted";
 }
 
 export function getMetrics(): Promise<PlatformMetrics | null> {

@@ -97,6 +97,7 @@ vi.mock("next/navigation", () => ({
 const { TeamPeople } = await import("./people-table");
 const { UnassignedBusinesses } = await import("./unassigned-businesses");
 const { AddTeammateSheet } = await import("./add-teammate-sheet");
+const { AmendStaff } = await import("./team-actions");
 const { SummaryCards } = await import("./summary-cards");
 const { TeamTabs } = await import("./team-tabs");
 const { default: TeamLayout } = await import("@/app/team/(tabs)/layout");
@@ -220,6 +221,113 @@ beforeEach(() => {
     });
 });
 afterEach(cleanup);
+
+describe("Editions", () => {
+    it("shows each person's editions, and All for a Platform owner", () => {
+        render(
+            <TeamPeople
+                members={[
+                    member({ editions: ["INDIA", "GLOBAL"] }),
+                    rahul,
+                    member({
+                        platformAdminId: "pa_owner",
+                        name: "Meera Iyer",
+                        email: "meera.iyer@example.com",
+                        editions: ["INDIA"],
+                        roles: [
+                            {
+                                assignmentId: "ra_o",
+                                role: "PLATFORM_OWNER",
+                                expiresAt: null,
+                                assignedAt: "2026-09-01T06:00:00.000Z",
+                                reason: "Founder",
+                            },
+                        ],
+                    }),
+                ]}
+                invites={[]}
+                canGrant={false}
+            />,
+        );
+        const row = (id: string) => within($(`[data-person="${id}"]`));
+        expect(row("pa_priya").getByText("India, Global")).toBeTruthy();
+        // A grant from before there were two is India's.
+        expect(row("pa_rahul").getByText("India")).toBeTruthy();
+        expect(row("pa_owner").getByText("All")).toBeTruthy();
+    });
+
+    it("Add a teammate starts on this console's edition and sends the choice", async () => {
+        teamActions.addTeammateAction.mockResolvedValue({
+            ok: true,
+            data: { kind: "granted", platformAdminId: "pa_new" },
+        });
+        render(<AddTeammateSheet onOpenChange={vi.fn()} />);
+        const india = screen.getByRole<HTMLInputElement>("checkbox", {
+            name: "India",
+        });
+        expect(india.checked).toBe(true);
+        fireEvent.click(screen.getByRole("checkbox", { name: "Global" }));
+        fireEvent.change($('input[name="name"]'), {
+            target: { value: "Neha Gupta" },
+        });
+        fireEvent.change($('input[name="email"]'), {
+            target: { value: "neha.gupta@example.com" },
+        });
+        fireEvent.change($('textarea[name="reason"]'), {
+            target: { value: "Joining the team" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Add teammate" }));
+        await waitFor(() =>
+            expect(teamActions.addTeammateAction).toHaveBeenCalledWith(
+                expect.objectContaining({ editions: ["INDIA", "GLOBAL"] }),
+            ),
+        );
+    });
+
+    it("Add a teammate asks for an edition, and a Platform owner has All", () => {
+        render(<AddTeammateSheet onOpenChange={vi.fn()} />);
+        fireEvent.click(screen.getByRole("checkbox", { name: "India" }));
+        fireEvent.change($('input[name="name"]'), {
+            target: { value: "Neha Gupta" },
+        });
+        fireEvent.change($('input[name="email"]'), {
+            target: { value: "neha.gupta@example.com" },
+        });
+        fireEvent.change($('textarea[name="reason"]'), {
+            target: { value: "Joining the team" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Add teammate" }));
+        expect(screen.getByText("Tick at least one edition.")).toBeTruthy();
+        expect(teamActions.addTeammateAction).not.toHaveBeenCalled();
+
+        fireEvent.click($('input[name="roles"][value="PLATFORM_OWNER"]'));
+        expect(screen.queryByRole("checkbox", { name: "India" })).toBeNull();
+        expect(
+            screen.getByText("All. A Platform owner opens every console."),
+        ).toBeTruthy();
+    });
+
+    it("Change saves the ticked editions on the same dialog", async () => {
+        teamActions.amendStaffAction.mockResolvedValue({ ok: true });
+        render(<AmendStaff member={member({ editions: ["INDIA"] })} />);
+        fireEvent.click(screen.getByRole("button", { name: "Change" }));
+        fireEvent.click(screen.getByRole("checkbox", { name: "Global" }));
+        fireEvent.change($("textarea"), {
+            target: { value: "Covering Global" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Save access" }));
+        await waitFor(() =>
+            expect(teamActions.amendStaffAction).toHaveBeenCalledWith(
+                "pa_priya",
+                expect.objectContaining({
+                    roles: ["ACCOUNT_MANAGER"],
+                    editions: ["INDIA", "GLOBAL"],
+                    reason: "Covering Global",
+                }),
+            ),
+        );
+    });
+});
 
 describe("Teammates: the people", () => {
     it("filters by job, one chip at a time, with counts", () => {
@@ -521,6 +629,7 @@ describe("Add a teammate", () => {
         fireEvent.click(screen.getByRole("button", { name: "Add teammate" }));
         await waitFor(() =>
             expect(teamActions.addTeammateAction).toHaveBeenCalledWith({
+                editions: ["INDIA"],
                 name: "Kavya Nair",
                 email: "kavya.nair@example.com",
                 worksAs: "ACCOUNT_MANAGER_JOB",
