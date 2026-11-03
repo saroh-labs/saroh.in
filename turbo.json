@@ -130,6 +130,8 @@
         "LAUNCH_AT",
         // Templates' switch (DEC-135): saroh.in's gallery and the merchant
         // app's template picker show only when it is "on"; read at build.
+        "GLOBAL_DEV_DOMAIN",
+        "NEXT_PUBLIC_EDITION",
         "NEXT_PUBLIC_TEMPLATES",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.

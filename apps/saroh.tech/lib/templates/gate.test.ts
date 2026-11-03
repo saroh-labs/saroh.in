@@ -172,7 +172,8 @@ describe("the real content", () => {
             const real = r.problems.filter((x) => !/confirm/i.test(x));
             expect(real, r.path).toEqual([]);
         }
-    });
+        // Reads and compares every page: 6s beside a full gate, 2s alone.
+    }, 30_000);
 
     it("gives a combo 250 words of its own, without the trade's shared lines", () => {
         for (const c of COMBOS) {

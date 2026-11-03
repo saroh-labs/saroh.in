@@ -39,7 +39,7 @@ describe("footerFacts (DEC-101, DEC-102)", () => {
             footerFacts({ email: null, credit: { referralCode: "k7m2p9qa" } }),
         ).toMatchObject({
             email: null,
-            credit: { href: "https://saroh.in/?ref=k7m2p9qa" },
+            credit: { href: "https://www.saroh.in/?ref=k7m2p9qa" },
         });
     });
 
@@ -75,7 +75,7 @@ describe("getFooterFacts", () => {
         );
         expect(await getFooterFacts("site_kavi")).toMatchObject({
             email: "hi@kavi.example",
-            credit: { href: "https://saroh.in/?ref=k7m2p9qa" },
+            credit: { href: "https://www.saroh.in/?ref=k7m2p9qa" },
         });
         expect(urls[0]).toMatch(/\/public\/sites\/site_kavi\/footer$/);
     });

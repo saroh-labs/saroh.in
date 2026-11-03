@@ -10,6 +10,7 @@ import {
     gstLineWords,
     gstOnPriceOf,
     isAutopayMethod,
+    moneyLocaleOf,
 } from "@saroh/site-blocks";
 
 import type { PayPayment } from "./invoice-paid-shape";
@@ -263,7 +264,7 @@ export function payMoney(amount: string, currency: string): string {
     const value = Number(amount);
     if (!Number.isFinite(value)) return `${currency} ${amount}`;
     try {
-        return new Intl.NumberFormat("en-IN", {
+        return new Intl.NumberFormat(moneyLocaleOf(currency), {
             style: "currency",
             currency,
             minimumFractionDigits: 2,

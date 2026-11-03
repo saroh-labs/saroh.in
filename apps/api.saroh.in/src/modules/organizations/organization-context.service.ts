@@ -115,7 +115,9 @@ export class OrganizationContextService {
                 id: true,
                 role: true,
                 extraActions: true,
-                organization: { select: { lifecycleStatus: true } },
+                organization: {
+                    select: { lifecycleStatus: true, edition: true },
+                },
             },
         });
 
@@ -150,6 +152,7 @@ export class OrganizationContextService {
                     stored !== null,
                 ),
                 roleKey: membership.role,
+                edition: membership.organization.edition,
                 // The role's permissions plus this person's own extras
                 // (F17), with implied holds; read on every request, so
                 // taking an extra away takes the power on the next one.

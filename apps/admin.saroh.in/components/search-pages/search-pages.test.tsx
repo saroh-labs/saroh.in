@@ -523,7 +523,8 @@ describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, 
             .closest('[role="menuitem"]');
         expect(item?.getAttribute("aria-disabled")).toBeNull();
         expect(item?.textContent).toBe("Publish on saroh.in");
-    });
+        // A whole table with its menus: over 5s beside a full gate.
+    }, 30_000);
 
     it("shows Held by checks while live, and says why", () => {
         render(

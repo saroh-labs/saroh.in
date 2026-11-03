@@ -125,7 +125,9 @@ describe("OrganizationContextService.resolve", () => {
                 id: true,
                 role: true,
                 extraActions: true,
-                organization: { select: { lifecycleStatus: true } },
+                organization: {
+                    select: { lifecycleStatus: true, edition: true },
+                },
             },
         });
         // Success path is a single query — no org existence lookup.

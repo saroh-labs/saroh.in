@@ -169,7 +169,12 @@ describe("OrganizationOnboardingService.onboard", () => {
                     kind: "BUSINESS",
                     billingProfileId: "bprof_1",
                 },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                    edition: true,
+                },
             });
             expect(mockFirstBillingProfile).not.toHaveBeenCalled();
         });
@@ -284,7 +289,12 @@ describe("OrganizationOnboardingService.onboard", () => {
 
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                    edition: true,
+                },
             });
         });
 
@@ -305,7 +315,12 @@ describe("OrganizationOnboardingService.onboard", () => {
             ).resolves.toEqual({ id: "org_1", slug: "acme" });
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                    edition: true,
+                },
             });
         });
 
@@ -408,7 +423,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(orgCreate).toHaveBeenCalledWith({
             // No kind sent (an app from before DEC-070): a business.
             data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-            select: { id: true, slug: true, createdAt: true },
+            select: { id: true, slug: true, createdAt: true, edition: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
             data: {
@@ -611,7 +626,12 @@ describe("OrganizationOnboardingService.onboard", () => {
 
                 expect(orgCreate).toHaveBeenCalledWith({
                     data: { name: "Asha Rao", slug: "asha-rao", kind },
-                    select: { id: true, slug: true, createdAt: true },
+                    select: {
+                        id: true,
+                        slug: true,
+                        createdAt: true,
+                        edition: true,
+                    },
                 });
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -743,7 +763,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(orgCreate).toHaveBeenCalledWith({
             data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
-            select: { id: true, slug: true, createdAt: true },
+            select: { id: true, slug: true, createdAt: true, edition: true },
         });
     });
 

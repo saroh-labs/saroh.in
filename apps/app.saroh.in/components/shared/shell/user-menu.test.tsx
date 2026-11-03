@@ -13,9 +13,11 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
+import { IntlProvider } from "use-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { billingProfilesUrl } from "@/lib/accounts";
+import en from "@/lib/language/en.json";
 import type { AccountManager, Organization } from "@/lib/organizations/service";
 
 import { AppHeader } from "./app-header";
@@ -72,13 +74,15 @@ async function openMenu(
 ) {
     act(() =>
         root.render(
-            <UserMenu
-                name="Asha Verma"
-                email="asha.verma@example.com"
-                businessName="Pulse Fitness Gurugram"
-                ownsABusiness={ownsABusiness}
-                accountManager={accountManager}
-            />,
+            <IntlProvider locale="en" messages={en}>
+                <UserMenu
+                    name="Asha Verma"
+                    email="asha.verma@example.com"
+                    businessName="Pulse Fitness Gurugram"
+                    ownsABusiness={ownsABusiness}
+                    accountManager={accountManager}
+                />
+            </IntlProvider>,
         ),
     );
     const trigger = host.querySelector("button");
@@ -126,12 +130,14 @@ describe("the header decides it from the roles", () => {
         const draw = (organizations: Organization[]) => {
             menuProps.mockReset();
             renderToStaticMarkup(
-                <AppHeader
-                    user={{ name: "Asha", email: "asha.verma@example.com" }}
-                    organizations={organizations}
-                    activeOrg={organizations[0] ?? null}
-                    unread={null}
-                />,
+                <IntlProvider locale="en" messages={en}>
+                    <AppHeader
+                        user={{ name: "Asha", email: "asha.verma@example.com" }}
+                        organizations={organizations}
+                        activeOrg={organizations[0] ?? null}
+                        unread={null}
+                    />
+                </IntlProvider>,
             );
             return (menuProps.mock.calls[0]?.[0] as { ownsABusiness?: boolean })
                 .ownsABusiness;
@@ -206,13 +212,15 @@ describe("Your Saroh contact", () => {
         const handed = (accountManager?: AccountManager | null) => {
             menuProps.mockReset();
             renderToStaticMarkup(
-                <AppHeader
-                    user={{ name: "Asha", email: "asha.verma@example.com" }}
-                    organizations={[org]}
-                    activeOrg={org}
-                    unread={null}
-                    accountManager={accountManager}
-                />,
+                <IntlProvider locale="en" messages={en}>
+                    <AppHeader
+                        user={{ name: "Asha", email: "asha.verma@example.com" }}
+                        organizations={[org]}
+                        activeOrg={org}
+                        unread={null}
+                        accountManager={accountManager}
+                    />
+                </IntlProvider>,
             );
             return (
                 menuProps.mock.calls[0]?.[0] as {

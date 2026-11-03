@@ -20,8 +20,8 @@ import { MONEY_LOCALE } from "@saroh/ui/lib/money";
 export const DISPLAY_LOCALE = "en-GB";
 
 /**
- * The locale every number and amount is grouped in: lakh and crore
- * ("₹20,44,971"), the way Saroh's merchants read money (owner, 2026-10-04,
+ * The locale every number and amount is grouped in: this deployment's edition's
+ * (`MONEY_LOCALE`), so lakh and crore ("₹20,44,971") in India (owner, 2026-10-04,
  * DEC-079). Dates stay on `DISPLAY_LOCALE`. Pinned for the same hydration
  * reason as above.
  */

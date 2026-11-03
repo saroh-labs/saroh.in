@@ -2715,3 +2715,30 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     9. **It presents the whole product, in saroh.in's style (owner, 2 Nov):** the same features and solutions, the same tokens and components, its own header and its own wording. It claims only what works outside India at the date of a private ledger, re-checked before launch; every feature keeps its page, marked Full, Limited or Coming soon. Words the product doesn't back, such as client quote acceptance and approvals, stay off the site (`apps/saroh.tech/scripts/check-claims.mjs`). This replaces the first build's quote and invoice positioning.
     10. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
 - Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.
+
+## DEC-204 Two editions from one codebase: one database, the business decides
+
+**Status: Accepted — 2026-11-02** · owner
+
+- Context: India runs on saroh.in. A global edition runs on saroh.tech. Both must share one codebase, and adding a domain later should mean config rather than code.
+- Decision:
+    1. **One codebase, deployed per edition.** The marketing site, `app`, `accounts` and `admin` each deploy once per edition. `saroh.app` is shared, because every business's site lives on `*.saroh.app`.
+    2. **One database and one running API for now.** The API answers on `api.saroh.in`, `api.saroh.tech` and `api.saroh.app`. A second database or instance comes only if a law, a large customer, load or migration risk calls for it.
+    3. **The edition belongs to the business.** It's set once, from the business's country, and everything under the business inherits it. A person's location only suggests the country.
+    4. **Code reads the edition from the business, never from the address** a request came through. An address must match the business's edition, apart from `api.saroh.app`, which serves merchant sites only and refuses routes it hasn't listed.
+    5. **One account per person,** signed in separately on each edition's accounts site. Each lists all that person's businesses.
+    6. **Admin shows one edition per deployment,** with staff, releases and audit shared.
+    7. **Settings over branches.** Code asks a profile in `@saroh/edition` what it needs ("which tax system?"), never "is this India?". A third edition should mean a new profile.
+    8. **Languages are separate from editions.** Formatting and text foundations come first; existing text moves over time.
+- Consequences: a bad migration or outage reaches both editions, so migrations stay backward-compatible and new Global behaviour sits behind per-edition flags.
+- Rules: `packages/edition/src/index.ts`; `Organization.edition`.
+
+**Finding a site from its address stays three lookups (2 Nov).** The plan was one function. The code has three, and their rules differ on purpose: `getPublicationBySubdomain` with `getPublicationByHostname` shows a site and refuses test addresses and paused domains; `resolveSiteHost` serves customer sign-in and messages and needs a live, published site; `businessForHost` serves reports and still counts a deleted site. One function would only pay off in a database split, which isn't planned, and merging risks live merchant sites. Merge them if a split is decided.
+
+**Global's development domain isn't in the repo (3 Nov, owner).** It's the `GLOBAL_DEV_DOMAIN` setting on the development API and a secret for the Global development apps' deployments. Those apps sit behind the access key, as saroh.io's do.
+
+**Language and formats (3 Nov).** Text moves into each app's `lib/language/en.json`, read through `use-intl`, as it's touched. `next-intl` was rejected for now: it upgrades `@swc/core` across the repo and brings a message extractor, for routing and server helpers a one-language app doesn't use, and `use-intl` is its core with the same message format. A person's language isn't stored until a second language is decided. Numbers group by the deployment's edition where it serves one, by the currency where it serves both. Dates are day first everywhere.
+
+**Shared data is listed (2 Nov).** `scripts/shared-data.json` names the 35 models that belong to no one business, each with why, and `check:shared-data` fails on a new one that isn't listed.
+
+**Sign-in on two domains (2 Nov).** A browser takes a session cookie only for the address's own domain, so the one running API keeps one Better Auth instance per edition address, chosen from a fixed list by the request's address. The configured `BETTER_AUTH_URL` stays the default, and a second instance is only built when someone reaches that address. Reading a session needs only the shared secret and database, so the guard uses one instance. Signed-in state stays separate per domain, as agreed.

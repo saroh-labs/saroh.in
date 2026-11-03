@@ -6346,3 +6346,23 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: `public/downloads/**` is a build output in `turbo.json`, so a cache hit restores it.
 **Rule**: a file a build writes outside `.next` and needs at run time is a Turbo output. "cache hit, replaying logs" means the build's scripts did not run, whatever the log says.
 **Category**: tooling · Turbo cache
+
+---
+
+## A package's `exports` named files its build never wrote
+
+**Symptom**: 2 Nov, `@saroh/edition` failed to resolve under Vitest ("Failed to resolve entry"), while the API's Jest and type check had passed on the same package.
+**Cause**: its `exports` were copied from `@saroh/pricing-catalog`, which isn't `type: module`. Under `type: module` tsup writes `index.js` (ESM) and `index.cjs`, not `index.mjs` and `index.js`, so `require` would have loaded ESM in the running API.
+**Fix**: `exports` name `index.js` and `index.cjs`, with a test holding them there, and both entries were run in plain Node.
+**Rule**: after adding a built package, load it the way its consumers do (`node -e 'require(...)'` from the API). A green Jest doesn't prove it.
+**Category**: tooling · packages
+
+---
+
+## A test that reads every page timed out only beside the full gate
+
+**Symptom**: 2 Nov, saroh.tech's template gate test passed alone and hit Vitest's 5s limit during `prepush --all`.
+**Cause**: it audits all pages at once, which took over 6s with the integration and browser runs on the same machine.
+**Fix**: that test has its own 30s limit.
+**Rule**: a test that walks all of a site's content sets its own timeout. A pass alone says little about the same test under the gate's load.
+**Category**: testing · timeouts

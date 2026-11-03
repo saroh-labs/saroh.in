@@ -16,7 +16,8 @@ import {
  * Free credit, so a paid site carries no Saroh link. Made-up businesses.
  */
 
-const REPORT = reportBusinessHref("rye.saroh.app");
+const SAROH = "https://www.saroh.in";
+const REPORT = reportBusinessHref("rye.saroh.app", SAROH);
 const SELLER: SiteSeller = {
     lead: "Sold by",
     name: "Rye Foods LLP",
@@ -39,11 +40,15 @@ describe("the words", () => {
     });
 
     it("reports to saroh.in/customers with the site's address filled in", () => {
-        expect(REPORT).toBe("https://saroh.in/customers?site=rye.saroh.app");
-        expect(reportBusinessHref(" Shop.Example.com ")).toBe(
-            "https://saroh.in/customers?site=shop.example.com",
+        expect(REPORT).toBe(
+            "https://www.saroh.in/customers?site=rye.saroh.app",
         );
-        expect(reportBusinessHref("")).toBe("https://saroh.in/customers");
+        expect(reportBusinessHref(" Shop.Example.com ", SAROH)).toBe(
+            "https://www.saroh.in/customers?site=shop.example.com",
+        );
+        expect(reportBusinessHref("", SAROH)).toBe(
+            "https://www.saroh.in/customers",
+        );
     });
 
     it("draws one quiet line on a confirmation, and nothing without one", () => {
@@ -143,7 +148,10 @@ describe("the footer's Sold by block", () => {
 });
 
 describe("Report, on Free only", () => {
-    const FREE = { href: madeWithSarohHref("k7m2p9qa"), reportHref: REPORT };
+    const FREE = {
+        href: madeWithSarohHref("k7m2p9qa", SAROH),
+        reportHref: REPORT,
+    };
 
     it("sits beside Made with Saroh, to saroh.in/customers", () => {
         render(
@@ -197,5 +205,13 @@ describe("Report, on Free only", () => {
                 name: "Report this business to Saroh",
             }),
         ).toBeNull();
+    });
+});
+
+describe("the edition's site", () => {
+    it("sends a Global business's customers to saroh.tech", () => {
+        expect(reportBusinessHref("shop.saroh.app", "https://saroh.tech")).toBe(
+            "https://saroh.tech/customers?site=shop.saroh.app",
+        );
     });
 });

@@ -174,7 +174,12 @@ export class OrganizationOnboardingService {
                         ? { signupSource: { ...dto.signupSource } }
                         : {}),
                 },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                    edition: true,
+                },
             });
 
             // Every business gets a profile, if only for its time zone
@@ -243,12 +248,14 @@ export class OrganizationOnboardingService {
             return {
                 id: organization.id,
                 slug: organization.slug,
+                edition: organization.edition,
                 managerSource: manager?.source ?? null,
             };
         });
         // A new profile whose email lost a race to the database's
         // one-email-per-owner index: the same 409 as asked, not a 500.
-        const { managerSource, ...onboarded } = await raceAsTaken(making);
+        const { managerSource, edition, ...onboarded } =
+            await raceAsTaken(making);
 
         // Emit the audit event AFTER the transaction commits, so we only record
         // an org that actually exists. `record` never throws (it swallows and
@@ -282,7 +289,7 @@ export class OrganizationOnboardingService {
             void sendWelcomeEmail(owner.email, {
                 businessName: dto.name,
                 goal: dto.goal ?? null,
-                openUrl: `${appBase()}/open/${onboarded.id}`,
+                openUrl: `${appBase(edition)}/open/${onboarded.id}`,
                 address: onboarded.slug,
             }).then(
                 (outcome) => {

@@ -56,6 +56,7 @@ import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
+import { siteUrlOf } from "@saroh/edition";
 import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { lookDock } from "@/lib/header-action";
@@ -510,6 +511,9 @@ export default async function SiteLayout({
                                               ...footerFacts.credit,
                                               reportHref: reportBusinessHref(
                                                   test.host,
+                                                  siteUrlOf(
+                                                      footerFacts.edition,
+                                                  ),
                                               ),
                                           }
                                         : null

@@ -3,6 +3,7 @@
 jest.mock("@saroh/database", () => ({
     prisma: {
         lead: { findUnique: jest.fn() },
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
         submission: { findFirst: jest.fn() },
         notification: { create: jest.fn() },
         membership: { findMany: jest.fn() },

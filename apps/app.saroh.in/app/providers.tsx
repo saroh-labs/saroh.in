@@ -4,8 +4,10 @@ import { brandToastOptions } from "@saroh/ui/sonner";
 import { setRefusalTest } from "@saroh/ui/toast";
 import { useEffect } from "react";
 import { Toaster } from "sonner";
+import { IntlProvider } from "use-intl";
 
 import { isRoleRefusal } from "@/lib/api/role-denied";
+import en from "@/lib/language/en.json";
 
 /*
  * Toasts rise from the bottom, and below 760px the tab bar lives there: the
@@ -35,7 +37,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     // `showError(res.error)` in the app asks this first (`role-denied.ts`).
     useEffect(() => setRefusalTest(isRoleRefusal), []);
     return (
-        <>
+        // shortcut: English only, until a person can choose (DEC-204). Text moves
+        // into en.json as it's touched; a screen's words needn't all move at once.
+        <IntlProvider locale="en" messages={en}>
             <Toaster
                 position="bottom-center"
                 offset={offset}
@@ -43,6 +47,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 toastOptions={brandToastOptions}
             />
             {children}
-        </>
+        </IntlProvider>
     );
 }

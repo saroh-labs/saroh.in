@@ -1,3 +1,5 @@
+import { numberLocaleOf, parseEdition } from "@saroh/edition";
+
 /**
  * What a currency's sign is and how many decimal places it has: the one
  * answer for the box an amount is typed in (`MoneyInput`) and for the words
@@ -8,10 +10,13 @@
  */
 
 /**
- * The locale every number and amount is grouped in: lakh and crore
- * ("₹20,44,971"), the way Saroh's merchants read money (DEC-079).
+ * The locale every number and amount is grouped in on this deployment: in
+ * India lakh and crore ("₹20,44,971"), the way its merchants read money
+ * (DEC-079). A deployment serves one edition, so its businesses all share it.
  */
-export const MONEY_LOCALE = "en-IN";
+export const MONEY_LOCALE = numberLocaleOf(
+    parseEdition(process.env.NEXT_PUBLIC_EDITION),
+);
 
 /** The sign a currency is written with ("₹" for INR). */
 export function moneySign(currency: string): string {
