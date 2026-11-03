@@ -14,6 +14,9 @@ import hreflang from "@saroh/edition/hreflang";
  */
 interface Env {
     ASSETS: { fetch: (request: Request) => Promise<Response> };
+    /** Set on a development deploy: nobody without it gets in. */
+    DEV_ACCESS_KEY?: string;
+    DEV_ACCESS_COOKIE_DOMAIN?: string;
 }
 
 const CANONICAL_HOST = "saroh.tech";
@@ -65,7 +68,57 @@ function withHeaders(response: Response, url: URL): Response {
     return out;
 }
 
+async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(value),
+    );
+    return Array.from(new Uint8Array(digest), (b) =>
+        b.toString(16).padStart(2, "0"),
+    ).join("");
+}
+
+/**
+ * `withDevAccess` from `@saroh/auth`, for a static site with no Next at the
+ * edge: same parameter, cookie and digest, so one visit opens every dev app.
+ * Null lets the request through.
+ */
+async function devGate(request: Request, env: Env): Promise<Response | null> {
+    const key = env.DEV_ACCESS_KEY?.trim();
+    if (!key) return null;
+    const expected = await sha256Hex(key);
+    const url = new URL(request.url);
+    const given = url.searchParams.get("access");
+    url.searchParams.delete("access");
+    if (given !== null && (await sha256Hex(given)) === expected) {
+        const domain = env.DEV_ACCESS_COOKIE_DOMAIN?.trim();
+        return new Response(null, {
+            status: 303,
+            headers: {
+                Location: url.toString(),
+                "Set-Cookie": `saroh-dev-access=${expected}; Path=/; Max-Age=${30 * DAY}; HttpOnly; Secure; SameSite=Lax${domain ? `; Domain=${domain}` : ""}`,
+                "X-Robots-Tag": "noindex, nofollow",
+            },
+        });
+    }
+    const pass = (request.headers.get("cookie") ?? "")
+        .split(";")
+        .map((c) => c.trim())
+        .includes(`saroh-dev-access=${expected}`);
+    return pass
+        ? null
+        : new Response("Not found", {
+              status: 404,
+              headers: {
+                  "Cache-Control": "no-store",
+                  "X-Robots-Tag": "noindex, nofollow",
+              },
+          });
+}
+
 export async function handle(request: Request, env: Env): Promise<Response> {
+    const shut = await devGate(request, env);
+    if (shut) return shut;
     const url = new URL(request.url);
     const secure = url.protocol === "https:";
 

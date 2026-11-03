@@ -16,6 +16,7 @@
         "check:templates": "tsx scripts/check-templates.ts",
         "make:templates": "tsx scripts/make-template-files.ts",
         "cf:preview": "wrangler dev",
+        "cf:build": "pnpm build",
         "cf:deploy": "wrangler deploy"
     },
     "portless": "tech.saroh",

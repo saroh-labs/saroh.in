@@ -70,3 +70,51 @@ describe("the saroh.tech Worker", () => {
         expect(indiaHrefFor("/legal/terms")).toBe("https://www.saroh.in/");
     });
 });
+
+describe("behind the access key", () => {
+    const env = () => ({
+        ASSETS: assets(),
+        DEV_ACCESS_KEY: "right-key",
+        DEV_ACCESS_COOKIE_DOMAIN: ".global-dev.example",
+    });
+    const site = "https://global-dev.example/";
+
+    it("shows nothing without the key, on any path", async () => {
+        for (const path of ["", "pricing", "r/abc123", "region/hide"]) {
+            const e = env();
+            const res = await handle(get(`${site}${path}`), e);
+            expect(res.status).toBe(404);
+            expect(res.headers.get("x-robots-tag")).toContain("noindex");
+            expect(e.ASSETS.fetch).not.toHaveBeenCalled();
+        }
+        const wrong = await handle(get(`${site}?access=wrong`), env());
+        expect(wrong.status).toBe(404);
+        const forged = await handle(
+            get(site, { cookie: "saroh-dev-access=right-key" }),
+            env(),
+        );
+        expect(forged.status).toBe(404);
+    });
+
+    it("lets the key in, and the cookie it sets opens the site", async () => {
+        const res = await handle(get(`${site}pricing?access=right-key`), env());
+        expect(res.status).toBe(303);
+        expect(res.headers.get("location")).toBe(`${site}pricing`);
+        const set = res.headers.get("set-cookie") ?? "";
+        expect(set).toContain("Domain=.global-dev.example");
+        expect(set).toContain("HttpOnly");
+        expect(set).not.toContain("right-key");
+        const pair = set.split(";")[0] ?? "";
+        const e = env();
+        const next = await handle(get(`${site}pricing`, { cookie: pair }), e);
+        expect(next.status).toBe(200);
+        expect(e.ASSETS.fetch).toHaveBeenCalled();
+    });
+
+    it("stays open where no key is set", async () => {
+        const res = await handle(get("https://saroh.tech/"), {
+            ASSETS: assets(),
+        });
+        expect(res.status).toBe(200);
+    });
+});
