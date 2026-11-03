@@ -55,7 +55,7 @@ jobs:
                   jq -n --arg v "$DEV_ACCESS_KEY" '{DEV_ACCESS_KEY: $v}' > "$RUNNER_TEMP/worker-secrets.json"
 
             - name: Build the packages the app uses
-              run: pnpm turbo run build --filter="./${{ matrix.dir }}^..."
+              run: pnpm turbo run build --filter="$(jq -r .name "${{ matrix.dir }}/package.json")^..."
 
             - name: Build for Cloudflare
               working-directory: ${{ matrix.dir }}

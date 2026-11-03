@@ -135,7 +135,8 @@ export function withDevAccess(
 
         const production = process.env.DEV_REDIRECT_ORIGIN?.trim();
         const isRead = request.method === "GET" || request.method === "HEAD";
-        if (!isRead || !production) {
+        // "refuse": a domain whose address shouldn't lead anywhere (DEC-204).
+        if (!isRead || !production || production === "refuse") {
             return noIndex(new NextResponse("Not found", { status: 404 }));
         }
         // An empty DEV_REDIRECT_PATH keeps the page, as an unset one does.
