@@ -6,6 +6,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma, startOnFreePlan } from "@saroh/database";
+import { currencyForCountry, editionOfHost } from "@saroh/edition";
 
 import { appBase } from "../../common/app-url";
 import { sendWelcomeEmail } from "../../common/email";
@@ -27,7 +28,7 @@ import {
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
 import { recordManagerInTx } from "./account-manager";
-import { refuseCountryOutsideIndia } from "./business-country";
+import { refuseCountryOutsideEdition } from "./business-country";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
@@ -85,9 +86,10 @@ export class OrganizationOnboardingService {
         dto: OnboardOrganizationDto,
         /**
          * Who is setting it up, for the welcome email: the signed-in
-         * caller, never a value from the body. Absent, none is sent.
+         * caller, never a value from the body. Absent, none is sent. `host` is
+         * the address they set it up on.
          */
-        owner?: { email: string },
+        owner?: { email: string; host?: string },
     ): Promise<OnboardedOrganization> {
         /*
          * The address the business reserves: the one the merchant chose, or
@@ -97,7 +99,15 @@ export class OrganizationOnboardingService {
          */
         // Blank counts as not chosen, like absent: `??` alone would keep ""
         // and refuse it, where it should fall back to the name.
-        refuseCountryOutsideIndia(dto.profile?.country);
+        // Which edition is decided by the address it's set up on, and the
+        // country must belong there (DEC-204). An address of neither is India.
+        const edition = editionOfHost(owner?.host ?? "") ?? "INDIA";
+        refuseCountryOutsideEdition(edition, dto.profile?.country);
+        const currency =
+            edition === "GLOBAL"
+                ? (dto.currency ??
+                  currencyForCountry(dto.profile?.country ?? ""))
+                : undefined;
         const chosen =
             dto.address === undefined || dto.address === ""
                 ? null
@@ -146,14 +156,15 @@ export class OrganizationOnboardingService {
             // here, or, for an owner with none yet, their first from the
             // business's details once it exists (below). An owner with
             // profiles who chose none is refused, naming the choice.
-            const billingProfileId = await chosenBillingProfileInTx(
-                tx,
-                userId,
-                {
-                    billingProfileId: dto.billingProfileId,
-                    newBillingProfile: dto.newBillingProfile,
-                },
-            );
+            // Saroh's own billing abroad is later (DEC-204): nothing to choose
+            // on Global yet, and its profile's fields are India's.
+            const billingProfileId =
+                edition === "INDIA"
+                    ? await chosenBillingProfileInTx(tx, userId, {
+                          billingProfileId: dto.billingProfileId,
+                          newBillingProfile: dto.newBillingProfile,
+                      })
+                    : null;
 
             // Who referred it (DEC-156) and where it came from (#1190),
             // written here and nowhere else: no later write names these
@@ -163,6 +174,7 @@ export class OrganizationOnboardingService {
                     name: dto.name,
                     slug,
                     kind,
+                    ...(edition === "GLOBAL" ? { edition, currency } : {}),
                     ...(billingProfileId ? { billingProfileId } : {}),
                     ...(referredBy
                         ? {
@@ -178,7 +190,6 @@ export class OrganizationOnboardingService {
                     id: true,
                     slug: true,
                     createdAt: true,
-                    edition: true,
                 },
             });
 
@@ -234,7 +245,7 @@ export class OrganizationOnboardingService {
             // from its details (DEC-167, R6), whose customer at Saroh's
             // billing provider is made by a job after the commit: never in
             // the way of signing up. A later business chose one above.
-            if (!billingProfileId) {
+            if (!billingProfileId && edition === "INDIA") {
                 await firstBillingProfileInTx(tx, {
                     ownerUserId: userId,
                     organizationId: organization.id,
@@ -248,14 +259,12 @@ export class OrganizationOnboardingService {
             return {
                 id: organization.id,
                 slug: organization.slug,
-                edition: organization.edition,
                 managerSource: manager?.source ?? null,
             };
         });
         // A new profile whose email lost a race to the database's
         // one-email-per-owner index: the same 409 as asked, not a 500.
-        const { managerSource, edition, ...onboarded } =
-            await raceAsTaken(making);
+        const { managerSource, ...onboarded } = await raceAsTaken(making);
 
         // Emit the audit event AFTER the transaction commits, so we only record
         // an org that actually exists. `record` never throws (it swallows and

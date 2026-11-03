@@ -171,6 +171,9 @@ model Organization {
   // it after that. Code reads it from here, never from the address a request
   // came through.
   edition Edition @default(INDIA)
+  // ISO 4217, chosen at setup by a Global business: its one currency. Null for
+  // a business from before, whose currency comes from what it sells (DEC-030).
+  currency String?
 
   // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
   // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for

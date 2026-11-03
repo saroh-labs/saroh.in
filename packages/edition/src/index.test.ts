@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    currencyForCountry,
     editionForCountry,
     editionOfHost,
     EDITIONS,
@@ -114,5 +115,14 @@ describe("how numbers are grouped", () => {
         expect(moneyLocaleOf("INR")).toBe("en-IN");
         expect(moneyLocaleOf("USD")).toBe("en-US");
         expect(moneyLocaleOf(null)).toBe("en-US");
+    });
+});
+
+describe("currencyForCountry", () => {
+    it("suggests the country's own, else dollars", () => {
+        expect(currencyForCountry("GB")).toBe("GBP");
+        expect(currencyForCountry("de")).toBe("EUR");
+        expect(currencyForCountry("IN")).toBe("INR");
+        expect(currencyForCountry("BR")).toBe("USD");
     });
 });

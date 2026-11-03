@@ -152,3 +152,37 @@ export const numberLocaleOf = (edition: Edition) =>
  */
 export const moneyLocaleOf = (currency: string | null | undefined) =>
     currency === "INR" ? "en-IN" : "en-US";
+
+const EURO_COUNTRIES =
+    "AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK".split(" ");
+
+/** What a Global business is offered at setup. Stripe takes all of these. */
+export const GLOBAL_CURRENCIES = [
+    "USD",
+    "EUR",
+    "GBP",
+    "CAD",
+    "AUD",
+    "NZD",
+    "SGD",
+    "AED",
+    "ZAR",
+] as const;
+
+const COUNTRY_CURRENCY: Record<string, (typeof GLOBAL_CURRENCIES)[number]> = {
+    GB: "GBP",
+    CA: "CAD",
+    AU: "AUD",
+    NZ: "NZD",
+    SG: "SGD",
+    AE: "AED",
+    ZA: "ZAR",
+};
+
+/** The currency setup suggests for a country; the business can pick another. */
+export function currencyForCountry(country: string): string {
+    const code = country.trim().toUpperCase();
+    if (code === "IN") return "INR";
+    if (EURO_COUNTRIES.includes(code)) return "EUR";
+    return COUNTRY_CURRENCY[code] ?? "USD";
+}

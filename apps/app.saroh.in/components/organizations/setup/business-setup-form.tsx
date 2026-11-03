@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { EDITION } from "@/lib/edition";
 import { PAGE_FORM, toFirstErrorIn } from "@/lib/hooks/page-form";
 import { addressFromName } from "@/lib/organizations/address";
 import type {
@@ -122,7 +123,7 @@ function startingAnswers(
         kind: "BUSINESS",
         yourName: "",
         address: "",
-        country: "IN",
+        country: EDITION === "INDIA" ? "IN" : "",
         goal: defaultGoal("BUSINESS"),
         managerCode: "",
         ...NO_BILLING,
@@ -153,7 +154,8 @@ function SetupSteps({
     // Who Saroh bills is asked only of an owner with a profile (DEC-167).
     const billing = useMemo<SetupBilling | null>(
         () =>
-            billingProfiles && billingProfiles.length > 0
+            // Saroh's own billing abroad is later (DEC-204).
+            EDITION === "INDIA" && billingProfiles && billingProfiles.length > 0
                 ? { profiles: billingProfiles }
                 : null,
         [billingProfiles],

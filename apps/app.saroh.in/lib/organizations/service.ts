@@ -1,3 +1,6 @@
+import type { Edition } from "@saroh/edition";
+
+import { EDITION } from "@/lib/edition";
 import { cache } from "react";
 
 import { toFailure } from "@/lib/api/failure";
@@ -31,6 +34,10 @@ export interface Organization {
     id: string;
     name: string;
     slug: string;
+    /** Which edition it runs under. Absent from an older API: India. */
+    edition?: Edition;
+    /** The currency a Global business chose at setup. */
+    currency?: string | null;
     /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrganizationRole;
     /** The role as stored — a built-in name, or an invented role's key. */
@@ -105,6 +112,8 @@ export interface CreateOrganizationInput {
     name: string;
     /** "What are you setting up?" (DEC-070). Absent, the API stores BUSINESS. */
     kind?: OrganizationKind;
+    /** A Global business's one currency (DEC-204). */
+    currency?: string;
     profile?: OrganizationProfileInput;
     /**
      * The `<address>.saroh.app` the business reserves — its first website is
@@ -190,8 +199,11 @@ export async function listOrganizations(): Promise<Organization[]> {
     const res = await apiFetch("/organizations");
     if (!res.ok) return [];
     const orgs = (await res.json()) as Organization[];
-    // The role's words on screen, not its stored name (DEC-069, L10).
-    return orgs.map((o) => ({ ...o, roleLabel: shownRoleLabel(o.roleLabel) }));
+    // Only this edition's businesses (DEC-204): the API refuses the others
+    // here. The role's words on screen, not its stored name (DEC-069, L10).
+    return orgs
+        .filter((o) => (o.edition ?? "INDIA") === EDITION)
+        .map((o) => ({ ...o, roleLabel: shownRoleLabel(o.roleLabel) }));
 }
 
 /**

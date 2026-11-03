@@ -8,6 +8,7 @@ import {
     normalisePhoneNumber,
     PHONE_EXAMPLE,
 } from "@saroh/block-contract";
+import type { Edition } from "@saroh/edition";
 
 /**
  * The business's public phone (DEC-053, F20): the merchant's own number,
@@ -50,11 +51,17 @@ export function normaliseIndianPhone(raw: string): PhoneResult {
 }
 
 /** The settings save's write: absent leaves it, "" clears it, else E.164. */
-export function phoneWrite(raw: string | undefined): {
+export function phoneWrite(
+    raw: string | undefined,
+    edition: Edition = "INDIA",
+): {
     phone?: string | null;
 } {
     if (raw === undefined) return {};
-    const result = normaliseIndianPhone(raw);
+    const result =
+        edition === "INDIA"
+            ? normaliseIndianPhone(raw)
+            : normalisePublicPhone(raw);
     if ("problem" in result) {
         throw new BadRequestException({
             message: result.problem,
