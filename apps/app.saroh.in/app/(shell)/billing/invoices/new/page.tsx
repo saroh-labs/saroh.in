@@ -12,6 +12,7 @@ import { listInvoices } from "@/lib/invoices/service";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readOrganizationSettings } from "@/lib/organizations/settings-service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "New invoice" };
@@ -76,7 +77,9 @@ export default async function NewInvoicePage({
                 }}
                 contacts={contacts}
                 // The currency the business last invoiced in.
-                defaultCurrency={invoices.rows.at(0)?.currency ?? "INR"}
+                defaultCurrency={
+                    invoices.rows.at(0)?.currency ?? (await startingCurrency())
+                }
                 initialContactId={forContact?.id}
                 registered={
                     settings.ok && (settings.data.tax?.registered ?? false)

@@ -173,7 +173,6 @@ describe("OrganizationOnboardingService.onboard", () => {
                     id: true,
                     slug: true,
                     createdAt: true,
-                    edition: true,
                 },
             });
             expect(mockFirstBillingProfile).not.toHaveBeenCalled();
@@ -293,7 +292,6 @@ describe("OrganizationOnboardingService.onboard", () => {
                     id: true,
                     slug: true,
                     createdAt: true,
-                    edition: true,
                 },
             });
         });
@@ -319,7 +317,6 @@ describe("OrganizationOnboardingService.onboard", () => {
                     id: true,
                     slug: true,
                     createdAt: true,
-                    edition: true,
                 },
             });
         });
@@ -407,6 +404,48 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
     });
 
+    describe("on a Global address (DEC-204)", () => {
+        const global = (dto: OnboardOrganizationDto) =>
+            service.onboard("user_1", dto, {
+                email: "owner@example.com",
+                host: "api.saroh.tech",
+            });
+
+        it("makes a Global business in its currency, with no billing profile", async () => {
+            await global({
+                name: "Acme",
+                currency: "CAD",
+                profile: { country: "GB" },
+            });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        edition: "GLOBAL",
+                        currency: "CAD",
+                    }),
+                }),
+            );
+            expect(mockFirstBillingProfile).not.toHaveBeenCalled();
+        });
+
+        it("suggests the country's currency when none was chosen", async () => {
+            await global({ name: "Acme", profile: { country: "DE" } });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ currency: "EUR" }),
+                }),
+            );
+        });
+
+        it("refuses India, and no country at all", async () => {
+            await expect(
+                global({ name: "Acme", profile: { country: "IN" } }),
+            ).rejects.toThrow(/India/);
+            await expect(global({ name: "Acme" })).rejects.toThrow(/country/);
+            expect(orgCreate).not.toHaveBeenCalled();
+        });
+    });
+
     it("creates org + profile + OWNER membership atomically in one transaction", async () => {
         const dto: OnboardOrganizationDto = {
             name: "Acme",
@@ -423,7 +462,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(orgCreate).toHaveBeenCalledWith({
             // No kind sent (an app from before DEC-070): a business.
             data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-            select: { id: true, slug: true, createdAt: true, edition: true },
+            select: { id: true, slug: true, createdAt: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
             data: {
@@ -630,7 +669,6 @@ describe("OrganizationOnboardingService.onboard", () => {
                         id: true,
                         slug: true,
                         createdAt: true,
-                        edition: true,
                     },
                 });
                 expect(record).toHaveBeenCalledWith(
@@ -763,7 +801,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(orgCreate).toHaveBeenCalledWith({
             data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
-            select: { id: true, slug: true, createdAt: true, edition: true },
+            select: { id: true, slug: true, createdAt: true },
         });
     });
 

@@ -5,9 +5,11 @@ import {
 } from "@saroh/ui/lib/setup-plan";
 import { z } from "zod";
 
+import { EDITION } from "@/lib/edition";
 import type { OrganizationKind } from "./kind";
 import { kindOf, ORGANIZATION_KINDS } from "./kind";
 import { managerCodeProblem } from "./referral-carry";
+
 import type { SetupBilling } from "./setup-billing";
 import { BILLING_FIELDS, billingProblems } from "./setup-billing";
 
@@ -58,8 +60,19 @@ export function setupSchema(
             address: z.string().min(3, {
                 error: "A web address needs at least 3 characters",
             }),
-            // India only for now (#1214): setup never asks, and sends IN.
-            country: z.literal("IN"),
+            // India's setup never asks, and sends IN (#1214). Global's asks,
+            // and India is for India's own address (DEC-204).
+            country: z
+                .string()
+                .refine(
+                    (code) =>
+                        EDITION === "INDIA"
+                            ? code === "IN"
+                            : /^[A-Z]{2}$/.test(code) && code !== "IN",
+                    { error: "Choose where your business is, outside India" },
+                ),
+            // Global's one currency for the business. India's isn't asked.
+            currency: z.string().optional(),
             // A goal's key, or "LATER".
             goal: z.string().min(1),
             // Bookings' trade (DEC-189): asked only when the goal is
@@ -157,7 +170,7 @@ export interface SetupStep {
 
 const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
     kind: ["kind"],
-    name: ["yourName", "name", "address", "country", "managerCode"],
+    name: ["yourName", "name", "address", "country", "currency", "managerCode"],
     billing: BILLING_FIELDS,
     first: ["goal", "trade"],
 };
@@ -418,8 +431,9 @@ const draftSchema = z.object({
         yourName: z.string().max(120).optional(),
         name: z.string().max(200),
         address: z.string().max(100),
-        // A draft from before #1214 can say another; it is read as IN.
-        country: z.string().length(2),
+        // India's reads as IN, whatever a draft from before #1214 said.
+        country: z.string().max(2),
+        currency: z.string().max(3).optional(),
         goal: z.string().min(1).max(40),
         trade: z.enum(SETUP_TRADES).optional(),
         managerCode: z.string().max(20).optional(),
@@ -445,10 +459,16 @@ export function readSetupDraft(email: string): SetupDraft | null {
         const parsed = draftSchema.safeParse(JSON.parse(raw));
         if (!parsed.success || parsed.data.for !== email) return null;
         const { for: _for, ...draft } = parsed.data;
-        // India only for now (#1214), whatever an older draft said. zod 4
-        // types a conditional `yourName` as a key that is always present.
+        // zod 4 types a conditional `yourName` as a key that is always present.
         const { yourName, ...values } = draft.values;
-        return { ...draft, values: { ...values, yourName, country: "IN" } };
+        return {
+            ...draft,
+            values: {
+                ...values,
+                yourName,
+                country: EDITION === "INDIA" ? "IN" : values.country,
+            },
+        };
     } catch {
         return null;
     }

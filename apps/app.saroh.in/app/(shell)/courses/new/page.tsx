@@ -8,6 +8,7 @@ import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { listCourses } from "@/lib/courses/service";
 import { readMissingRates } from "@/lib/gst-rates/service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
@@ -85,7 +86,10 @@ export default async function NewCoursePage() {
                     <CourseForm
                         services={options}
                         // The currency the business last priced a course in.
-                        defaultCurrency={courses.at(0)?.currency ?? "INR"}
+                        defaultCurrency={
+                            courses.at(0)?.currency ??
+                            (await startingCurrency())
+                        }
                         gst={{
                             asked: rates?.registered === true,
                             priceMode: rates?.priceMode ?? null,

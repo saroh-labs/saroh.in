@@ -5,6 +5,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type {
     OrganizationContext,
@@ -42,6 +43,10 @@ export interface UserOrganization {
      * listed: its people can't open it (#921).
      */
     lifecycleStatus: string;
+    /** Which edition it runs under: each edition's app lists only its own. */
+    edition: Edition;
+    /** The one a Global business chose at setup; null otherwise. */
+    currency: string | null;
     /**
      * What is being set up (DEC-070), so the words fit before a business
      * is opened. Words and defaults only.
@@ -189,6 +194,8 @@ export class OrganizationContextService {
                         slug: true,
                         lifecycleStatus: true,
                         kind: true,
+                        edition: true,
+                        currency: true,
                         businessProfile: {
                             select: { timezone: true, country: true },
                         },
@@ -267,6 +274,8 @@ export class OrganizationContextService {
                     ),
                 ],
                 lifecycleStatus: membership.organization.lifecycleStatus,
+                edition: membership.organization.edition,
+                currency: membership.organization.currency,
                 kind: kindRead(membership.organization.kind),
                 timeZone:
                     membership.organization.businessProfile?.timezone ?? null,

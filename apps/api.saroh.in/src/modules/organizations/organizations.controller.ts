@@ -8,8 +8,10 @@ import {
     Post,
     Put,
     Query,
+    Req,
     UseGuards,
 } from "@nestjs/common";
+import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -58,8 +60,12 @@ export class OrganizationsController {
     onboard(
         @CurrentUser() user: AuthUser,
         @Body() dto: OnboardOrganizationDto,
+        @Req() req: Request,
     ) {
-        return this.onboarding.onboard(user.id, dto, { email: user.email });
+        return this.onboarding.onboard(user.id, dto, {
+            email: user.email,
+            host: req.headers.host,
+        });
     }
 
     @Get()

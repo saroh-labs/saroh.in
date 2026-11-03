@@ -1,6 +1,7 @@
 import { readMissingRates } from "@/lib/gst-rates/service";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { businessCurrencyOf } from "@/lib/services/editor-data";
 import type { Service } from "@/lib/services/service";
 import { readServices } from "@/lib/services/service";
@@ -55,7 +56,10 @@ export async function loadPackEditorContext(): Promise<PackEditorContext> {
                   .map(toOption)
                   .sort((a, b) => a.name.localeCompare(b.name))
             : null,
-        currency: read.ok ? businessCurrencyOf(read.services) : "INR",
+        currency:
+            read.ok && read.services.some((s) => s.currency)
+                ? businessCurrencyOf(read.services)
+                : await startingCurrency(),
         gst: {
             asked: rates?.registered === true,
             priceMode: rates?.priceMode ?? null,

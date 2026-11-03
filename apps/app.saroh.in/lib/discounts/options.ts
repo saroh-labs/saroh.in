@@ -1,4 +1,5 @@
 import type { ReachOptions } from "@/components/stores/discounts/discount-form";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { listCategories, listProducts } from "@/lib/products/service";
 import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
@@ -27,6 +28,6 @@ export async function loadReachOptions(): Promise<{
             COLLECTION: categories.map((c) => ({ id: c.id, label: c.name })),
             PRODUCT: products.map((p) => ({ id: p.id, label: p.name })),
         },
-        defaultCurrency: first?.currency ?? "INR",
+        defaultCurrency: first?.currency ?? (await startingCurrency()),
     };
 }

@@ -7,6 +7,7 @@ import { MoneyInput } from "@saroh/ui/money-input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { useId } from "react";
 
+import { useStartingCurrency } from "@/components/shared/fields/business-country";
 import type { DayDraft, TurnOnDraft } from "@/lib/modules/turn-on";
 import { hoursErrorsByWeekday, WEEK } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
@@ -28,6 +29,7 @@ export function BookingsFields({
     update: Update;
     errors: FieldErrors;
 }) {
+    const currency = useStartingCurrency();
     const id = useId();
     const b = draft.APPOINTMENTS;
     const byDay = hoursErrorsByWeekday(errors, draft);
@@ -177,7 +179,7 @@ export function BookingsFields({
                 >
                     <MoneyInput
                         id={`${id}-price`}
-                        currency="INR"
+                        currency={currency}
                         value={b.price}
                         maxLength={10}
                         autoComplete="off"

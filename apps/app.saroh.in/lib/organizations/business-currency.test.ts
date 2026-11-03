@@ -6,6 +6,10 @@ const reads = vi.hoisted(() => ({
     listServices: vi.fn(),
 }));
 
+vi.mock("@/lib/organizations/starting-currency", () => ({
+    DEFAULT_CURRENCY: "INR",
+    startingCurrency: () => Promise.resolve("INR"),
+}));
 vi.mock("@/lib/stores/storefronts", () => ({
     listStorefronts: reads.listStorefronts,
     getStorefront: reads.getStorefront,

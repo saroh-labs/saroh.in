@@ -17,8 +17,8 @@ export function assertEditionMatchesAddress(
     const served = editionOfHost(host);
     if (served && served !== edition) {
         throw new ForbiddenException({
-            code: "EDITION_ADDRESS_MISMATCH",
             message: "This business isn't served from this address.",
+            details: { reason: "edition_address" },
         });
     }
 }

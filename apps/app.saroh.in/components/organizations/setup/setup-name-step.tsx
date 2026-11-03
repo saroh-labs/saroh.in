@@ -13,10 +13,12 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useFormContext, useWatch } from "react-hook-form";
 
+import { EDITION } from "@/lib/edition";
 import { cleanAddressInput } from "@/lib/organizations/address";
 import { kindDefaults, kindWords } from "@/lib/organizations/kind";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
 
+import { SetupCountryFields } from "./setup-country-fields";
 import { SetupManagerCode } from "./setup-manager-code";
 import type { AddressState } from "./use-address-check";
 
@@ -29,10 +31,9 @@ import type { AddressState } from "./use-address-check";
  * because it is where the business's website lives (`<address>.saroh.app`),
  * so it is asked once, here, and never again when Website is turned on.
  *
- * No country is asked: Saroh is for businesses in India for now (#1214),
- * so the form sends IN. The country chips and `CountrySelect` come back
- * when Saroh sells elsewhere (#1212). Under the address, one quiet line
- * asks whether someone from Saroh is helping, for their code (DEC-169).
+ * India's setup asks no country and sends IN (#1214). Global's asks where the
+ * business is and its one currency (DEC-204). Under the address, one quiet
+ * line asks whether someone from Saroh is helping, for their code (DEC-169).
  *
  * It draws inside the setup form's `<Form>`: the answers are that one
  * form's, so leaving this step and coming back loses nothing.
@@ -108,6 +109,8 @@ export function SetupNameStep({
                     </FormItem>
                 )}
             />
+
+            {EDITION === "GLOBAL" ? <SetupCountryFields /> : null}
 
             <FormField
                 control={form.control}

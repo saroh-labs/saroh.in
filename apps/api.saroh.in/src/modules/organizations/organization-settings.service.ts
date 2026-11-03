@@ -29,7 +29,7 @@ import {
 } from "../sites/page-cache-revalidate";
 import type { PublicContact } from "./business-contact";
 import { businessPublicContactOf } from "./business-contact";
-import { refuseCountryOutsideIndia } from "./business-country";
+import { refuseCountryOutsideEdition } from "./business-country";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -474,7 +474,7 @@ export class OrganizationSettingsService {
         const typeValue = businessTypeWrite(profileData.type);
         const businessType = typeValue === undefined ? {} : { type: typeValue };
         // Checked and made E.164 before anything is written; "" clears it.
-        const phone = phoneWrite(dto.profile?.phone);
+        const phone = phoneWrite(dto.profile?.phone, ctx.edition);
         const taxSent = {
             tax: dto.tax,
             taxId: profileData.taxId,
@@ -488,7 +488,11 @@ export class OrganizationSettingsService {
               })
             : null;
         // Sending a country always touches tax, so the stored one is read.
-        refuseCountryOutsideIndia(profileData.country, taxCurrent?.country);
+        refuseCountryOutsideEdition(
+            ctx.edition ?? "INDIA",
+            profileData.country,
+            taxCurrent?.country ?? "",
+        );
         const taxData = touchesTax(taxSent)
             ? taxChanges(taxCurrent, taxSent)
             : {};

@@ -1,3 +1,4 @@
+import { GLOBAL_CURRENCIES } from "@saroh/edition";
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
@@ -165,6 +166,13 @@ export class OnboardOrganizationDto {
     @ValidateNested()
     @Type(() => OnboardingProfileDto)
     profile?: OnboardingProfileDto;
+
+    /** A Global business's one currency (DEC-204). India's ignores it. */
+    @IsOptional()
+    @IsIn(GLOBAL_CURRENCIES, {
+        message: "Choose one of the currencies listed.",
+    })
+    currency?: string;
 
     /**
      * The business's address on Saroh — the `<address>.saroh.app` its website
