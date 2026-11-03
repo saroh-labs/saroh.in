@@ -164,7 +164,7 @@ export {
 export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
 // A price as the site shows it; no directive, so server pages can call it.
-export { formatAmount } from "./lib/money";
+export { formatAmount, moneyLocaleOf } from "./lib/money";
 // The GST words beside a price, one way on every page; the API's numbers.
 export {
     browsePriceWords,

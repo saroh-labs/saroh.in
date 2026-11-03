@@ -1,0 +1,46 @@
+{
+    "_": "Data that belongs to no one business, so it stays readable from both editions (DEC-204). A model here is what a later database split has to plan for. `edition` says what a model will need when its stage comes.",
+    "person": {
+        "User": "one account per person, across editions",
+        "Session": "signed in separately per domain, stored together",
+        "Account": "sign-in methods",
+        "Verification": "sign-in codes",
+        "SignInEmailChange": "a person's email change",
+        "AccountEmailCodeSend": "per-address code limit",
+        "AccountPhoneCode": "phone sign-in, India only for now",
+        "AccountPhoneEvent": "phone sign-in, India only for now",
+        "OtpWidgetTokenUse": "phone sign-in, India only for now",
+        "BillingProfile": "who pays, and it can span a person's businesses"
+    },
+    "staff": {
+        "PlatformAdmin": "staff are shared",
+        "PlatformAdminRoleAssignment": "staff are shared",
+        "StaffProfile": "staff are shared",
+        "StaffInvite": "staff are shared",
+        "AdminOperation": "staff's bulk work",
+        "AdminOperationItem": "staff's bulk work",
+        "FeatureFlag": "flags, read per edition later"
+    },
+    "saroh": {
+        "Plan": "edition: stage 9, USD plans",
+        "PricingCatalogVersion": "edition: stage 9, USD plans",
+        "PricingCatalogDraft": "edition: stage 9, USD plans",
+        "PricingCoupon": "edition: stage 9, USD plans",
+        "PricingProviderPlan": "edition: stage 9, USD plans",
+        "SarohInvoiceSequence": "edition: stage 9, Saroh's own invoice numbers",
+        "CommissionRate": "Saroh's own partners",
+        "CommissionPayout": "Saroh's own partners",
+        "SarohLead": "edition: stage 7, admin shows one edition",
+        "ContactMessage": "edition: stage 7, admin shows one edition",
+        "WaitlistSignup": "edition: stage 7, admin shows one edition",
+        "DownloadLead": "edition: stage 7, admin shows one edition",
+        "SearchPage": "saroh.in's search pages",
+        "SearchPageEvent": "saroh.in's search pages"
+    },
+    "messaging": {
+        "MessagingMessage": "Saroh's own sender, India only for now",
+        "MessagingUsage": "Saroh's own sender, India only for now",
+        "MessagingContactWindow": "Saroh's own sender, India only for now",
+        "MessagingWebhookEvent": "Saroh's own sender, India only for now"
+    }
+}

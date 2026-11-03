@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
+import { useTranslations } from "use-intl";
 
 import { accountsLoginUrl, billingProfilesUrl } from "@/lib/accounts";
 import { helpHomeUrl } from "@/lib/help/links";
@@ -76,6 +77,7 @@ export function UserMenu({
     accountManager?: AccountManager | null;
 }) {
     const { theme = "system", setTheme } = useTheme();
+    const t = useTranslations("userMenu");
     // An empty-string name is as good as absent.
     const displayName = name?.trim() ?? "";
     const firstName = displayName.split(/\s+/).at(0) ?? "";
@@ -91,7 +93,9 @@ export function UserMenu({
                     // Their name or email: masked in a session recording,
                     // even where the bar around it is readable.
                     data-ph-mask=""
-                    aria-label={`Your account, ${displayName || email}`}
+                    aria-label={t("yourAccountOf", {
+                        who: displayName || email,
+                    })}
                     className="ml-0.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-[9px] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active coarse:min-h-11"
                 >
                     <Avatar className="size-[26px] text-[11px]">
@@ -113,7 +117,7 @@ export function UserMenu({
                     </Avatar>
                     <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold">
-                            {displayName || "Your account"}
+                            {displayName || t("yourAccount")}
                         </span>
                         <span className="block truncate text-[11.5px] text-muted-foreground">
                             {email}
@@ -125,7 +129,7 @@ export function UserMenu({
                         there to accounts.saroh.in. */}
                     <Link href="/settings/profile">
                         <UserRound />
-                        <span className="flex-1">Your profile</span>
+                        <span className="flex-1">{t("profile")}</span>
                     </Link>
                 </DropdownMenuItem>
                 {ownsABusiness ? (
@@ -147,7 +151,7 @@ export function UserMenu({
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="gap-2.5 rounded-[7px] px-[9px] py-[7px] text-[13px] [&>svg]:size-4">
                         <SunMoon />
-                        <span className="flex-1">Appearance</span>
+                        <span className="flex-1">{t("appearance")}</span>
                         <span className="text-[11.5px] text-muted-foreground">
                             {appearance}
                         </span>
@@ -175,7 +179,7 @@ export function UserMenu({
                 <DropdownMenuItem asChild>
                     <a href={helpHomeUrl()} target="_blank" rel="noreferrer">
                         <CircleHelp />
-                        <span className="flex-1">Help centre</span>
+                        <span className="flex-1">{t("helpCentre")}</span>
                     </a>
                 </DropdownMenuItem>
                 <p className="px-[9px] pb-1 pt-2 text-[11px] leading-[1.45] text-muted-foreground">
@@ -203,7 +207,7 @@ export function UserMenu({
                     }}
                 >
                     <LogOut />
-                    Sign out
+                    {t("signOut")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

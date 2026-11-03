@@ -1,3 +1,5 @@
+import { parseEdition, siteUrlOf } from "@saroh/edition";
+
 /**
  * Saroh's own Privacy, Terms and Help pages, for the quiet line under every
  * screen outside the workspace (`SplitShell`): signing up, signing in and
@@ -15,8 +17,10 @@
  * `apps/app.saroh.in/lib/help/links.ts`).
  */
 
-/** The marketing site. `www`, as saroh.in redirects to it. */
-export const SAROH_SITE_URL = "https://www.saroh.in";
+/** This deployment's marketing site. */
+export const SAROH_SITE_URL = siteUrlOf(
+    parseEdition(process.env.NEXT_PUBLIC_EDITION),
+);
 
 /** Where Help lives until it publishes on the marketing site. */
 export const SAROH_OLD_HELP_URL = "https://help.saroh.in";

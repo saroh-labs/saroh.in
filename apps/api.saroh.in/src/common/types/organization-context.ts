@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import type { OrgAction } from "../../modules/organizations/organization-actions";
 
 /**
@@ -69,4 +70,6 @@ export interface OrganizationContext {
      * wherever this is not set.
      */
     actions?: ReadonlySet<OrgAction>;
+    /** The edition the business runs under (DEC-204). Absent where a context wasn't built from the business. */
+    edition?: Edition;
 }

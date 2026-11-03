@@ -227,6 +227,14 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # No new hard-coded addresses in shared code (DEC-204)
+      - name: Hard-coded domains
+        run: pnpm run check:domains
+
+      # Every model has a business, or is listed as shared (DEC-204)
+      - name: Shared data
+        run: pnpm run check:shared-data
+
       # Every date field is the shadcn date picker, never a native one.
       - name: Date inputs
         run: pnpm run check:date-inputs

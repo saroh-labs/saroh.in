@@ -14,6 +14,7 @@ import {
     sendPasswordResetEmail,
 } from "../email";
 import { trustedProxyRanges } from "../trust-proxy";
+import { otherAuthAddress } from "./auth-address";
 import { claimCodeMail } from "./code-mail-limits";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
@@ -27,7 +28,7 @@ import { deliverVerificationOtp } from "./verification-otp";
  */
 const deletionLogger = new Logger("AccountDeletion");
 
-export const auth: Auth = createAuth({
+const authServices: Parameters<typeof createAuth>[0] = {
     // Email verification is code-based (see the emailOTP plugin in @saroh/auth):
     // no verification LINK is sent, so there is no link sender to inject.
     // A held address gets none (admin console U9, `verification-otp.ts`).
@@ -72,4 +73,31 @@ export const auth: Auth = createAuth({
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
     mayMailCode: (email, { turnstileToken }) =>
         claimCodeMail(email, turnstileToken),
-});
+};
+
+export const auth: Auth = createAuth(authServices);
+
+const instanceByAddress = new Map<string, Auth>();
+
+/**
+ * The instance for the address a request came in on. Built on first use, so a
+ * deployment nobody reaches on another domain runs only `auth`. Reading a
+ * session needs only the shared secret and database, so the guard's `auth` is
+ * right for every address; what differs is the cookie a sign-in sets.
+ */
+export function authFor(host: string | null | undefined): Auth {
+    const address = otherAuthAddress(host, env.BETTER_AUTH_URL);
+    if (!address) return auth;
+    let instance = instanceByAddress.get(address);
+    if (!instance) {
+        instance = createAuth({ ...authServices, baseURL: address });
+        instanceByAddress.set(address, instance);
+    }
+    return instance;
+}
+
+/** What `/api/auth/*` is mounted on: `auth`, answering by address. */
+export const mountedAuth: Auth = {
+    ...auth,
+    handler: (request) => authFor(request.headers.get("host")).handler(request),
+};

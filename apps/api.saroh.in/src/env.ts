@@ -47,6 +47,9 @@ const envSchema = z.object({
     BETTER_AUTH_SECRET: z.string().min(1).optional(),
     BETTER_AUTH_URL: z.url().optional(),
     BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
+    // Global's development domain, on the development API only (DEC-204). It
+    // stays out of the repo, which is public; `@saroh/edition` reads it.
+    GLOBAL_DEV_DOMAIN: z.string().optional(),
 
     // OAuth providers (optional — email/password works without them).
     AUTH_GITHUB_ID: z.string().optional(),

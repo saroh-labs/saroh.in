@@ -30,6 +30,7 @@
     "@saroh/auth": "workspace:*",
     "@saroh/block-contract": "workspace:*",
     "@saroh/database": "workspace:*",
+    "@saroh/edition": "workspace:*",
     "@saroh/error-tracking": "workspace:*",
     "@saroh/integrations": "workspace:*",
     "@saroh/object-storage": "workspace:*",

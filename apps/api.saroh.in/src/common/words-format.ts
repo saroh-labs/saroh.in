@@ -18,9 +18,9 @@
  *
  * Pure: no Prisma, no Nest, no clock.
  */
-import { toMoneyString } from "./money";
+import { moneyLocaleOf } from "@saroh/edition";
 
-const MONEY_LOCALE = "en-IN";
+import { toMoneyString } from "./money";
 
 const MONTHS = [
     "Jan",
@@ -43,7 +43,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function moneySign(currency: string): string {
     try {
         return (
-            new Intl.NumberFormat(MONEY_LOCALE, {
+            new Intl.NumberFormat(moneyLocaleOf(currency), {
                 style: "currency",
                 currency,
                 currencyDisplay: "narrowSymbol",
@@ -67,7 +67,9 @@ export function moneyWords(
     const fixed = toMoneyString(amount);
     const negative = fixed.startsWith("-");
     const [whole = "0", frac = "00"] = fixed.replace("-", "").split(".");
-    const grouped = new Intl.NumberFormat(MONEY_LOCALE).format(BigInt(whole));
+    const grouped = new Intl.NumberFormat(moneyLocaleOf(currency)).format(
+        BigInt(whole),
+    );
     const paise = frac === "00" ? "" : `.${frac}`;
     return `${negative ? "-" : ""}${moneySign(currency)}${grouped}${paise}`;
 }

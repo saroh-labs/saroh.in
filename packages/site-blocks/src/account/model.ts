@@ -6,7 +6,7 @@ import type {
 import { timeWords } from "../lib/clock";
 import type { GstOnPrice } from "../lib/gst-price";
 import { gstUnderWords, payPriceWords } from "../lib/gst-price";
-import { siteMoney } from "../lib/money";
+import { moneyLocaleOf, siteMoney } from "../lib/money";
 import type {
     AccountChange,
     AccountCourse,
@@ -308,7 +308,8 @@ export function initials(name: string | null, email: string): string {
 /** "₹450" — whole rupees drop the paise; anything else keeps them. */
 export function accountMoney(amount: string, currency: string): string {
     return (
-        siteMoney(Number(amount), currency, "en-IN") ?? `${currency} ${amount}`
+        siteMoney(Number(amount), currency, moneyLocaleOf(currency)) ??
+        `${currency} ${amount}`
     );
 }
 

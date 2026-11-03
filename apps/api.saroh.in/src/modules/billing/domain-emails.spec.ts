@@ -30,6 +30,7 @@ jest.mock("@saroh/database", () => ({
 }));
 jest.mock("../../common/app-url", () => ({
     appBase: () => "https://app.example.test",
+    appBaseOf: () => Promise.resolve("https://app.example.test"),
 }));
 jest.mock("./saroh-seller", () => ({
     sarohSeller: () => ({ email: "billing@example.test" }),

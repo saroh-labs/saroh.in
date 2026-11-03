@@ -152,6 +152,12 @@ export interface CreateAuthOptions {
      */
     onUserDeleting?: (user: { id: string }) => Promise<void> | void;
     /**
+     * The address this instance answers on, when it isn't BETTER_AUTH_URL. A
+     * browser takes a session cookie only for the address's own domain, so
+     * one API on two domains needs one instance for each (DEC-204).
+     */
+    baseURL?: string;
+    /**
      * Told once, after a user's row is first written (sign-up by password
      * or through a provider). Handed the id only, never the email or name,
      * and the sign-up request's `Cookie` header (null when there was no
@@ -564,11 +570,12 @@ function sessionHooks(
 
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
-    const cookieDomain = sessionCookieDomain(process.env.BETTER_AUTH_URL);
+    const baseURL = opts.baseURL ?? process.env.BETTER_AUTH_URL;
+    const cookieDomain = sessionCookieDomain(baseURL);
 
     const options: BetterAuthOptions = {
         secret,
-        baseURL: process.env.BETTER_AUTH_URL,
+        baseURL,
         trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",

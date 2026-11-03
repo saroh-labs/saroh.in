@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
+import type { Edition } from "@saroh/edition";
+import { siteUrlOf } from "@saroh/edition";
 import type { SiteCredit, SiteSeller } from "@saroh/site-blocks";
 import { madeWithSarohHref, sellerLead, soldByLine } from "@saroh/site-blocks";
 
@@ -16,6 +18,8 @@ export interface FooterFacts {
     email: string | null;
     /** "Made with Saroh" on Free; null on a paid plan. */
     credit: SiteCredit | null;
+    /** The edition the business runs under, for Saroh's links. */
+    edition: Edition;
     /**
      * Who a customer is buying from (DEC-121), from Settings › Business:
      * each null when the business has set none.
@@ -34,7 +38,12 @@ export interface SellerFacts {
 const NO_SELLER: SellerFacts = { legalName: null, address: null, phone: null };
 
 /** Nothing extra: no email, no Saroh credit, and no details to name. */
-const NONE: FooterFacts = { email: null, credit: null, seller: NO_SELLER };
+const NONE: FooterFacts = {
+    email: null,
+    credit: null,
+    edition: "INDIA",
+    seller: NO_SELLER,
+};
 
 const text = (value: unknown): string | null =>
     typeof value === "string" && value.trim() ? value.trim() : null;
@@ -92,15 +101,18 @@ export function footerFacts(body: unknown): FooterFacts {
         credit?: unknown;
         seller?: unknown;
     };
-    const code =
+    const { referralCode: code, edition } =
         credit !== null && typeof credit === "object"
-            ? (credit as { referralCode?: unknown }).referralCode
-            : undefined;
+            ? (credit as { referralCode?: unknown; edition?: unknown })
+            : { referralCode: undefined, edition: undefined };
+    // A release of the API that doesn't say yet: India, as every business was.
+    const editionOfSite = edition === "GLOBAL" ? "GLOBAL" : "INDIA";
     return {
         email: typeof email === "string" && email.trim() ? email.trim() : null,
+        edition: editionOfSite,
         credit:
             typeof code === "string" && REFERRAL_CODE.test(code)
-                ? { href: madeWithSarohHref(code) }
+                ? { href: madeWithSarohHref(code, siteUrlOf(editionOfSite)) }
                 : null,
         seller: sellerFacts(seller),
     };

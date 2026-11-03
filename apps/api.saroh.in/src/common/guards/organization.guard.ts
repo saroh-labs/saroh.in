@@ -15,6 +15,7 @@ import {
 } from "../../modules/organizations/organization-lifecycle.gate";
 import type { LifecycleWriteClass } from "../../modules/organizations/organization-lifecycle.policy";
 import { LIFECYCLE_WRITE_KEY } from "../decorators/lifecycle-write.decorator";
+import { assertEditionMatchesAddress } from "../edition-address";
 import type { OrganizationContext } from "../types/organization-context";
 import type { AuthUser } from "../types/store-context";
 
@@ -87,6 +88,10 @@ export class OrganizationGuard implements CanActivate {
         request.organizationContext = await this.organizations.resolve(
             user.id,
             organizationId,
+        );
+        assertEditionMatchesAddress(
+            request.organizationContext.edition,
+            request.headers.host,
         );
         // After membership: a stranger learns nothing about the business's
         // state, and a member learns why their write was refused.

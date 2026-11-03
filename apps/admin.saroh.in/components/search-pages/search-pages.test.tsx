@@ -75,6 +75,9 @@ const table = (canPublish: boolean) =>
         />,
     );
 
+// Whole tables with their menus: over 5s beside a full gate and on CI.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("SearchPagesTable (DEC-193)", () => {
     it("groups the rows by section, A to Z by name, and folds a group", () => {
         const tool = (slug: string, name: string, family: string): PageRow => ({

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { useState, useTransition } from "react";
+import { useTranslations } from "use-intl";
 
 import { acceptStaffInviteAction } from "@/app/staff-invite/actions";
 import { authClient } from "@/lib/auth.client";
@@ -81,6 +82,7 @@ export function AcceptStaffInvite({
  */
 export function SignOutAndReturn({ email }: { email: string }) {
     const [pending, startTransition] = useTransition();
+    const t = useTranslations("staffInvite");
     return (
         <Button
             variant="outline"
@@ -96,7 +98,7 @@ export function SignOutAndReturn({ email }: { email: string }) {
                 })
             }
         >
-            {pending ? "Signing out…" : "Sign out and use another account"}
+            {pending ? t("signingOut") : t("signOutAndSwitch")}
         </Button>
     );
 }

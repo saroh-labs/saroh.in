@@ -876,6 +876,8 @@ bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step domains pnpm run check:domains
+bg_step shared-data pnpm run check:shared-data
 bg_step date-inputs pnpm run check:date-inputs
 bg_step history-state pnpm run check:history-state
 bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request

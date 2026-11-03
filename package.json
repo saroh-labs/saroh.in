@@ -27,6 +27,8 @@
         "check:migration-fold": "pnpm --filter @saroh/database db:verify:migration-fold",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",
+        "check:domains": "node scripts/check-hard-coded-domains.mjs",
+        "check:shared-data": "node scripts/check-shared-data.mjs",
         "check:tag-strip": "node scripts/check-tag-strip.mjs",
         "check:titles": "node scripts/check-page-titles.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",

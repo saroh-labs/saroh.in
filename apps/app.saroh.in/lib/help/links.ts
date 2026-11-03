@@ -1,3 +1,5 @@
+import { SAROH_SITE_URL } from "@saroh/ui/lib/saroh-links";
+
 /**
  * Where help lives, in one place.
  *
@@ -24,11 +26,8 @@
  */
 export const HELP_URL = "https://help.saroh.in";
 
-/**
- * The marketing site, where Help lives from 17 Oct. `www`, as saroh.in
- * redirects to it (and help.saroh.in sends people there).
- */
-export const MARKETING_URL = "https://www.saroh.in";
+/** This deployment's marketing site, where Help lives from 17 Oct. */
+export const MARKETING_URL = SAROH_SITE_URL;
 
 /** Help's `publishOn` on saroh.in (`content/help.ts`); the test keeps them equal. */
 export const HELP_MOVES_ON = "2026-10-17";

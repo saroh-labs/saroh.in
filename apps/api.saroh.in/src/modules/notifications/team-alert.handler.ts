@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import type { Edition } from "@saroh/edition";
+
 import { appBase } from "../../common/app-url";
 import type { TeamAlertMail } from "../../common/email";
 import { sendTeamAlertEmail } from "../../common/email";
@@ -278,7 +280,7 @@ async function whoToEmail(
         }),
         tx.organization.findUnique({
             where: { id: organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         }),
     ]);
 
@@ -309,7 +311,11 @@ async function whoToEmail(
     });
     if (recipients.length === 0) return [];
 
-    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    const mail = renderAlertEmail(
+        alert,
+        cleanName(org?.name, "Your business"),
+        org?.edition,
+    );
     return recipients.map((m) => ({
         userId: m.userId,
         to: m.user.email.trim(),
@@ -335,7 +341,7 @@ async function reviewersToEmail(
         }),
         tx.organization.findUnique({
             where: { id: organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         }),
     ]);
     const onTeam = new Set(
@@ -356,7 +362,11 @@ async function reviewersToEmail(
             onTeam.has(g.userId),
     );
     if (recipients.length === 0) return [];
-    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    const mail = renderAlertEmail(
+        alert,
+        cleanName(org?.name, "Your business"),
+        org?.edition,
+    );
     return recipients.map((g) => ({
         userId: g.userId,
         to: g.user.email.trim(),
@@ -384,14 +394,18 @@ async function namedToEmail(
         }),
         tx.organization.findUnique({
             where: { id: organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         }),
     ]);
     const recipients = members.filter(
         (m) => m.user.email.trim() && m.userId !== alert.skipUserId,
     );
     if (recipients.length === 0) return [];
-    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    const mail = renderAlertEmail(
+        alert,
+        cleanName(org?.name, "Your business"),
+        org?.edition,
+    );
     return recipients.map((m) => ({
         userId: m.userId,
         to: m.user.email.trim(),
@@ -407,12 +421,13 @@ export function renderAlertEmail(
     alert: Pick<WordedAlert, "event" | "mail" | "path"> &
         Partial<Pick<WordedAlert, "cta" | "emailReviewersOf" | "footer">>,
     business: string,
+    edition?: Edition,
 ): TeamAlertMail {
     return {
         subject: `${business}: ${alert.mail.heading}`,
         heading: alert.mail.heading,
         body: alert.mail.body,
-        url: alert.path ? `${appBase()}${alert.path}` : null,
+        url: alert.path ? `${appBase(edition)}${alert.path}` : null,
         ...(alert.cta ? { cta: alert.cta } : {}),
         footer: footerOf(alert, business),
     };

@@ -82,9 +82,12 @@ export interface SiteCredit {
     reportHref?: string | null;
 }
 
-/** Where "Made with Saroh" links: saroh.in with the business's code. */
-export function madeWithSarohHref(referralCode: string): string {
-    return `https://saroh.in/?ref=${encodeURIComponent(referralCode)}`;
+/** Where "Made with Saroh" links: Saroh's site, with the business's code. */
+export function madeWithSarohHref(
+    referralCode: string,
+    sarohSite: string,
+): string {
+    return `${sarohSite}/?ref=${encodeURIComponent(referralCode)}`;
 }
 
 /** The merchant's own footer block, when it is more than a line. */

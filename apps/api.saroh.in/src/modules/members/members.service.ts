@@ -10,8 +10,8 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { appBase } from "../../common/app-url";
 import { sendStoreInvitationEmail } from "../../common/email";
-import { env } from "../../env";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { allows, outOfReach } from "../organizations/organization-policy";
 import {
@@ -200,9 +200,9 @@ export class MembersService {
 
         const store = await prisma.store.findUnique({
             where: { id: storeId },
-            select: { name: true },
+            select: { name: true, organization: { select: { edition: true } } },
         });
-        const appUrl = env.APP_URL ?? "https://app.saroh.localhost";
+        const appUrl = appBase(store?.organization.edition);
         await sendStoreInvitationEmail(
             email,
             `${appUrl}/invitations/${token}`,

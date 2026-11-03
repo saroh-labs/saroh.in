@@ -1,0 +1,38 @@
+{
+    "tech": "https://saroh.tech",
+    "in": "https://www.saroh.in",
+    "pairs": [
+        {
+            "tech": "/",
+            "in": "/"
+        },
+        {
+            "tech": "/pricing",
+            "in": "/pricing"
+        },
+        {
+            "tech": "/changelog",
+            "in": "/changelog"
+        },
+        {
+            "tech": "/tools",
+            "in": "/tools"
+        },
+        {
+            "tech": "/tools/invoice-generator",
+            "in": "/tools/gst-invoice-generator"
+        },
+        {
+            "tech": "/tools/quote-maker",
+            "in": "/tools/quotation-maker"
+        },
+        {
+            "tech": "/tools/receipt-maker",
+            "in": "/tools/receipt-maker"
+        },
+        {
+            "tech": "/tools/gst-calculator",
+            "in": "/tools/gst-calculator"
+        }
+    ]
+}

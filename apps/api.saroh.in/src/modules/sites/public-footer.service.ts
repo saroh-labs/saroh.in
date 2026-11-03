@@ -5,6 +5,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { Prisma, prisma, runInOrgContext } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { BusinessAccess } from "../billing/catalogue-access.service";
 import {
@@ -36,7 +37,7 @@ import { newRefCode } from "../waitlist/waitlist-keys";
  */
 export interface PublicFooter {
     email: string | null;
-    credit: { referralCode: string } | null;
+    credit: { referralCode: string; edition: Edition } | null;
     seller: {
         legalName: string | null;
         address: string | null;
@@ -100,7 +101,7 @@ export class PublicFooterService {
             where: { id: siteId, deletedAt: null },
             select: {
                 organizationId: true,
-                organization: { select: { referralCode: true } },
+                organization: { select: { referralCode: true, edition: true } },
             },
         });
         if (!site) throw new NotFoundException("Nothing to show here");
@@ -131,7 +132,9 @@ export class PublicFooterService {
             : null;
         return {
             email: said(profile?.contactEmail),
-            credit: referralCode ? { referralCode } : null,
+            credit: referralCode
+                ? { referralCode, edition: site.organization.edition }
+                : null,
             seller: {
                 legalName: said(profile?.legalName),
                 address: profile

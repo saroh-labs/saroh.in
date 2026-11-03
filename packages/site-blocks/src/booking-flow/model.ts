@@ -11,7 +11,7 @@ import {
     gstOnPriceOf,
     gstPriceWords,
 } from "../lib/gst-price";
-import { siteMoney } from "../lib/money";
+import { moneyLocaleOf, siteMoney } from "../lib/money";
 import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
 
@@ -691,7 +691,7 @@ export function servicePickPrice(service: BookingService): string | null {
 export function formatMoney(
     cents: number | null,
     currency: string | null,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string | null {
     if (cents === null || !currency) return null;
     return siteMoney(cents / 100, currency, locale);
