@@ -30,7 +30,6 @@ jest.mock("@saroh/database", () => {
             stockLevel: { aggregate: jest.fn() },
             subscription: { findUnique: jest.fn() },
             entitlementOverride: { findMany: jest.fn() },
-            organization: { findUnique: jest.fn().mockResolvedValue(null) },
             order: { count: jest.fn(), findFirst: jest.fn() },
             merchantPaymentProvider: {
                 findMany: jest.fn(),
