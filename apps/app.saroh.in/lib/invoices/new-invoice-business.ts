@@ -30,6 +30,7 @@ export function newInvoiceBusiness(
             name: settings.name,
             address: printedAddress(settings.registeredAddress),
             gstin: registered ? (settings.profile?.taxId ?? null) : null,
+            taxId: registered ? null : (settings.profile?.taxId ?? null),
             state: state
                 ? `${settings.tax?.stateName ?? "State"} (${state})`
                 : null,
@@ -42,6 +43,13 @@ export function newInvoiceBusiness(
             style: paperStyleOf(settings.invoicePaper?.style),
             colour: paperColourOf(settings.invoicePaper?.colour),
         },
+        taxLine:
+            settings.tax?.taxName && Number(settings.tax.taxRate) > 0
+                ? {
+                      label: `${settings.tax.taxName} ${Number(settings.tax.taxRate)}%`,
+                      rate: Number(settings.tax.taxRate),
+                  }
+                : null,
         nextNumber: nextNumberOf(settings.tax, zone, now),
         // As an issued, unpaid invoice prints it: what it will carry.
         howToPay: howToPayLines(

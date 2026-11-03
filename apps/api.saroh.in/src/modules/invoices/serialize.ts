@@ -39,6 +39,8 @@ export const INVOICE_SELECT = {
     currency: true,
     subtotal: true,
     tax: true,
+    taxLabel: true,
+    sellerTaxId: true,
     total: true,
     issuedAt: true,
     dueAt: true,
@@ -181,6 +183,8 @@ export interface InvoiceRow {
     currency: string;
     subtotal: Money;
     tax: Money;
+    taxLabel?: string | null;
+    sellerTaxId?: string | null;
     total: Money;
     issuedAt: Date | null;
     dueAt: Date | null;
@@ -421,6 +425,10 @@ export interface InvoiceViewModel {
     currency: string;
     subtotal: string;
     tax: string;
+    /** The tax line's own words ("VAT 20%"); null, "Tax". */
+    taxLabel: string | null;
+    /** The seller's tax number, on a Global business's taxed paper. */
+    sellerTaxId: string | null;
     total: string;
     issuedAt: string | null;
     dueAt: string | null;
@@ -671,6 +679,8 @@ export function serializeInvoice(
         currency: row.currency,
         subtotal: toMoneyString(row.subtotal),
         tax: toMoneyString(row.tax),
+        taxLabel: row.taxLabel ?? null,
+        sellerTaxId: row.sellerTaxId ?? null,
         total: toMoneyString(row.total),
         issuedAt: iso(row.issuedAt),
         dueAt: iso(row.dueAt),

@@ -56,6 +56,9 @@ export interface PayInvoice {
     dueAt: string | null;
     lines: PayInvoiceLine[];
     tax: string;
+    /** A named tax and the seller's number; absent from an older API. */
+    taxLabel?: string | null;
+    sellerTaxId?: string | null;
     total: string;
     /**
      * Paid so far and what is left to pay (DEC-173), as money strings. A

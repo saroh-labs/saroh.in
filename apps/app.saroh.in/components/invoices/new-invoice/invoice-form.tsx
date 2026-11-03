@@ -193,7 +193,11 @@ export function InvoiceForm({
             billToGstin: values.billToGstin,
             billToState: values.billToState,
         },
-        { registered, businessState: biz?.state ?? null },
+        {
+            registered,
+            businessState: biz?.state ?? null,
+            taxLine: biz?.taxLine ?? null,
+        },
     );
     const buyerName =
         contacts.find((c) => c.id === values.contactId)?.name ??

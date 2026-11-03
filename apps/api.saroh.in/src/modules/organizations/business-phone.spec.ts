@@ -158,3 +158,21 @@ describe("the API's rule and the phone fields agree (#1036)", () => {
         }
     });
 });
+
+describe("a Global business's phone", () => {
+    it("keeps any country's number with its +", () => {
+        expect(phoneWrite("+1 202 555 0123", "GLOBAL")).toEqual({
+            phone: "+12025550123",
+        });
+    });
+
+    it("refuses one without, rather than reading it as Indian", () => {
+        expect(() => phoneWrite("(202) 555-0123", "GLOBAL")).toThrow(/\+/);
+        expect(() => phoneWrite("2025550123", "GLOBAL")).toThrow(/\+/);
+    });
+
+    it("can still be cleared, and India's rule is unchanged", () => {
+        expect(phoneWrite("", "GLOBAL")).toEqual({ phone: null });
+        expect(phoneWrite("98450 12345")).toEqual({ phone: "+919845012345" });
+    });
+});

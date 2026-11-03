@@ -258,6 +258,9 @@ const PROFILE_SELECT = {
     deliveryGstRate: true,
     deliverySacCode: true,
     gstPriceMode: true,
+    taxName: true,
+    taxRate: true,
+    yearStartMonth: true,
     logoMediaId: true,
     logoUrl: true,
     addressLine1: true,
@@ -273,6 +276,7 @@ const PROFILE_SELECT = {
 } as const;
 
 interface ProfileRow {
+    yearStartMonth?: number | null;
     legalName: string | null;
     type: string | null;
     country: string | null;
@@ -494,7 +498,7 @@ export class OrganizationSettingsService {
             taxCurrent?.country ?? "",
         );
         const taxData = touchesTax(taxSent)
-            ? taxChanges(taxCurrent, taxSent)
+            ? taxChanges(taxCurrent, taxSent, ctx.edition)
             : {};
         // GST is part of MRP (`products/product-rules.ts`): a save that
         // adds GST to the business's prices is refused while it would take
@@ -913,12 +917,16 @@ export class OrganizationSettingsService {
      */
     private async counters(
         organizationId: string,
-        p: Pick<ProfileRow, "invoicePrefix" | "timezone"> | null,
+        p: Pick<
+            ProfileRow,
+            "invoicePrefix" | "timezone" | "yearStartMonth"
+        > | null,
     ): Promise<Record<NumberRestart, number>> {
         const keys = invoiceSeriesKeys(
             p?.invoicePrefix ?? null,
             new Date(),
             p?.timezone,
+            p?.yearStartMonth,
         );
         const rows = await prisma.invoiceSequence.findMany({
             where: { organizationId, series: { in: Object.values(keys) } },

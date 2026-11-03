@@ -19,6 +19,15 @@ describe("accountsBase", () => {
         ).toBe("https://accounts.example.test");
     });
 
+    it("is another edition's accounts when the sign-up came from there", () => {
+        expect(
+            accountsBase(
+                { ACCOUNTS_URL: "https://accounts.saroh.in" },
+                "https://accounts.saroh.tech",
+            ),
+        ).toBe("https://accounts.saroh.tech");
+    });
+
     it("is the sign-up page's origin when ACCOUNTS_URL is unset", () => {
         expect(
             accountsBase(

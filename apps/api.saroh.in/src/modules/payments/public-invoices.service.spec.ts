@@ -187,6 +187,8 @@ describe("PublicInvoicesService.read", () => {
         const view = await makeService().service.read(TOKEN);
         expect(Object.keys(view).sort()).toEqual(
             [
+                "taxLabel",
+                "sellerTaxId",
                 "billOfSupply",
                 "billedTo",
                 "businessName",

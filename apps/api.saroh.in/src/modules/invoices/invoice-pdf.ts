@@ -266,7 +266,8 @@ function sellerPieces(
     const pieces: Piece[] = [
         { text: view.seller.name, font: "Bold", size: m.name, color: ink },
     ];
-    for (const [n, line] of [...view.seller.lines, view.seller.tax].entries()) {
+    const sellerLines = [...view.seller.lines, view.seller.tax].filter(Boolean);
+    for (const [n, line] of sellerLines.entries()) {
         pieces.push({
             text: line,
             font: "Regular",

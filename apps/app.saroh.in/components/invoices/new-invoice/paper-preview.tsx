@@ -5,6 +5,7 @@ import { Lock } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { EDITION } from "@/lib/edition";
 import { formatMoney } from "@/lib/format/money";
 import type { Place, PreviewSeller } from "@/lib/invoices/new-invoice";
 import type { PreviewSums } from "@/lib/invoices/new-invoice-lines";
@@ -113,7 +114,9 @@ export function PaperPreview({
                   [rate ? `CGST ${halfRate(rate)}%` : "CGST", sums.cgstCents],
                   [rate ? `SGST ${halfRate(rate)}%` : "SGST", sums.sgstCents],
               ]
-        : [];
+        : sums.added
+          ? [[sums.added.label, sums.added.cents]]
+          : [];
     const hsnColumn = registered && sums.lines.some((l) => l.hsn);
     const accent: CSSProperties | undefined = colours.coloured
         ? { color: colours.accent }
@@ -154,7 +157,11 @@ export function PaperPreview({
                 ) : null}
                 {registered
                     ? `GSTIN ${seller.gstin ?? ""}${seller.state ? ` · ${seller.state}` : ""}`
-                    : "Not registered for GST"}
+                    : EDITION === "GLOBAL"
+                      ? seller.taxId
+                          ? `Tax ID ${seller.taxId}`
+                          : null
+                      : "Not registered for GST"}
             </p>
             {tag("Seller")}
         </div>,
@@ -386,8 +393,11 @@ export function PaperPreview({
                               howToPay.map((line) => <p key={line}>{line}</p>)
                           ) : (
                               <p className="text-muted-foreground">
-                                  Add your UPI ID or bank details, and every
-                                  unpaid invoice carries them.
+                                  Add your{" "}
+                                  {EDITION === "GLOBAL"
+                                      ? "bank details"
+                                      : "UPI ID or bank details"}
+                                  , and every unpaid invoice carries them.
                               </p>
                           )}
                       </section>,

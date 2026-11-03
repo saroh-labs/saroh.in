@@ -657,7 +657,7 @@ export class InvoicesService {
             billToAddress: null,
         });
         const profile = await loadTaxProfile(prisma, ctx.organizationId);
-        const doc = this.price(dto.lines, profile, gst, dto.tax ?? "0");
+        const doc = this.price(dto.lines, profile, gst, dto.tax ?? "0", true);
         // Its own look, else none: a draft follows the business's default
         // until it chooses (DEC-173, #1118).
         const paper = paperWrite(
@@ -716,8 +716,16 @@ export class InvoicesService {
         });
         const profile = await loadTaxProfile(prisma, ctx.organizationId);
         // A receipt keeps the tax typed on it; a tax invoice derives its own.
-        const typedTax = dto.tax ?? (current.gst ? "0" : current.tax);
-        const doc = this.price(lines, profile, gst, typedTax);
+        // A named tax is worked out again, so its old amount isn't typed tax.
+        const typedTax =
+            dto.tax ?? (current.gst || current.taxLabel ? "0" : current.tax);
+        const doc = this.price(
+            lines,
+            profile,
+            gst,
+            typedTax,
+            current.source === "MANUAL",
+        );
         // The draft's own look: what was sent, else what it had chosen.
         const sentPaper = paperWrite(
             { style: dto.paperStyle, colour: dto.paperColour },
@@ -805,6 +813,8 @@ export class InvoicesService {
                     contactId: true,
                     dueAt: true,
                     tax: true,
+                    taxLabel: true,
+                    source: true,
                     billToGstin: true,
                     billToState: true,
                     billToAddress: true,
@@ -868,9 +878,10 @@ export class InvoicesService {
                     billToState: draft.billToState,
                     billToAddress: draft.billToAddress,
                 },
-                draft.tax.toString(),
+                draft.taxLabel ? "0" : draft.tax.toString(),
                 // A draft written before the business registered carried a
                 // typed tax; a tax invoice derives its own.
+                draft.source === "MANUAL",
             );
             const number = await numberFor(
                 tx,
@@ -1228,6 +1239,8 @@ export class InvoicesService {
                 currency: true,
                 subtotal: true,
                 tax: true,
+                taxLabel: true,
+                sellerTaxId: true,
                 total: true,
                 source: true,
                 subscriptionId: true,
@@ -1264,6 +1277,8 @@ export class InvoicesService {
                 currency: old.currency,
                 subtotal: old.subtotal,
                 tax: old.tax,
+                taxLabel: old.taxLabel,
+                sellerTaxId: old.sellerTaxId,
                 total: old.total,
                 source: old.source,
                 subscriptionId: old.subscriptionId,
@@ -1425,6 +1440,7 @@ export class InvoicesService {
         profile: TaxProfile,
         gst: BillToGst,
         typedTax: string,
+        named = false,
     ): BuiltDocument {
         if (lines.length === 0) {
             fieldError("An invoice needs at least one line", "lines");
@@ -1446,6 +1462,7 @@ export class InvoicesService {
             profile,
             gst.billToState,
             profile.registered ? 0 : toCents(typedTax),
+            named ? profile.taxLine : null,
         );
         if (doc.totalCents > MAX_CENTS) {
             fieldError(

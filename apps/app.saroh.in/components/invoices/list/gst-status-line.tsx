@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 
 import { useMissingRatesSheet } from "@/components/gst-rates/missing-rates-notice";
+import { EDITION } from "@/lib/edition";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { missingShort } from "@/lib/gst-rates/missing";
 
@@ -28,6 +29,7 @@ export function gstWords(
 ): string | null {
     if (exempt) return exempt;
     if (!tax) return null;
+    if (EDITION === "GLOBAL") return null;
     if (!tax.registered) return "Not GST-registered. No tax is charged.";
     return tax.gstin
         ? `GST tax invoices · GSTIN ${tax.gstin}`

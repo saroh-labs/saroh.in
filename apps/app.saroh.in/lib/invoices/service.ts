@@ -354,6 +354,9 @@ export interface Invoice {
     currency: string;
     subtotal: string;
     tax: string;
+    /** The tax line's own words ("VAT 20%"); absent or null, "Tax". */
+    taxLabel?: string | null;
+    sellerTaxId?: string | null;
     total: string;
     /**
      * What is left to pay (DEC-173): the total less the payments recorded

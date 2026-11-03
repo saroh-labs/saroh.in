@@ -87,6 +87,11 @@ describe("Global's development addresses", () => {
     it("come only from the deployment's setting", () => {
         vi.stubEnv("GLOBAL_DEV_DOMAIN", "other.example");
         expect(hostsFor("GLOBAL", "development").api).toBe("api.other.example");
+        vi.stubEnv("GLOBAL_DEV_DOMAIN", "  ");
+        expect(hostsFor("GLOBAL", "development").api).toBe(
+            "api.global-dev.invalid",
+        );
+        expect(editionOfHost("")).toBeNull();
         vi.stubEnv("GLOBAL_DEV_DOMAIN", undefined);
         expect(hostsFor("GLOBAL", "development").api).toBe(
             "api.global-dev.invalid",

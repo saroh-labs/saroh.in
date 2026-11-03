@@ -2737,6 +2737,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 **Global's development domain isn't in the repo (3 Nov, owner).** It's the `GLOBAL_DEV_DOMAIN` setting on the development API and a secret for the Global development apps' deployments. Those apps sit behind the access key, as saroh.io's do.
 
+**Each edition shows its own businesses (3 Nov, owner).** The app and accounts on one edition list only that edition's businesses, though a person has one account. A person who has businesses on both sees them on each edition's own addresses.
+
+**Global setup (3 Nov).** It offers USD, EUR, GBP, CAD, AUD, NZD, SGD, AED and ZAR, suggested by the country. A Global business has no billing profile until Saroh's own billing abroad exists. MRP reads as Original price, since MRP is an Indian legal term.
+
+**Global invoices (3 Nov).** A Global business uses the non-GST paper path, and it can't register for GST. A named tax line ("VAT 20%") comes from its settings, is added on top of a manual invoice's lines and is frozen on the paper with its tax number, as `taxLabel` and `sellerTaxId`. The business works out what to charge; Saroh doesn't calculate tax by country yet. Only a manual invoice takes the tax line. One made from an order, a booking, a plan, a pack, a course or a payment records money already agreed or paid, so adding to it would leave the paper disagreeing with the charge. The numbering year runs January to December or April to March by its choice, starting on January. India's stays April to March by GST law.
+
 **Language and formats (3 Nov).** Text moves into each app's `lib/language/en.json`, read through `use-intl`, as it's touched. `next-intl` was rejected for now: it upgrades `@swc/core` across the repo and brings a message extractor, for routing and server helpers a one-language app doesn't use, and `use-intl` is its core with the same message format. A person's language isn't stored until a second language is decided. Numbers group by the deployment's edition where it serves one, by the currency where it serves both. Dates are day first everywhere.
 
 **Shared data is listed (2 Nov).** `scripts/shared-data.json` names the 35 models that belong to no one business, each with why, and `check:shared-data` fails on a new one that isn't listed.
