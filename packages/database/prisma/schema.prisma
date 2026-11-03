@@ -2790,6 +2790,10 @@ model PlatformAdmin {
   /// Why this person has staff access (e.g. "on-call platform engineer").
   note String?
 
+  /// The editions' consoles this person may open (DEC-204). A Platform owner
+  /// opens every edition's, whatever this says.
+  editions Edition[] @default([INDIA])
+
   @@index([revokedAt])
 }
 
@@ -2968,6 +2972,8 @@ model StaffInvite {
 // Not a tenant row: it belongs to Saroh.
 model SarohLead {
   id String @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   /// Who: the business's or the person's name, as known.
   name     String
@@ -6447,6 +6453,8 @@ model BillingWebhookEvent {
 // investigated and a self-referral recognised.
 model WaitlistSignup {
   id String @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   email       String
   emailKey    String
@@ -8924,6 +8932,8 @@ enum BusinessReportStatus {
 // after it arrived (`contact-messages/contact-retention.ts`).
 model ContactMessage {
   id        String   @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
   // One of the form's topics (`CONTACT_TOPICS` in the API), never free text.
   topic     String
   name      String
