@@ -7,7 +7,10 @@ import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ClosingBanner } from "@/components/organizations/closing/closing-banner";
 import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
-import { BusinessCountryProvider } from "@/components/shared/fields/business-country";
+import {
+    BusinessCountryProvider,
+    BusinessCurrencyProvider,
+} from "@/components/shared/fields/business-country";
 import { LiveRefresh } from "@/components/shared/live-refresh/live-refresh";
 import { CommandMenu } from "@/components/shared/navigation/command-menu";
 import type { NavCounts } from "@/components/shared/navigation/nav-items";
@@ -371,10 +374,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                                 />
                                 {/* What a lower plan paused, or will (#800). */}
                                 <PausedBanner view={paused} />
-                                {/* Just accepted an invitation: which business
+                                <BusinessCurrencyProvider
+                                    value={activeOrg?.currency ?? null}
+                                >
+                                    {/* Just accepted an invitation: which business
                                 this is and what their role opens, once. */}
-                                <JoinedNotice />
-                                {children}
+                                    <JoinedNotice />
+                                    {children}
+                                </BusinessCurrencyProvider>
                             </BusinessCountryProvider>
                         </BusinessZoneProvider>
                     </div>

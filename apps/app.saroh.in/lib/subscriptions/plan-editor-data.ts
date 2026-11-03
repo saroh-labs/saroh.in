@@ -1,6 +1,7 @@
 import { readMissingRates } from "@/lib/gst-rates/service";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 
 import { plansShowClasses } from "./plan-cards";
 import type { Plan } from "./service";
@@ -50,7 +51,7 @@ export async function planEditorContext(planId: string | null): Promise<{
         withClasses: plansShowClasses(appointments, mine.length ? mine : plans),
         currency:
             [...plans].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-                ?.currency ?? "INR",
+                ?.currency ?? (await startingCurrency()),
         plan: mine[0] ?? null,
         autopayOffered: autopay?.offered ?? false,
         gst: {

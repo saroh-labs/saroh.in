@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Organization } from "@/lib/organizations/service";
 
 const resolveActiveOrganization = vi.fn();
+vi.mock("@/lib/organizations/starting-currency", () => ({
+    DEFAULT_CURRENCY: "INR",
+    startingCurrency: () => Promise.resolve("INR"),
+}));
 vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: () => resolveActiveOrganization() as unknown,
 }));

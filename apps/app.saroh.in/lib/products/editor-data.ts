@@ -5,6 +5,7 @@ import { readMissingRates } from "@/lib/gst-rates/service";
 import { businessModeOf } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readOrganizationSettings } from "@/lib/organizations/settings-service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
 import { roleName } from "@/lib/products/editor-labels";
 import { getProductListings } from "@/lib/products/listings";
@@ -93,7 +94,7 @@ export async function loadEditorContext(
     return {
         storeId: store.id,
         storeName: store.name,
-        currency: settings?.currency ?? "INR",
+        currency: settings?.currency ?? (await startingCurrency()),
         categories: categories.map((c) => ({ id: c.id, name: c.name })),
         categoriesHref: productCategoriesHref(),
         options,
