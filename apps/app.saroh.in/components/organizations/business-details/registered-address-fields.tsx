@@ -12,6 +12,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
 
+import { EDITION } from "@/lib/edition";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type { RegisteredAddressValues } from "@/lib/organizations/registered-address";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -47,7 +48,13 @@ const LINES = [
         "address-line2",
     ],
     ["city", "City", "240px", true, "address-level2"],
-    ["postalCode", "PIN code", "140px", false, "postal-code"],
+    [
+        "postalCode",
+        EDITION === "GLOBAL" ? "Postcode" : "PIN code",
+        "140px",
+        false,
+        "postal-code",
+    ],
 ] as const;
 
 /**
@@ -164,7 +171,9 @@ export function RegisteredAddressFields<T extends FieldValues>({
                                 />
                             </FormControl>
                             <FormDescription>
-                                Saroh is for businesses in India for now.
+                                {EDITION === "GLOBAL"
+                                    ? "Contact us to change your business's country."
+                                    : "Saroh is for businesses in India for now."}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

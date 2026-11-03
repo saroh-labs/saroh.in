@@ -344,6 +344,8 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
               : i.standing === "CREDITED"
                 ? "Cancelled by credit note. "
                 : "";
+    // GST is only ever about rupees (DEC-204).
+    if (i.currency !== "INR") return paid.trim();
     return Number(i.tax) > 0
         ? `${paid}${businessName} is not registered for GST.`
         : `${paid}${businessName} is not registered for GST, so no tax is charged.`;

@@ -413,7 +413,9 @@ export function PaperPreview({
                         ? exempt
                             ? "Bill of supply under section 31(3)(c), CGST Act. Supply exempt from GST."
                             : "Tax invoice under section 31, CGST Act. Reverse charge does not apply."
-                        : `${seller.name} is not registered for GST, so no tax is charged.`}
+                        : EDITION === "GLOBAL"
+                          ? null
+                          : `${seller.name} is not registered for GST, so no tax is charged.`}
                 </p>
                 {tag("Required")}
             </div>
