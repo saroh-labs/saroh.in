@@ -40,7 +40,11 @@ export function SetupCountryFields() {
                                 value={field.value}
                                 onValueChange={(code) => {
                                     field.onChange(code);
-                                    if (!form.formState.dirtyFields.currency) {
+                                    // India is refused here, so has none to suggest.
+                                    if (
+                                        code !== "IN" &&
+                                        !form.getFieldState("currency").isDirty
+                                    ) {
                                         form.setValue(
                                             "currency",
                                             currencyForCountry(code),
@@ -72,7 +76,11 @@ export function SetupCountryFields() {
                         >
                             <FormControl>
                                 <SelectTrigger className="w-full max-w-[380px]">
-                                    <SelectValue placeholder="Choose a currency" />
+                                    {/* The value by hand: one set while the
+                                        list is shut wouldn't otherwise show. */}
+                                    <SelectValue placeholder="Choose a currency">
+                                        {field.value || undefined}
+                                    </SelectValue>
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
