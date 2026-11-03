@@ -25,6 +25,22 @@ describe("a Global business's invoice preview", () => {
         expect(sums.totalCents).toBe(24000);
     });
 
+    it("rounds as the API does, where floats wouldn't", () => {
+        const sums = previewSums(
+            {
+                lines: [{ ...line, quantity: "1", unitPrice: "10.00" }],
+                billToGstin: "",
+                billToState: "",
+            } as never,
+            {
+                registered: false,
+                businessState: null,
+                taxLine: { label: "VAT 16.15%", rate: 16.15 },
+            },
+        );
+        expect(sums.added?.cents).toBe(162);
+    });
+
     it("has no tax line without one", () => {
         const sums = previewSums(
             { lines: [line], billToGstin: "", billToState: "" } as never,

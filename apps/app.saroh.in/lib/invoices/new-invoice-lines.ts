@@ -202,7 +202,12 @@ export function previewSums(
     const added = ctx.taxLine
         ? {
               label: ctx.taxLine.label,
-              cents: Math.round((sums.totalCents * ctx.taxLine.rate) / 100),
+              // In basis points, as the API does: 16.15% of 10.00 is 1.62, and
+              // the same sum in floats says 1.61.
+              cents: Math.round(
+                  (sums.totalCents * Math.round(ctx.taxLine.rate * 100)) /
+                      10_000,
+              ),
           }
         : null;
     if (added) sums.totalCents += added.cents;

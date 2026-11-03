@@ -185,7 +185,10 @@ export function InvoicePay({
                                     colSpan={2}
                                     className="px-4 pt-3 text-right text-site-muted"
                                 >
-                                    Tax
+                                    {invoice.taxLabel ?? "Tax"}
+                                    {invoice.sellerTaxId
+                                        ? ` · Tax ID ${invoice.sellerTaxId}`
+                                        : null}
                                 </td>
                                 <td className="px-4 pt-3 text-right tabular-nums">
                                     {money(invoice.tax)}

@@ -72,7 +72,7 @@ export function BusinessTaxRows({
                 >
                     <Saved
                         text={
-                            saved.taxName && saved.taxRate
+                            saved.taxName && Number(saved.taxRate) > 0
                                 ? `${saved.taxName} ${saved.taxRate}%`
                                 : ""
                         }
@@ -127,7 +127,11 @@ export function BusinessTaxRows({
                     />
                 </Row>
             ) : null}
-            <Row label="Financial year">
+            <Row
+                label={
+                    EDITION === "GLOBAL" ? "Numbering year" : "Financial year"
+                }
+            >
                 {EDITION === "GLOBAL" ? (
                     <span>
                         {saved.yearStartMonth === "1"

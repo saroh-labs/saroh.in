@@ -94,6 +94,9 @@ export interface PublicInvoiceView {
         gst: GstOnPrice | null;
     }[];
     tax: string;
+    /** A Global business's named tax and number; null otherwise. */
+    taxLabel: string | null;
+    sellerTaxId: string | null;
     total: string;
     /**
      * Paid so far and what is left to pay (DEC-173), as money strings:
@@ -208,6 +211,8 @@ export async function invoicePaper(
             issuedAt: true,
             dueAt: true,
             tax: true,
+            taxLabel: true,
+            sellerTaxId: true,
             total: true,
             paidCents: true,
             currency: true,
@@ -270,6 +275,8 @@ export async function invoicePaper(
             };
         }),
         tax: toMoneyString(invoice.tax),
+        taxLabel: invoice.taxLabel,
+        sellerTaxId: invoice.sellerTaxId,
         total: toMoneyString(invoice.total),
         paidSoFar: fromMinor(paidSoFarCents(invoice)),
         leftToPay: fromMinor(owedNowCents(invoice)),

@@ -97,6 +97,21 @@ export const formSchema = z
         ...registeredAddressShape,
     })
     .superRefine((v, ctx) => {
+        // A tax line needs both: one alone prints nothing on an invoice.
+        if (v.taxName && !(Number(v.taxRate) > 0)) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["taxRate"],
+                message: "Add the rate, or clear the name.",
+            });
+        }
+        if (!v.taxName && Number(v.taxRate) > 0) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["taxName"],
+                message: "Say what your tax is called, like VAT.",
+            });
+        }
         // Which part of the GSTIN is short or wrong, not just "15 characters".
         const gstin = v.gstRegistered ? gstinProblem(v.taxId ?? "") : null;
         if (gstin) {

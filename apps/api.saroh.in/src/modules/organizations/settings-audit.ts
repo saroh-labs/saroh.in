@@ -35,6 +35,8 @@ export interface SettingsRow {
         invoicePrefix?: string | null;
         invoiceNumberFormat?: unknown;
         yearStartMonth?: number | null;
+        taxName?: string | null;
+        taxRate?: { toString(): string } | null;
         deliveryGstRate?: { toString(): string } | null;
         deliverySacCode?: string | null;
         gstPriceMode?: string | null;
@@ -121,6 +123,9 @@ export function settingsSnapshot(
         gstRegistered: p.gstRegistered ?? false,
         taxId: p.taxId ?? null,
         gstState: stateName(p.gstState) ?? p.gstState ?? null,
+        taxName: p.taxName ?? null,
+        taxRate: p.taxRate == null ? null : `${Number(p.taxRate)}%`,
+        yearStartMonth: p.yearStartMonth ?? null,
         invoicePrefix: p.invoicePrefix ?? null,
         invoiceNumberFormat: numberExample(p, at),
         deliveryGstRate: rate === null ? null : `${bpsToRate(rate)}%`,

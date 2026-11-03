@@ -54,7 +54,7 @@ describe("a Global business's tax line", () => {
         expect(doc.sellerTaxId).toBe("GB123456789");
     });
 
-    it("isn't added for callers recording money already agreed", () => {
+    it("isn't added unless the caller names it", () => {
         const doc = buildManualInvoice(
             lines,
             {
