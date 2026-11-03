@@ -139,6 +139,16 @@ describe("withDevAccess — the dev environment's key", () => {
         expect(next).not.toHaveBeenCalled();
     });
 
+    it('refuses with a 404 on "refuse", leading nowhere', async () => {
+        vi.stubEnv("DEV_REDIRECT_ORIGIN", "refuse");
+        const res = await gate(
+            new NextRequest("https://app.saroh.io/settings"),
+        );
+        expect(res.status).toBe(404);
+        expect(res.headers.get("location")).toBeNull();
+        expect(next).not.toHaveBeenCalled();
+    });
+
     it("refuses rather than guessing when it has nowhere to send visitors", async () => {
         vi.stubEnv("DEV_REDIRECT_ORIGIN", "");
         const res = await gate(request("https://app.saroh.io/"));

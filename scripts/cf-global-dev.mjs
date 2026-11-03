@@ -7,8 +7,9 @@
  *
  *   GLOBAL_DEV_DOMAIN=… node scripts/cf-global-dev.mjs apps/app.saroh.in
  *
- * A visitor without the access key gets a 404 rather than a redirect, since
- * Global's production addresses aren't live yet.
+ * A visitor without the access key gets a 404, not a redirect that would tie
+ * this domain to Saroh. Routes aren't in the config: the deploy token has no
+ * access to this zone, so they're set once on Cloudflare, with the DNS.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,10 +27,8 @@ export function globalDevConfig(config, dir, domain) {
     if (dir === SITE) {
         return {
             ...config,
-            routes: [domain, `www.${domain}`].map((host) => ({
-                pattern: `${host}/*`,
-                zone_name: domain,
-            })),
+            workers_dev: false,
+            preview_urls: false,
             vars: {
                 API_URL: `https://api.${domain}`,
                 DEV_ACCESS_COOKIE_DOMAIN: `.${domain}`,
@@ -40,28 +39,27 @@ export function globalDevConfig(config, dir, domain) {
     const name = config.name.replace(/-dev$/, "-global-dev");
     const vars = Object.fromEntries(
         Object.entries(config.vars)
-            .filter(([key]) => !key.startsWith("DEV_REDIRECT_"))
+            .filter(([key]) => key !== "DEV_REDIRECT_PATH")
             .map(([key, value]) => [
                 key,
                 // sites.saroh.io is merchants' custom domains' target: shared.
                 String(value).replace(/(?<!sites\.)saroh\.io/g, domain),
             ]),
     );
+    const { routes: _indiaRoutes, ...rest } = config;
     return {
-        ...config,
+        ...rest,
         name,
         services: config.services?.map((service) =>
             service.binding === "WORKER_SELF_REFERENCE"
                 ? { ...service, service: name }
                 : service,
         ),
-        routes: [
-            {
-                pattern: `${SUBDOMAIN[dir]}.${domain}/*`,
-                zone_name: domain,
-            },
-        ],
-        vars: { ...vars, NEXT_PUBLIC_EDITION: "GLOBAL" },
+        vars: {
+            ...vars,
+            DEV_REDIRECT_ORIGIN: "refuse",
+            NEXT_PUBLIC_EDITION: "GLOBAL",
+        },
     };
 }
 
