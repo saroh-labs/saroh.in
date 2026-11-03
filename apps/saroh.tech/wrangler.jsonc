@@ -1,5 +1,6 @@
 // saroh.tech: static files from `next build` (out/), behind worker/index.ts.
-// Not deployed yet: no routes until the owner says so.
+// No production routes until the owner says so. A Global development deploy
+// adds its routes and settings in its own checkout (scripts/cf-global-dev.mjs).
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-tech-dev",
