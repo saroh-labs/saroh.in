@@ -199,7 +199,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-[1440px] px-4 pt-4 md:px-20 md:pt-10"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-4 md:pt-10"
         >
             <JsonLd
                 data={[

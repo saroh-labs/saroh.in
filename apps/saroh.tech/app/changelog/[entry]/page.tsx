@@ -34,7 +34,7 @@ export default async function Page({ params }: Props) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-[1440px] px-4 pt-4 md:px-20 md:pt-10"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-4 md:pt-10"
         >
             <JsonLd data={[articleSchema(page), ...pageSchema(page)]} />
             <div className="flex max-w-[860px] flex-col gap-4">

@@ -1,6 +1,10 @@
-import { ButtonLink } from "./button";
+import { buttonClasses } from "@saroh/marketing/button";
+import Link from "next/link";
 
-/** The closing band: the page's one next step again, with why it costs nothing to try. */
+/**
+ * The closing band, in saroh.in's look (`@saroh/marketing/cta-band`). Its own
+ * markup until U9: that one brings its own gutter, and these pages already have one.
+ */
 export function CtaBand({
     title,
     line,
@@ -16,24 +20,25 @@ export function CtaBand({
     from: string;
 }) {
     return (
-        <section className="flex flex-col gap-5 rounded-3xl bg-ink px-[22px] py-7 text-paper md:flex-row md:items-center md:justify-between md:gap-10 md:px-14 md:py-12">
-            <div className="flex flex-col gap-2">
-                <h2 className="m-0 font-display text-[28px] font-bold leading-[1.05] tracking-[-0.04em] md:text-[40px]">
+        <section className="flex flex-wrap items-end justify-between gap-10 rounded-mk-band bg-foreground p-mk-band text-background">
+            <div className="grid flex-[1_1_420px] gap-4">
+                <h2 className="m-0 font-display text-mk-band font-bold [text-wrap:balance]">
                     {title}
                 </h2>
                 {line ? (
-                    <p className="m-0 text-[17px] leading-normal text-[#D8D5CC]">
+                    <p className="m-0 max-w-[46ch] text-mk-band-body text-mk-on-ink [text-wrap:pretty]">
                         {line}
                     </p>
                 ) : null}
             </div>
-            <ButtonLink
+            <Link
+                prefetch={false}
                 href={href}
                 data-cta={from}
-                className="shrink-0 !bg-paper !text-ink hover:!bg-white"
+                className={buttonClasses({ variant: "saffron" })}
             >
                 {action}
-            </ButtonLink>
+            </Link>
         </section>
     );
 }

@@ -83,7 +83,7 @@ export function LegalPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 pt-6 md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-6 md:pt-7"
         >
             {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
             <div className="flex flex-col gap-2.5">

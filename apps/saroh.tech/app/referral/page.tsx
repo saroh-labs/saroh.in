@@ -43,7 +43,7 @@ export default function ReferralPage() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-10 px-4 pt-4 md:gap-[72px] md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-4 md:gap-[72px] md:pt-7"
         >
             <JsonLd data={pageSchema(page)} />
             <section className="grid items-center gap-8 xl:grid-cols-[minmax(0,1fr)_520px] xl:gap-16">

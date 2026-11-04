@@ -10,6 +10,7 @@
             "tech": "/pricing",
             "in": "/pricing"
         },
+        { "tech": "/customers", "in": "/customers" },
         {
             "tech": "/changelog",
             "in": "/changelog"

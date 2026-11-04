@@ -1,31 +1,27 @@
 "use client";
 
+import { ButtonLink } from "@saroh/marketing/button";
 import { useSyncExternalStore } from "react";
 
 import { headerStart, onHeaderStart } from "@/lib/tools/header-start";
 
-import { ButtonLink } from "./button";
-
 /** "Start free", until a tool has made something worth carrying over. */
-export function HeaderStart({ href }: { href: string }) {
+export function HeaderStart({
+    href,
+    className,
+}: {
+    href: string;
+    className?: string;
+}) {
     const after = useSyncExternalStore(onHeaderStart, headerStart, () => null);
     return (
         <ButtonLink
-            look="compact"
+            size="sm"
             href={after ?? href}
             data-cta={after ? "save-send-header" : "start-free"}
-            className={after ? "max-md:px-3" : undefined}
+            className={className}
         >
-            {after ? (
-                <span className="whitespace-nowrap max-md:text-sm">
-                    <span className="max-[379px]:hidden">
-                        Save, send and get paid
-                    </span>
-                    <span className="min-[380px]:hidden">Save and send</span>
-                </span>
-            ) : (
-                "Start free"
-            )}
+            {after ? "Save it in Saroh" : "Start free"}
         </ButtonLink>
     );
 }

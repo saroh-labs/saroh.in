@@ -19,7 +19,7 @@ const page = pageOf("/");
 
 export const metadata = pageMetadata(page);
 
-const WRAP = "mx-auto w-full max-w-[1440px] px-4 md:px-20";
+const WRAP = "mx-auto w-full max-w-mk-page px-mk-gutter";
 const H2 =
     "m-0 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.045em] md:text-5xl md:leading-[1.02]";
 const LEAD =

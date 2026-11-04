@@ -115,7 +115,7 @@ export default function ToolsHubPage() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-9 px-4 pt-4 md:gap-[52px] md:px-20 md:pt-10"
+            className="mx-auto flex max-w-mk-page flex-col gap-9 px-mk-gutter pt-4 md:gap-[52px] md:pt-10"
         >
             <JsonLd
                 data={[...pageSchema(page), itemListSchema(page.h1, live)]}

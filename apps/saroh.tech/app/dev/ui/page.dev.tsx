@@ -16,7 +16,7 @@ export default function UiSheet() {
     const [term, setTerm] = useState("net30");
     const [mode, setMode] = useState<"add" | "remove">("add");
     return (
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-8 md:px-20">
+        <div className="mx-auto flex max-w-mk-page flex-col gap-8 px-mk-gutter py-8">
             <h1 className="m-0 font-display text-4xl font-bold">
                 Shared pieces
             </h1>

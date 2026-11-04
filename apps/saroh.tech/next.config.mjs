@@ -6,6 +6,7 @@
  * `*.dev.tsx` routes (the components sheet) exist only under `next dev`.
  */
 const dev = process.env.NODE_ENV !== "production";
+const globalDevDomain = process.env.GLOBAL_DEV_DOMAIN?.trim();
 
 /** @type {import("next").NextConfig} */
 export default {
@@ -15,4 +16,7 @@ export default {
     poweredByHeader: false,
     pageExtensions: dev ? ["dev.tsx", "tsx", "ts"] : ["tsx", "ts"],
     transpilePackages: ["@saroh/ui", "@saroh/marketing"],
+    // A tool's "Save it in Saroh" is built in the browser, and its address
+    // follows the deploy (`site.config.ts`). Only ever set on a deploy.
+    ...(globalDevDomain && { env: { GLOBAL_DEV_DOMAIN: globalDevDomain } }),
 };

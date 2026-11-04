@@ -11,7 +11,7 @@ export function RegionBar() {
             data-region-bar
             hidden
             aria-label="Region"
-            className="flex items-center justify-center gap-3 bg-ink py-1 pl-4 pr-1 text-sm text-paper md:px-20"
+            className="flex items-center justify-center gap-3 bg-ink py-1 pl-4 pr-1 text-sm text-paper md:px-mk-gutter"
         >
             <span>
                 <span className="hidden md:inline">

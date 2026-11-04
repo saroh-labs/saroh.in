@@ -1,20 +1,26 @@
-// The shared @saroh/tailwind-config preset, as saroh.in uses it, extended with
-// the boards' colour names. Every board colour is defined in app/tech.css.
+// saroh.in's Tailwind: the shared preset with `packages/marketing`'s theme, so
+// the two sites draw from the same values. The old colour names below are the
+// same values under the boards' words, until the pages stop using them (U9).
 import type { Config } from "tailwindcss";
 
+import {
+    marketingContent,
+    marketingTheme,
+} from "../../packages/marketing/src/tailwind";
 import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
 
-const shared = sharedConfig.theme?.extend ?? {};
+const theme = marketingTheme(sharedConfig.theme?.extend ?? {});
 const c = (name: string) => `hsl(var(--st-${name}) / <alpha-value>)`;
 
 const config: Config = {
     ...sharedConfig,
+    content: [...(sharedConfig.content as string[]), ...marketingContent],
     theme: {
         ...sharedConfig.theme,
         extend: {
-            ...shared,
+            ...theme,
             colors: {
-                ...(shared.colors as Record<string, unknown>),
+                ...theme.colors,
                 paper: c("paper"),
                 ink: c("ink"),
                 body: c("body"),
@@ -24,18 +30,12 @@ const config: Config = {
                 surface: c("surface"),
             },
             borderColor: {
-                line: "rgba(28, 28, 26, 0.13)",
-                control: "rgba(28, 28, 26, 0.22)",
-                strong: "rgba(28, 28, 26, 0.25)",
-            },
-            fontFamily: {
-                ...(shared.fontFamily as Record<string, string[]> | undefined),
-                sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-                display: ["var(--font-display)", "system-ui", "sans-serif"],
-                mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+                line: "hsl(var(--border))",
+                control: "hsl(var(--border-strong))",
+                strong: "hsl(var(--border-strong))",
             },
             borderRadius: {
-                ...(shared.borderRadius as Record<string, string> | undefined),
+                ...theme.borderRadius,
                 control: "9px",
                 button: "12px",
                 card: "16px",

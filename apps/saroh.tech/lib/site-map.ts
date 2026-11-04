@@ -260,6 +260,18 @@ export const PAGES: SitePage[] = [
     ),
     {
         ...hub(
+            "/customers",
+            "legal",
+            "For customers: your order, or report a business | Saroh",
+            "For customers of a business that uses Saroh: who is responsible for your order or booking, how to reach them, and how to report a business.",
+            "Bought from a business that uses Saroh?",
+            "For customers",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
             "/tools",
             "tools-hub",
             "Free invoice, quote and tax tools, no sign-up | Saroh",

@@ -22,7 +22,7 @@ const CURRENT =
     "underline decoration-brand-500 decoration-2 underline-offset-8";
 
 interface Level {
-    id: "features" | "solutions" | "resources" | "tools";
+    id: "features" | "solutions" | "resources" | "tools" | "templates";
     label: string;
     items: NavItem[];
     seeAll?: MenuLink;
@@ -44,6 +44,8 @@ export function PhoneSheet({
     solutionMenu,
     allTrades,
     allTools,
+    templates = [],
+    allTemplates,
     aboutLinks,
     pricing,
     actions,
@@ -59,6 +61,9 @@ export function PhoneSheet({
     solutionMenu?: NavItem[];
     allTrades?: MenuLink;
     allTools?: MenuLink;
+    /** A Templates row after Tools, for a site that has a gallery menu. */
+    templates?: NavItem[];
+    allTemplates?: MenuLink;
     /** The Resources level's quieter links. */
     aboutLinks: MenuLink[];
     /** Whether the Pricing row shows. */
@@ -104,6 +109,12 @@ export function PhoneSheet({
             links: aboutLinks,
         },
         { id: "tools", label: "Tools", items: tools, seeAll: allTools },
+        {
+            id: "templates",
+            label: "Templates",
+            items: templates,
+            seeAll: allTemplates,
+        },
     ];
     const opened = levels.find((l) => l.id === openId);
     const row = (level: Level) =>
@@ -265,7 +276,10 @@ export function PhoneSheet({
                         ) : null}
                         {levels
                             .filter(
-                                (l) => l.id === "resources" || l.id === "tools",
+                                (l) =>
+                                    l.id === "resources" ||
+                                    l.id === "tools" ||
+                                    l.id === "templates",
                             )
                             .map(row)}
                     </div>

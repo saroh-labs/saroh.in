@@ -17,7 +17,13 @@ export interface MenuLink {
 }
 
 export type NavSection =
-    "features" | "solutions" | "pricing" | "resources" | "tools" | null;
+    | "features"
+    | "solutions"
+    | "pricing"
+    | "resources"
+    | "tools"
+    | "templates"
+    | null;
 
 /**
  * Items in columns: one per `group` where they have them, else `flat` columns

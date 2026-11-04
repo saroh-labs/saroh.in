@@ -37,14 +37,13 @@ const COMPANY = [
     ["Company", site.company],
     ["Registered details", placeholders.companyDetails],
     ["Email", placeholders.supportEmail],
-    ["Social", site.social],
 ];
 
 export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-10 px-4 pt-6 md:gap-16 md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-6 md:gap-16 md:pt-7"
         >
             <JsonLd data={pageSchema(page)} />
             <div className="flex flex-col gap-4">

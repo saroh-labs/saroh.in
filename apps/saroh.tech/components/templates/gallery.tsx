@@ -87,7 +87,7 @@ export function GalleryPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-7 px-4 pt-4 md:gap-9 md:px-20 md:pt-10"
+            className="mx-auto flex max-w-mk-page flex-col gap-7 px-mk-gutter pt-4 md:gap-9 md:pt-10"
         >
             <JsonLd
                 data={[

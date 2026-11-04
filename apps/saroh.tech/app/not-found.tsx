@@ -31,7 +31,7 @@ export default function NotFound() {
     return (
         <div
             data-page-type="not-found"
-            className="mx-auto flex max-w-[1440px] flex-col gap-10 px-4 pt-10 md:gap-14 md:px-20 md:pt-16"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-10 md:gap-14 md:pt-16"
         >
             <div className="flex flex-col gap-4">
                 <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">

@@ -114,7 +114,7 @@ export default async function PricingPage() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col px-4 md:px-20"
+            className="mx-auto flex max-w-mk-page flex-col px-mk-gutter"
         >
             <JsonLd
                 data={[

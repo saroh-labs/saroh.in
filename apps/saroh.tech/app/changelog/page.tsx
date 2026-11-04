@@ -22,7 +22,7 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-[1440px] px-4 pt-6 md:px-20 md:pt-12"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-6 md:pt-12"
         >
             <div className="flex max-w-[940px] flex-col gap-6">
                 <div className="flex flex-col gap-3.5">

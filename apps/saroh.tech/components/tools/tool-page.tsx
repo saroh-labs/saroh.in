@@ -44,7 +44,7 @@ export function ToolPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-3.5 px-4 pt-4 md:gap-7 md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-3.5 px-mk-gutter pt-4 md:gap-7 md:pt-7"
         >
             <JsonLd
                 data={[
