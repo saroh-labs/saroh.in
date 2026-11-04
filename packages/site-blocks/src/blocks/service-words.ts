@@ -24,6 +24,20 @@ export interface PublicService {
 }
 
 /**
+ * A services list's services, read by the page that serves it: on a Book
+ * page, what the booking flow offers (`lib/book-page-offer.ts` in saroh.app).
+ * Given, the block reads nothing itself.
+ */
+export interface ServicesFeed {
+    services: PublicService[];
+    /**
+     * Where to see everything else the business can be booked for, when this
+     * list doesn't draw it all: the merchant chose some, or draws one card.
+     */
+    moreHref?: string | null;
+}
+
+/**
  * A service's price as the list shows it: the price the business typed,
  * with "+ GST" after it when GST comes on top. Null for none to show.
  */

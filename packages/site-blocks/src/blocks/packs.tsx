@@ -22,6 +22,7 @@ import {
 } from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { FeedFailed } from "./feed-failed";
 import {
     PriceFrame,
     PriceParts,
@@ -41,7 +42,8 @@ import {
  * block has:
  *
  * - **`feed`** — handed in by the page that serves the site, read on the
- *   server. No packs: the block renders NOTHING.
+ *   server. No packs: the block renders NOTHING. A read that failed says
+ *   so, and offers Try again (`FeedFailed`).
  * - **no feed, a `siteId`** — the editor's canvas, which reads the same list
  *   itself and says why the section is empty rather than vanishing.
  *
@@ -71,6 +73,8 @@ export type { PublicPack } from "../prices/pack-words";
 /** The packs to show, and what their button can do. */
 export interface PacksFeed {
     packs: PublicPack[];
+    /** The read failed: not "none", so the section says so (`FeedFailed`). */
+    failed?: boolean;
     /** Whether a signed-in customer can buy online now. */
     payOnline: boolean;
     /**
@@ -190,6 +194,11 @@ export default function PacksSection({
 
     const title = said(content.title) ?? PACKS_TITLE;
 
+    if (feed?.failed) {
+        return (
+            <FeedFailed title={title} things="our class packs" look={look} />
+        );
+    }
     if (feed) {
         return (
             <PackCards
