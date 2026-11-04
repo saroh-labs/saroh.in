@@ -242,7 +242,7 @@ describe("a Book page's list, fed what the flow offers", () => {
 
     it("draws the feed, reads nothing, and opens the flow at each", () => {
         const fetchMock = vi.fn();
-        globalThis.fetch = fetchMock as unknown as typeof fetch;
+        globalThis.fetch = fetchMock;
         render(
             <ServicesListSection
                 content={{ ...content, serviceIds: ["gone"] }}
