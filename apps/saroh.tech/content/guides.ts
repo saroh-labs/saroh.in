@@ -5,6 +5,12 @@ import type { Faq } from "@/components/shared/faq-list";
  * loader this way, and the HowTo and FAQ schema read the same steps and answers
  * the page draws.
  */
+/** Who signs a guide, as saroh.in's guides are signed. */
+export const GUIDE_AUTHOR = {
+    name: "Yash Mehta",
+    role: "Founder at Saroh",
+} as const;
+
 export type GuideBlock =
     | { kind: "text"; text: string }
     | { kind: "list"; items: readonly string[] }

@@ -98,14 +98,19 @@ export const itemListSchema = (
     })),
 });
 
-/** Author and dates stay the organisation and the real edit day until a person signs the page. */
-export const articleSchema = (page: SitePage): Ld => ({
+/** The author is who signs the page (a guide), else the organisation; dates are the real edit day. */
+export const articleSchema = (
+    page: SitePage,
+    author?: { name: string; role: string },
+): Ld => ({
     "@context": context,
     "@type": "Article",
     headline: page.h1,
     description: page.description,
     url: canonicalOf(page.path),
-    author: { "@type": "Organization", name: site.name, url: site.url },
+    author: author
+        ? { "@type": "Person", name: author.name, jobTitle: author.role }
+        : { "@type": "Organization", name: site.name, url: site.url },
     publisher: { "@type": "Organization", name: site.name, url: site.url },
     ...(page.updated && {
         datePublished: page.updated,

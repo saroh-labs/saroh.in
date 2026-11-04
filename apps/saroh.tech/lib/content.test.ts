@@ -21,7 +21,6 @@ import { HELP, HELP_FAQS } from "@/content/help";
 import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
 import { INTEGRATIONS } from "@/content/integrations";
 import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
-import { placeholders } from "@/content/placeholders";
 import { solutionList, solutions } from "@/content/solutions";
 
 import { ONE_PERSON } from "../scripts/check-claims.mjs";
@@ -250,10 +249,7 @@ describe("saroh.tech's words", () => {
         expect(words(features.insights)).toContain("Paid orders and bookings");
     });
 
-    it("mark only what the owner must supply", () => {
-        expect(Object.keys(placeholders).sort()).toEqual(
-            ["changelog", "guideAuthor"].sort(),
-        );
+    it("have no marker left", () => {
         expect(words(all)).not.toContain("[confirm");
     });
 

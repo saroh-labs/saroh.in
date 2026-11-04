@@ -3,13 +3,16 @@ import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { ButtonLink } from "@/components/shared/button";
-import { ConfirmTag } from "@/components/shared/confirm-tag";
 import { CtaBand } from "@/components/shared/cta-band";
 import { FaqList } from "@/components/shared/faq-list";
 import { JsonLd } from "@/components/shared/json-ld";
 import type { Guide, GuideBlock } from "@/content/guides";
-import { guideOf, guideSteps, readMinutes } from "@/content/guides";
-import { placeholders } from "@/content/placeholders";
+import {
+    GUIDE_AUTHOR,
+    guideOf,
+    guideSteps,
+    readMinutes,
+} from "@/content/guides";
 import {
     articleSchema,
     faqSchema,
@@ -17,6 +20,7 @@ import {
     pageSchema,
 } from "@/lib/schema";
 import type { SitePage } from "@/lib/site-map";
+import { formatDate } from "@/lib/tools/dates";
 
 const LABEL =
     "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
@@ -207,7 +211,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                 data={[
                     ...(steps.length
                         ? [howToSchema(page.h1, steps)]
-                        : [articleSchema(page)]),
+                        : [articleSchema(page, GUIDE_AUTHOR)]),
                     faqSchema(guide.faqs),
                     ...pageSchema(page),
                 ]}
@@ -242,9 +246,16 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                     <div className="mb-7 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <span
                             aria-hidden="true"
-                            className="inline-block size-8 rounded-full bg-mk-hover"
-                        />
-                        <ConfirmTag>{placeholders.guideAuthor}</ConfirmTag>
+                            className="inline-grid size-8 place-items-center rounded-full bg-mk-hover font-semibold text-foreground"
+                        >
+                            {GUIDE_AUTHOR.name.charAt(0)}
+                        </span>
+                        <span>
+                            Written by {GUIDE_AUTHOR.name}, {GUIDE_AUTHOR.role}
+                        </span>
+                        {page.updated ? (
+                            <span>Last updated {formatDate(page.updated)}</span>
+                        ) : null}
                         <span>{readMinutes(guide)} min read</span>
                     </div>
 
