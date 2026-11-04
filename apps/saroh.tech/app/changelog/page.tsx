@@ -1,8 +1,16 @@
+import { ComingList } from "@saroh/marketing/coming-list";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 
 import { ChangelogBand } from "@/components/content/changelog-entry";
 import { ChangelogList } from "@/components/content/changelog-list";
+import {
+    COMING,
+    COMING_INTRO,
+    COMING_TITLE,
+    NOT_AVAILABLE_YET,
+} from "@/content/coming";
 import { canonicalOf, pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 
@@ -34,6 +42,24 @@ export default function Page() {
                     </p>
                 </div>
                 <ChangelogList />
+                <section aria-labelledby="coming" className="grid gap-1 pt-10">
+                    <Eyebrow
+                        as="h2"
+                        id="coming"
+                        tone="muted"
+                        className="m-0 pb-1"
+                    >
+                        {COMING_TITLE}
+                    </Eyebrow>
+                    <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
+                        {COMING_INTRO}
+                    </p>
+                    <ComingList
+                        groups={COMING}
+                        idPrefix="coming"
+                        mark={NOT_AVAILABLE_YET}
+                    />
+                </section>
             </div>
             <ChangelogBand />
         </div>

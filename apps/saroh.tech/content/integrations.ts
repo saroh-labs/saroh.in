@@ -1,3 +1,10 @@
+import {
+    COMING,
+    COMING_INTRO,
+    COMING_TITLE,
+    NOT_AVAILABLE_YET,
+} from "./coming";
+
 /**
  * /integrations: only what works for a business outside India today, then the
  * one list of what's coming, marked as saroh.in marks its own, with no dates.
@@ -32,44 +39,10 @@ export const INTEGRATIONS = {
             where: "Find it in Settings › Your data",
         },
     ],
-    plannedTitle: "Planned · not available yet",
-    plannedIntro:
-        "These aren't built yet. Each one gets a changelog entry when it ships.",
-    notYet: "Not available yet",
-    planned: [
-        {
-            key: "next",
-            label: "Coming next",
-            rows: [
-                {
-                    name: "Stripe",
-                    line: "Take payments online through Stripe, into your own account: online checkout, deposits, payment at booking and payment links.",
-                },
-                {
-                    name: "Plans in US dollars",
-                    line: "Grow and Pro, on sale on saroh.tech.",
-                },
-            ],
-        },
-        {
-            key: "later",
-            label: "Later",
-            rows: [
-                {
-                    name: "Autopay",
-                    line: "Customers' renewals paid automatically.",
-                },
-                {
-                    name: "PayPal",
-                    line: "Take payments through PayPal, into your own account.",
-                },
-                {
-                    name: "Automatic tax by country",
-                    line: "Saroh works out the tax. Today you add your tax line to an invoice you write.",
-                },
-            ],
-        },
-    ],
+    plannedTitle: COMING_TITLE,
+    plannedIntro: COMING_INTRO,
+    notYet: NOT_AVAILABLE_YET,
+    planned: COMING,
     ask: {
         before: "Need something else?",
         link: "Tell us what you use",
