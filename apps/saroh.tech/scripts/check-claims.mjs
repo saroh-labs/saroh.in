@@ -19,10 +19,12 @@ const ABOUT_TAX =
 const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
 
 /** A receipt says how it was paid; the one list of what's coming says "Not available yet". */
-const NAMES_A_PROVIDER = /^\/(tools\/receipt-maker|changelog|integrations)(\/|$)/;
+const NAMES_A_PROVIDER =
+    /^\/(tools\/receipt-maker|changelog|integrations)(\/|$)/;
 
 /** Advice and paper for anyone's trade, or the law's words: not what the product does for you. */
-const NOT_THE_PRODUCT = /^\/(tools|templates|guides|legal|customers|contact)(\/|$)/;
+const NOT_THE_PRODUCT =
+    /^\/(tools|templates|guides|legal|customers|contact)(\/|$)/;
 
 /**
  * Until plans are on sale here, the pages speak to one person running their
@@ -59,7 +61,7 @@ export const BANNED = [
     { phrase: /\bquote approvals?\b/i },
     { phrase: /\bevery version and every\b/i },
     { phrase: /\bclient pages?\b/i },
-    { phrase: /\bone page for every client\b/i },
+    { phrase: /\b(one |a )page for every client\b/i },
     { phrase: /\bpay button\b/i },
     { phrase: /\bpay now\b/i, except: ABOUT_DOCS },
     { phrase: /\bno login\b/i },
@@ -96,12 +98,23 @@ export const BANNED = [
     ...ONE_PERSON.map((phrase) => ({ phrase, except: NOT_THE_PRODUCT })),
 ];
 
-/** The words a visitor or a search engine reads. The India bar is the Worker's. */
+/** The words a visitor, a screen reader or a search engine reads. The India bar is the Worker's. */
 export function visibleText(html) {
     const description =
         /<meta name="description" content="([^"]*)"/.exec(html)?.[1] ?? "";
-    return `${description} ${html}`
-        .replace(/<aside[^>]*data-region-bar[\s\S]*?<\/aside>/g, " ")
+    const page = html.replace(
+        /<aside[^>]*data-region-bar[\s\S]*?<\/aside>/g,
+        " ",
+    );
+    const attributes = [
+        ...page.matchAll(/\b(?:alt|aria-label)="([^"]*)"/g),
+    ].map((m) => m[1]);
+    const jsonLd = [
+        ...page.matchAll(
+            /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g,
+        ),
+    ].map((m) => m[1]);
+    return `${description} ${attributes.join(" ")} ${jsonLd.join(" ")} ${page}`
         .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, " ")
         .replace(/<[^>]+>/g, " ")
         .replace(/&#x27;|&#39;/g, "'")

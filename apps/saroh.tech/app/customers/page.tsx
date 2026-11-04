@@ -37,7 +37,8 @@ export default function CustomersPage() {
                 ))}
             </div>
             <div className="pb-10 pt-2">
-                <ReportForm apiUrl={process.env.API_URL ?? site.apiUrl} />
+                {/* Always Global's address: the API files the report under the edition of the address it came through. */}
+                <ReportForm apiUrl={site.apiUrl} />
             </div>
         </Container>
     );

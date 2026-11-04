@@ -14,6 +14,21 @@ import {
 
 import { checkSite, findClaims, visibleText } from "./check-claims.mjs";
 
+describe("the words nobody sees on the page", () => {
+    it("reads alt, aria-label and JSON-LD, and the claims in them fail", () => {
+        const html = `<img alt="Flagged for the team"><a aria-label="a page for every client">x</a><script type="application/ld+json">{"name":"Pay now in one tap"}</script><script>var quiet="pay button"</script>`;
+        const text = visibleText(html);
+        expect(findClaims("/", text).map((f) => f.phrase)).toEqual(
+            expect.arrayContaining([
+                "the team",
+                "a page for every client",
+                "in one tap",
+            ]),
+        );
+        expect(text).not.toContain("pay button");
+    });
+});
+
 describe("what saroh.tech may not say", () => {
     it("passes plain words", () => {
         expect(findClaims("/", "Your site, bookings and orders.")).toEqual([]);

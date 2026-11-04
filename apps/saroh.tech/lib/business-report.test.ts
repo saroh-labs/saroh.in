@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { prefilledSite, reportProblem, sendReport } from "./business-report";
@@ -69,5 +72,36 @@ describe("a report", () => {
                 "unavailable",
             );
         });
+    });
+});
+
+describe("where a report goes", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    const apiUrl = async () => {
+        vi.resetModules();
+        return (await import("@/site.config")).site.apiUrl;
+    };
+
+    it("is the edition's address, in production and on Global's development deploy", async () => {
+        vi.stubEnv("GLOBAL_DEV_DOMAIN", "");
+        expect(await apiUrl()).toBe("https://api.saroh.tech");
+        vi.stubEnv("GLOBAL_DEV_DOMAIN", "global.example");
+        expect(await apiUrl()).toBe("https://api.global.example");
+    });
+
+    it("is the address Contact posts to, with no setting to send it elsewhere", () => {
+        const page = (name: string) =>
+            readFileSync(join(__dirname, `../app/${name}/page.tsx`), "utf8");
+        expect(page("customers")).toContain(
+            "<ReportForm apiUrl={site.apiUrl} />",
+        );
+        expect(page("contact")).toContain(
+            "<ContactForm apiUrl={site.apiUrl} />",
+        );
+        expect(page("customers")).not.toContain("process.env");
     });
 });
