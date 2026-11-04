@@ -152,7 +152,9 @@ test("Bookings makes the booking page, and Publish booking page puts it live", a
 
     // The page lists what the flow offers, with no republish: its list was
     // written with the first service, and a site this one made would stay
-    // at that one. In a new address, as a kept page may wait out its minute.
+    // at that one. What this proves is the read, not the page cache: the new
+    // address only skips a copy kept from before, for up to a minute. A
+    // service is capped by no plan (`createService`), so the second is made.
     const services = `${urls.API_URL}/organizations/${business.id}/services`;
     const headers = { origin: urls.APP_URL };
     const made = await page.request.post(services, {

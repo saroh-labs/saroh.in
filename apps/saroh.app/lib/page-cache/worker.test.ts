@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { dontCachePage, keepPageAtMost, tagPage } from "./record";
 import { signPageRevalidation } from "./signature";
-import { LIVE_HEAD_MAX_AGE_SECONDS, pageCacheRules } from "./site-rules";
+import {
+    LIVE_HEAD_MAX_AGE_SECONDS,
+    pageCacheRules,
+    SERVICES_OFFERED_MAX_AGE_SECONDS,
+    showsServicesOffered,
+} from "./site-rules";
 import { fakeCache, fakeNamespace } from "./testing";
 import type { PageCacheEnv, WaitUntil } from "./worker";
 import {
@@ -277,6 +282,30 @@ describe("the merchant sites' page cache (#863)", () => {
                 CACHE_STATUS_HEADER,
             ),
         ).toBe("miss");
+    });
+
+    it("keeps /book a minute at most: no service write revalidates it", async () => {
+        const h = harness();
+        h.render = () => {
+            pageCacheRules({
+                siteId: "site_1",
+                test: false,
+                liveHead: false,
+                catalogueFailed: false,
+            });
+            showsServicesOffered();
+            return page();
+        };
+        const status = async () =>
+            (await h.fetch("https://rye.saroh.app/book")).headers.get(
+                CACHE_STATUS_HEADER,
+            );
+        await status();
+        expect(SERVICES_OFFERED_MAX_AGE_SECONDS).toBe(60);
+        h.clock.now += 59_000;
+        expect(await status()).toBe("hit");
+        h.clock.now += 2000;
+        expect(await status()).toBe("miss");
     });
 
     it("never keeps a page the render didn't tag, or refused", async () => {
