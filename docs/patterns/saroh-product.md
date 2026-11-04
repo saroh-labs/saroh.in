@@ -907,8 +907,9 @@ rules.
   `apps/accounts.saroh.in/wrangler.jsonc`) is off, so anyone can sign up and
   Sign in shows. Marketing pages and designs use Start free, never a waitlist.
   Before launch (until 17 Oct) sign-up was waitlist-only and no CTA
-  pointed at sign-up or Sign in. Social publishing is not a
-  current priority and must not be exposed as production-ready (§22). AI
+  pointed at sign-up or Sign in. Saroh Social (social
+  publishing) is planned, Coming next since 4 Nov 2026, and must not be exposed
+  as production-ready until it's built (§22). AI
   features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,
   density and motion are open (confirmed 2026-08-04).

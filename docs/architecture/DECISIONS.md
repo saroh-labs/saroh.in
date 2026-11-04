@@ -1358,7 +1358,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 **Status: Accepted — 2026-10-10** · owner
 
 - Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
-- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: "Coming next" or "Later". Never a date (owner, 4 Nov 2026: it was months, then "Early 2027", until then, and those dates went stale).
+- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: "Coming next" or "Later". Never a date (owner, 4 Nov 2026: it was months, then "Early 2027", until then, and those dates went stale). The same day the owner moved Saroh for Android, Invoice layouts, Sign in with Google, Bring your own login, API keys and webhooks, and social publishing, now named Saroh Social, up to Coming next.
 - Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
 
 ## DEC-120 A business scheduled for deletion winds down, and an owner can download its data

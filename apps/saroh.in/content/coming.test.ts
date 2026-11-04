@@ -104,13 +104,11 @@ describe.each(lists)("%s", (_title, rows) => {
         }
     });
 
-    it("keeps social publishing in Later: it is not a current priority", () => {
-        const social = rows.filter((row) => /social|canva/i.test(row.name));
-        expect(social.map((row) => row.name).sort()).toEqual([
-            "Canva",
-            "Social publishing",
-        ]);
-        expect(social.every((row) => row.group === "later")).toBe(true);
+    it("has Saroh Social coming next, and Canva later (owner, 4 Nov 2026)", () => {
+        const groupOf = (name: string) =>
+            rows.find((row) => row.name === name)?.group;
+        expect(groupOf("Saroh Social")).toBe("next");
+        expect(groupOf("Canva")).toBe("later");
     });
 
     it("writes no em-dash aside", () => {
@@ -134,12 +132,12 @@ describe("the two lists together", () => {
             "Automatic WhatsApp messages",
             "Google Calendar sync",
             "Google Meet and Zoom links",
+            "Saroh Social",
             "Shopify import",
             "PhonePe",
             "Shiprocket",
             "Google Business Profile",
             "Tally and Zoho Books export",
-            "Social publishing",
             "Canva",
         ]);
         const planned = plannedIntegrations.map((row) => row.line);
