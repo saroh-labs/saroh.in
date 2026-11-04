@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { viaBusinessOrNone } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -51,12 +53,16 @@ export class AdminBusinessReportsService {
     async list(
         staff: PlatformAdminInfo,
         query: { status?: BusinessReportStatusFilter; cursor?: string },
+        edition: Edition | null = null,
     ): Promise<BusinessReportPage> {
         const status = query.status ?? "open";
-        const where =
-            status === "all"
+        const inEdition = viaBusinessOrNone(edition);
+        const where = {
+            ...inEdition,
+            ...(status === "all"
                 ? {}
-                : ({ status: status === "done" ? "DONE" : "OPEN" } as const);
+                : ({ status: status === "done" ? "DONE" : "OPEN" } as const)),
+        };
         const seesContact = staff.permissions.includes(
             AdminPermission.OrganizationPiiRead,
         );
@@ -82,7 +88,9 @@ export class AdminBusinessReportsService {
                     // Newest first.
                     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 }),
-                prisma.businessReport.count({ where: { status: "OPEN" } }),
+                prisma.businessReport.count({
+                    where: { status: "OPEN", ...inEdition },
+                }),
             ]),
         );
         const hasMore = rows.length > PAGE_SIZE;
@@ -112,14 +120,25 @@ export class AdminBusinessReportsService {
         staff: PlatformAdminInfo,
         id: string,
         reason: string,
+        edition: Edition | null = null,
     ): Promise<{ id: string; status: "DONE" }> {
         return outsideOrgContext(() =>
             prisma.$transaction(async (tx) => {
                 const report = await tx.businessReport.findUnique({
                     where: { id },
-                    select: { status: true, organizationId: true },
+                    select: {
+                        status: true,
+                        organizationId: true,
+                        organization: { select: { edition: true } },
+                    },
                 });
-                if (!report) throw new NotFoundException("No such report");
+                const elsewhere =
+                    edition &&
+                    report?.organization &&
+                    report.organization.edition !== edition;
+                if (!report || elsewhere) {
+                    throw new NotFoundException("No such report");
+                }
                 if (report.status === "DONE") return { id, status: "DONE" };
                 await tx.businessReport.update({
                     where: { id },

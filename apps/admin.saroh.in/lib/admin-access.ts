@@ -1,7 +1,12 @@
+import { hostsFor, urlOf } from "@saroh/edition";
+
 import { env } from "@/env";
 
+import { EDITION } from "./edition";
+
 export const accountsUrl =
-    env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
+    env.NEXT_PUBLIC_ACCOUNTS_URL ??
+    urlOf(hostsFor(EDITION, "production").accounts);
 
 export const accountsLoginUrl = `${accountsUrl}/login`;
 

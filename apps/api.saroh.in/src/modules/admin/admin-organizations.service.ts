@@ -6,9 +6,11 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { siteRootDomain } from "../sites/site-host-mode";
+import { editionWhere } from "./admin-edition";
 import { businessesWaitingOnRefunds } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
@@ -139,6 +141,7 @@ export class AdminOrganizationsService {
     async directory(
         query: OrganizationDirectoryQuery,
         caller: { canReadPii: boolean },
+        edition: Edition | null = null,
     ): Promise<OrganizationDirectoryPage> {
         const limit = clamp(query.limit);
         const attention = query.health === "attention";
@@ -153,6 +156,7 @@ export class AdminOrganizationsService {
             query,
             caller,
             new Set([...waiting, ...billing]),
+            edition,
         );
 
         const records = await prisma.organization.findMany({
@@ -190,8 +194,11 @@ export class AdminOrganizationsService {
      * Organizations an operator can target with a flag override: id, name
      * and slug only. The flag picker needs nothing else about a tenant.
      */
-    async picker(): Promise<{ id: string; name: string; slug: string }[]> {
+    async picker(
+        edition: Edition | null = null,
+    ): Promise<{ id: string; name: string; slug: string }[]> {
         return prisma.organization.findMany({
+            where: editionWhere(edition),
             select: { id: true, name: true, slug: true },
             orderBy: { name: "asc" },
         });
@@ -218,8 +225,10 @@ export class AdminOrganizationsService {
         query: OrganizationDirectoryQuery,
         caller: { canReadPii: boolean },
         waitingOnRefunds: ReadonlySet<string> = new Set(),
+        edition: Edition | null = null,
     ): Prisma.OrganizationWhereInput {
         const and: Prisma.OrganizationWhereInput[] = [];
+        if (edition) and.push({ edition });
         const q = query.q?.trim();
 
         if (q) {

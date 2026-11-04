@@ -3,6 +3,8 @@ import type {
     BusinessTabBadge,
 } from "@/components/business/business-tabs";
 
+import type { Edition } from "@saroh/edition";
+
 import type { NextChargeHow } from "./billing-words";
 import { formatPaise, istDate } from "./billing-words";
 import { asWords, camelToWords, formatDate } from "./format";
@@ -144,6 +146,10 @@ export interface OverviewBadges {
 
 export interface BusinessOverview {
     organizationId: string;
+    /** Set once, from its country. Older API builds leave these out. */
+    edition?: Edition;
+    /** Three letters. Null: from before, its currency is what it sells in. */
+    currency?: string | null;
     plan: OverviewPanel<OverviewPlan>;
     /** Null: not for this caller. `name` null: no billing profile yet. */
     billedTo: { name: string | null } | null;

@@ -1,12 +1,14 @@
 import {
     Body,
     Controller,
+    Headers,
     HttpCode,
     HttpException,
     HttpStatus,
     Post,
     UseGuards,
 } from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { SiteRelay } from "../site-accounts/site-relay";
@@ -115,6 +117,7 @@ export class LinkPreviewController {
     async unlock(
         @Body() dto: UnlockReportDto,
         @RelayContext() relay: SiteRelay,
+        @Headers("host") host?: string,
     ): Promise<UnlockResult> {
         const key = relay.clientHash;
         if (!this.unlocks.take(key)) {
@@ -128,6 +131,7 @@ export class LinkPreviewController {
             email: dto.email,
             url: dto.url,
             ipHash: key,
+            edition: editionOfHost(host ?? "") ?? "INDIA",
         });
     }
 }

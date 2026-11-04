@@ -4,6 +4,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -11,6 +12,7 @@ import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { peopleWhere as inEditionWhere, viaBusiness } from "./admin-edition";
 import type {
     PersonHistoryItem,
     PersonRow,
@@ -20,7 +22,7 @@ import {
     peopleWhere,
     personHistory,
     personRow,
-    personSelect,
+    personSelectIn,
     signInState,
 } from "./admin-people-reads";
 import { AdminPermission } from "./admin-permissions";
@@ -67,6 +69,8 @@ export interface PersonDetail extends PersonRow {
     }[];
     /** The Sign-in tab, and why they can't sign in if anything stops them. */
     signIn: SignInState;
+    /** Their businesses on the other edition: a count, never which. */
+    otherEditionBusinesses: number;
 }
 
 /**
@@ -98,6 +102,7 @@ export class AdminPeopleService {
             filters?: readonly PeopleFilter[];
             page?: number;
         } = {},
+        edition: Edition | null = null,
     ): Promise<PeoplePage> {
         const term = input.q?.trim() ?? "";
         if (term.length === 1) {
@@ -107,8 +112,13 @@ export class AdminPeopleService {
         }
         const page = input.page ?? 1;
         const users = await prisma.user.findMany({
-            where: peopleWhere(term, input.filters ?? []),
-            select: personSelect,
+            where: {
+                AND: [
+                    peopleWhere(term, input.filters ?? [], undefined, edition),
+                    inEditionWhere(edition),
+                ],
+            },
+            select: personSelectIn(edition),
             orderBy: term
                 ? [{ email: "asc" }]
                 : [{ createdAt: "desc" }, { id: "desc" }],
@@ -133,14 +143,16 @@ export class AdminPeopleService {
      * which businesses they belong to. Same personal data as a search, so the
      * route in front of it needs the same permission and records each read.
      */
-    async recent(): Promise<RecentSignup[]> {
+    async recent(edition: Edition | null = null): Promise<RecentSignup[]> {
         const users = await prisma.user.findMany({
+            where: inEditionWhere(edition),
             select: {
                 id: true,
                 name: true,
                 email: true,
                 createdAt: true,
                 memberships: {
+                    where: viaBusiness(edition),
                     select: {
                         organization: { select: { id: true, name: true } },
                     },
@@ -162,12 +174,17 @@ export class AdminPeopleService {
         }));
     }
 
-    async detail(userId: string): Promise<PersonDetail> {
+    /** Reachable on either console; the businesses shown are its edition's. */
+    async detail(
+        userId: string,
+        edition: Edition | null = null,
+    ): Promise<PersonDetail> {
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
-                ...personSelect,
+                ...personSelectIn(edition),
                 memberships: {
+                    where: viaBusiness(edition),
                     select: {
                         role: true,
                         organization: {
@@ -201,6 +218,14 @@ export class AdminPeopleService {
         return {
             ...(await personRow({ ...base, memberships })),
             signIn: await signInState(base),
+            otherEditionBusinesses: edition
+                ? await prisma.membership.count({
+                      where: {
+                          userId,
+                          organization: { edition: { not: edition } },
+                      },
+                  })
+                : 0,
             memberships: memberships.map((row) => ({
                 organizationId: row.organization.id,
                 organizationName: row.organization.name,

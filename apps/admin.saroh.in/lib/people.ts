@@ -63,6 +63,8 @@ export interface PersonDetail extends PersonRow {
         userAgent: string | null;
     }[];
     signIn: SignInState;
+    /** Their businesses this console doesn't show. Older API builds leave it out. */
+    otherEditionBusinesses?: number;
 }
 
 /** One line of the History tab: something staff did to this person. */

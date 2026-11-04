@@ -17,6 +17,7 @@ import { isOverdue } from "./lead-rules";
 
 export const LEAD_SELECT = {
     id: true,
+    edition: true,
     name: true,
     email: true,
     emailKey: true,

@@ -1,8 +1,10 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
+import { ServedEdition } from "./admin-edition";
 import { AdminHealthService } from "./admin-health.service";
 import { AdminMachineryService } from "./admin-machinery.service";
 import { AdminOperationsService } from "./admin-operations.service";
@@ -37,14 +39,17 @@ export class AdminMachineryController {
 
     @Get("jobs/queue")
     @RequireAdminPermission(AdminPermission.JobsRead)
-    queue() {
-        return this.machinery.queue();
+    queue(@ServedEdition() edition: Edition | null) {
+        return this.machinery.queue(edition);
     }
 
     @Get("jobs")
     @RequireAdminPermission(AdminPermission.JobsRead)
-    jobs(@Query() query: ListJobsDto) {
-        return this.machinery.jobs(query);
+    jobs(
+        @Query() query: ListJobsDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.machinery.jobs(query, edition);
     }
 
     /** What a retry would do, changing nothing. */
@@ -97,14 +102,17 @@ export class AdminMachineryController {
 
     @Get("webhooks/summary")
     @RequireAdminPermission(AdminPermission.WebhooksRead)
-    webhookSummary() {
-        return this.machinery.webhookSummary();
+    webhookSummary(@ServedEdition() edition: Edition | null) {
+        return this.machinery.webhookSummary(edition);
     }
 
     @Get("webhooks")
     @RequireAdminPermission(AdminPermission.WebhooksRead)
-    webhooks(@Query() query: ListWebhooksDto) {
-        return this.machinery.webhooks(query);
+    webhooks(
+        @Query() query: ListWebhooksDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.machinery.webhooks(query, edition);
     }
 
     /** What a replay would do, changing nothing. */
@@ -164,8 +172,8 @@ export class AdminMachineryController {
 
     @Get("providers")
     @RequireAdminPermission(AdminPermission.ProvidersRead)
-    providers() {
-        return this.machinery.providers();
+    providers(@ServedEdition() edition: Edition | null) {
+        return this.machinery.providers(edition);
     }
 
     @Post("providers/domains/:domainId/recheck")

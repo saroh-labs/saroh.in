@@ -180,10 +180,21 @@ describe("Saroh's own leads (DB, U20)", () => {
             await waitlist.join({ email: tool, source: "link-preview" });
 
             await expect(
-                prisma.sarohLead.findUnique({ where: { emailKey: waiting } }),
+                prisma.sarohLead.findUnique({
+                    where: {
+                        edition_emailKey: {
+                            edition: "INDIA",
+                            emailKey: waiting,
+                        },
+                    },
+                }),
             ).resolves.toMatchObject({ source: "WAITLIST" });
             await expect(
-                prisma.sarohLead.findUnique({ where: { emailKey: tool } }),
+                prisma.sarohLead.findUnique({
+                    where: {
+                        edition_emailKey: { edition: "INDIA", emailKey: tool },
+                    },
+                }),
             ).resolves.toBeNull();
         });
 
@@ -196,7 +207,14 @@ describe("Saroh's own leads (DB, U20)", () => {
                 message: "I can't find my invoices.",
             });
             await expect(
-                prisma.sarohLead.findUnique({ where: { emailKey: address } }),
+                prisma.sarohLead.findUnique({
+                    where: {
+                        edition_emailKey: {
+                            edition: "INDIA",
+                            emailKey: address,
+                        },
+                    },
+                }),
             ).resolves.toBeNull();
         });
 
@@ -633,7 +651,9 @@ describe("Saroh's own leads (DB, U20)", () => {
             // A manager's own lead is never purged here.
             await service.add(asPriya(), { name: "Added", email: added });
             await prisma.sarohLead.update({
-                where: { emailKey: added },
+                where: {
+                    edition_emailKey: { edition: "INDIA", emailKey: added },
+                },
                 data: { websiteSeenAt: old },
             });
             // A lead that became a business stays.
@@ -644,7 +664,9 @@ describe("Saroh's own leads (DB, U20)", () => {
             });
             const business = await businessOwnedBy(email("wonbiz"), "Won Biz");
             await prisma.sarohLead.update({
-                where: { emailKey: won },
+                where: {
+                    edition_emailKey: { edition: "INDIA", emailKey: won },
+                },
                 data: {
                     stage: "WON",
                     wonOrganizationId: business.id,
@@ -652,7 +674,9 @@ describe("Saroh's own leads (DB, U20)", () => {
                 },
             });
             const staleLead = await prisma.sarohLead.findUniqueOrThrow({
-                where: { emailKey: stale },
+                where: {
+                    edition_emailKey: { edition: "INDIA", emailKey: stale },
+                },
             });
             await prisma.sarohContactLog.create({
                 data: {
@@ -695,7 +719,14 @@ describe("Saroh's own leads (DB, U20)", () => {
             );
             await admin.remove(support(), entry.id, "They asked to be removed");
             await expect(
-                prisma.sarohLead.findUnique({ where: { emailKey: address } }),
+                prisma.sarohLead.findUnique({
+                    where: {
+                        edition_emailKey: {
+                            edition: "INDIA",
+                            emailKey: address,
+                        },
+                    },
+                }),
             ).resolves.toBeNull();
         });
     });

@@ -1,9 +1,11 @@
 import { Body, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
+import { ServedEdition } from "../admin/admin-edition";
 import { AdminPermission } from "../admin/admin-permissions";
 import { AdminRoutes } from "../admin/admin-routes.decorator";
 import { SarohBusinessContactsService } from "./business-contacts.service";
@@ -44,15 +46,19 @@ export class SarohLeadsController {
     leadsBoard(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: LeadsBoardQueryDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        return this.leads.board(staff, query);
+        return this.leads.board(staff, query, edition);
     }
 
     /** Who a lead may be given to. Before `:leadId`, so it isn't one. */
     @Get("saroh-leads/managers")
     @RequireAdminPermission(AdminPermission.SarohLeadsWrite)
-    leadManagers(@PlatformAdminContext() staff: PlatformAdminInfo) {
-        return this.leads.managers(staff);
+    leadManagers(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.leads.managers(staff, edition);
     }
 
     @Get("saroh-leads/:leadId")

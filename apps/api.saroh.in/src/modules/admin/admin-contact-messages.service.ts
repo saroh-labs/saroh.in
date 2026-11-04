@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { ContactTopic } from "../contact-messages/dto";
 import { normaliseEmail } from "../waitlist/waitlist-keys";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { editionWhere } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -52,13 +54,17 @@ export interface ContactMessagePage {
 export class AdminContactMessagesService {
     constructor(private readonly audit: AdminAuditService) {}
 
-    async list(query: {
-        topic?: ContactTopic;
-        state?: "open" | "handled";
-        email?: string;
-        cursor?: string;
-    }): Promise<ContactMessagePage> {
+    async list(
+        query: {
+            topic?: ContactTopic;
+            state?: "open" | "handled";
+            email?: string;
+            cursor?: string;
+        },
+        edition: Edition | null = null,
+    ): Promise<ContactMessagePage> {
         const where: Prisma.ContactMessageWhereInput = {
+            ...editionWhere(edition),
             ...(query.topic ? { topic: query.topic } : {}),
             ...(query.state === "open"
                 ? { handledAt: null }
@@ -88,7 +94,10 @@ export class AdminContactMessagesService {
         });
         const hasMore = rows.length > PAGE_SIZE;
         const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-        const links = await linksFor(page.map((row) => row.email));
+        const links = await linksFor(
+            page.map((row) => row.email),
+            edition,
+        );
         return {
             items: page.map((row) => ({
                 ...row,
@@ -103,10 +112,11 @@ export class AdminContactMessagesService {
         staff: PlatformAdminInfo,
         id: string,
         handled: boolean,
+        edition: Edition | null = null,
     ): Promise<{ id: string; handledAt: Date | null }> {
         return prisma.$transaction(async (tx) => {
             const { count } = await tx.contactMessage.updateMany({
-                where: { id },
+                where: { id, ...editionWhere(edition) },
                 data: handled
                     ? { handledAt: new Date(), handledByUserId: staff.userId }
                     : { handledAt: null, handledByUserId: null },
@@ -138,6 +148,7 @@ export class AdminContactMessagesService {
  */
 async function linksFor(
     emails: string[],
+    edition: Edition | null,
 ): Promise<(email: string) => ContactMessageRow["links"]> {
     if (emails.length === 0) {
         return () => ({ lead: false, waitlist: false, userId: null });
@@ -147,6 +158,7 @@ async function linksFor(
     const [leads, waiting, users] = await Promise.all([
         prisma.sarohLead.findMany({
             where: {
+                ...editionWhere(edition),
                 OR: [
                     { emailKey: { in: keys } },
                     { signUpEmailKey: { in: keys } },
@@ -155,7 +167,7 @@ async function linksFor(
             select: { emailKey: true, signUpEmailKey: true },
         }),
         prisma.waitlistSignup.findMany({
-            where: { emailKey: { in: keys } },
+            where: { ...editionWhere(edition), emailKey: { in: keys } },
             select: { emailKey: true },
         }),
         prisma.user.findMany({

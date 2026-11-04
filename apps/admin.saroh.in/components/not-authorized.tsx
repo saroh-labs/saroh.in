@@ -7,6 +7,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin-shell";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { StaffIdentity } from "@/lib/control-plane";
+import { EDITION, EDITION_LABEL } from "@/lib/edition";
 
 /**
  * Shown when the API refuses the caller. Deliberately says nothing about why —
@@ -20,6 +21,9 @@ import type { StaffIdentity } from "@/lib/control-plane";
  *   and they are never stranded on a page whose only way out is Sign out.
  * - **Not staff at all** (no grant, not on the allowlist) keep the bare page:
  *   there is no menu to show them.
+ * - **Staff whose grant leaves out this console's edition** (`wrongConsole`)
+ *   get the bare page saying so: the API told them, and every read here would
+ *   be refused too, so there is no menu either.
  *
  * The copy says "does not have access to this area" rather than naming platform
  * administrator access, because staff who lack one permission are still
@@ -28,9 +32,11 @@ import type { StaffIdentity } from "@/lib/control-plane";
 export function NotAuthorized({
     email,
     staff,
+    wrongConsole = false,
 }: {
     email: string;
     staff?: StaffIdentity | null;
+    wrongConsole?: boolean;
 }) {
     if (staff) {
         return (
@@ -49,8 +55,16 @@ export function NotAuthorized({
                     <Wordmark suffix="console" />
                 </div>
                 <EmptyState
-                    title="Not authorized"
-                    description={`${email} does not have access to this area.`}
+                    title={
+                        wrongConsole
+                            ? "Your access doesn't include this console"
+                            : "Not authorized"
+                    }
+                    description={
+                        wrongConsole
+                            ? `This is the ${EDITION_LABEL[EDITION]} console. ${email} is on Saroh's team, but not for this one. A Platform owner can add it from Team.`
+                            : `${email} does not have access to this area.`
+                    }
                     action={<SignOutButton />}
                 />
             </div>

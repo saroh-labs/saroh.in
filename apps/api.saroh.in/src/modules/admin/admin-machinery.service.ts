@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { DomainsService } from "../domains/domains.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { viaBusiness, viaBusinessOrNone } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -42,9 +44,10 @@ export class AdminMachineryService {
     ) {}
 
     /** The queue at a glance: how much is waiting, how late, what is failing. */
-    async queue() {
+    async queue(edition: Edition | null = null) {
         const now = new Date();
         const since = new Date(now.getTime() - DAY_MS);
+        const inEdition = viaBusinessOrNone(edition);
         const [
             byStatus,
             oldestDue,
@@ -53,26 +56,38 @@ export class AdminMachineryService {
             failedToday,
             renewal,
         ] = await Promise.all([
-            prisma.job.groupBy({ by: ["status"], _count: { _all: true } }),
+            prisma.job.groupBy({
+                by: ["status"],
+                where: inEdition,
+                _count: { _all: true },
+            }),
             prisma.job.findFirst({
-                where: { status: "PENDING", runAt: { lte: now } },
+                where: { status: "PENDING", runAt: { lte: now }, ...inEdition },
                 select: { runAt: true },
                 orderBy: { runAt: "asc" },
             }),
             prisma.job.groupBy({
                 by: ["type"],
-                where: { status: "FAILED" },
+                where: { status: "FAILED", ...inEdition },
                 _count: { _all: true },
                 orderBy: { _count: { type: "desc" } },
             }),
             prisma.job.count({
-                where: { status: "DONE", processedAt: { gte: since } },
+                where: {
+                    status: "DONE",
+                    processedAt: { gte: since },
+                    ...inEdition,
+                },
             }),
             prisma.job.count({
-                where: { status: "FAILED", processedAt: { gte: since } },
+                where: {
+                    status: "FAILED",
+                    processedAt: { gte: since },
+                    ...inEdition,
+                },
             }),
             prisma.job.findFirst({
-                where: { type: "subscription.renew" },
+                where: { type: "subscription.renew", ...inEdition },
                 select: {
                     status: true,
                     runAt: true,
@@ -111,8 +126,9 @@ export class AdminMachineryService {
         };
     }
 
-    async jobs(query: JobListQuery) {
+    async jobs(query: JobListQuery, edition: Edition | null = null) {
         const where: Prisma.JobWhereInput = {
+            ...viaBusinessOrNone(edition),
             ...(query.status ? { status: query.status } : {}),
             ...(query.type ? { type: query.type } : {}),
             ...(query.organizationId
@@ -141,16 +157,18 @@ export class AdminMachineryService {
         return page(rows);
     }
 
-    async webhookSummary() {
+    async webhookSummary(edition: Edition | null = null) {
         const since = new Date(Date.now() - DAY_MS);
+        const inEdition = viaBusinessOrNone(edition);
         const [byStatus, lastDay] = await Promise.all([
             prisma.webhookEvent.groupBy({
                 by: ["status"],
+                where: inEdition,
                 _count: { _all: true },
             }),
             prisma.webhookEvent.groupBy({
                 by: ["status"],
-                where: { createdAt: { gte: since } },
+                where: { createdAt: { gte: since }, ...inEdition },
                 _count: { _all: true },
             }),
         ]);
@@ -164,8 +182,9 @@ export class AdminMachineryService {
         return { total: toMap(byStatus), lastDay: toMap(lastDay) };
     }
 
-    async webhooks(query: WebhookListQuery) {
+    async webhooks(query: WebhookListQuery, edition: Edition | null = null) {
         const where: Prisma.WebhookEventWhereInput = {
+            ...viaBusinessOrNone(edition),
             ...(query.status ? { status: query.status } : {}),
             ...(query.provider ? { provider: query.provider } : {}),
             ...(query.organizationId
@@ -198,23 +217,27 @@ export class AdminMachineryService {
      * domains are still waiting on DNS. Derived from stored state; a domain
      * can be checked again live with `recheckDomain`.
      */
-    async providers() {
+    async providers(edition: Edition | null = null) {
+        const owned = viaBusiness(edition);
         const [payments, messaging, domains, attentionDomains] =
             await Promise.all([
                 prisma.merchantPaymentProvider.groupBy({
                     by: ["provider", "status"],
+                    where: owned,
                     _count: { _all: true },
                 }),
                 prisma.communicationProvider.groupBy({
                     by: ["channel", "provider", "status"],
+                    where: owned,
                     _count: { _all: true },
                 }),
                 prisma.domain.groupBy({
                     by: ["status"],
+                    where: owned,
                     _count: { _all: true },
                 }),
                 prisma.domain.findMany({
-                    where: { status: { not: "VERIFIED" } },
+                    where: { status: { not: "VERIFIED" }, ...owned },
                     select: {
                         id: true,
                         hostname: true,

@@ -5,7 +5,12 @@ import { formatDate } from "@/lib/format";
 import { ROLE_LABEL } from "@/lib/roles";
 import type { StaffInvite, StaffMember } from "@/lib/staff";
 import { memberBase } from "@/lib/team-member-words";
-import { accessEnds, JOB_LABEL, looksAfterBusinesses } from "@/lib/team-words";
+import {
+    accessEnds,
+    editionsWords,
+    JOB_LABEL,
+    looksAfterBusinesses,
+} from "@/lib/team-words";
 
 import { LoadBar } from "./load-bar";
 import {
@@ -36,6 +41,7 @@ export function personFacts(person: Person) {
             name: invite.name,
             email: invite.email,
             job: JOB_LABEL[invite.worksAs],
+            editions: editionsWords(invite.roles, invite.editions),
             roles: invite.roles.map((role) => ({
                 key: role,
                 text: ROLE_LABEL[role],
@@ -62,6 +68,10 @@ export function personFacts(person: Person) {
         name: member.name ?? member.email,
         email: member.email,
         job: job ? JOB_LABEL[job] : "No job yet",
+        editions: editionsWords(
+            member.roles.map((role) => role.role),
+            member.editions,
+        ),
         roles: member.roles.map((role) => ({
             key: role.assignmentId,
             text: role.expiresAt
@@ -179,6 +189,9 @@ export function PersonCard({
                     </Badge>
                 ))}
             </div>
+            <p className="text-[13px] text-muted-foreground">
+                Editions: {facts.editions}
+            </p>
             <p className="text-[13px] text-muted-foreground">
                 {facts.since} · {facts.ends}
                 {facts.note && ` · ${facts.note}`}

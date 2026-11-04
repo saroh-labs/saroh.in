@@ -12,6 +12,9 @@ import {
     MinLength,
 } from "class-validator";
 
+import type { Edition } from "@saroh/edition";
+import { EDITIONS } from "@saroh/edition";
+
 import { AdminRole } from "./admin-permissions";
 import { OperatorReasonDto } from "./dto";
 import type { StaffJob } from "./staff-profile";
@@ -49,6 +52,14 @@ export class InviteStaffDto extends OperatorReasonDto {
     @IsOptional()
     @IsBoolean()
     onCommission?: boolean;
+
+    /** Which consoles they may open. Left out: the one this was sent from. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(EDITIONS.length)
+    @IsIn(EDITIONS, { each: true })
+    editions?: Edition[];
 }
 
 /**

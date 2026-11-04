@@ -1,6 +1,8 @@
 import { Get, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { AdminUsageService } from "./admin-usage.service";
@@ -17,11 +19,17 @@ export class AdminUsageController {
 
     @Get("usage/storage")
     @RequireAdminPermission(AdminPermission.OrganizationRead)
-    storage(@Query() query: ListStorageUsageDto) {
-        return this.usage.storage({
-            order: query.order,
-            page: query.page,
-            limit: query.limit,
-        });
+    storage(
+        @Query() query: ListStorageUsageDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.usage.storage(
+            {
+                order: query.order,
+                page: query.page,
+                limit: query.limit,
+            },
+            edition,
+        );
     }
 }

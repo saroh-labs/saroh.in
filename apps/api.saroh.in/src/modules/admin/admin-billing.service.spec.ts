@@ -312,10 +312,14 @@ describe("AdminBillingController records every read", () => {
             service,
             audit as unknown as AdminAuditService,
         );
-        await controller.listInvoices(staffAs(AdminRole.Billing), {
-            q: "Some Person",
-            month: "2026-10",
-        });
+        await controller.listInvoices(
+            staffAs(AdminRole.Billing),
+            {
+                q: "Some Person",
+                month: "2026-10",
+            },
+            null,
+        );
         const entry = audit.recordRead.mock.calls[0]![0] as {
             metadata: Record<string, unknown>;
         };

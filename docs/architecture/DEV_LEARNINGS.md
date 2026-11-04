@@ -6376,3 +6376,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the tax line is now an argument only the manual invoice path passes, with a test that a caller without it adds nothing.
 **Rule**: before changing a shared function's behaviour, grep every caller. New behaviour for one caller is an explicit argument, not something read from shared data.
 **Category**: backend · invoices
+
+---
+
+## A changed unique key still type-checked, in tests that no longer ran
+
+**Symptom**: 4 Nov, after one lead per email became one per edition, the full gate failed four tests in `saroh-leads.db.spec.ts` with a Prisma validation error. Type checks and unit tests had passed.
+**Cause**: those tests look a lead up with `where: { emailKey }`, which stopped being a unique key. The API's `tsconfig.json` leaves specs out, and ts-jest doesn't fail on type errors, so only running them against a database showed it.
+**Fix**: the tests use `edition_emailKey`.
+**Rule**: when a `@unique` changes, grep the specs for the old key too, as `tsc` won't find them. Type-checking specs would catch this, but they have older type errors to clear first.
+**Category**: testing · database

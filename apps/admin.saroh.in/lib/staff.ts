@@ -1,3 +1,5 @@
+import type { Edition } from "@saroh/edition";
+
 import type { AdminPermission, AdminRole } from "./control-plane";
 import { getJson } from "./control-plane";
 import type { StaffJob } from "./team-words";
@@ -16,6 +18,8 @@ export interface StaffMember {
     grantedAt: string;
     revokedAt: string | null;
     note: string | null;
+    /** The consoles they may open. Older API builds leave it out. */
+    editions?: Edition[];
     roles: {
         assignmentId: string;
         role: AdminRole;
@@ -50,6 +54,8 @@ export interface StaffInvite {
     roles: AdminRole[];
     worksAs: StaffJob;
     onCommission: boolean;
+    /** The consoles the grant opens. Older API builds leave it out. */
+    editions?: Edition[];
     state: "waiting" | "expired" | "accepted" | "withdrawn";
     expiresAt: string;
     sentAt: string;

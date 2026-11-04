@@ -1,9 +1,11 @@
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { EmailVerifiedBy } from "../../common/auth/email-verification";
 import { emailVerifiedBy } from "../../common/auth/email-verification";
 import { holds } from "../../common/auth/sign-in-holds";
 import { AdminAuditOutcome } from "./admin-audit.service";
+import { viaBusiness } from "./admin-edition";
 import type { PeopleFilter } from "./sign-in-help-rules";
 import {
     CODE_WINDOW_MS,
@@ -18,6 +20,7 @@ export function peopleWhere(
     q: string | undefined,
     filters: readonly PeopleFilter[],
     now: Date = new Date(),
+    edition: Edition | null = null,
 ) {
     const and: object[] = [];
     const term = q?.trim();
@@ -34,7 +37,11 @@ export function peopleWhere(
         if (filter === "no-business") and.push({ memberships: { none: {} } });
         if (filter === "unverified") and.push({ emailVerified: false });
         if (filter === "owners") {
-            and.push({ memberships: { some: { role: "OWNER" } } });
+            and.push({
+                memberships: {
+                    some: { role: "OWNER", ...viaBusiness(edition) },
+                },
+            });
         }
         if (filter === "joined-this-week") {
             and.push({
@@ -232,6 +239,22 @@ export const personSelect = {
     },
     platformAdmin: { select: { revokedAt: true } },
 } as const;
+
+/**
+ * {@link personSelect} counting only this edition's businesses, so a row on
+ * one console says nothing of what the person has on the other.
+ */
+export function personSelectIn(edition: Edition | null) {
+    const inEdition = viaBusiness(edition);
+    return {
+        ...personSelect,
+        _count: { select: { memberships: { where: inEdition } } },
+        memberships: {
+            ...personSelect.memberships,
+            where: { role: "OWNER", ...inEdition },
+        },
+    };
+}
 
 export interface PersonRecord {
     id: string;

@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 
 import { AdminShell } from "@/components/admin-shell";
 import { requireStaff } from "@/lib/console";
-import { SAROH_APPS, sarohAppUrl } from "@/lib/saroh-apps";
+import { sarohApps, sarohAppUrl } from "@/lib/saroh-apps";
 
 export const metadata = { title: "Saroh's apps" };
 
@@ -30,7 +30,7 @@ export default async function AppsPage() {
                     description="Every host this instance runs, in this environment."
                 />
                 <ul className="grid divide-y divide-border rounded-xl border border-border bg-card">
-                    {SAROH_APPS.map((app) => (
+                    {sarohApps().map((app) => (
                         <li key={app.name}>
                             <a
                                 href={sarohAppUrl(app, host)}

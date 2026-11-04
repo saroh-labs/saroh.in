@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { deleteWebsiteLeadOnRequest } from "../saroh-leads/lead-retention";
@@ -16,6 +17,7 @@ import {
     TOOL_SOURCE_PREFIX,
 } from "../waitlist/waitlist-keys";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { editionWhere } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -70,12 +72,14 @@ export class AdminWaitlistService {
         private readonly invites: WaitlistInvitesService,
     ) {}
 
-    async summary() {
+    async summary(edition: Edition | null = null) {
         const now = Date.now();
+        const inEdition = editionWhere(edition);
         // Waiting for Saroh: not invited, and not a free tool's email gate.
         const waitingOnly: Prisma.WaitlistSignupWhereInput = {
             invitedAt: null,
             ...NOT_TOOL_GATE,
+            ...inEdition,
         };
         const [
             waiting,
@@ -92,7 +96,7 @@ export class AdminWaitlistService {
         ] = await Promise.all([
             prisma.waitlistSignup.count({ where: waitingOnly }),
             prisma.waitlistSignup.count({
-                where: { invitedAt: { not: null } },
+                where: { invitedAt: { not: null }, ...inEdition },
             }),
             prisma.waitlistSignup.groupBy({
                 by: ["source"],
@@ -119,7 +123,7 @@ export class AdminWaitlistService {
             }),
             prisma.waitlistSignup.groupBy({
                 by: ["referredById"],
-                where: { referredById: { not: null } },
+                where: { referredById: { not: null }, ...inEdition },
                 _count: { _all: true },
                 orderBy: { _count: { referredById: "desc" } },
                 take: TOP_REFERRERS,
@@ -133,11 +137,14 @@ export class AdminWaitlistService {
                 where: {
                     createdAt: { gte: new Date(now - 7 * DAY_MS) },
                     ...NOT_TOOL_GATE,
+                    ...inEdition,
                 },
             }),
-            prisma.waitlistSignup.count({ where: { joinedAt: { not: null } } }),
             prisma.waitlistSignup.count({
-                where: { invitedAt: null, ...TOOL_GATE },
+                where: { joinedAt: { not: null }, ...inEdition },
+            }),
+            prisma.waitlistSignup.count({
+                where: { invitedAt: null, ...TOOL_GATE, ...inEdition },
             }),
         ]);
         const referrerIds = referrers.flatMap((row) =>
@@ -200,8 +207,10 @@ export class AdminWaitlistService {
         };
     }
 
-    async list(query: WaitlistQuery) {
+    async list(query: WaitlistQuery, edition: Edition | null = null) {
+        const inEdition = editionWhere(edition);
         const where: Prisma.WaitlistSignupWhereInput = {
+            ...inEdition,
             ...(query.state === "invited"
                 ? { invitedAt: { not: null } }
                 : query.state === "tools"
@@ -268,6 +277,7 @@ export class AdminWaitlistService {
                               { emailKey: { in: keys } },
                               { signUpEmailKey: { in: keys } },
                           ],
+                          ...inEdition,
                       },
                       select: { emailKey: true, signUpEmailKey: true },
                   });
@@ -289,21 +299,34 @@ export class AdminWaitlistService {
      * and reason only — the address is what was asked to go. Anyone this
      * entry referred stays on the list, credited to nobody.
      */
-    async remove(staff: PlatformAdminInfo, id: string, reason: string) {
+    async remove(
+        staff: PlatformAdminInfo,
+        id: string,
+        reason: string,
+        edition: Edition | null = null,
+    ) {
         const why = reason.trim();
         if (why.length < 4)
             throw new BadRequestException("Give a reason for removing them.");
         return prisma.$transaction(async (tx) => {
             const entry = await tx.waitlistSignup.findUnique({
                 where: { id },
-                select: { emailKey: true },
+                select: { emailKey: true, businessKey: true },
             });
             const { count } = await tx.waitlistSignup.deleteMany({
-                where: { id },
+                where: { id, ...editionWhere(edition) },
             });
             if (!entry || count === 0) {
                 throw new NotFoundException("Not on the waitlist");
             }
+            // They asked to be taken off, so the same entry goes from the
+            // other edition too (owner, 4 Nov).
+            await tx.waitlistSignup.deleteMany({
+                where: {
+                    emailKey: entry.emailKey,
+                    businessKey: entry.businessKey,
+                },
+            });
             // Their unconverted sales lead goes too (DEC-169, U20).
             const leadRemoved = await deleteWebsiteLeadOnRequest(
                 tx,
@@ -322,6 +345,18 @@ export class AdminWaitlistService {
             return { removed: true };
         });
     }
+}
+
+/** An invite by id names only this edition's entries: another's is a 404. */
+export async function assertWaitlistInEdition(
+    ids: string[],
+    edition: Edition | null,
+): Promise<void> {
+    if (!edition) return;
+    const elsewhere = await prisma.waitlistSignup.count({
+        where: { id: { in: ids }, edition: { not: edition } },
+    });
+    if (elsewhere > 0) throw new NotFoundException("Not on the waitlist");
 }
 
 /**

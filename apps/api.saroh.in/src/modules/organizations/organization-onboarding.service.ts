@@ -223,6 +223,7 @@ export class OrganizationOnboardingService {
                 organizationId: organization.id,
                 ownerUserId: userId,
                 madeAt: organization.createdAt,
+                edition,
                 claim: {
                     link: dto.managerLinkCode
                         ? {

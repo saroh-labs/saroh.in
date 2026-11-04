@@ -1,10 +1,12 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { ListBusinessReportsDto, MarkBusinessReportDoneDto } from "./dto";
@@ -30,8 +32,9 @@ export class AdminBusinessReportsController {
     listBusinessReports(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListBusinessReportsDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        return this.reports.list(staff, query);
+        return this.reports.list(staff, query, edition);
     }
 
     @Post("business-reports/:id/done")
@@ -43,6 +46,7 @@ export class AdminBusinessReportsController {
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("id") id: string,
         @Body() dto: MarkBusinessReportDoneDto,
+        @ServedEdition() edition: Edition | null,
     ) {
         return this.idempotency.run(
             {
@@ -51,7 +55,7 @@ export class AdminBusinessReportsController {
                 actorUserId: staff.userId,
             },
             { id, reason: dto.reason },
-            () => this.reports.markDone(staff, id, dto.reason),
+            () => this.reports.markDone(staff, id, dto.reason, edition),
         );
     }
 }

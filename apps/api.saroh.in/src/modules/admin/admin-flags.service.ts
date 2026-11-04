@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { FlagKey, FlagMetadata } from "../feature-flags/flags";
 import { FLAG_KEYS, FLAG_METADATA } from "../feature-flags/flags";
+import { editionWhere, viaBusiness } from "./admin-edition";
 
 /** One flag as the control plane sees it: the global default + who overrides it. */
 export interface AdminFlagView {
@@ -60,12 +62,14 @@ export const HISTORY_LIMIT = 20;
  */
 @Injectable()
 export class AdminFlagsService {
-    async list(): Promise<AdminFlagView[]> {
+    async list(edition: Edition | null = null): Promise<AdminFlagView[]> {
         const [defaults, overrides] = await Promise.all([
             prisma.featureFlag.findMany({
                 select: { key: true, enabledByDefault: true },
             }),
+            // The flags are shared; another edition's business never is.
             prisma.featureFlagOverride.findMany({
+                where: viaBusiness(edition),
                 select: {
                     flagKey: true,
                     enabled: true,
@@ -156,7 +160,11 @@ export class AdminFlagsService {
      * release manager does not hold. Names are joined here so the console
      * says who changed what, not two ids.
      */
-    async history(key: FlagKey, page = 1): Promise<AdminFlagChange[]> {
+    async history(
+        key: FlagKey,
+        page = 1,
+        edition: Edition | null = null,
+    ): Promise<AdminFlagChange[]> {
         const rows = await prisma.featureFlagAudit.findMany({
             where: { flagKey: key },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -189,7 +197,7 @@ export class AdminFlagsService {
                 : [],
             orgIds.length > 0
                 ? prisma.organization.findMany({
-                      where: { id: { in: orgIds } },
+                      where: { id: { in: orgIds }, ...editionWhere(edition) },
                       select: { id: true, name: true },
                   })
                 : [],

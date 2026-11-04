@@ -2790,6 +2790,10 @@ model PlatformAdmin {
   /// Why this person has staff access (e.g. "on-call platform engineer").
   note String?
 
+  /// The editions' consoles this person may open (DEC-204). A Platform owner
+  /// opens every edition's, whatever this says.
+  editions Edition[] @default([INDIA])
+
   @@index([revokedAt])
 }
 
@@ -2920,7 +2924,9 @@ model StaffInvite {
   name         String
   roles        String[]
   worksAs      String
-  onCommission Boolean  @default(false)
+  onCommission Boolean   @default(false)
+  /// The consoles the grant opens once accepted (DEC-204).
+  editions     Edition[] @default([INDIA])
   reason       String
 
   tokenHash String   @unique
@@ -2967,18 +2973,20 @@ model StaffInvite {
 // its email is left (`saroh-leads/lead-retention.ts`, the enquiry purge).
 // Not a tenant row: it belongs to Saroh.
 model SarohLead {
-  id String @id @default(cuid())
+  id      String  @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   /// Who: the business's or the person's name, as known.
   name     String
   email    String?
-  emailKey String?   @unique
+  emailKey String?
   /// When this email was first put on the lead.
   emailAt  DateTime?
 
   /// The email the business signed up with, when it isn't `email`.
   signUpEmail    String?
-  signUpEmailKey String?   @unique
+  signUpEmailKey String?
   signUpEmailAt  DateTime?
 
   phone String?
@@ -3014,6 +3022,12 @@ model SarohLead {
   @@index([ownerPlatformAdminId, stage])
   @@index([stage, followUpOn])
   @@index([websiteSeenAt])
+
+  // One lead per email on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey])
+  @@unique([edition, signUpEmailKey])
+  @@index([emailKey])
+  @@index([signUpEmailKey])
 }
 
 // A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
@@ -6446,7 +6460,9 @@ model BillingWebhookEvent {
 // matching the public enquiry surface — and exists so abuse can be
 // investigated and a self-referral recognised.
 model WaitlistSignup {
-  id String @id @default(cuid())
+  id      String  @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   email       String
   emailKey    String
@@ -6534,7 +6550,9 @@ model WaitlistSignup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([emailKey, businessKey])
+  // One entry per person and business on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey, businessKey])
+  @@index([emailKey])
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])
@@ -7111,14 +7129,14 @@ model Invoice {
   sgst            Decimal @default(0) @db.Decimal(12, 2)
   igst            Decimal @default(0) @db.Decimal(12, 2)
 
-  currency String
-  subtotal Decimal @db.Decimal(12, 2)
+  currency    String
+  subtotal    Decimal @db.Decimal(12, 2)
   // What the tax line prints as ("VAT 20%"), frozen on the paper; null is "Tax".
-  taxLabel String?
+  taxLabel    String?
   // The tax number printed beside it. A GST seller's is `sellerGstin`.
   sellerTaxId String?
-  tax      Decimal @default(0) @db.Decimal(12, 2)
-  total    Decimal @db.Decimal(12, 2)
+  tax         Decimal @default(0) @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
 
   issuedAt   DateTime?
   dueAt      DateTime?
@@ -8923,17 +8941,19 @@ enum BusinessReportStatus {
 // them in the admin console (organization:pii:read). Deleted 12 months
 // after it arrived (`contact-messages/contact-retention.ts`).
 model ContactMessage {
-  id        String   @id @default(cuid())
+  id              String    @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition         Edition   @default(INDIA)
   // One of the form's topics (`CONTACT_TOPICS` in the API), never free text.
-  topic     String
-  name      String
-  email     String
+  topic           String
+  name            String
+  email           String
   // One of the waitlist's kinds of business (`WAITLIST_KINDS`), if they chose one.
-  kind      String?
-  message   String
+  kind            String?
+  message         String
   // A digest of the writer's address, as the waitlist keeps one; never the address.
-  ipHash    String?
-  createdAt DateTime @default(now())
+  ipHash          String?
+  createdAt       DateTime  @default(now())
   // When staff marked it handled (they replied from the team's mailbox), and
   // who; null while it is open. Set from the console's Messages screen.
   handledAt       DateTime?

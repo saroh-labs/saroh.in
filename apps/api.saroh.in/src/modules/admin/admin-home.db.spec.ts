@@ -127,7 +127,7 @@ beforeAll(async () => {
 
 describe("Home (DB, U10)", () => {
     it("lists every kind that is waiting, for a Platform owner", async () => {
-        const home = await service.home(as([Roles.PlatformOwner]), now);
+        const home = await service.home(as([Roles.PlatformOwner]), null, now);
 
         expect(home.checked).toEqual([
             "billing",
@@ -157,19 +157,27 @@ describe("Home (DB, U10)", () => {
     });
 
     it("shows only what each person's permissions reach", async () => {
-        const release = await service.home(as([Roles.ReleaseManager]), now);
+        const release = await service.home(
+            as([Roles.ReleaseManager]),
+            null,
+            now,
+        );
         expect(release.checked).toEqual(["reports"]);
         expect(release.needs.map((n) => n.kind)).toEqual(["reports"]);
         expect(release.counts.paying).toBeNull();
         expect(release.counts.jobsFailedToday).toBeNull();
 
-        const billing = await service.home(as([Roles.Billing]), now);
+        const billing = await service.home(as([Roles.Billing]), null, now);
         expect(billing.checked).toEqual(["billing", "reports"]);
 
-        const support = await service.home(as([Roles.Support]), now);
+        const support = await service.home(as([Roles.Support]), null, now);
         expect(support.checked).toEqual(["reports", "help", "sign-ups"]);
 
-        const operations = await service.home(as([Roles.Operations]), now);
+        const operations = await service.home(
+            as([Roles.Operations]),
+            null,
+            now,
+        );
         expect(operations.checked).toEqual(["reports", "jobs"]);
         expect(operations.counts.jobsFailedToday).toBe(1);
     });
@@ -187,7 +195,7 @@ describe("Home (DB, U10)", () => {
         // job have all aged off Home.
         const later = new Date(now.getTime() + 31 * DAY);
 
-        const home = await service.home(as([Roles.PlatformOwner]), later);
+        const home = await service.home(as([Roles.PlatformOwner]), null, later);
         expect(home.needs).toEqual([]);
         expect(home.checked).toHaveLength(5);
     });

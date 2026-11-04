@@ -1,6 +1,8 @@
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { EDITION, EDITION_LABEL } from "@/lib/edition";
+
 /**
  * The console's frame: the sticky 56px bar and the rail beside the work
  * area. `AdminShell` fills it with the real pieces; `ConsoleLoading` with
@@ -33,6 +35,10 @@ export function ConsoleFrame({
                 <Link href="/" className="shrink-0">
                     <Wordmark suffix="console" />
                 </Link>
+                {/* Which console this is, so nobody works in the wrong one. */}
+                <span className="shrink-0 text-[12px] text-muted-foreground">
+                    {EDITION_LABEL[EDITION]}
+                </span>
                 <div className="order-last flex min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto">
                     {search}
                 </div>

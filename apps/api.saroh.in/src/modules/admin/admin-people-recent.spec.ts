@@ -142,7 +142,7 @@ describe("GET /admin/people/recent (Newest sign-ups)", () => {
     it("records each opening in the admin audit trail, as a search is", async () => {
         findMany.mockResolvedValue([user(1), user(2), user(3)]);
         const { controller, audit } = build();
-        const rows = await controller.recent(staff);
+        const rows = await controller.recent(staff, null);
         expect(rows).toHaveLength(3);
         expect(audit.recordRead).toHaveBeenCalledTimes(1);
         expect(audit.recordRead).toHaveBeenCalledWith({

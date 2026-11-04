@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { EDITIONS } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -112,6 +114,8 @@ export interface StaffMember {
     grantedAt: Date;
     revokedAt: Date | null;
     note: string | null;
+    /** The consoles they may open (a Platform owner opens all, whatever this says). */
+    editions: Edition[];
     roles: {
         assignmentId: string;
         role: AdminRole;
@@ -148,6 +152,11 @@ export interface GrantInput {
     worksAs?: StaffJob;
     /** With `worksAs`: whether they are paid by commission. */
     onCommission?: boolean;
+    /**
+     * Which consoles they may open. Left out: the console this came from, for
+     * someone new; someone already on the team keeps theirs.
+     */
+    editions?: string[];
 }
 
 /**
@@ -178,6 +187,7 @@ export class AdminStaffService {
                 grantedAt: true,
                 revokedAt: true,
                 note: true,
+                editions: true,
                 user: { select: { email: true, name: true } },
                 staffProfile: {
                     select: {
@@ -237,6 +247,7 @@ export class AdminStaffService {
                 grantedAt: row.grantedAt,
                 revokedAt: row.revokedAt,
                 note: row.note,
+                editions: row.editions,
                 roles,
                 permissions: row.revokedAt
                     ? []
@@ -262,6 +273,8 @@ export class AdminStaffService {
         const reason = requireReason(input.reason);
         const expiresAt = requireFuture(input.expiresAt);
         const email = input.email.trim().toLowerCase();
+        const chosen = input.editions && requireEditions(input.editions);
+        const fresh = chosen ?? [consoleEdition(input.staff)];
         if (input.worksAs !== undefined) {
             if (!STAFF_JOBS.includes(input.worksAs)) {
                 throw new BadRequestException("Choose what they work as.");
@@ -291,10 +304,15 @@ export class AdminStaffService {
                     userId: user.id,
                     grantedByUserId: input.staff.userId,
                     note: reason,
+                    editions: fresh,
                 },
                 update: {},
-                select: { id: true, revokedAt: true },
+                select: { id: true, revokedAt: true, editions: true },
             });
+            // A grant only adds, as it does roles; Change sets them exactly.
+            const editions = admin.revokedAt
+                ? fresh
+                : [...new Set([...admin.editions, ...(chosen ?? [])])];
             if (admin.revokedAt) {
                 await tx.platformAdmin.update({
                     where: { id: admin.id },
@@ -303,7 +321,13 @@ export class AdminStaffService {
                         grantedAt: now,
                         grantedByUserId: input.staff.userId,
                         note: reason,
+                        editions,
                     },
+                });
+            } else if (editions.length !== admin.editions.length) {
+                await tx.platformAdmin.update({
+                    where: { id: admin.id },
+                    data: { editions },
                 });
             }
 
@@ -345,6 +369,7 @@ export class AdminStaffService {
                     reopened: Boolean(admin.revokedAt),
                     worksAs: input.worksAs ?? null,
                     onCommission: input.onCommission ?? null,
+                    editions,
                 },
             });
             return { platformAdminId: admin.id, added };
@@ -387,7 +412,8 @@ export class AdminStaffService {
      * Set exactly which roles someone holds, and until when. Roles that go
      * are revoked; roles that come are written new; a role whose expiry
      * changes is revoked and written again with the new one. Taking the
-     * Account manager role away ends their account-manager links.
+     * Account manager role away ends their account-manager links. `editions`
+     * sets exactly which consoles they may open; left out, it stays.
      */
     async amend(input: {
         staff: PlatformAdminInfo;
@@ -395,8 +421,10 @@ export class AdminStaffService {
         roles: string[];
         reason: string;
         expiresAt?: Date | null;
+        editions?: string[];
     }) {
         const roles = new Set(requireRoles(input.roles));
+        const editions = input.editions && requireEditions(input.editions);
         const reason = requireReason(input.reason);
         const expiresAt =
             input.expiresAt === null
@@ -427,8 +455,24 @@ export class AdminStaffService {
             );
             const toAdd = [...roles].filter((role) => !kept.has(role));
 
-            if (toRevoke.length === 0 && toAdd.length === 0) {
+            const editionsChange =
+                editions &&
+                (editions.length !== admin.editions.length ||
+                    editions.some((e) => !admin.editions.includes(e)))
+                    ? editions
+                    : undefined;
+            if (
+                toRevoke.length === 0 &&
+                toAdd.length === 0 &&
+                !editionsChange
+            ) {
                 return { platformAdminId: admin.id, changed: false };
+            }
+            if (editionsChange) {
+                await tx.platformAdmin.update({
+                    where: { id: admin.id },
+                    data: { editions: editionsChange },
+                });
             }
 
             await tx.platformAdminRoleAssignment.updateMany({
@@ -477,6 +521,8 @@ export class AdminStaffService {
                     added: toAdd,
                     expiresAt: expiresAt?.toISOString() ?? null,
                     managerLinksEnded: linksEnded.length,
+                    editions: editions ?? admin.editions,
+                    editionsBefore: admin.editions,
                 },
             });
             return { platformAdminId: admin.id, changed: true };
@@ -785,7 +831,7 @@ export class AdminStaffService {
     ) {
         const admin = await tx.platformAdmin.findUnique({
             where: { id: platformAdminId },
-            select: { id: true, revokedAt: true },
+            select: { id: true, revokedAt: true, editions: true },
         });
         if (!admin) throw new NotFoundException(notFound);
         return admin;
@@ -874,6 +920,23 @@ export function requireRoles(values: string[]): AdminRole[] {
         throw new BadRequestException(`Unknown role: ${unknown.join(", ")}`);
     }
     return roles as AdminRole[];
+}
+
+export function requireEditions(values: readonly string[]): Edition[] {
+    const editions = [...new Set(values)];
+    if (editions.length === 0) {
+        throw new BadRequestException("Choose at least one edition.");
+    }
+    const known = EDITIONS as readonly string[];
+    if (editions.some((edition) => !known.includes(edition))) {
+        throw new BadRequestException("Choose India, Global or both.");
+    }
+    return editions as Edition[];
+}
+
+/** The edition of the console a request came through; India on one of none (local). */
+export function consoleEdition(staff: PlatformAdminInfo): Edition {
+    return staff.edition ?? "INDIA";
 }
 
 export function requireReason(value: string): string {

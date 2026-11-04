@@ -17,6 +17,7 @@
     "portless": "admin.saroh",
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/edition": "workspace:*",
         "@saroh/error-tracking": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
         "@saroh/search-pages": "workspace:*",

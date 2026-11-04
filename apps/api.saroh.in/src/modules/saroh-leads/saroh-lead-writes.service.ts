@@ -103,8 +103,9 @@ export class SarohLeadWritesService {
         const name = requiredName(input.name);
         const email = optionalEmail(input.email);
         const now = new Date();
+        const edition = staff.edition ?? "INDIA";
         return this.writing(async (tx) => {
-            if (email) await assertEmailFree(tx, email.key, null);
+            if (email) await assertEmailFree(tx, email.key, null, edition);
             const own = scope.kind === "own" ? scope.platformAdminId : null;
             const row = await tx.sarohLead.create({
                 data: {
@@ -124,6 +125,7 @@ export class SarohLeadWritesService {
                     source: "ADDED",
                     stage: "NEW",
                     stagedAt: now,
+                    edition,
                     ...(own
                         ? {
                               ownerPlatformAdminId: own,
@@ -169,7 +171,14 @@ export class SarohLeadWritesService {
             if (input.email !== undefined) {
                 const email = optionalEmail(input.email);
                 if (email?.key !== lead.emailKey) {
-                    if (email) await assertEmailFree(tx, email.key, lead.id);
+                    if (email) {
+                        await assertEmailFree(
+                            tx,
+                            email.key,
+                            lead.id,
+                            lead.edition,
+                        );
+                    }
                     Object.assign(
                         data,
                         email
@@ -186,7 +195,14 @@ export class SarohLeadWritesService {
             if (input.signUpEmail !== undefined) {
                 const email = optionalEmail(input.signUpEmail);
                 if (email?.key !== lead.signUpEmailKey) {
-                    if (email) await assertEmailFree(tx, email.key, lead.id);
+                    if (email) {
+                        await assertEmailFree(
+                            tx,
+                            email.key,
+                            lead.id,
+                            lead.edition,
+                        );
+                    }
                     Object.assign(
                         data,
                         email

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { sendLinkReportEmail } from "../../common/email";
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -79,6 +80,8 @@ export class LinkReportGateService {
         email: string;
         url: string;
         ipHash?: string;
+        /** The website's edition, from the address it wrote through. */
+        edition?: Edition;
         now?: Date;
     }): Promise<UnlockResult> {
         const check = await this.preview.check(input.url);
@@ -93,6 +96,7 @@ export class LinkReportGateService {
             checkedUrl: link,
             checkedAt: now,
             ipHash: input.ipHash,
+            edition: input.edition,
         });
 
         let emailed: "sent" | "limited" | "not-sent";
@@ -132,9 +136,12 @@ export class LinkReportGateService {
         checkedUrl: string;
         checkedAt: Date;
         ipHash?: string;
+        edition?: Edition;
     }): Promise<string> {
+        const edition = row.edition ?? "INDIA";
         const where = {
-            emailKey_businessKey: {
+            edition_emailKey_businessKey: {
+                edition,
                 emailKey: row.emailKey,
                 businessKey: NO_BUSINESS,
             },
@@ -159,6 +166,7 @@ export class LinkReportGateService {
                     checkedAt: row.checkedAt,
                     newsConsent: false,
                     ipHash: row.ipHash ?? null,
+                    edition,
                 },
                 select: { id: true },
             });

@@ -151,6 +151,18 @@ describe("AdminUsageService.storage", () => {
         expect(sqlOf(0).values).toEqual(["READY", 100, 0]);
     });
 
+    it("narrows the list and both totals to one edition, as a parameter", async () => {
+        answer([]);
+
+        await new AdminUsageService(accessWith({})).storage({}, "GLOBAL");
+
+        expect(sqlOf(0).sql).toContain('o."edition" = ?::"Edition"');
+        expect(sqlOf(0).values).toEqual(["READY", "GLOBAL", 25, 0]);
+        // The total's count, and its bytes through the Organization join.
+        expect(sqlOf(1).sql).toContain('JOIN "Organization" o');
+        expect(sqlOf(1).values).toEqual(["GLOBAL", "READY", "GLOBAL"]);
+    });
+
     it("gives each row its plan's storage limit and the share used", async () => {
         answer([
             raw("org_half", 2_000_000_000n),
