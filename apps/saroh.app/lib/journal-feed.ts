@@ -20,10 +20,12 @@ export async function journalFeed(
     sections: readonly { type: string }[],
     /** The posts index the cards link under: `/blog`, or the preview's. */
     basePath: string,
-    read: () => Promise<JournalPost[]>,
+    /** The posts; null when the read failed, which is not "none". */
+    read: () => Promise<JournalPost[] | null>,
 ): Promise<JournalFeed | undefined> {
     if (!hasJournal(sections)) return undefined;
-    // A failed read is an empty list (the readers never throw), and an empty
-    // list draws nothing: the page still serves.
-    return { posts: await read(), basePath };
+    // An empty list draws nothing, and the page still serves. A failed read
+    // says so instead (the readers never throw).
+    const posts = await read();
+    return posts ? { posts, basePath } : { posts: [], basePath, failed: true };
 }

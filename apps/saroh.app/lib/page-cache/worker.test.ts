@@ -306,6 +306,17 @@ describe("the merchant sites' page cache (#863)", () => {
                 return page();
             },
             () => {
+                // The header has lost Book for this render, on every page.
+                pageCacheRules({
+                    siteId: "site_1",
+                    test: false,
+                    liveHead: false,
+                    catalogueFailed: false,
+                    bookingFailed: true,
+                });
+                return page();
+            },
+            () => {
                 tagPage("site:site_1");
                 keepPageAtMost(0);
                 return page();

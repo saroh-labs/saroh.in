@@ -6,6 +6,7 @@ import { isBookingPage, isPublicVisit } from "@saroh/site-blocks";
 
 import { serverApiUrl } from "./api-url";
 import { servedHost } from "./origin";
+import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
 const API_URL = serverApiUrl();
@@ -82,11 +83,14 @@ export const getBookingVisit = cache(async function bookingVisit(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/visit`,
             { cache: "no-store", headers: sent },
         );
-        if (!res.ok) return null;
+        // Absent is a business with nothing to show; a failure isn't kept.
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error(`Visit read failed: ${res.status}`);
         const body: unknown = await res.json().catch(() => null);
         // Narrowed, not cast (#264).
         return isPublicVisit(body) ? body : null;
     } catch {
+        dontCachePage("visit unavailable");
         return null;
     }
 });

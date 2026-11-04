@@ -9,14 +9,15 @@ import { productGridFeeds } from "./product-grid-feed";
  * A Product grid's products (round-2 G12), server to server, never cached:
  * `GET /public/sites/:siteId/shop/products?source=…`. The API serves only
  * published products listed at the site's storefront and 404s while the
- * shop isn't open for the business. Either way a miss is an empty list
- * here, so the grid draws nothing. The call carries the signed relay, as
- * the shop's reads do, so the API's per-visitor limit counts the visitor.
+ * shop isn't open for the business, an empty list here, so the grid draws
+ * nothing. A read that failed is null, and the page isn't kept. The call
+ * carries the signed relay, as the shop's reads do, so the API's per-visitor
+ * limit counts the visitor.
  */
 async function getGridProducts(
     siteId: string,
     query: string,
-): Promise<ProductGridFeed["products"]> {
+): Promise<ProductGridFeed["products"] | null> {
     // Its cards' prices and stock are on the page (#863).
     listsProducts(siteId);
     const res = await shopFetch(
@@ -24,11 +25,12 @@ async function getGridProducts(
     );
     // A shop that isn't open is an empty grid, as kept as any page; a read
     // that failed is not what every visitor should see for minutes.
-    if (!res || (!res.ok && res.status !== 404)) {
-        dontCachePage("grid unavailable");
-    }
-    if (!res?.ok) return [];
-    return productCardsOf(await res.json().catch(() => null)) ?? [];
+    if (res?.status === 404) return [];
+    const cards = res?.ok
+        ? productCardsOf(await res.json().catch(() => null))
+        : null;
+    if (!cards) dontCachePage("grid unavailable");
+    return cards;
 }
 
 /** The grid's query, from a snapshot section's content (JSON). */

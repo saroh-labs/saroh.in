@@ -5,6 +5,7 @@ import { env } from "@/env";
 import { pausedOriginOf, pausedTestOrigin } from "@/lib/domain-paused";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
+import { dontCachePage } from "@/lib/page-cache/site-rules";
 import type { SiteHostKind } from "@/lib/site-host-mode";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import type { SiteIcon } from "@/lib/site-icon";
@@ -567,15 +568,16 @@ export function postsPrefix(snapshot: PublicationSnapshot): string {
 }
 
 /**
- * A site's live posts, newest first, or an empty list.
+ * A site's live posts, newest first, or null when the read failed: "We don't
+ * know" isn't "none", and a page drawn from it is never kept.
  *
  * Reads the api's public post index, which serves each post's CURRENT
  * publication and nothing else — so a draft, an edited-but-unpublished post,
  * or one taken down is structurally unreachable here, exactly as with pages.
  */
-export async function getPublishedPosts(
+export async function readPublishedPosts(
     siteId: string,
-): Promise<PublishedPost[]> {
+): Promise<PublishedPost[] | null> {
     let res: Response;
     try {
         res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
@@ -583,17 +585,30 @@ export async function getPublishedPosts(
             headers: { accept: "application/json" },
         });
     } catch {
-        return [];
+        dontCachePage("posts unavailable");
+        return null;
     }
-    if (!res.ok) return [];
-    const body = (await res.json().catch(() => null)) as {
-        posts?: PostSnapshot[];
-    } | null;
+    const body = res.ok
+        ? ((await res.json().catch(() => null)) as {
+              posts?: PostSnapshot[];
+          } | null)
+        : null;
+    if (!Array.isArray(body?.posts)) {
+        dontCachePage("posts unavailable");
+        return null;
+    }
     // The api is typed, but this is a wire boundary: a row without a post, or
     // a post without a slug, is dropped rather than rendered as a broken link.
-    return (body?.posts ?? [])
+    return body.posts
         .map((row) => (row as Partial<PostSnapshot> | null)?.post)
         .filter((post): post is PublishedPost => Boolean(post?.slug));
+}
+
+/** The same where a failed read may read as none: the sitemap. */
+export async function getPublishedPosts(
+    siteId: string,
+): Promise<PublishedPost[]> {
+    return (await readPublishedPosts(siteId)) ?? [];
 }
 
 /**
@@ -607,7 +622,7 @@ export function getJournalFeed(
     siteId: string | null,
 ): Promise<JournalFeed | undefined> {
     return journalFeed(sections, `/${postsPrefix(snapshot)}`, () =>
-        siteId ? getPublishedPosts(siteId) : Promise.resolve([]),
+        siteId ? readPublishedPosts(siteId) : Promise.resolve([]),
     );
 }
 
@@ -627,21 +642,21 @@ export function getPreviewJournalFeed(
     );
 }
 
-/** One live post by slug, or null when it is not live. */
+/**
+ * One live post by slug, or null when it is not live. A read that failed
+ * throws, to the site's error boundary with its Try again: "not found" would
+ * tell a reader, and a crawler, that a live post has gone.
+ */
 export async function getPublishedPost(
     siteId: string,
     slug: string,
 ): Promise<PublishedPost | null> {
-    let res: Response;
-    try {
-        res = await fetch(
-            `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
-        );
-    } catch {
-        return null;
-    }
-    if (!res.ok) return null;
+    const res = await fetch(
+        `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
+        { cache: "no-store", headers: { accept: "application/json" } },
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Post read failed: ${res.status}`);
     const body = (await res.json().catch(() => null)) as {
         snapshot?: PostSnapshot;
     } | null;
@@ -694,6 +709,41 @@ export async function getSiteForHost(
     const subdomain = subdomainFromHost(host);
     if (!subdomain) return null;
     return fetchSiteView(`by-subdomain/${encodeURIComponent(subdomain)}`);
+}
+
+/**
+ * Whether a host with no live site got there because a read failed rather
+ * than because the API said nothing is here. Asked only on that miss, as
+ * `getMovedTo` is: the layout then throws to the site's error page with its
+ * Try again, not "there's no website at this address", to a visitor or a
+ * crawler, for what was an API restart. Never asked for a test host, whose
+ * release says why itself.
+ */
+export async function siteReadFailed(
+    host: string | null | undefined,
+): Promise<boolean> {
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    if (!hostname) return false;
+    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
+    const subdomain = subdomainFromHost(host);
+    const reads = [
+        ...(root && hostname !== root && !hostname.endsWith(`.${root}`)
+            ? [`by-hostname/${encodeURIComponent(hostname)}`]
+            : []),
+        ...(subdomain ? [`by-subdomain/${encodeURIComponent(subdomain)}`] : []),
+    ];
+    for (const read of reads) {
+        try {
+            const res = await fetch(`${API_URL}/public/sites/${read}`, {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+            });
+            if (res.status !== 404) return true;
+        } catch {
+            return true;
+        }
+    }
+    return false;
 }
 
 /** One public site read, returning the snapshot and the site id together. */

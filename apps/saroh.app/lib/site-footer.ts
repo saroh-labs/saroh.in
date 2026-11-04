@@ -8,6 +8,7 @@ import { madeWithSarohHref, sellerLead, soldByLine } from "@saroh/site-blocks";
 
 import { serverApiUrl } from "./api-url";
 import { servedHost } from "./origin";
+import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
 const API_URL = serverApiUrl();
@@ -147,9 +148,11 @@ export const getFooterFacts = cache(async function footerFactsFor(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/footer`,
             { cache: "no-store", headers: sent },
         );
-        if (!res.ok) return NONE;
+        if (!res.ok) throw new Error(`Footer read failed: ${res.status}`);
         return footerFacts(await res.json().catch(() => null));
     } catch {
+        // Nothing to add for this visitor, and not for the next few minutes'.
+        dontCachePage("footer unavailable");
         return NONE;
     }
 });

@@ -8,9 +8,9 @@ import { lookOf, ModulePageUnavailable } from "@saroh/site-blocks";
 import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
-    getPublishedPosts,
     getSiteForHost,
     postsPrefix,
+    readPublishedPosts,
     shareImages,
 } from "@/lib/publication";
 import { canonical, titled } from "@/lib/site-meta";
@@ -104,7 +104,10 @@ export default async function SitePostPage({
     // is checked BEFORE pages because a page could otherwise be created at the
     // same path and silently win depending on nothing the merchant can see.
     if (slug === postsPrefix(snapshot)) {
-        const posts = siteId ? await getPublishedPosts(siteId) : [];
+        const posts = siteId ? await readPublishedPosts(siteId) : [];
+        // To the site's error boundary, with Try again: never "Nothing here
+        // yet" for writing we couldn't read.
+        if (!posts) throw new Error("Posts read failed");
         return (
             <PostIndex
                 posts={posts}
