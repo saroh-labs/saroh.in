@@ -6416,3 +6416,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: Customers' Last order is a `BusinessDate`, with a test. The capture takes the seed's zone from `SHOTS_ZONE`.
 **Rule**: an order's time is written in the business's zone, on every screen (`BusinessDate`).
 **Category**: dates · screenshots
+
+---
+
+## A saroh.tech shot contradicted the page it sat on
+
+**Symptom**: 4 Nov, a re-audit found a "You've reached your 1 team member… See plans" banner, "comes with a paid plan" and a dentist's root canal under "Shown with Larkspur & Vane", on pages saying one person and nothing to buy.
+**Cause**: a look through the images checked for India's details only, not for what the page around them claims. The demo diaries also ran far past what one person on Free looks like.
+**Fix**: shots clip to the true region (`shots.global.ts`), the salon has its own treatment order, `checkGlobal` asserts a quiet diary (`BOOKINGS_A_MONTH`), and `lib/shots.test.ts` refuses "team" and "plan" in an alt and a `who` naming another business.
+**Rule**: read every shot against its page's claims as well as for rupees, and clip or drop what a screen says to everyone until the app's words are fixed. Never retouch.
+**Category**: screenshots · editions

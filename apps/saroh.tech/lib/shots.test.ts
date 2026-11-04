@@ -85,4 +85,26 @@ describe("saroh.tech's screenshots", () => {
         }
         expect(GLOBAL_SHOTS["g-subs"]).toBeUndefined();
     });
+
+    it("never says team or plan in an alt: one person, nothing to buy", () => {
+        for (const [key, shot] of Object.entries(GLOBAL_SHOTS)) {
+            expect(shot.alt, key).not.toMatch(/\bteams?\b|\bplans?\b/i);
+        }
+    });
+
+    it("names the shot's real business on every feature page", () => {
+        const owner = (key: ShotKey) =>
+            key.startsWith("d-")
+                ? "Wrenfield Dental"
+                : key.startsWith("g-")
+                  ? "Ironvale Fitness"
+                  : key.startsWith("l-")
+                    ? "Larkspur & Vane"
+                    : "Thistlewick Bakery";
+        for (const f of Object.values(features)) {
+            for (const s of f.steps) {
+                expect(s.who, `${f.slug}: ${s.shot}`).toContain(owner(s.shot));
+            }
+        }
+    });
 });

@@ -19,9 +19,9 @@ export const CAPTURED: Record<
 > = {
     "s-home": {
         src: "/shots/v2/s-home.webp",
-        alt: "Home at Thistlewick Bakery (demo bakery): what needs doing today, most urgent first",
-        width: 2880,
-        height: 1800,
+        alt: "Home at Thistlewick Bakery (demo bakery): what needs doing today, most urgent first, beside today's pick-ups",
+        width: 2316,
+        height: 1368,
     },
     "s-orders": {
         src: "/shots/v2/s-orders.webp",
@@ -38,8 +38,8 @@ export const CAPTURED: Record<
     "r-invoice": {
         src: "/shots/v2/r-invoice.webp",
         alt: "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
-        width: 2880,
-        height: 1800,
+        width: 1424,
+        height: 1222,
     },
     "r-customers": {
         src: "/shots/v2/r-customers.webp",
@@ -67,7 +67,7 @@ export const CAPTURED: Record<
     },
     "s-insights": {
         src: "/shots/v2/s-insights.webp",
-        alt: "Insights at Thistlewick Bakery (demo bakery): money in dollars over the last four weeks, against the four before",
+        alt: "Insights at Thistlewick Bakery (demo bakery): what to do next, money in dollars, what sells most, then visits, visitors, enquiries and orders",
         width: 2880,
         height: 1800,
     },
@@ -110,32 +110,38 @@ export const CAPTURED: Record<
     "p-detail": {
         src: "/shots/v2/p-detail.webp",
         alt: "The Sourdough loaf's page at Thistlewick Bakery (demo bakery): what can be sold now, with open orders and the website",
-        width: 2880,
-        height: 1800,
+        width: 2404,
+        height: 1928,
     },
     "l-home": {
         src: "/shots/v2/l-home.webp",
         alt: "Home at Larkspur & Vane (demo salon): today's appointments and overdue invoices, in pounds",
-        width: 2880,
-        height: 1800,
+        width: 2316,
+        height: 1068,
     },
     "l-book": {
         src: "/shots/v2/l-book.webp",
         alt: "The booking page of Larkspur & Vane (demo salon): services with prices in pounds",
         width: 2184,
-        height: 2180,
+        height: 2572,
     },
     "l-team": {
         src: "/shots/v2/l-team.webp",
-        alt: "Imogen Vane's hours at Larkspur & Vane (demo salon), the one person Free has room for, by day of the week",
-        width: 2880,
-        height: 1800,
+        alt: "Imogen Vane's hours at Larkspur & Vane (demo salon), by day of the week, with her time off and booking rules",
+        width: 2332,
+        height: 1218,
     },
     "l-bookings": {
         src: "/shots/v2/l-bookings.webp",
         alt: "The week at Larkspur & Vane (demo salon): Imogen Vane's appointments, by the hour",
         width: 2300,
         height: 1416,
+    },
+    "l-order": {
+        src: "/shots/v2/l-order.webp",
+        alt: "A colour correction at Larkspur & Vane (demo salon): visit 1 attended, visit 2 booked, visit 3 still to book",
+        width: 2880,
+        height: 1800,
     },
     "l-customer": {
         src: "/shots/v2/l-customer.webp",
@@ -146,8 +152,8 @@ export const CAPTURED: Record<
     "l-invoice": {
         src: "/shots/v2/l-invoice.webp",
         alt: "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
-        width: 2880,
-        height: 1800,
+        width: 1424,
+        height: 1188,
     },
     "l-site": {
         src: "/shots/v2/l-site.webp",
@@ -158,8 +164,8 @@ export const CAPTURED: Record<
     "g-home": {
         src: "/shots/v2/g-home.webp",
         alt: "Home at Ironvale Fitness (demo gym): today's sessions and overdue invoices",
-        width: 2880,
-        height: 1800,
+        width: 2316,
+        height: 470,
     },
     "g-bookings": {
         src: "/shots/v2/g-bookings.webp",
@@ -171,7 +177,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/g-book.webp",
         alt: "The booking page of Ironvale Fitness (demo gym), with services, classes and a summary",
         width: 2184,
-        height: 2012,
+        height: 2236,
     },
     "g-courses": {
         src: "/shots/v2/g-courses.webp",
@@ -181,7 +187,7 @@ export const CAPTURED: Record<
     },
     "g-customer": {
         src: "/shots/v2/g-customer.webp",
-        alt: "Alex Romero's page at Ironvale Fitness (demo gym): the next booking, who came and who didn't, and an old injury flagged for the team",
+        alt: "Alex Romero's page at Ironvale Fitness (demo gym): the next booking, who came and who didn't, and an old injury flagged on the page",
         width: 2880,
         height: 1800,
     },
@@ -200,18 +206,12 @@ export const CAPTURED: Record<
     "d-home": {
         src: "/shots/v2/d-home.webp",
         alt: "Home at Wrenfield Dental (demo clinic): today's patients, overdue invoices and a patient's note from the booking page",
-        width: 2880,
-        height: 1800,
+        width: 2316,
+        height: 766,
     },
     "d-order": {
         src: "/shots/v2/d-order.webp",
         alt: "A root canal at Wrenfield Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
-        width: 2880,
-        height: 1800,
-    },
-    "d-customer": {
-        src: "/shots/v2/d-customer.webp",
-        alt: "Daniel Foster's page at Wrenfield Dental (demo clinic), with a note from the booking page about a new blood-pressure tablet",
         width: 2880,
         height: 1800,
     },
@@ -225,7 +225,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/d-book.webp",
         alt: "The booking page of Wrenfield Dental (demo clinic), with check-ups, a root canal over three visits and a video consultation",
         width: 2184,
-        height: 2012,
+        height: 2118,
     },
     "d-billing": {
         src: "/shots/v2/d-billing.webp",

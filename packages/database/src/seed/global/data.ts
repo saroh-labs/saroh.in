@@ -23,6 +23,12 @@ import { RYE_CAKE_PHOTOS } from "../showcase/catalog-photos";
 export const ORDERS_A_MONTH = 18;
 /** Bookings customers make on its site in one calendar month. */
 export const ONLINE_BOOKINGS_A_MONTH = 15;
+/**
+ * Most bookings of any kind a month: one person's quiet diary. The desk's own
+ * don't count against Free (metering.ts, DEC-095), but a full diary beside a
+ * small online allowance reads as a way round it.
+ */
+export const BOOKINGS_A_MONTH = 40;
 
 export interface GlobalService {
     key: string;
@@ -175,6 +181,17 @@ export interface GlobalBusiness {
     regulars: readonly GlobalRegular[];
     /** Generated people on top of the regulars. */
     people: number;
+    /** Share of a day's free times that get booked, today and after. */
+    busyness?: number;
+    /** Treatments sold as orders: one over several visits, paid or not. */
+    treatments?: readonly {
+        person: string;
+        service: string;
+        number: string;
+        /** Day from today, and minute of the day, of each visit made so far. */
+        visits: readonly (readonly [number, number])[];
+        paid: boolean;
+    }[];
     orders: number;
     manualInvoices: readonly GlobalManualInvoice[];
     site: {
@@ -531,7 +548,7 @@ export const LARKSPUR: GlobalBusiness = {
     taxName: "VAT",
     taxRate: 20,
     taxId: "GB000000000",
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE"],
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COMMERCE"],
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Larkspur & Vane" }],
     hours: hoursFrom({
@@ -590,6 +607,17 @@ export const LARKSPUR: GlobalBusiness = {
             weight: 2,
         },
         {
+            key: "correction",
+            name: "Colour correction",
+            description:
+                "Three visits of an hour. We book the rest with you after the first.",
+            minutes: 60,
+            capacity: 1,
+            price: 24000,
+            visits: 3,
+            weight: 0,
+        },
+        {
             key: "consult",
             name: "Colour consultation",
             description: "Fifteen minutes and a patch test.",
@@ -605,7 +633,15 @@ export const LARKSPUR: GlobalBusiness = {
             name: "Imogen Vane",
             title: "Owner and stylist",
             owner: true,
-            services: ["cut", "blow", "gents", "roots", "balayage", "consult"],
+            services: [
+                "cut",
+                "blow",
+                "gents",
+                "roots",
+                "balayage",
+                "correction",
+                "consult",
+            ],
             hours: [
                 { days: [2, 3, 5], from: "09:30", to: "18:00" },
                 { days: [4], from: "09:30", to: "20:00" },
@@ -638,6 +674,19 @@ export const LARKSPUR: GlobalBusiness = {
         { key: "amelia", first: "Amelia", last: "Rowe", visits: 5 },
     ],
     people: 40,
+    busyness: 0.04,
+    treatments: [
+        {
+            person: "amelia",
+            service: "correction",
+            number: "ORD-001",
+            visits: [
+                [-7, 600],
+                [4, 660],
+            ],
+            paid: true,
+        },
+    ],
     orders: 0,
     manualInvoices: [
         {
@@ -820,11 +869,8 @@ export const IRONVALE: GlobalBusiness = {
             capacity: 12,
             price: 2200,
             weight: 0,
-            classAt: [
-                { days: [1, 3, 5], at: "17:30" },
-                { days: [2, 4], at: "06:30" },
-            ],
-            fill: [6, 12],
+            classAt: [{ days: [1], at: "17:30" }],
+            fill: [1, 2],
         },
         {
             key: "yoga",
@@ -834,11 +880,8 @@ export const IRONVALE: GlobalBusiness = {
             capacity: 14,
             price: 2000,
             weight: 0,
-            classAt: [
-                { days: [2], at: "17:30" },
-                { days: [6], at: "09:00" },
-            ],
-            fill: [5, 13],
+            classAt: [{ days: [6], at: "09:00" }],
+            fill: [1, 2],
         },
         {
             key: "foundations",
@@ -880,7 +923,7 @@ export const IRONVALE: GlobalBusiness = {
             service: "foundations",
             price: 18000,
             seats: 10,
-            enrolled: 7,
+            enrolled: 3,
             startsInDays: -9,
             at: "10:00",
             sessions: 4,
@@ -903,12 +946,13 @@ export const IRONVALE: GlobalBusiness = {
                 },
             ],
             notes: ["Training for a first 10K in the spring."],
-            visits: 10,
+            visits: 6,
         },
-        { key: "priscilla", first: "Nora", last: "Bennett", visits: 7 },
-        { key: "marcus", first: "Marcus", last: "Hale", visits: 6 },
+        { key: "priscilla", first: "Nora", last: "Bennett", visits: 4 },
+        { key: "marcus", first: "Marcus", last: "Hale", visits: 3 },
     ],
     people: 60,
+    busyness: 0.02,
     orders: 0,
     manualInvoices: [
         {
@@ -1174,6 +1218,26 @@ export const WRENFIELD: GlobalBusiness = {
         },
     ],
     people: 70,
+    busyness: 0.03,
+    treatments: [
+        {
+            person: "daniel",
+            service: "rootcanal",
+            number: "ORD-001",
+            visits: [
+                [-7, 540],
+                [4, 600],
+            ],
+            paid: true,
+        },
+        {
+            person: "grace",
+            service: "whitening",
+            number: "ORD-002",
+            visits: [[3, 780]],
+            paid: false,
+        },
+    ],
     orders: 0,
     manualInvoices: [
         {

@@ -10,6 +10,9 @@
  * hidden from a shot: what's on the page is what a Free business sees, with
  * Insights (the bakery) and Courses (the gym) turned on, as Free can.
  *
+ * `d-customer` isn't taken: the note card says "for the team" to one person
+ * (PENDING_SHOTS). Retake it when the app's words are fixed.
+ *
  * Read-only, like every shot: nothing here saves. `alt` is true to the image
  * and names the business as a demo.
  */
@@ -35,6 +38,32 @@ const weekGrid: Partial<Shot> = {
     viewport: { width: 1440, height: 1100 },
     clip: { selector: "[data-week-view] >> visible=true" },
 };
+
+/**
+ * The paper as it prints: the panel beside it offers a paid plan's online
+ * payment and own email, which Free's page says it doesn't sell.
+ */
+const invoicePaper: Partial<Shot> = {
+    viewport: { width: 1440, height: 1100 },
+    clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+};
+/**
+ * Home from its tiles down through Needs you, with Today beside it. It stops
+ * above Finish setup, whose last step asks for bank details a foreign bank
+ * can't fill in yet (the API requires an IFSC). `open` opens that many of the
+ * Needs you groups, so the column reaches the bottom of Today.
+ */
+const homeRegion = (open = 0): Partial<Shot> => ({
+    viewport: { width: 1440, height: 1200 },
+    steps: Array.from({ length: open }, () => ({
+        click: '[data-need-group] button[aria-label="Show the rows"]',
+    })),
+    clip: {
+        selector: '[data-home-layout="desk"]',
+        until: '[data-home-layout="desk"] section:has(h2:text-is("Needs you"))',
+        pad: 4,
+    },
+});
 
 const shop = (
     key: string,
@@ -71,7 +100,8 @@ export const GLOBAL_SHOTS: Shot[] = [
     shop(
         "s-home",
         "/",
-        "Home at Thistlewick Bakery (demo bakery): what needs doing today, most urgent first",
+        "Home at Thistlewick Bakery (demo bakery): what needs doing today, most urgent first, beside today's pick-ups",
+        homeRegion(),
     ),
     shop(
         "s-orders",
@@ -87,6 +117,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "r-invoice",
         `/billing/invoices/${SHOP}_invoice_manual_cedar`,
         "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
+        invoicePaper,
     ),
     shop(
         "r-customers",
@@ -110,8 +141,8 @@ export const GLOBAL_SHOTS: Shot[] = [
     ),
     shop(
         "s-insights",
-        "/analytics?tab=money",
-        "Insights at Thistlewick Bakery (demo bakery): money in dollars over the last four weeks, against the four before",
+        "/analytics",
+        "Insights at Thistlewick Bakery (demo bakery): what to do next, money in dollars, what sells most, then visits, visitors, enquiries and orders",
     ),
     shop(
         "i-compare",
@@ -170,6 +201,14 @@ export const GLOBAL_SHOTS: Shot[] = [
         "p-detail",
         `/commerce/products/${SHOP}_product_0`,
         "The Sourdough loaf's page at Thistlewick Bakery (demo bakery): what can be sold now, with open orders and the website",
+        // Below the page's head, whose switch reads "Team view" to one person.
+        {
+            viewport: { width: 1440, height: 1300 },
+            clip: {
+                selector: 'main :has(> :is(a,button):has-text("Overview"))',
+                until: "main",
+            },
+        },
     ),
 
     // ── Larkspur & Vane ────────────────────────────────────────────────
@@ -177,6 +216,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "l-home",
         "/",
         "Home at Larkspur & Vane (demo salon): today's appointments and overdue invoices, in pounds",
+        homeRegion(1),
     ),
     salon(
         "l-book",
@@ -187,13 +227,28 @@ export const GLOBAL_SHOTS: Shot[] = [
     salon(
         "l-team",
         "/bookings/availability",
-        "Imogen Vane's hours at Larkspur & Vane (demo salon), the one person Free has room for, by day of the week",
+        "Imogen Vane's hours at Larkspur & Vane (demo salon), by day of the week, with her time off and booking rules",
+        {
+            viewport: { width: 1440, height: 1200 },
+            // From "Whose hours" down: the page's head says "each person"
+            // and, on Free, a notice about a team seat.
+            clip: {
+                selector: 'main button:has-text("Whose hours")',
+                until: 'main div[class*="_400px"]',
+                pad: 8,
+            },
+        },
     ),
     salon(
         "l-bookings",
         "/bookings?layout=week&date={nextMonday}",
         "The week at Larkspur & Vane (demo salon): Imogen Vane's appointments, by the hour",
         weekGrid,
+    ),
+    salon(
+        "l-order",
+        `/commerce/orders/${SALON}_order_amelia`,
+        "A colour correction at Larkspur & Vane (demo salon): visit 1 attended, visit 2 booked, visit 3 still to book",
     ),
     salon(
         "l-customer",
@@ -204,6 +259,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "l-invoice",
         `/billing/invoices/${SALON}_invoice_manual_bridal`,
         "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
+        invoicePaper,
     ),
     salon(
         "l-site",
@@ -216,6 +272,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "g-home",
         "/",
         "Home at Ironvale Fitness (demo gym): today's sessions and overdue invoices",
+        homeRegion(),
     ),
     gym(
         "g-bookings",
@@ -237,7 +294,7 @@ export const GLOBAL_SHOTS: Shot[] = [
     gym(
         "g-customer",
         `/contacts/${GYM}_contact_alex`,
-        "Alex Romero's page at Ironvale Fitness (demo gym): the next booking, who came and who didn't, and an old injury flagged for the team",
+        "Alex Romero's page at Ironvale Fitness (demo gym): the next booking, who came and who didn't, and an old injury flagged on the page",
     ),
     gym(
         "g-billing",
@@ -255,16 +312,12 @@ export const GLOBAL_SHOTS: Shot[] = [
         "d-home",
         "/",
         "Home at Wrenfield Dental (demo clinic): today's patients, overdue invoices and a patient's note from the booking page",
+        homeRegion(1),
     ),
     clinic(
         "d-order",
         `/commerce/orders/${CLINIC}_order_daniel`,
         "A root canal at Wrenfield Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
-    ),
-    clinic(
-        "d-customer",
-        `/contacts/${CLINIC}_contact_daniel`,
-        "Daniel Foster's page at Wrenfield Dental (demo clinic), with a note from the booking page about a new blood-pressure tablet",
     ),
     clinic(
         "d-customers",

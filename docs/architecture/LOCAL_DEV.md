@@ -521,9 +521,10 @@ Thistlewick Bakery, Larkspur & Vane (pounds, VAT), Ironvale Fitness and
 Wrenfield Dental (`seed/global/`), owned by `demo@saroh.dev`: `edition: GLOBAL`,
 on Free, no payment provider, sample data only, rewritten whole each run. Each
 is what a Free business can have: setup's modules, plus the Insights (the
-bakery) and Courses (the gym) switches Free offers, no Payments or class packs,
-one person (a diary person with no login would take a seat), plan limits
-enforced for these four. Local
+bakery), Courses (the gym) and Sell (the salon and clinic, for a treatment over
+several visits) switches Free offers, no Payments or class packs, one person
+(a diary person with no login would take a seat), a quiet diary
+(`BOOKINGS_A_MONTH`, asserted), plan limits enforced for these four. Local
 addresses have no edition (`editionOfHost` returns null), so the seed sets it
 on the business, and app and accounts need `NEXT_PUBLIC_EDITION=GLOBAL` to list
 them and read money their way. Their zone is one where it's mid-morning when

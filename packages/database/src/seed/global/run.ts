@@ -24,6 +24,7 @@ import type {
     GlobalService,
 } from "./data";
 import {
+    BOOKINGS_A_MONTH,
     FIRST_NAMES,
     GLOBAL_BUSINESSES,
     LAST_NAMES,
@@ -826,18 +827,15 @@ async function seedOne(
     }
 
     // Treatments sold as orders (E9): a root canal part-way through its visits.
-    const treatments =
-        biz.key === "clinic"
-            ? planTreatments(biz, sid, {
-                  regularOf,
-                  at,
-                  now,
-                  orgId,
-                  storeId: storeIds[0],
-                  docs,
-                  book,
-              })
-            : [];
+    const treatments = planTreatments(biz, sid, {
+        regularOf,
+        at,
+        now,
+        orgId,
+        storeId: storeIds[0],
+        docs,
+        book,
+    });
     for (const t of treatments) {
         await prisma.customer.create({ data: t.customer });
         await prisma.customerIdentityLink.create({ data: t.link });
@@ -1668,7 +1666,8 @@ function planDiary(
                 if (!w.days.includes(weekday)) continue;
                 let minute = minuteOf(w.from);
                 const end = minuteOf(w.to);
-                const busyness = day > 7 ? 0.2 : day > 0 ? 0.4 : 0.5;
+                // Today is what Home shows: it has someone on it.
+                const busyness = day === 0 ? 0.15 : (biz.busyness ?? 0.1);
                 while (minute < end) {
                     const s = rng.weighted(offered, (o) => o.weight);
                     if (minute + s.minutes > end) break;
@@ -1702,7 +1701,7 @@ function planDiary(
     }
 }
 
-/** Daniel's root canal (visit 1 attended, 2 coming, 3 not booked) and Grace's whitening. */
+/** Treatments sold as orders: visit 1 attended, the next coming, the last not booked. */
 function planTreatments(
     biz: GlobalBusiness,
     sid: (...parts: (string | number)[]) => string,
@@ -1726,31 +1725,15 @@ function planTreatments(
     },
 ) {
     const { at } = a;
-    // The clinic is shut at weekends: the next weekday instead.
-    const toWeekday = (day: number) => {
-        const weekday = weekdayOf(a.now, biz.zone, day);
-        return weekday === 6 ? 2 : weekday === 0 ? 1 : 0;
-    };
-    const scene = [
-        {
-            person: "daniel",
-            service: "rootcanal",
-            number: "ORD-001",
-            visits: [
-                [-7, 540],
-                [4, 600],
-            ] as const,
-            paid: true,
-        },
-        {
-            person: "grace",
-            service: "whitening",
-            number: "ORD-002",
-            visits: [[3, 780]] as const,
-            paid: false,
-        },
-    ];
-    return scene.map((t) => {
+    const staff = biz.staff[0];
+    // A visit on a day they don't work moves to the next one they do.
+    const workDay = (day: number): number =>
+        staff.hours.some((h) =>
+            h.days.includes(weekdayOf(a.now, biz.zone, day)),
+        )
+            ? day
+            : workDay(day + 1);
+    return (biz.treatments ?? []).map((t) => {
         const person = a.regularOf.get(t.person);
         const service = biz.services.find((s) => s.key === t.service);
         if (!person || !service) throw new Error(`${t.person}: no scene`);
@@ -1763,8 +1746,8 @@ function planTreatments(
                 id: sid("visit", t.person, `treat${v}`),
                 service,
                 person,
-                startAt: at(day + toWeekday(day), minute),
-                staffKey: "helen",
+                startAt: at(workDay(day), minute),
+                staffKey: staff.key,
                 orderId,
                 visitNumber: v + 1,
                 roll: 0.3,
@@ -1999,16 +1982,18 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[]) {
     });
     for (const { organizationId, timezone } of zones) {
         const zone = timezone ?? "UTC";
-        const [orders, online] = await Promise.all([
+        const [orders, bookings] = await Promise.all([
             prisma.order.findMany({
                 where: { organizationId },
                 select: { createdAt: true },
             }),
             prisma.booking.findMany({
-                where: { organizationId, bookedOnline: true },
-                select: { createdAt: true },
+                // A course's sessions are its seats, never counted (metering.ts).
+                where: { organizationId, courseEnrollmentId: null },
+                select: { createdAt: true, bookedOnline: true },
             }),
         ]);
+        const online = bookings.filter((b) => b.bookedOnline);
         const worst = (rows: { createdAt: Date }[]) => {
             const per = new Map<string, number>();
             for (const r of rows) {
@@ -2023,6 +2008,11 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[]) {
         ) {
             throw new Error(
                 `[global] ${organizationId} over Free's ${FREE_MONTHLY_CAP} a month: ${worst(orders)} orders, ${worst(online)} online bookings`,
+            );
+        }
+        if (worst(bookings) > BOOKINGS_A_MONTH) {
+            throw new Error(
+                `[global] ${organizationId} isn't one quiet diary: ${worst(bookings)} bookings in a month`,
             );
         }
     }

@@ -2,7 +2,7 @@
  * The screenshots this site shows: its own, taken from the real app on the
  * Global demo businesses (`e2e/marketing-shots/shots.global.ts`), each what a
  * Free business can have, and each read by a person for rupees, GST, UPI,
- * +91 and India's places (plan U11). A key with no shot draws no frame.
+ * +91, India's places, plan offers and "team" (plan U11). A key with no shot draws no frame.
  */
 import type { ShotKey } from "@saroh/marketing/content-types";
 import type { Shot, ShotView } from "@saroh/marketing/shot";
@@ -14,6 +14,8 @@ import { CAPTURED } from "./shots.captured";
  * the app edition work; `lib/shots.test.ts` fails on any other missing image.
  */
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
+    "d-customer":
+        "The booking-page note's card says \"for the team\" to one person; retake when the app's words are fixed.",
     "r-subdetail": "Subscriptions isn't usable on Global yet.",
     "s-subs": "Subscriptions isn't usable on Global yet.",
 };

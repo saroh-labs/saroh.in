@@ -64,6 +64,7 @@ export const SHOT_KEYS = [
     "l-book",
     "l-team",
     "l-bookings",
+    "l-order",
     "l-packs",
     "l-customer",
     "l-invoice",
