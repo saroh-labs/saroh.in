@@ -2761,3 +2761,9 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 **Shared data is listed (2 Nov).** `scripts/shared-data.json` names the 35 models that belong to no one business, each with why, and `check:shared-data` fails on a new one that isn't listed.
 
 **Sign-in on two domains (2 Nov).** A browser takes a session cookie only for the address's own domain, so the one running API keeps one Better Auth instance per edition address, chosen from a fixed list by the request's address. The configured `BETTER_AUTH_URL` stays the default, and a second instance is only built when someone reaches that address. Reading a session needs only the shared secret and database, so the guard uses one instance. Signed-in state stays separate per domain, as agreed.
+
+## DEC-205 A Book page lists everything offered
+
+- Decision (owner, 4 Nov 2026): whoever opens `/book` can pick anything the business offers. A published Book page lists every service offered: its stored ids first, in their order, then the rest. Its layout, prices, button label and heading stay the merchant's. Home, Prices and other pages keep their stored selection.
+- Why: "if we open all bookings page, it should list down all so that we can select one, but it was showing empty, so ideally we should be seeing all". A snapshot can't tell a merchant's choice from a list written when one service existed.
+- Rules: `apps/saroh.app/lib/book-page-offer.ts`, `frontend-data-and-state.md`.
