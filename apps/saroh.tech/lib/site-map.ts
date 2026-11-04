@@ -43,7 +43,6 @@ export type PageType =
     | "about"
     | "contact"
     | "integrations"
-    | "referral"
     | "help"
     | "legal"
     | "tools-hub"
@@ -52,8 +51,6 @@ export type PageType =
     | "template"
     | "guides"
     | "guide"
-    | "compare"
-    | "alternative"
     | "not-found";
 
 export interface SitePage {
@@ -135,15 +132,6 @@ const GUIDES = [
         "VAT and sales tax basics, in plain words | Saroh",
         "VAT is generally charged at each step of a sale, sales tax once at the end. Plus where to find the rules for your country.",
     ],
-] as const;
-
-export const ALTERNATIVES = [
-    ["invoice-simple", "Invoice Simple"],
-    ["joist", "Joist"],
-    ["honeybook", "HoneyBook"],
-    ["bonsai", "Bonsai"],
-    ["invoice2go", "Invoice2go"],
-    ["freshbooks", "FreshBooks"],
 ] as const;
 
 const CONTENT_BUILT = { unreviewed: true, updated: "2026-11-02" };
@@ -271,18 +259,6 @@ export const PAGES: SitePage[] = [
         ),
         unreviewed: true,
         updated: "2026-11-04",
-    },
-    {
-        ...hub(
-            "/referral",
-            "referral",
-            "Refer a friend | Saroh",
-            "Share Saroh with a friend. The rules are on this page.",
-            "Refer a friend",
-            "Referral",
-        ),
-        unreviewed: true,
-        updated: "2026-11-02",
     },
     {
         ...hub(
@@ -436,26 +412,6 @@ export const PAGES: SitePage[] = [
         description,
         h1: name,
         crumb: under("Guides", "/guides", name),
-        ...CONTENT_BUILT,
-    })),
-    {
-        ...hub(
-            "/compare",
-            "compare",
-            "Compare Saroh with other invoice apps | Saroh",
-            "What Saroh does today, to set beside the invoice app you use now.",
-            "Compare Saroh",
-            "Compare",
-        ),
-        ...CONTENT_BUILT,
-    },
-    ...ALTERNATIVES.map(([slug, name]) => ({
-        path: `/compare/${slug}-alternative`,
-        type: "alternative" as const,
-        title: `${name} alternative | Saroh`,
-        description: `What Saroh does today and what it doesn't, to set beside ${name}.`,
-        h1: `Looking for ${/^[aeiou]/i.test(name) ? "an" : "a"} ${name} alternative?`,
-        crumb: under("Compare", "/compare", `${name} alternative`),
         ...CONTENT_BUILT,
     })),
 ];

@@ -60,13 +60,10 @@ describe("the nav", () => {
         }
     });
 
-    it("keeps compare and referral out of every menu, while they still build", () => {
-        const hrefs = allLinks.map((l) => l.href);
-        expect(hrefs.filter((h) => /^\/(compare|referral)/.test(h))).toEqual(
-            [],
-        );
-        expect(PAGES.some((p) => p.path === "/compare")).toBe(true);
-        expect(PAGES.some((p) => p.path === "/referral")).toBe(true);
+    it("has no compare or referral page, in the site map or a menu", () => {
+        const gone = /^\/(compare|referral)/;
+        expect(allLinks.filter((l) => gone.test(l.href))).toEqual([]);
+        expect(PAGES.filter((p) => gone.test(p.path))).toEqual([]);
     });
 
     it("groups Templates as documents, countries and six trades", () => {

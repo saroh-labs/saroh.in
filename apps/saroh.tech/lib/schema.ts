@@ -76,7 +76,6 @@ export function pageSchema(page: SitePage): Ld[] {
         case "tools-hub":
         case "templates":
         case "guides":
-        case "compare":
             return [collection(page), ...breadcrumbs(page)];
         default:
             return breadcrumbs(page);

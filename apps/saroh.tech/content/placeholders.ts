@@ -10,7 +10,6 @@ export const placeholders = {
     /** Board words held out of this public repo until launch. */
     pricePromise:
         "[confirm: the pricing promise line on tool bands, /pricing and home]",
-    referralOffer: "[confirm: the referral offer's headline]",
     /** The boards leave most questions closed: these answers were written for them. */
     toolAnswers:
         "[confirm: the tool pages' question answers in content/tools.tsx]",
@@ -25,12 +24,6 @@ export const placeholders = {
         "[confirm: /pricing's answers on the first month, changing plans, refunds]",
     homeAnswers:
         "[confirm: home's answers on client accounts, currencies, CSV import, export]",
-    referralRules: "[confirm: referral rules and the founding member extra]",
-    competitorFacts: "[confirm: facts with links and dates]",
-    /** Not in the agreed list of what Saroh's column may say yet: phone app, leaving with your data. */
-    sarohCompareRows: "[confirm: Saroh's phone app and data export lines]",
-    /** Unsourced: why people leave invoice apps, and that other apps export a CSV. */
-    compareMarketClaims: "[confirm: why people look around, with a source]",
     indiaPaths:
         "[confirm: saroh.in paths in hreflang.json against the live site]",
     taxRates: "[confirm: tax rates in the presets]",
