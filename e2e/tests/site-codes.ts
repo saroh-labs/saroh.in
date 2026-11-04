@@ -153,8 +153,19 @@ export async function bookUntilOurs(
         await expect(done.or(gone).first()).toBeVisible({ timeout: 30_000 });
         if (await done.first().isVisible()) return;
         expect(left, "a free time that stayed free").toBeGreaterThan(0);
-        const chosen = times.and(page.locator('[aria-checked="true"]'));
-        if ((await chosen.count()) === 0) await times.last().click();
+        // A time still chosen is folded to its row; else its day's are picked
+        // from, once a day is pressed (Classic's page holds them back).
+        const chosen = page.getByRole("button", { name: /^Edit the time/ });
+        if ((await chosen.count()) === 0) {
+            const days = page.getByRole("radiogroup", { name: "Day" });
+            if ((await days.count()) > 0) {
+                await days
+                    .getByRole("radio", { name: /times? free/ })
+                    .first()
+                    .click();
+            }
+            await times.last().click();
+        }
         await page
             .getByRole("button", { name: /^(Book|Pay )/ })
             .filter({ visible: true })

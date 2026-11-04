@@ -291,12 +291,10 @@ test.describe("the waitlist offer's claim link (#1149)", () => {
 
             // The booking page, on that session, held for them.
             await expect(page).toHaveURL(/\/book\?service=/);
-            const held = page.getByRole("radio", {
-                name: /Held for you until/,
-            });
-            await expect(held).toHaveAttribute("aria-checked", "true", {
-                timeout: 15_000,
-            });
+            await expect(
+                page.getByRole("button", { name: /^Edit the class/ }),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(page.getByText(/Held for you until/)).toBeVisible();
             await expect(page.getByText(/That time has gone/)).toHaveCount(0);
             // An account that joined the line without a name is asked for
             // one before booking, as any booking does.
