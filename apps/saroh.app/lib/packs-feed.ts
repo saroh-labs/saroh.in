@@ -18,6 +18,8 @@ export interface PacksRead {
     payOnline: boolean;
     /** The business isn't taking orders on this site (#800). */
     notTakingOrders?: boolean;
+    /** The read failed: not "none", so the block says so. */
+    failed?: boolean;
 }
 
 export async function packsFeed(
@@ -27,10 +29,11 @@ export async function packsFeed(
     read: () => Promise<PacksRead>,
 ): Promise<PacksFeed | undefined> {
     if (!hasPacks(sections)) return undefined;
-    // A failed read, Class packs off or no pack on sale is an empty list
-    // (the reader never throws), and an empty list draws nothing.
-    const { packs, payOnline, notTakingOrders } = await read();
+    // Class packs off or no pack on sale is an empty list, which draws
+    // nothing. A failed read is not (the reader never throws).
+    const { packs, payOnline, notTakingOrders, failed } = await read();
     return {
+        ...(failed ? { failed: true } : {}),
         packs,
         payOnline,
         askHref,

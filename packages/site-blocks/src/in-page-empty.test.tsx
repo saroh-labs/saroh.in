@@ -95,6 +95,59 @@ describe("sectionRendersNothing", () => {
     });
 });
 
+describe("a section whose read failed", () => {
+    it("isn't nothing: it stays, and its menu entry too", () => {
+        const failed = { ...posts(0), failed: true };
+        expect(sectionRendersNothing(journal, { journal: failed })).toBe(false);
+        expect(
+            sectionRendersNothing(plans, {
+                plans: { ...noPlans, failed: true },
+            }),
+        ).toBe(false);
+        expect(
+            sectionRendersNothing(
+                { type: "packs", content: {} },
+                {
+                    packs: {
+                        packs: [],
+                        payOnline: false,
+                        askHref: null,
+                        failed: true,
+                    },
+                },
+            ),
+        ).toBe(false);
+        expect(
+            sectionRendersNothing(
+                { type: "productGrid", content: {} },
+                {
+                    productGrid: {
+                        products: [],
+                        basePath: "/shop",
+                        failed: true,
+                    },
+                },
+            ),
+        ).toBe(false);
+    });
+
+    it("says so in the section, in the site's words, with Try again", () => {
+        render(
+            <PageSections
+                sections={[
+                    { type: "plans", content: { title: "Memberships" } },
+                ]}
+                plans={{ ...noPlans, failed: true }}
+            />,
+        );
+        expect(screen.getByRole("heading").textContent).toBe("Memberships");
+        expect(screen.getByRole("alert").textContent).toContain(
+            "We couldn't load our plans right now.",
+        );
+        expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    });
+});
+
 describe("withoutEmptyInPageEntries (the server's half)", () => {
     const NAV = [
         { label: "Journal", href: "/#journal" },

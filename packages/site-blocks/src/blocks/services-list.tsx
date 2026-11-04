@@ -13,16 +13,16 @@ import type { LookProps } from "../look-context";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton, ctaClasses } from "./cta";
 import { frontButton } from "./look-front";
-import type { PublicService } from "./service-words";
+import type { PublicService, ServicesFeed } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
-import LookServices from "./services-look";
+import LookServices, { SeeAllServices } from "./services-look";
 
 export {
     formatDuration,
     formatPrice,
     servicePriceWords,
 } from "./service-words";
-export type { PublicService } from "./service-words";
+export type { PublicService, ServicesFeed } from "./service-words";
 
 /**
  * `servicesList` v1 — the merchant's real Services, read live (#255).
@@ -39,6 +39,11 @@ export type { PublicService } from "./service-words";
  *   "Book now" for services that no longer exist, would promise what the
  *   business cannot keep;
  * - the request fails: the block's own error state, with a retry, like booking.
+ *
+ * A Book page is the exception, because it IS the way to book: `/book` hands
+ * this list what the booking flow offers (`feed`, `lib/book-page-offer.ts` in
+ * saroh.app), so the stored ids narrow it only when a merchant chose some, and
+ * no service the flow offers is out of reach.
  *
  * `services` skips the fetch. The catalog and the snapshot tests pass sample
  * services through it, because fixture ids belong to no real Service.
@@ -67,7 +72,8 @@ function isPublicService(value: unknown): value is PublicService {
 export default function ServicesListSection({
     content,
     apiUrl = DEFAULT_API_URL,
-    services: given,
+    services,
+    feed,
     bookHref,
     look,
 }: LookProps & {
@@ -76,6 +82,8 @@ export default function ServicesListSection({
     apiUrl?: string;
     /** Sample services to draw instead of fetching (catalog, tests). */
     services?: PublicService[];
+    /** What the page that serves the site read for it (a Book page). */
+    feed?: ServicesFeed;
     /**
      * The site's booking page (U19), on a live site only: each service links
      * to it, opened on that service. A preview has no `/book`.
@@ -83,6 +91,8 @@ export default function ServicesListSection({
     bookHref?: string;
 }) {
     const source = useQrSource();
+    const given = feed?.services ?? services;
+    const moreHref = feed?.moreHref ?? null;
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", services: given } : { kind: "loading" },
     );
@@ -141,6 +151,7 @@ export default function ServicesListSection({
                 state={state}
                 retry={retry}
                 bookHref={bookHref}
+                moreHref={moreHref}
                 look={look}
             />
         );
@@ -156,6 +167,7 @@ export default function ServicesListSection({
                 state={state}
                 retry={retry}
                 bookHref={bookHref}
+                moreHref={moreHref}
             />
         );
     }
@@ -241,11 +253,7 @@ export default function ServicesListSection({
                         bookHref={bookHref}
                         look={look}
                     />
-                    {content.cta ? (
-                        <div className="mt-8">
-                            <CtaButton content={content.cta} />
-                        </div>
-                    ) : null}
+                    <ListFoot content={content} moreHref={moreHref} />
                 </>
             ) : (
                 <>
@@ -313,14 +321,32 @@ export default function ServicesListSection({
                             );
                         })}
                     </ul>
-                    {content.cta ? (
-                        <div className="mt-8">
-                            <CtaButton content={content.cta} />
-                        </div>
-                    ) : null}
+                    <ListFoot content={content} moreHref={moreHref} />
                 </>
             )}
         </section>
+    );
+}
+
+/** Under the list: the merchant's button, and the way to every service. */
+function ListFoot({
+    content,
+    moreHref,
+}: {
+    content: RenderedServicesList;
+    moreHref: string | null;
+}) {
+    if (!content.cta && !moreHref) return null;
+    return (
+        <div
+            className={cn(
+                "mt-8",
+                moreHref && "flex flex-wrap items-center gap-4",
+            )}
+        >
+            {content.cta ? <CtaButton content={content.cta} /> : null}
+            {moreHref ? <SeeAllServices href={moreHref} /> : null}
+        </div>
     );
 }
 
@@ -464,12 +490,14 @@ function PriceCardSection({
     state,
     retry,
     bookHref,
+    moreHref,
     look,
 }: {
     content: RenderedServicesList;
     state: LoadState;
     retry: () => void;
     bookHref?: string;
+    moreHref: string | null;
     look?: LookId;
 }) {
     const heading = said(content.heading);
@@ -552,7 +580,16 @@ function PriceCardSection({
                         ) : null}
                     </div>
                 ) : null}
-                {card}
+                <div className="min-w-0">
+                    {card}
+                    {moreHref ? (
+                        <SeeAllServices
+                            href={moreHref}
+                            look={look}
+                            className="mt-3"
+                        />
+                    ) : null}
+                </div>
             </div>
         </section>
     );

@@ -658,6 +658,9 @@ const buttonLabel = z.string().trim().max(40).optional();
  * - none left, or Appointments switched off: the block renders nothing, rather
  *   than a heading over an empty list or a claim the business cannot keep;
  * - the API unreachable: the block's own error state, with a retry.
+ * On a Book page, `/book` draws it from what the booking flow offers instead,
+ * the ids narrowing it only when a merchant chose (`book-page-offer.ts` in
+ * saroh.app); with nothing offered the page says so.
  * A price is never drawn as 0 when absent (`saroh-product.md`).
  *
  * `cta` is the usual button (#207), typically "Book now" pointing at the page

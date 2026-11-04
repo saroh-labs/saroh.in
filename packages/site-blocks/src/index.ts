@@ -92,6 +92,7 @@ export {
 export {
     dayLabel,
     isPublicTimetable,
+    isWeekday,
     placesWord,
     sessionHref,
     timetableQuery,
@@ -126,7 +127,7 @@ export {
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
-export type { PublicService } from "./blocks/services-list";
+export type { PublicService, ServicesFeed } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
 export { productCardsOf, productGridQuery } from "./lib/product-grid-read";

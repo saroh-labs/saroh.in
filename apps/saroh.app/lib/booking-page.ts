@@ -2,10 +2,18 @@ import { headers } from "next/headers";
 import { cache } from "react";
 
 import type { BookingPageData, PublicVisit } from "@saroh/site-blocks";
-import { isBookingPage, isPublicVisit } from "@saroh/site-blocks";
+import {
+    isBookingPage,
+    isPublicTimetable,
+    isPublicVisit,
+    isWeekday,
+    timetableQuery,
+} from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
+import { shopFetch } from "./catalogue";
 import { servedHost } from "./origin";
+import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
 const API_URL = serverApiUrl();
@@ -33,7 +41,11 @@ export const getBookingPage = cache(async function getBookingPage(
     try {
         res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/booking`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return { ok: false, reason: "unavailable" };
@@ -80,13 +92,60 @@ export const getBookingVisit = cache(async function bookingVisit(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/visit`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
-        if (!res.ok) return null;
+        // Absent is a business with nothing to show; a failure isn't kept.
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error(`Visit read failed: ${res.status}`);
         const body: unknown = await res.json().catch(() => null);
         // Narrowed, not cast (#264).
         return isPublicVisit(body) ? body : null;
     } catch {
+        dontCachePage("visit unavailable");
         return null;
     }
 });
+
+/** One Timetable block's classes on show this week, or null on a failed read. */
+async function classesOnTimetable(
+    siteId: string,
+    content: { serviceIds?: string[]; weekdaysOnly?: boolean } | null,
+): Promise<string[] | null> {
+    const res = await shopFetch(
+        `${encodeURIComponent(siteId)}/timetable${timetableQuery(content?.serviceIds)}`,
+    );
+    if (res?.status === 404) return [];
+    const body: unknown = res?.ok ? await res.json().catch(() => null) : null;
+    if (!isPublicTimetable(body)) {
+        dontCachePage("timetable unavailable");
+        return null;
+    }
+    return body.sessions
+        .filter((s) => content?.weekdaysOnly !== true || isWeekday(s.date))
+        .map((s) => s.serviceId);
+}
+
+/**
+ * What each Timetable on a Book page has on show, by section index, the read
+ * the block itself makes in the browser (`?services=` narrows it): whether the
+ * block reaches a service is only known from its week. A page with a services
+ * list has no need to ask (`bookPageOffer`), so it costs no read.
+ */
+export function getTimetableClasses(
+    sections: readonly { type: string; content: unknown }[],
+    siteId: string,
+): Promise<(string[] | null | undefined)[]> {
+    if (sections.some((s) => s.type === "servicesList")) {
+        return Promise.resolve([]);
+    }
+    return Promise.all(
+        sections.map(async (s) =>
+            s.type === "timetable"
+                ? classesOnTimetable(
+                      siteId,
+                      s.content as Parameters<typeof classesOnTimetable>[1],
+                  )
+                : undefined,
+        ),
+    );
+}

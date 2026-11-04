@@ -31,7 +31,8 @@ import type { SiteNavItem } from "./site-header-menu";
  *
  * Mirrors each block's own "nothing to show" rule. Answers false whenever
  * the feed is not given: then the block reads for itself, or draws its note
- * on the editor's canvas, and that is not nothing.
+ * on the editor's canvas, and that is not nothing. A feed whose read failed
+ * isn't nothing either: the block says so (`FeedFailed`).
  */
 
 /** The section types whose data the serving page reads (G9, G10, G12, G20). */
@@ -56,6 +57,7 @@ export function sectionRendersNothing(
 ): boolean {
     switch (section.type) {
         case "journal":
+            if (feeds.journal?.failed) return false;
             return feeds.journal
                 ? journalShowsNothing(
                       section.content as RenderedJournal,
@@ -63,11 +65,15 @@ export function sectionRendersNothing(
                   )
                 : false;
         case "plans":
-            return feeds.plans ? feeds.plans.plans.length === 0 : false;
+            return feeds.plans
+                ? !feeds.plans.failed && feeds.plans.plans.length === 0
+                : false;
         case "packs":
-            return feeds.packs ? feeds.packs.packs.length === 0 : false;
+            return feeds.packs
+                ? !feeds.packs.failed && feeds.packs.packs.length === 0
+                : false;
         case "productGrid": {
-            if (!feeds.productGrid) return false;
+            if (!feeds.productGrid || feeds.productGrid.failed) return false;
             const count =
                 (section.content as RenderedProductGrid | null)?.count ??
                 PRODUCT_GRID_DEFAULT_COUNT;

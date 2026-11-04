@@ -4,8 +4,9 @@ import { cache } from "react";
 import type { PublicContact } from "@saroh/site-blocks";
 import { NO_CONTACT, publicContactOf } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
+import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
 const API_URL = serverApiUrl();
@@ -23,8 +24,13 @@ const API_URL = serverApiUrl();
  * shares one read between the layout and the page within a request.
  *
  * Never takes the page down: anything but a good answer draws no contact
- * group, rather than a stale or a guessed one.
+ * group, rather than a stale or a guessed one, and that page isn't kept.
  */
+function noContact(): PublicContact {
+    dontCachePage("contact unavailable");
+    return NO_CONTACT;
+}
+
 export const getSiteContact = cache(async function siteContactFor(
     siteId: string,
 ): Promise<PublicContact> {
@@ -40,13 +46,13 @@ export const getSiteContact = cache(async function siteContactFor(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/contact`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
-        if (!res.ok) return NO_CONTACT;
+        if (!res.ok) return noContact();
         return (
-            publicContactOf(await res.json().catch(() => null)) ?? NO_CONTACT
+            publicContactOf(await res.json().catch(() => null)) ?? noContact()
         );
     } catch {
-        return NO_CONTACT;
+        return noContact();
     }
 });

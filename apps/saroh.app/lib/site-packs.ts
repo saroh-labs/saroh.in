@@ -4,25 +4,26 @@ import { packsOf } from "@saroh/site-blocks";
 import { shopFetch } from "./catalogue";
 import type { PacksRead } from "./packs-feed";
 import { packsFeed } from "./packs-feed";
+import { dontCachePage } from "./page-cache/site-rules";
 import { underPrefix } from "./plans-feed";
 import { enquiryPagePath } from "./shop-checkout-shape";
 
 /**
  * The business's class packs on sale (round-2 G20), server to server, never
  * cached: `GET /public/sites/:siteId/packs`. The API serves only packs on
- * sale with their published values, and 404s while Class packs is off.
- * Either way a miss is an empty list here, so the block draws nothing. The
- * call carries the signed relay, so the API's limit counts the visitor.
+ * sale with their published values, and 404s while Class packs is off. A
+ * 404 is an empty list here, so the block draws nothing; a read that failed
+ * is not, and is never kept by the page cache. The call carries the signed relay, so the API's limit counts the visitor.
  */
 export async function getPublicPacks(siteId: string): Promise<PacksRead> {
     const res = await shopFetch(`${encodeURIComponent(siteId)}/packs`);
-    if (!res?.ok) return { packs: [], payOnline: false };
-    return (
-        packsOf(await res.json().catch(() => null)) ?? {
-            packs: [],
-            payOnline: false,
-        }
-    );
+    if (res?.status === 404) return { packs: [], payOnline: false };
+    const read = res?.ok ? packsOf(await res.json().catch(() => null)) : null;
+    if (!read) {
+        dontCachePage("packs unavailable");
+        return { packs: [], payOnline: false, failed: true };
+    }
+    return read;
 }
 
 type Snapshot = Parameters<typeof enquiryPagePath>[0];

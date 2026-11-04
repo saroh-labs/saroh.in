@@ -234,6 +234,55 @@ describe("a service's price when GST comes on top", () => {
     });
 });
 
+describe("a Book page's list, fed what the flow offers", () => {
+    const realFetch = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = realFetch;
+    });
+
+    it("draws the feed, reads nothing, and opens the flow at each", () => {
+        const fetchMock = vi.fn();
+        globalThis.fetch = fetchMock;
+        render(
+            <ServicesListSection
+                content={{ ...content, serviceIds: ["gone"] }}
+                feed={{ services: [cut, consult] }}
+                bookHref="/book"
+            />,
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(
+            screen
+                .getAllByRole("heading", { level: 3 })
+                .map((h) => h.textContent),
+        ).toEqual(["Cut and finish", "Consultation"]);
+        expect(screen.queryByRole("link", { name: "See all services" })).toBe(
+            null,
+        );
+    });
+
+    it.each([
+        ["a list", {}, undefined],
+        ["cards", { layout: "cards" as const }, undefined],
+        ["a price card", { variant: "priceCard" }, undefined],
+        ["a look's rows", {}, "folio" as const],
+    ])("offers the rest under %s", (_name, extra, look) => {
+        render(
+            <ServicesListSection
+                content={{ ...content, ...extra }}
+                feed={{ services: [cut], moreHref: "/book?step=what" }}
+                bookHref="/book"
+                look={look}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: "See all services" })
+                .getAttribute("href"),
+        ).toBe("/book?step=what");
+    });
+});
+
 describe("a free service under a look (DEC-172, VD01, VA01)", () => {
     const free = { priceCents: 0, currency: "INR", gst: null };
     it('says "Free" under a look, and Classic keeps its "₹0"', () => {

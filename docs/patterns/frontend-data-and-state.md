@@ -129,7 +129,8 @@ add or change there may be served to the next visitor without rendering.
   `/_img/…` route keeps each size in the Cache API by host, key, width and
   format, apart from the page cache (`frontend-design-system.md` → "A photo is sized for the screen").
 - **A live read outside the publication shortens the page's life.** The
-  head (trackers, codes; DEC-108) keeps it 60 seconds at most
+  head (trackers, codes; DEC-108) and `/book`, which draws the services offered
+  now (`showsServicesOffered`), keep it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five
   minutes) unless the API revalidates its tags: a new API write that
   changes what a published page shows queues `site.pages.revalidate`
@@ -150,6 +151,49 @@ add or change there may be served to the next visitor without rendering.
   (`qr-source.ts`).
 - **Outside the Worker** (`next dev`, a test) none of it runs: pages render
   per request, as before.
+
+## Merchant sites: a read that failed, and what a page offers — **Current** (4 Nov 2026)
+
+- **A failed read is never "none" and never kept.** A reader in
+  `apps/saroh.app/lib` tells the API's real "none" (a 404: the module is off,
+  the shop closed) from a failure (anything else, no answer, the wrong shape).
+  On a failure it calls `dontCachePage(reason)` itself, so no caller can forget;
+  `lib/read-failures.test.ts` fails a new reader that doesn't, unless it says
+  why not.
+- **What each failure draws:** a feed-backed block (Plans, Class packs, Product
+  grid, Journal) gets `feed.failed`, stays on the page and says so with Try
+  again (`FeedFailed`); it keeps its menu entry. An empty feed still draws
+  nothing. The blog index and a post throw to the site's error boundary, and a
+  host whose site read failed throws from the layout (`siteReadFailed`): never
+  "Nothing here yet", a 404, or "no website at this address" for what was a
+  restart of the API.
+- **A module route offers what its flow offers.** A published page at `/book`
+  or `/shop` is the way in, so it can't be narrower than the route it dresses:
+    - `/book` always lists everything offered, so a visitor can pick one (owner,
+      4 Nov 2026). It draws its list from the booking flow's own read
+      (`lib/book-page-offer.ts`), so a frozen snapshot can't disagree with
+      `/book?service=` and a new service shows with no republish. Stored ids keep
+      the merchant's order, followed by every other service offered, and never
+      narrow it; the section's layout, prices, button label and heading stay. A
+      page with no list keeps its Booking and Timetable blocks, each counted only
+      for what it can really draw (a Timetable by its week's read), and gets a list
+      of what they don't reach.
+    - `/shop` keeps the merchant's grids and adds "See all products"
+      (`?all=1`, the built-in listing) for what they don't draw
+      (`lib/shop-page-offer.ts`).
+    - With nothing to offer or a failed read, the route draws its own state
+      (`ClosedCard`, `ShopEmpty`, `BookingUnavailable`, `ShopUnavailable`): words
+      and how to reach the business, out of search. A title over nothing is a bug.
+    - A block elsewhere (a home page, Prices' "Try it once") keeps to its stored
+      list and is hidden when nothing is left: the page has other things to say.
+- **A server read waits 8 seconds; a read in the browser's booking flow 15, and
+  asks once more.** `serverReadSignal()` (`lib/api-url.ts`) goes on every public
+  read a page is drawn from, never on a write, and an abort lands in that reader's
+  failure path. `fetchDays` and `fetchHold` (`booking-flow/api.ts`) retry on no
+  answer or a 5xx, and the page says "Still finding times…" after 4 seconds.
+- **A read that failed doesn't take a page out of search.** `routeHasNothing` is
+  told `empty` only for a read that answered with nothing; a blip keeps the page
+  indexed and unkept.
 
 ## Merchant sites: what a customer typed, kept for the visit — **Current**
 

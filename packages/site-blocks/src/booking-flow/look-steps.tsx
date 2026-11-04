@@ -15,6 +15,7 @@ import type {
     PayChoice,
 } from "./model";
 import { servicePickPrice } from "./model";
+import { StillFinding } from "./still-finding";
 import type { Times } from "./use-times";
 
 /**
@@ -180,6 +181,7 @@ export function LookWho({
                 aria-label="Loading who takes it"
                 className="grid gap-2"
             >
+                <StillFinding />
                 {[0, 1, 2].map((i) => (
                     <div
                         key={i}

@@ -9,6 +9,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { LookProps } from "../look-context";
+import { FeedFailed } from "./feed-failed";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
 import { JournalLead } from "./journal-lead";
@@ -33,7 +34,8 @@ import { cardLink, listCard, listPhoto } from "./list-layout";
  *   `GET public/sites/:siteId/posts` on the server (the same read as the
  *   posts index) and, behind a preview token, the draft's posts, as the
  *   preview's index already does. With no posts the block renders NOTHING: a
- *   heading over an empty grid tells a visitor nothing.
+ *   heading over an empty grid tells a visitor nothing. A read that failed
+ *   says so, and offers Try again (`FeedFailed`).
  * - **no feed, a `siteId`** — the editor's canvas. The block reads the same
  *   public list itself, so the merchant sees their real posts, and says "No
  *   posts yet" rather than vanishing, because a block that disappears on the
@@ -386,6 +388,9 @@ export default function JournalSection({
 
     const title = said(content.title) ?? JOURNAL_TITLE;
 
+    if (feed?.failed) {
+        return <FeedFailed title={title} things="our posts" look={look} />;
+    }
     if (feed) {
         return (
             <JournalCards

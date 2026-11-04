@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import type {
     Catalogue,
     CatalogueLookup,
@@ -51,6 +51,7 @@ export async function shopFetch(path: string): Promise<Response | null> {
         return await fetch(`${API_URL}/public/sites/${path}`, {
             cache: "no-store",
             headers: sent,
+            signal: serverReadSignal(),
         });
     } catch {
         return null;

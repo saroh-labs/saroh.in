@@ -51,6 +51,7 @@ import type { ProductGridFeed } from "./blocks/product-grid";
 import ProductGridSection from "./blocks/product-grid";
 import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
+import type { ServicesFeed } from "./blocks/service-words";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import TimetableSection from "./blocks/timetable";
@@ -103,6 +104,7 @@ export default function SectionRenderer({
     prices,
     thread,
     productGrid,
+    serviceList,
     fixtures,
     modulePage = false,
     reach,
@@ -216,6 +218,11 @@ export default function SectionRenderer({
      * reads them itself and says why when there are none.
      */
     productGrid?: ProductGridFeed;
+    /**
+     * This list's services, read by the page that serves the site, on a
+     * Book page only. Undefined elsewhere: the block reads them itself.
+     */
+    serviceList?: ServicesFeed;
 }) {
     // A pinned moment (`SiteFixtures.now`); undefined on a live site, where
     // each block reads the clock.
@@ -299,6 +306,7 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     services={fixtures?.services}
+                    feed={serviceList}
                 />
             );
         case "contact":
@@ -499,6 +507,7 @@ export function PageSections({
     prices,
     thread,
     productGrids,
+    serviceLists,
     fixtures,
     top = null,
     modulePage = top !== null,
@@ -556,6 +565,8 @@ export function PageSections({
      * `sections`: every grid asks for its own.
      */
     productGrids?: readonly (ProductGridFeed | undefined)[];
+    /** Each services list's services, by section index: a Book page's. */
+    serviceLists?: readonly (ServicesFeed | undefined)[];
     /**
      * The business's live data, given rather than read (`site-fixtures.ts`):
      * the renderer's template renders only. A live site never passes it.
@@ -593,6 +604,8 @@ export function PageSections({
         sections[i + 1]?.type === "packs" &&
         plans !== undefined &&
         packs !== undefined &&
+        !plans.failed &&
+        !packs.failed &&
         !nothing(i) &&
         !nothing(i + 1);
     return (
@@ -620,6 +633,7 @@ export function PageSections({
                         prices={prices}
                         thread={thread}
                         productGrid={productGrids?.[i]}
+                        serviceList={serviceLists?.[i]}
                         fixtures={fixtures}
                         modulePage={modulePage}
                         reach={reach}

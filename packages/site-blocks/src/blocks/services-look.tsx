@@ -50,18 +50,51 @@ export type ServicesLoad =
     | { kind: "ready"; services: PublicService[] }
     | { kind: "error" };
 
+/**
+ * The way on from a list that doesn't draw all the business offers: the
+ * booking flow's own list of services, the scan's tag carried on.
+ */
+export function SeeAllServices({
+    href,
+    look,
+    className,
+}: {
+    href: string;
+    look?: LookId;
+    className?: string;
+}) {
+    const source = useQrSource();
+    return (
+        <a
+            href={withQrSource(href, source)}
+            className={
+                look
+                    ? frontButton(look, "quiet", className)
+                    : cn(
+                          "text-site-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg coarse:min-h-11 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70",
+                          className,
+                      )
+            }
+        >
+            See all services
+        </a>
+    );
+}
+
 export default function LookServices({
     content,
     look,
     state,
     retry,
     bookHref,
+    moreHref = null,
 }: {
     content: RenderedServicesList;
     look: LookId;
     state: ServicesLoad;
     retry: () => void;
     bookHref?: string;
+    moreHref?: string | null;
 }) {
     const type = FRONT_TYPE[look];
     const heading = said(content.heading);
@@ -139,16 +172,22 @@ export default function LookServices({
             />
         );
 
-    const cta = content.cta ? (
-        <div
-            className={cn(
-                "pt-6 min-[700px]:pt-8",
-                look === "quiet" && "min-[700px]:text-center",
-            )}
-        >
-            <FrontCta content={content.cta} look={look} />
-        </div>
-    ) : null;
+    const cta =
+        content.cta || moreHref ? (
+            <div
+                className={cn(
+                    "flex flex-wrap items-center gap-3 pt-6 min-[700px]:pt-8",
+                    look === "quiet" && "min-[700px]:justify-center",
+                )}
+            >
+                {content.cta ? (
+                    <FrontCta content={content.cta} look={look} />
+                ) : null}
+                {moreHref ? (
+                    <SeeAllServices href={moreHref} look={look} />
+                ) : null}
+            </div>
+        ) : null;
 
     return (
         <section
