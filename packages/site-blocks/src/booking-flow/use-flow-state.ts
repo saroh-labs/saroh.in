@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { SignedInCustomer } from "../account/api";
+import { customerHandle } from "../account/api";
 import type { BookingLookup } from "../account/booking-page";
 import { accountPhone } from "./booking-account";
 import type { Phase } from "./flow-state";
@@ -41,6 +42,20 @@ export function useFlowState({
     const [note, setNote] = useState("");
     // A phone to reach them on (UX-049), optional; theirs if signed in.
     const [phoneNo, setPhoneNo] = useState(() => accountPhone(signedIn));
+    // Signing in draws the page again, and that draw can be the first to say
+    // who it is. Only when the server names someone new: "Not you?" and a
+    // refused session aren't undone by a draw still carrying the old prop.
+    const signedInHandle = signedIn ? customerHandle(signedIn) : null;
+    const [seenHandle, setSeenHandle] = useState(signedInHandle);
+    if (seenHandle !== signedInHandle) {
+        setSeenHandle(signedInHandle);
+        if (signedIn) {
+            setCustomer((c) => c ?? signedIn);
+            setPhoneNo((typed) =>
+                typed.trim() ? typed : accountPhone(signedIn),
+            );
+        }
+    }
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [submitting, setSubmitting] = useState(false);

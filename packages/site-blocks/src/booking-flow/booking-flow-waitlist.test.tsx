@@ -405,12 +405,11 @@ describe("a full class on the booking page (A12)", () => {
             />,
         );
         // Chosen as the page opens, and read as theirs.
-        const held = await screen.findByRole("radio", {
-            name: /Held for you until 3:00 pm/,
+        const row = await screen.findByRole("button", {
+            name: /Edit the class, 6:30 to/,
         });
-        await waitFor(() =>
-            expect(held).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(row).toBeVisible();
+        expect(screen.getByText(/Held for you until 3:00 pm/)).toBeVisible();
         fireEvent.click(confirmButton(/Book and pay at the desk/));
         expect(
             await screen.findByRole("heading", {

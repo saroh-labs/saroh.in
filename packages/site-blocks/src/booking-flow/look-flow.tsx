@@ -18,6 +18,7 @@ import type { FrameProps } from "./frames/frame-parts";
 import { PageFrame } from "./frames/page-frame";
 import { PanelFrame } from "./frames/panel-frame";
 import { SheetsFrame } from "./frames/sheets-frame";
+import { useHeaderSignIn } from "./header-sign-in";
 import type { InlineCodeHandle } from "./inline-code";
 import { stepBar } from "./look-bar";
 import { LookStepBody } from "./look-body";
@@ -84,6 +85,13 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
         { root: rootRef, heading: headingRef },
     );
     const { s, times, words, act, pick } = flow;
+    // The header's Sign in, on Your details: the code asked there. The field
+    // is only on the page there; elsewhere the header opens its own sheet.
+    useHeaderSignIn(() => {
+        if (!codeRef.current) return false;
+        codeRef.current.focus();
+        return true;
+    });
     const closeBooking = useCloseBooking();
     // Escape and Close (review #20): never mid-Book — the answer decides
     // whether there is a hold — and a hold of theirs is let go first.

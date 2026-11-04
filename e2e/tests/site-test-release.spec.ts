@@ -254,6 +254,10 @@ test.describe("flows stop short on a test release (T6)", () => {
         await page
             .getByRole("radio", { name: /Warehouse walkthrough/ })
             .click();
+        await page
+            .getByRole("radio", { name: /times? free/ })
+            .first()
+            .click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
             hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
