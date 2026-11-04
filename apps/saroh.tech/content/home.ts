@@ -38,7 +38,7 @@ export const home = {
     featuresTitle: "Nine parts, one workspace.",
     solutionsTitle: "Solutions",
     pricingTitle: "Pricing",
-    pricingCompare: "Compare every plan",
+    pricingCompare: "See pricing",
     faqTitle: "Questions",
     /** The dark CTA band's title. */
     closer: "Every morning, know what needs you.",

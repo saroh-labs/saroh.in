@@ -50,7 +50,10 @@ export function FeatureSteps({
                     "grid list-none pt-14",
                     steps.some((step) => step.shot)
                         ? "gap-[88px]"
-                        : "gap-x-14 gap-y-16 md:grid-cols-2",
+                        : cn(
+                              "gap-x-14 gap-y-16 md:grid-cols-2",
+                              steps.length === 3 && "lg:grid-cols-3",
+                          ),
                 )}
             >
                 {steps.map((step, i) => (

@@ -20,7 +20,7 @@ describe("the pricing, integrations, about and contact words", () => {
         expect(words([pricing, live, ABOUT, CONTACT])).not.toMatch(
             /\b(stripe|paypal)\b/i,
         );
-        expect(planned.map((g) => g.label)).toEqual(["Decided", "Later"]);
+        expect(planned.map((g) => g.label)).toEqual(["Coming next", "Later"]);
     });
 
     it("give no address, handle or reply time that isn't confirmed", () => {

@@ -38,8 +38,8 @@ export const INTEGRATIONS = {
     notYet: "Not available yet",
     planned: [
         {
-            key: "decided",
-            label: "Decided",
+            key: "next",
+            label: "Coming next",
             rows: [
                 {
                     name: "Stripe",
