@@ -17,8 +17,11 @@ export interface LegalSection {
     links?: readonly { name: string; href: string }[];
 }
 
-const CLIENT_MONEY =
-    "Your clients pay you directly, through your own Stripe, PayPal or bank. We never hold or move your clients' money. We only record that a payment happened.";
+const CUSTOMER_MONEY =
+    "Your customers pay you directly. We don't hold or move your customers' money. You record in Saroh that a payment happened.";
+
+const PAID_PLANS =
+    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech yet. This page will say how they're charged before they are.";
 
 export const TERMS: readonly LegalSection[] = [
     {
@@ -40,28 +43,26 @@ export const TERMS: readonly LegalSection[] = [
         items: [
             "Give us true details, and keep them up to date.",
             "Keep your sign-in safe. You are responsible for what happens in your account.",
-            "Only send quotes, invoices and messages you have the right to send.",
+            "Only send invoices and messages you have the right to send.",
         ],
     },
     {
         title: "Your content",
         paragraphs: [
-            "What you put in Saroh stays yours. That means your clients, quotes, invoices and notes. We use it only to run Saroh for you.",
+            "What you put in Saroh stays yours. That means your customers, invoices and notes. We use it only to run Saroh for you.",
             `You can export your data at any time. ${p.appSteps}`,
         ],
     },
     {
-        title: "Your clients' money",
+        title: "Your customers' money",
         paragraphs: [
-            CLIENT_MONEY,
-            "Your payment provider's own terms and fees apply. Refunds and disputes with your clients are between you and them.",
+            CUSTOMER_MONEY,
+            "Refunds and disputes with your customers are between you and them.",
         ],
     },
     {
         title: "Paying for Saroh",
-        paragraphs: [
-            `Paid plans are prepaid. ${p.merchantOfRecord} is the merchant of record: it sells you the plan and charges any tax on it. Cancel in Settings, and you keep access until the end of the paid period.`,
-        ],
+        paragraphs: [PAID_PLANS],
         links: [{ name: "Billing and cancelling", href: "/legal/billing" }],
     },
     {
@@ -211,15 +212,15 @@ export const PRIVACY: readonly LegalSection[] = [
     {
         title: "If you sign up for Saroh",
         paragraphs: [
-            "We keep your sign-in details, your business details, and what you put in the app: your clients, quotes, invoices, payments you record and notes. We use them to run Saroh and to send you emails about your account.",
+            "We keep your sign-in details, your business details, and what you put in the app: your customers, invoices, payments you record and notes. We use them to run Saroh and to send you emails about your account.",
             p.appSteps,
         ],
     },
     {
-        title: "Your clients' details",
+        title: "Your customers' details",
         paragraphs: [
-            "You decide what you put in Saroh about your clients, and you're responsible for having the right to. We use those details only to run Saroh for you.",
-            CLIENT_MONEY,
+            "You decide what you put in Saroh about your customers, and you're responsible for having the right to. We use those details only to run Saroh for you.",
+            CUSTOMER_MONEY,
         ],
     },
     {
@@ -230,7 +231,6 @@ export const PRIVACY: readonly LegalSection[] = [
         title: "Who else handles it",
         paragraphs: [
             `Services that help us run Saroh handle some of this data for us: ${p.processors}`,
-            `${p.merchantOfRecord} takes payment for our plans and handles your card details.`,
         ],
     },
     {
@@ -244,50 +244,16 @@ export const PRIVACY: readonly LegalSection[] = [
 
 export const BILLING: readonly LegalSection[] = [
     {
-        title: "Your clients' money is never ours",
-        paragraphs: [
-            CLIENT_MONEY,
-            "We take 0% of what your clients pay you. Your payment provider's own fees still apply.",
-        ],
+        title: "Your customers' money is never ours",
+        paragraphs: [CUSTOMER_MONEY],
     },
     {
         title: "How paying for Saroh works",
-        paragraphs: [
-            "There's a free plan, and it needs no card. Paid plans are prepaid: you pay at the start of each month or year.",
-            `How our prices can change: ${p.pricePromise}`,
-        ],
+        paragraphs: [PAID_PLANS],
         links: [{ name: "See the plans", href: "/pricing" }],
     },
     {
-        title: "Who charges you, and tax",
-        paragraphs: [
-            `${p.merchantOfRecord} is the merchant of record for our plans. It takes your payment, charges any tax due on the plan, and gives you the receipt. That name is what you'll see on your statement.`,
-        ],
-    },
-    {
-        title: "Before we renew",
-        paragraphs: [
-            `We email you 7 days before a yearly renewal. ${p.appSteps}`,
-        ],
-    },
-    {
-        title: "Cancelling",
-        paragraphs: [
-            "Cancel in Settings in two taps. No calls, no forms. You keep access until the end of the period you paid for, and we don't charge you again.",
-        ],
-        links: [
-            {
-                name: "How to cancel, step by step",
-                href: "/help/cancel-your-plan",
-            },
-        ],
-    },
-    {
-        title: "Refunds",
-        paragraphs: [p.refunds],
-    },
-    {
-        title: "Your data after you cancel",
-        paragraphs: [`${p.dataAfterCancel}`],
+        title: "Leaving",
+        paragraphs: ["You can leave at any time.", `${p.dataAfterCancel}`],
     },
 ];

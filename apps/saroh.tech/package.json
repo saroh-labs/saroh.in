@@ -22,6 +22,7 @@
     "portless": "tech.saroh",
     "dependencies": {
         "@saroh/edition": "workspace:*",
+        "@saroh/marketing": "workspace:*",
         "@saroh/pricing-catalog": "workspace:^",
         "@saroh/ui": "workspace:*",
         "jspdf": "4.2.1",

@@ -6,6 +6,8 @@ import { CHANGELOG, changelogPath } from "@/content/changelog";
 
 import { HELP } from "@/content/help";
 
+import { home, UPDATED as HOME_UPDATED } from "@/content/home";
+
 /**
  * Every page, as the site map and page-spec boards list them. Title,
  * description and H1 are the specs' own words. An `unreviewed` page is noindex
@@ -153,11 +155,10 @@ export const PAGES: SitePage[] = [
     {
         path: "/",
         type: "home",
-        title: "Quotes, invoices and client pages with 0% fees | Saroh",
-        description:
-            "Send quotes and invoices, get paid through your own Stripe, PayPal or bank link, and give every client one page. Free plan, no card needed.",
-        h1: "Quotes, invoices and one page for every client.",
-        updated: "2026-11-02",
+        title: `${home.seoTitle} | Saroh`,
+        description: home.seoDescription,
+        h1: home.headlineLabel,
+        updated: HOME_UPDATED,
     },
     {
         ...hub(
@@ -240,7 +241,7 @@ export const PAGES: SitePage[] = [
     legal(
         "terms",
         "Terms of service",
-        "The terms for using Saroh and its free tools. We never hold or move your clients' money.",
+        "The terms for using Saroh and its free tools.",
     ),
     legal(
         "privacy",
@@ -255,7 +256,7 @@ export const PAGES: SitePage[] = [
     legal(
         "billing",
         "Billing and cancelling",
-        "How paying for Saroh works: prepaid plans, tax, cancelling and refunds.",
+        "How paying for Saroh works, what happens to your customers' money, and how to leave.",
     ),
     {
         ...hub(

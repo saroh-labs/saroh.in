@@ -14,5 +14,5 @@ export default {
     images: { unoptimized: true },
     poweredByHeader: false,
     pageExtensions: dev ? ["dev.tsx", "tsx", "ts"] : ["tsx", "ts"],
-    transpilePackages: ["@saroh/ui"],
+    transpilePackages: ["@saroh/ui", "@saroh/marketing"],
 };

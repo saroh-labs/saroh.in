@@ -23,12 +23,7 @@ export interface HelpArticle {
     related: readonly [string, string, string];
 }
 
-export const HELP_GROUPS = [
-    "Free tools",
-    "Quotes and client pages",
-    "Getting paid",
-    "Your plan",
-] as const;
+export const HELP_GROUPS = ["Free tools", "Invoices and payments"] as const;
 
 /** The app isn't built: words about it come from the boards, not from the screen. */
 const app = (title: string, text: string): HelpStep => ({
@@ -57,7 +52,7 @@ export const HELP: readonly HelpArticle[] = [
             },
             {
                 title: "Add who it's from and who it's for",
-                text: "Fill in From with your business details, then Bill to with your client's name and email.",
+                text: "Fill in From with your business details, then Bill to with your customer's name and email.",
             },
             {
                 title: "Add the work",
@@ -74,7 +69,7 @@ export const HELP: readonly HelpArticle[] = [
         },
         related: [
             "write-a-payment-reminder",
-            "move-a-draft-into-saroh",
+            "add-your-tax-line",
             "record-a-payment",
         ],
     },
@@ -92,7 +87,7 @@ export const HELP: readonly HelpArticle[] = [
             },
             {
                 title: "Fill in the invoice",
-                text: "Add your client's first name, your name, the invoice number, the amount and the date it was due. Add your payment link if you have one.",
+                text: "Add your customer's first name, your name, the invoice number, the amount and the date it was due. Add your payment link if you have one.",
             },
             {
                 title: "Pick the tone and how you'll send it",
@@ -108,152 +103,66 @@ export const HELP: readonly HelpArticle[] = [
             href: "/tools/payment-reminder",
         },
         related: [
-            "send-a-payment-reminder",
+            "share-an-invoice",
             "make-an-invoice-pdf",
             "record-a-payment",
         ],
     },
     {
-        slug: "move-a-draft-into-saroh",
-        task: "Move a free tool draft into Saroh",
-        group: "Free tools",
+        slug: "add-your-tax-line",
+        task: "Add your tax line to an invoice you write",
+        group: "Invoices and payments",
         minutes: 2,
-        line: "Keep what you typed when you sign up.",
-        intro: "When you sign up from a free tool, your draft and your details come with you. Nothing is typed twice.",
+        line: "One tax line you name, with your tax number.",
+        intro: "On an invoice you write, you can add one tax line, like VAT 20%. You choose the name and the rate. Saroh doesn't work out tax for you.",
         steps: [
-            {
-                title: "Finish your draft in the free tool",
-                text: "Make your invoice or quote, then choose Download PDF.",
-            },
-            {
-                title: "Choose to carry on in Saroh",
-                text: "After the download, choose Save, send and get paid. On the quote maker it says Send it from Saroh.",
-            },
-            app("Sign up", "Create your account. The free plan needs no card."),
+            app("Write a new invoice", "Add your customer and each line."),
             app(
-                "Check your draft and add your logo",
-                "Your draft opens in the app. A logo is too long to travel in a link, so add it again.",
+                "Add your tax line",
+                "Give it a name and a rate. It's added on top of the total.",
+            ),
+            app(
+                "Check your tax number",
+                "Your tax number is kept on the invoice with the tax line.",
             ),
         ],
-        next: doInSaroh("/import"),
-        related: ["make-an-invoice-pdf", "send-a-quote", "share-a-client-page"],
-    },
-    {
-        slug: "send-a-quote",
-        task: "Send a quote",
-        group: "Quotes and client pages",
-        minutes: 5,
-        line: "Pick your services, set a deposit, send the link.",
-        intro: "Your client gets a link to the quote and accepts it online. You see when they did.",
-        steps: [
-            app("Start a new quote", "Choose your client, or add a new one."),
-            app(
-                "Add the work",
-                "Pick from your saved services, or add a line for this job.",
-            ),
-            app("Set a deposit", "Add a deposit if you want one up front."),
-            app(
-                "Send the link",
-                "Send your client the link to the quote. They don't need a login.",
-            ),
-            app(
-                "See the yes",
-                "Your client taps Accept on their client page. You get told, and the time is kept with the quote.",
-            ),
-        ],
-        next: doInSaroh("/quotes/new"),
+        note: "Invoices made from an order, a booking, a pack or a course have no tax line or tax number.",
+        next: doInSaroh("/invoices"),
         related: [
-            "turn-a-quote-into-an-invoice",
-            "share-a-client-page",
-            "add-your-stripe-payment-link",
+            "record-a-payment",
+            "share-an-invoice",
+            "make-an-invoice-pdf",
         ],
     },
     {
-        slug: "turn-a-quote-into-an-invoice",
-        task: "Turn an accepted quote into an invoice",
-        group: "Quotes and client pages",
+        slug: "share-an-invoice",
+        task: "Share an invoice by link or WhatsApp",
+        group: "Invoices and payments",
         minutes: 1,
-        line: "One tap. Nothing typed twice.",
-        intro: "An accepted quote becomes an invoice in one tap, with the same client and the same lines.",
+        line: "WhatsApp opens with the words typed. You press send.",
+        intro: "Share an invoice from Saroh yourself. Your customer gets it from you, in your own WhatsApp or wherever you paste the link.",
         steps: [
-            app("Open the accepted quote", "Find it in your quotes."),
+            app("Open the invoice", "Find it in your invoices."),
             app(
-                "Make the invoice",
-                "Choose to turn it into an invoice. The lines come across.",
+                "Choose how to share it",
+                "Copy its link, or choose WhatsApp. WhatsApp opens with the words typed.",
             ),
-            app(
-                "Check it and send it",
-                "Check the amounts and the due date, then send the link.",
-            ),
+            app("Send it", "Read it, then press send."),
         ],
-        next: doInSaroh("/quotes"),
-        related: [
-            "send-a-quote",
-            "record-a-payment",
-            "add-your-stripe-payment-link",
-        ],
-    },
-    {
-        slug: "share-a-client-page",
-        task: "Share a client page",
-        group: "Quotes and client pages",
-        minutes: 2,
-        line: "One link, with everything for that client.",
-        intro: "Every client gets one page with their quotes, invoices, payments and notes. It's one link, and they don't need a login.",
-        steps: [
-            app(
-                "Add your logo and payment link",
-                "These two things make the page work: your logo so it looks like you, and your payment link so there's a Pay button.",
-            ),
-            app("Open your client", "Find them in your client list."),
-            app(
-                "Copy the link",
-                "Copy the link to their client page, then send it to them.",
-            ),
-        ],
-        next: doInSaroh("/clients"),
-        related: [
-            "add-your-stripe-payment-link",
-            "send-a-quote",
-            "send-a-payment-reminder",
-        ],
-    },
-    {
-        slug: "add-your-stripe-payment-link",
-        task: "Add your Stripe payment link",
-        group: "Getting paid",
-        minutes: 3,
-        line: "Put a Pay button on your client pages.",
-        intro: "Your client pays you through your own Stripe account. The money goes to you, and we take 0% of it.",
-        steps: [
-            {
-                title: "Copy a payment link from Stripe",
-                text: "In your Stripe account, make a payment link and copy it.",
-            },
-            app(
-                "Paste it into Saroh",
-                "Open your payment settings in Saroh and paste the link.",
-            ),
-            app(
-                "Check the Pay button",
-                "Open one of your client pages and check that the Pay button goes to your Stripe page.",
-            ),
-        ],
-        note: "Stripe's own fees still apply. PayPal links and bank details work the same way.",
-        next: doInSaroh("/settings/payments"),
+        next: doInSaroh("/invoices"),
         related: [
             "record-a-payment",
-            "share-a-client-page",
-            "send-a-payment-reminder",
+            "add-your-tax-line",
+            "write-a-payment-reminder",
         ],
     },
     {
         slug: "record-a-payment",
         task: "Record a payment",
-        group: "Getting paid",
+        group: "Invoices and payments",
         minutes: 1,
-        line: "Mark the invoice as paid. The receipt is made.",
-        intro: "Clients pay you directly, so we never see the money. You record that it happened, and the receipt is made for you.",
+        line: "Mark the invoice as paid. It becomes a receipt.",
+        intro: "Your customers pay you directly, so we never see the money. You record that it happened, and the invoice becomes a receipt.",
         steps: [
             app("Open the invoice", "Find it in your invoices."),
             app(
@@ -262,58 +171,15 @@ export const HELP: readonly HelpArticle[] = [
             ),
             app(
                 "Check the receipt",
-                "The receipt is made from the invoice. Your client can see it on their client page.",
+                "Once it's paid, the invoice reads as a receipt. Share it the same way.",
             ),
         ],
         next: doInSaroh("/invoices"),
         related: [
-            "add-your-stripe-payment-link",
-            "send-a-payment-reminder",
-            "turn-a-quote-into-an-invoice",
+            "share-an-invoice",
+            "add-your-tax-line",
+            "make-an-invoice-pdf",
         ],
-    },
-    {
-        slug: "send-a-payment-reminder",
-        task: "Send a payment reminder from Saroh",
-        group: "Getting paid",
-        minutes: 1,
-        line: "See who's late. One tap writes the message.",
-        intro: "Saroh tells you who's late and writes the message. It goes out from your own email or WhatsApp, so your client sees your name.",
-        steps: [
-            app("See who's late", "Open your overdue invoices."),
-            app("Choose Remind", "Choose Remind beside the invoice."),
-            app(
-                "Send it from your own app",
-                "Your email or WhatsApp opens with the message filled in. Read it, then send it.",
-            ),
-        ],
-        next: doInSaroh("/invoices"),
-        related: [
-            "write-a-payment-reminder",
-            "record-a-payment",
-            "share-a-client-page",
-        ],
-    },
-    {
-        slug: "cancel-your-plan",
-        task: "Cancel your plan",
-        group: "Your plan",
-        minutes: 1,
-        line: "In Settings. No calls, no forms.",
-        intro: "Plans are prepaid. Cancel in Settings whenever you like, and you keep access until the end of what you paid for.",
-        steps: [
-            app("Open Settings", "Go to billing in your settings."),
-            app(
-                "Cancel your plan",
-                "Choose to cancel and confirm it. It takes two taps.",
-            ),
-            app(
-                "Keep working until the period ends",
-                "You keep access until the end of what you paid for. We don't charge you again.",
-            ),
-        ],
-        next: doInSaroh("/settings/billing"),
-        related: ["record-a-payment", "share-a-client-page", "send-a-quote"],
     },
 ];
 
@@ -321,19 +187,11 @@ export const helpArticle = (slug: string) => HELP.find((a) => a.slug === slug);
 
 export const HELP_FAQS = [
     {
-        question: "Do you take a cut when my client pays?",
-        answer: "No. Payments go straight to your own Stripe, PayPal or bank. We only record that it happened. Your payment provider's own fees still apply.",
+        question: "How do my customers pay me?",
+        answer: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Paying online isn't available yet.",
     },
     {
         question: "Do the free tools need an account?",
-        answer: "No. They run in your browser, and what you type stays in that browser unless you choose to carry it into Saroh.",
-    },
-    {
-        question: "Does my client need an account?",
-        answer: "No. Your client gets one link and needs no login.",
-    },
-    {
-        question: "Can I cancel any time?",
-        answer: "Yes. Plans are prepaid. Cancel in Settings, and you keep access until the end of what you paid for.",
+        answer: "No. They run in your browser, and what you type stays in that browser.",
     },
 ] as const;

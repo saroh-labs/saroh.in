@@ -13,6 +13,7 @@
     "exports": {
         "./tokens.css": "./src/tokens.css",
         "./tailwind": "./src/tailwind.ts",
+        "./content-types": "./src/content/types.ts",
         "./cn": "./src/cn.ts",
         "./ring": "./src/ring.ts",
         "./roving": "./src/roving.ts",

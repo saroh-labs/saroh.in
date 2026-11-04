@@ -1117,6 +1117,9 @@ importers:
       '@saroh/edition':
         specifier: workspace:*
         version: link:../../packages/edition
+      '@saroh/marketing':
+        specifier: workspace:*
+        version: link:../../packages/marketing
       '@saroh/pricing-catalog':
         specifier: workspace:^
         version: link:../../packages/pricing-catalog

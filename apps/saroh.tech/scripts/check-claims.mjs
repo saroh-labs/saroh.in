@@ -13,6 +13,13 @@ import { fileURLToPath } from "node:url";
 const ABOUT_TAX =
     /^\/(templates|guides|tools\/(gst|vat|sales-tax)-calculator)(\/|$)/;
 
+/** The free tools, templates and guides are about the document, not the product. */
+const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
+
+/** The one list of what's coming names these, marked "Not available yet". */
+const NAMES_A_PROVIDER =
+    /^\/(tools|templates|guides|changelog|integrations)(\/|$)/;
+
 export const BANNED = [
     { phrase: /\b(tap|taps|tapped) accept\b/i },
     { phrase: /\baccepts? (it )?online\b/i },
@@ -20,15 +27,33 @@ export const BANNED = [
     { phrase: /\bapprovals? with history\b/i },
     { phrase: /\bquote approvals?\b/i },
     { phrase: /\bevery version and every\b/i },
-    { phrase: /\bclient pages? on every plan\b/i },
-    { phrase: /\ba client page for every\b/i },
+    { phrase: /\bclient pages?\b/i },
     { phrase: /\bone page for every client\b/i },
+    { phrase: /\bpay button\b/i },
+    { phrase: /\bpay now\b/i, except: ABOUT_DOCS },
+    { phrase: /\bno login\b/i },
+    { phrase: /\bsee when (they|your client)\b/i },
+    { phrase: /\byou see when\b/i },
+    { phrase: /\bget a yes\b/i },
+    { phrase: /\baccepted quote\b/i },
+    { phrase: /\bfrom quote to paid\b/i },
+    { phrase: /\bsend a quote\b/i, except: ABOUT_DOCS },
+    { phrase: /\bquotes?(,| and) invoices\b/i, except: ABOUT_DOCS },
+    { phrase: /\bany currency\b/i, except: ABOUT_DOCS },
+    { phrase: /\bSMS\b/ },
+    { phrase: /\b0% fees?\b/i },
+    { phrase: /\bwe take 0%/i },
+    { phrase: /\bnever touch(es)?\b/i },
+    { phrase: /\btake a cut\b/i },
+    { phrase: /\bmerchant of record\b/i },
+    { phrase: /\b(stripe|paypal)\b/i, except: NAMES_A_PROVIDER },
     { phrase: /\byour own (stripe|paypal)\b/i },
     { phrase: /\bstripe, paypal\b/i },
     { phrase: /\bpay link\b/i },
     { phrase: /\bpayable link\b/i },
     { phrase: /\btax invoices?\b/i, except: ABOUT_TAX },
     { phrase: /\bGST invoices?\b/i, except: ABOUT_TAX },
+    { phrase: /\bVAT invoices?\b/i, except: ABOUT_TAX },
     { phrase: /\bUPI\b/, except: /^\/$/ },
     { phrase: /\b(razorpay|cashfree)\b/i },
 ];

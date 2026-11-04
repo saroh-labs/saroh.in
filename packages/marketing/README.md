@@ -3,7 +3,8 @@
 What each edition's public site draws with, so the sites match by construction:
 `src/tokens.css` (the `--mk-*` values), `src/tailwind.ts` (the `mk-*` theme and
 the `content` glob), `cn`, `ring`, `nextIndex`, the link, button, layout, section,
-nav and media primitives, the page sections and the pricing tables. Import one piece at a time (`@saroh/marketing/button`);
+nav and media primitives, the page sections, the pricing tables and the shape of a
+site's content (`content-types`: words stay per site). Import one piece at a time (`@saroh/marketing/button`);
 there is no barrel, because each file ends up in a browser bundle.
 
 An app using it needs `@saroh/marketing` in `transpilePackages`,

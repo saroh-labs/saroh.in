@@ -37,6 +37,7 @@ const SOURCES = [
     "apps/saroh.in/app",
     "apps/saroh.in/components",
     "packages/marketing/src",
+    "apps/saroh.tech/content",
 ];
 const HELP = ["apps/help.saroh.in/content", "apps/saroh.in/content/help"];
 
@@ -97,7 +98,7 @@ const MARKETING_RETIRED = [
     ],
     [/\b(?:for|get) early access\b/i, "for early access", "Start free"],
 ];
-const MARKETING = ["apps/saroh.in/", "packages/marketing/"];
+const MARKETING = ["apps/saroh.in/", "apps/saroh.tech/", "packages/marketing/"];
 /** The waitlist page's own files, until the follow-up removes them. */
 const WAITLIST_PAGE = [
     "apps/saroh.in/app/(standalone)/waitlist",

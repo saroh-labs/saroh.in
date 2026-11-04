@@ -26,7 +26,7 @@ describe("what saroh.tech may not say", () => {
         expect(findClaims("/tools/receipt-maker", "Paid by PayPal")).toEqual(
             [],
         );
-        expect(findClaims("/", "through your own PayPal")).toHaveLength(1);
+        expect(findClaims("/", "through your own PayPal")).not.toEqual([]);
     });
 
     it("lets a country template name a tax invoice, and nothing else", () => {
@@ -36,6 +36,29 @@ describe("what saroh.tech may not say", () => {
         expect(
             findClaims("/features/billing", "Sends a tax invoice"),
         ).toHaveLength(1);
+    });
+
+    it.each([
+        "Your client page has a Pay button.",
+        "Send a quote today.",
+        "See when they open it.",
+        "Works in any currency.",
+        "Texts by SMS.",
+        "0% fees.",
+        "We never touch your money.",
+        "Add your Stripe account.",
+        "The merchant of record charges you.",
+    ])("catches what was removed: %s", (line) => {
+        expect(findClaims("/features/billing", line)).not.toEqual([]);
+    });
+
+    it("lets the coming list name a provider, and the tools talk about documents", () => {
+        expect(findClaims("/changelog", "Stripe: Not available yet")).toEqual(
+            [],
+        );
+        expect(
+            findClaims("/tools/quote-maker", "Send a quote in any currency"),
+        ).toEqual([]);
     });
 
     it("reads what a visitor reads", () => {
