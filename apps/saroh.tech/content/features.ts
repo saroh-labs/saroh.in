@@ -401,28 +401,28 @@ export const features: Record<FeatureSlug, StatedFeature> = {
      * Not usable yet for a business outside India, so nothing here is sold as
      * working: the page and its place stay (the plan's Feature state rule), the
      * hero says so, every part is marked, and no other feature or solution leans
-     * on it. It opens with USD plans. The words name no plan's contents.
+     * on it. The words name no plan's contents.
      */
     subscriptions: {
         slug: "subscriptions",
         state: "coming-soon",
         worksToday:
-            "You can't start a subscription yet. Subscriptions opens with USD plans, which aren't available yet.",
+            "Subscriptions isn't available yet, so you can't start one.",
         phrase: "membership and subscription billing",
         seoTitle: "Membership and subscription billing software",
         seoDescription:
-            "Membership and subscription billing in Saroh is not available yet. It opens with USD plans. Here's what it is.",
+            "Membership and subscription billing in Saroh is not available yet. Here's what it will do.",
         name: "Subscriptions",
         navLine: "Plans that renew on their day. Not available yet",
         cardLine: "Plans that renew on their day. Not available yet.",
         homeBody:
             "Not available yet. Plans that renew on their day, each with its invoice.",
         headline: "Regulars on a plan. Not available yet.",
-        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions. You can't start one yet. It opens with USD plans, and this is what it is.",
+        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions. It isn't available yet, so here's what it will do.",
         hero: {
             shot: "r-subdetail",
         },
-        howTitle: "What it is, when it opens.",
+        howTitle: "What it will do.",
         steps: [
             {
                 title: "Each plan renews on its day",
