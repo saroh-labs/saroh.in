@@ -24,7 +24,7 @@ export const faqs = {
     },
     tax: {
         q: "Does it work out my tax?",
-        a: "No. You choose the name and the rate. On an invoice you write, add one tax line, like VAT 20%, and your tax number, and they're kept on the invoice. Invoices made from an order, a booking, a pack or a course have no tax line.",
+        a: "No. You choose the name and the rate. On an invoice you write, add one tax line, like VAT 20%, and your tax number, and they're kept on the invoice. Invoices made from an order, a booking or a course have no tax line.",
     },
     pay: {
         q: "How do my customers pay?",
@@ -55,8 +55,8 @@ export const faqs = {
         a: "Yes. Each location keeps its own stock, and an order holds stock where it was placed, so two people never sell the same last loaf.",
     },
     "gyms-pack-and-membership": {
-        q: "Can members use a class pack?",
-        a: "Yes. You sell a pack at the desk, and credits are used as they're booked. Each member's page shows what they have left.",
+        q: "Can I run courses as well as classes?",
+        a: "Yes. Set how many places a class has. A course runs for several weeks: enrol people and see who's paid.",
     },
     "clinics-medical-notes": {
         q: "Who can read a patient's medical notes?",

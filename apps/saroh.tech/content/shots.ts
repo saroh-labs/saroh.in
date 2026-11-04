@@ -16,8 +16,6 @@ import { CAPTURED } from "./shots.captured";
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "r-subdetail": "Subscriptions isn't usable on Global yet.",
     "s-subs": "Subscriptions isn't usable on Global yet.",
-    "g-packs": "Class packs aren't offered to any business yet (DEC-099).",
-    "l-packs": "Class packs aren't offered to any business yet (DEC-099).",
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */

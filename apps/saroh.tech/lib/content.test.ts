@@ -146,6 +146,12 @@ describe("saroh.tech's words", () => {
     };
     const sold = words(all);
 
+    it("don't sell or count class packs, which no plan offers (DEC-099)", () => {
+        // The question's id is shared with saroh.in; its words may not say it.
+        const claims = sold.replaceAll("gyms-pack-and-membership", "");
+        expect(claims).not.toMatch(/\bpack(s|ages?)?\b/i);
+    });
+
     it("stay out of what isn't true outside India", () => {
         const banned =
             /\b(GST|GSTIN|UPI|HSN|SAC|Razorpay|Cashfree|bills? of supply|Stripe|PayPal|SMS|pay link|deposits?|autopay|custom domain|your own domain|quotes?|estimates?|client pages?|approvals?|acceptance|any currency|see when|reminders?)\b|₹/i;

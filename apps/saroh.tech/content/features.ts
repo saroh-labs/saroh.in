@@ -279,11 +279,10 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 shot: "s-customer",
             },
             {
-                title: "Regulars, with what they have left",
-                body: "Classes left in their pack and their next booking.",
+                title: "Regulars, with what's next",
+                body: "Their next booking and the classes they've been to.",
                 who: "Ironvale Fitness (demo gym)",
-                // Class packs aren't offered yet: no screen shows one left.
-                shot: "g-packs",
+                shot: "g-customer",
             },
             {
                 title: "Notes they send reach the team",
@@ -362,12 +361,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's paid.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-courses",
-            },
-            {
-                title: "Class packs",
-                body: "Sell five or ten classes at a price, at the desk. Credits are used as they're booked, and expire when you say.",
-                who: "Ironvale Fitness (demo gym)",
-                shot: "g-packs",
             },
             {
                 title: "Treatments over several visits",
@@ -507,7 +500,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         points: [
             {
                 title: "Your own tax line",
-                body: "On invoices you write. Invoices made from an order, a booking, a pack or a course have no tax line or tax number.",
+                body: "On invoices you write. Invoices made from an order, a booking or a course have no tax line or tax number.",
             },
             {
                 title: "Share it yourself",

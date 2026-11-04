@@ -126,7 +126,7 @@ export const HELP: readonly HelpArticle[] = [
                 "Your tax number is kept on the invoice with the tax line.",
             ),
         ],
-        note: "Invoices made from an order, a booking, a pack or a course have no tax line or tax number.",
+        note: "Invoices made from an order, a booking or a course have no tax line or tax number.",
         next: doInSaroh("/invoices"),
         related: [
             "record-a-payment",

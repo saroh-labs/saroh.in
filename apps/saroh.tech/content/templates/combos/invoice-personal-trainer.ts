@@ -43,6 +43,6 @@ export const invoicePersonalTrainer: Combo = {
     ],
     band: {
         title: "Trained, billed, paid.",
-        line: "Take monthly coaching and packs through your own payment link, and keep every session in one place. 0% fees.",
+        line: "Keep every session and every invoice in one place. 0% fees.",
     },
 };

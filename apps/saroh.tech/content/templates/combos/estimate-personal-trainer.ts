@@ -92,6 +92,6 @@ export const estimatePersonalTrainer: Combo = {
     ],
     band: {
         title: "A number before the first rep.",
-        line: "Send the estimate, then turn it into a pack or a monthly plan once they say yes. 0% fees.",
+        line: "Send the estimate, then book the sessions once they say yes. 0% fees.",
     },
 };
