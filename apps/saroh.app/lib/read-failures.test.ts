@@ -151,6 +151,25 @@ describe("the posts", () => {
         answerAll(json({}, 500));
         await expect(getPublishedPost("site_1", "a")).rejects.toThrow();
     });
+
+    it("throw on a failed post read, and the page isn't kept", async () => {
+        for (const answer of [
+            json({}, 500),
+            new Error("offline"),
+            json({ nope: true }),
+        ]) {
+            shop.refused.mockClear();
+            answerAll(answer);
+            await expect(getPublishedPost("site_1", "a")).rejects.toThrow();
+            expect(shop.refused).toHaveBeenCalledWith("post unavailable");
+        }
+    });
+
+    it("don't refuse the page for a post that really has gone", async () => {
+        answerAll(json({}, 404));
+        await getPublishedPost("site_1", "a");
+        expect(shop.refused).not.toHaveBeenCalled();
+    });
 });
 
 describe("the footer and the header's facts", () => {

@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { LookId } from "@saroh/block-contract";
 import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 
@@ -660,20 +662,31 @@ export async function getPublishedPost(
     siteId: string,
     slug: string,
 ): Promise<PublishedPost | null> {
-    const res = await fetch(
-        `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
-        {
-            cache: "no-store",
-            headers: { accept: "application/json" },
-            signal: serverReadSignal(),
-        },
-    );
+    const failed = (why: string): Error => {
+        dontCachePage("post unavailable");
+        return new Error(`Post read failed: ${why}`);
+    };
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
+        );
+    } catch {
+        throw failed("no answer");
+    }
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Post read failed: ${res.status}`);
+    if (!res.ok) throw failed(String(res.status));
     const body = (await res.json().catch(() => null)) as {
         snapshot?: PostSnapshot;
     } | null;
-    return body?.snapshot?.post ?? null;
+    // A 200 with no post is a bad answer, not a post that has gone.
+    if (!body?.snapshot?.post) throw failed("not a post");
+    return body.snapshot.post;
 }
 
 /**
@@ -724,6 +737,9 @@ export async function getSiteForHost(
     return fetchSiteView(`by-subdomain/${encodeURIComponent(subdomain)}`);
 }
 
+/** Whether a site read in this request has failed. One box per request. */
+const siteReads = cache(() => ({ failed: false }));
+
 /**
  * Whether a host with no live site got there because a read failed rather
  * than because the API said nothing is here. Asked only on that miss, as
@@ -735,6 +751,9 @@ export async function getSiteForHost(
 export async function siteReadFailed(
     host: string | null | undefined,
 ): Promise<boolean> {
+    // `getSiteForHost` has already seen this request's read fail: don't wait
+    // on two more to be told.
+    if (siteReads().failed) return true;
     const hostname = host?.split(":")[0]?.toLowerCase().trim();
     if (!hostname) return false;
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
@@ -745,18 +764,21 @@ export async function siteReadFailed(
             : []),
         ...(subdomain ? [`by-subdomain/${encodeURIComponent(subdomain)}`] : []),
     ];
-    for (const read of reads) {
-        try {
-            const res = await fetch(`${API_URL}/public/sites/${read}`, {
-                cache: "no-store",
-                headers: { accept: "application/json" },
-            });
-            if (res.status !== 404) return true;
-        } catch {
-            return true;
-        }
-    }
-    return false;
+    const answers = await Promise.all(
+        reads.map(async (read) => {
+            try {
+                const res = await fetch(`${API_URL}/public/sites/${read}`, {
+                    cache: "no-store",
+                    headers: { accept: "application/json" },
+                    signal: serverReadSignal(),
+                });
+                return res.status !== 404;
+            } catch {
+                return true;
+            }
+        }),
+    );
+    return answers.includes(true);
 }
 
 /** One public site read, returning the snapshot and the site id together. */
@@ -769,10 +791,13 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
             signal: serverReadSignal(),
         });
     } catch {
+        siteReads().failed = true;
         return null;
     }
-    if (!res.ok) return null;
-    return siteViewOf(await res.json().catch(() => null));
+    if (res.status === 404) return null;
+    const site = res.ok ? siteViewOf(await res.json().catch(() => null)) : null;
+    if (!site) siteReads().failed = true;
+    return site;
 }
 
 /**
@@ -798,6 +823,7 @@ async function fetchHostnameView(
             },
         );
     } catch {
+        siteReads().failed = true;
         return null;
     }
     if (res.status === 404) {
@@ -808,8 +834,8 @@ async function fetchHostnameView(
         );
         return to ? { pausedTo: to } : null;
     }
-    if (!res.ok) return null;
-    const site = siteViewOf(await res.json().catch(() => null));
+    const site = res.ok ? siteViewOf(await res.json().catch(() => null)) : null;
+    if (!site) siteReads().failed = true;
     return site ? { site } : null;
 }
 
