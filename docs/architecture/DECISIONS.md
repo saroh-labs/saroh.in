@@ -2723,6 +2723,10 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 **One person, and no compare or referral pages, for now (owner, 4 Nov).** While plans can't be bought abroad, saroh.tech's pages speak to one person running their business. Anything that needs a second person is out, a diary person with no login included, since they take a team seat (DEC-155): `ONE_PERSON` in `apps/saroh.tech/scripts/check-claims.mjs` fails the build on those words. Teams aren't listed as coming. `/compare`, its six alternatives and `/referral` are removed from saroh.tech, and come back through git, with no feature flag.
 
+**Referral links stay, compare pages stay out (owner, 4 Nov).** `/referral` is back, noindex and in no menu (saroh.in has no referral page or link), and it says what a link does today: the "Made with Saroh" credit records who referred a new business (DEC-156), with no reward while plans can't be bought abroad. saroh.tech's Worker keeps `?ref=` and shares `saroh_ref` with the app's domain, as saroh.in's page does. The app still has no referral screen.
+
+**Saroh.tech's facts (owner, 4 Nov).** The address is support@saroh.tech. Its legal pages take saroh.in's company facts and limits, in saroh.in's words where they hold abroad, and stay marked "Draft: not yet in force" until the owner's legal read. Guides are signed as saroh.in's are. /pricing says what happens at each of Free's limits, in the words the API refuses in, read from the catalogue at build.
+
 ## DEC-204 Two editions from one codebase: one database, the business decides
 
 **Status: Accepted — 2026-11-02** · owner
