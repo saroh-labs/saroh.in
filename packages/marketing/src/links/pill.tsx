@@ -44,9 +44,9 @@ export function PillLink({
     href: string;
     size?: "md" | "lg";
     className?: string;
-    children: ReactNode;
     /** `false` where the page behind it preloads a heavy picture. */
     prefetch?: boolean;
+    children: ReactNode;
 }) {
     return (
         <Link
