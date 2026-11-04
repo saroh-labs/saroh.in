@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { ReactNode } from "react";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -12,7 +13,7 @@ import { cardOf } from "@/lib/templates/pages";
 import { CardGrid, ChipLink } from "./blocks";
 
 const LABEL =
-    "w-full flex-none text-xs font-semibold uppercase tracking-[0.1em] text-quiet md:w-[90px]";
+    "w-full flex-none text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground md:w-[90px]";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -28,7 +29,7 @@ export function FilterChips({ current }: { current: string }) {
     return (
         <nav
             aria-label="Filter templates"
-            className="flex flex-col gap-3 rounded-card border border-line bg-surface px-4 py-5 md:px-[22px]"
+            className="flex flex-col gap-3 rounded-mk-card border border-border bg-card px-4 py-5 md:px-[22px]"
         >
             <Row label="Document">
                 <ChipLink href="/templates" on={current === "/templates"}>
@@ -100,10 +101,8 @@ export function GalleryPage({
             />
             <div className="flex max-w-[1100px] flex-col gap-4">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[40px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[72px]">
-                    {page.h1}
-                </h1>
-                <p className="m-0 text-[17px] leading-relaxed text-body md:text-[19px]">
+                <PageTitle size="page">{page.h1}</PageTitle>
+                <p className="m-0 text-[17px] leading-relaxed text-mk-copy md:text-[19px]">
                     {lede}
                 </p>
             </div>

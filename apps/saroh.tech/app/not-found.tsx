@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 
 import { ButtonLink } from "@/components/shared/button";
@@ -34,10 +35,8 @@ export default function NotFound() {
             className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-10 md:gap-14 md:pt-16"
         >
             <div className="flex flex-col gap-4">
-                <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">
-                    We can't find that page
-                </h1>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-body md:text-[19px]">
+                <PageTitle size="page">We can't find that page</PageTitle>
+                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
                     The link may be old, or the address may have a typo.
                 </p>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2">

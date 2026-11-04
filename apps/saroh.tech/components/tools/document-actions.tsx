@@ -41,7 +41,7 @@ export function useDownload(
 
 export function DownloadProblem({ problem }: { problem: string | null }) {
     return problem ? (
-        <p role="alert" className="m-0 text-sm text-body">
+        <p role="alert" className="m-0 text-sm text-mk-copy">
             {problem}
         </p>
     ) : null;
@@ -68,5 +68,29 @@ export function DeskActions({
                 Print
             </Button>
         </div>
+    );
+}
+
+/** Where a draft is, and how to clear it. */
+export function SavedNote({
+    savedAt,
+    onClear,
+}: {
+    savedAt?: string | null;
+    onClear: () => void;
+}) {
+    return (
+        <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            {savedAt
+                ? `Saved in this browser · ${savedAt}`
+                : "Stays in this browser"}
+            <button
+                type="button"
+                onClick={onClear}
+                className="min-h-11 cursor-pointer border-0 bg-transparent p-0 font-sans text-[13px] text-foreground underline md:min-h-0"
+            >
+                Clear
+            </button>
+        </span>
     );
 }

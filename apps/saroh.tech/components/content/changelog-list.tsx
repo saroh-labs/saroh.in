@@ -38,17 +38,17 @@ export function ChangelogList() {
                 </a>
             </div>
             {entries.length ? (
-                <div className="flex flex-col border-b border-line">
+                <div className="flex flex-col border-b border-border">
                     {entries.map((e) => (
                         <article
                             key={e.slug}
-                            className="grid gap-3 border-t border-line py-7 md:grid-cols-[200px_minmax(0,1fr)] md:gap-10 md:py-9"
+                            className="grid gap-3 border-t border-border py-7 md:grid-cols-[200px_minmax(0,1fr)] md:gap-10 md:py-9"
                         >
                             <div className="flex flex-row items-center gap-2.5 md:flex-col md:items-start">
                                 <EntryMeta entry={e} />
                             </div>
                             <div className="flex flex-col gap-3">
-                                <h2 className="m-0 font-display text-[24px] font-bold tracking-[-0.035em] md:text-[28px]">
+                                <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                                     <Link
                                         prefetch={false}
                                         href={changelogPath(e)}
@@ -63,7 +63,7 @@ export function ChangelogList() {
                     ))}
                 </div>
             ) : (
-                <p className="m-0 border-t border-line py-9 text-[17px] text-body">
+                <p className="m-0 border-t border-border py-9 text-[17px] text-mk-copy">
                     Nothing tagged {show} yet.
                 </p>
             )}

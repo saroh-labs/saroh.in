@@ -1233,6 +1233,11 @@ if [ "$QUICK" = 0 ] && affected web; then
     step draft-words pnpm run check:draft-words
 fi
 
+# saroh.tech's postbuild fails on a claim the product can't back (DEC-203).
+if [ "$QUICK" = 0 ] && affected tech; then
+    step tech-claims pnpm --filter tech build
+fi
+
 [ -n "$W" ] && [ -z "$FAILED" ] && rm -rf "$W"
 echo "--- $(( $(date +%s) - T0 ))s"
 if [ -n "$FAILED" ]; then

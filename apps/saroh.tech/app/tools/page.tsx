@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -80,10 +81,10 @@ const live = GROUPS.flatMap((g) =>
 );
 
 const CARD =
-    "box-border flex min-h-[128px] flex-col gap-2 rounded-card p-[22px]";
+    "box-border flex min-h-[128px] flex-col gap-2 rounded-mk-card p-[22px]";
 const NAME =
     "flex items-center justify-between gap-3 font-display text-xl font-bold tracking-[-0.03em]";
-const LINE = "m-0 text-[15px] leading-normal text-body";
+const LINE = "m-0 text-[15px] leading-normal text-mk-copy";
 
 export default function ToolsHubPage() {
     return (
@@ -96,10 +97,8 @@ export default function ToolsHubPage() {
             />
             <div className="flex max-w-[860px] flex-col items-start gap-4">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[44px] font-bold leading-none tracking-[-0.05em] md:text-[72px] md:leading-[0.98]">
-                    {page.h1}
-                </h1>
-                <p className="m-0 text-[16.5px] leading-normal text-body md:text-[19px] md:leading-[1.55]">
+                <PageTitle size="page">{page.h1}</PageTitle>
+                <p className="m-0 text-[16.5px] leading-normal text-mk-copy md:text-[19px] md:leading-[1.55]">
                     They run in your browser. No account, no watermark, nothing
                     sent to us. Start with the invoice generator.
                 </p>
@@ -113,7 +112,7 @@ export default function ToolsHubPage() {
 
             {GROUPS.map((group) => (
                 <section key={group.title} className="flex flex-col gap-[18px]">
-                    <h2 className="m-0 font-display text-2xl font-bold tracking-[-0.035em] md:text-[28px]">
+                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                         {group.title}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
@@ -122,7 +121,7 @@ export default function ToolsHubPage() {
                                 key={t.name}
                                 prefetch={false}
                                 href={t.href}
-                                className={`${CARD} border border-line bg-surface no-underline transition-colors duration-150 hover:border-ink`}
+                                className={`${CARD} border border-border bg-card no-underline transition-colors duration-150 hover:border-foreground`}
                             >
                                 <span className={NAME}>
                                     {t.name}
@@ -135,8 +134,8 @@ export default function ToolsHubPage() {
                 </section>
             ))}
 
-            <section className="flex flex-col justify-between gap-3 border-t border-line pt-7 md:flex-row md:items-center md:gap-6">
-                <p className="m-0 text-[17px] text-body">
+            <section className="flex flex-col justify-between gap-3 border-t border-border pt-7 md:flex-row md:items-center md:gap-6">
+                <p className="m-0 text-[17px] text-mk-copy">
                     Looking for a ready-made file instead? Invoices, quotes and
                     receipts in PDF, Word, Google Docs and Sheets.
                 </p>

@@ -1,15 +1,18 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { EntryBody, EntryMeta } from "@/components/content/changelog-entry";
+import {
+    ChangelogBand,
+    EntryBody,
+    EntryMeta,
+} from "@/components/content/changelog-entry";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
-import { CtaBand } from "@/components/shared/cta-band";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CHANGELOG, changelogPath } from "@/content/changelog";
 import { articleSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
-import { signupHref } from "@/site.config";
 
 export const dynamicParams = false;
 
@@ -42,20 +45,10 @@ export default async function Page({ params }: Props) {
                 <div className="flex items-center gap-2.5">
                     <EntryMeta entry={entry} />
                 </div>
-                <h1 className="m-0 font-display text-[34px] font-bold leading-none tracking-[-0.045em] md:text-[56px]">
-                    {page.h1}
-                </h1>
+                <PageTitle size="article">{page.h1}</PageTitle>
                 <EntryBody entry={entry} />
             </div>
-            <div className="pt-10 md:pt-16">
-                <CtaBand
-                    title="We ship every week."
-                    line="Try what's new on the free plan."
-                    action="Start free"
-                    href={signupHref("changelog")}
-                    from="start-free-band"
-                />
-            </div>
+            <ChangelogBand />
         </div>
     );
 }

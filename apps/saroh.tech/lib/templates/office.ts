@@ -1,6 +1,8 @@
 import { crc32, deflateRawSync } from "node:zlib";
 
+import { esc } from "@/lib/escape-xml";
 import type { DocumentView } from "@/lib/tools/document";
+import { columnsOf } from "@/lib/tools/document";
 import { parseNumber } from "@/lib/tools/money";
 
 /**
@@ -11,13 +13,6 @@ const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 const PKG = "http://schemas.openxmlformats.org/package/2006";
 const DOC_REL =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
-const esc = (s: string) =>
-    s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
 
 /** A zip with fixed dates, so a run writes the same bytes. */
 export function zip(parts: Record<string, string>): Buffer {
@@ -128,17 +123,7 @@ export function docx(v: DocumentView, paper: Paper = "a4"): Buffer {
     const { w, h } = PAGE[paper];
     const width = w - 2 * MARGIN;
     const head = headersOf(v);
-    const columns = [
-        ...v.parties,
-        ...(v.facts.length
-            ? [
-                  {
-                      label: "",
-                      lines: v.facts.map((f) => `${f.label}: ${f.value}`),
-                  },
-              ]
-            : []),
-    ];
+    const columns = columnsOf(v);
     const third = Math.floor(width / columns.length);
     const rowWidths = [width - 3400, 1200, 1100, 1100];
     const body = [

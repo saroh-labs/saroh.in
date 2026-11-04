@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -24,10 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return pageMetadata(pageOf(`/compare/${(await params).slug}`));
 }
 
-const H2 =
-    "m-0 font-display text-[28px] font-bold leading-[1.05] tracking-[-0.045em] md:text-[40px]";
-const CARD_TITLE =
-    "font-display text-[22px] font-bold tracking-[-0.03em] md:text-[26px]";
+const H2 = "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+const CARD_TITLE = "font-display text-mk-card-lg font-bold [text-wrap:balance]";
 const LIST =
     "m-0 flex list-disc flex-col gap-2 pl-[22px] text-[17px] leading-[1.55]";
 
@@ -78,14 +77,12 @@ export default async function Page({ params }: Props) {
             <JsonLd data={[faqSchema(questions), ...pageSchema(page)]} />
             <section className="flex max-w-[920px] flex-col gap-[18px]">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[38px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[72px]">
-                    {page.h1}
-                </h1>
-                <p className="m-0 text-[17px] leading-[1.6] text-body md:text-[19px]">
+                <PageTitle size="article">{page.h1}</PageTitle>
+                <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-[19px]">
                     What Saroh does today and what it doesn&apos;t, so you can
                     set it beside {name} yourself.
                 </p>
-                <p className="m-0 text-sm text-quiet">
+                <p className="m-0 text-sm text-muted-foreground">
                     We state nothing about {name} here: we haven&apos;t checked
                     its public pages yet. {name} is a trademark of its owner.
                     Saroh is not connected to them.
@@ -93,7 +90,7 @@ export default async function Page({ params }: Props) {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2 md:gap-6">
-                <Card className="!border-2 !border-ink !p-5 md:!p-7">
+                <Card className="!border-2 !border-foreground !p-5 md:!p-7">
                     <h2 className={`${CARD_TITLE} m-0`}>
                         What Saroh does today
                     </h2>

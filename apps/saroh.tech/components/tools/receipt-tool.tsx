@@ -13,7 +13,7 @@ import { CURRENCY_OPTIONS } from "@/lib/tools/money";
 import type { ReceiptDraft } from "@/lib/tools/receipt";
 import { applyReceiptCarry, PAID_BY, receiptView } from "@/lib/tools/receipt";
 
-import { DownloadProblem, useDownload } from "./document-actions";
+import { DownloadProblem, SavedNote, useDownload } from "./document-actions";
 import { FROM_KEY } from "./document-editor";
 import { DocumentPreview } from "./document-preview";
 import { DateField, Section, SelectField } from "./fields";
@@ -131,7 +131,7 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
                             type="checkbox"
                             checked={d.showTax}
                             onChange={(e) => set({ showTax: e.target.checked })}
-                            className="size-5 accent-ink"
+                            className="size-5 accent-foreground"
                         />
                         Show tax included
                     </label>
@@ -159,22 +159,16 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
             </div>
             <aside className="flex min-w-0 flex-col gap-3.5 print:!flex">
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-quiet">Preview</span>
-                    <span className="flex items-center gap-2 text-[13px] text-quiet">
-                        {d.savedAt
-                            ? `Saved in this browser · ${d.savedAt}`
-                            : "Stays in this browser"}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                clearDraft();
-                                clearFrom();
-                            }}
-                            className="min-h-11 cursor-pointer border-0 bg-transparent p-0 font-sans text-[13px] text-ink underline md:min-h-0"
-                        >
-                            Clear
-                        </button>
+                    <span className="text-[13px] text-muted-foreground">
+                        Preview
                     </span>
+                    <SavedNote
+                        savedAt={d.savedAt}
+                        onClear={() => {
+                            clearDraft();
+                            clearFrom();
+                        }}
+                    />
                 </div>
                 <DocumentPreview view={view} />
                 <DownloadProblem problem={problem} />

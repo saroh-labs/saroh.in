@@ -15,7 +15,10 @@ export function Field({
             <span className="text-[13px] font-semibold">
                 {label}
                 {hint ? (
-                    <span className="font-normal text-quiet"> {hint}</span>
+                    <span className="font-normal text-muted-foreground">
+                        {" "}
+                        {hint}
+                    </span>
                 ) : null}
             </span>
             <input className={INPUT_CLASS} {...props} />

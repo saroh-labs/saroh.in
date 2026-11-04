@@ -1,6 +1,7 @@
 import type { jsPDF as JsPdf } from "jspdf";
 
 import type { DocumentView } from "./document";
+import { columnsOf } from "./document";
 
 /**
  * The PDF's built-in font draws Western European characters only. A name in
@@ -78,17 +79,7 @@ export function drawPdf(
     y += bold ? 80 : compact ? 64 : 76;
 
     const col = (right - MARGIN) / 3;
-    const columns = [
-        ...v.parties,
-        ...(v.facts.length
-            ? [
-                  {
-                      label: "",
-                      lines: v.facts.map((f) => `${f.label}: ${f.value}`),
-                  },
-              ]
-            : []),
-    ];
+    const columns = columnsOf(v);
     let tallest = 0;
     columns.forEach((c, i) => {
         const x = MARGIN + i * col;

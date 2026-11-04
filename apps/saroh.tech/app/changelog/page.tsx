@@ -1,10 +1,10 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 
+import { ChangelogBand } from "@/components/content/changelog-entry";
 import { ChangelogList } from "@/components/content/changelog-list";
-import { CtaBand } from "@/components/shared/cta-band";
 import { canonicalOf, pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
-import { signupHref } from "@/site.config";
 
 const page = pageOf("/changelog");
 const base = pageMetadata(page);
@@ -26,10 +26,8 @@ export default function Page() {
         >
             <div className="flex max-w-[940px] flex-col gap-6">
                 <div className="flex flex-col gap-3.5">
-                    <h1 className="m-0 font-display text-[38px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[72px]">
-                        {page.h1}
-                    </h1>
-                    <p className="m-0 text-[17px] leading-[1.6] text-body md:text-[19px]">
+                    <PageTitle size="page">{page.h1}</PageTitle>
+                    <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-[19px]">
                         Every change to Saroh, newest first. <b>Global</b> means
                         saroh.tech only. <b>Both</b> means saroh.tech and
                         saroh.in.
@@ -37,15 +35,7 @@ export default function Page() {
                 </div>
                 <ChangelogList />
             </div>
-            <div className="pt-10 md:pt-16">
-                <CtaBand
-                    title="We ship every week."
-                    line="Try what's new on the free plan."
-                    action="Start free"
-                    href={signupHref("changelog")}
-                    from="start-free-band"
-                />
-            </div>
+            <ChangelogBand />
         </div>
     );
 }

@@ -333,3 +333,16 @@ export function applyCarry(d: DocDraft, carry: unknown): Partial<DocDraft> {
     if (typeof c.depositPaid === "string") patch.depositPaid = c.depositPaid;
     return patch;
 }
+
+/** The columns over a document's lines: who it's between, then its facts. */
+export const columnsOf = (v: DocumentView) => [
+    ...v.parties,
+    ...(v.facts.length
+        ? [
+              {
+                  label: "",
+                  lines: v.facts.map((f) => `${f.label}: ${f.value}`),
+              },
+          ]
+        : []),
+];

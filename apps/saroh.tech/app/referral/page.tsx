@@ -8,6 +8,7 @@ import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { site } from "@/site.config";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 const page = pageOf("/referral");
 
@@ -34,10 +35,9 @@ const RULES = [
     "Can I refer myself or a second business?",
 ].map((question) => ({ question, answer: TBC }));
 
-const H2 =
-    "m-0 font-display text-[30px] font-bold leading-[1.05] tracking-[-0.045em] md:text-[40px]";
-const HINT = "text-sm text-quiet";
-const OUTLINE = buttonClass("secondary", "bg-surface");
+const H2 = "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+const HINT = "text-sm text-muted-foreground";
+const OUTLINE = buttonClass("secondary", "bg-card");
 
 export default function ReferralPage() {
     return (
@@ -48,10 +48,8 @@ export default function ReferralPage() {
             <JsonLd data={pageSchema(page)} />
             <section className="grid items-center gap-8 xl:grid-cols-[minmax(0,1fr)_520px] xl:gap-16">
                 <div className="flex flex-col items-start gap-5">
-                    <h1 className="m-0 font-display text-[46px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[84px] md:leading-[0.96]">
-                        {page.h1}
-                    </h1>
-                    <p className="m-0 text-[17px] leading-[1.6] text-body md:text-xl">
+                    <PageTitle size="page">{page.h1}</PageTitle>
+                    <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-xl">
                         Know another freelancer or small business who could use
                         Saroh? Share your link.
                     </p>
@@ -69,16 +67,16 @@ export default function ReferralPage() {
                 <Card
                     role="img"
                     aria-label="Your referral link card as it looks in Settings"
-                    className="!gap-4 !border-ink !p-5 md:!p-7"
+                    className="!gap-4 !border-foreground !p-5 md:!p-7"
                 >
-                    <span className="text-xs font-semibold uppercase tracking-[.08em] text-quiet">
+                    <span className="text-xs font-semibold uppercase tracking-[.08em] text-muted-foreground">
                         In Settings › Referral
                     </span>
-                    <span className="font-display text-[22px] font-bold tracking-[-0.03em]">
+                    <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
                         Your link
                     </span>
                     <div className="flex gap-2">
-                        <span className="flex h-11 min-w-0 flex-1 items-center rounded-control border border-control px-3.5 font-mono text-sm">
+                        <span className="flex h-11 min-w-0 flex-1 items-center rounded-mk-control border border-border-strong px-3.5 font-mono text-sm">
                             saroh.tech/r/lumen
                         </span>
                         <span className={OUTLINE}>Copy</span>
@@ -112,10 +110,10 @@ export default function ReferralPage() {
                                 <span className={`font-mono ${HINT}`}>
                                     {String(i + 1).padStart(2, "0")}
                                 </span>
-                                <span className="font-display text-[22px] font-bold tracking-[-0.03em]">
+                                <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
                                     {s.title}
                                 </span>
-                                <p className="m-0 text-base leading-[1.6] text-body">
+                                <p className="m-0 text-base leading-[1.6] text-mk-copy">
                                     {s.line}
                                 </p>
                             </Card>

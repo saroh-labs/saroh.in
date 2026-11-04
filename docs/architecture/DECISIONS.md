@@ -2719,6 +2719,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 **Free's limits on /pricing (4 Nov, owner).** Paid plans come later, and Free keeps the limits it already has. So until the USD catalogue exists, Free's card on saroh.tech reads Free's own rows from the published catalogue at build (`apps/saroh.tech/lib/plans.ts`), and nothing else in it: no price, no paid plan. With no catalogue at build, the card keeps its general lines and footnote.
 
+**The free tools and the claims check (4 Nov, owner).** saroh.tech says only what's verified, and `apps/saroh.tech/scripts/check-claims.mjs` runs as `postbuild`, so a phrase the product can't back fails the build, in CI's Build job too. A tool's sign-up goes to the real sign-up with the tool's `src`: the app has no import page, so a draft stays in the browser and no line says otherwise. This departs from the plan's "destinations stay". Comparison pages state Saroh's side only, until a fact about another tool has its own public page and a date.
+
 ## DEC-204 Two editions from one codebase: one database, the business decides
 
 **Status: Accepted — 2026-11-02** · owner

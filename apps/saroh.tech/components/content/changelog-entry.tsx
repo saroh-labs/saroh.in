@@ -1,24 +1,26 @@
 import Link from "next/link";
 
 import { ConfirmTag } from "@/components/shared/confirm-tag";
+import { CtaBand } from "@/components/shared/cta-band";
 import type { ChangelogEntry } from "@/content/changelog";
 import { placeholders } from "@/content/placeholders";
 import { formatDate } from "@/lib/tools/dates";
+import { signupHref } from "@/site.config";
 
 export function EntryMeta({ entry }: { entry: ChangelogEntry }) {
     return (
         <>
             <time
                 dateTime={entry.date}
-                className="font-mono text-sm text-quiet"
+                className="font-mono text-sm text-muted-foreground"
             >
                 {formatDate(entry.date)}
             </time>
             <span
                 className={`self-start rounded-full border px-[9px] py-[3px] text-[11px] font-semibold uppercase tracking-[0.08em] ${
                     entry.tag === "Global"
-                        ? "border-ink bg-ink text-paper"
-                        : "border-ink text-ink"
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-foreground text-foreground"
                 }`}
             >
                 {entry.tag}
@@ -31,7 +33,7 @@ export function EntryMeta({ entry }: { entry: ChangelogEntry }) {
 export function EntryBody({ entry }: { entry: ChangelogEntry }) {
     return (
         <>
-            <p className="m-0 text-[17px] leading-[1.6] text-body">
+            <p className="m-0 text-[17px] leading-[1.6] text-mk-copy">
                 {entry.summary}
             </p>
             {entry.example ? (
@@ -49,5 +51,19 @@ export function EntryBody({ entry }: { entry: ChangelogEntry }) {
                 </Link>
             ) : null}
         </>
+    );
+}
+
+export function ChangelogBand() {
+    return (
+        <div className="pt-10 md:pt-16">
+            <CtaBand
+                title="See what's new in Saroh."
+                line="Try what's new on the free plan."
+                action="Start free"
+                href={signupHref("changelog")}
+                from="start-free-band"
+            />
+        </div>
     );
 }

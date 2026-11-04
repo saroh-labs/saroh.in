@@ -1,16 +1,9 @@
 import type { ChangelogEntry } from "@/content/changelog";
 import { changelogPath } from "@/content/changelog";
+import { esc } from "@/lib/escape-xml";
 import { site } from "@/site.config";
 
 import { canonicalOf } from "./seo";
-
-const esc = (s: string) =>
-    s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
 
 const rfc822 = (date: string) => new Date(`${date}T00:00:00Z`).toUTCString();
 

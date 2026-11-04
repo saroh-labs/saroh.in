@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -8,13 +9,13 @@ import type { SitePage } from "@/lib/site-map";
 
 import { ContactCard } from "./contact-card";
 
-const COPY = "m-0 text-[17px] leading-relaxed text-body";
+const COPY = "m-0 text-[17px] leading-relaxed text-mk-copy";
 
 function Section({ section }: { section: LegalSection }) {
     const { title, paragraphs, items, table, links } = section;
     return (
         <section className="flex flex-col gap-3">
-            <h2 className="m-0 font-display text-2xl font-bold tracking-[-0.04em] md:text-[28px]">
+            <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                 {title}
             </h2>
             {paragraphs?.map((text) => (
@@ -30,10 +31,10 @@ function Section({ section }: { section: LegalSection }) {
                 </ul>
             ) : null}
             {table ? (
-                <table className="w-full border-collapse text-left text-[15px] text-body">
+                <table className="w-full border-collapse text-left text-[15px] text-mk-copy">
                     <caption className="sr-only">{table.caption}</caption>
                     <thead>
-                        <tr className="border-b border-strong text-ink">
+                        <tr className="border-b border-border-strong text-foreground">
                             {table.head.map((h) => (
                                 <th
                                     key={h}
@@ -47,7 +48,7 @@ function Section({ section }: { section: LegalSection }) {
                     </thead>
                     <tbody>
                         {table.rows.map(([name, what, long]) => (
-                            <tr key={name} className="border-b border-line">
+                            <tr key={name} className="border-b border-border">
                                 <td className="py-3 pr-3 align-top font-mono text-[13px] [overflow-wrap:anywhere]">
                                     {name}
                                 </td>
@@ -87,16 +88,14 @@ export function LegalPage({
         >
             {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
             <div className="flex flex-col gap-2.5">
-                <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">
-                    {page.h1}
-                </h1>
-                <p className="m-0 text-[15px] text-quiet">
+                <PageTitle size="article">{page.h1}</PageTitle>
+                <p className="m-0 text-[15px] text-muted-foreground">
                     Last updated: <Marked text={placeholders.legalUpdated} />
                 </p>
             </div>
             <p
                 role="note"
-                className="m-0 max-w-[720px] rounded-card border border-saffron bg-saffron/10 px-5 py-4 text-[17px] leading-normal"
+                className="m-0 max-w-[720px] rounded-mk-card border border-brand-500 bg-brand-500/10 px-5 py-4 text-[17px] leading-normal"
             >
                 <b>Draft: not yet in force.</b> A lawyer hasn't read this page
                 yet. Marked words are still to be confirmed.
@@ -107,7 +106,7 @@ export function LegalPage({
                         <Section key={section.title} section={section} />
                     ))}
                 </div>
-                <aside className="lg:sticky lg:top-[calc(var(--st-header-h)+16px)] lg:self-start">
+                <aside className="lg:sticky lg:top-[calc(var(--mk-nav-h)+16px)] lg:self-start">
                     <ContactCard />
                 </aside>
             </div>

@@ -29,7 +29,12 @@ import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref, decodeDraft } from "@/lib/tools/handoff";
 import { CURRENCY_OPTIONS, formatMoney } from "@/lib/tools/money";
 
-import { DeskActions, DownloadProblem, useDownload } from "./document-actions";
+import {
+    DeskActions,
+    DownloadProblem,
+    SavedNote,
+    useDownload,
+} from "./document-actions";
 import { DocumentPreview } from "./document-preview";
 import { DateField, Section, SelectField, TextArea } from "./fields";
 import { FromSection, NO_FROM } from "./from-section";
@@ -187,7 +192,7 @@ export function DocumentEditor({
                                     { value: "estimate", label: "Estimate" },
                                 ]}
                             />
-                            <span className="text-[13px] text-quiet">
+                            <span className="text-[13px] text-muted-foreground">
                                 A quote is a fixed price. An estimate is your
                                 best guess and can change.{" "}
                                 <Link
@@ -278,7 +283,7 @@ export function DocumentEditor({
                                 aria-label="Payment terms"
                                 className="flex flex-wrap items-center gap-2"
                             >
-                                <span className="text-[13px] text-quiet">
+                                <span className="text-[13px] text-muted-foreground">
                                     Payment terms
                                 </span>
                                 {(Object.keys(TERM_LABELS) as Terms[]).map(
@@ -299,14 +304,14 @@ export function DocumentEditor({
                     <Section
                         title={invoice ? "Items" : "Work and prices"}
                         aside={
-                            <span className="text-[13px] text-quiet md:hidden">
+                            <span className="text-[13px] text-muted-foreground md:hidden">
                                 {d.items.length}
                             </span>
                         }
                     >
                         <div
                             aria-hidden="true"
-                            className="hidden grid-cols-[minmax(0,1fr)_70px_110px_110px_28px] gap-2.5 text-xs font-semibold uppercase tracking-[.08em] text-quiet md:grid"
+                            className="hidden grid-cols-[minmax(0,1fr)_70px_110px_110px_28px] gap-2.5 text-xs font-semibold uppercase tracking-[.08em] text-muted-foreground md:grid"
                         >
                             <span>Description</span>
                             <span>Qty</span>
@@ -325,7 +330,7 @@ export function DocumentEditor({
                                         <button
                                             type="button"
                                             onClick={() => setOpenItem(item.id)}
-                                            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-0 text-left font-sans text-[15px] text-ink md:hidden"
+                                            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-0 text-left font-sans text-[15px] text-foreground md:hidden"
                                         >
                                             <span>
                                                 {item.description} · {item.qty}{" "}
@@ -393,7 +398,7 @@ export function DocumentEditor({
                                                     ),
                                                 })
                                             }
-                                            className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink disabled:cursor-default disabled:opacity-30 md:h-10"
+                                            className="h-11 cursor-pointer border-0 bg-transparent text-lg text-foreground disabled:cursor-default disabled:opacity-30 md:h-10"
                                         >
                                             ×
                                         </button>
@@ -467,13 +472,13 @@ export function DocumentEditor({
                                             ),
                                         })
                                     }
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
+                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-foreground md:h-10"
                                 >
                                     ×
                                 </button>
                             </div>
                         ))}
-                        <span className="text-[13px] text-quiet">
+                        <span className="text-[13px] text-muted-foreground">
                             You choose the rate.{" "}
                             <Link
                                 prefetch={false}
@@ -507,7 +512,7 @@ export function DocumentEditor({
                                     type="button"
                                     aria-label="Remove discount"
                                     onClick={() => set({ discount: null })}
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
+                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-foreground md:h-10"
                                 >
                                     ×
                                 </button>
@@ -527,7 +532,7 @@ export function DocumentEditor({
                                     type="button"
                                     aria-label="Remove deposit paid"
                                     onClick={() => set({ depositPaid: null })}
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
+                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-foreground md:h-10"
                                 >
                                     ×
                                 </button>
@@ -654,7 +659,7 @@ export function DocumentEditor({
                                         onChange={(e) =>
                                             set({ signLine: e.target.checked })
                                         }
-                                        className="size-5 accent-ink"
+                                        className="size-5 accent-foreground"
                                     />
                                     Add a line for the client to sign
                                 </label>
@@ -684,21 +689,13 @@ export function DocumentEditor({
                                 </Chip>
                             ))}
                         </div>
-                        <span className="flex items-center gap-2 text-[13px] text-quiet">
-                            {d.savedAt
-                                ? `Saved in this browser · ${d.savedAt}`
-                                : "Stays in this browser"}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    clearDraft();
-                                    clearFrom();
-                                }}
-                                className="min-h-11 cursor-pointer border-0 bg-transparent p-0 font-sans text-[13px] text-ink underline md:min-h-0"
-                            >
-                                Clear
-                            </button>
-                        </span>
+                        <SavedNote
+                            savedAt={d.savedAt}
+                            onClear={() => {
+                                clearDraft();
+                                clearFrom();
+                            }}
+                        />
                     </div>
                     <DocumentPreview view={view} />
                     <div className="hidden flex-col gap-3.5 lg:flex">
@@ -713,9 +710,11 @@ export function DocumentEditor({
                 </aside>
             </div>
 
-            <div className="sticky bottom-2 z-10 flex flex-col gap-2.5 rounded-card border border-[rgba(28,28,26,.2)] bg-surface p-3 shadow-[0_-8px_24px_-12px_rgba(28,28,26,.25)] lg:hidden print:hidden">
+            <div className="sticky bottom-2 z-10 flex flex-col gap-2.5 rounded-mk-card border border-border-strong bg-card p-3 shadow-mk-panel lg:hidden print:hidden">
                 <div className="flex items-baseline justify-between px-1">
-                    <span className="text-[13px] text-quiet">{totalLabel}</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {totalLabel}
+                    </span>
                     <span
                         className="font-mono text-[17px] font-semibold"
                         aria-live="polite"

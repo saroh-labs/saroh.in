@@ -1,20 +1,4 @@
-/*
- * saroh.in's tokens (@saroh/marketing/tokens.css, @saroh/ui/globals.css) under
- * the boards' colour names, so every page takes them at once. The names go in U9.
- */
-:root {
-    color-scheme: light;
-    --st-paper: var(--background);
-    --st-ink: var(--foreground);
-    --st-body: var(--mk-body);
-    --st-quiet: var(--muted-foreground);
-    --st-saffron: var(--brand-500);
-    --st-saffron-text: var(--brand-700);
-    --st-surface: var(--card);
-    /* The sticky header's height: what sticks or lands below it reads this. */
-    --st-header-h: var(--mk-nav-h);
-}
-
+/* The phone nav and page basics. Tokens are saroh.in's: @saroh/marketing/tokens.css, @saroh/ui/globals.css. */
 /* The phone nav runs to 1100px here, not saroh.in's 760: six items don't fit. */
 @media (max-width: 1099.98px) {
     :root {

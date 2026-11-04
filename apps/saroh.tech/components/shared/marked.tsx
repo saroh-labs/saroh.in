@@ -4,7 +4,7 @@ export function Marked({ text }: { text: string }) {
         i % 2 ? (
             <mark
                 key={i}
-                className="rounded bg-[#F7E8D2] px-1 font-medium text-saffron-text"
+                className="rounded bg-mk-soon px-1 font-medium text-brand-700"
             >
                 {part}
             </mark>

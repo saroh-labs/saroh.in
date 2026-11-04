@@ -125,9 +125,11 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                 <section
                     aria-live="polite"
                     aria-label="Late fee"
-                    className="flex flex-col gap-2 rounded-card border border-ink bg-surface p-4 md:p-6"
+                    className="flex flex-col gap-2 rounded-mk-card border border-foreground bg-card p-4 md:p-6"
                 >
-                    <span className="text-[13px] text-quiet">Late fee</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        Late fee
+                    </span>
                     <span className="font-mono text-4xl font-semibold tracking-tight">
                         {money(r.fee)}
                     </span>
@@ -139,15 +141,15 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                         ].map(([label, value]) => (
                             <div
                                 key={label}
-                                className="flex justify-between gap-3 border-t border-line py-2.5"
+                                className="flex justify-between gap-3 border-t border-border py-2.5"
                             >
                                 <span>{label}</span>
                                 <span className="font-mono">{value}</span>
                             </div>
                         ))}
                     </div>
-                    <div className="rounded-control bg-paper p-3 text-[15px]">
-                        <span className="text-[13px] text-quiet">
+                    <div className="rounded-mk-control bg-background p-3 text-[15px]">
+                        <span className="text-[13px] text-muted-foreground">
                             Line to add to the invoice
                         </span>
                         <br />
@@ -179,7 +181,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                     </div>
                 </section>
                 <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
-                <p className="m-0 rounded-card border border-line bg-surface p-4 text-[15px] leading-normal">
+                <p className="m-0 rounded-mk-card border border-border bg-card p-4 text-[15px] leading-normal">
                     <b>Before you charge it</b>
                     <br />
                     Only add a late fee if your terms said so before the work

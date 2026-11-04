@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -17,10 +18,11 @@ import {
 } from "@/lib/schema";
 import type { SitePage } from "@/lib/site-map";
 
-const LABEL = "text-xs font-semibold uppercase tracking-[0.08em] text-quiet";
-const COPY = "m-0 text-[17px] leading-[1.7] text-[#2B2A27] md:text-lg";
+const LABEL =
+    "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const COPY = "m-0 text-[17px] leading-[1.7] text-mk-prose md:text-lg";
 const H2 =
-    "m-0 mb-3 mt-9 scroll-mt-[calc(var(--st-header-h)+16px)] font-display text-[26px] font-bold leading-[1.1] tracking-[-0.035em] md:mt-11 md:text-[32px]";
+    "m-0 mb-3 mt-9 scroll-mt-[calc(var(--mk-nav-h)+16px)] font-display text-mk-h2-article font-bold md:mt-11 [text-wrap:balance]";
 
 function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
     switch (block.kind) {
@@ -47,15 +49,15 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
             );
         case "steps":
             return (
-                <ol className="m-0 list-none border-b border-line p-0">
+                <ol className="m-0 list-none border-b border-border p-0">
                     {block.items.map((step, i) => (
                         <li
                             key={step.title}
-                            className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 border-t border-line py-[18px]"
+                            className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 border-t border-border py-[18px]"
                         >
                             <span
                                 aria-hidden="true"
-                                className="flex size-9 items-center justify-center rounded-full border-[1.9px] border-ink font-mono text-sm"
+                                className="flex size-9 items-center justify-center rounded-full border-[1.9px] border-foreground font-mono text-sm"
                             >
                                 {i + 1}
                             </span>
@@ -72,7 +74,7 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
                 <div
                     role="img"
                     aria-label={block.label}
-                    className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5 rounded-[14px] border border-line bg-surface px-[22px] py-5 text-[15.5px] leading-normal"
+                    className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5 rounded-mk-card border border-border bg-card px-[22px] py-5 text-[15.5px] leading-normal"
                 >
                     {block.rows.map(([name, amount]) => (
                         <div key={name} className="contents">
@@ -82,17 +84,17 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
                             </span>
                         </div>
                     ))}
-                    <b className="border-t border-ink pt-1.5">
+                    <b className="border-t border-foreground pt-1.5">
                         {block.total[0]}
                     </b>
-                    <b className="border-t border-ink pl-6 pt-1.5 text-right font-mono">
+                    <b className="border-t border-foreground pl-6 pt-1.5 text-right font-mono">
                         {block.total[1]}
                     </b>
                 </div>
             );
         case "message":
             return (
-                <figure className="m-0 mb-3 rounded-[14px] border border-line bg-surface px-[22px] py-5">
+                <figure className="m-0 mb-3 rounded-mk-card border border-border bg-card px-[22px] py-5">
                     <figcaption className={`${LABEL} mb-2`}>
                         {block.title}
                     </figcaption>
@@ -103,7 +105,7 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
             );
         case "table":
             return (
-                <div className="mb-4 overflow-hidden rounded-[14px] border border-line bg-surface">
+                <div className="mb-4 overflow-hidden rounded-mk-card border border-border bg-card">
                     <table className="w-full border-collapse text-[14.5px] leading-[1.45] md:text-base">
                         <thead>
                             <tr>
@@ -111,7 +113,7 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
                                     <th
                                         key={h}
                                         scope="col"
-                                        className="border-b border-strong p-3 text-left text-[13px] font-semibold text-quiet md:px-5 md:py-4"
+                                        className="border-b border-border-strong p-3 text-left text-[13px] font-semibold text-muted-foreground md:px-5 md:py-4"
                                     >
                                         {h || (
                                             <span className="sr-only">
@@ -126,7 +128,7 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
                             {block.rows.map(([first, ...rest]) => (
                                 <tr
                                     key={first}
-                                    className="border-b border-line last:border-b-0"
+                                    className="border-b border-border last:border-b-0"
                                 >
                                     <th
                                         scope="row"
@@ -167,19 +169,19 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
             );
         case "tool":
             return (
-                <div className="my-8 flex flex-col gap-5 rounded-[18px] bg-ink px-7 py-[26px] text-paper md:flex-row md:items-center md:justify-between md:gap-6">
+                <div className="my-8 flex flex-col gap-5 rounded-[18px] bg-foreground px-7 py-[26px] text-background md:flex-row md:items-center md:justify-between md:gap-6">
                     <div>
                         <b className="font-display text-xl tracking-[-0.02em]">
                             {block.title}
                         </b>
-                        <p className="m-0 mt-1.5 text-base text-[#D8D5CC]">
+                        <p className="m-0 mt-1.5 text-base text-mk-on-ink">
                             {block.line}
                         </p>
                     </div>
                     <ButtonLink
                         href={guide.tool.href}
                         data-cta="guide-tool"
-                        className="shrink-0 whitespace-normal !bg-paper text-center !text-ink hover:!bg-white md:whitespace-nowrap"
+                        className="shrink-0 whitespace-normal !bg-background text-center !text-foreground hover:!bg-white md:whitespace-nowrap"
                     >
                         Try the {guide.tool.name}
                     </ButtonLink>
@@ -210,11 +212,11 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                     ...pageSchema(page),
                 ]}
             />
-            <div className="grid gap-10 xl:grid-cols-[240px_minmax(0,720px)_minmax(0,1fr)] xl:gap-16">
+            <div className="grid gap-10 xl:grid-cols-[200px_minmax(0,1fr)_200px] xl:gap-10">
                 <div className="hidden pt-[210px] xl:block">
                     <nav
                         aria-label="On this page"
-                        className="sticky top-[calc(var(--st-header-h)+16px)]"
+                        className="sticky top-[calc(var(--mk-nav-h)+16px)]"
                     >
                         <span className={LABEL}>On this page</span>
                         <ul className="m-0 mt-2 list-none p-0">
@@ -222,7 +224,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                                 <li key={t.id}>
                                     <a
                                         href={`#${t.id}`}
-                                        className="block py-[7px] text-[15px] text-body no-underline hover:underline"
+                                        className="block py-[7px] text-[15px] text-mk-copy no-underline hover:underline"
                                     >
                                         {t.title}
                                     </a>
@@ -234,13 +236,13 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
 
                 <article className="min-w-0">
                     {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                    <h1 className="m-0 mb-4 mt-3.5 font-display text-[38px] font-bold leading-none tracking-[-0.05em] md:text-[64px]">
+                    <PageTitle size="article" className="mb-4 mt-3.5">
                         {page.h1}
-                    </h1>
-                    <div className="mb-7 flex flex-wrap items-center gap-3 text-sm text-quiet">
+                    </PageTitle>
+                    <div className="mb-7 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <span
                             aria-hidden="true"
-                            className="inline-block size-8 rounded-full bg-[#EAE6DE]"
+                            className="inline-block size-8 rounded-full bg-mk-hover"
                         />
                         <ConfirmTag>{placeholders.guideAuthor}</ConfirmTag>
                         <span>{readMinutes(guide)} min read</span>
@@ -248,7 +250,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
 
                     <div
                         id="short-answer"
-                        className="mb-2 scroll-mt-[calc(var(--st-header-h)+16px)] rounded-card border border-ink bg-surface px-6 py-[22px]"
+                        className="mb-2 scroll-mt-[calc(var(--mk-nav-h)+16px)] rounded-mk-card border border-foreground bg-card px-6 py-[22px]"
                     >
                         <span className={LABEL}>The short answer</span>
                         <p className="m-0 mt-2 text-lg leading-relaxed">
@@ -273,7 +275,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                         </h2>
                         <FaqList items={guide.faqs} />
                     </section>
-                    <p className="m-0 mt-6 text-sm text-quiet">
+                    <p className="m-0 mt-6 text-sm text-muted-foreground">
                         This guide is general information, not tax or legal
                         advice.
                     </p>
@@ -288,10 +290,10 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                                 key={slug}
                                 prefetch={false}
                                 href={`/guides/${slug}`}
-                                className="flex flex-col rounded-[14px] border border-line bg-surface p-4 no-underline transition-colors duration-150 hover:border-strong"
+                                className="flex flex-col rounded-mk-card border border-border bg-card p-4 no-underline transition-colors duration-150 hover:border-border-strong"
                             >
                                 <b>{title}</b>
-                                <span className="text-sm text-quiet">
+                                <span className="text-sm text-muted-foreground">
                                     {line}
                                 </span>
                             </Link>

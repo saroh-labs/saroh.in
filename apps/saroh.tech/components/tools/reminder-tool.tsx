@@ -126,7 +126,7 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                         onChange={(e) => set({ payLink: e.target.value })}
                     />
                     {d.wasDue ? (
-                        <span className="text-[13px] text-quiet">
+                        <span className="text-[13px] text-muted-foreground">
                             {late > 0
                                 ? `${late} day${late === 1 ? "" : "s"} overdue`
                                 : "Not overdue yet"}
@@ -156,11 +156,11 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                 <section
                     aria-live="polite"
                     aria-label="Your message"
-                    className="flex flex-col gap-3 rounded-card border border-ink bg-surface p-4 text-[15.5px] leading-normal md:p-6"
+                    className="flex flex-col gap-3 rounded-mk-card border border-foreground bg-card p-4 text-[15.5px] leading-normal md:p-6"
                 >
                     {email ? (
                         <div>
-                            <span className="text-[13px] text-quiet">
+                            <span className="text-[13px] text-muted-foreground">
                                 Subject
                             </span>
                             <br />
@@ -192,7 +192,7 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                         {email ? "Open in my email" : "Open WhatsApp"}
                     </a>
                 </div>
-                <span className="text-[13px] text-quiet">
+                <span className="text-[13px] text-muted-foreground">
                     Opens your own app with the message filled in. You tap send.
                 </span>
                 <NextStepCard copy={copy} tool={TOOL} done={moment.done} />

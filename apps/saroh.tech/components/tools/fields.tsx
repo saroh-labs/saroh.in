@@ -18,7 +18,7 @@ export function Section({
     children: ReactNode;
 }) {
     return (
-        <section className="flex flex-col gap-3.5 rounded-card border border-line bg-surface p-4 md:px-6 md:py-[22px]">
+        <section className="flex flex-col gap-3.5 rounded-mk-card border border-border bg-card p-4 md:px-6 md:py-[22px]">
             <div className="flex items-center justify-between gap-3">
                 <h2 className="m-0 font-display text-lg font-semibold tracking-[-0.02em]">
                     {title}
@@ -35,7 +35,10 @@ export function LabelText({ text, hint }: { text: string; hint?: string }) {
         <span className="text-[13px] font-semibold">
             {text}
             {hint ? (
-                <span className="font-normal text-quiet"> {hint}</span>
+                <span className="font-normal text-muted-foreground">
+                    {" "}
+                    {hint}
+                </span>
             ) : null}
         </span>
     );
@@ -106,7 +109,7 @@ export function DateField({
                 id={id}
                 value={value}
                 onValueChange={onChange}
-                className="h-11 w-full rounded-control border-control bg-surface font-sans text-base font-normal text-ink shadow-none md:h-10 md:text-[15px]"
+                className="h-11 w-full rounded-mk-control border-border-strong bg-card font-sans text-base font-normal text-foreground shadow-none md:h-10 md:text-[15px]"
             />
         </div>
     );

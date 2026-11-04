@@ -10,6 +10,7 @@ import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { signupHref } from "@/site.config";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 const page = pageOf("/help");
 
@@ -24,17 +25,15 @@ export default function Page() {
             <JsonLd data={[...pageSchema(page), faqSchema(HELP_FAQS)]} />
             <div className="flex flex-col gap-4">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">
-                    {page.h1}
-                </h1>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-body md:text-[19px]">
+                <PageTitle size="page">{page.h1}</PageTitle>
+                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
                     {page.description}
                 </p>
             </div>
 
             {HELP_GROUPS.map((group) => (
                 <section key={group} className="flex flex-col gap-4">
-                    <h2 className="m-0 font-display text-2xl font-bold tracking-[-0.04em] md:text-[32px]">
+                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                         {group}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2 md:gap-6 xl:grid-cols-3">

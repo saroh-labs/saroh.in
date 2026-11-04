@@ -67,9 +67,9 @@ export function NextStepCard({
     const onClick = started(tool);
     if (!done && copy.quiet) {
         return (
-            <div className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-4 md:px-[22px] md:py-5">
+            <div className="flex flex-col gap-1.5 rounded-mk-card border border-border bg-card p-4 md:px-[22px] md:py-5">
                 <b className="text-[15.5px]">{copy.quiet.title}</b>
-                <span className="text-[15px] leading-normal text-body">
+                <span className="text-[15px] leading-normal text-mk-copy">
                     {copy.quiet.line}
                 </span>
                 <a
@@ -83,18 +83,20 @@ export function NextStepCard({
         );
     }
     return (
-        <div className="flex flex-col gap-2.5 rounded-card border border-ink bg-surface px-[22px] py-5">
-            <span className="font-display text-[22px] font-bold tracking-[-0.03em]">
+        <div className="flex flex-col gap-2.5 rounded-mk-card border border-foreground bg-card px-[22px] py-5">
+            <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
                 {copy.cardTitle}
             </span>
-            <span className="text-[15px] leading-normal text-body">
+            <span className="text-[15px] leading-normal text-mk-copy">
                 {copy.cardLine}
             </span>
             <div className="flex flex-wrap items-center gap-3.5">
                 <ButtonLink href={href} onClick={onClick}>
                     {copy.action}
                 </ButtonLink>
-                <span className="text-[13px] text-quiet">{copy.hint}</span>
+                <span className="text-[13px] text-muted-foreground">
+                    {copy.hint}
+                </span>
             </div>
         </div>
     );
@@ -114,13 +116,13 @@ export function SignupSheet({
 }) {
     return (
         <Dialog open={done !== null} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="flex flex-col gap-4 bg-paper font-sans text-ink">
-                <span className="pr-10 text-sm text-body">✓ {done}</span>
-                <DialogTitle className="m-0 font-display text-[30px] font-bold leading-[1.05] tracking-[-0.04em]">
+            <DialogContent className="flex flex-col gap-4 bg-background font-sans text-foreground">
+                <span className="pr-10 text-sm text-mk-copy">✓ {done}</span>
+                <DialogTitle className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                     {copy.sheetTitle}
                 </DialogTitle>
                 <DialogDescription asChild>
-                    <ul className="m-0 flex list-none flex-col gap-3 p-0 text-[15.5px] leading-normal text-ink">
+                    <ul className="m-0 flex list-none flex-col gap-3 p-0 text-[15.5px] leading-normal text-foreground">
                         {copy.sheetLines.map((l) => (
                             <li key={l} className="flex gap-2.5">
                                 <span aria-hidden="true">✓</span>
@@ -136,13 +138,13 @@ export function SignupSheet({
                 >
                     {copy.action}
                 </a>
-                <span className="text-center text-[13.5px] leading-snug text-quiet">
+                <span className="text-center text-[13.5px] leading-snug text-muted-foreground">
                     {copy.sheetNote}
                 </span>
                 <button
                     type="button"
                     onClick={onClose}
-                    className="h-11 cursor-pointer border-0 bg-transparent text-[15px] text-body underline"
+                    className="h-11 cursor-pointer border-0 bg-transparent text-[15px] text-mk-copy underline"
                 >
                     Not now
                 </button>

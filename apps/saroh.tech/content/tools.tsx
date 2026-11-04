@@ -5,8 +5,8 @@ import type { ToolContent } from "@/components/tools/tool-page";
 import { H2 } from "@/components/tools/tool-page";
 
 const LIST = "m-0 list-disc pl-5 text-[17px] leading-[1.9]";
-const COPY = "m-0 text-[17px] leading-relaxed text-body";
-const FINE = "m-0 text-sm text-quiet";
+const COPY = "m-0 text-[17px] leading-relaxed text-mk-copy";
+const FINE = "m-0 text-sm text-muted-foreground";
 
 const to = (href: string, name: string) => (
     <Link prefetch={false} href={href}>
@@ -259,10 +259,10 @@ export const QUOTE: ToolContent = {
     explain: (
         <>
             <h2 className={H2}>Quote or estimate?</h2>
-            <div className="overflow-x-auto rounded-card border border-line bg-surface">
+            <div className="overflow-x-auto rounded-mk-card border border-border bg-card">
                 <table className="w-full border-collapse text-left text-[15px]">
                     <thead>
-                        <tr className="border-b border-line">
+                        <tr className="border-b border-border">
                             <td className="p-3" />
                             <th scope="col" className="p-3">
                                 Quote
@@ -286,7 +286,7 @@ export const QUOTE: ToolContent = {
                                 "Explain why, before you bill",
                             ],
                         ].map(([row, quote, estimate]) => (
-                            <tr key={row} className="border-t border-line">
+                            <tr key={row} className="border-t border-border">
                                 <th scope="row" className="p-3">
                                     {row}
                                 </th>
@@ -435,12 +435,14 @@ export const REMINDER: ToolContent = {
                 ].map(([when, what]) => (
                     <div
                         key={when}
-                        className="flex flex-col gap-1 border-t border-line py-3 md:flex-row md:gap-4"
+                        className="flex flex-col gap-1 border-t border-border py-3 md:flex-row md:gap-4"
                     >
                         <dt className="font-bold md:w-32 md:shrink-0">
                             {when}
                         </dt>
-                        <dd className="m-0 text-[15.5px] text-body">{what}</dd>
+                        <dd className="m-0 text-[15.5px] text-mk-copy">
+                            {what}
+                        </dd>
                     </div>
                 ))}
             </dl>
@@ -557,10 +559,10 @@ const formula = (name: string, rate: number, base: number, symbol: string) => {
         .toFixed(2)
         .replace(/\.00$/, "");
     return (
-        <div className="rounded-[14px] border border-line bg-surface p-4 text-[15.5px] leading-[1.7]">
+        <div className="rounded-[14px] border border-border bg-card p-4 text-[15.5px] leading-[1.7]">
             <b>Add {name}:</b> price × (1 + rate)
             <br />
-            <span className="font-mono text-[13.5px] text-quiet">
+            <span className="font-mono text-[13.5px] text-muted-foreground">
                 {symbol}
                 {base} × {factor} = {symbol}
                 {gross}
@@ -568,13 +570,13 @@ const formula = (name: string, rate: number, base: number, symbol: string) => {
             <br />
             <b>Remove {name}:</b> total ÷ (1 + rate)
             <br />
-            <span className="font-mono text-[13.5px] text-quiet">
+            <span className="font-mono text-[13.5px] text-muted-foreground">
                 {symbol}
                 {gross} ÷ {factor} = {symbol}
                 {base}
             </span>
             <br />
-            <span className="text-quiet">
+            <span className="text-muted-foreground">
                 A common mistake: taking {rate}% off {symbol}
                 {gross} gives {symbol}
                 {wrong}, not {symbol}
