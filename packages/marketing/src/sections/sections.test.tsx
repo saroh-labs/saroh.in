@@ -28,6 +28,16 @@ const HERO = {
 const frames = (c: HTMLElement) => c.querySelectorAll("[data-shot]");
 
 describe("ProductHero", () => {
+    it("says what works today in the sub's type, in place of the free line", () => {
+        const { container } = render(
+            <ProductHero {...HERO} freeLine={undefined} today="What works" />,
+        );
+        expect(screen.getByText("What works").className).toContain(
+            "text-mk-body",
+        );
+        expect(container.textContent).not.toContain("A free line");
+    });
+
     it("draws the given words, links and shot", () => {
         const { container } = render(
             <ProductHero

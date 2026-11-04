@@ -6,9 +6,11 @@ import { Eyebrow } from "./eyebrow";
 export function WorksFor({
     label,
     items,
+    prefetch,
 }: {
     label: string;
     items: readonly { href: string; name: string }[];
+    prefetch?: boolean;
 }) {
     return (
         <Container
@@ -18,7 +20,7 @@ export function WorksFor({
         >
             <Eyebrow>{label}</Eyebrow>
             {items.map((s) => (
-                <PillLink key={s.href} href={s.href}>
+                <PillLink key={s.href} href={s.href} prefetch={prefetch}>
                     {s.name}
                 </PillLink>
             ))}

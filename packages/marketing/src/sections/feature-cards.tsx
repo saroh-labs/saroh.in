@@ -7,10 +7,12 @@ export function FeatureCards({
     eyebrow,
     title,
     items,
+    prefetch,
 }: {
     eyebrow: string;
     title: string;
     items: readonly { href: string; title: string; body: string }[];
+    prefetch?: boolean;
 }) {
     return (
         <Container
@@ -26,7 +28,7 @@ export function FeatureCards({
             />
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,max(200px,calc((100%-48px)/4))),1fr))] gap-4 pb-14 pt-10">
                 {items.map((f) => (
-                    <CardLink key={f.href} {...f} />
+                    <CardLink key={f.href} {...f} prefetch={prefetch} />
                 ))}
             </div>
         </Container>

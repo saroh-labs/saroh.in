@@ -39,15 +39,19 @@ export function PillLink({
     size = "md",
     className,
     children,
+    prefetch,
 }: {
     href: string;
     size?: "md" | "lg";
     className?: string;
     children: ReactNode;
+    /** `false` where the page behind it preloads a heavy picture. */
+    prefetch?: boolean;
 }) {
     return (
         <Link
             href={href}
+            prefetch={prefetch}
             className={cn(
                 `inline-flex cursor-pointer items-center rounded-full border border-border bg-card font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground ${ring()} active:scale-[0.98]`,
                 size === "md"

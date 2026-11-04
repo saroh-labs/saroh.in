@@ -2,9 +2,18 @@ import type { CatalogInput } from "@saroh/pricing-catalog";
 import { parseCatalog } from "@saroh/pricing-catalog";
 import { describe, expect, it, vi } from "vitest";
 
+import { faqs } from "@/content/faq";
+import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
 
-import { freeLimitLines, pricingModel, readCatalog } from "./plans";
+import {
+    faqWithPlans,
+    freeCardModel,
+    freeLimitLines,
+    freePlanLine,
+    pricingModel,
+    readCatalog,
+} from "./plans";
 
 /** Made up on purpose (Plan A, 111): no test carries a real plan's terms. */
 const fakeInput = (): CatalogInput => ({
@@ -216,5 +225,37 @@ describe("the pricing page's plans, with no catalogue", () => {
         expect(JSON.stringify(view)).not.toMatch(
             /₹|\$|rupee|GST|\bVAT\b|\btax\b|\d|stripe|paypal|razorpay|cashfree/i,
         );
+    });
+});
+
+describe("Free's limits beyond /pricing", () => {
+    it("says Free's card lines in the hero line, and nothing with no catalogue", () => {
+        const catalog = parseCatalog(fakeInput());
+        expect(freePlanLine(catalog)).toBe(
+            "Free to start: 7 things. No card needed.",
+        );
+        expect(freePlanLine(null)).toBe(FREE_PLAN_LINE.fallback);
+    });
+
+    it("answers Start free with the limits, once they're read", () => {
+        const catalog = parseCatalog(fakeInput());
+        const answer = (c: typeof catalog | null) =>
+            faqWithPlans(c, ["start-free", "tax"])[0].a;
+        expect(answer(catalog)).toMatch(/^Free includes 7 things/);
+        expect(answer(catalog)).not.toContain("77");
+        expect(answer(null)).toBe(faqs["start-free"].a);
+    });
+
+    it("draws Free's card alone, with no price or paid plan", () => {
+        for (const c of [null, parseCatalog(fakeInput())]) {
+            const { plans } = freeCardModel(c).views["month-excl"];
+            expect(plans.map((p) => p.id)).toEqual(["free"]);
+        }
+    });
+
+    it("doesn't say Free twice on its card", () => {
+        const [card] = freeCardModel(null).views["month-excl"].plans;
+        expect(card.name).toBe("Free");
+        expect(card.price).not.toBe("Free");
     });
 });

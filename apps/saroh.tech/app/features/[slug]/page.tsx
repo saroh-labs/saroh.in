@@ -14,9 +14,10 @@ import { notFound } from "next/navigation";
 import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
 import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
-import { CTA_BAND, FREE_PLAN_LINE } from "@/content/home";
+import { CTA_BAND } from "@/content/home";
 import { shotView } from "@/content/shots";
 import { solutionHref, solutions } from "@/content/solutions";
+import { freePlanLine, readCatalog } from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageAt } from "@/lib/site-map";
@@ -55,9 +56,8 @@ function NotYet({
 }
 
 /**
- * saroh.in's feature template, section for section. A Limited page's line under
- * the button says what works today, in place of the free-plan line, so a page
- * carries one message. A Coming soon page says it in its headline and sub, and
+ * saroh.in's feature template, section for section. A Limited page says what
+ * works today, in place of the free-plan line, so a page carries one message. A Coming soon page says it in its headline and sub, and
  * its parts are planned rows, with no steps to follow.
  */
 export default async function FeaturePage({ params }: Props) {
@@ -66,6 +66,8 @@ export default async function FeaturePage({ params }: Props) {
     if (!page) notFound();
     const feature = features[slug as FeatureSlug];
     const coming = feature.state === "coming-soon";
+    const limited = feature.state === "limited";
+    const catalog = limited ? null : await readCatalog();
 
     return (
         <div data-page-type={page.type}>
@@ -77,11 +79,8 @@ export default async function FeaturePage({ params }: Props) {
                 sub={feature.sub}
                 narrow
                 actions={<HeroActions src={`feature-${slug}`} />}
-                freeLine={
-                    feature.state === "limited"
-                        ? feature.worksToday
-                        : FREE_PLAN_LINE.fallback
-                }
+                today={limited ? feature.worksToday : undefined}
+                freeLine={limited ? undefined : freePlanLine(catalog)}
                 shot={shotView(feature.hero.shot, feature.hero.alt)}
             />
             {coming ? (

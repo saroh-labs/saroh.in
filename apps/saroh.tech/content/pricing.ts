@@ -8,7 +8,7 @@ export const PRICING = {
     eyebrow: "Pricing",
     title: "Start free. Paid plans come later.",
     intro: "Free is the plan you can use today, with no card. Grow and Pro aren't available yet, so there's nothing to buy here.",
-    closer: "Start your site for free.",
+    closer: "Put your business on Saroh today.",
     /** Free leads: it's the one plan with something to press. */
     plans: [
         { plan: "free", name: "Free", featured: true },
@@ -21,7 +21,7 @@ export const PRICING = {
     words: {
         free: {
             tagline: "For getting your business online.",
-            price: "Free",
+            price: "No charge",
             sub: "No card needed",
         },
         grow: { tagline: "For one place that sells, books and bills." },

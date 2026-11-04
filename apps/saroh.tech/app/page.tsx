@@ -11,12 +11,13 @@ import { WorksFor } from "@saroh/marketing/works-for";
 import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
 import { PricingTeaser } from "@/components/shared/pricing-teaser";
-import { faqItems, HOME_FAQ } from "@/content/faq";
+import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
-import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
+import { CTA_BAND, home } from "@/content/home";
 import { shotView } from "@/content/shots";
 import { solutionHref, solutionList } from "@/content/solutions";
 import { ALL_TOOLS } from "@/lib/nav";
+import { faqWithPlans, freePlanLine, readCatalog } from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -27,10 +28,12 @@ export const metadata = pageMetadata(page);
 
 /**
  * saroh.in's Home, section for section (`apps/saroh.in/app/(site)/page.tsx`).
- * The one addition is the free tools, because tools are how people arrive.
+ * The one addition is the free tools, because tools are how people arrive. Its
+ * cards don't prefetch: each page's payload preloads that page's hero shot.
  */
-export default function HomePage() {
-    const faq = faqItems(HOME_FAQ);
+export default async function HomePage() {
+    const catalog = await readCatalog();
+    const faq = faqWithPlans(catalog, HOME_FAQ);
     return (
         <div data-page-type={page.type}>
             <JsonLd
@@ -47,12 +50,13 @@ export default function HomePage() {
                 headline={home.headline}
                 sub={home.sub}
                 actions={<HeroActions src="home-hero" />}
-                freeLine={FREE_PLAN_LINE.fallback}
+                freeLine={freePlanLine(catalog)}
                 chips={home.chips}
                 shot={shotView(home.hero.shot)}
             />
             <WorksFor
                 label={home.worksFor}
+                prefetch={false}
                 items={solutionList.map((s) => ({
                     href: solutionHref(s.slug),
                     name: s.card.name,
@@ -61,6 +65,7 @@ export default function HomePage() {
             <FeatureCards
                 eyebrow={home.featuresEyebrow}
                 title={home.featuresTitle}
+                prefetch={false}
                 items={featureList.map((f) => ({
                     href: featureHref(f.slug),
                     title: f.name,
@@ -69,6 +74,7 @@ export default function HomePage() {
             />
             <SolutionCards
                 title={home.solutionsTitle}
+                prefetch={false}
                 items={solutionList.map((s) => ({
                     href: solutionHref(s.slug),
                     title: s.card.name,
@@ -89,6 +95,7 @@ export default function HomePage() {
                         <CardLink
                             key={tool.href}
                             href={tool.href}
+                            prefetch={false}
                             title={tool.title}
                             body={tool.line}
                             className={
@@ -109,6 +116,8 @@ export default function HomePage() {
                 id="pricing"
                 title={home.pricingTitle}
                 className="scroll-mt-6 pt-[110px]"
+                catalog={catalog}
+                src="home-pricing"
             />
             <Faq items={faq} title={home.faqTitle} />
             <CtaBand

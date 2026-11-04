@@ -20,7 +20,7 @@ export type FaqId =
 export const faqs = {
     "start-free": {
         q: "What does Start free include?",
-        a: "Free gives you what you need to put your site up and start. No card needed.",
+        a: "Free gives you what you need to put your site up and start. It has limits on how much you can use. No card needed.",
     },
     tax: {
         q: "Does it work out my tax?",
@@ -51,8 +51,8 @@ export const faqs = {
         a: "Yes. The owner can export your data, one CSV per table, invoices included.",
     },
     "shops-counter-online": {
-        q: "Does each location keep its own stock?",
-        a: "Yes. Each location keeps its own stock, and an order holds stock where it was placed, so the same last loaf is never sold twice.",
+        q: "Does my online shop share stock with my place?",
+        a: "It can. Your website sells from one stock: your place's, or one kept for online orders. An order holds stock where it was placed, so the same last loaf is never sold twice.",
     },
     "gyms-pack-and-membership": {
         q: "Can I run courses as well as classes?",

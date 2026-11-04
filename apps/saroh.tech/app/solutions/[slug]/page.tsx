@@ -10,11 +10,12 @@ import { notFound } from "next/navigation";
 import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
 import { PricingTeaser } from "@/components/shared/pricing-teaser";
-import { faqItems, solutionFaq } from "@/content/faq";
+import { solutionFaq } from "@/content/faq";
 import { featureHref, features } from "@/content/features";
-import { CTA_BAND, FREE_PLAN_LINE } from "@/content/home";
+import { CTA_BAND } from "@/content/home";
 import { shotView } from "@/content/shots";
 import { solutions } from "@/content/solutions";
+import { faqWithPlans, freePlanLine, readCatalog } from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageAt } from "@/lib/site-map";
@@ -41,7 +42,8 @@ export default async function SolutionPage({ params }: Props) {
     const page = pageAt(`/solutions/${slug}`);
     if (!page) notFound();
     const s = solutions[slug as SolutionSlug];
-    const faq = faqItems(solutionFaq(s.faq));
+    const catalog = await readCatalog();
+    const faq = faqWithPlans(catalog, solutionFaq(s.faq));
     // "See {feature} →" on the first segment of each area only.
     const linked = new Set<FeatureSlug>();
     // A lone screen leaves the other rows half empty: two columns of words
@@ -67,7 +69,7 @@ export default async function SolutionPage({ params }: Props) {
                 headline={s.headline}
                 sub={s.sub}
                 actions={<HeroActions src={`solutions-${slug}-hero`} />}
-                freeLine={FREE_PLAN_LINE.fallback}
+                freeLine={freePlanLine(catalog)}
                 shot={s.hero && shotView(s.hero.shot, s.hero.alt)}
                 note={s.heroNote}
             />
@@ -94,7 +96,12 @@ export default async function SolutionPage({ params }: Props) {
                     };
                 })}
             />
-            <PricingTeaser title={s.pricing.title} className="pt-[130px]" />
+            <PricingTeaser
+                title={s.pricing.title}
+                className="pt-[130px]"
+                catalog={catalog}
+                src={`solutions-${slug}-pricing`}
+            />
             <Faq items={faq} className="pt-[120px]" />
             <CtaBand
                 title={s.closer}

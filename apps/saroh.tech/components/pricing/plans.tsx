@@ -10,13 +10,23 @@ import { PRICING } from "@/content/pricing";
 import { signupHref } from "@/site.config";
 
 /** The shared plan cards. Free starts; a paid plan has nothing to press yet. */
-export function Plans({ model }: { model: PricingPageModel }) {
+export function Plans({
+    model,
+    src = "pricing",
+    compare,
+}: {
+    model: PricingPageModel;
+    /** The page that brought them, on the sign-up link. */
+    src?: string;
+    compare?: { href: string; label: string };
+}) {
     const switches = usePricingSwitches(model);
     return (
         <PricingCards
             model={model}
             switches={switches}
             ownHeight
+            compare={compare}
             cta={(plan, look) =>
                 plan.cta.paid ? (
                     <Pill
@@ -28,7 +38,7 @@ export function Plans({ model }: { model: PricingPageModel }) {
                 ) : (
                     <ButtonLink
                         {...look}
-                        href={signupHref("pricing")}
+                        href={signupHref(src)}
                         data-cta="plan-free"
                     >
                         Start free

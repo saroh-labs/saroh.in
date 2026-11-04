@@ -4,6 +4,7 @@ import type {
     PricingView,
 } from "@saroh/marketing/pricing-model";
 import { placeholderPricingModel } from "@saroh/marketing/pricing-view";
+import { sentenceList } from "@saroh/marketing/sentence-list";
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
     cellOf,
@@ -12,6 +13,9 @@ import {
     parseCatalog,
 } from "@saroh/pricing-catalog";
 
+import type { FaqId } from "@/content/faq";
+import { faqItems } from "@/content/faq";
+import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
 
 /** Words of India's catalogue that mean nothing on this edition. */
@@ -47,6 +51,48 @@ export async function readCatalog(
     }
 }
 
+const freePlanOf = (catalog: Catalog) =>
+    catalog.plans.find(
+        (p) => p.id === "free" && p.pricePaise === 0 && !p.retired,
+    );
+
+/** "Your website" → "your website"; "1 website" stays. */
+const lowerFirst = (s: string) =>
+    /^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+
+/**
+ * The line under a hero's buttons, as saroh.in builds it: "Free to start: 1
+ * website, … and …. No card needed.", from Free's card lines for the modules
+ * `FREE_PLAN_LINE` picks. With no catalogue, or none of them, the fallback.
+ */
+export function freePlanLine(catalog: Catalog | null): string {
+    const { lead, modules, tail, fallback } = FREE_PLAN_LINE;
+    const free = catalog && freePlanOf(catalog);
+    if (!catalog || !free) return fallback;
+    const parts = modules.flatMap((id) => {
+        const m = catalog.modules.find((x) => x.id === id);
+        if (m?.pricing !== "show") return [];
+        const cell = cellOf(m, free.id);
+        return cell.inc && cell.card && !INDIA_ONLY.test(cell.card)
+            ? [lowerFirst(cell.card)]
+            : [];
+    });
+    return parts.length ? `${lead}: ${sentenceList(parts)}. ${tail}` : fallback;
+}
+
+/** A page's questions. "start-free" lists Free's limits when the catalogue was read. */
+export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]) {
+    const limits = catalog && freeLimitLines(catalog);
+    return faqItems(ids).map((item, i) =>
+        ids[i] === "start-free" && limits
+            ? {
+                  ...item,
+                  a: `Free includes ${sentenceList(limits.map(lowerFirst))}. No card needed.`,
+              }
+            : item,
+    );
+}
+
 /**
  * Free's limits, in saroh.in's words: its card line, or for a capped row with
  * none, the words the limit's own notices use. It reads Free's cells and
@@ -54,9 +100,7 @@ export async function readCatalog(
  * Null when the catalogue has no free plan or says nothing for it.
  */
 export function freeLimitLines(catalog: Catalog): string[] | null {
-    const free = catalog.plans.find(
-        (p) => p.id === "free" && p.pricePaise === 0 && !p.retired,
-    );
+    const free = freePlanOf(catalog);
     if (!free) return null;
     const lines = catalog.modules.flatMap((m) => {
         if (m.pricing !== "show") return [];
@@ -116,5 +160,24 @@ export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
             "year-incl": view,
         },
         rows: [],
+    };
+}
+
+/** Home's and a solution page's card: Free's alone, the one plan with something to press. */
+export function freeCardModel(catalog: Catalog | null): PricingPageModel {
+    const model = pricingModel(catalog);
+    const view = model.views["month-excl"];
+    const free: PricingView = {
+        ...view,
+        plans: view.plans.filter((plan) => !plan.cta.paid),
+    };
+    return {
+        ...model,
+        views: {
+            "month-excl": free,
+            "month-incl": free,
+            "year-excl": free,
+            "year-incl": free,
+        },
     };
 }

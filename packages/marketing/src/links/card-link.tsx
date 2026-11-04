@@ -43,6 +43,7 @@ export function CardLink({
     action,
     size = "md",
     className,
+    prefetch,
 }: {
     href: string;
     title: ReactNode;
@@ -52,10 +53,13 @@ export function CardLink({
     action?: ReactNode;
     size?: "md" | "lg";
     className?: string;
+    /** `false` where the page behind it preloads a heavy picture. */
+    prefetch?: boolean;
 }) {
     return (
         <Link
             href={href}
+            prefetch={prefetch}
             className={cardLinkClasses(
                 cn("gap-2", size === "md" ? "p-[22px]" : "p-6", className),
             )}

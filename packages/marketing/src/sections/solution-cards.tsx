@@ -5,6 +5,7 @@ import { Section } from "./section";
 export function SolutionCards({
     title,
     items,
+    prefetch,
 }: {
     title: string;
     items: readonly {
@@ -14,6 +15,7 @@ export function SolutionCards({
         meta: string;
         action: string;
     }[];
+    prefetch?: boolean;
 }) {
     return (
         <Section
@@ -32,6 +34,7 @@ export function SolutionCards({
                         meta={s.meta}
                         action={s.action}
                         size="lg"
+                        prefetch={prefetch}
                     />
                 ))}
             </div>

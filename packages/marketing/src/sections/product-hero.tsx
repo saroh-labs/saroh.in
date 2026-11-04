@@ -19,6 +19,7 @@ export function ProductHero({
     sub,
     narrow = false,
     actions,
+    today,
     freeLine,
     shot,
     note,
@@ -32,8 +33,10 @@ export function ProductHero({
     /** The feature template's 16ch headline; a solution's is 17ch. */
     narrow?: boolean;
     actions?: ReactNode;
+    /** What works today, for a page that's limited: read as part of the sub. */
+    today?: string;
     /** The free-plan line, from the site's read of its plans. */
-    freeLine: string;
+    freeLine?: string;
     shot?: ShotView;
     note?: string;
 }) {
@@ -52,10 +55,17 @@ export function ProductHero({
                 <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
                     {sub}
                 </p>
+                {today ? (
+                    <p className="m-0 max-w-[60ch] text-mk-body text-mk-copy [text-wrap:pretty]">
+                        {today}
+                    </p>
+                ) : null}
                 {actions}
-                <p className="m-0 text-mk-note text-muted-foreground">
-                    {freeLine}
-                </p>
+                {freeLine ? (
+                    <p className="m-0 text-mk-note text-muted-foreground">
+                        {freeLine}
+                    </p>
+                ) : null}
             </Container>
             {shot ? (
                 <Container className="pt-14">
