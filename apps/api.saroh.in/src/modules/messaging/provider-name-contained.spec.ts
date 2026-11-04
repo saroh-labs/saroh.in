@@ -32,6 +32,8 @@ const ALLOWED: Record<string, string> = {
         "checks the widget's host is allowed",
     "apps/saroh.in/page-policies.test.ts":
         "checks the widget's host is not allowed there",
+    "apps/saroh.tech/lib/content.test.ts":
+        "checks Global's legal pages don't name it",
 };
 
 function files(): string[] {
