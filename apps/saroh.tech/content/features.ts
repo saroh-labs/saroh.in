@@ -46,7 +46,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders and overdue invoices, each with its next step. Hand over an order right from the list.",
+                body: "Late orders, stock short for orders and overdue invoices, each with its next step. Mark an order sent right from the list.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-home",
             },
@@ -76,7 +76,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Done from the list",
-                body: "Hand over an order without opening it.",
+                body: "Mark an order sent without opening it.",
             },
             {
                 title: "The last 24 hours",

@@ -40,7 +40,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 feature: "dashboard",
                 pain: "“I open up and don't know what to do first.”",
                 title: "One list of what needs you this morning",
-                body: "Late orders, sizes short for orders and what's overdue, most urgent first. Hand over an order right from the list.",
+                body: "Late orders, sizes short for orders and what's overdue, most urgent first. Mark an order sent right from the list.",
                 shot: "s-home",
             },
             {

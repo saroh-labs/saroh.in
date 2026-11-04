@@ -221,10 +221,11 @@ describe("saroh.tech's words", () => {
         );
     });
 
-    it("don't send what's handed over at a counter", () => {
-        expect(words({ features, solutions })).not.toMatch(
-            /\bmark an order sent\b|\bsend (the morning's|today's) orders\b/i,
-        );
+    it("name Home's button as Home does, and don't send what's handed over at a counter", () => {
+        const text = words({ features, solutions });
+        expect(text).not.toMatch(/\bhand over an order\b/i);
+        expect(text).toMatch(/\bMark an order sent\b/);
+        expect(text).not.toMatch(/\bsend (the morning's|today's) orders\b/i);
     });
 
     it("name Insights in the screen's words", () => {
