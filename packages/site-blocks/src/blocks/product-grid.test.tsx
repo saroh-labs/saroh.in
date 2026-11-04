@@ -101,6 +101,25 @@ describe("the Product grid on a served page (G12)", () => {
         expect(screen.queryByText("Shop")).toBeNull();
     });
 
+    it("on the Shop page, offers what its grids don't draw", () => {
+        render(
+            <ProductGridSection
+                content={content}
+                feed={{
+                    products: BREADS,
+                    basePath: "/shop",
+                    atShop: true,
+                    moreHref: "/shop?all=1",
+                }}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: "See all products" })
+                .getAttribute("href"),
+        ).toBe("/shop?all=1");
+    });
+
     it("draws the photo, the options, the name, one line and the price", () => {
         render(
             <ProductGridSection

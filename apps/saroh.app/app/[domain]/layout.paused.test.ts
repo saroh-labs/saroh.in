@@ -15,12 +15,14 @@ const state = vi.hoisted(
         movedTo: string | null;
         path: string | null;
         release: unknown;
+        readFailed: boolean;
     } => ({
         resolved: null,
         pausedTo: null,
         movedTo: null,
         path: null,
         release: null,
+        readFailed: false,
     }),
 );
 const nav = vi.hoisted(() => ({
@@ -45,6 +47,7 @@ vi.mock("@/lib/publication", () => ({
     getMovedTo: reads.getMovedTo,
     shareImages: vi.fn(() => undefined),
     siteOriginFor: (_site: unknown, host: string) => `https://${host}`,
+    siteReadFailed: vi.fn(() => Promise.resolve(state.readFailed)),
 }));
 vi.mock("@/lib/test-release", () => ({
     rootDomain: () => "saroh.app",
@@ -164,6 +167,14 @@ describe("a request on a paused domain (DEC-139)", () => {
     it("is a plain 404 for a host that is neither paused nor moved", async () => {
         await expect(draw("shop.example.com")).rejects.toThrow("NOT_FOUND");
         expect(nav.redirect).not.toHaveBeenCalled();
+    });
+
+    it("isn't a 404 when the site's read failed: the error page says so", async () => {
+        state.readFailed = true;
+        await expect(draw("shop.example.com")).rejects.toThrow(
+            "Site read failed",
+        );
+        state.readFailed = false;
     });
 
     it("still forwards an old Saroh address, which is never paused", async () => {

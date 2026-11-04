@@ -61,7 +61,41 @@ async function call<T>(
         return { ok: false, status: 0, message: OFFLINE };
     }
     const body: unknown = await res.json().catch(() => null);
+    // Given up on halfway through the body: no answer, not a wrong one.
+    if (init.signal?.aborted) return { ok: false, status: 0, message: OFFLINE };
     return resultOf(res.status, body, narrow);
+}
+
+/** How long the browser waits on one read before giving up on it. */
+export const READ_TIMEOUT_MS = 15_000;
+
+/**
+ * A read that may hang: given up on after {@link READ_TIMEOUT_MS}, and asked
+ * once more when it got no answer or our side failed. A 4xx is an answer.
+ */
+async function read<T>(
+    url: string,
+    init: RequestInit,
+    narrow: (v: unknown) => v is T,
+): Promise<Result<T>> {
+    const once = async (): Promise<Result<T>> => {
+        // A timer rather than `AbortSignal.timeout`, which older phones lack.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
+        try {
+            return await call(
+                url,
+                { ...init, signal: controller.signal },
+                narrow,
+            );
+        } finally {
+            clearTimeout(timer);
+        }
+    };
+    const first = await once();
+    return first.ok || (first.status !== 0 && first.status < 500)
+        ? first
+        : once();
 }
 
 /**
@@ -150,7 +184,7 @@ export function fetchDays(
     serviceId: string,
     ask: DaysAsk = {},
 ): Promise<Result<BookingDays>> {
-    return call(
+    return read(
         daysUrl(apiUrl, serviceId, ask),
         { cache: "no-store" },
         isBookingDays,
@@ -234,7 +268,7 @@ export function fetchHold(
     apiUrl: string,
     token: string,
 ): Promise<Result<HoldView>> {
-    return call(
+    return read(
         `${apiUrl}/public/services/holds/${encodeURIComponent(token)}`,
         { cache: "no-store", referrerPolicy: "no-referrer" },
         isHoldView,

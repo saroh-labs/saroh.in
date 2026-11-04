@@ -1,5 +1,7 @@
 import type { ModulePageStates } from "@saroh/site-blocks";
 
+import type { BookingPageLookup } from "./booking-page";
+
 /**
  * Module pages on the live site (round-2 G15): a published page with a kind
  * (`BOOK`, `SHOP`, `PRICES`, `JOURNAL`, `CONTACT`; G14), and whether it
@@ -142,6 +144,28 @@ export function isBookingDeepLink(params: {
 }
 
 /**
+ * `/book` with its read: a Book page draws only while the booking flow's own
+ * read has something to offer. With nothing offered, closed, or a read that
+ * failed, the route draws the flow, which says so in words with how to reach
+ * the business (`ClosedCard`, `BookingUnavailable`), never a title over
+ * nothing. The one exception is a test release of a site never published,
+ * whose release has a page while the read's 404 says nothing is live.
+ */
+export function bookRoute<P>(
+    route: ModuleRoute<P>,
+    lookup: BookingPageLookup | null,
+    testHost = false,
+): ModuleRoute<P> {
+    if (route.draw !== "page") return route;
+    if (testHost && lookup?.ok === false && lookup.reason === "missing") {
+        return route;
+    }
+    return lookup?.ok && lookup.page.open && lookup.page.services.length > 0
+        ? route
+        : { draw: "builtin" };
+}
+
+/**
  * A page that answers 200 with nothing to show, for its metadata: out of
  * search, its links still followed. An SEO audit found "not available"
  * pages indexable; a 404 says it for a page that isn't there, and this says
@@ -153,15 +177,14 @@ export const NOT_FOR_SEARCH = {
 
 /**
  * Whether a module's own route (`/shop`, `/book`) has nothing to show now:
- * its page is taken off while the module is off, or the built-in listing
- * has nothing (`builtinEmpty`: its read failed, or came back empty or
- * closed). A published module page is the merchant's own writing and is
- * never empty on this account, whatever the built-in read says.
+ * its page is taken off while the module is off, or its read has nothing
+ * (`empty`: it came back empty or closed; a read that failed is not `empty`,
+ * or a blip would drop the page from search). A Book or Shop page doesn't
+ * stand in for that: with nothing to offer the route says so.
  */
 export function routeHasNothing(
     route: { draw: "unavailable" | "page" | "builtin" },
-    builtinEmpty: boolean,
+    empty: boolean,
 ): boolean {
-    if (route.draw === "unavailable") return true;
-    return route.draw === "builtin" && builtinEmpty;
+    return route.draw === "unavailable" || empty;
 }

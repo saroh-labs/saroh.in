@@ -22,6 +22,7 @@ import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
+import { FeedFailed } from "./feed-failed";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 import { LeadGrid } from "./product-grid-lead";
 import { PlatesGrid } from "./product-grid-plates";
@@ -36,8 +37,8 @@ import { PlatesGrid } from "./product-grid-plates";
  * a 404 while the shop isn't open for the business. Two ways in:
  *
  * - **`feed`** — handed in by the page that serves the site, read on the
- *   server. No products (none to show, the shop not open, the read failed):
- *   the block renders NOTHING.
+ *   server. No products (none to show, the shop not open): the block renders
+ *   NOTHING. A read that failed says so, and offers Try again (`FeedFailed`).
  * - **no feed, a `siteId`** — the editor's canvas. The block reads the same
  *   list itself so the merchant sees their real products, and says why the
  *   section is empty rather than vanishing.
@@ -72,6 +73,13 @@ export interface ProductGridFeed {
      * page the visitor is on (UX-082).
      */
     atShop?: boolean;
+    /**
+     * Where to see everything else the shop sells, when the Shop page's grids
+     * don't draw it all: drawn in place of "Shop →" (`shop-page-offer.ts`).
+     */
+    moreHref?: string | null;
+    /** The read failed: not "none", so the section says so (`FeedFailed`). */
+    failed?: boolean;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -131,6 +139,7 @@ export default function ProductGridSection({
     feed,
     siteId,
     apiUrl = DEFAULT_API_URL,
+    look,
 }: LookProps & {
     content: RenderedProductGrid;
     /** The products, read by the page that serves the site (live or preview). */
@@ -185,6 +194,9 @@ export default function ProductGridSection({
 
     const title = said(content.title) ?? PRODUCT_GRID_TITLE;
 
+    if (feed?.failed) {
+        return <FeedFailed title={title} things="our products" look={look} />;
+    }
     if (feed) {
         return <ProductCards content={content} title={title} feed={feed} />;
     }
@@ -420,7 +432,14 @@ function ProductCards({
             note={said(content.note)}
             cutOff={said(content.cutOff)}
             more={
-                feed.atShop ? null : base !== null ? (
+                feed.moreHref ? (
+                    <a
+                        href={feed.moreHref}
+                        className={cn(textButton, "shrink-0")}
+                    >
+                        See all products
+                    </a>
+                ) : feed.atShop ? null : base !== null ? (
                     <a
                         href={base || "/"}
                         className={cn(textButton, "shrink-0")}

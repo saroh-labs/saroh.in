@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { LookId } from "@saroh/block-contract";
 import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 
@@ -5,6 +7,7 @@ import { env } from "@/env";
 import { pausedOriginOf, pausedTestOrigin } from "@/lib/domain-paused";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
+import { dontCachePage } from "@/lib/page-cache/site-rules";
 import type { SiteHostKind } from "@/lib/site-host-mode";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import type { SiteIcon } from "@/lib/site-icon";
@@ -13,7 +16,7 @@ import { SITE_RELAY_HEADER } from "@/lib/site-relay";
 import type { TestReleaseInfo } from "@/lib/test-release";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -261,7 +264,11 @@ export async function getPublicationBySubdomain(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-subdomain/${encodeURIComponent(subdomain)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         // Network/DNS error — treat as "not renderable" rather than throwing a
@@ -298,7 +305,11 @@ export async function getPublicationByHostname(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return null;
@@ -567,33 +578,48 @@ export function postsPrefix(snapshot: PublicationSnapshot): string {
 }
 
 /**
- * A site's live posts, newest first, or an empty list.
+ * A site's live posts, newest first, or null when the read failed: "We don't
+ * know" isn't "none", and a page drawn from it is never kept.
  *
  * Reads the api's public post index, which serves each post's CURRENT
  * publication and nothing else — so a draft, an edited-but-unpublished post,
  * or one taken down is structurally unreachable here, exactly as with pages.
  */
-export async function getPublishedPosts(
+export async function readPublishedPosts(
     siteId: string,
-): Promise<PublishedPost[]> {
+): Promise<PublishedPost[] | null> {
     let res: Response;
     try {
         res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
             cache: "no-store",
             headers: { accept: "application/json" },
+            signal: serverReadSignal(),
         });
     } catch {
-        return [];
+        dontCachePage("posts unavailable");
+        return null;
     }
-    if (!res.ok) return [];
-    const body = (await res.json().catch(() => null)) as {
-        posts?: PostSnapshot[];
-    } | null;
+    const body = res.ok
+        ? ((await res.json().catch(() => null)) as {
+              posts?: PostSnapshot[];
+          } | null)
+        : null;
+    if (!Array.isArray(body?.posts)) {
+        dontCachePage("posts unavailable");
+        return null;
+    }
     // The api is typed, but this is a wire boundary: a row without a post, or
     // a post without a slug, is dropped rather than rendered as a broken link.
-    return (body?.posts ?? [])
+    return body.posts
         .map((row) => (row as Partial<PostSnapshot> | null)?.post)
         .filter((post): post is PublishedPost => Boolean(post?.slug));
+}
+
+/** The same where a failed read may read as none: the sitemap. */
+export async function getPublishedPosts(
+    siteId: string,
+): Promise<PublishedPost[]> {
+    return (await readPublishedPosts(siteId)) ?? [];
 }
 
 /**
@@ -607,7 +633,7 @@ export function getJournalFeed(
     siteId: string | null,
 ): Promise<JournalFeed | undefined> {
     return journalFeed(sections, `/${postsPrefix(snapshot)}`, () =>
-        siteId ? getPublishedPosts(siteId) : Promise.resolve([]),
+        siteId ? readPublishedPosts(siteId) : Promise.resolve([]),
     );
 }
 
@@ -627,25 +653,40 @@ export function getPreviewJournalFeed(
     );
 }
 
-/** One live post by slug, or null when it is not live. */
+/**
+ * One live post by slug, or null when it is not live. A read that failed
+ * throws, to the site's error boundary with its Try again: "not found" would
+ * tell a reader, and a crawler, that a live post has gone.
+ */
 export async function getPublishedPost(
     siteId: string,
     slug: string,
 ): Promise<PublishedPost | null> {
+    const failed = (why: string): Error => {
+        dontCachePage("post unavailable");
+        return new Error(`Post read failed: ${why}`);
+    };
     let res: Response;
     try {
         res = await fetch(
             `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
-        return null;
+        throw failed("no answer");
     }
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
+    if (!res.ok) throw failed(String(res.status));
     const body = (await res.json().catch(() => null)) as {
         snapshot?: PostSnapshot;
     } | null;
-    return body?.snapshot?.post ?? null;
+    // A 200 with no post is a bad answer, not a post that has gone.
+    if (!body?.snapshot?.post) throw failed("not a post");
+    return body.snapshot.post;
 }
 
 /**
@@ -696,6 +737,50 @@ export async function getSiteForHost(
     return fetchSiteView(`by-subdomain/${encodeURIComponent(subdomain)}`);
 }
 
+/** Whether a site read in this request has failed. One box per request. */
+const siteReads = cache(() => ({ failed: false }));
+
+/**
+ * Whether a host with no live site got there because a read failed rather
+ * than because the API said nothing is here. Asked only on that miss, as
+ * `getMovedTo` is: the layout then throws to the site's error page with its
+ * Try again, not "there's no website at this address", to a visitor or a
+ * crawler, for what was an API restart. Never asked for a test host, whose
+ * release says why itself.
+ */
+export async function siteReadFailed(
+    host: string | null | undefined,
+): Promise<boolean> {
+    // `getSiteForHost` has already seen this request's read fail: don't wait
+    // on two more to be told.
+    if (siteReads().failed) return true;
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    if (!hostname) return false;
+    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
+    const subdomain = subdomainFromHost(host);
+    const reads = [
+        ...(root && hostname !== root && !hostname.endsWith(`.${root}`)
+            ? [`by-hostname/${encodeURIComponent(hostname)}`]
+            : []),
+        ...(subdomain ? [`by-subdomain/${encodeURIComponent(subdomain)}`] : []),
+    ];
+    const answers = await Promise.all(
+        reads.map(async (read) => {
+            try {
+                const res = await fetch(`${API_URL}/public/sites/${read}`, {
+                    cache: "no-store",
+                    headers: { accept: "application/json" },
+                    signal: serverReadSignal(),
+                });
+                return res.status !== 404;
+            } catch {
+                return true;
+            }
+        }),
+    );
+    return answers.includes(true);
+}
+
 /** One public site read, returning the snapshot and the site id together. */
 async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
     let res: Response;
@@ -703,12 +788,16 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         res = await fetch(`${API_URL}/public/sites/${suffix}`, {
             cache: "no-store",
             headers: { accept: "application/json" },
+            signal: serverReadSignal(),
         });
     } catch {
+        siteReads().failed = true;
         return null;
     }
-    if (!res.ok) return null;
-    return siteViewOf(await res.json().catch(() => null));
+    if (res.status === 404) return null;
+    const site = res.ok ? siteViewOf(await res.json().catch(() => null)) : null;
+    if (!site) siteReads().failed = true;
+    return site;
 }
 
 /**
@@ -727,9 +816,14 @@ async function fetchHostnameView(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
+        siteReads().failed = true;
         return null;
     }
     if (res.status === 404) {
@@ -740,8 +834,8 @@ async function fetchHostnameView(
         );
         return to ? { pausedTo: to } : null;
     }
-    if (!res.ok) return null;
-    const site = siteViewOf(await res.json().catch(() => null));
+    const site = res.ok ? siteViewOf(await res.json().catch(() => null)) : null;
+    if (!site) siteReads().failed = true;
     return site ? { site } : null;
 }
 
@@ -867,7 +961,7 @@ export async function getMovedTo(
     try {
         const res = await fetch(
             `${API_URL}/public/sites/moved/${encodeURIComponent(address)}`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) return null;
         const body = (await res.json().catch(() => null)) as {

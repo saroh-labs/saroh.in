@@ -27,6 +27,8 @@ export interface PlansRead {
     notTakingOrders?: boolean;
     /** How long members may pause, in weeks (DEC-172 U7); none when absent. */
     pauseWeeks?: number[];
+    /** The read failed: not "none", so the block says so. */
+    failed?: boolean;
 }
 
 export async function plansFeed(
@@ -36,17 +38,18 @@ export async function plansFeed(
     read: () => Promise<PlansRead>,
 ): Promise<PlansFeed | undefined> {
     if (!hasPlans(sections)) return undefined;
-    // A failed read, Payments off or no plan on sale is an empty list (the
-    // reader never throws), and an empty list draws nothing: the page still
-    // serves.
+    // Payments off or no plan on sale is an empty list, which draws nothing.
+    // A failed read is not (the reader never throws): the block says so.
     const {
         plans,
         payOnline,
         autopayMethods = [],
         notTakingOrders,
         pauseWeeks = [],
+        failed,
     } = await read();
     return {
+        ...(failed ? { failed: true } : {}),
         plans,
         joinHref,
         payOnline,

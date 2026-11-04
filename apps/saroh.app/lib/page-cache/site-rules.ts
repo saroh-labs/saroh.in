@@ -16,6 +16,13 @@ import { productTag, siteProductsTag, siteTag } from "./tags";
  */
 export const LIVE_HEAD_MAX_AGE_SECONDS = 60;
 
+/**
+ * The most seconds `/book` may be kept: it draws the services offered now,
+ * and no service write revalidates a page (`backend-jobs.md`), so a service
+ * added shows within this, with no republish.
+ */
+export const SERVICES_OFFERED_MAX_AGE_SECONDS = 60;
+
 export interface LayoutFacts {
     /** The live site, or null when the host resolved to none. */
     siteId: string | null | undefined;
@@ -25,6 +32,8 @@ export interface LayoutFacts {
     liveHead: boolean;
     /** The shop's read failed (not "closed": failed). */
     catalogueFailed: boolean;
+    /** The booking read failed: the header has lost Book for this render. */
+    bookingFailed?: boolean;
 }
 
 function tagSafely(make: () => string): void {
@@ -48,6 +57,12 @@ export function pageCacheRules(facts: LayoutFacts): void {
     // The header's Order and the shop's pages follow this read: a failure
     // must not be what every visitor sees for the next few minutes.
     if (facts.catalogueFailed) dontCachePage("catalogue unavailable");
+    if (facts.bookingFailed) dontCachePage("booking unavailable");
+}
+
+/** `/book`, which draws the services offered now. */
+export function showsServicesOffered(): void {
+    keepPageAtMost(SERVICES_OFFERED_MAX_AGE_SECONDS);
 }
 
 /** `/shop` and every page with a Product grid: they list products. */
