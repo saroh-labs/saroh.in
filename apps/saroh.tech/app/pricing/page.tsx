@@ -7,7 +7,7 @@ import { Plans } from "@/components/pricing/plans";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CTA_BAND } from "@/content/home";
 import { PRICING } from "@/content/pricing";
-import { pricingModel } from "@/lib/plans";
+import { pricingModel, readCatalog } from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -17,8 +17,8 @@ const page = pageOf("/pricing");
 
 export const metadata = pageMetadata(page);
 
-/** saroh.in's pricing page, without the tables: there's no catalogue to fill them. */
-export default function PricingPage() {
+/** saroh.in's pricing page, without the tables: only Free's limits are read. */
+export default async function PricingPage() {
     return (
         <div data-page-type={page.type}>
             <JsonLd data={pageSchema(page)} />
@@ -35,7 +35,7 @@ export default function PricingPage() {
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
-                <Plans model={pricingModel()} />
+                <Plans model={pricingModel(await readCatalog())} />
             </Container>
             <CtaBand
                 title={PRICING.closer}

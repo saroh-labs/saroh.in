@@ -1,7 +1,8 @@
 /**
  * /pricing's words. Only Free can be used on this edition: plans aren't on sale
  * until stage 9, so nothing here names a price, a limit or what a paid plan
- * would include. Plan names and taglines are saroh.in's public ones.
+ * would include. Free's limits come from the published catalogue at build
+ * (`lib/plans.ts`). Plan names and taglines are saroh.in's public ones.
  */
 export const PRICING = {
     eyebrow: "Pricing",
@@ -26,6 +27,7 @@ export const PRICING = {
         grow: { tagline: "For one place that sells, books and bills." },
         pro: { tagline: "For a business with more than one place." },
     } as Record<string, { tagline: string; price?: string; sub?: string }>,
+    /** Free's card with no catalogue at build. */
     freeLines: [
         "Your website on a saroh.app address",
         "Products, variants and stock",
@@ -34,6 +36,8 @@ export const PRICING = {
         "One page per customer",
         "Numbered invoices in your currency",
     ],
+    /** What Free has with no limit, under its limits. */
+    freeAlways: ["One page per customer", "Numbered invoices in your currency"],
     paidLead: "We'll say what it includes when it's on sale.",
     footnote: "Free has limits on how much you can use.",
 } as const;
