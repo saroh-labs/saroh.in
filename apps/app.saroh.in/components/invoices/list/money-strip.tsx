@@ -3,6 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { ScrollX } from "@saroh/ui/scroll-x";
 
+import { useStartingCurrency } from "@/components/shared/fields/business-country";
 import type { ListQuery } from "@/lib/invoices/list-view";
 import { figureOn } from "@/lib/invoices/list-view";
 import type {
@@ -43,6 +44,7 @@ export function MoneyStrip({
     onPick: (filter: SummaryFilter | null) => void;
     className?: string;
 }) {
+    const currency = useStartingCurrency();
     if (!summary) {
         return (
             <FailedRead
@@ -52,7 +54,7 @@ export function MoneyStrip({
             />
         );
     }
-    const figures = stripFigures(summary);
+    const figures = stripFigures(summary, currency);
     return (
         <ScrollX label="Money owed and paid" bare className={className}>
             <ul

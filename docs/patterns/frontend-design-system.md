@@ -1048,6 +1048,9 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
       (`lib/organizations/business-currency.ts`) by the Leads list, the
       Pipeline, the lead page, a contact's leads and the Contacts list, and
       typed in a `MoneyInput`. It is still kept in minor units.
+      A zero total with no currency is in the business's too
+      (`useStartingCurrency()`), and the money icon is `MoneyIcon`
+      (`components/shared/money-icon.tsx`), a rupee only for rupees.
       `formatNumber(1204)` is "1,204". The sign and the decimal places are
       `moneySign` and `moneyDecimals` from `@saroh/ui/lib/money`, the same
       ones `MoneyInput` shows and keeps.

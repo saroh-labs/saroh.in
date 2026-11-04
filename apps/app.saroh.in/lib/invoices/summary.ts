@@ -42,13 +42,17 @@ export interface FigureView {
     filter: SummaryFilter;
 }
 
-/** "₹35,400", or "₹35,400 + $120" for a business billing in two currencies. */
+/**
+ * "₹35,400", or "₹35,400 + $120" for a business billing in two currencies. The
+ * API sends no totals for nothing, so a zero is in `currency`, the business's.
+ */
 export function totalsWords(
     totals: readonly SummaryTotal[] | undefined,
+    currency = "INR",
 ): string {
     const some = (totals ?? []).filter((t) => t.amountMinor !== 0);
     if (some.length === 0)
-        return formatMoney(0, totals?.[0]?.currency ?? "INR");
+        return formatMoney(0, totals?.[0]?.currency ?? currency);
     return some.map((t) => formatMoney(t.amountMinor, t.currency)).join(" + ");
 }
 
@@ -79,6 +83,7 @@ function figure(
     f: SummaryFigure,
     money: boolean,
     noun: { one: string; other: string },
+    currency?: string,
 ): FigureView {
     const late = key === "overdue" && f.count > 0;
     if (!money) {
@@ -95,7 +100,7 @@ function figure(
     return {
         key,
         label,
-        value: totalsWords(f.totals),
+        value: totalsWords(f.totals, currency),
         sub: f.count === 0 ? "None" : count(f.count, noun.one, noun.other),
         late,
         filter: f.filter,
@@ -105,21 +110,29 @@ function figure(
 const INVOICES = { one: "invoice", other: "invoices" };
 
 /** Owed to you, Overdue, Paid in ‹month›, Drafts: what the strip draws. */
-export function stripFigures(s: InvoiceSummary): FigureView[] {
+export function stripFigures(
+    s: InvoiceSummary,
+    currency?: string,
+): FigureView[] {
     return [
-        figure("owed", "Owed to you", s.owed, s.money, INVOICES),
-        figure("overdue", "Overdue", s.overdue, s.money, INVOICES),
+        figure("owed", "Owed to you", s.owed, s.money, INVOICES, currency),
+        figure("overdue", "Overdue", s.overdue, s.money, INVOICES, currency),
         figure(
             "paid",
             `Paid in ${monthName(s.monthStart)}`,
             s.paidThisMonth,
             s.money,
             INVOICES,
+            currency,
         ),
-        figure("drafts", "Drafts", s.drafts, s.money, {
-            one: "draft",
-            other: "drafts",
-        }),
+        figure(
+            "drafts",
+            "Drafts",
+            s.drafts,
+            s.money,
+            { one: "draft", other: "drafts" },
+            currency,
+        ),
     ];
 }
 

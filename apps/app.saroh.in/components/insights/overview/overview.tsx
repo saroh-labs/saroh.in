@@ -1,7 +1,8 @@
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight, IndianRupee, Info } from "lucide-react";
+import { ChevronRight, Info } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -106,7 +107,7 @@ export function Overview({
                 <EmptyState
                     size="page"
                     className="bg-card"
-                    icon={<IndianRupee />}
+                    icon={<MoneyIcon />}
                     title="Your first sale shows here the week it's paid"
                     description="Then Insights says how each week went, what sells and where customers come from."
                     action={

@@ -102,6 +102,23 @@ describe("the strip's words", () => {
         ).toBe("₹35,400 + $120");
     });
 
+    it("says a zero in the business's currency, and India's stays rupees", () => {
+        const none = { count: 0, totals: [], filter: {} };
+        const empty = {
+            ...SUMMARY,
+            owed: none,
+            overdue: none,
+            paidThisMonth: none,
+            drafts: none,
+        };
+        const drafts = (currency?: string) =>
+            stripFigures(empty, currency).find((f) => f.key === "drafts")
+                ?.value;
+        expect(drafts("GBP")).toBe("£0");
+        expect(drafts("USD")).toBe("$0");
+        expect(drafts("INR")).toBe("₹0");
+    });
+
     it("names the month from its first day, whatever the viewer's zone", () => {
         expect(monthName("2026-10-01")).toBe("October");
         expect(monthName("2027-01-01")).toBe("January");

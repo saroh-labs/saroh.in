@@ -29,7 +29,10 @@ const BusinessCurrencyContext = createContext<string | null>(null);
 
 export const BusinessCurrencyProvider = BusinessCurrencyContext.Provider;
 
-/** The currency to start a new price in, when nothing's priced yet. */
+/**
+ * The currency for money that records none of its own: a new price, a zero
+ * total, an icon. What a Global business chose, else India's rupee.
+ */
 export function useStartingCurrency(): string {
     return useContext(BusinessCurrencyContext) ?? "INR";
 }

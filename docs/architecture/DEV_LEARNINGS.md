@@ -6396,3 +6396,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: a `prettier.config.js` override gives `packages/marketing/**` saroh.in's Tailwind config, and the moved files were restored.
 **Rule**: a package holding Tailwind classes needs that override when it's added. Run the gate again after a commit whose hook rewrote files: its tree isn't the one that passed.
 **Category**: tooling · formatting
+
+---
+
+## A zero with no currency was drawn in rupees on a Global business
+
+**Symptom**: 4 Nov, a Global business saw a ₹ icon on Money in today, "Drafts ₹0" on Invoices and "To pay ₹0" on its booking page.
+**Cause**: the API sends no totals for nothing and a null currency on a free service, and the screens filled the gap with a literal `"INR"` rather than the business's own. Icons were `IndianRupee` by name.
+**Fix**: a zero asks `useStartingCurrency()`, the shell's `Organization.currency` or rupees; the public booking page sends `currency` too. `components/shared/money-icon.tsx` is the one money icon.
+**Rule**: money with no currency of its own is in the business's, never a literal. Use `MoneyIcon`, not `IndianRupee` (`frontend-design-system.md`).
+**Category**: currency · editions

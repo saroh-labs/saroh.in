@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { BusinessCurrencyProvider } from "@/components/shared/fields/business-country";
 import type { TileView } from "@/lib/home/tiles";
 
 import { TodayTiles } from "./today-tiles";
@@ -60,6 +61,25 @@ describe("TodayTiles", () => {
             expect(html).toContain(`href="${href}"`);
         }
         expect(html).toContain("lucide-indian-rupee");
+    });
+
+    it("draws Money in today's icon in the business's currency, at zero too", () => {
+        const money = tile({
+            key: "moneyIn",
+            label: "Money in today",
+            value: "Nothing",
+        });
+        const drawn = (currency: string | null) =>
+            renderToStaticMarkup(
+                <BusinessCurrencyProvider value={currency}>
+                    <TodayTiles tiles={[money]} />
+                </BusinessCurrencyProvider>,
+            );
+        expect(drawn("USD")).not.toContain("lucide-indian-rupee");
+        expect(drawn("USD")).toContain("lucide-banknote");
+        expect(drawn("INR")).toContain("lucide-indian-rupee");
+        // A business from before, which never chose: India's, as it was.
+        expect(drawn(null)).toContain("lucide-indian-rupee");
     });
 
     it("draws three for a role without money", () => {

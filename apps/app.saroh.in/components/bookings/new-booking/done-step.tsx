@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,7 +11,6 @@ import {
     Clock,
     Copy,
     Eye,
-    IndianRupee,
     MessageCircle,
     MessageSquareText,
     Plus,
@@ -191,7 +191,7 @@ export function DoneStep({
                             </div>
                             <div className="flex min-h-14 items-center gap-3 py-2">
                                 <dt className="flex w-7 shrink-0 justify-center text-muted-foreground">
-                                    <IndianRupee
+                                    <MoneyIcon
                                         aria-label="Payment"
                                         className="size-[18px]"
                                     />

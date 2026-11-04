@@ -1,3 +1,4 @@
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -6,7 +7,7 @@ import {
 } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronUp, IndianRupee } from "lucide-react";
+import { ChevronUp } from "lucide-react";
 import Link from "next/link";
 
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
@@ -120,7 +121,7 @@ export function MoneyTab({
                 <EmptyState
                     size="page"
                     className="bg-card"
-                    icon={<IndianRupee />}
+                    icon={<MoneyIcon />}
                     title="Your first sale shows here the week it's paid"
                     description="Then Money says how each week went, where the money comes from and who owes you."
                     action={

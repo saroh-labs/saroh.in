@@ -61,7 +61,14 @@ export function payWords({
     const way = bookingPaymentOf(page.rules);
     const choices = service
         ? [
-              ...(credit ? [creditChoice(credit, service.currency)] : []),
+              ...(credit
+                  ? [
+                        creditChoice(
+                            credit,
+                            service.currency ?? page.currency ?? null,
+                        ),
+                    ]
+                  : []),
               ...payChoices(service, page.payOnline, page.businessName, way),
           ]
         : [];
@@ -80,7 +87,8 @@ export function payWords({
     /** What is left for the visit once the deposit is paid. */
     const rest =
         pay === "DEPOSIT" && service ? restAfterDeposit(service) : null;
-    const zero = formatMoney(0, service?.currency ?? "INR") ?? "₹0";
+    const zero =
+        formatMoney(0, service?.currency ?? page.currency ?? "INR") ?? "₹0";
 
     // "At the desk" for a visit in person, "later" for one held online.
     const later = laterWords(service, page.businessName);

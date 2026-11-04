@@ -1,7 +1,8 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
-import { CalendarPlus, IndianRupee, Plus } from "lucide-react";
+import { CalendarPlus, Plus } from "lucide-react";
 import type { ReactElement } from "react";
 
 import type { MoreRow } from "@/components/bookings/quick-look/quick-look-more";
@@ -43,7 +44,7 @@ export function MainButton({
                     className={BIG}
                     onClick={onTake}
                 >
-                    <IndianRupee aria-hidden className="size-4" />
+                    <MoneyIcon aria-hidden className="size-4" />
                     {amount ? `Take ${amount}` : "Take payment"}
                 </Button>
             );
