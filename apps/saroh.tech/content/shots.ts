@@ -1,8 +1,8 @@
 /**
  * The screenshots this site shows: its own, taken from the real app on the
- * Global demo businesses (`e2e/marketing-shots/shots.global.ts`) and each read
- * by a person for rupees, GST, UPI, +91 and India's places (plan U11). A key
- * with no shot draws no frame.
+ * Global demo businesses (`e2e/marketing-shots/shots.global.ts`), each what a
+ * default Free business has, and each read by a person for rupees, GST, UPI,
+ * +91 and India's places (plan U11). A key with no shot draws no frame.
  */
 import type { ShotKey } from "@saroh/marketing/content-types";
 import type { Shot, ShotView } from "@saroh/marketing/shot";
@@ -16,6 +16,11 @@ import { CAPTURED } from "./shots.captured";
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "r-subdetail": "Subscriptions isn't usable on Global yet.",
     "s-subs": "Subscriptions isn't usable on Global yet.",
+    "g-courses": "Courses isn't on a default Free business.",
+    "s-insights": "Insights isn't on a default Free business.",
+    "i-compare": "Insights isn't on a default Free business.",
+    "i-weeks": "Insights isn't on a default Free business.",
+    "i-store": "Insights isn't on a default Free business.",
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */

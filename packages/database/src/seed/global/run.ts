@@ -23,7 +23,13 @@ import type {
     GlobalManualInvoice,
     GlobalService,
 } from "./data";
-import { FIRST_NAMES, GLOBAL_BUSINESSES, LAST_NAMES } from "./data";
+import {
+    FIRST_NAMES,
+    GLOBAL_BUSINESSES,
+    LAST_NAMES,
+    ONLINE_BOOKINGS_A_MONTH,
+    ORDERS_A_MONTH,
+} from "./data";
 import { morningZone } from "./morning-zone";
 
 /**
@@ -80,6 +86,14 @@ function weekdayOf(now: Date, zone: string, dayOffset: number): number {
     return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(name);
 }
 
+/** "2026-11": the calendar month a moment falls in, where the business is. */
+const monthOf = (at: Date, zone: string) =>
+    at.toLocaleDateString("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+    });
+
 const minuteOf = (hhmm: string) => {
     const [h, m] = hhmm.split(":").map(Number);
     return h * 60 + m;
@@ -99,10 +113,9 @@ interface Person {
 interface Doc {
     id: string;
     status: "DRAFT" | "ISSUED" | "PAID";
-    source: "BOOKING" | "MANUAL" | "ORDER" | "COURSE";
+    source: "BOOKING" | "MANUAL" | "ORDER";
     bookingId?: string;
     orderId?: string;
-    courseEnrollmentId?: string;
     contactId?: string;
     billToName: string;
     billToEmail: string | null;
@@ -228,12 +241,22 @@ async function seedOne(
             },
         });
     }
+    // Free's limits and locks apply here, as they would on Global.
+    await prisma.featureFlagOverride.create({
+        data: {
+            id: sid("flagoverride", "plan-enforcement"),
+            flagKey: "PLAN_ENFORCEMENT",
+            organizationId: orgId,
+            enabled: true,
+        },
+    });
     // Free: the only plan a Global business can be on today.
     await prisma.subscription.create({
         data: {
             id: sid("subscription"),
             organizationId: orgId,
-            planId: await seedPlanId(prisma, now, "free"),
+            // The wall clock: `now` is rounded down, to before a catalogue just imported.
+            planId: await seedPlanId(prisma, new Date(), "free"),
             status: "ACTIVE",
             currentPeriodEnd: at(30, 540),
         },
@@ -488,19 +511,6 @@ async function seedOne(
                 })),
             ),
         });
-        if (s.dayOff !== undefined) {
-            await prisma.staffTimeOff.create({
-                data: {
-                    id: sid("timeoff", s.key),
-                    organizationId: orgId,
-                    staffId: sid("staff", s.key),
-                    startAt: at(s.dayOff, 0),
-                    endAt: at(s.dayOff + 1, 0),
-                    reason: "Day off",
-                    createdAt: at(-5, 600),
-                },
-            });
-        }
     }
     await prisma.bookingRules.create({
         data: {
@@ -542,8 +552,8 @@ async function seedOne(
                 source: "STAFF",
                 status: "ACTIVE",
                 createdByUserId: demoUserId,
-                createdAt: at(-120, 600),
-                updatedAt: at(-120, 600),
+                createdAt: at(-40, 600),
+                updatedAt: at(-40, 600),
             }),
         );
         r.notes?.forEach((body, k) =>
@@ -607,17 +617,23 @@ async function seedOne(
         });
     }
 
-    // --- courses, packs and the diary
+    // --- the diary
     const bookings: (Prisma.BookingCreateManyInput & { id: string })[] = [];
     const events: Prisma.BookingEventCreateManyInput[] = [];
+    // One person: what's booked already, so nothing lands on top of it.
+    const busy: [number, number][] = [];
+    const onlineByMonth = new Map<string, number>();
+    const free = (startAt: Date, minutes: number) => {
+        const from = startAt.getTime();
+        const to = from + minutes * 60_000;
+        return busy.every(([s, e]) => to <= s || from >= e);
+    };
     const book = (b: {
         id: string;
         service: GlobalService;
         person: Person;
         startAt: Date;
         staffKey: string | null;
-        paidWith?: string | null;
-        courseEnrollmentId?: string;
         orderId?: string;
         visitNumber?: number;
         intakeNote?: string;
@@ -627,6 +643,7 @@ async function seedOne(
         const endAt = new Date(
             b.startAt.getTime() + b.service.minutes * 60_000,
         );
+        busy.push([b.startAt.getTime(), endAt.getTime()]);
         const past = endAt < now;
         const cancelled = b.status === "CANCELLED";
         const hoursAgo = (now.getTime() - endAt.getTime()) / 3_600_000;
@@ -644,6 +661,12 @@ async function seedOne(
                 now.getTime() - (0.6 + b.roll * 12) * DAY,
             ),
         );
+        // Some made on the site, up to its month's share; the rest at the desk.
+        const madeIn = monthOf(madeAt, biz.zone);
+        const made = onlineByMonth.get(madeIn) ?? 0;
+        const bookedOnline =
+            !cancelled && b.roll < 0.4 && made < ONLINE_BOOKINGS_A_MONTH;
+        if (bookedOnline) onlineByMonth.set(madeIn, made + 1);
         bookings.push({
             id: b.id,
             organizationId: orgId,
@@ -661,8 +684,8 @@ async function seedOne(
             bookerEmail: b.person.email,
             bookerPhone: b.person.phone,
             staffId: b.staffKey ? sid("staff", b.staffKey) : null,
-            paidWith: b.paidWith ?? (b.service.price ? "DESK" : null),
-            courseEnrollmentId: b.courseEnrollmentId,
+            bookedOnline,
+            paidWith: b.service.price ? "DESK" : null,
             orderId: b.orderId,
             visitNumber: b.visitNumber,
             intakeNote: b.intakeNote,
@@ -717,114 +740,13 @@ async function seedOne(
         return { outcome, endAt, cancelled };
     };
 
-    if (biz.services.length) {
-        planDiary(biz, sid, {
-            people,
-            regularOf,
-            book,
-            docs,
-            now,
-            at,
-            rng: rng("diary"),
-        });
-    }
-
-    // Courses, before the rows that point at them.
-    const enrolments: Prisma.CourseEnrollmentCreateManyInput[] = [];
-    const sessions: Prisma.CourseSessionCreateManyInput[] = [];
-    const courseRows: Prisma.CourseCreateManyInput[] = [];
-    biz.courses.forEach((c, ci) => {
-        const service = biz.services.find((s) => s.key === c.service);
-        if (!service) throw new Error(`${biz.name}: no service ${c.service}`);
-        const courseId = sid("course", ci);
-        courseRows.push({
-            id: courseId,
-            organizationId: orgId,
-            serviceId: sid("service", c.service),
-            name: c.name,
-            description: c.description,
-            price: money(c.price),
-            currency: biz.currency,
-            seats: c.seats,
-            status: "OPEN",
-            createdAt: at(c.startsInDays - 21, 600),
-            updatedAt: at(c.startsInDays - 21, 600),
-        });
-        const starts = Array.from({ length: c.sessions }, (_, k) =>
-            at(c.startsInDays + k * 7, minuteOf(c.at)),
-        );
-        starts.forEach((startAt, si) =>
-            sessions.push({
-                id: sid("coursesession", ci, si),
-                organizationId: orgId,
-                courseId,
-                startAt,
-                endAt: new Date(startAt.getTime() + service.minutes * 60_000),
-                createdAt: at(c.startsInDays - 21, 600),
-            }),
-        );
-        for (let e = 0; e < c.enrolled; e++) {
-            const person = people[e];
-            const joined = at(c.startsInDays - 14 + e, 700);
-            const enrollmentId = sid("enrollment", ci, e);
-            enrolments.push({
-                id: enrollmentId,
-                organizationId: orgId,
-                courseId,
-                contactId: person.contactId,
-                status: "ACTIVE",
-                price: money(c.price),
-                currency: biz.currency,
-                createdByUserId: demoUserId,
-                createdAt: joined,
-                updatedAt: joined,
-            });
-            starts.forEach((startAt, si) =>
-                book({
-                    id: sid("coursebooking", ci, e, si),
-                    service,
-                    person,
-                    startAt,
-                    staffKey: "jordan",
-                    paidWith: "DESK",
-                    courseEnrollmentId: enrollmentId,
-                    roll: ((e * 7 + si * 3) % 10) / 13,
-                }),
-            );
-            docs.push({
-                id: sid("invoice", "course", ci, e),
-                status: e % 5 === 4 ? "ISSUED" : "PAID",
-                source: "COURSE",
-                courseEnrollmentId: enrollmentId,
-                contactId: person.contactId,
-                billToName: person.name,
-                billToEmail: person.email,
-                issuedAt: joined,
-                dueAt: new Date(joined.getTime() + 14 * DAY),
-                paidAt: e % 5 === 4 ? null : joined,
-                paymentMethod: e % 5 === 4 ? null : "CARD",
-                lines: [
-                    {
-                        description: `${c.name} · ${c.sessions} sessions`,
-                        quantity: 1,
-                        unit: c.price,
-                    },
-                ],
-            });
-        }
-    });
-    if (courseRows.length) {
-        await prisma.course.createMany({ data: courseRows });
-        await prisma.courseSession.createMany({ data: sessions });
-        await prisma.courseEnrollment.createMany({ data: enrolments });
-    }
-
     // Treatments sold as orders (E9): a root canal part-way through its visits.
     const treatments =
         biz.key === "clinic"
             ? planTreatments(biz, sid, {
                   regularOf,
                   at,
+                  now,
                   orgId,
                   storeId: storeIds[0],
                   docs,
@@ -835,6 +757,19 @@ async function seedOne(
         await prisma.customer.create({ data: t.customer });
         await prisma.customerIdentityLink.create({ data: t.link });
         await prisma.order.create({ data: t.order });
+    }
+
+    if (biz.services.length) {
+        planDiary(biz, sid, {
+            people,
+            regularOf,
+            book,
+            free,
+            docs,
+            now,
+            at,
+            rng: rng("diary"),
+        });
     }
 
     for (let k = 0; k < bookings.length; k += 1000) {
@@ -1235,12 +1170,24 @@ async function writeOrders(
         paid: boolean;
     }[] = [];
     const history = biz.orders - 6;
+    const inMonth = new Map<string, number>();
+    const take = (day: number) => {
+        const month = monthOf(at(day, 720), biz.zone);
+        const taken = inMonth.get(month) ?? 0;
+        if (taken >= ORDERS_A_MONTH) return false;
+        inMonth.set(month, taken + 1);
+        return true;
+    };
+    // Today's board counts first: it's this month's, whatever history draws.
+    for (const day of [0, 0, 0, 0, 0, -2]) take(day);
     for (let i = 0; i < history; i++) {
         const fulfilment = rng.chance(0.2)
             ? ("LOCAL_DELIVERY" as const)
             : ("PICKUP" as const);
+        const day = -rng.int(1, 80);
+        if (!take(day)) continue;
         specs.push({
-            day: -rng.int(1, 80),
+            day,
             minute: rng.int(7 * 60, 16 * 60),
             stage: fulfilment === "PICKUP" ? "COLLECTED" : "DELIVERED",
             fulfilment,
@@ -1375,7 +1322,11 @@ async function writeOrders(
             chosen.add(rng.weighted(a.placed, (p) => p.weight));
         let subtotal = 0;
         const lines: Doc["lines"] = [];
-        const open = spec.stage !== "COLLECTED" && spec.stage !== "DELIVERED";
+        // On its way, it has left the shelf: only these still hold stock.
+        const open =
+            spec.stage === "NEW" ||
+            spec.stage === "PREPARING" ||
+            spec.stage === "READY";
         Array.from(chosen).forEach((p, l) => {
             const shelf = p.shelves[rng.int(0, p.shelves.length - 1)];
             const quantity = shelf.price < 1000 ? rng.int(1, 3) : 1;
@@ -1486,6 +1437,7 @@ function planDiary(
             roll: number;
             status?: "CONFIRMED" | "CANCELLED";
         }) => { outcome: string | null; endAt: Date; cancelled: boolean };
+        free: (startAt: Date, minutes: number) => boolean;
         docs: Doc[];
         now: Date;
         at: (day: number, minute: number) => Date;
@@ -1527,46 +1479,9 @@ function planDiary(
         });
     };
 
+    // Classes first: they're at fixed times, and the rest fits around them.
     for (let day = -45; day <= 21; day++) {
         const weekday = weekdayOf(now, biz.zone, day);
-        for (const staff of biz.staff) {
-            if (staff.dayOff === day) continue;
-            const offered = biz.services.filter(
-                (s) => s.weight > 0 && staff.services.includes(s.key),
-            );
-            if (!offered.length) continue;
-            for (const w of staff.hours) {
-                if (!w.days.includes(weekday)) continue;
-                let minute = minuteOf(w.from);
-                const end = minuteOf(w.to);
-                const busyness = day > 7 ? 0.25 : day > 0 ? 0.55 : 0.7;
-                while (minute < end) {
-                    const s = rng.weighted(offered, (o) => o.weight);
-                    if (minute + s.minutes > end) break;
-                    if (rng.chance(busyness)) {
-                        const id = sid("booking", n++);
-                        const person = pickPerson();
-                        const startAt = at(day, minute);
-                        const { outcome, cancelled } = a.book({
-                            id,
-                            service: s,
-                            person,
-                            startAt,
-                            staffKey: staff.key,
-                            roll: rng.next(),
-                            status: rng.chance(0.05)
-                                ? "CANCELLED"
-                                : "CONFIRMED",
-                        });
-                        if (outcome === "ATTENDED" && !cancelled)
-                            billVisit(id, person, s, startAt);
-                        minute += s.minutes;
-                    } else {
-                        minute += 30;
-                    }
-                }
-            }
-        }
         for (const s of biz.services) {
             for (const c of s.classAt ?? []) {
                 if (!c.days.includes(weekday)) continue;
@@ -1604,59 +1519,102 @@ function planDiary(
             }
         }
     }
-    // Every regular has a next visit, so their page has one.
+    // Every regular has past visits and a next one, so their page has them.
     const oneToOne = biz.services.filter((s) => s.weight > 0);
+    /** The last free start in that day's hours, if the person works that day. */
+    const lastFree = (day: number, s: GlobalService) => {
+        const staff = biz.staff.find((t) => t.services.includes(s.key));
+        const w = staff?.hours.find((h) =>
+            h.days.includes(weekdayOf(now, biz.zone, day)),
+        );
+        if (!staff || !w) return null;
+        for (
+            let minute = minuteOf(w.to) - s.minutes;
+            minute >= minuteOf(w.from);
+            minute -= 30
+        ) {
+            if (a.free(at(day, minute), s.minutes)) {
+                return { staff, startAt: at(day, minute) };
+            }
+        }
+        return null;
+    };
     biz.regulars.forEach((r, i) => {
         const person = a.regularOf.get(r.key);
         const s = oneToOne.at(0) ?? biz.services.at(0);
-        if (!person || !s || !biz.staff.length) return;
+        if (!person || !s) return;
         for (let v = 0; v < (r.visits ?? 0); v++) {
-            const day = -5 - v * 9 - i;
-            const staff = biz.staff.find(
-                (t) =>
-                    t.services.includes(s.key) &&
-                    t.hours.some((w) =>
-                        w.days.includes(weekdayOf(now, biz.zone, day)),
-                    ),
-            );
-            if (!staff) continue;
-            const w = staff.hours.find((h) =>
-                h.days.includes(weekdayOf(now, biz.zone, day)),
-            );
-            if (!w) continue;
+            const slot = lastFree(-5 - v * 9 - i, s);
+            if (!slot) continue;
             const id = sid("visit", r.key, v);
-            const startAt = at(day, minuteOf(w.to) - s.minutes);
             const { outcome } = a.book({
                 id,
                 service: s,
                 person,
-                startAt,
-                staffKey: staff.key,
+                startAt: slot.startAt,
+                staffKey: slot.staff.key,
                 roll: ((v * 3) % 10) / 11,
             });
-            if (outcome === "ATTENDED") billVisit(id, person, s, startAt);
+            if (outcome === "ATTENDED") billVisit(id, person, s, slot.startAt);
         }
         for (let d = 2 + i; d < 14; d++) {
-            const wd = weekdayOf(now, biz.zone, d);
-            const staff = biz.staff.find(
-                (t) =>
-                    t.services.includes(s.key) &&
-                    t.dayOff !== d &&
-                    t.hours.some((w) => w.days.includes(wd)),
-            );
-            const w = staff?.hours.find((h) => h.days.includes(wd));
-            if (!staff || !w) continue;
+            const slot = lastFree(d, s);
+            if (!slot) continue;
             a.book({
                 id: sid("visit", r.key, "next"),
                 service: s,
                 person,
-                startAt: at(d, minuteOf(w.to) - s.minutes),
-                staffKey: staff.key,
+                startAt: slot.startAt,
+                staffKey: slot.staff.key,
                 roll: 0,
             });
             break;
         }
     });
+    // The day to day, in what's left of each day.
+    for (let day = -45; day <= 21; day++) {
+        const weekday = weekdayOf(now, biz.zone, day);
+        for (const staff of biz.staff) {
+            const offered = biz.services.filter(
+                (s) => s.weight > 0 && staff.services.includes(s.key),
+            );
+            if (!offered.length) continue;
+            for (const w of staff.hours) {
+                if (!w.days.includes(weekday)) continue;
+                let minute = minuteOf(w.from);
+                const end = minuteOf(w.to);
+                const busyness = day > 7 ? 0.2 : day > 0 ? 0.4 : 0.5;
+                while (minute < end) {
+                    const s = rng.weighted(offered, (o) => o.weight);
+                    if (minute + s.minutes > end) break;
+                    if (
+                        a.free(at(day, minute), s.minutes) &&
+                        rng.chance(busyness)
+                    ) {
+                        const id = sid("booking", n++);
+                        const person = pickPerson();
+                        const startAt = at(day, minute);
+                        const { outcome, cancelled } = a.book({
+                            id,
+                            service: s,
+                            person,
+                            startAt,
+                            staffKey: staff.key,
+                            roll: rng.next(),
+                            status: rng.chance(0.05)
+                                ? "CANCELLED"
+                                : "CONFIRMED",
+                        });
+                        if (outcome === "ATTENDED" && !cancelled)
+                            billVisit(id, person, s, startAt);
+                        minute += s.minutes;
+                    } else {
+                        minute += 30;
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** Daniel's root canal (visit 1 attended, 2 coming, 3 not booked) and Grace's whitening. */
@@ -1666,6 +1624,7 @@ function planTreatments(
     a: {
         regularOf: Map<string, Person>;
         at: (day: number, minute: number) => Date;
+        now: Date;
         orgId: string;
         storeId: string;
         docs: Doc[];
@@ -1682,6 +1641,11 @@ function planTreatments(
     },
 ) {
     const { at } = a;
+    // The clinic is shut at weekends: the next weekday instead.
+    const toWeekday = (day: number) => {
+        const weekday = weekdayOf(a.now, biz.zone, day);
+        return weekday === 6 ? 2 : weekday === 0 ? 1 : 0;
+    };
     const scene = [
         {
             person: "daniel",
@@ -1714,7 +1678,7 @@ function planTreatments(
                 id: sid("visit", t.person, `treat${v}`),
                 service,
                 person,
-                startAt: at(day, minute),
+                startAt: at(day + toWeekday(day), minute),
                 staffKey: "helen",
                 orderId,
                 visitNumber: v + 1,
@@ -1858,7 +1822,6 @@ async function writeInvoices(
             source: d.source,
             bookingId: d.bookingId,
             orderId: d.orderId,
-            courseEnrollmentId: d.courseEnrollmentId,
             contactId: d.contactId,
             billToName: d.billToName,
             billToEmail: d.billToEmail,
@@ -1927,6 +1890,22 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[]) {
         }
     }
     const scoped = { organizationId: { in: [...orgIds] } };
+    // What a default Free business is: one person, and no Payments or courses.
+    const [members, otherStaff, modules] = await Promise.all([
+        prisma.membership.count({ where: scoped }),
+        prisma.staffMember.count({ where: { ...scoped, membershipId: null } }),
+        prisma.organizationModule.count({
+            where: {
+                ...scoped,
+                moduleKey: { in: ["PAYMENTS", "COURSES", "CLASS_PACKS"] },
+            },
+        }),
+    ]);
+    if (members !== orgIds.length || otherStaff > 0 || modules > 0) {
+        throw new Error(
+            `[global] more than Free: ${members} members, ${otherStaff} staff with no login, ${modules} paid modules`,
+        );
+    }
     const rupees = await Promise.all([
         prisma.invoice.count({ where: { ...scoped, currency: "INR" } }),
         prisma.order.count({ where: { ...scoped, currency: "INR" } }),

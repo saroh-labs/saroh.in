@@ -5,8 +5,10 @@
  *
  * A person looks at every image: nothing checks pixels for ₹ or GST. A screen
  * that still shows India's details, or a feature a Global business can't use
- * (working subscriptions, online payments, pay links), isn't listed here, and
- * its key stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS.
+ * (working subscriptions, online payments, pay links), or one a default Free
+ * business doesn't have on (Insights, courses), isn't listed here, and its key
+ * stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS. Nothing is hidden
+ * from a shot: what's on the page is what a Free business sees.
  *
  * Read-only, like every shot: nothing here saves. `alt` is true to the image
  * and names the business as a demo.
@@ -22,8 +24,6 @@ const SALON = "seed_gl_salon";
 const GYM = "seed_gl_gym";
 const CLINIC = "seed_gl_clinic";
 
-/** "Connect payments": a Global business has nothing to connect yet. */
-const NO_SETUP = { steps: [{ hide: "[data-setup-checklist]" }] };
 /** Past a service's click the summary reads its price, not the empty "To pay". */
 const bookingPage = (service: string): Partial<Shot> => ({
     viewport: { width: 1440, height: 1600 },
@@ -77,7 +77,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "s-orders",
         "/commerce/orders",
         "The Orders list at Thistlewick Bakery (demo bakery): each order's step, how long it has waited and its total",
-        { steps: [{ hide: '[role="note"]:has-text("count as late")' }] },
     ),
     shop(
         "r-order",
@@ -88,6 +87,10 @@ export const GLOBAL_SHOTS: Shot[] = [
         "r-invoice",
         `/billing/invoices/${SHOP}_invoice_manual_cedar`,
         "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
+        {
+            viewport: { width: 1440, height: 1100 },
+            clip: { selector: ".invoice-paper", pad: 16 },
+        },
     ),
     shop(
         "r-customers",
@@ -108,6 +111,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "r-calendar",
         "/calendar",
         "This month on the calendar at Thistlewick Bakery (demo bakery), with each day's money and a strip of totals",
+        { viewport: { width: 1440, height: 845 } },
     ),
     shop(
         "p-products",
@@ -129,83 +133,43 @@ export const GLOBAL_SHOTS: Shot[] = [
         `/commerce/products/${SHOP}_product_0`,
         "The Sourdough loaf's page at Thistlewick Bakery (demo bakery): what can be sold now, with open orders and the website",
     ),
-    shop(
-        "s-insights",
-        "/analytics?tab=money",
-        "Insights at Thistlewick Bakery (demo bakery): money in dollars over the last four weeks, against the four before",
-    ),
-    shop(
-        "i-compare",
-        "/analytics?tab=from",
-        "Four numbers for the site of Thistlewick Bakery (demo bakery): visits, visitors, enquiries, and paid orders and bookings",
-        {
-            viewport: { width: 1440, height: 1100 },
-            clip: {
-                selector:
-                    'main section:has(h2:text-is("Your website")) > div.grid > :first-child',
-                pad: 12,
-            },
-        },
-    ),
-    shop(
-        "i-weeks",
-        "/analytics?tab=from&period=3m",
-        "Three months of visits to the site of Thistlewick Bakery (demo bakery), a bar for each day",
-        {
-            viewport: { width: 1440, height: 1800 },
-            clip: {
-                selector: 'main section:has(h3:text-is("Visits each day"))',
-                pad: 8,
-            },
-        },
-    ),
-    shop(
-        "i-store",
-        "/analytics?tab=from",
-        "The pages people open most on the site of Thistlewick Bakery (demo bakery), with their visits",
-        {
-            viewport: { width: 1440, height: 2000 },
-            clip: {
-                selector:
-                    'main section:has(h3:text-is("Which pages do people open?"))',
-                pad: 16,
-            },
-        },
-    ),
 
     // ── Larkspur & Vane ────────────────────────────────────────────────
     salon(
         "l-home",
         "/",
-        "Home at Larkspur & Vane (demo salon): today's appointments with each stylist and overdue invoices, in pounds",
-        NO_SETUP,
+        "Home at Larkspur & Vane (demo salon): today's appointments and overdue invoices, in pounds",
     ),
     salon(
         "l-book",
         "site:/book",
-        "The booking page of Larkspur & Vane (demo salon): services with prices in pounds, choosing a stylist",
+        "The booking page of Larkspur & Vane (demo salon): services with prices in pounds",
         bookingPage("Cut and blow-dry"),
     ),
     salon(
         "l-team",
         "/bookings/availability",
-        "Each person's hours at Larkspur & Vane (demo salon), by day of the week",
+        "Imogen Vane's hours at Larkspur & Vane (demo salon), the one person Free has room for, by day of the week",
     ),
     salon(
         "l-bookings",
         "/bookings?layout=week&date={nextMonday}",
-        "The week at Larkspur & Vane (demo salon): each stylist's appointments, by the hour",
+        "The week at Larkspur & Vane (demo salon): Imogen Vane's appointments, by the hour",
         weekGrid,
     ),
     salon(
         "l-customer",
         `/contacts/${SALON}_contact_hannah`,
-        "Hannah Clarke's page at Larkspur & Vane (demo salon): her visits, spend, an allergy and the team's note",
+        "Hannah Clarke's page at Larkspur & Vane (demo salon): her next booking, who came and who didn't, and an allergy",
     ),
     salon(
         "l-invoice",
         `/billing/invoices/${SALON}_invoice_manual_bridal`,
         "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
+        {
+            viewport: { width: 1440, height: 1100 },
+            clip: { selector: ".invoice-paper", pad: 16 },
+        },
     ),
     salon(
         "l-site",
@@ -217,13 +181,12 @@ export const GLOBAL_SHOTS: Shot[] = [
     gym(
         "g-home",
         "/",
-        "Home at Ironvale Fitness (demo gym): today's sessions, money in and overdue invoices",
-        NO_SETUP,
+        "Home at Ironvale Fitness (demo gym): today's sessions and overdue invoices",
     ),
     gym(
         "g-bookings",
         "/bookings?layout=week&date={nextMonday}",
-        "The week at Ironvale Fitness (demo gym): personal training and classes, by the hour",
+        "The week at Ironvale Fitness (demo gym): personal training and classes with Jordan Reyes, by the hour",
         weekGrid,
     ),
     gym(
@@ -231,11 +194,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "site:/book",
         "The booking page of Ironvale Fitness (demo gym), with services, classes and a summary",
         bookingPage("Personal training"),
-    ),
-    gym(
-        "g-courses",
-        "/courses",
-        "Courses at Ironvale Fitness (demo gym): a four-week strength course with the places taken",
     ),
     gym(
         "g-customer",
@@ -258,7 +216,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "d-home",
         "/",
         "Home at Wrenfield Dental (demo clinic): today's patients, overdue invoices and a patient's note from the booking page",
-        NO_SETUP,
     ),
     clinic(
         "d-order",
@@ -273,7 +230,7 @@ export const GLOBAL_SHOTS: Shot[] = [
     clinic(
         "d-customers",
         "/commerce/customers",
-        "Patients at Wrenfield Dental (demo clinic), with medical and allergy tags",
+        "The Customers list at Wrenfield Dental (demo clinic): patients with medical and allergy tags, last order and spend",
     ),
     clinic(
         "d-book",

@@ -11,7 +11,18 @@ import { RYE_CAKE_PHOTOS } from "../showcase/catalog-photos";
  * and streets are made up. No GSTIN, no payment provider, nothing online: what
  * a Global business can do today. They sit on the Free plan, the only plan
  * Global can use (no working subscriptions, deposits or pay links).
+ *
+ * Each is what a new Free business has after setup and some real use: the
+ * modules setup offers, no Payments, and one person: the owner, with no other
+ * login or diary person, since each would take a team seat. Numbers stay inside
+ * the limits of dev's catalogue (LOCAL_DEV), which aren't written here: the
+ * repo is public.
  */
+
+/** Orders a business takes in one calendar month. */
+export const ORDERS_A_MONTH = 18;
+/** Bookings customers make on its site in one calendar month. */
+export const ONLINE_BOOKINGS_A_MONTH = 15;
 
 export interface GlobalService {
     key: string;
@@ -42,21 +53,6 @@ export interface GlobalStaff {
     owner?: boolean;
     services: readonly string[];
     hours: readonly { days: readonly number[]; from: string; to: string }[];
-    /** A day off this week, days from today. */
-    dayOff?: number;
-}
-
-export interface GlobalCourse {
-    name: string;
-    description: string;
-    service: string;
-    price: number;
-    seats: number;
-    enrolled: number;
-    /** Weekly: first session this many days from today, at this time. */
-    startsInDays: number;
-    at: string;
-    sessions: number;
 }
 
 export interface GlobalVariant {
@@ -154,7 +150,6 @@ export interface GlobalBusiness {
     }[];
     services: readonly GlobalService[];
     staff: readonly GlobalStaff[];
-    courses: readonly GlobalCourse[];
     categories: readonly { key: string; name: string }[];
     options: readonly {
         key: string;
@@ -220,7 +215,7 @@ export const THISTLEWICK: GlobalBusiness = {
     taxName: "Sales tax",
     taxRate: 5.5,
     taxId: "00-0000000",
-    modules: ["COMMERCE", "CRM", "WEBSITE", "PAYMENTS", "INSIGHTS"],
+    modules: ["COMMERCE", "CRM", "WEBSITE"],
     invoiceStyle: "CLASSIC",
     stores: [
         { key: "main", name: "Downtown" },
@@ -237,7 +232,6 @@ export const THISTLEWICK: GlobalBusiness = {
     }),
     services: [],
     staff: [],
-    courses: [],
     categories: [
         { key: "bread", name: "Bread" },
         { key: "pastry", name: "Pastry" },
@@ -399,7 +393,7 @@ export const THISTLEWICK: GlobalBusiness = {
         { key: "lucy", first: "Lucy", last: "Alvarez", orders: 4 },
     ],
     people: 34,
-    orders: 110,
+    orders: 48,
     manualInvoices: [
         {
             key: "cedar",
@@ -522,7 +516,7 @@ export const LARKSPUR: GlobalBusiness = {
     taxName: "VAT",
     taxRate: 20,
     taxId: "GB000000000",
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "PAYMENTS"],
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE"],
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Larkspur & Vane" }],
     hours: hoursFrom({
@@ -596,29 +590,14 @@ export const LARKSPUR: GlobalBusiness = {
             name: "Imogen Vane",
             title: "Owner and stylist",
             owner: true,
-            services: ["cut", "blow", "roots", "balayage", "consult"],
-            hours: [{ days: [2, 3, 4, 5, 6], from: "09:30", to: "17:30" }],
-        },
-        {
-            key: "tom",
-            name: "Tom Ashby",
-            title: "Senior stylist",
-            services: ["cut", "blow", "gents", "consult"],
+            services: ["cut", "blow", "gents", "roots", "balayage", "consult"],
             hours: [
-                { days: [2, 3, 5, 6], from: "09:30", to: "17:30" },
-                { days: [4], from: "12:00", to: "20:00" },
+                { days: [2, 3, 5], from: "09:30", to: "18:00" },
+                { days: [4], from: "09:30", to: "20:00" },
+                { days: [6], from: "09:00", to: "17:00" },
             ],
         },
-        {
-            key: "rosa",
-            name: "Rosa Lindqvist",
-            title: "Colourist",
-            services: ["roots", "balayage", "blow", "consult"],
-            hours: [{ days: [3, 4, 5, 6], from: "10:00", to: "18:00" }],
-            dayOff: 2,
-        },
     ],
-    courses: [],
     categories: [{ key: "care", name: "Hair care" }],
     options: [],
     products: [],
@@ -636,7 +615,7 @@ export const LARKSPUR: GlobalBusiness = {
                 },
             ],
             notes: [
-                "Likes Tom for cuts, Rosa for colour. Books Thursdays after work.",
+                "Books Thursdays after work. Likes the colour a shade cooler.",
             ],
             visits: 9,
         },
@@ -730,15 +709,15 @@ export const LARKSPUR: GlobalBusiness = {
     ],
     site: {
         heading: "Good hair, no fuss, right in the old town.",
-        text: "A small salon in Bristol. Choose your stylist and book a time that's really free.",
+        text: "A one-chair salon in Bristol. Book a time that's really free.",
         cta: { label: "Book an appointment", href: "/book" },
         servicesHeading: "Services and prices",
         features: {
             heading: "How we work",
             items: [
                 {
-                    title: "Ask for who you like",
-                    body: "Pick your stylist, or take whoever's free first.",
+                    title: "One stylist, start to finish",
+                    body: "Imogen does every cut and colour herself.",
                 },
                 {
                     title: "Tell us what matters",
@@ -778,23 +757,23 @@ export const IRONVALE: GlobalBusiness = {
     taxName: null,
     taxRate: null,
     taxId: null,
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "PAYMENTS", "COURSES"],
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE"],
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Front desk" }],
     hours: hoursFrom({
-        MON: ["06:00", "20:30"],
-        TUE: ["06:00", "20:30"],
-        WED: ["06:00", "20:30"],
-        THU: ["06:00", "20:30"],
-        FRI: ["06:00", "19:00"],
-        SAT: ["08:00", "14:00"],
+        MON: ["09:00", "18:30"],
+        TUE: ["06:30", "18:30"],
+        WED: ["09:00", "18:30"],
+        THU: ["06:30", "15:00"],
+        FRI: ["09:00", "18:30"],
+        SAT: ["08:30", "12:00"],
         SUN: null,
     }),
     services: [
         {
             key: "pt",
             name: "Personal training",
-            description: "An hour with a coach, one to one.",
+            description: "An hour with your coach, one to one.",
             minutes: 60,
             capacity: 1,
             price: 7500,
@@ -812,7 +791,7 @@ export const IRONVALE: GlobalBusiness = {
         {
             key: "trial",
             name: "Free trial session",
-            description: "Come in, try a session, meet a coach.",
+            description: "Come in, try a session, meet your coach.",
             minutes: 30,
             capacity: 1,
             price: 0,
@@ -841,60 +820,25 @@ export const IRONVALE: GlobalBusiness = {
             price: 2000,
             weight: 0,
             classAt: [
-                { days: [2], at: "18:00" },
+                { days: [2], at: "17:30" },
                 { days: [6], at: "09:00" },
             ],
             fill: [5, 13],
-        },
-        {
-            key: "foundations",
-            name: "Strength foundations",
-            description: "The four-week course for beginners.",
-            minutes: 75,
-            capacity: 10,
-            price: 0,
-            weight: 0,
-            hidden: true,
         },
     ],
     staff: [
         {
             key: "jordan",
             name: "Jordan Reyes",
-            title: "Owner and head coach",
+            title: "Owner and coach",
             owner: true,
-            services: ["pt", "assess", "trial", "strength", "foundations"],
-            hours: [{ days: [1, 2, 3, 4, 5], from: "06:00", to: "14:00" }],
-        },
-        {
-            key: "casey",
-            name: "Casey Nguyen",
-            title: "Coach",
-            services: ["pt", "assess", "trial", "strength"],
-            hours: [{ days: [1, 2, 3, 4, 5], from: "12:00", to: "20:00" }],
-        },
-        {
-            key: "dana",
-            name: "Dana Whitfield",
-            title: "Yoga teacher",
-            services: ["yoga", "trial"],
+            services: ["pt", "assess", "trial", "strength", "yoga"],
             hours: [
-                { days: [2], from: "16:00", to: "20:00" },
-                { days: [6], from: "08:00", to: "13:00" },
+                { days: [1, 3, 5], from: "09:00", to: "18:30" },
+                { days: [2], from: "06:30", to: "18:30" },
+                { days: [4], from: "06:30", to: "15:00" },
+                { days: [6], from: "08:30", to: "12:00" },
             ],
-        },
-    ],
-    courses: [
-        {
-            name: "Strength foundations, four weeks",
-            description: "Learn the big lifts safely, in a group of ten.",
-            service: "foundations",
-            price: 18000,
-            seats: 10,
-            enrolled: 7,
-            startsInDays: -9,
-            at: "10:00",
-            sessions: 4,
         },
     ],
     categories: [{ key: "gear", name: "Gear" }],
@@ -984,7 +928,7 @@ export const IRONVALE: GlobalBusiness = {
     ],
     site: {
         heading: "Get strong, in good company.",
-        text: "A small gym in Denver with coaches who know your name. Your first session is free.",
+        text: "A small gym in Denver with a coach who knows your name. Your first session is free.",
         cta: { label: "Book a free trial", href: "/book" },
         servicesHeading: "Classes and coaching",
         features: {
@@ -999,12 +943,12 @@ export const IRONVALE: GlobalBusiness = {
                     body: "Twelve people at most, and a coach watching your form.",
                 },
                 {
-                    title: "Buy a pack",
-                    body: "Five or ten classes at the desk, used as you book.",
+                    title: "Pay when you come",
+                    body: "By card or cash at the desk, with no contract.",
                 },
             ],
         },
-        visit: "<h2>Come and see us</h2><p>2400 Sample Avenue, Denver, CO 80205</p><p>Open from 6 am on weekdays, 8 am on Saturdays.</p>",
+        visit: "<h2>Come and see us</h2><p>2400 Sample Avenue, Denver, CO 80205</p><p>Monday to Saturday, from 6:30 am on Tuesdays and Thursdays.</p>",
         footer: "Ironvale Fitness. A demo business.",
     },
     rules: {
@@ -1032,7 +976,7 @@ export const WRENFIELD: GlobalBusiness = {
     taxName: null,
     taxRate: null,
     taxId: null,
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "PAYMENTS", "COMMERCE"],
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COMMERCE"],
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Wrenfield Dental" }],
     hours: hoursFrom({
@@ -1088,7 +1032,7 @@ export const WRENFIELD: GlobalBusiness = {
             key: "video",
             name: "Video consultation",
             description:
-                "Twenty minutes with a dentist, at the clinic or by video.",
+                "Twenty minutes with the dentist, at the clinic or by video.",
             minutes: 20,
             capacity: 1,
             price: 5000,
@@ -1121,18 +1065,12 @@ export const WRENFIELD: GlobalBusiness = {
                 "video",
                 "xray",
             ],
-            hours: [{ days: [1, 2, 3, 4, 5], from: "08:00", to: "15:00" }],
-        },
-        {
-            key: "owen",
-            name: "Dr. Owen Castillo",
-            title: "Dentist",
-            services: ["checkup", "review", "whitening", "video", "xray"],
-            hours: [{ days: [1, 2, 3, 4], from: "10:00", to: "17:00" }],
-            dayOff: 3,
+            hours: [
+                { days: [1, 2, 3, 4], from: "08:00", to: "17:00" },
+                { days: [5], from: "08:00", to: "15:00" },
+            ],
         },
     ],
-    courses: [],
     categories: [{ key: "care", name: "Dental care" }],
     options: [],
     products: [],
