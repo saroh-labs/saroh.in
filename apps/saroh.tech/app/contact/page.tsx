@@ -7,17 +7,18 @@ import Link from "next/link";
 
 import { ContactForm } from "@/components/contact/contact-form";
 import { JsonLd } from "@/components/shared/json-ld";
-import { CONTACT } from "@/content/contact";
+import { CONTACT, REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { site } from "@/site.config";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 const page = pageOf("/contact");
 
 export const metadata = pageMetadata(page);
 
-/** saroh.in's Contact: the form on the left, the ways to help yourself on the right. */
+/** saroh.in's Contact: the form on the left; on the right the ways to help yourself, the other ways to reach us and the registered office. */
 export default function ContactPage() {
     return (
         <div data-page-type={page.type}>
@@ -60,6 +61,37 @@ export default function ContactPage() {
                             </span>
                         </Link>
                     ))}
+                    <div className="grid gap-3 rounded-mk-card border border-border bg-card px-[22px] py-5">
+                        <h2 className="m-0 font-sans text-[16.5px] font-semibold text-foreground">
+                            {CONTACT.ways.title}
+                        </h2>
+                        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-[18px] gap-y-2 text-[14.5px] leading-[1.5]">
+                            <dt className="text-muted-foreground">
+                                {CONTACT.ways.email}
+                            </dt>
+                            <dd className="m-0">
+                                <a
+                                    href={`mailto:${SUPPORT_EMAIL}`}
+                                    className={textLinkClasses()}
+                                >
+                                    {SUPPORT_EMAIL}
+                                </a>
+                            </dd>
+                        </dl>
+                    </div>
+                    <div className="grid gap-1.5 rounded-mk-card bg-muted px-[22px] py-5 text-[14.5px] leading-[1.55] text-mk-copy">
+                        <h2 className="m-0 font-sans text-[14.5px] font-semibold leading-[1.55] text-foreground">
+                            {CONTACT.office.title}
+                        </h2>
+                        <address className="not-italic">
+                            {site.company}
+                            {REGISTERED_OFFICE.map((line) => (
+                                <span key={line} className="block">
+                                    {line}
+                                </span>
+                            ))}
+                        </address>
+                    </div>
                 </div>
             </Container>
 

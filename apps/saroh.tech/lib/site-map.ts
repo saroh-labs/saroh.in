@@ -18,6 +18,8 @@ import { HELP } from "@/content/help";
 
 import { INTEGRATIONS } from "@/content/integrations";
 
+import { LEGAL_UPDATED } from "@/content/legal";
+
 import { PRICING } from "@/content/pricing";
 
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
@@ -144,7 +146,7 @@ const legal = (slug: string, name: string, description: string): SitePage => ({
     h1: name,
     crumb: [{ name: "Home", path: "/" }, { name }],
     unreviewed: true,
-    updated: "2026-11-02",
+    updated: LEGAL_UPDATED,
 });
 
 const hub = (

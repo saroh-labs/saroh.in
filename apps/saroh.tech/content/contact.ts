@@ -4,7 +4,16 @@ import type {
     ContactTopicId,
 } from "@/lib/contact-message";
 
-/** /contact: saroh.in's form, with no address to write to: a send that fails says only to try again. */
+/** The one address Saroh gives on saroh.tech (owner, 4 Nov). */
+export const SUPPORT_EMAIL = "support@saroh.tech";
+
+/** The registered office, a line at a time: the same company as saroh.in's (`content/company.ts`). */
+export const REGISTERED_OFFICE = [
+    "Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38",
+    "Gurgaon, Haryana 122001, India",
+] as const;
+
+/** /contact: saroh.in's form and ways to reach us. */
 export const CONTACT = {
     eyebrow: "Contact",
     title: "Talk to a person, not a bot.",
@@ -57,8 +66,8 @@ export const CONTACT = {
         } satisfies Record<ContactField, string>,
         submit: "Send message",
         sending: "Sending…",
-        failed: "We couldn't send your message just now. Nothing was sent. Try again in a minute.",
-        rateLimited: "Too many messages from here. Try again later.",
+        failed: "We couldn't send your message just now. Nothing was sent. Try again in a minute, or email",
+        rateLimited: "Too many messages from here. Try again later, or email",
     },
     done: {
         title: (firstName: string) => `Thanks, ${firstName}. We've got it.`,
@@ -82,6 +91,11 @@ export const CONTACT = {
             href: "/customers",
         },
     ],
+    ways: {
+        title: "Other ways to reach us",
+        email: "Email",
+    },
+    office: { title: "Registered office" },
     before: {
         title: "Before you write",
         items: [

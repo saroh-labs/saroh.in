@@ -8,7 +8,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { Field, SelectField, TextArea } from "@/components/shared/field";
-import { CONTACT } from "@/content/contact";
+import { CONTACT, SUPPORT_EMAIL } from "@/content/contact";
 import type {
     ContactField,
     ContactKindId,
@@ -258,7 +258,14 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
                     role="alert"
                     className="m-0 text-[14.5px] font-semibold text-destructive"
                 >
-                    {send.message}
+                    {send.message}{" "}
+                    <a
+                        href={`mailto:${SUPPORT_EMAIL}`}
+                        className="text-destructive"
+                    >
+                        {SUPPORT_EMAIL}
+                    </a>
+                    .
                 </p>
             ) : null}
 

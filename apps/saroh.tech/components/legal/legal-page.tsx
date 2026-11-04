@@ -2,14 +2,29 @@ import { PageTitle } from "@saroh/marketing/page-title";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
-import { Marked } from "@/components/shared/marked";
+import { SUPPORT_EMAIL } from "@/content/contact";
 import type { LegalSection } from "@/content/legal";
-import { placeholders } from "@/content/placeholders";
+import { LEGAL_UPDATED } from "@/content/legal";
 import type { SitePage } from "@/lib/site-map";
+import { formatDate } from "@/lib/tools/dates";
 
 import { ContactCard } from "./contact-card";
 
 const COPY = "m-0 text-[17px] leading-relaxed text-mk-copy";
+
+/** A legal sentence, with the address in it a link, as saroh.in's are. */
+function Sentence({ text }: { text: string }) {
+    const [before, ...rest] = text.split(SUPPORT_EMAIL);
+    return rest.length === 0 ? (
+        text
+    ) : (
+        <>
+            {before}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            {rest.join(SUPPORT_EMAIL)}
+        </>
+    );
+}
 
 function Section({ section }: { section: LegalSection }) {
     const { title, paragraphs, items, table, links } = section;
@@ -20,13 +35,15 @@ function Section({ section }: { section: LegalSection }) {
             </h2>
             {paragraphs?.map((text) => (
                 <p key={text} className={COPY}>
-                    <Marked text={text} />
+                    <Sentence text={text} />
                 </p>
             ))}
             {items ? (
                 <ul className={`${COPY} list-disc pl-5`}>
                     {items.map((text) => (
-                        <li key={text}>{text}</li>
+                        <li key={text}>
+                            <Sentence text={text} />
+                        </li>
                     ))}
                 </ul>
             ) : null}
@@ -90,7 +107,7 @@ export function LegalPage({
             <div className="flex flex-col gap-2.5">
                 <PageTitle size="article">{page.h1}</PageTitle>
                 <p className="m-0 text-[15px] text-muted-foreground">
-                    Last updated: <Marked text={placeholders.legalUpdated} />
+                    Last updated: {formatDate(LEGAL_UPDATED)}
                 </p>
             </div>
             <p
@@ -98,7 +115,7 @@ export function LegalPage({
                 className="m-0 max-w-[720px] rounded-mk-card border border-brand-500 bg-brand-500/10 px-5 py-4 text-[17px] leading-normal"
             >
                 <b>Draft: not yet in force.</b> A lawyer hasn't read this page
-                yet. Marked words are still to be confirmed.
+                yet.
             </p>
             <div className="grid gap-10 pt-2 lg:grid-cols-[minmax(0,720px)_320px] lg:justify-between">
                 <div className="flex flex-col gap-9">

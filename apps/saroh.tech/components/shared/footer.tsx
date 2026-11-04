@@ -9,8 +9,7 @@ import { signInHref, site } from "@/site.config";
 const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
 
 /**
- * saroh.in's footer in layout and type, with this site's columns. No address,
- * registration number or email until a page can vouch for one for Global.
+ * saroh.in's footer in layout and type, with this site's columns.
  */
 export function Footer() {
     return (

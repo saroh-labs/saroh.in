@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { SHOT_KEYS, SOLUTION_FAQ_IDS } from "@saroh/marketing/content-types";
 
+import { officeLine } from "../../saroh.in/content/company";
 import { faqs as inFaqs } from "../../saroh.in/content/faq";
 import { featureList as inFeatures } from "../../saroh.in/content/features";
 import { home as inHome } from "../../saroh.in/content/home";
@@ -12,7 +13,7 @@ import { solutionList as inSolutions } from "../../saroh.in/content/solutions";
 
 import { CHANGELOG, changelogPath } from "@/content/changelog";
 import { COMING } from "@/content/coming";
-import { CONTACT } from "@/content/contact";
+import { CONTACT, REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
 import { faqs, HOME_FAQ, solutionFaq } from "@/content/faq";
 import { featureList, features } from "@/content/features";
 import { GUIDE_CONTENT, guideSteps } from "@/content/guides";
@@ -209,6 +210,20 @@ describe("saroh.tech's words", () => {
         );
     });
 
+    it("give saroh.in's company facts, and only saroh.tech's address", () => {
+        const legal = words([TERMS, PRIVACY]);
+        expect(REGISTERED_OFFICE.join(", ")).toBe(officeLine());
+        expect(legal).toContain(officeLine());
+        expect(legal).toContain(SUPPORT_EMAIL);
+        expect(legal).not.toContain("@saroh.in");
+    });
+
+    it("name only who handles data on Global", () => {
+        expect(words(PRIVACY)).not.toMatch(
+            /Razorpay|Cashfree|Google Analytics|MSG91|DPDP|grievance|Data Fiduciary/i,
+        );
+    });
+
     it("have nothing false left in legal", () => {
         expect(words([TERMS, PRIVACY, COOKIES, BILLING])).not.toMatch(
             /\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i,
@@ -237,18 +252,7 @@ describe("saroh.tech's words", () => {
 
     it("mark only what the owner must supply", () => {
         expect(Object.keys(placeholders).sort()).toEqual(
-            [
-                "changelog",
-                "companyDetails",
-                "dataAfterCancel",
-                "dataLocation",
-                "governingLaw",
-                "guideAuthor",
-                "legalUpdated",
-                "liability",
-                "processors",
-                "supportEmail",
-            ].sort(),
+            ["changelog", "guideAuthor"].sort(),
         );
         expect(words(all)).not.toContain("[confirm");
     });

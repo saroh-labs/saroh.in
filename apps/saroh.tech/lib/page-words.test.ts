@@ -23,9 +23,9 @@ describe("the pricing, integrations, about and contact words", () => {
         expect(planned.map((g) => g.label)).toEqual(["Coming next", "Later"]);
     });
 
-    it("give no address, handle or reply time that isn't confirmed", () => {
+    it("give no reply time that isn't confirmed, and no address of saroh.in's", () => {
         expect(words([pricing, live, ABOUT, CONTACT])).not.toMatch(
-            /@saroh|mailto:|working day|within \d|instagram|linkedin|Gurgaon/i,
+            /@saroh\.in|working day|within \d/i,
         );
     });
 
