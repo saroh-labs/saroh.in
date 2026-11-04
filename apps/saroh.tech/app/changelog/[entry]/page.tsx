@@ -47,6 +47,19 @@ export default async function Page({ params }: Props) {
                 </div>
                 <PageTitle size="article">{page.h1}</PageTitle>
                 <EntryBody entry={entry} />
+                {entry.sections?.map((s) => (
+                    <section
+                        key={s.name}
+                        className="flex flex-col gap-1.5 pt-2"
+                    >
+                        <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                            {s.name}
+                        </h2>
+                        <p className="m-0 text-[17px] leading-[1.6] text-mk-copy">
+                            {s.body}
+                        </p>
+                    </section>
+                ))}
             </div>
             <ChangelogBand />
         </div>

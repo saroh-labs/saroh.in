@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { CHANGELOG } from "@/content/changelog";
-
 import { changelogRss } from "./rss";
 
 const entry = {
@@ -42,14 +40,5 @@ describe("the changelog feed", () => {
         const xml = changelogRss([]);
         expect(xml).not.toContain("<item>");
         expect(xml).not.toContain("lastBuildDate");
-    });
-
-    it("labels an Example entry", () => {
-        const example = CHANGELOG.find((e) => e.example);
-        if (example) {
-            expect(changelogRss([example])).toContain(
-                `<title>Example: ${example.title}</title>`,
-            );
-        }
     });
 });

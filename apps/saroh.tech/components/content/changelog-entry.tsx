@@ -1,9 +1,7 @@
 import Link from "next/link";
 
-import { ConfirmTag } from "@/components/shared/confirm-tag";
 import { CtaBand } from "@/components/shared/cta-band";
 import type { ChangelogEntry } from "@/content/changelog";
-import { placeholders } from "@/content/placeholders";
 import { formatDate } from "@/lib/tools/dates";
 import { signupHref } from "@/site.config";
 
@@ -36,11 +34,6 @@ export function EntryBody({ entry }: { entry: ChangelogEntry }) {
             <p className="m-0 text-[17px] leading-[1.6] text-mk-copy">
                 {entry.summary}
             </p>
-            {entry.example ? (
-                <div>
-                    <ConfirmTag>{`Example ${placeholders.changelog}`}</ConfirmTag>
-                </div>
-            ) : null}
             {entry.try ? (
                 <Link
                     prefetch={false}
