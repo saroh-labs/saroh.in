@@ -12,6 +12,38 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Sites — signing in during a booking lost the date and time
+
+**Symptom**: 4 Nov 2026, the owner: "we do all the steps, then we click the
+sign in, and finish sign in... I was on the same page, but all the items
+selected like the date and time were reset, and had to select again." Worst on
+a day from "Show later dates". With a person chosen, the booking could go to
+someone else.
+**Cause**: the Server Action that sets the session cookie makes Next draw the
+page again, and the new props carry what the address now says. `use-times`
+loaded "the service the page was opened on" in an effect keyed on that prop, so
+`?service=` arriving read the first two weeks again with no person: the later
+day was gone, the time fell away (`chosen` is found again only among the days
+on show) and the step dropped from details to when. A chosen person was dropped
+from the read, and `chosen` matches by `startAt` alone. Separately `customer`
+read its prop once, so a draw that was first to say who it was went unseen.
+**Fix**: the opened service is held in a ref and loads once; another service is
+`pickService`. `use-flow-state` adopts a customer when the server names someone
+new (keyed on `customerHandle`, so "Not you?" and a refused session aren't
+undone by a draw still carrying the old prop), and fills an empty phone.
+**Rule**: on a page that takes Server Actions, `initial*` props describe the
+address at the last draw, not a request to start again. Read them once.
+**Where it lives**: `booking-flow.test.tsx`, `booking-flow-customer.test.tsx`
+and `look-sign-in.test.tsx` draw the page again mid-booking under Classic and
+each look; `site-booking-steps.spec.ts` signs in on a later day and reads what
+was booked.
+**Still open, the owner's call**: the header's Sign in leaves for `/account`
+(A5), and coming back brings the choices from the address and the draft but not
+the phone or note, which are kept out of storage. A reload on a look's `?step=pay`
+opens on when (`openedStep`), a different cause from this one.
+
+---
+
 ## Site — a merchant's Book page came up empty while booking one service worked
 
 **Symptom**: 4 Nov 2026, the owner showing a live site: `/book` was a title and

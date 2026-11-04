@@ -656,3 +656,85 @@ describe("the booked card's calendar", () => {
         ).toBe(false);
     });
 });
+
+describe("the customer the server's next draw brings", () => {
+    const signedOut = () => account({ customer: null });
+    const drawnAgain = (customer: SignedInCustomer | null) => (
+        <BookingFlow
+            page={PAGE}
+            apiUrl={API}
+            account={account({ customer })}
+            initialServiceId="svc_pt"
+            initialDate="2026-09-20"
+            initialStart="07:00"
+            initialStep="details"
+        />
+    );
+    const seven = () =>
+        screen.getByRole("radio", { name: "7:00 am with Karan Mehta" });
+
+    it("keeps what was chosen and typed, says who is booking, and asks for no code", async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: "98450 00000" },
+        });
+        fireEvent.change(screen.getByLabelText("Anything we should know?"), {
+            target: { value: "Bad knee" },
+        });
+        expect(
+            screen.getAllByRole("button", { name: "Continue to sign in" })
+                .length,
+        ).toBeGreaterThan(0);
+
+        rerender(drawnAgain(ASHA));
+
+        expect(screen.getByText(/Booking as/)).toHaveTextContent(
+            "Booking as Asha Rao",
+        );
+        expect(seven()).toHaveAttribute("aria-checked", "true");
+        // What they typed stands over the phone on their account.
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
+            "98450 00000",
+        );
+        expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
+            "Bad knee",
+        );
+        expect(
+            screen.queryByRole("button", { name: "Continue to sign in" }),
+        ).toBeNull();
+        expect(screen.queryByLabelText("Code")).toBeNull();
+    });
+
+    it("fills an empty phone from their account", async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+        );
+        await chooseOneToOne();
+        rerender(drawnAgain(ASHA));
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
+            "98450 12345",
+        );
+    });
+
+    it('doesn\'t undo "Not you?" when a draw still carries the old customer', async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("button", { name: "Not you?" }));
+        await waitFor(() =>
+            expect(screen.queryByText(/Booking as/)).toBeNull(),
+        );
+
+        rerender(drawnAgain(ASHA));
+
+        expect(screen.queryByText(/Booking as/)).toBeNull();
+        expect(seven()).toHaveAttribute("aria-checked", "true");
+    });
+});

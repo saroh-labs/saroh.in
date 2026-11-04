@@ -622,7 +622,8 @@ describe("the booking page (U19)", () => {
         const desk = await screen.findByRole("button", {
             name: "Book it to pay at the desk",
         });
-        // Drawn again by the server with the service the address now names.
+        // Drawn again by the server with the service the address now names:
+        // nothing is read again for it.
         const daysRead = () => calls.filter((c) => c.url.endsWith("/days"));
         const before = daysRead().length;
         rerender(
@@ -633,7 +634,10 @@ describe("the booking page (U19)", () => {
                 initialServiceId="svc_pt"
             />,
         );
-        await waitFor(() => expect(daysRead().length).toBe(before + 1));
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        });
+        expect(daysRead().length).toBe(before);
         fireEvent.click(desk);
 
         expect(
@@ -2841,5 +2845,144 @@ describe("GST on the booking page", () => {
         expect(
             screen.getByRole("button", { name: "Pay ₹1,000 and book" }),
         ).toBeInTheDocument();
+    });
+});
+
+describe("signing in while booking, when the server draws the page again", () => {
+    const LATER = "2026-10-08T04:30:00.000Z";
+    const PEOPLE = [
+        { id: "staff_karan", name: "Karan Mehta" },
+        { id: "staff_ritu", name: "Ritu Kapoor" },
+    ];
+    const laterDays = {
+        ...ONE_DAYS,
+        staff: PEOPLE,
+        days: [
+            {
+                date: "2026-10-08",
+                open: true,
+                starts: [
+                    {
+                        startAt: LATER,
+                        endAt: "2026-10-08T05:30:00.000Z",
+                        staffId: "staff_ritu",
+                        staffName: "Ritu Kapoor",
+                        placesLeft: null,
+                    },
+                ],
+            },
+        ],
+    };
+
+    it("keeps a later day's time, the person and how they'll pay, reads no days again, and books them", async () => {
+        window.sessionStorage.clear();
+        window.history.replaceState(null, "", "/book");
+        serve((url) => {
+            if (url.endsWith("/book")) return json(booked(), 201);
+            return json(
+                url.includes("skip=14")
+                    ? laterDays
+                    : { ...ONE_DAYS, staff: PEOPLE },
+            );
+        });
+        const { rerender } = render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null })}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        );
+        fireEvent.click(
+            await screen.findByRole("radio", { name: "Ritu Kapoor" }),
+        );
+        await waitFor(() =>
+            expect(calls.at(-1)?.url).toContain("staffId=staff_ritu"),
+        );
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Show later dates" }),
+        );
+        const time = await screen.findByRole("radio", {
+            name: "10:00 am with Ritu Kapoor",
+        });
+        fireEvent.click(time);
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        const reads = calls.length;
+
+        // What the Server Action that sets the cookie brings: the address's
+        // choices, none of them the later weeks, and who is signed in.
+        rerender(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+                initialServiceId="svc_pt"
+                initialStaff="staff_ritu"
+                initialDate="2026-10-08"
+                initialStart="10:00"
+                initialStep="details"
+            />,
+        );
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        });
+
+        expect(
+            calls.slice(reads).filter((c) => c.url.includes("/days")),
+        ).toEqual([]);
+        expect(
+            screen.getByRole("radio", { name: "10:00 am with Ritu Kapoor" }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("radio", { name: "Ritu Kapoor" }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("radio", { name: /Pay at the desk/ }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(new URLSearchParams(window.location.search).get("step")).toBe(
+            "details",
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        const sent = calls.find((c) => c.url.endsWith("/book"));
+        expect(JSON.parse(sent?.init?.body as string)).toMatchObject({
+            startAt: LATER,
+            staffId: "staff_ritu",
+            pay: "DESK",
+        });
+    });
+
+    it("still changes service afterwards", async () => {
+        window.sessionStorage.clear();
+        window.history.replaceState(null, "", "/book");
+        serve((url) => json(url.includes("svc_hiit") ? CLASS_DAYS : ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null })}
+            />,
+        );
+        await chooseOneToOne();
+        rerender(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+                initialServiceId="svc_pt"
+            />,
+        );
+        fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
+        await waitFor(() =>
+            expect(calls.at(-1)?.url).toContain("/svc_hiit/days"),
+        );
+        expect(
+            screen.getByRole("radio", { name: /HIIT class/ }),
+        ).toHaveAttribute("aria-checked", "true");
     });
 });

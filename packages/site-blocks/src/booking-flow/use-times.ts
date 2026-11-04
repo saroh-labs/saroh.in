@@ -106,17 +106,20 @@ export function useTimes({
     );
 
     // The service the page was opened on (`?service=`) loads once, for
-    // the person it asked for.
-    const firstId = first?.id ?? null;
+    // the person it asked for. Held, because signing in draws the page again
+    // with the service the address now names: that is no reason to read the
+    // first two weeks again and lose a later time or a person. Another
+    // service is `pickService`.
+    const firstId = useRef(first?.id ?? null);
     const firstStaff = useRef(initialStaff);
     useEffect(() => {
-        if (firstId) {
+        if (firstId.current) {
             loadDays(
-                firstId,
+                firstId.current,
                 firstStaff.current ? { staffId: firstStaff.current } : {},
             );
         }
-    }, [firstId, loadDays]);
+    }, [loadDays]);
 
     /** Another service: everything after it is unchosen. */
     const pickService = (id: string, ask: DaysAsk = {}) => {
