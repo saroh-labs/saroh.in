@@ -195,6 +195,7 @@ describe("unlocking the downloads", () => {
             source: "qr-maker",
             checkedAt: now,
             newsConsent: false,
+            edition: "INDIA",
             ipHash: "h1",
         });
     });

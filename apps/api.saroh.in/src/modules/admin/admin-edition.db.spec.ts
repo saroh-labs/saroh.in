@@ -10,12 +10,17 @@ import { prisma } from "@saroh/database";
 
 import type { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { OrganizationMembersService } from "../organizations/organization-members.service";
+import { assertEmailFree } from "../saroh-leads/lead-access";
+import { recordWebsiteLead } from "../saroh-leads/lead-intake";
+import type { WaitlistInvitesService } from "../waitlist/invites.service";
+import { WaitlistService } from "../waitlist/waitlist.service";
 import type { AdminAuditService } from "./admin-audit.service";
 import { AdminHomeService } from "./admin-home.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminRole, permissionsFor } from "./admin-permissions";
 import { AdminSearchService } from "./admin-search.service";
+import { AdminWaitlistService } from "./admin-waitlist.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const now = new Date();
@@ -219,5 +224,74 @@ describe("Each console shows its own edition (DB, DEC-204)", () => {
         const local = await people.detail(bothId, null);
         expect(local.memberships).toHaveLength(2);
         expect(local.otherEditionBusinesses).toBe(0);
+    });
+});
+
+describe("an email on each edition (owner, 4 Nov)", () => {
+    const email = `lead-${tag}@example.com`;
+
+    it("gives one email a lead on each edition, merging within one", async () => {
+        const on = (edition: "INDIA" | "GLOBAL") =>
+            recordWebsiteLead({ source: "WEBSITE", email, edition });
+        await expect(on("INDIA")).resolves.toBe("created");
+        await expect(on("GLOBAL")).resolves.toBe("created");
+        await expect(on("GLOBAL")).resolves.toBe("merged");
+    });
+
+    it("refuses an email taken only on the same edition", async () => {
+        await prisma.$transaction(async (tx) => {
+            await expect(
+                assertEmailFree(tx, `free-${tag}@example.com`, null, "GLOBAL"),
+            ).resolves.toBeUndefined();
+        });
+        const taken = `taken-${tag}@example.com`;
+        await recordWebsiteLead({
+            source: "WEBSITE",
+            email: taken,
+            edition: "INDIA",
+        });
+        await prisma.$transaction(async (tx) => {
+            await expect(
+                assertEmailFree(tx, taken, null, "GLOBAL"),
+            ).resolves.toBeUndefined();
+            await expect(
+                assertEmailFree(tx, taken, null, "INDIA"),
+            ).rejects.toMatchObject({ status: 409 });
+        });
+    });
+
+    it("takes a person off both editions when they ask", async () => {
+        const waitlist = new WaitlistService();
+        const person = `both-lists-${tag}@example.com`;
+        for (const edition of ["INDIA", "GLOBAL"] as const) {
+            await expect(
+                waitlist.join({ email: person, edition }),
+            ).resolves.toMatchObject({ created: true });
+            await recordWebsiteLead({
+                source: "WAITLIST",
+                email: person,
+                edition,
+            });
+        }
+        await expect(
+            waitlist.join({ email: person, edition: "GLOBAL" }),
+        ).resolves.toEqual({ created: false });
+
+        const india = await prisma.waitlistSignup.findFirstOrThrow({
+            where: { email: person, edition: "INDIA" },
+            select: { id: true },
+        });
+        const admin = new AdminWaitlistService(
+            audit,
+            {} as WaitlistInvitesService,
+        );
+        await admin.remove(owner, india.id, "They asked", "INDIA");
+
+        expect(
+            await prisma.waitlistSignup.count({ where: { email: person } }),
+        ).toBe(0);
+        expect(await prisma.sarohLead.count({ where: { email: person } })).toBe(
+            0,
+        );
     });
 });

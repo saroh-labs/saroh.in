@@ -2980,13 +2980,13 @@ model SarohLead {
   /// Who: the business's or the person's name, as known.
   name     String
   email    String?
-  emailKey String?   @unique
+  emailKey String?
   /// When this email was first put on the lead.
   emailAt  DateTime?
 
   /// The email the business signed up with, when it isn't `email`.
   signUpEmail    String?
-  signUpEmailKey String?   @unique
+  signUpEmailKey String?
   signUpEmailAt  DateTime?
 
   phone String?
@@ -3022,6 +3022,12 @@ model SarohLead {
   @@index([ownerPlatformAdminId, stage])
   @@index([stage, followUpOn])
   @@index([websiteSeenAt])
+
+  // One lead per email on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey])
+  @@unique([edition, signUpEmailKey])
+  @@index([emailKey])
+  @@index([signUpEmailKey])
 }
 
 // A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
@@ -6544,7 +6550,9 @@ model WaitlistSignup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([emailKey, businessKey])
+  // One entry per person and business on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey, businessKey])
+  @@index([emailKey])
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])

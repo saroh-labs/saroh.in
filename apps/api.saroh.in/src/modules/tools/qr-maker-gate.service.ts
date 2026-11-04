@@ -114,8 +114,10 @@ export class QrMakerGateService {
         ipHash?: string;
         edition?: Edition;
     }): Promise<string> {
+        const edition = row.edition ?? "INDIA";
         const where = {
-            emailKey_businessKey: {
+            edition_emailKey_businessKey: {
+                edition,
                 emailKey: row.emailKey,
                 businessKey: NO_BUSINESS,
             },
@@ -150,7 +152,7 @@ export class QrMakerGateService {
                     checkedAt: row.usedAt,
                     newsConsent: false,
                     ipHash: row.ipHash ?? null,
-                    edition: row.edition,
+                    edition,
                 },
                 select: { id: true },
             });

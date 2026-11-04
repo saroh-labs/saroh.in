@@ -94,7 +94,10 @@ export class AdminContactMessagesService {
         });
         const hasMore = rows.length > PAGE_SIZE;
         const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-        const links = await linksFor(page.map((row) => row.email));
+        const links = await linksFor(
+            page.map((row) => row.email),
+            edition,
+        );
         return {
             items: page.map((row) => ({
                 ...row,
@@ -145,6 +148,7 @@ export class AdminContactMessagesService {
  */
 async function linksFor(
     emails: string[],
+    edition: Edition | null,
 ): Promise<(email: string) => ContactMessageRow["links"]> {
     if (emails.length === 0) {
         return () => ({ lead: false, waitlist: false, userId: null });
@@ -154,6 +158,7 @@ async function linksFor(
     const [leads, waiting, users] = await Promise.all([
         prisma.sarohLead.findMany({
             where: {
+                ...editionWhere(edition),
                 OR: [
                     { emailKey: { in: keys } },
                     { signUpEmailKey: { in: keys } },
@@ -162,7 +167,7 @@ async function linksFor(
             select: { emailKey: true, signUpEmailKey: true },
         }),
         prisma.waitlistSignup.findMany({
-            where: { emailKey: { in: keys } },
+            where: { ...editionWhere(edition), emailKey: { in: keys } },
             select: { emailKey: true },
         }),
         prisma.user.findMany({

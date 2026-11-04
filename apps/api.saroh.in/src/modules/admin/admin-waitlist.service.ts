@@ -311,7 +311,7 @@ export class AdminWaitlistService {
         return prisma.$transaction(async (tx) => {
             const entry = await tx.waitlistSignup.findUnique({
                 where: { id },
-                select: { emailKey: true },
+                select: { emailKey: true, businessKey: true },
             });
             const { count } = await tx.waitlistSignup.deleteMany({
                 where: { id, ...editionWhere(edition) },
@@ -319,6 +319,14 @@ export class AdminWaitlistService {
             if (!entry || count === 0) {
                 throw new NotFoundException("Not on the waitlist");
             }
+            // They asked to be taken off, so the same entry goes from the
+            // other edition too (owner, 4 Nov).
+            await tx.waitlistSignup.deleteMany({
+                where: {
+                    emailKey: entry.emailKey,
+                    businessKey: entry.businessKey,
+                },
+            });
             // Their unconverted sales lead goes too (DEC-169, U20).
             const leadRemoved = await deleteWebsiteLeadOnRequest(
                 tx,

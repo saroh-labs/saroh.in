@@ -138,8 +138,10 @@ export class LinkReportGateService {
         ipHash?: string;
         edition?: Edition;
     }): Promise<string> {
+        const edition = row.edition ?? "INDIA";
         const where = {
-            emailKey_businessKey: {
+            edition_emailKey_businessKey: {
+                edition,
                 emailKey: row.emailKey,
                 businessKey: NO_BUSINESS,
             },
@@ -164,7 +166,7 @@ export class LinkReportGateService {
                     checkedAt: row.checkedAt,
                     newsConsent: false,
                     ipHash: row.ipHash ?? null,
-                    edition: row.edition,
+                    edition,
                 },
                 select: { id: true },
             });

@@ -104,7 +104,8 @@ describe("WaitlistService", () => {
 
         expect(findUnique).toHaveBeenCalledWith({
             where: {
-                emailKey_businessKey: {
+                edition_emailKey_businessKey: {
+                    edition: "INDIA",
                     emailKey: "ab@gmail.com",
                     businessKey: "glow studio",
                 },

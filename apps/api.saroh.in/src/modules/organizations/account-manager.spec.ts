@@ -282,6 +282,7 @@ describe("managerFor: the first proof wins", () => {
         expect(tx.sarohLead.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
+                    edition: "INDIA",
                     ownerPlatformAdminId: { not: null },
                     OR: [
                         {

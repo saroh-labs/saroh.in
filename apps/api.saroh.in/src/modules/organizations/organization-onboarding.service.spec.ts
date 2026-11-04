@@ -356,6 +356,7 @@ describe("OrganizationOnboardingService.onboard", () => {
                 organizationId: "org_1",
                 ownerUserId: "user_1",
                 madeAt: MADE_AT,
+                edition: "INDIA",
                 claim: {
                     link: {
                         code: "ABCD2345",
@@ -373,6 +374,7 @@ describe("OrganizationOnboardingService.onboard", () => {
                 organizationId: "org_1",
                 ownerUserId: "user_1",
                 madeAt: MADE_AT,
+                edition: "INDIA",
                 claim: { link: null, code: undefined },
             });
         });
