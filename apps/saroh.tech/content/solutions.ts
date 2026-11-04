@@ -16,14 +16,14 @@ export const solutions: Record<SolutionSlug, Solution> = {
         phrase: "order and stock software for shops",
         seoTitle: "Order and stock software for shops and bakeries",
         seoDescription:
-            "Order and stock software for shops and bakeries: counter orders, stock for each location and numbered invoices in one place.",
+            "Order and stock software for shops and bakeries: counter orders, stock you can count and numbered invoices in one place.",
         name: "Shops",
         navLine: "Orders at the counter, stock and invoices",
         longName: "Shops and bakeries",
         card: {
             name: "Shops and bakeries",
             body: "Sell at the counter, with stock that stays right and orders that don't get lost.",
-            day: "Start: send the morning's orders, check stock, see what's owed.",
+            day: "Start: hand over the morning's orders, check stock, see what's owed.",
             uses: "Products · Orders · Billing · Website",
             link: "See Saroh for shops",
         },
@@ -40,7 +40,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 feature: "dashboard",
                 pain: "“I open up and don't know what to do first.”",
                 title: "One list of what needs you this morning",
-                body: "Late orders, sizes short for orders and what's overdue, most urgent first. Mark an order sent right from the list.",
+                body: "Late orders, sizes short for orders and what's overdue, most urgent first. Hand over an order right from the list.",
                 shot: "s-home",
             },
             {
@@ -74,8 +74,8 @@ export const solutions: Record<SolutionSlug, Solution> = {
             {
                 feature: "insights",
                 pain: "“I put up a site and never know if anyone looks at it.”",
-                title: "See how your site is doing",
-                body: "Site views, visitors, enquiries and orders, day by day, and the pages people open most.",
+                title: "See where customers come from",
+                body: "Insights counts your site's visits and visitors, with enquiries, paid orders and bookings beside them. It also answers “Am I making more money?” and “What sells, who books?”.",
                 shot: "s-insights",
             },
         ],
@@ -96,7 +96,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
         longName: "Salons and barbers",
         card: {
             name: "Salons and barbers",
-            body: "Your appointments, a page for every client, and a site with your services and prices.",
+            body: "Your appointments, each client's history, and a site with your services and prices.",
             day: "Start: see today's appointments and who's coming.",
             uses: "Bookings · Customers · Billing · Website",
             link: "See Saroh for salons",

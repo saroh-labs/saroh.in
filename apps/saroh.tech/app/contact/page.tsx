@@ -2,6 +2,7 @@ import { Arrow } from "@saroh/marketing/arrow";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { Container } from "@saroh/marketing/container";
 import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Section } from "@saroh/marketing/section";
 import Link from "next/link";
 
 import { ContactForm } from "@/components/contact/contact-form";
@@ -61,6 +62,29 @@ export default function ContactPage() {
                     ))}
                 </div>
             </Container>
+
+            <Section
+                titleId="contact-before"
+                title={CONTACT.before.title}
+                size="sm"
+                className="grid gap-[18px] pt-24"
+            >
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))] gap-3">
+                    {CONTACT.before.items.map((item) => (
+                        <div
+                            key={item.q}
+                            className="grid content-start gap-1.5 rounded-[14px] border border-border bg-card px-5 py-[18px]"
+                        >
+                            <h3 className="m-0 font-sans text-[15.5px] font-semibold">
+                                {item.q}
+                            </h3>
+                            <p className="m-0 text-[14.5px] leading-[1.55] text-mk-copy">
+                                {item.a}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            </Section>
         </div>
     );
 }

@@ -26,7 +26,8 @@ const website: Ld = {
 const application = (page: SitePage): Ld => ({
     "@context": context,
     "@type": "SoftwareApplication",
-    name: page.h1,
+    // Home's H1 is a line of copy. The product's name is Saroh.
+    name: page.type === "home" ? site.name : page.h1,
     url: canonicalOf(page.path),
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",

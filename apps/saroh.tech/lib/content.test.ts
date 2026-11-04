@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { SHOT_KEYS, SOLUTION_FAQ_IDS } from "@saroh/marketing/content-types";
@@ -8,12 +11,16 @@ import { home as inHome } from "../../saroh.in/content/home";
 import { solutionList as inSolutions } from "../../saroh.in/content/solutions";
 
 import { CHANGELOG, changelogPath } from "@/content/changelog";
+import { COMING } from "@/content/coming";
+import { CONTACT } from "@/content/contact";
 import { faqs, HOME_FAQ, solutionFaq } from "@/content/faq";
 import { featureList, features } from "@/content/features";
 import { GUIDE_CONTENT, guideSteps } from "@/content/guides";
 import { HELP, HELP_FAQS } from "@/content/help";
 import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
+import { INTEGRATIONS } from "@/content/integrations";
 import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
+import { placeholders } from "@/content/placeholders";
 import { solutionList, solutions } from "@/content/solutions";
 
 import { ONE_PERSON } from "../scripts/check-claims.mjs";
@@ -208,6 +215,43 @@ describe("saroh.tech's words", () => {
         );
     });
 
+    it("say your place and your online shop: a Free business has one place customers visit", () => {
+        expect(words({ ...all, CONTACT })).not.toMatch(
+            /\b(every|each|all|two|several|other) (locations?|branch(es)?)\b|\bbetween locations\b|\bbranches\b|\bstock (for|by|at) (each )?location\b/i,
+        );
+    });
+
+    it("don't send what's handed over at a counter", () => {
+        expect(words({ features, solutions })).not.toMatch(
+            /\bmark an order sent\b|\bsend (the morning's|today's) orders\b/i,
+        );
+    });
+
+    it("name Insights in the screen's words", () => {
+        const insights = words([features.insights, solutions.shops]);
+        expect(insights).not.toMatch(/\b(site )?views\b/i);
+        expect(insights).toContain("Am I making more money?");
+        expect(words(features.insights)).toContain("Paid orders and bookings");
+    });
+
+    it("mark only what the owner must supply", () => {
+        expect(Object.keys(placeholders).sort()).toEqual(
+            [
+                "changelog",
+                "companyDetails",
+                "dataAfterCancel",
+                "dataLocation",
+                "governingLaw",
+                "guideAuthor",
+                "legalUpdated",
+                "liability",
+                "processors",
+                "supportEmail",
+            ].sort(),
+        );
+        expect(words(all)).not.toContain("[confirm");
+    });
+
     it("every cross-link and shot lands", () => {
         const shots = new Set<string>(SHOT_KEYS);
         for (const f of featureList) {
@@ -284,6 +328,26 @@ describe("guides", () => {
             (g) => g.slug === "how-to-write-an-invoice",
         ).flatMap(guideSteps);
         expect(steps).toHaveLength(8);
+    });
+});
+
+describe("what's coming", () => {
+    const rows = COMING.flatMap((g) => g.rows.map((r) => r.name));
+
+    it("is one list, on the changelog and on Integrations", () => {
+        expect(INTEGRATIONS.planned).toBe(COMING);
+        const page = readFileSync(
+            join(__dirname, "../app/changelog/page.tsx"),
+            "utf8",
+        );
+        expect(page).toContain("groups={COMING}");
+    });
+
+    it("has Subscriptions, before the Autopay that depends on it", () => {
+        expect(rows.indexOf("Subscriptions")).toBeGreaterThanOrEqual(0);
+        expect(rows.indexOf("Subscriptions")).toBeLessThan(
+            rows.indexOf("Autopay"),
+        );
     });
 });
 

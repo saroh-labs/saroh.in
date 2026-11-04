@@ -6,7 +6,8 @@
  * page says plainly what works today in `worksToday`.
  *
  * Left out on purpose: payment links, deposits, reminders and invoice email,
- * your own domain, the online shop, and saroh.in's tax words. Screenshots are
+ * your own domain, and saroh.in's tax words. A Free business has one place
+ * customers visit, so "your place and your online shop", never "every location". Screenshots are
  * this site's own, of the Global demo businesses (plan U11), and each `who`
  * names the business in that screenshot.
  */
@@ -16,11 +17,10 @@ import type {
 } from "@saroh/marketing/content-types";
 import { FEATURE_SLUGS } from "@saroh/marketing/content-types";
 
+export { NOT_AVAILABLE_YET } from "./coming";
+
 /** The day this module's words last changed: its pages' `updated`. */
 export const UPDATED = "2026-11-04";
-
-/** The mark on a part with `notYet`, the same words as the coming list. */
-export const NOT_AVAILABLE_YET = "Not available yet";
 
 export const features: Record<FeatureSlug, StatedFeature> = {
     dashboard: {
@@ -46,7 +46,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders and overdue invoices, each with its next step. Mark an order sent right from the list.",
+                body: "Late orders, stock short for orders and overdue invoices, each with its next step. Hand over an order right from the list.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-home",
             },
@@ -76,7 +76,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Done from the list",
-                body: "Mark an order sent without opening it.",
+                body: "Hand over an order without opening it.",
             },
             {
                 title: "The last 24 hours",
@@ -99,12 +99,11 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         phrase: "stock management",
         seoTitle: "Stock management software for small business",
         seoDescription:
-            "Stock management and a product catalogue for small businesses: sizes, prices and photos, stock for each location, and low stock shown first.",
+            "Stock management and a product catalogue for small businesses: sizes, prices and photos, stock you can count, and low stock shown first.",
         name: "Products",
         navLine: "Prices, sizes, photos and stock, in one place",
         cardLine: "Names, prices and stock for everything you sell.",
-        homeBody:
-            "Variants, prices, photos and stock for each location, in one place.",
+        homeBody: "Variants, prices, photos and stock, in one place.",
         headline: "Add a product once. It's right everywhere.",
         sub: "A product catalogue and stock management for any business that sells things. Change a price and the next order uses it. Orders already placed keep the price agreed. Stock goes down as orders go out, and the Products list shows what's running low before a size runs out.",
         hero: {
@@ -120,7 +119,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Stock follows every order",
-                body: "Each sale takes it off the shelf, for the location it was sold at. Count in the morning, move stock between locations, and every change is kept in a log.",
+                body: "Each sale takes it off the shelf. Count in the morning, move stock between your place and your online shop, and every change is kept in a log.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "p-stock",
             },
@@ -141,8 +140,8 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 body: "Show a struck-through original price beside today's.",
             },
             {
-                title: "Stock for each location",
-                body: "Each location counts its own stock, because an order holds stock where it was placed.",
+                title: "Stock for your place and your online shop",
+                body: "Your online shop can sell from your place's stock, or keep its own. An order holds stock where it was placed.",
             },
             {
                 title: "Low stock at the top",
@@ -187,7 +186,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         name: "Orders",
         navLine: "Every order in one list, late ones flagged",
         cardLine: "Every order, in one list.",
-        homeBody: "One list from every location, with late orders flagged.",
+        homeBody: "One list of every order, with late ones flagged.",
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Take orders at the counter and follow each one to done, with its next step on the order. Late ones are flagged.",
         hero: {
@@ -216,7 +215,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         ],
         points: [
             {
-                title: "Each way has its own steps",
+                title: "Steps to fit the order",
                 body: "A pick-up and an order fulfilled by visits each follow their own steps.",
             },
             {
@@ -244,7 +243,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             "Orders take names and prices from Products and make invoices in Billing.",
         worksWith: ["products", "customers", "billing"],
         usedBy: ["shops", "clinics"],
-        closer: "Send today's orders in the right order.",
+        closer: "Hand over today's orders in the right order.",
     },
     customers: {
         slug: "customers",
@@ -330,9 +329,10 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         name: "Bookings",
         navLine: "Classes, sessions and appointments",
         cardLine: "Classes, sessions and appointments.",
-        homeBody: "Classes, sessions and appointments, with places and hours.",
+        homeBody:
+            "Classes, sessions and appointments, in your hours, with places for each class.",
         headline: "A calendar customers can book into themselves.",
-        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with places and hours. Customers book a free time on your site, and you manage the day at the desk.",
+        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments. Customers book a free time on your site, and you manage the day at the desk.",
         hero: {
             shot: "g-bookings",
         },
@@ -364,11 +364,11 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "In person or online",
-                body: "Or let the customer choose, with your video link on the booking's confirmation page.",
+                body: "Choose one, or let the customer choose. Your video link is on the booking's confirmation page.",
             },
             {
                 title: "Moves and cancellations",
-                body: "Move a booking to another real free time.",
+                body: "Move a booking to another real free time, or cancel it.",
             },
             {
                 title: "Check-in and no-shows",
@@ -587,35 +587,42 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         slug: "insights",
         state: "limited",
         worksToday:
-            "Today Insights counts what happens on your site: views, visitors, enquiries and orders.",
+            "Insights reads what's on record in Saroh: your paid orders and bookings, your enquiries and your site's visits.",
         phrase: "website analytics",
-        seoTitle: "Website analytics for your business site",
+        seoTitle: "Website analytics and answers for your business",
         seoDescription:
-            "Website analytics for a small business site: views, visitors, enquiries and orders for the last 7, 30 or 90 days, and your top pages.",
+            "Website analytics and money answers for a small business: am I making more money, what sells, and where do customers come from.",
         name: "Insights",
-        navLine: "Site views, visitors, enquiries and orders",
-        cardLine: "How your site is doing.",
-        homeBody: "Site views, visitors, enquiries and orders, day by day.",
-        headline: "See how your site is doing.",
-        sub: "Website analytics for your business's site: site views, visitors, enquiries and orders for the last week, month or three months, with views by day and the pages people open most.",
+        navLine: "Money in, what sells and where customers come from",
+        cardLine: "How your business is doing.",
+        homeBody:
+            "Am I making more money? What sells, who books? Where do customers come from?",
+        headline: "See how your business is doing.",
+        sub: "Website analytics and money answers for a small business. For the last 7 days, 4 weeks or 3 months, Insights answers three questions: Am I making more money? What sells, who books? Where do customers come from?",
         hero: { shot: "s-insights" },
         howTitle: "From this week to the last three months.",
         steps: [
             {
+                title: "Three answers first",
+                body: "Each question is answered in a sentence, from the same figures its card draws, and each opens its own tab.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "s-insights",
+            },
+            {
                 title: "Four numbers for your site",
-                body: "Site views, unique visitors, enquiries and orders, side by side for the days you pick.",
+                body: "Visits, Visitors, Enquiries, and Paid orders and bookings, each against the period before.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-compare",
             },
             {
-                title: "Views, day by day",
+                title: "Visits, day by day",
                 body: "A bar for each day shows when people came to your site.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-weeks",
             },
             {
                 title: "The pages people open most",
-                body: "See which pages get the most views, so you know what people come for.",
+                body: "See which pages get the most visits, so you know what people come for.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-store",
             },
@@ -623,7 +630,11 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         points: [
             {
                 title: "Pick the days",
-                body: "The last 7, 30 or 90 days.",
+                body: "The last 7 days, 4 weeks or 3 months.",
+            },
+            {
+                title: "The Money tab",
+                body: "What came in, week by week, in your currency, against the same length before.",
             },
             {
                 title: "The last 24 hours",
@@ -635,10 +646,10 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
         ],
         worksLead:
-            "Insights counts what happens on your site: views, visitors, enquiries and orders.",
+            "Each answer comes from your orders, bookings and site, so it says what really happened.",
         worksWith: ["website", "dashboard", "orders"],
         usedBy: ["shops", "gyms", "clinics"],
-        closer: "See how your site is doing.",
+        closer: "See how your business is doing.",
     },
 };
 

@@ -23,7 +23,7 @@ const TOP_TOOLS = [
     },
     {
         title: "Receipt maker",
-        line: "Show a client they've paid.",
+        line: "Show a customer they've paid.",
         href: "/tools/receipt-maker",
     },
 ];

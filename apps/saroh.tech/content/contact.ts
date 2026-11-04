@@ -17,7 +17,7 @@ export const CONTACT = {
             {
                 id: "question",
                 label: "A question before signing up",
-                hint: "e.g. Can I take bookings for two branches?",
+                hint: "e.g. Does Saroh work in my country?",
             },
             {
                 id: "help",
@@ -68,7 +68,7 @@ export const CONTACT = {
     side: [
         {
             title: "Need help with your account?",
-            body: "Step-by-step guides for setting up and using Saroh. Often faster than waiting for a reply.",
+            body: "Step-by-step guides for setting up your business, products, orders, bookings, your website and invoices. Often faster than waiting for a reply.",
             href: "/help",
         },
         {
@@ -82,4 +82,13 @@ export const CONTACT = {
             href: "/customers",
         },
     ],
+    before: {
+        title: "Before you write",
+        items: [
+            {
+                q: "A customer paid me. Where's the money?",
+                a: "With you. Customers pay you directly, in cash, by card machine or by bank transfer, and you record it in Saroh. Saroh never holds your money, and paying online isn't available yet.",
+            },
+        ],
+    },
 } as const;

@@ -91,7 +91,7 @@ export const TOOLS: NavItem[] = [
     {
         group: MAKE,
         name: "Receipt maker",
-        line: "Show a client they've paid",
+        line: "Show a customer they've paid",
         href: "/tools/receipt-maker",
     },
     {
