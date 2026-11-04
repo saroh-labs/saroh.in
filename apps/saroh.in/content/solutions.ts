@@ -180,7 +180,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Treatments over several visits",
                 pain: "“A colour correction takes three visits, and I keep count on paper.”",
                 title: "Treatments over several visits",
-                body: "A treatment can be three visits of an hour. The client books the first, and your team books the rest.",
+                body: "With Sell turned on, a treatment can be three visits of an hour. The client books the first, and your team books the rest.",
             },
             {
                 feature: "customers",

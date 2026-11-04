@@ -103,7 +103,7 @@ export default async function FeaturePage({ params }: Props) {
                     </Section>
                     <Section
                         titleId="what-it-does"
-                        title="What it does"
+                        title="What else it will do"
                         className="grid gap-9 pt-[130px]"
                     >
                         <NotYet
