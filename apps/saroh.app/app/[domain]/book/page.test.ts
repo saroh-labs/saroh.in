@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublishedPage } from "@/components/published-page";
 import type * as ModulePages from "@/lib/module-pages";
-import { dontCachePage } from "@/lib/page-cache/site-rules";
+import {
+    dontCachePage,
+    showsServicesOffered,
+} from "@/lib/page-cache/site-rules";
 import { BookingFlow, BookingUnavailable } from "@saroh/site-blocks";
 
 import BookPage, { generateMetadata } from "./page";
@@ -35,10 +38,13 @@ const OFFERED = [
     },
 ];
 
-const site = vi.hoisted((): { resolved: unknown; lookup: unknown } => ({
-    resolved: null,
-    lookup: { ok: true },
-}));
+const site = vi.hoisted(
+    (): { resolved: unknown; lookup: unknown; timetables: unknown[] } => ({
+        resolved: null,
+        lookup: { ok: true },
+        timetables: [],
+    }),
+);
 
 const LIST_OF_GONE = {
     type: "servicesList",
@@ -77,6 +83,7 @@ vi.mock("@/lib/api-url", () => ({ publicApiUrl: () => "https://api.test" }));
 vi.mock("@/lib/booking-page", () => ({
     getBookingPage: vi.fn(() => Promise.resolve(site.lookup)),
     getBookingVisit: vi.fn(() => Promise.resolve(null)),
+    getTimetableClasses: vi.fn(() => Promise.resolve(site.timetables)),
 }));
 vi.mock("@/lib/catalogue", () => ({
     getCatalogue: vi.fn(() => Promise.resolve({ ok: false })),
@@ -178,6 +185,8 @@ describe("/book on a site with a published Book page", () => {
         expect(element.type).toBe(PublishedPage);
         const lists = element.props.serviceLists as unknown[];
         expect(lists[1]).toEqual({ services: OFFERED, moreHref: null });
+        // No service write revalidates a kept page: kept a minute at most.
+        expect(showsServicesOffered).toHaveBeenCalled();
     });
 
     it("offers it when the page was published with no list at all", async () => {
@@ -212,6 +221,35 @@ describe("/book on a site with a published Book page", () => {
         expect(dontCachePage).toHaveBeenCalled();
     });
 
+    it("adds what a Timetable can't reach beside it", async () => {
+        const week = { type: "timetable", contractVersion: 1, content: {} };
+        siteWith([week]);
+        site.timetables = [["svc_new"]];
+        const element = await open();
+        const page = element.props.page as { sections: { type: string }[] };
+        expect(page.sections.map((s) => s.type)).toEqual([
+            "timetable",
+            "servicesList",
+        ]);
+        const lists = element.props.serviceLists as { services: unknown[] }[];
+        expect(lists[1]?.services).toEqual([OFFERED[1]]);
+    });
+
+    it("404s a live site with nothing published to read", async () => {
+        site.lookup = { ok: false, reason: "missing" };
+        await expect(open()).rejects.toThrow();
+    });
+
+    it("draws a test release of a site never published", async () => {
+        siteWith([INTRO, LIST_OF_GONE]);
+        (site.resolved as { mode: string }).mode = "test";
+        site.lookup = { ok: false, reason: "missing" };
+        const element = await open();
+        expect(element.type).toBe(PublishedPage);
+        // The read has nothing to say here: the blocks read for themselves.
+        expect(element.props.serviceLists).toBeUndefined();
+    });
+
     it("still goes straight into the flow on a deep link", async () => {
         const element = await open({ service: "svc_new" });
         expect(drawn(element).type).toBe(BookingFlow);
@@ -234,7 +272,12 @@ describe("/book in search", () => {
     it("is kept out while it says nothing can be booked", async () => {
         offering([]);
         expect(await robots()).toEqual({ index: false, follow: true });
-        site.lookup = { ok: false, reason: "unavailable" };
+        offering(OFFERED, false);
         expect(await robots()).toEqual({ index: false, follow: true });
+    });
+
+    it("stays in while a read fails: a blip says nothing about the page", async () => {
+        site.lookup = { ok: false, reason: "unavailable" };
+        expect(await robots()).toBeNull();
     });
 });

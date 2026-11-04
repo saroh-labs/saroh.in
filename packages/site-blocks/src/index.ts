@@ -92,6 +92,7 @@ export {
 export {
     dayLabel,
     isPublicTimetable,
+    isWeekday,
     placesWord,
     sessionHref,
     timetableQuery,

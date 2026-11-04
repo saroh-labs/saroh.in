@@ -169,11 +169,15 @@ add or change there may be served to the next visitor without rendering.
   restart of the API.
 - **A module route offers what its flow offers.** A published page at `/book`
   or `/shop` is the way in, so it can't be narrower than the route it dresses:
-    - `/book` draws its list from the booking flow's own read
+    - `/book` always lists everything offered, so a visitor can pick one (owner,
+      4 Nov 2026). It draws its list from the booking flow's own read
       (`lib/book-page-offer.ts`), so a frozen snapshot can't disagree with
       `/book?service=` and a new service shows with no republish. Stored ids keep
-      the merchant's order; they narrow the list only when they leave a gap among
-      the services offered, and "See all services" then opens `?step=what`.
+      the merchant's order, followed by every other service offered, and never
+      narrow it; the section's layout, prices, button label and heading stay. A
+      page with no list keeps its Booking and Timetable blocks, each counted only
+      for what it can really draw (a Timetable by its week's read), and gets a list
+      of what they don't reach.
     - `/shop` keeps the merchant's grids and adds "See all products"
       (`?all=1`, the built-in listing) for what they don't draw
       (`lib/shop-page-offer.ts`).
@@ -182,6 +186,14 @@ add or change there may be served to the next visitor without rendering.
       and how to reach the business, out of search. A title over nothing is a bug.
     - A block elsewhere (a home page, Prices' "Try it once") keeps to its stored
       list and is hidden when nothing is left: the page has other things to say.
+- **A server read waits 8 seconds; a read in the browser's booking flow 15, and
+  asks once more.** `serverReadSignal()` (`lib/api-url.ts`) goes on every public
+  read a page is drawn from, never on a write, and an abort lands in that reader's
+  failure path. `fetchDays` and `fetchHold` (`booking-flow/api.ts`) retry on no
+  answer or a 5xx, and the page says "Still finding times…" after 4 seconds.
+- **A read that failed doesn't take a page out of search.** `routeHasNothing` is
+  told `empty` only for a read that answered with nothing; a blip keeps the page
+  indexed and unkept.
 
 ## Merchant sites: what a customer typed, kept for the visit — **Current**
 

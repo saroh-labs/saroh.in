@@ -20,7 +20,11 @@ import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn, getBooking, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { bookPageOffer } from "@/lib/book-page-offer";
-import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
+import {
+    getBookingPage,
+    getBookingVisit,
+    getTimetableClasses,
+} from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import {
@@ -111,18 +115,20 @@ import {
  * page's address says "This isn't available right now" with a link home.
  * A site with no Book page gets today's flow, unchanged.
  *
- * **It offers what the flow offers** (`lib/book-page-offer.ts`): its list is
- * drawn from this page's own read, not the ids its snapshot froze, so a new
- * service shows with no republish and the list can't come up empty while
- * the flow has services. With nothing to offer, or a read that failed, the
+ * **It offers what the flow offers** (`lib/book-page-offer.ts`): everything,
+ * so a visitor can pick one. Its list is drawn from this page's own read, in
+ * the snapshot's order with every other service after it, so a new service
+ * shows with no republish and the list can't come up empty while the flow has
+ * services. With nothing to offer, or a read that failed, the
  * route draws the flow, which says so with how to reach the business
  * (`bookRoute`). No service write revalidates a kept page, so `/book` is kept
  * a minute at most.
  *
- * A booking page with nothing to book (the module is off, the read failed,
- * online booking isn't open or offers no service) is kept out of search: it
- * answers 200, and "not available" is not a page to rank. One paused at its
- * plan's monthly limit stays indexed: it opens again by itself.
+ * A booking page with nothing to book (the module is off, online booking
+ * isn't open or offers no service) is kept out of search: it answers 200, and
+ * "not available" is not a page to rank. A read that failed says nothing about
+ * that, and one paused at its plan's monthly limit opens again by itself:
+ * both stay indexed.
  */
 
 export async function generateMetadata({
@@ -151,9 +157,11 @@ export async function generateMetadata({
     return shareable(resolved, {
         ...(routeHasNothing(
             moduleRoute(resolved.snapshot.pages, resolved.modules, "BOOK"),
-            !booking?.ok ||
-                !booking.page.open ||
-                booking.page.services.length === 0,
+            // A read that failed says nothing about what's here: not a page
+            // to drop from search for a blip.
+            booking?.ok
+                ? !booking.page.open || booking.page.services.length === 0
+                : booking?.reason !== "unavailable",
         )
             ? NOT_FOR_SEARCH
             : {}),
@@ -213,6 +221,7 @@ export default async function BookPage({
     // The Book page (G15): its sections on a plain /book, or its address
     // taken off while Appointments is off. Deep links go on to the flow.
     showsServicesOffered();
+    const offer = await getBookingPage(resolved.siteId);
     const route = bookRoute(
         moduleRoute(
             resolved.snapshot.pages,
@@ -220,7 +229,8 @@ export default async function BookPage({
             "BOOK",
             isBookingDeepLink({ service, date, start, step, staff, ref }),
         ),
-        await getBookingPage(resolved.siteId),
+        offer,
+        resolved.mode === "test",
     );
     if (route.draw === "unavailable") {
         return (
@@ -231,12 +241,19 @@ export default async function BookPage({
         );
     }
     if (route.draw === "page") {
-        const lookup = await getBookingPage(resolved.siteId);
-        const { sections, serviceLists } = bookPageOffer(
-            route.page.sections,
-            lookup.ok ? lookup.page.services : [],
-            lookOf(resolved.snapshot.site.look),
-        );
+        // No read to draw from only on a test release of a site never
+        // published (`bookRoute`): its blocks read for themselves.
+        const { sections, serviceLists } = offer.ok
+            ? bookPageOffer(
+                  route.page.sections,
+                  offer.page.services,
+                  lookOf(resolved.snapshot.site.look),
+                  await getTimetableClasses(
+                      route.page.sections,
+                      resolved.siteId,
+                  ),
+              )
+            : { sections: route.page.sections, serviceLists: undefined };
         return (
             <PublishedPage
                 page={{ ...route.page, sections }}

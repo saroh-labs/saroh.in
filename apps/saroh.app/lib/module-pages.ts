@@ -148,13 +148,18 @@ export function isBookingDeepLink(params: {
  * read has something to offer. With nothing offered, closed, or a read that
  * failed, the route draws the flow, which says so in words with how to reach
  * the business (`ClosedCard`, `BookingUnavailable`), never a title over
- * nothing.
+ * nothing. The one exception is a test release of a site never published,
+ * whose release has a page while the read's 404 says nothing is live.
  */
 export function bookRoute<P>(
     route: ModuleRoute<P>,
     lookup: BookingPageLookup | null,
+    testHost = false,
 ): ModuleRoute<P> {
     if (route.draw !== "page") return route;
+    if (testHost && lookup?.ok === false && lookup.reason === "missing") {
+        return route;
+    }
     return lookup?.ok && lookup.page.open && lookup.page.services.length > 0
         ? route
         : { draw: "builtin" };
@@ -173,8 +178,9 @@ export const NOT_FOR_SEARCH = {
 /**
  * Whether a module's own route (`/shop`, `/book`) has nothing to show now:
  * its page is taken off while the module is off, or its read has nothing
- * (`empty`: it failed, or came back empty or closed). A Book or Shop page
- * doesn't stand in for that: with nothing to offer the route says so.
+ * (`empty`: it came back empty or closed; a read that failed is not `empty`,
+ * or a blip would drop the page from search). A Book or Shop page doesn't
+ * stand in for that: with nothing to offer the route says so.
  */
 export function routeHasNothing(
     route: { draw: "unavailable" | "page" | "builtin" },

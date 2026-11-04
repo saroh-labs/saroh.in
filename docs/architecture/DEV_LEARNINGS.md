@@ -18,6 +18,7 @@ mistaken for bureaucracy and removed.
 "Pick a service, then a time that suits you." over nothing, or listed only some
 services. `/book?service=<id>` opened and booked. The API answered fine, with
 the right CORS, so nothing looked wrong in the network tab.
+
 **Cause**: two reads of one question. A published Book page draws `servicesList`,
 whose ids are frozen in the snapshot; the flow reads what is offered now. A
 list is written once, when the page is made (`defaultModuleSections`, the
@@ -29,19 +30,29 @@ starter's context), and nothing adds to it later, not even a republish:
   returns `[]` and the block returns `null` ("empty");
 - a Book page made before there were real services has no list at all (the
   contract asks for at least one id), so services added later never show.
-  The same read lied elsewhere: `[]` on a failure drew as "none", and the layout's
-  failed booking read took Book off the header of a page kept for five minutes. A
-  failed site read told visitors there was no website at that address, and `/shop`
-  drew at most a Shop page's grid (12 products) with no way to the rest.
-  **Fix**: `/book` draws its list from `getBookingPage`, the flow's own read
-  (`lib/book-page-offer.ts`), so existing snapshots are right with no republish
-  and no data change. Nothing to offer or a failed read draws the flow's own words
-  with how to reach the business. Failed reads refuse the page cache in the
-  reader, and say so in the block (`FeedFailed`). `/shop` got the same rule.
-  **Where the rule lives**: `frontend-data-and-state.md` → "a read that failed, and
-  what a page offers"; `lib/read-failures.test.ts` fails a new silent reader, and
-  `book/page.test.ts` holds what `/book` draws. A snapshot holds choices, never the
-  list of what is on offer: anything that must follow the business reads it live.
+
+The same read lied elsewhere: `[]` on a failure drew as "none", and the layout's
+failed booking read took Book off the header of a page kept for five minutes. A
+failed site read told visitors there was no website at that address, and `/shop`
+drew at most a Shop page's grid (12 products) with no way to the rest.
+
+**Fix**: `/book` draws its list from `getBookingPage`, the flow's own read
+(`lib/book-page-offer.ts`), so existing snapshots are right with no republish
+and no data change. Nothing to offer or a failed read draws the flow's own words
+with how to reach the business. Failed reads refuse the page cache in the
+reader, and say so in the block (`FeedFailed`). `/shop` got the same rule.
+
+**A first cut guessed and was overruled**: it read a merchant's choice from a gap
+in the stored ids, and a merchant who narrowed `[A]` of `[A,B,C]` looks like a list
+written when only A existed, so the guess was wrong either way. The owner settled
+it the same day: `/book` lists everything offered, stored order first, and the
+stored ids choose only elsewhere (Home, Prices). Don't infer intent from data that
+can't hold it.
+
+**Where the rule lives**: `frontend-data-and-state.md` → "a read that failed, and
+what a page offers"; `lib/read-failures.test.ts` fails a new silent reader, and
+`book/page.test.ts` holds what `/book` draws. A snapshot holds choices, never the
+list of what is on offer: anything that must follow the business reads it live.
 
 ---
 
