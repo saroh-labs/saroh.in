@@ -60,10 +60,17 @@ describe("the nav", () => {
         }
     });
 
-    it("has no compare or referral page, in the site map or a menu", () => {
-        const gone = /^\/(compare|referral)/;
+    it("has no compare page, in the site map or a menu", () => {
+        const gone = /^\/compare/;
         expect(allLinks.filter((l) => gone.test(l.href))).toEqual([]);
         expect(PAGES.filter((p) => gone.test(p.path))).toEqual([]);
+    });
+
+    it("builds /referral noindex, out of every menu, as saroh.in has none", () => {
+        expect(allLinks.filter((l) => l.href === "/referral")).toEqual([]);
+        expect(PAGES.find((p) => p.path === "/referral")?.unreviewed).toBe(
+            true,
+        );
     });
 
     it("groups Templates as documents, countries and six trades", () => {

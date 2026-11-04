@@ -7,6 +7,8 @@ import hreflang from "@saroh/edition/hreflang";
  * - the India bar for CF-IPCountry IN, added by showing what the page carries,
  *   never a redirect, so pages stay static
  * - /r/{code}: sets the referral cookie and 302s home
+ * - ?ref={code} on any page, the "Made with Saroh" credit's link: sets it too,
+ *   on the domain the app shares, as saroh.in's page does (DEC-156)
  * - /region/hide: remembers the × for 90 days
  *
  * The header for app.saroh.tech comes with that app's deploy. saroh.app isn't
@@ -23,6 +25,8 @@ const CANONICAL_HOST = "saroh.tech";
 const DAY = 86_400;
 const HIDE_COOKIE = "saroh_region_bar";
 const REFERRAL = /^\/r\/([A-Za-z0-9_-]{3,32})$/;
+/** A business's code, the shape the app sends to the API (`carriedReferral`). */
+const BUSINESS_CODE = /^[a-hj-km-np-z2-9]{8}$/;
 
 const SECURITY_HEADERS: Record<string, string> = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
@@ -40,6 +44,15 @@ export function indiaHrefFor(path: string): string {
 
 const cookie = (name: string, value: string, maxAge: number, secure: boolean) =>
     `${name}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure ? "; Secure" : ""}`;
+
+/** The app reads this cookie as a business is made, so it can't stay on this host. */
+function referralCookie(code: string, url: URL, env: Env): string {
+    const domain =
+        url.hostname === CANONICAL_HOST
+            ? CANONICAL_HOST
+            : env.DEV_ACCESS_COOKIE_DOMAIN?.trim();
+    return `${cookie("saroh_ref", code, 90 * DAY, url.protocol === "https:")}${domain ? `; Domain=${domain}` : ""}`;
+}
 
 const hasCookie = (request: Request, name: string) =>
     (request.headers.get("cookie") ?? "")
@@ -128,12 +141,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
             status: 302,
             headers: {
                 Location: "/",
-                "Set-Cookie": cookie(
-                    "saroh_ref",
-                    referral[1],
-                    90 * DAY,
-                    secure,
-                ),
+                "Set-Cookie": referralCookie(referral[1], url, env),
                 "X-Robots-Tag": "noindex",
             },
         });
@@ -154,6 +162,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         .get("content-type")
         ?.startsWith("text/html");
     if (!isHtml) return response;
+    const ref = url.searchParams.get("ref")?.trim().toLowerCase();
+    if (ref && BUSINESS_CODE.test(ref)) {
+        response.headers.append("Set-Cookie", referralCookie(ref, url, env));
+    }
 
     const india = indiaHrefFor(url.pathname);
     const showBar =

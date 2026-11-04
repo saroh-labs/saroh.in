@@ -213,7 +213,7 @@ export const PRIVACY: readonly LegalSection[] = [
     {
         title: "If you open a referral link",
         paragraphs: [
-            "We set a cookie holding the referral code, so your friend can be credited if you sign up.",
+            "We keep that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.",
         ],
         links: [{ name: "Cookies", href: "/legal/cookies" }],
     },

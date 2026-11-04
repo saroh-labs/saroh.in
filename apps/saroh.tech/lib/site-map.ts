@@ -45,6 +45,7 @@ export type PageType =
     | "about"
     | "contact"
     | "integrations"
+    | "referral"
     | "help"
     | "legal"
     | "tools-hub"
@@ -258,6 +259,18 @@ export const PAGES: SitePage[] = [
             "What Saroh works with today, and what isn't built yet.",
             INTEGRATIONS.title,
             "Integrations",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
+            "/referral",
+            "referral",
+            "Refer a friend | Saroh",
+            "Send a friend the link from your site. It records who sent them, and there's no reward today.",
+            "Refer a friend",
+            "Referral",
         ),
         unreviewed: true,
         updated: "2026-11-04",
