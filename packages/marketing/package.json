@@ -33,6 +33,7 @@
         "./point-grid": "./src/sections/point-grid.tsx",
         "./column-heading": "./src/nav/column-heading.tsx",
         "./nav-types": "./src/nav/nav-types.ts",
+        "./social-mark": "./src/nav/social-mark.tsx",
         "./menu-panel": "./src/nav/menu-panel.tsx",
         "./phone-sheet": "./src/nav/phone-sheet.tsx",
         "./sentence-list": "./src/sentence-list.ts",

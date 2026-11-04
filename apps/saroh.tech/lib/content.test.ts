@@ -21,7 +21,9 @@ import { HELP, HELP_FAQS } from "@/content/help";
 import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
 import { INTEGRATIONS } from "@/content/integrations";
 import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
+import { SAROH_SOCIAL } from "@/content/social";
 import { solutionList, solutions } from "@/content/solutions";
+import { pageSchema } from "@/lib/schema";
 
 import { ONE_PERSON } from "../scripts/check-claims.mjs";
 
@@ -215,6 +217,13 @@ describe("saroh.tech's words", () => {
         expect(legal).toContain(officeLine());
         expect(legal).toContain(SUPPORT_EMAIL);
         expect(legal).not.toContain("@saroh.in");
+    });
+
+    it("point the structured data at saroh.tech's own accounts", () => {
+        const [org] = pageSchema(pageAt("/")!) as { sameAs?: string[] }[];
+        expect(org?.sameAs).toEqual(SAROH_SOCIAL.map((s) => s.href));
+        expect(org?.sameAs).toContain("https://x.com/sarohtech");
+        expect(org?.sameAs).toContain("https://www.instagram.com/sarohtech");
     });
 
     it("name only who handles data on Global", () => {

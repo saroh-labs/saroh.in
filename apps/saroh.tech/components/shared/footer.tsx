@@ -1,12 +1,20 @@
 import { ring } from "@saroh/marketing/ring";
+import { SocialMark } from "@saroh/marketing/social-mark";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { SAROH_SOCIAL } from "@/content/social";
 import { FOOTER_COLUMNS, LEGAL_LINKS } from "@/lib/nav";
 import { signInHref, site } from "@/site.config";
 
 const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
+
+const SOCIAL_LINK = textLinkClasses({
+    tone: "quiet",
+    className:
+        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
+});
 
 /**
  * saroh.in's footer in layout and type, with this site's columns.
@@ -34,6 +42,25 @@ export function Footer() {
                             (rising)
                         </p>
                     </div>
+                    <ul
+                        aria-label="Follow Saroh"
+                        className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
+                    >
+                        {SAROH_SOCIAL.map((link) => (
+                            <li key={link.href}>
+                                <a
+                                    href={link.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Saroh on ${link.label}`}
+                                    title={link.label}
+                                    className={SOCIAL_LINK}
+                                >
+                                    <SocialMark label={link.label} />
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,130px),1fr))] gap-x-6 gap-y-10">
                     {FOOTER_COLUMNS.map((column) => (

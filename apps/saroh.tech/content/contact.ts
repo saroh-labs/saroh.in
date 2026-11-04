@@ -94,6 +94,8 @@ export const CONTACT = {
     ways: {
         title: "Other ways to reach us",
         email: "Email",
+        /** saroh.in's three, by `content/social.ts`'s label. */
+        social: ["Instagram", "LinkedIn", "X"] as readonly string[],
     },
     office: { title: "Registered office" },
     before: {

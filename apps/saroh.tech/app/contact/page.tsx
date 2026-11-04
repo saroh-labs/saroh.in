@@ -4,10 +4,12 @@ import { Container } from "@saroh/marketing/container";
 import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { Section } from "@saroh/marketing/section";
 import Link from "next/link";
+import { Fragment } from "react";
 
 import { ContactForm } from "@/components/contact/contact-form";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CONTACT, REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
+import { SAROH_SOCIAL } from "@/content/social";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -77,6 +79,28 @@ export default function ContactPage() {
                                     {SUPPORT_EMAIL}
                                 </a>
                             </dd>
+                            {SAROH_SOCIAL.filter((s) =>
+                                CONTACT.ways.social.includes(s.label),
+                            ).map((s) => (
+                                <Fragment key={s.href}>
+                                    <dt className="text-muted-foreground">
+                                        {s.label}
+                                    </dt>
+                                    <dd className="m-0">
+                                        <a
+                                            href={s.href}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={textLinkClasses()}
+                                        >
+                                            {s.href.replace(
+                                                /^https:\/\/(www\.)?/,
+                                                "",
+                                            )}
+                                        </a>
+                                    </dd>
+                                </Fragment>
+                            ))}
                         </dl>
                     </div>
                     <div className="grid gap-1.5 rounded-mk-card bg-muted px-[22px] py-5 text-[14.5px] leading-[1.55] text-mk-copy">

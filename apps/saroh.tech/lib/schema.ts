@@ -1,3 +1,5 @@
+import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
+import { SAROH_SOCIAL } from "@/content/social";
 import { site } from "@/site.config";
 
 import { canonicalOf } from "./seo";
@@ -14,6 +16,22 @@ const organization: Ld = {
     url: site.url,
     logo: `${site.url}/apple-icon.png`,
     parentOrganization: { "@type": "Organization", name: site.company },
+    email: SUPPORT_EMAIL,
+    contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        email: SUPPORT_EMAIL,
+        url: `${site.url}/contact`,
+    },
+    sameAs: SAROH_SOCIAL.map((link) => link.href),
+    address: {
+        "@type": "PostalAddress",
+        streetAddress: REGISTERED_OFFICE[0],
+        addressLocality: "Gurgaon",
+        addressRegion: "Haryana",
+        postalCode: "122001",
+        addressCountry: "IN",
+    },
 };
 
 const website: Ld = {
