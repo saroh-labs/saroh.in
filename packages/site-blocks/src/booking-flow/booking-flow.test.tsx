@@ -18,6 +18,7 @@ import BookingFlow from "./booking-flow";
 import type { CheckoutOutcome, CheckoutRequest } from "./checkout";
 import type { BookingPageData } from "./model";
 import { isBookResult } from "./model";
+import { pressDay } from "./test-press-day";
 
 /**
  * The provider's window (E11), stood in for: each one the page opens is
@@ -231,6 +232,7 @@ afterEach(() => {
 
 async function chooseOneToOne() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
+    await pressDay();
     await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
     fireEvent.click(
         screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
@@ -251,9 +253,17 @@ describe("the booking page (U19)", () => {
         expect(
             screen.getByRole("radio", { name: "Sat 19 Sep: closed" }),
         ).toBeDisabled();
+        // The first free day is the one a press lands on: unchosen till then.
+        const free = screen.getByRole("radio", {
+            name: "Sun 20 Sep: 1 time free",
+        });
+        expect(free).toHaveAttribute("aria-checked", "false");
+        await pressDay();
         expect(
-            screen.getByRole("radio", { name: "Sun 20 Sep: 1 time free" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", {
+                name: "Edit the day, Sunday 20 September",
+            }),
+        ).toBeVisible();
         expect(calls[0]?.url).toBe(`${API}/public/services/svc_pt/days`);
     });
 
@@ -799,6 +809,7 @@ describe("the booking page (U19)", () => {
 
         await tryIt("Pay ₹1,200 and book");
         // The same choice again: the same key.
+        fireEvent.click(screen.getByRole("button", { name: /Edit the time/ }));
         fireEvent.click(
             screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         );
@@ -807,6 +818,7 @@ describe("the booking page (U19)", () => {
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         await tryIt("Book and pay at the desk");
         // Another time: a new key.
+        fireEvent.click(screen.getByRole("button", { name: /Edit the time/ }));
         fireEvent.click(
             screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
         );
@@ -832,7 +844,9 @@ describe("the booking page (U19)", () => {
         });
         expect(open).toBeEnabled();
         fireEvent.click(open);
-        expect(open).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("button", { name: /Edit the class, 6:30 to/ }),
+        ).toBeVisible();
     });
 
     it("offers only the desk when the business takes no payment online", async () => {
@@ -845,6 +859,7 @@ describe("the booking page (U19)", () => {
                 initialServiceId="svc_pt"
             />,
         );
+        await pressDay();
         await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
         fireEvent.click(
             screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
@@ -954,6 +969,7 @@ describe("Where and anything we should know (E7)", () => {
 
     async function chooseAt(service: RegExp) {
         fireEvent.click(screen.getByRole("radio", { name: service }));
+        await pressDay();
         const time = await screen.findByRole("radio", {
             name: "7:00 am with Dr Kavitha Rao",
         });
@@ -1256,6 +1272,9 @@ describe("online checkout (E11)", () => {
             }),
         ).toBeInTheDocument();
 
+        fireEvent.click(
+            screen.getByRole("button", { name: /Edit what you're booking/ }),
+        );
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
         fireEvent.click(
             await screen.findByRole("radio", {
@@ -1456,6 +1475,7 @@ describe("online checkout (E11)", () => {
                 initialServiceId="svc_pt"
             />,
         );
+        await pressDay();
         fireEvent.click(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",
@@ -1500,15 +1520,16 @@ describe("opening on a time from On today (G18)", () => {
                 initialStart="08:00"
             />,
         );
-        const time = await screen.findByRole("radio", {
-            name: "8:00 am with Karan Mehta",
-        });
-        await waitFor(() =>
-            expect(time).toHaveAttribute("aria-checked", "true"),
-        );
         expect(
-            screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
-        ).toHaveAttribute("aria-checked", "true");
+            await screen.findByRole("button", {
+                name: "Edit the time, 8:00 am",
+            }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole("button", {
+                name: "Edit the day, Sunday 20 September",
+            }),
+        ).toBeVisible();
         // Straight on to who they are.
         expect(screen.getByText(/Booking as/)).toBeInTheDocument();
         expect(screen.queryByText(/has gone/)).toBeNull();
@@ -1530,8 +1551,10 @@ describe("opening on a time from On today (G18)", () => {
             await screen.findByText("That time has gone. Here's what's left."),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", {
+                name: "Edit the day, Sunday 20 September",
+            }),
+        ).toBeVisible();
         expect(
             screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "false");
@@ -1550,12 +1573,11 @@ describe("opening on a time from On today (G18)", () => {
                 initialStart="18:30"
             />,
         );
-        const open = await screen.findByRole("radio", {
-            name: /6:30 to 7:15 pm.*2 places left/,
-        });
-        await waitFor(() =>
-            expect(open).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: /Edit the class, 6:30 to/,
+            }),
+        ).toBeVisible();
         unmount();
         // Another visit: nothing chosen on the last one is kept for it.
         window.sessionStorage.clear();
@@ -1590,6 +1612,7 @@ describe("opening on a time from On today (G18)", () => {
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
+        await pressDay();
         await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
         expect(
             screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
@@ -1640,6 +1663,7 @@ describe("sign-in at the last step (A9)", () => {
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
+        await pressDay();
         fireEvent.click(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",
@@ -1769,8 +1793,8 @@ describe("sign-in at the last step (A9)", () => {
         expect(verifyCode).toHaveBeenCalledWith("meera@example.in", "123456");
         // The time chosen is as it was.
         expect(
-            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", { name: "Edit the time, 7:00 am" }),
+        ).toBeVisible();
 
         fireEvent.change(nameField, { target: { value: "Meera Shah" } });
         fireEvent.click(
@@ -1870,6 +1894,8 @@ describe("sign-in at the last step (A9)", () => {
         expect(screen.queryByLabelText("Email")).toBeNull();
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         unmount();
+        // Another visit: nothing chosen on the last one is kept for it.
+        window.sessionStorage.clear();
 
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await pickSeven();
@@ -1926,8 +1952,8 @@ describe("sign-in at the last step (A9)", () => {
         // Not "the time has gone": the times aren't read again.
         expect(calls.filter((c) => c.url.endsWith("/days"))).toHaveLength(1);
         expect(
-            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", { name: "Edit the time, 7:00 am" }),
+        ).toBeVisible();
     });
 
     it("the time goes while they sign in: says so, and chooses the next free one", async () => {
@@ -1977,8 +2003,8 @@ describe("sign-in at the last step (A9)", () => {
             ),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", { name: "Edit the time, 8:00 am" }),
+        ).toBeVisible();
         // Signed in now: booking the next one needs no code.
         expect(
             screen.getByRole("button", { name: "Book and pay at the desk" }),
@@ -2904,6 +2930,8 @@ describe("signing in while booking, when the server draws the page again", () =>
         fireEvent.click(
             await screen.findByRole("button", { name: "Show later dates" }),
         );
+        await waitFor(() => expect(calls.at(-1)?.url).toContain("skip=14"));
+        await pressDay();
         const time = await screen.findByRole("radio", {
             name: "10:00 am with Ritu Kapoor",
         });
@@ -2933,11 +2961,11 @@ describe("signing in while booking, when the server draws the page again", () =>
             calls.slice(reads).filter((c) => c.url.includes("/days")),
         ).toEqual([]);
         expect(
-            screen.getByRole("radio", { name: "10:00 am with Ritu Kapoor" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", { name: "Edit the time, 10:00 am" }),
+        ).toBeVisible();
         expect(
-            screen.getByRole("radio", { name: "Ritu Kapoor" }),
-        ).toHaveAttribute("aria-checked", "true");
+            document.querySelector('[data-chosen-row="the day"]'),
+        ).toHaveTextContent("With Ritu Kapoor");
         expect(
             screen.getByRole("radio", { name: /Pay at the desk/ }),
         ).toHaveAttribute("aria-checked", "true");
@@ -2977,12 +3005,17 @@ describe("signing in while booking, when the server draws the page again", () =>
                 initialServiceId="svc_pt"
             />,
         );
+        fireEvent.click(
+            screen.getByRole("button", { name: /Edit what you're booking/ }),
+        );
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
         await waitFor(() =>
             expect(calls.at(-1)?.url).toContain("/svc_hiit/days"),
         );
         expect(
-            screen.getByRole("radio", { name: /HIIT class/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", {
+                name: "Edit what you're booking, HIIT class",
+            }),
+        ).toBeVisible();
     });
 });

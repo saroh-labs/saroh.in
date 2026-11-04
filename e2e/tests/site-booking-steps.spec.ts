@@ -47,6 +47,10 @@ const timeRadios = (page: Page) =>
         hasText: /^\d{1,2}:\d{2} [ap]m$/,
     });
 
+/** A time chosen, folded to its row with Edit. */
+const timeRow = (page: Page, label: string) =>
+    page.getByRole("button", { name: `Edit the time, ${label}` });
+
 /**
  * Service, then person, then time, on Kavi's check-up: each moves the step
  * in the address. Returns the time's label.
@@ -63,12 +67,16 @@ async function serviceThenPersonThenTime(page: Page): Promise<string> {
     await person.click();
     await expect(page).toHaveURL(/step=when/);
     await expect(page).toHaveURL(/staff=/);
+    await page
+        .getByRole("radio", { name: /times? free/ })
+        .first()
+        .click();
     const time = timeRadios(page).first();
     await expect(time).toBeVisible({ timeout: 15_000 });
     const label = (await time.innerText()).trim();
     await time.click();
     await expect(page).toHaveURL(/step=details/);
-    await expect(time).toHaveAttribute("aria-checked", "true");
+    await expect(timeRow(page, label)).toBeVisible();
     return label;
 }
 
@@ -91,13 +99,14 @@ test.describe("the booking step in the address", () => {
         await page.goBack();
         await expect.poll(() => stepOf(page)).toBe("when");
         await expect(
-            page.getByRole("radio", { name: new RegExp(CHECK_UP) }),
-        ).toHaveAttribute("aria-checked", "true");
+            page.getByRole("button", {
+                name: `Edit what you're booking, ${CHECK_UP}`,
+            }),
+        ).toBeVisible();
         // The person is still chosen; the time is not.
         const withGroup = page.getByRole("radiogroup", { name: "With" });
-        await expect(withGroup.getByRole("radio").nth(1)).toHaveAttribute(
-            "aria-checked",
-            "true",
+        await expect(page.locator('[data-chosen-row="the day"]')).toContainText(
+            "With ",
         );
         await expect(
             timeRadios(page).filter({ hasText: label }).first(),
@@ -113,15 +122,15 @@ test.describe("the booking step in the address", () => {
             withGroup.getByRole("radio", { name: "Anyone" }),
         ).toHaveAttribute("aria-checked", "true");
         await expect(
-            page.getByRole("radio", { name: new RegExp(CHECK_UP) }),
-        ).toHaveAttribute("aria-checked", "true");
+            page.getByRole("button", {
+                name: `Edit what you're booking, ${CHECK_UP}`,
+            }),
+        ).toBeVisible();
 
         await page.goForward();
         await page.goForward();
         await expect.poll(() => stepOf(page)).toBe("details");
-        await expect(
-            timeRadios(page).filter({ hasText: label }).first(),
-        ).toHaveAttribute("aria-checked", "true");
+        await expect(timeRow(page, label)).toBeVisible();
         expect(documents).toHaveLength(1);
     });
 
@@ -130,12 +139,12 @@ test.describe("the booking step in the address", () => {
         const label = await serviceThenPersonThenTime(page);
         const address = page.url();
         await page.reload();
+        await expect(timeRow(page, label)).toBeVisible({ timeout: 15_000 });
         await expect(
-            timeRadios(page).filter({ hasText: label }).first(),
-        ).toHaveAttribute("aria-checked", "true", { timeout: 15_000 });
-        await expect(
-            page.getByRole("radio", { name: new RegExp(CHECK_UP) }),
-        ).toHaveAttribute("aria-checked", "true");
+            page.getByRole("button", {
+                name: `Edit what you're booking, ${CHECK_UP}`,
+            }),
+        ).toBeVisible();
         expect(page.url()).toBe(address);
     });
 
@@ -153,9 +162,7 @@ test.describe("the booking step in the address", () => {
         const visitor = await other.newPage();
         await asNewVisitor(visitor);
         await visitor.goto(link);
-        await expect(
-            timeRadios(visitor).filter({ hasText: label }).first(),
-        ).toHaveAttribute("aria-checked", "true", { timeout: 15_000 });
+        await expect(timeRow(visitor, label)).toBeVisible({ timeout: 15_000 });
         await expect(
             visitor.getByRole("heading", { name: "Your details" }),
         ).toBeVisible();
@@ -229,8 +236,8 @@ test.describe("the booking step in the address", () => {
         ).toBeVisible({ timeout: 15_000 });
         // The details are drawn only once a session is chosen.
         await expect(
-            services.getByRole("radio", { checked: true }),
-        ).toHaveCount(1);
+            page.getByRole("button", { name: /^Edit the class/ }),
+        ).toBeVisible();
         expect(stepOf(page)).toBe("details");
     });
 
@@ -349,11 +356,18 @@ test.describe("the booking step in the address", () => {
                 await expect(
                     page.getByRole("heading", { name: "Your details" }),
                 ).toBeVisible();
+                // The weeks and the person are on the strip: Edit shows it,
+                // and the same day pressed closes it with the time kept.
+                await page
+                    .getByRole("button", { name: /^Edit the day/ })
+                    .click();
                 await expect(later).toBeVisible();
                 await expect(chosenPerson).toBeVisible();
-                await expect(
-                    timeRadios(page).filter({ hasText: label }).first(),
-                ).toHaveAttribute("aria-checked", "true");
+                await page
+                    .getByRole("radiogroup", { name: "Day" })
+                    .getByRole("radio", { checked: true })
+                    .click();
+                await expect(timeRow(page, label)).toBeVisible();
                 await expect(page.getByLabel("Phone (optional)")).toHaveValue(
                     typedPhone,
                 );
@@ -424,8 +438,13 @@ test.describe("the booking step in the address", () => {
         await page
             .getByRole("radio", { name: new RegExp(WALKTHROUGH) })
             .click();
+        await page
+            .getByRole("radio", { name: /times? free/ })
+            .first()
+            .click();
         const time = timeRadios(page).last();
         await expect(time).toBeVisible({ timeout: 15_000 });
+        const label = (await time.innerText()).trim();
 
         // No time yet: the sheet takes a sign-in here, and Escape leaves all.
         const stepBefore = page.url();
@@ -456,7 +475,7 @@ test.describe("the booking step in the address", () => {
         await expect(headerSignIn).toHaveCount(0, { timeout: 15_000 });
         expect(new URL(page.url()).pathname).toBe("/book");
         expect(stepOf(page)).toBe("details");
-        await expect(time).toHaveAttribute("aria-checked", "true");
+        await expect(timeRow(page, label)).toBeVisible();
         await expect(page.getByLabel("Phone (optional)")).toHaveValue(
             typedPhone,
         );

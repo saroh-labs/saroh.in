@@ -24,6 +24,7 @@ import type { BookingAccount } from "./booking-flow";
 import BookingFlow, { accountPhone } from "./booking-flow";
 import type { BookingPageData } from "./model";
 import { googleCalendarHref, isBookResult, laterSkip } from "./model";
+import { pressDay } from "./test-press-day";
 
 /**
  * The booking page for a customer coming back: what the page already knows
@@ -165,6 +166,7 @@ afterEach(() => {
 
 async function chooseOneToOne() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
+    await pressDay();
     fireEvent.click(
         await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
@@ -246,7 +248,8 @@ describe("the booking page on a phone", () => {
 
         viewport("phone");
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
-        await chooseOneToOne();
+        // The time chosen above is kept for this tab, and brought back.
+        await screen.findByRole("button", { name: "Edit the time, 7:00 am" });
         expect(
             screen
                 .getByRole("button", { name: /^Book/ })
@@ -275,6 +278,7 @@ describe("the booking page on a phone", () => {
             "coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))]",
         );
         // A time is 45px tall already.
+        await pressDay();
         expect(
             screen.getByRole("radio", { name: "7:00 am with Karan Mehta" })
                 .className,
@@ -354,6 +358,8 @@ describe("choosing on the booking page", () => {
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
+        // The weeks are on the day strip: Edit opens it again.
+        fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Show later dates" }),
         );
@@ -362,16 +368,19 @@ describe("choosing on the booking page", () => {
                 `${API}/public/services/svc_pt/days?skip=14`,
             ),
         );
+        // The business books 21 days ahead: nothing later than these.
+        await screen.findByRole("radiogroup", { name: "Day" });
+        expect(
+            screen.queryByRole("button", { name: "Show later dates" }),
+        ).toBeNull();
         // Other weeks are other times: the one chosen is let go.
+        await pressDay();
         expect(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",
             }),
         ).toHaveAttribute("aria-checked", "false");
-        // The business books 21 days ahead: nothing later than these.
-        expect(
-            screen.queryByRole("button", { name: "Show later dates" }),
-        ).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Show earlier dates" }),
         );
@@ -482,15 +491,16 @@ describe("the booking through a reload", () => {
         cleanup();
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
-        const seven = await screen.findByRole("radio", {
-            name: "7:00 am with Karan Mehta",
-        });
-        await waitFor(() =>
-            expect(seven).toHaveAttribute("aria-checked", "true"),
-        );
+        // Each brought back folded, as they left it.
         expect(
-            screen.getByRole("radio", { name: /Personal training/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            await screen.findByRole("button", {
+                name: "Edit the time, 7:00 am",
+            }),
+        ).toBeVisible();
+        // The one service: chosen, with nothing else to Edit to.
+        expect(
+            document.querySelector('[data-chosen-row="what you\'re booking"]'),
+        ).toHaveTextContent("Personal training");
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
             "",
@@ -527,12 +537,11 @@ describe("the booking through a reload", () => {
             }),
         );
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
-        const nine = await screen.findByRole("radio", {
-            name: "9:00 am with Karan Mehta",
-        });
-        await waitFor(() =>
-            expect(nine).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: "Edit the time, 9:00 am",
+            }),
+        ).toBeVisible();
         expect(
             screen.getAllByText(
                 "That time has gone. We've chosen the next free one: Sun 20 Sep at 9:00 am.",
@@ -718,8 +727,8 @@ describe("the header's Sign in during a booking", () => {
         await screen.findByText(/Booking as/);
         expect(screen.queryByRole("dialog")).toBeNull();
         expect(
-            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", { name: "Edit the time, 7:00 am" }),
+        ).toBeVisible();
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
             "98450 00000",
         );
@@ -744,7 +753,7 @@ describe("the customer the server's next draw brings", () => {
         />
     );
     const seven = () =>
-        screen.getByRole("radio", { name: "7:00 am with Karan Mehta" });
+        screen.getByRole("button", { name: "Edit the time, 7:00 am" });
 
     it("keeps what was chosen and typed, says who is booking, and asks for no code", async () => {
         serve(() => json(ONE_DAYS));
@@ -768,7 +777,7 @@ describe("the customer the server's next draw brings", () => {
         expect(screen.getByText(/Booking as/)).toHaveTextContent(
             "Booking as Asha Rao",
         );
-        expect(seven()).toHaveAttribute("aria-checked", "true");
+        expect(seven()).toBeVisible();
         // What they typed stands over the phone on their account.
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
             "98450 00000",
@@ -808,6 +817,6 @@ describe("the customer the server's next draw brings", () => {
         rerender(drawnAgain(ASHA));
 
         expect(screen.queryByText(/Booking as/)).toBeNull();
-        expect(seven()).toHaveAttribute("aria-checked", "true");
+        expect(seven()).toBeVisible();
     });
 });

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { timeRangeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
@@ -7,6 +9,7 @@ import { dateIn, dateText, dayParts, placesText } from "../model";
 import { optionClasses, quietFill, textAction } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { fullSessionText } from "../waitlist";
+import { ChosenRow, useFocusOnChange } from "./chosen-row";
 import type { Weeks } from "./weeks";
 import { THESE_WEEKS, WeeksButtons } from "./weeks";
 
@@ -21,6 +24,7 @@ export function Sessions({
     waitlist,
     weeks = THESE_WEEKS,
     reach = null,
+    stepped = false,
 }: {
     sessions: BookingStart[];
     more: boolean;
@@ -39,7 +43,37 @@ export function Sessions({
     weeks?: Weeks;
     /** A call and a message, offered when there is no class to book. */
     reach?: BusinessReach | null;
+    /** Classic's page: the class chosen folds to a row with Edit. */
+    stepped?: boolean;
 }) {
+    const [editing, setEditing] = useState(false);
+    const folded = stepped && !!chosen && !editing;
+    const focusRef = useFocusOnChange(folded);
+    if (folded) {
+        const end = new Date(chosen.startAt).getTime() + duration * 60_000;
+        const full = (chosen.placesLeft ?? 0) <= 0;
+        return (
+            <ChosenRow
+                rowRef={focusRef}
+                what="the class"
+                value={`${timeRangeWords(chosen.startAt, end, zone)} · ${dateText(dateIn(chosen.startAt, zone))}`}
+                sub={
+                    [
+                        chosen.staffName ? `With ${chosen.staffName}` : null,
+                        full && waitlist
+                            ? fullSessionText(
+                                  waitlist.placeOf(chosen.startAt),
+                                  zone,
+                              )
+                            : null,
+                    ]
+                        .filter(Boolean)
+                        .join(" · ") || undefined
+                }
+                onEdit={() => setEditing(true)}
+            />
+        );
+    }
     if (sessions.length === 0) {
         return (
             <div>
@@ -54,7 +88,13 @@ export function Sessions({
         );
     }
     return (
-        <div role="radiogroup" aria-label="Class" className="grid gap-2">
+        <div
+            ref={focusRef}
+            tabIndex={-1}
+            role="radiogroup"
+            aria-label="Class"
+            className="grid gap-2 outline-none"
+        >
             {sessions.map((s) => {
                 const on = chosen?.startAt === s.startAt;
                 const left = s.placesLeft ?? 0;
@@ -75,7 +115,10 @@ export function Sessions({
                         role="radio"
                         aria-checked={on}
                         disabled={closed}
-                        onClick={() => onPick(s)}
+                        onClick={() => {
+                            setEditing(false);
+                            onPick(s);
+                        }}
                         className={cn(
                             optionClasses(on),
                             // Full, with no waitlist: quiet and dashed, so

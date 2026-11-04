@@ -376,10 +376,10 @@ describe("a class credit online (A10)", () => {
         expect(credit).toHaveBeenCalledTimes(2);
         // The time is still chosen, and paying is back to the other ways.
         expect(
-            screen.getByRole("radio", {
-                name: /6:30 to 7:15 pm.*4 places left/,
+            screen.getByRole("button", {
+                name: /Edit the class, 6:30 to 7:15 pm/,
             }),
-        ).toHaveAttribute("aria-checked", "true");
+        ).toBeVisible();
         expect(
             screen.getByRole("radio", { name: /Pay ₹500 for this class/ }),
         ).toHaveAttribute("aria-checked", "true");
