@@ -23,12 +23,20 @@ export type PlanCta = (plan: PlanCardView, look: PlanCtaLook) => ReactNode;
 export function PlanCards({
     plans,
     cta,
+    ownHeight,
 }: {
     plans: PlanCardView[];
     cta: PlanCta;
+    /** Each card as tall as its own words, not the row's tallest. */
+    ownHeight?: boolean;
 }) {
     return (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] items-stretch gap-4">
+        <div
+            className={cn(
+                "grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4",
+                ownHeight ? "items-start" : "items-stretch",
+            )}
+        >
             {plans.map((p) => (
                 <PlanCard key={p.id} plan={p} cta={cta} />
             ))}

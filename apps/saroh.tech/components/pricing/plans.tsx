@@ -16,6 +16,7 @@ export function Plans({ model }: { model: PricingPageModel }) {
         <PricingCards
             model={model}
             switches={switches}
+            ownHeight
             cta={(plan, look) =>
                 plan.cta.paid ? (
                     <Pill

@@ -24,6 +24,7 @@ export function PricingCards({
     taxToggle,
     onYearlyChange,
     compare,
+    ownHeight,
 }: {
     model: PricingPageModel;
     switches: PricingSwitches;
@@ -33,6 +34,8 @@ export function PricingCards({
     /** Told when the visitor flips Monthly / Yearly. */
     onYearlyChange?: (yearly: boolean) => void;
     compare?: { href: string; label: string };
+    /** Each card as tall as its own words, not the row's tallest. */
+    ownHeight?: boolean;
 }) {
     const { yearly, setYearly, withTax, setWithTax, view } = switches;
     const tax = model.tax.toggle ? taxToggle?.(withTax, setWithTax) : null;
@@ -56,7 +59,7 @@ export function PricingCards({
                     {tax}
                 </div>
             ) : null}
-            <PlanCards plans={view.plans} cta={cta} />
+            <PlanCards plans={view.plans} cta={cta} ownHeight={ownHeight} />
             {view.footnote || compare ? (
                 <div className="flex flex-wrap gap-x-5 gap-y-2 text-mk-note text-muted-foreground">
                     {view.footnote ? (

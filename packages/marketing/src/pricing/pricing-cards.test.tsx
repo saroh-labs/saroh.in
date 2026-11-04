@@ -148,6 +148,31 @@ describe("the pricing tables", () => {
         },
     );
 
+    it("cards stretch to the row's height unless asked for their own", () => {
+        const grid = (ownHeight?: boolean) => {
+            const m = model(["a", "b"]);
+            function Page() {
+                const switches = usePricingSwitches(m);
+                return (
+                    <PricingCards
+                        model={m}
+                        switches={switches}
+                        cta={() => null}
+                        ownHeight={ownHeight}
+                    />
+                );
+            }
+            const { container, unmount } = render(<Page />);
+            const cls =
+                container.querySelector("[data-plan]")?.parentElement
+                    ?.className;
+            unmount();
+            return cls;
+        };
+        expect(grid()).toContain("items-stretch");
+        expect(grid(true)).toContain("items-start");
+    });
+
     it("the package has no tax box of its own", () => {
         render(<Page m={model(["a"])} withToggle={false} />);
         expect(screen.queryByRole("checkbox")).toBeNull();
