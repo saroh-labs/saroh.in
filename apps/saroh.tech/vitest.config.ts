@@ -11,6 +11,7 @@ export default defineConfig({
             "lib/**/*.test.ts",
             "worker/**/*.test.ts",
             "scripts/**/*.test.ts",
+            "tailwind-content.test.ts",
         ],
     },
 });

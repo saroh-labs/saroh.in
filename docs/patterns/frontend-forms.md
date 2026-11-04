@@ -554,6 +554,10 @@ preview under its fields, from the draft.
   `authClient`, and that app does not depend on React Hook Form. Keep a new
   accounts form consistent with its neighbours unless you are migrating them
   all.
+- `saroh.tech` draws every field from `@saroh/ui` through
+  `components/shared/field.tsx` (`Field`, `TextArea`, `SelectField`,
+  `DateField`). `check:native-selects` refuses a `<select>` there. saroh.in's
+  tools and contact form still draw native ones (the audit's separate batch).
 - `packages/site-blocks` enquiry and booking forms run on merchant sites and
   manage their own state; the package does not depend on `@saroh/ui`.
 - Eight `app.saroh.in` components with a `<form>` still hold fields in `useState`

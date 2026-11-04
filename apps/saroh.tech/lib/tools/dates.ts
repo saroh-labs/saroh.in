@@ -20,6 +20,16 @@ export const addDays = (iso: string, days: number) =>
 export const daysBetween = (from: string, to: string) =>
     Math.round((toUtc(to) - toUtc(from)) / DAY_MS);
 
+/**
+ * An end date when its start moves: it stays until the start passes it, then
+ * keeps the gap in days it had.
+ */
+export function endAfterMove(before: string, after: string, end: string) {
+    if (!isDate(after) || !isDate(end) || after <= end) return end;
+    const gap = isDate(before) ? Math.max(daysBetween(before, end), 0) : 0;
+    return addDays(after, gap);
+}
+
 const LONG = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",

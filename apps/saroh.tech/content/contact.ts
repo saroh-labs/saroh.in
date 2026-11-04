@@ -38,7 +38,6 @@ export const CONTACT = {
         nameLabel: "Your name",
         emailLabel: "Email",
         kindLabel: "Your business",
-        optional: "(optional)",
         kindNone: "Choose one",
         kinds: [
             { id: "salon", label: "Salon or beauty" },

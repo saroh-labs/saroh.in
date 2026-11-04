@@ -239,6 +239,10 @@ jobs:
       - name: Date inputs
         run: pnpm run check:date-inputs
 
+      # Every list on saroh.tech is the shadcn select, never a native one.
+      - name: Native selects
+        run: pnpm run check:native-selects
+
       # An address written in place is one Next's router follows (null state).
       - name: History state
         run: pnpm run check:history-state

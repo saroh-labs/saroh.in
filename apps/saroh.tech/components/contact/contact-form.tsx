@@ -3,10 +3,11 @@
 import { Button } from "@saroh/marketing/button";
 import { ChoiceChip } from "@saroh/marketing/choice-chip";
 import { nextIndex } from "@saroh/marketing/roving";
+import { Field as FieldFrame } from "@saroh/ui/field";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { INPUT_CLASS } from "@/components/shared/field";
+import { Field, SelectField, TextArea } from "@/components/shared/field";
 import { CONTACT } from "@/content/contact";
 import type {
     ContactField,
@@ -23,9 +24,6 @@ import {
 const copy = CONTACT.form;
 const done = CONTACT.done;
 const FIRST_TOPIC: ContactTopicId = "question";
-const LABEL = "text-[14.5px] font-semibold";
-const FIELD = `${INPUT_CLASS} md:!text-base placeholder:text-muted-foreground`;
-const RED = "!border-destructive";
 
 type Send =
     | { at: "idle" | "sending" }
@@ -34,8 +32,8 @@ type Send =
 
 /**
  * saroh.in's form. Nothing is checked until Send is pressed; from then on every
- * field at fault has the red border, one line says the first of them, and the
- * keyboard goes to it. A failed send keeps everything typed. Once sent, the card
+ * field at fault says what it needs under itself, and the keyboard goes to the
+ * first of them. A failed send keeps everything typed. Once sent, the card
  * thanks them; "Send another message" keeps the name and the email.
  */
 export function ContactForm({ apiUrl }: { apiUrl: string }) {
@@ -67,16 +65,13 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
     const refusedEmail = send.at === "refused";
     const atFault = (field: ContactField) =>
         problems.includes(field) || (refusedEmail && field === "email");
-    const first: ContactField | null =
-        problems.at(0) ?? (refusedEmail ? "email" : null);
     const sending = send.at === "sending";
     const fieldProps = (field: ContactField) => ({
         id: `contact-${field}`,
         name: field,
         maxLength: CONTACT_LIMITS[field],
         "aria-required": true,
-        "aria-invalid": atFault(field) || undefined,
-        "aria-describedby": first === field ? "contact-error" : undefined,
+        error: atFault(field) ? copy.errors[field] : undefined,
     });
     const edited = () => {
         if (send.at !== "idle" && send.at !== "sending") {
@@ -179,10 +174,7 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
                 </span>
             </div>
 
-            <div className="grid gap-2">
-                <span id="contact-topic-label" className={LABEL}>
-                    {copy.topicLabel}
-                </span>
+            <FieldFrame group htmlFor="contact-topic" label={copy.topicLabel}>
                 <div
                     role="radiogroup"
                     aria-labelledby="contact-topic-label"
@@ -208,97 +200,60 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
                         );
                     })}
                 </div>
-            </div>
+            </FieldFrame>
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-[14px]">
-                <div className="grid gap-1.5">
-                    <label htmlFor="contact-name" className={LABEL}>
-                        {copy.nameLabel}
-                    </label>
-                    <input
-                        {...fieldProps("name")}
-                        type="text"
-                        autoComplete="name"
-                        value={name}
-                        onChange={(e) => {
-                            setName(e.target.value);
-                            edited();
-                        }}
-                        className={`${FIELD} !h-12 ${atFault("name") ? RED : ""}`}
-                    />
-                </div>
-                <div className="grid gap-1.5">
-                    <label htmlFor="contact-email" className={LABEL}>
-                        {copy.emailLabel}
-                    </label>
-                    <input
-                        {...fieldProps("email")}
-                        type="email"
-                        inputMode="email"
-                        autoComplete="email"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        value={email}
-                        onChange={(e) => {
-                            setEmail(e.target.value);
-                            edited();
-                        }}
-                        className={`${FIELD} !h-12 ${atFault("email") ? RED : ""}`}
-                    />
-                </div>
-            </div>
-
-            <div className="grid gap-1.5">
-                <label htmlFor="contact-kind" className={LABEL}>
-                    {copy.kindLabel}{" "}
-                    <span className="font-normal text-muted-foreground">
-                        {copy.optional}
-                    </span>
-                </label>
-                <select
-                    id="contact-kind"
-                    name="kind"
-                    value={kind}
-                    onChange={(e) =>
-                        setKind(e.target.value as ContactKindId | "")
-                    }
-                    className={`${FIELD} !h-12 pl-3 pr-10`}
-                >
-                    <option value="">{copy.kindNone}</option>
-                    {copy.kinds.map((k) => (
-                        <option key={k.id} value={k.id}>
-                            {k.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="grid gap-1.5">
-                <label htmlFor="contact-message" className={LABEL}>
-                    {copy.messageLabel}
-                </label>
-                <textarea
-                    {...fieldProps("message")}
-                    rows={5}
-                    placeholder={copy.topics.find((t) => t.id === topic)?.hint}
-                    value={message}
+                <Field
+                    {...fieldProps("name")}
+                    label={copy.nameLabel}
+                    type="text"
+                    autoComplete="name"
+                    value={name}
                     onChange={(e) => {
-                        setMessage(e.target.value);
+                        setName(e.target.value);
                         edited();
                     }}
-                    className={`${FIELD} !h-auto resize-y py-3 leading-[1.5] ${atFault("message") ? RED : ""}`}
+                />
+                <Field
+                    {...fieldProps("email")}
+                    label={copy.emailLabel}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={email}
+                    onChange={(e) => {
+                        setEmail(e.target.value);
+                        edited();
+                    }}
                 />
             </div>
 
-            {first ? (
-                <p
-                    id="contact-error"
-                    role="alert"
-                    className="m-0 text-[14.5px] font-semibold text-destructive"
-                >
-                    {copy.errors[first]}
-                </p>
-            ) : send.at === "failed" ? (
+            <SelectField<ContactKindId | "">
+                label={copy.kindLabel}
+                optional
+                value={kind}
+                options={[
+                    { value: "", label: copy.kindNone },
+                    ...copy.kinds.map((k) => ({ value: k.id, label: k.label })),
+                ]}
+                onChange={setKind}
+            />
+
+            <TextArea
+                {...fieldProps("message")}
+                label={copy.messageLabel}
+                rows={5}
+                placeholder={copy.topics.find((t) => t.id === topic)?.hint}
+                value={message}
+                onChange={(e) => {
+                    setMessage(e.target.value);
+                    edited();
+                }}
+            />
+
+            {send.at === "failed" ? (
                 <p
                     role="alert"
                     className="m-0 text-[14.5px] font-semibold text-destructive"

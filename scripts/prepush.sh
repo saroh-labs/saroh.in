@@ -879,6 +879,7 @@ bg_step mktemp pnpm run check:mktemp
 bg_step domains pnpm run check:domains
 bg_step shared-data pnpm run check:shared-data
 bg_step date-inputs pnpm run check:date-inputs
+bg_step native-selects pnpm run check:native-selects
 bg_step history-state pnpm run check:history-state
 bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request
 bg_step client-calls pnpm run check:client-calls

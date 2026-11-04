@@ -3,7 +3,9 @@
 import Link from "next/link";
 
 import { buttonClass } from "@/components/shared/button";
-import { Field } from "@/components/shared/field";
+import { Field as FieldFrame } from "@saroh/ui/field";
+
+import { Field, SelectField } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref } from "@/lib/tools/handoff";
@@ -18,7 +20,7 @@ import {
     toCents,
 } from "@/lib/tools/money";
 
-import { CopyButton, Section, SelectField } from "./fields";
+import { CopyButton, Section } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -95,15 +97,14 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                     options={CURRENCY_OPTIONS}
                     onChange={(currency) => set({ currency })}
                 />
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Fee type</span>
+                <FieldFrame group label="Fee type">
                     <SegmentedControl
                         legend="Fee type"
                         value={d.type}
                         options={TYPES}
                         onChange={(type) => set({ type })}
                     />
-                </div>
+                </FieldFrame>
                 <div className="grid grid-cols-2 gap-3">
                     <Field
                         label={flat ? "Fee amount" : "Rate %"}

@@ -1,9 +1,10 @@
 "use client";
 
+import { Field as FieldFrame } from "@saroh/ui/field";
 import { useEffect, useMemo, useState } from "react";
 
 import { buttonClass } from "@/components/shared/button";
-import { Field } from "@/components/shared/field";
+import { DateField, Field } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { todayIso } from "@/lib/tools/dates";
 import { useDraft } from "@/lib/tools/draft-store";
@@ -16,7 +17,7 @@ import {
     reminderMessage,
 } from "@/lib/tools/reminder";
 
-import { CopyButton, DateField, Section } from "./fields";
+import { CopyButton, Section } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -119,7 +120,7 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                     </div>
                     <Field
                         label="Payment link"
-                        hint="(optional)"
+                        optional
                         type="url"
                         placeholder="https://"
                         value={d.payLink}
@@ -133,24 +134,22 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                         </span>
                     ) : null}
                 </Section>
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Tone</span>
+                <FieldFrame group label="Tone">
                     <SegmentedControl
                         legend="Tone"
                         value={d.tone}
                         options={TONES}
                         onChange={(tone) => set({ tone })}
                     />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Send by</span>
+                </FieldFrame>
+                <FieldFrame group label="Send by">
                     <SegmentedControl
                         legend="Channel"
                         value={d.channel}
                         options={CHANNELS}
                         onChange={(channel) => set({ channel })}
                     />
-                </div>
+                </FieldFrame>
             </div>
             <div className="flex min-w-0 flex-col gap-3.5">
                 <section

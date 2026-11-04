@@ -1,7 +1,13 @@
 import { jsPDF } from "jspdf";
 import { describe, expect, it } from "vitest";
 
-import { addDays, daysBetween, formatDate, todayIso } from "./dates";
+import {
+    addDays,
+    daysBetween,
+    endAfterMove,
+    formatDate,
+    todayIso,
+} from "./dates";
 import type { DocDraft } from "./document";
 import { applyCarry, documentView, dueFor, totals } from "./document";
 import { carryHref, decodeDraft, encodeDraft } from "./handoff";
@@ -493,5 +499,43 @@ describe("the PDF", () => {
             from,
         );
         expect(canDrawPdf(euro)).toBe(true);
+    });
+});
+
+describe("an end date when its start moves", () => {
+    it("stays until the start passes it", () => {
+        expect(endAfterMove("2026-11-04", "2026-11-10", "2026-11-18")).toBe(
+            "2026-11-18",
+        );
+        expect(endAfterMove("2026-11-04", "2026-11-18", "2026-11-18")).toBe(
+            "2026-11-18",
+        );
+        expect(endAfterMove("2026-11-10", "2026-11-01", "2026-11-18")).toBe(
+            "2026-11-18",
+        );
+    });
+
+    it("keeps the same gap once passed", () => {
+        expect(endAfterMove("2026-11-04", "2026-12-01", "2026-11-18")).toBe(
+            "2026-12-15",
+        );
+    });
+
+    it("lands on the start when the gap is unknown or was already wrong", () => {
+        expect(endAfterMove("", "2026-12-01", "2026-11-18")).toBe("2026-12-01");
+        expect(endAfterMove("2026-11-20", "2026-12-01", "2026-11-18")).toBe(
+            "2026-12-01",
+        );
+    });
+
+    it("leaves a cleared date alone", () => {
+        expect(endAfterMove("2026-11-04", "", "2026-11-18")).toBe("2026-11-18");
+        expect(endAfterMove("2026-11-04", "2026-12-01", "")).toBe("");
+    });
+
+    it("a custom due date moves; a term still counts from the new date", () => {
+        const moved = endAfterMove("2026-11-04", "2026-12-01", "2026-11-18");
+        expect(dueFor("2026-12-01", "custom", moved)).toBe("2026-12-15");
+        expect(dueFor("2026-12-01", "net30", moved)).toBe("2026-12-31");
     });
 });

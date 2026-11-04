@@ -165,7 +165,7 @@ export function FromSection({
                     />
                     <Field
                         label="Tax ID"
-                        hint="(optional)"
+                        optional
                         value={from.taxId}
                         onChange={(e) => onChange({ taxId: e.target.value })}
                     />

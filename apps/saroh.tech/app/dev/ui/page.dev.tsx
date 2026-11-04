@@ -41,7 +41,7 @@ export default function UiSheet() {
                 ]}
             />
             <Field label="Business name" placeholder="Lumen Studio" />
-            <Field label="Tax ID" hint="(optional)" />
+            <Field label="Tax ID" optional />
             <Card>A card</Card>
             <LinkCard
                 href="/tools"

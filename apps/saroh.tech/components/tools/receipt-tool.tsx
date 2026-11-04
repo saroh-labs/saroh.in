@@ -1,10 +1,12 @@
 "use client";
 
+import { CheckRow } from "@saroh/ui/check-row";
+import { Field as FieldFrame } from "@saroh/ui/field";
 import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
-import { Field } from "@/components/shared/field";
+import { DateField, Field, SelectField } from "@/components/shared/field";
 import { todayIso } from "@/lib/tools/dates";
 import type { FromDetails } from "@/lib/tools/document";
 import { useDraft } from "@/lib/tools/draft-store";
@@ -16,7 +18,7 @@ import { applyReceiptCarry, PAID_BY, receiptView } from "@/lib/tools/receipt";
 import { DownloadProblem, SavedNote, useDownload } from "./document-actions";
 import { FROM_KEY } from "./document-editor";
 import { DocumentPreview } from "./document-preview";
-import { DateField, Section, SelectField } from "./fields";
+import { Section } from "./fields";
 import { FromSection, NO_FROM } from "./from-section";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
@@ -72,7 +74,7 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
                         value={d.receivedFrom}
                         onChange={(e) => set({ receivedFrom: e.target.value })}
                     />
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3">
                         <Field
                             label="Amount"
                             inputMode="decimal"
@@ -99,14 +101,7 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
                             onChange={(e) => set({ number: e.target.value })}
                         />
                     </div>
-                    <div
-                        role="group"
-                        aria-label="Paid by"
-                        className="flex flex-col gap-1.5"
-                    >
-                        <span className="text-[13px] font-semibold">
-                            Paid by
-                        </span>
+                    <FieldFrame group label="Paid by">
                         <div className="flex flex-wrap gap-2">
                             {PAID_BY.map((m) => (
                                 <Chip
@@ -118,23 +113,20 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
                                 </Chip>
                             ))}
                         </div>
-                    </div>
+                    </FieldFrame>
                     <Field
                         label="For"
-                        hint="(optional)"
+                        optional
                         placeholder="Invoice number, what it was for"
                         value={d.paidFor}
                         onChange={(e) => set({ paidFor: e.target.value })}
                     />
-                    <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] md:min-h-0">
-                        <input
-                            type="checkbox"
-                            checked={d.showTax}
-                            onChange={(e) => set({ showTax: e.target.checked })}
-                            className="size-5 accent-foreground"
-                        />
+                    <CheckRow
+                        checked={d.showTax}
+                        onChange={(showTax) => set({ showTax })}
+                    >
                         Show tax included
-                    </label>
+                    </CheckRow>
                     {d.showTax ? (
                         <div className="grid grid-cols-2 gap-3">
                             <Field

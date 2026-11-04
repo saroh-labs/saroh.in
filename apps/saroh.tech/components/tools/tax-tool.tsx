@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { buttonClass } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
-import { Field } from "@/components/shared/field";
+import { Field, SelectField } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref } from "@/lib/tools/handoff";
@@ -18,7 +18,7 @@ import {
 import type { TaxKind, TaxMode } from "@/lib/tools/tax";
 import { TAX_KINDS, taxBreakdown } from "@/lib/tools/tax";
 
-import { CopyButton, SelectField } from "./fields";
+import { CopyButton } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -98,7 +98,7 @@ export function TaxTool({
                                 : `Total including ${k.lower}`
                         }
                         inputMode="decimal"
-                        className="[&_input]:!h-[52px] [&_input]:font-mono [&_input]:!text-xl"
+                        className="[&_input]:font-mono"
                         value={d.amount}
                         onChange={(e) => set({ amount: e.target.value })}
                     />

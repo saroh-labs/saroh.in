@@ -4,7 +4,7 @@ import { Button } from "@saroh/marketing/button";
 import type { FormEvent } from "react";
 import { useRef, useState, useSyncExternalStore } from "react";
 
-import { INPUT_CLASS } from "@/components/shared/field";
+import { Field, TextArea } from "@/components/shared/field";
 import { CUSTOMERS, REPORT_FIELDS } from "@/content/customers";
 import type { ReportBody, ReportField } from "@/lib/business-report";
 import {
@@ -26,8 +26,8 @@ type State =
 /**
  * Report a business: the site's address, what happened, and the reporter's
  * own email and phone, as saroh.in's form asks. Send checks the fields in order:
- * the first at fault has the red border, one line says what it needs, and the
- * keyboard goes to it. A send that fails keeps everything typed.
+ * the first at fault says what it needs under itself, and the keyboard goes to
+ * it. A send that fails keeps everything typed.
  */
 export function ReportForm({ apiUrl }: { apiUrl: string }) {
     const given = useSyncExternalStore(
@@ -41,8 +41,6 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
 
     const value = (name: ReportField) =>
         typed[name] ?? (name === "site" ? given : "");
-    const wrong = (name: ReportField) =>
-        state.at === "error" && state.field === name;
 
     const fault = (field: ReportField) => {
         setState({ at: "error", message: faultOf(field), field });
@@ -102,19 +100,16 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
                 {copy.title}
             </h2>
             {REPORT_FIELDS.map((field) => {
-                const id = `report-${field.name}`;
                 const shared = {
-                    id,
+                    id: `report-${field.name}`,
                     name: field.name,
+                    label: field.label,
+                    hint: field.hint,
+                    error:
+                        state.at === "error" && state.field === field.name
+                            ? state.message
+                            : undefined,
                     "aria-required": true,
-                    "aria-invalid": wrong(field.name) || undefined,
-                    "aria-describedby":
-                        [
-                            wrong(field.name) ? "report-error" : "",
-                            field.hint ? `${id}-hint` : "",
-                        ]
-                            .filter(Boolean)
-                            .join(" ") || undefined,
                     maxLength: REPORT_LIMITS[field.name],
                     value: value(field.name),
                     onChange: (e: { target: { value: string } }) => {
@@ -122,55 +117,32 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
                         if (state.at === "error") setState({ at: "idle" });
                     },
                 };
-                const border = wrong(field.name)
-                    ? "border-destructive focus:border-destructive"
-                    : "";
-                return (
-                    <div key={field.name} className="grid gap-1.5">
-                        <label htmlFor={id} className="text-[14px] font-medium">
-                            {field.label}
-                        </label>
-                        {field.name === "message" ? (
-                            <textarea
-                                {...shared}
-                                rows={5}
-                                className={`${INPUT_CLASS} !h-auto py-2.5 leading-[1.5] ${border}`}
-                            />
-                        ) : (
-                            <input
-                                {...shared}
-                                type={
-                                    field.name === "email"
-                                        ? "email"
-                                        : field.name === "phone"
-                                          ? "tel"
-                                          : "text"
-                                }
-                                autoComplete={
-                                    field.name === "email"
-                                        ? "email"
-                                        : field.name === "phone"
-                                          ? "tel"
-                                          : "off"
-                                }
-                                placeholder={field.placeholder}
-                                className={`${INPUT_CLASS} !h-[46px] ${border}`}
-                            />
-                        )}
-                        {field.hint ? (
-                            <p
-                                id={`${id}-hint`}
-                                className="m-0 text-mk-note leading-[1.5] text-muted-foreground"
-                            >
-                                {field.hint}
-                            </p>
-                        ) : null}
-                    </div>
+                return field.name === "message" ? (
+                    <TextArea key={field.name} {...shared} rows={5} />
+                ) : (
+                    <Field
+                        key={field.name}
+                        {...shared}
+                        type={
+                            field.name === "email"
+                                ? "email"
+                                : field.name === "phone"
+                                  ? "tel"
+                                  : "text"
+                        }
+                        autoComplete={
+                            field.name === "email"
+                                ? "email"
+                                : field.name === "phone"
+                                  ? "tel"
+                                  : "off"
+                        }
+                        placeholder={field.placeholder}
+                    />
                 );
             })}
-            {state.at === "error" ? (
+            {state.at === "error" && state.field === null ? (
                 <p
-                    id="report-error"
                     role="alert"
                     className="m-0 text-[14px] font-medium text-destructive"
                 >
