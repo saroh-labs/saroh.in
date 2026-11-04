@@ -77,6 +77,7 @@ export function DatePicker({
                 <Calendar
                     mode="single"
                     selected={value}
+                    defaultMonth={value}
                     onSelect={(d) => {
                         onValueChange(d);
                         setOpen(false);
