@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/cn";
+import { cn } from "../cn";
 
 const SIZE = {
     /** A feature page's "What it does": 16.5px titles, 280px columns. */

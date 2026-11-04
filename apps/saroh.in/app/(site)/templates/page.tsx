@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { Container } from "@/components/shared/layout/container";
 import { CtaBand } from "@/components/shared/sections/cta-band";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
     earlyAccessOpen,
@@ -15,6 +13,8 @@ import {
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
+import { Container } from "@saroh/marketing/container";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 export const metadata: Metadata = pageMetadata({
     title: page.seo.title,

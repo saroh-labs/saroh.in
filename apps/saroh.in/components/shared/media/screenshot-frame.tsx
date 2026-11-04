@@ -1,4 +1,4 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 
 import type { ShotKey } from "@/content/shots";
 import { shots } from "@/content/shots";

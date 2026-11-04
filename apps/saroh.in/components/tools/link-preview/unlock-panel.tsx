@@ -5,7 +5,7 @@ import { EmailGate, ToolGateProvider } from "@saroh/search-pages";
 
 import { linkPreview as copy } from "@/content/link-preview";
 import type { UnlockResult } from "@/lib/link-preview";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 export type Unlocked = Extract<UnlockResult, { unlocked: true }>;
 

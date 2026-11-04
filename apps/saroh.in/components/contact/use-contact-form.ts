@@ -9,7 +9,7 @@ import type {
     ContactTopicId,
 } from "@/lib/contact-message";
 import { contactProblems } from "@/lib/contact-message";
-import { nextIndex } from "@/lib/roving";
+import { nextIndex } from "@saroh/marketing/roving";
 
 const copy = CONTACT_PAGE.form;
 

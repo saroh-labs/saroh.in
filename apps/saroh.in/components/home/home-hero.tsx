@@ -1,11 +1,11 @@
 import { home } from "@/content/home";
 import { demoHref } from "@/lib/demos";
 
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Pill } from "@saroh/marketing/pill";
 import { HeroActions } from "../shared/buttons/hero-actions";
-import { Container } from "../shared/layout/container";
-import { Pill } from "../shared/links/pill";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
-import { Eyebrow } from "../shared/sections/eyebrow";
 
 /**
  * Home's opening (Home design, "saroh" hero copy): the eyebrow, "Services,

@@ -1,5 +1,5 @@
-import { cn } from "@/lib/cn";
 import type { PlanCardView } from "@/lib/pricing-model";
+import { cn } from "@saroh/marketing/cn";
 
 import { CtaLink } from "../shared/buttons/cta-link";
 

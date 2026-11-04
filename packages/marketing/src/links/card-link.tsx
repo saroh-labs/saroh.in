@@ -1,7 +1,7 @@
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { cn } from "../cn";
+import { ring } from "../ring";
 
 import { Arrow } from "./arrow";
 

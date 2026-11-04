@@ -1,10 +1,10 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 
 import { CTA_BAND } from "@/content/home";
 import type { PlanId } from "@/lib/links";
 
+import { Container } from "@saroh/marketing/container";
 import { HeroActions } from "../buttons/hero-actions";
-import { Container } from "../layout/container";
 
 /**
  * The dark band every page closes with: the page's own title, the shared

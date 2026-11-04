@@ -5,9 +5,7 @@ import Link from "next/link";
 import { PreviewBanner } from "@/components/pricing/preview/preview-banner";
 import { PreviewControls } from "@/components/pricing/preview/preview-controls";
 import { PricingPage } from "@/components/pricing/pricing-page";
-import { Container } from "@/components/shared/layout/container";
 import { SiteChrome } from "@/components/shared/layout/site-chrome";
-import { textLinkClasses } from "@/components/shared/links/text-link";
 import { LAUNCH_MODE } from "@/lib/links";
 import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
 import { markChanges } from "@/lib/pricing-marks";
@@ -17,6 +15,8 @@ import {
     previewViewFrom,
 } from "@/lib/pricing-preview";
 import { pricingPageModel } from "@/lib/pricing-view";
+import { Container } from "@saroh/marketing/container";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * `/pricing/draft` — the shared draft of the pricing catalogue, for a staff

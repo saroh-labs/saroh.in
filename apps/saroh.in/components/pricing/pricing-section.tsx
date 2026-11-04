@@ -1,7 +1,7 @@
-import { cn } from "@/lib/cn";
 import type { PricingPageModel } from "@/lib/pricing-model";
+import { cn } from "@saroh/marketing/cn";
 
-import { Section } from "../shared/sections/section";
+import { Section } from "@saroh/marketing/section";
 import { PricingCards } from "./pricing-cards";
 
 /**

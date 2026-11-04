@@ -3,15 +3,12 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
-import { buttonClasses } from "@/components/shared/buttons/button";
-import { IntentLink } from "@/components/shared/links/intent-link";
 import type { Consent } from "@/lib/consent";
 import { readChoices, subscribeConsent, writeChoices } from "@/lib/consent";
 import { browserTracking } from "@/lib/error-tracking-browser";
 import type { TagConfig } from "@/lib/ga";
 import { asksConsent, hasAdTags } from "@/lib/ga";
 import { isPreviewPath } from "@/lib/pricing-preview";
-import { ring } from "@/lib/ring";
 import {
     allowedNow,
     browserOptsOut,
@@ -22,6 +19,9 @@ import {
 } from "@/lib/tags";
 import { useBrowserValue } from "@/lib/use-browser-value";
 import { WELCOME_PATH } from "@/lib/welcome";
+import { buttonClasses } from "@saroh/marketing/button";
+import { IntentLink } from "@saroh/marketing/intent-link";
+import { ring } from "@saroh/marketing/ring";
 
 /** Before the browser has been asked (the server's render): show nothing. */
 const UNREAD = "unread";

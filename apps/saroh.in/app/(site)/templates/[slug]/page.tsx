@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
-import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import { CtaBand } from "@/components/shared/sections/cta-band";
@@ -20,12 +19,13 @@ import {
 } from "@/content/templates";
 import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
+import { Container } from "@saroh/marketing/container";
 
-import { PageTitle } from "@/components/shared/sections/page-title";
-import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
  * One template (Resources plan U6, industry templates plan U13; design

@@ -1,9 +1,8 @@
 import { ChevronDown } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { cn } from "../cn";
 
-import type { FaqItem } from "@/content/types";
-import { ring } from "@/lib/ring";
+import { ring } from "../ring";
 
 import { Section } from "./section";
 
@@ -20,7 +19,7 @@ export function Faq({
     size,
     className,
 }: {
-    items: FaqItem[];
+    items: { q: string; a: string }[];
     title?: string;
     id?: string;
     /** The heading's size: `article` inside an article (an integration page). */

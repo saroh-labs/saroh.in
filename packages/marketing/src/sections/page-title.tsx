@@ -1,5 +1,5 @@
-import { cn } from "@/lib/cn";
 import type { HTMLAttributes } from "react";
+import { cn } from "../cn";
 
 /**
  * A page's H1 (DEC-195, V6), in one of two sizes:

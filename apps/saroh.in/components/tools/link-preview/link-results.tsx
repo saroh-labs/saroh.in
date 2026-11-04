@@ -3,9 +3,9 @@
 import { ShareCard } from "@saroh/ui/share-card";
 
 import { linkPreview as copy } from "@/content/link-preview";
-import { cn } from "@/lib/cn";
 import type { CheckResult, TagRow } from "@/lib/link-preview";
 import { APP_NAMES, cardImage, cardText, EXTRA_APPS } from "@/lib/link-preview";
+import { cn } from "@saroh/marketing/cn";
 
 type Checked = Extract<CheckResult, { ok: true }>;
 

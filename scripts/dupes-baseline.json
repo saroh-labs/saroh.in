@@ -396,17 +396,6 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/shared/nav/mobile-sheet.tsx",
-                "apps/saroh.in/components/shared/nav/site-nav.tsx"
-            ],
-            "windows": [
-                "2a0e92cc0e6b",
-                "91b52972c5b3"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
                 "packages/search-pages/src/tools/break-even-calculator/index.tsx",
                 "packages/search-pages/src/tools/gstin-checker/index.tsx",
                 "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",

@@ -1,11 +1,11 @@
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
 import Link from "next/link";
 import type {
     AnchorHTMLAttributes,
     ButtonHTMLAttributes,
     ReactNode,
 } from "react";
+import { cn } from "../cn";
+import { ring } from "../ring";
 
 export type ButtonVariant =
     /** Ink, the page's main action. */

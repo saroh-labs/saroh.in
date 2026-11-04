@@ -5,8 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { track } from "@/lib/analytics";
 import { readChoices, subscribeConsent } from "@/lib/consent";
-import { ring } from "@/lib/ring";
 import { pageKind } from "@/lib/whatsapp";
+import { ring } from "@saroh/marketing/ring";
 
 /** Before the browser has been asked (the server's render). */
 const UNREAD = "unread";

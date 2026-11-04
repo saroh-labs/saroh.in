@@ -1,8 +1,8 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import type { ReactNode } from "react";
 
-import { IntentLink } from "../links/intent-link";
-import { textLinkClasses } from "../links/text-link";
+import { IntentLink } from "@saroh/marketing/intent-link";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 export interface Crumb {
     name: ReactNode;

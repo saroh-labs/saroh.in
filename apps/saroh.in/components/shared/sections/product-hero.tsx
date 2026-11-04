@@ -2,8 +2,8 @@ import type { ComponentProps, ReactNode } from "react";
 
 import type { ShotRef } from "@/content/types";
 
+import { Container } from "@saroh/marketing/container";
 import { HeroActions } from "../buttons/hero-actions";
-import { Container } from "../layout/container";
 import { ScreenshotFrame } from "../media/screenshot-frame";
 import type { Crumb } from "../nav/breadcrumbs";
 import { Breadcrumbs } from "../nav/breadcrumbs";

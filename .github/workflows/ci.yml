@@ -288,7 +288,7 @@ jobs:
         run: pnpm run check:copy
 
       # One copy of each block (DEC-195): no new run of six lines copied
-      # across saroh.in and @saroh/search-pages; the baseline only shrinks.
+      # across saroh.in, @saroh/marketing and @saroh/search-pages; the baseline only shrinks.
       - name: One copy of each block
         run: pnpm run check:dupes
 

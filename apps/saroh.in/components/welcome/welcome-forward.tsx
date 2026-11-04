@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 
 import type { TagConfig } from "@/lib/ga";
-import { ring } from "@/lib/ring";
 import { readWelcome } from "@/lib/welcome";
 import { forwardWelcome } from "@/lib/welcome-forward";
+import { ring } from "@saroh/marketing/ring";
 
 /**
  * `/welcome`'s one job, done as the page opens (`lib/welcome-forward.ts`):

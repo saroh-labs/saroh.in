@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 
 const APP = path.resolve(__dirname, "../..");
 const PKG = path.resolve(APP, "../../packages/search-pages");
+const MARKETING = path.resolve(APP, "../../packages/marketing");
 const SKIP = new Set(["node_modules", ".next", ".turbo", ".open-next"]);
 
 interface Source {
@@ -60,7 +61,15 @@ function load(root: string, dirs: string[]): Source[] {
         }));
 }
 
-const SITE = load(APP, ["app", "components", "lib", "content"]);
+/** Where the site's primitives live (`@saroh/marketing`), as `home` names it. */
+const MK = "packages/marketing/src";
+const SITE = [
+    ...load(APP, ["app", "components", "lib", "content"]),
+    ...load(MARKETING, ["src"]).map((f) => ({
+        ...f,
+        rel: `packages/marketing/${f.rel}`,
+    })),
+];
 const PACKAGE = load(PKG, ["src"]);
 
 interface Rule {
@@ -104,16 +113,16 @@ const both = (a: string, b: string) =>
 
 const RULES: Rule[] = [
     {
-        name: "the focus ring is ring() from lib/ring.ts (C1)",
+        name: "the focus ring is ring() from @saroh/marketing/ring (C1)",
         pattern: /focus-visible:\[outline-style:solid\]/,
-        home: ["lib/ring.ts"],
+        home: [`${MK}/ring.ts`],
         allow: {},
         files: SITE,
     },
     {
         name: "a question list is Faq (V3)",
         pattern: /<details\b/,
-        home: ["components/shared/sections/faq.tsx"],
+        home: [`${MK}/sections/faq.tsx`],
         allow: {},
         files: SITE,
     },
@@ -137,14 +146,14 @@ const RULES: Rule[] = [
     {
         name: "a section's H2 is SectionHeading / Section (A8)",
         pattern: /<h2\b[^>]*?font-display[^>]*?text-mk-h2/,
-        home: ["components/shared/sections/section-heading.tsx"],
+        home: [`${MK}/sections/section-heading.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a Saffron text link is TextLink (V1, A2)",
         pattern: both("\\btext-brand-700\\b", "\\bno-underline\\b"),
-        home: ["components/shared/links/text-link.tsx"],
+        home: [`${MK}/links/text-link.tsx`],
         allow: {},
         files: SITE,
     },
@@ -153,7 +162,7 @@ const RULES: Rule[] = [
         pattern: new RegExp(
             `\\btext-muted-foreground\\b${RUN}\\bno-underline\\b${RUN}hover:text-foreground`,
         ),
-        home: ["components/shared/links/text-link.tsx"],
+        home: [`${MK}/links/text-link.tsx`],
         allow: {},
         files: SITE,
     },
@@ -178,7 +187,7 @@ const RULES: Rule[] = [
         ),
         // ChoiceChip's chosen state is Ink too.
         home: [
-            "components/shared/buttons/button.tsx",
+            `${MK}/buttons/button.tsx`,
             "components/shared/fields/choice-chips.tsx",
         ],
         allow: {},
@@ -204,14 +213,14 @@ const RULES: Rule[] = [
     {
         name: "a small caps label is Eyebrow (V12)",
         pattern: both("\\buppercase\\b", "tracking-\\[0\\.1em\\]"),
-        home: ["components/shared/sections/eyebrow.tsx"],
+        home: [`${MK}/sections/eyebrow.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a page title is PageTitle, its size a token (V6, A7)",
         pattern: /text-\[clamp\(/,
-        home: ["components/shared/sections/page-title.tsx"],
+        home: [`${MK}/sections/page-title.tsx`],
         allow: {
             "app/(standalone)/waitlist/page.tsx":
                 "keep: the waitlist's 68px opening line is a paragraph of its own design, not a page title",
@@ -225,21 +234,21 @@ const RULES: Rule[] = [
     {
         name: "a reading column is Container width (V7, A23)",
         pattern: /max-w-\[(?:720|760|768|860|900)px\]/,
-        home: ["components/shared/layout/container.tsx"],
+        home: [`${MK}/layout/container.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a link card's hover is CardLink's (V5)",
         pattern: /hover:shadow-mk-(?:lift|card)\b/,
-        home: ["components/shared/links/card-link.tsx"],
+        home: [`${MK}/links/card-link.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: 'a "Coming soon" badge is Pill tone="soon" (A19)',
         pattern: /\bbg-mk-soon\b/,
-        home: ["components/shared/links/pill.tsx"],
+        home: [`${MK}/links/pill.tsx`],
         allow: {
             "components/pricing/plan-cards.tsx":
                 "keep: the staff preview's changed-part highlight, not a badge",
@@ -297,9 +306,9 @@ const RULES: Rule[] = [
         files: SITE,
     },
     {
-        name: "arrow keys in a row are nextIndex() from lib/roving.ts (B6)",
+        name: "arrow keys in a row are nextIndex() from @saroh/marketing/roving (B6)",
         pattern: /"Arrow(?:Right|Left)"/,
-        home: ["lib/roving.ts"],
+        home: [`${MK}/roving.ts`],
         allow: {},
         files: SITE,
     },
@@ -412,6 +421,19 @@ describe("one of each piece on saroh.in (DEC-195)", () => {
         });
     }
 
+    // A file that moves and leaves its rule's `home` behind would pass every
+    // scan above: nothing draws the piece at the old path, and no copy trips it.
+    it("every rule's home is a file that exists", () => {
+        for (const rule of RULES) {
+            for (const home of rule.home) {
+                const there = home.endsWith("/")
+                    ? rule.files.some((f) => f.rel.startsWith(home))
+                    : rule.files.some((f) => f.rel === home);
+                expect(there, `${rule.name}: ${home}`).toBe(true);
+            }
+        }
+    });
+
     it("every allow-list entry gives its reason", () => {
         for (const rule of RULES) {
             for (const [rel, why] of Object.entries(rule.allow)) {
@@ -474,6 +496,15 @@ describe("the scan catches a redraw", () => {
         expect(offenders(rule("package: the content blocks"), [gst])).toEqual([
             gst.rel,
         ]);
+    });
+
+    it("a redraw inside @saroh/marketing fails too", () => {
+        const copy: Source = {
+            rel: `${MK}/sections/my-faq.tsx`,
+            code: `<details><summary>Q</summary></details>`,
+        };
+        expect(offenders(rule("a question list"), [copy])).toEqual([copy.rel]);
+        expect(SITE.some((f) => f.rel === `${MK}/sections/faq.tsx`)).toBe(true);
     });
 
     it("the piece's own home passes", () => {

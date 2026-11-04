@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, Ref } from "react";
 
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
+import { cn } from "@saroh/marketing/cn";
+import { ring } from "@saroh/marketing/ring";
 
 /**
  * One choice in a row of choices (DEC-195, V9): 36px, 14px, white card,

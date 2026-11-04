@@ -3,15 +3,8 @@ import type { Metadata } from "next";
 import { HomeHero } from "@/components/home/home-hero";
 import { TourVideo } from "@/components/home/tour-video";
 import { PricingSection } from "@/components/pricing/pricing-section";
-import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { CardLink } from "@/components/shared/links/card-link";
-import { PillLink } from "@/components/shared/links/pill";
 import { CtaBand } from "@/components/shared/sections/cta-band";
-import { Eyebrow } from "@/components/shared/sections/eyebrow";
-import { Faq } from "@/components/shared/sections/faq";
-import { Section } from "@/components/shared/sections/section";
-import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
@@ -29,6 +22,13 @@ import {
     softwareApplicationLd,
     webSiteLd,
 } from "@/lib/structured-data";
+import { CardLink } from "@saroh/marketing/card-link";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Faq } from "@saroh/marketing/faq";
+import { PillLink } from "@saroh/marketing/pill";
+import { Section } from "@saroh/marketing/section";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
  * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,

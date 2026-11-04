@@ -15,11 +15,11 @@ import {
     splitScheme,
 } from "@/lib/link-preview";
 import { readAddress } from "@/lib/page-address";
-import { ring } from "@/lib/ring";
 import { useBrowserValue } from "@/lib/use-browser-value";
+import { ring } from "@saroh/marketing/ring";
 import type { GateResult } from "@saroh/search-pages";
 
-import { Button } from "../../shared/buttons/button";
+import { Button } from "@saroh/marketing/button";
 import { LinkInput } from "./link-input";
 import { CardsGrid, ScorePanel } from "./link-results";
 import type { Unlocked } from "./unlock-panel";

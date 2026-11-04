@@ -7,8 +7,8 @@ import { track } from "@/lib/analytics";
 import type { PricingPageModel, PricingView } from "@/lib/pricing-model";
 import { viewKey } from "@/lib/pricing-model";
 
-import { Arrow } from "../shared/links/arrow";
-import { textLinkClasses } from "../shared/links/text-link";
+import { Arrow } from "@saroh/marketing/arrow";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { BillingToggle } from "./billing-toggle";
 import { GstToggle } from "./gst-toggle";
 import { PlanCards } from "./plan-cards";

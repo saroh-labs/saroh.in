@@ -2,10 +2,10 @@
  * The focus ring (DESIGN.md), written once (DEC-195, C1). Width, offset,
  * colour, then the style: tailwind-merge 3 reads `outline` as a width, so the
  * style is the arbitrary outline-style property below, never `outline` (see
- * lib/cn.ts).
+ * cn.ts).
  *
  * The class names are spelt out whole so Tailwind finds them here
- * (tailwind.config.ts adds this file to `content`); Tailwind reads comments
+ * (`marketingContent` in tailwind.ts names this file); Tailwind reads comments
  * too, so none of them is written up here.
  */
 const OFFSET = {

@@ -77,6 +77,7 @@ const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
     transpilePackages: [
         "@saroh/ui",
+        "@saroh/marketing",
         "@saroh/search-pages",
         "@saroh/site-blocks",
     ],

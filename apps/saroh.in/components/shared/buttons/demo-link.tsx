@@ -4,7 +4,7 @@ import type { DemoTrade } from "@/content/demos";
 import { DEMO_LABEL } from "@/content/demos";
 import { track } from "@/lib/analytics";
 
-import { ButtonLink } from "./button";
+import { ButtonLink } from "@saroh/marketing/button";
 
 /**
  * "See a live demo" (#1191): the secondary button beside a hero's start

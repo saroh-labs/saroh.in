@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import type { Shot } from "@/content/shots";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 /** Fetched on the first click: most visits never enlarge a screenshot. */
 const Lightbox = dynamic(() => import("./lightbox").then((m) => m.Lightbox), {

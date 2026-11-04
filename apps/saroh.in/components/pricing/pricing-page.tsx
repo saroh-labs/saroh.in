@@ -2,10 +2,10 @@ import { PRICING_COPY } from "@/content/pricing";
 import { demoHref } from "@/lib/demos";
 import type { PricingPageModel } from "@/lib/pricing-model";
 
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { DemoLink } from "../shared/buttons/demo-link";
-import { Container } from "../shared/layout/container";
 import { CtaBand } from "../shared/sections/cta-band";
-import { Eyebrow } from "../shared/sections/eyebrow";
 import { PricingPlans } from "./pricing-plans";
 
 /**

@@ -1,13 +1,13 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import Link from "next/link";
 
 import { featureHref } from "@/content/features";
 import type { SegmentView } from "@/content/solutions";
 
-import { Arrow } from "../shared/links/arrow";
-import { textLinkClasses } from "../shared/links/text-link";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
-import { Eyebrow } from "../shared/sections/eyebrow";
 
 /**
  * One "What changes" problem: the area's label, the pain quote with its left

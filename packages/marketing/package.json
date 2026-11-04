@@ -1,0 +1,69 @@
+{
+    "name": "@saroh/marketing",
+    "version": "0.0.0",
+    "private": true,
+    "description": "What every edition's public site draws with: tokens, the Tailwind theme, and the link, button, layout, section and nav primitives. Words, links and switches come in as props.",
+    "license": "MIT",
+    "sideEffects": [
+        "*.css"
+    ],
+    "files": [
+        "src/**"
+    ],
+    "exports": {
+        "./tokens.css": "./src/tokens.css",
+        "./tailwind": "./src/tailwind.ts",
+        "./cn": "./src/cn.ts",
+        "./ring": "./src/ring.ts",
+        "./roving": "./src/roving.ts",
+        "./button": "./src/buttons/button.tsx",
+        "./arrow": "./src/links/arrow.tsx",
+        "./card-link": "./src/links/card-link.tsx",
+        "./intent-link": "./src/links/intent-link.tsx",
+        "./pill": "./src/links/pill.tsx",
+        "./text-link": "./src/links/text-link.tsx",
+        "./container": "./src/layout/container.tsx",
+        "./use-focus-trap": "./src/layout/use-focus-trap.ts",
+        "./section": "./src/sections/section.tsx",
+        "./section-heading": "./src/sections/section-heading.tsx",
+        "./eyebrow": "./src/sections/eyebrow.tsx",
+        "./page-title": "./src/sections/page-title.tsx",
+        "./faq": "./src/sections/faq.tsx",
+        "./point-grid": "./src/sections/point-grid.tsx",
+        "./column-heading": "./src/nav/column-heading.tsx",
+        "./nav-types": "./src/nav/nav-types.ts",
+        "./menu-panel": "./src/nav/menu-panel.tsx",
+        "./phone-sheet": "./src/nav/phone-sheet.tsx"
+    },
+    "scripts": {
+        "lint": "eslint src/",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@saroh/ui": "workspace:*",
+        "clsx": "^2.1.1",
+        "lucide-react": "catalog:",
+        "tailwind-merge": "^3.6.0"
+    },
+    "peerDependencies": {
+        "next": "^16.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tsconfig": "workspace:*",
+        "@testing-library/react": "^16.1.0",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "eslint": "catalog:",
+        "jsdom": "^25.0.1",
+        "next": "^16.4.2",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "typescript": "catalog:",
+        "vitest": "^4.1.12"
+    }
+}

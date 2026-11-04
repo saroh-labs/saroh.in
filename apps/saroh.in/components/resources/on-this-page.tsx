@@ -1,5 +1,5 @@
-import { textLinkClasses } from "../shared/links/text-link";
-import { Eyebrow } from "../shared/sections/eyebrow";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 export interface PageHeading {
     /** The heading's `id`, which its link jumps to. */

@@ -1,5 +1,5 @@
-import { cn } from "@/lib/cn";
 import type { ElementType, HTMLAttributes } from "react";
+import { cn } from "../cn";
 
 const WIDTH = {
     page: "max-w-mk-page",

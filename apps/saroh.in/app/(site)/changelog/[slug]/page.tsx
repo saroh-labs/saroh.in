@@ -2,12 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Article } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Arrow } from "@/components/shared/links/arrow";
-import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
@@ -17,6 +13,10 @@ import { linkShown, liveBySlug } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Article } from "@saroh/marketing/container";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * One changelog entry (plan U4, design "Saroh is open"). Every entry is

@@ -6,8 +6,8 @@ import { LEGAL_PAGES, isLive } from "@/content/resources";
 import { formatDay } from "@/lib/format/day";
 import { parseLegal } from "@/lib/legal-markdown";
 import { resourcesContext } from "@/lib/resources-context";
-import { Container } from "../shared/layout/container";
-import { PageTitle } from "../shared/sections/page-title";
+import { Container } from "@saroh/marketing/container";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 /**
  * A legal page (plan U1, R6): the owner's text, verbatim, in a 720px reading

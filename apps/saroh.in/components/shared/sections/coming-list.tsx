@@ -1,7 +1,7 @@
 import type { ComingItem } from "@/content/coming";
 import { byComingGroup, NOT_AVAILABLE_YET } from "@/content/coming";
 
-import { Pill } from "../links/pill";
+import { Pill } from "@saroh/marketing/pill";
 
 /** The 140px "when" column, in JetBrains Mono. */
 const WHEN_COL = "flex-[0_0_140px] font-mono text-[13px]";

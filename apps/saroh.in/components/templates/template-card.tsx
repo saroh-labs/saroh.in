@@ -1,10 +1,10 @@
 import Link from "next/link";
 
-import { Arrow } from "@/components/shared/links/arrow";
 import type { GalleryTemplate } from "@/content/templates";
-import { ring } from "@/lib/ring";
+import { Arrow } from "@saroh/marketing/arrow";
+import { ring } from "@saroh/marketing/ring";
 
-import { CARD_GROUP_HOVER } from "../shared/links/card-link";
+import { CARD_GROUP_HOVER } from "@saroh/marketing/card-link";
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
 

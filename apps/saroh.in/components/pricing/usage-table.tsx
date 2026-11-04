@@ -4,7 +4,7 @@ import { PRICING_COPY } from "@/content/pricing";
 import type { PlanCardView, UsageView } from "@/lib/pricing-model";
 import { NOT_INCLUDED } from "@/lib/pricing-model";
 
-import { Section } from "../shared/sections/section";
+import { Section } from "@saroh/marketing/section";
 import { PlanTable } from "./plan-table";
 
 /**

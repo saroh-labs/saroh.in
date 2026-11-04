@@ -2,7 +2,7 @@
 
 import type { PricingPageModel } from "@/lib/pricing-model";
 
-import { Container } from "../shared/layout/container";
+import { Container } from "@saroh/marketing/container";
 import { CompareTable } from "./compare-table";
 import { PricingCards, usePricingSwitches } from "./pricing-cards";
 import { UsageTable } from "./usage-table";

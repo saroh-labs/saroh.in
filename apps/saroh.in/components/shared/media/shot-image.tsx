@@ -1,8 +1,8 @@
 import { preload } from "react-dom";
 
 import type { Shot } from "@/content/shots";
-import { cn } from "@/lib/cn";
 import { shotSources } from "@/lib/shot-sources";
+import { cn } from "@saroh/marketing/cn";
 
 /**
  * One screenshot from the manifest, or — until the capture pipeline (U20) has

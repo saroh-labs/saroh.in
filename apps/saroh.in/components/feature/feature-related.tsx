@@ -4,12 +4,12 @@ import type { Feature } from "@/content/types";
 import type { LaunchMode } from "@/lib/links";
 import { solutionLink } from "@/lib/search-pages";
 
-import { Container } from "../shared/layout/container";
-import { CardLink } from "../shared/links/card-link";
-import { PillLink } from "../shared/links/pill";
-import { Eyebrow } from "../shared/sections/eyebrow";
-import { PointGrid } from "../shared/sections/point-grid";
-import { SectionHeading } from "../shared/sections/section-heading";
+import { CardLink } from "@saroh/marketing/card-link";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { PillLink } from "@saroh/marketing/pill";
+import { PointGrid } from "@saroh/marketing/point-grid";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
  * "What it does": the page's points, each under a hairline, as many columns

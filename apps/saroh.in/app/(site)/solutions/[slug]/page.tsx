@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PricingSection } from "@/components/pricing/pricing-section";
-import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
-import { Faq } from "@/components/shared/sections/faq";
-import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { SolutionHero } from "@/components/solution/solution-hero";
 import { SolutionSegment } from "@/components/solution/solution-segment";
 import { solutionFaq } from "@/content/faq";
@@ -24,6 +21,9 @@ import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
+import { Container } from "@saroh/marketing/container";
+import { Faq } from "@saroh/marketing/faq";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
  * `/solutions/shops`, `/solutions/salons`, `/solutions/gyms`,

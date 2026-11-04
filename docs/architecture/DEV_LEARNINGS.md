@@ -6386,3 +6386,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the tests use `edition_emailKey`.
 **Rule**: when a `@unique` changes, grep the specs for the old key too, as `tsc` won't find them. Type-checking specs would catch this, but they have older type errors to clear first.
 **Category**: testing · database
+
+---
+
+## Prettier re-sorted classes in a package with no Tailwind config
+
+**Symptom**: 4 Nov, committing the move of saroh.in's primitives to `packages/marketing` changed `m-0 font-display` to `font-display m-0`, and `live-pages.snapshot.test.ts` failed on the committed tree after the gate had passed on the staged one.
+**Cause**: lint-staged runs prettier with the Tailwind plugin, which looks for a config near each file. The package has none, so its classes were sorted without the site's `mk-*` theme.
+**Fix**: a `prettier.config.js` override gives `packages/marketing/**` saroh.in's Tailwind config, and the moved files were restored.
+**Rule**: a package holding Tailwind classes needs that override when it's added. Run the gate again after a commit whose hook rewrote files: its tree isn't the one that passed.
+**Category**: tooling · formatting

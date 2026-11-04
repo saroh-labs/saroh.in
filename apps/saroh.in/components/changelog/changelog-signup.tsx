@@ -7,7 +7,7 @@ import { CHANGELOG } from "@/content/changelog";
 import { isEmailShape } from "@/lib/email-shape";
 import { postWaitlist, SEND_FAILED, WAITLIST_MESSAGES } from "@/lib/waitlist";
 
-import { Button } from "../shared/buttons/button";
+import { Button } from "@saroh/marketing/button";
 import { fieldClasses } from "../shared/fields/field-classes";
 
 type State =

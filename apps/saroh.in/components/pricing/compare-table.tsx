@@ -3,8 +3,8 @@ import { Fragment } from "react";
 import { PRICE_NOTE } from "@/content/types";
 import type { CompareRow, PlanCardView } from "@/lib/pricing-model";
 
-import { Pill } from "../shared/links/pill";
-import { Section } from "../shared/sections/section";
+import { Pill } from "@saroh/marketing/pill";
+import { Section } from "@saroh/marketing/section";
 import { PlanTable } from "./plan-table";
 
 /**

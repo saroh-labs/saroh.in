@@ -3,9 +3,9 @@
 import { useRef } from "react";
 
 import type { Shot } from "@/content/shots";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
-import { useFocusTrap } from "../layout/use-focus-trap";
+import { useFocusTrap } from "@saroh/marketing/use-focus-trap";
 import { ShotImage } from "./shot-image";
 
 /**

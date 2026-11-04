@@ -27,6 +27,8 @@ const APPS = [
         app: "apps/saroh.in",
         sources: ["app", "components", "lib", "content"],
     },
+    // Moved out of saroh.in's folders with plan U2; it has no formatter of its own.
+    { app: "packages/marketing", sources: ["src"] },
 ];
 
 /** The one place these calls belong. */

@@ -1,15 +1,15 @@
 import Link from "next/link";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 
 import type { FeatureHelpLink } from "@/content/feature-help";
 import type { Feature } from "@/content/types";
 
-import { Container } from "../shared/layout/container";
-import { Arrow } from "../shared/links/arrow";
-import { textLinkClasses } from "../shared/links/text-link";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Container } from "@saroh/marketing/container";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
-import { SectionHeading } from "../shared/sections/section-heading";
 
 /**
  * "How it works": the page's title, then each step beside its screenshot,

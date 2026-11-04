@@ -1,11 +1,11 @@
 "use client";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
 import type { IntegrationStep } from "@/content/integrations";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 /**
  * "Connect it in N steps" (Integrations › provider design): the steps as a

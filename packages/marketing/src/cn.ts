@@ -4,7 +4,7 @@ import { extendTailwindMerge } from "tailwind-merge";
 
 /**
  * `cn()` for the Marketing Site V2 components — `@saroh/ui/lib/utils`'s, taught
- * this app's `mk-*` theme keys (tailwind.config.ts).
+ * the `mk-*` theme keys (tailwind.ts).
  *
  * Why not the shared one: tailwind-merge does not read the Tailwind config, so
  * it took `text-mk-note` for a colour and silently dropped it whenever a

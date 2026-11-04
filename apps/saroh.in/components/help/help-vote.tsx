@@ -4,10 +4,10 @@ import { useState, useSyncExternalStore } from "react";
 
 import { HELP_EMAIL } from "@/content/help";
 import { track } from "@/lib/analytics";
-import { cn } from "@/lib/cn";
 import { readConsent, subscribeConsent } from "@/lib/consent";
-import { ring } from "@/lib/ring";
-import { textLinkClasses } from "../shared/links/text-link";
+import { cn } from "@saroh/marketing/cn";
+import { ring } from "@saroh/marketing/ring";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * "Did this help?" (design 2a), drawn only where the answer is really

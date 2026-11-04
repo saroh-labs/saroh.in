@@ -9,10 +9,10 @@ import { SAROH_NAME } from "@/content/name";
 import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
-import { Pill } from "../links/pill";
-import { textLinkClasses } from "../links/text-link";
+import { Pill } from "@saroh/marketing/pill";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { CookieChoicesButton } from "./cookie-choices-button";
 import type { NavItem } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
