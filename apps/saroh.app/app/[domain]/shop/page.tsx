@@ -31,7 +31,11 @@ import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { shopCutOff } from "@/lib/shop-cut-off";
-import { shopPageFeeds, withShopGrid } from "@/lib/shop-page-offer";
+import {
+    ALL_PRODUCTS_HREF,
+    shopPageFeeds,
+    withShopGrid,
+} from "@/lib/shop-page-offer";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical, shopDescription } from "@/lib/site-meta";
 import { getProductGridFeeds } from "@/lib/site-product-grids";
@@ -64,8 +68,9 @@ import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
  * The built-in shop says how an order reaches the customer in one line
  * under its heading, from the location's checkout (`shopLeadLine`), and
  * nothing when the site takes no online orders. A page that has nothing to
- * show (the module is off, the read failed, nothing is on sale) is kept out
- * of search: it answers 200, and "not available" is not a page to rank.
+ * show (the module is off, nothing is on sale) is kept out of search: it
+ * answers 200, and "not available" is not a page to rank. A read that failed
+ * says nothing about that, so a blip keeps the page indexed.
  */
 
 export async function generateMetadata({
@@ -134,7 +139,8 @@ async function shopIsMissing(
 
 /**
  * Whether `/shop` draws no shop now: its page is taken off while Commerce
- * is off, or the shop's read failed or came back with nothing on sale.
+ * is off, or the shop's read came back with nothing on sale. A read that
+ * failed doesn't say so.
  */
 function shopHasNothing(
     resolved: NonNullable<Awaited<ReturnType<typeof getSiteForHost>>>,
@@ -142,7 +148,9 @@ function shopHasNothing(
 ): boolean {
     return routeHasNothing(
         moduleRoute(resolved.snapshot.pages, resolved.modules, "SHOP"),
-        !catalogue?.ok || catalogue.data.products.length === 0,
+        catalogue?.ok
+            ? catalogue.data.products.length === 0
+            : catalogue?.reason !== "unavailable",
     );
 }
 
@@ -197,16 +205,17 @@ export default async function ShopPage({
             </main>
         );
     }
-    const [lookup, checkout] = await Promise.all([
+    const page = route.draw === "page" ? withShopGrid(route.page) : null;
+    const [lookup, checkout, feeds] = await Promise.all([
         getCatalogue(siteId),
         getCheckoutOptions(siteId),
+        page ? getProductGridFeeds(page.sections, siteId, true) : undefined,
     ]);
     const failed = !lookup.ok && lookup.reason !== "missing";
-    if (route.draw === "page" && !failed) {
-        const page = withShopGrid(route.page);
+    if (page && !failed) {
         const grids = shopPageFeeds(
             page.sections,
-            await getProductGridFeeds(page.sections, siteId, true),
+            feeds,
             lookup.ok ? lookup.data.products : [],
         );
         // The page's main landmark (UX-082), as the product page has: the
@@ -231,7 +240,8 @@ export default async function ShopPage({
         return (
             <ShopUnavailable
                 business={snapshot.site.name}
-                retryHref="/shop"
+                // The address as it was opened, past a Shop page too.
+                retryHref={all !== undefined ? ALL_PRODUCTS_HREF : "/shop"}
                 look={lookOf(snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(siteId))}
