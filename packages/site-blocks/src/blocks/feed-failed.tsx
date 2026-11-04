@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import type { LookId } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
@@ -24,12 +26,15 @@ export function FeedFailed({
     things: string;
     look?: LookId;
 }) {
+    const titleId = useId();
     return (
         <section
+            aria-labelledby={titleId}
             data-feed-failed=""
             className="text-site-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
         >
             <h2
+                id={titleId}
                 data-site-title=""
                 className="font-site-heading text-[calc(1.5rem*var(--site-heading-scale))] font-semibold tracking-tight"
             >
