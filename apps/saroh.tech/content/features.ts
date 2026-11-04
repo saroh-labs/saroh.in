@@ -33,11 +33,12 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         seoDescription:
             "A business dashboard that lists what's late, who's coming in and what's owed each morning, most urgent first.",
         name: "Dashboard",
-        navLine: "What needs you today, for each person",
+        navLine: "What needs you today",
         cardLine: "What needs you today.",
-        homeBody: "What needs each person today, based on their role.",
+        homeBody:
+            "What's late, who's coming in and what's owed, most urgent first.",
         headline: "Open up and see what needs you.",
-        sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in and what's owed, most urgent first. Each person sees the part that's theirs.",
+        sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in and what's owed, most urgent first.",
         hero: {
             shot: "s-home",
         },
@@ -51,7 +52,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Today's people, in order",
-                body: "Who's booked, at what time and with whom. Anything the team should know is beside their name.",
+                body: "Who's booked and at what time. Anything you should know is beside their name.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "d-home",
             },
@@ -76,10 +77,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Done from the list",
                 body: "Mark an order sent without opening it.",
-            },
-            {
-                title: "Right for each role",
-                body: "Someone without money access sees today's people, not the takings.",
             },
             {
                 title: "The last 24 hours",
@@ -153,7 +150,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "A log of every change",
-                body: "Received, sold, returned, moved, wasted or counted, with who did it. Nothing is deleted.",
+                body: "Received, sold, returned, moved, wasted or counted. Nothing is deleted.",
             },
             {
                 title: "Stock you don't count",
@@ -170,10 +167,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Bring them in",
                 body: "Import your products from a CSV.",
-            },
-            {
-                title: "The right people only",
-                body: "Choose who can edit products, who can count stock and who can only look.",
             },
         ],
         worksLead:
@@ -264,9 +257,9 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         navLine: "Bookings, invoices, notes and linked orders on one page",
         cardLine: "Everything about each customer.",
         homeBody:
-            "Bookings, invoices, notes and linked orders on one page. Sensitive notes only for the right roles.",
+            "Bookings, invoices, notes and linked orders on one page. Medical notes only you can read.",
         headline: "Know the person in front of you.",
-        sub: "Customer management for a small team. Every customer's bookings, invoices and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
+        sub: "Customer management for a small business. Every customer's bookings, invoices and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything you should know before they arrive.",
         hero: {
             shot: "r-customers",
         },
@@ -285,14 +278,14 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 shot: "g-customer",
             },
             {
-                title: "Notes they send reach the team",
-                body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
+                title: "Notes they send reach you",
+                body: "What a patient writes when booking is matched to their record. Check it, label it and add it where you'll see it.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "d-customer",
             },
             {
-                title: "Flags only for the right people",
-                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to those allowed to see them.",
+                title: "Flags where you need them",
+                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to you.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "d-customers",
             },
@@ -305,10 +298,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Needs attention",
                 body: "Allergies, medical notes and access needs, on orders, bookings and tickets too.",
-            },
-            {
-                title: "Contact details by permission",
-                body: "A role without contact access sees names, not phone numbers or emails.",
             },
             {
                 title: "Search and filters",
@@ -337,14 +326,13 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         phrase: "online booking",
         seoTitle: "Online booking and appointment scheduling software",
         seoDescription:
-            "Online booking and appointment scheduling for classes and one-to-one sessions: customers pick a real free time with your staff.",
+            "Online booking and appointment scheduling for classes and one-to-one sessions: customers pick a real free time.",
         name: "Bookings",
         navLine: "Classes, sessions and appointments",
         cardLine: "Classes, sessions and appointments.",
-        homeBody:
-            "Classes, sessions and appointments with staff, places and hours.",
+        homeBody: "Classes, sessions and appointments, with places and hours.",
         headline: "A calendar customers can book into themselves.",
-        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with staff, places and hours. Customers book a free time on your site, and you manage the day at the desk.",
+        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with places and hours. Customers book a free time on your site, and you manage the day at the desk.",
         hero: {
             shot: "g-bookings",
         },
@@ -352,7 +340,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         steps: [
             {
                 title: "Customers book themselves",
-                body: "Your booking page shows only real free times, from your team's hours.",
+                body: "Your booking page shows only real free times, from your hours.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-book",
             },
@@ -364,15 +352,15 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Treatments over several visits",
-                body: "A course of treatment can be three visits of an hour. Patients book the first visit and tell you what you need to know. Your team books the rest.",
+                body: "A course of treatment can be three visits of an hour. Patients book the first visit and tell you what you need to know. You book the rest.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "d-book",
             },
         ],
         points: [
             {
-                title: "Your team's hours",
-                body: "Each person's hours and time off, including holidays when the whole business is closed.",
+                title: "Your hours",
+                body: "Your hours and time off, including holidays when the business is closed.",
             },
             {
                 title: "In person or online",
@@ -380,15 +368,11 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Moves and cancellations",
-                body: "Your team moves a booking to another real free time.",
+                body: "Move a booking to another real free time.",
             },
             {
                 title: "Check-in and no-shows",
                 body: "Mark who came. No-shows are counted on their record.",
-            },
-            {
-                title: "Who can change what",
-                body: "Booking and moving is one permission. Changing services and hours is another.",
             },
         ],
         worksLead:
@@ -585,7 +569,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 body: "Choose a colourway, a pair of typefaces and the spacing, and every page follows.",
             },
             {
-                title: "Enquiries reach your team",
+                title: "Enquiries reach you",
                 body: "A form on your site adds the person to your contacts as a lead.",
             },
             {
@@ -648,10 +632,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Each day's money",
                 body: "The calendar shows money in, money out and what's due, day by day, in your currency.",
-            },
-            {
-                title: "For owners only",
-                body: "Only people with access to money see it.",
             },
         ],
         worksLead:

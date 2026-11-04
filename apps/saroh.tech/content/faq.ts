@@ -31,12 +31,12 @@ export const faqs = {
         a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Paying online isn't available yet.",
     },
     team: {
-        q: "Can my team use it without seeing everything?",
-        a: "Yes. Each person gets a role, and roles decide who can edit products and prices, see money or read sensitive notes.",
+        q: "Can more than one person use it?",
+        a: "Not today. Saroh is for one person running their business: one sign-in and one calendar.",
     },
     "medical-notes": {
         q: "Who can read a patient's medical notes?",
-        a: "Only people whose role allows sensitive notes. Allergies and access needs show on their orders, tickets, bookings and today's list, so the whole team knows to take care.",
+        a: "You do. Allergies and access needs show on their orders, tickets, bookings and today's list, so you can take care.",
     },
     currencies: {
         q: "Which countries and currencies work?",
@@ -52,7 +52,7 @@ export const faqs = {
     },
     "shops-counter-online": {
         q: "Does each location keep its own stock?",
-        a: "Yes. Each location keeps its own stock, and an order holds stock where it was placed, so two people never sell the same last loaf.",
+        a: "Yes. Each location keeps its own stock, and an order holds stock where it was placed, so the same last loaf is never sold twice.",
     },
     "gyms-pack-and-membership": {
         q: "Can I run courses as well as classes?",
@@ -60,11 +60,11 @@ export const faqs = {
     },
     "clinics-medical-notes": {
         q: "Who can read a patient's medical notes?",
-        a: "Only people whose role allows sensitive notes, such as the owner and anyone you allow. Allergies and access needs show on a patient's bookings and today's list, so the desk still knows to take care.",
+        a: "You do. Allergies and access needs show on a patient's bookings and today's list, so you can take care.",
     },
     "salons-choose-stylist": {
-        q: "Can a client choose their stylist?",
-        a: "Yes. When more than one person takes a service, your booking page offers Anyone or a named person, and shows only the times that person is free. You choose who takes each service.",
+        q: "Can a client book without messaging me?",
+        a: "Yes. Your booking page shows your services and only the times you're free, and the client picks one.",
     },
 } satisfies Record<FaqId, FaqItem>;
 

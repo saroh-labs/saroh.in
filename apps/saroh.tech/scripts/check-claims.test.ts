@@ -61,6 +61,35 @@ describe("what saroh.tech may not say", () => {
         expect(findClaims("/features/billing", line)).not.toEqual([]);
     });
 
+    it.each([
+        "Online booking by stylist.",
+        "Each person's hours and time off.",
+        "Each trainer's week, by the hour.",
+        "The times your trainers are free.",
+        "See who does what.",
+        "Bookings with your staff.",
+        "Can my team use it without seeing everything?",
+        "Sensitive notes only for the right roles.",
+        "Booking and moving is one permission.",
+    ])("catches what needs several people: %s", (line) => {
+        expect(findClaims("/solutions/salons", line)).not.toEqual([]);
+    });
+
+    it("lets a template or the law talk about staff, and us about the Saroh team", () => {
+        expect(
+            findClaims(
+                "/templates/invoice/plumber",
+                "Your team and your staff",
+            ),
+        ).toEqual([]);
+        expect(
+            findClaims("/customers", "Reports go to the Saroh team."),
+        ).toEqual([]);
+        expect(
+            findClaims("/solutions/gyms", "For personal trainers too."),
+        ).toEqual([]);
+    });
+
     it("lets the coming list name a provider, and the tools talk about documents", () => {
         expect(findClaims("/changelog", "Stripe: Not available yet")).toEqual(
             [],

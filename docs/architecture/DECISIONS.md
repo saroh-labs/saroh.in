@@ -2721,6 +2721,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 **The free tools and the claims check (4 Nov, owner).** saroh.tech says only what's verified, and `apps/saroh.tech/scripts/check-claims.mjs` runs as `postbuild`, so a phrase the product can't back fails the build, in CI's Build job too. A tool's sign-up goes to the real sign-up with the tool's `src`: the app has no import page, so a draft stays in the browser and no line says otherwise. This departs from the plan's "destinations stay". Comparison pages state Saroh's side only, until a fact about another tool has its own public page and a date.
 
+**One person, and no compare or referral pages, for now (owner, 4 Nov).** While plans can't be bought abroad, saroh.tech's pages speak to one person running their business. Anything that needs a second person is out, a diary person with no login included, since they take a team seat (DEC-155): `ONE_PERSON` in `apps/saroh.tech/scripts/check-claims.mjs` fails the build on those words. Teams aren't listed as coming. `/compare`, its six alternatives and `/referral` are removed from saroh.tech, and come back through git, with no feature flag.
+
 ## DEC-204 Two editions from one codebase: one database, the business decides
 
 **Status: Accepted — 2026-11-02** · owner

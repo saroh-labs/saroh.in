@@ -32,7 +32,7 @@ export const PRICING = {
         "Your website on a saroh.app address",
         "Products, variants and stock",
         "Orders at the counter",
-        "Bookings with your staff",
+        "Bookings on your own calendar",
         "One page per customer",
         "Numbered invoices in your currency",
     ],

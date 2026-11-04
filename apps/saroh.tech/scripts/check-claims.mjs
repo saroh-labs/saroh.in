@@ -21,6 +21,36 @@ const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
 /** A receipt says how it was paid; the one list of what's coming says "Not available yet". */
 const NAMES_A_PROVIDER = /^\/(tools\/receipt-maker|changelog|integrations)(\/|$)/;
 
+/** Advice and paper for anyone's trade, or the law's words: not what the product does for you. */
+const NOT_THE_PRODUCT = /^\/(tools|templates|guides|legal|customers|contact)(\/|$)/;
+
+/**
+ * Until plans are on sale here, the pages speak to one person running their
+ * business, so nothing about the product may need several people: not a second
+ * login, and not a second person on the diary, who with no login still takes a
+ * seat (DEC-155, DEC-203).
+ */
+export const ONE_PERSON = [
+    /\bby stylist\b/i,
+    /\bstylists?\b/i,
+    /\beach (person|trainer|barber|dentist|teacher|therapist|helper|artist)\b/i,
+    /\byour (team|staff|trainers?|barbers?|teachers?|helpers?)\b/i,
+    /\bthe (whole )?team\b/i,
+    /\bthe trainers\b/i,
+    /\bmy team\b/i,
+    /\bsmall team\b/i,
+    /\bwith (your )?staff\b/i,
+    /\bwith (whom|which)\b/i,
+    /\bwho does what\b/i,
+    /\bright (people|roles?)\b/i,
+    /\beach role\b/i,
+    /\bgets? a role\b/i,
+    /\bwhose role\b/i,
+    /\bpermissions?\b/i,
+    /\bwho can (edit|change|see|count)\b/i,
+    /\banyone you allow\b/i,
+];
+
 export const BANNED = [
     { phrase: /\b(tap|taps|tapped) accept\b/i },
     { phrase: /\baccepts? (it )?online\b/i },
@@ -63,6 +93,7 @@ export const BANNED = [
     { phrase: /\bVAT invoices?\b/i, except: ABOUT_TAX },
     { phrase: /\bUPI\b/ },
     { phrase: /\b(razorpay|cashfree)\b/i },
+    ...ONE_PERSON.map((phrase) => ({ phrase, except: NOT_THE_PRODUCT })),
 ];
 
 /** The words a visitor or a search engine reads. The India bar is the Worker's. */

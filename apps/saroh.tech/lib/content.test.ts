@@ -16,6 +16,8 @@ import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
 import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
 import { solutionList, solutions } from "@/content/solutions";
 
+import { ONE_PERSON } from "../scripts/check-claims.mjs";
+
 import { pageAt, PAGES } from "./site-map";
 
 const words = (o: unknown) => JSON.stringify(o);
@@ -150,6 +152,14 @@ describe("saroh.tech's words", () => {
         // The question's id is shared with saroh.in; its words may not say it.
         const claims = sold.replaceAll("gyms-pack-and-membership", "");
         expect(claims).not.toMatch(/\bpack(s|ages?)?\b/i);
+    });
+
+    it("ask for one person, until plans are on sale (DEC-203)", () => {
+        // Ids shared with saroh.in; their words may not say it.
+        const claims = sold
+            .replaceAll('"team":', "")
+            .replaceAll("salons-choose-stylist", "");
+        for (const phrase of ONE_PERSON) expect(claims).not.toMatch(phrase);
     });
 
     it("stay out of what isn't true outside India", () => {
@@ -290,11 +300,9 @@ describe("the changelog", () => {
 });
 
 describe("content pages are held back until someone reads them", () => {
-    it("guides, comparisons and the changelog are all unreviewed", () => {
+    it("guides and the changelog are all unreviewed", () => {
         for (const p of PAGES.filter((p) =>
-            ["guide", "guides", "alternative", "compare", "changelog"].includes(
-                p.type,
-            ),
+            ["guide", "guides", "changelog"].includes(p.type),
         )) {
             expect(p.unreviewed, p.path).toBe(true);
             expect(p.title.length, p.path).toBeLessThanOrEqual(60);
