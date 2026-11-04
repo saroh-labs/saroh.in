@@ -201,40 +201,101 @@ describe("a host with no live site", () => {
 
 /**
  * Every read a kept public page can be drawn from has to say what a failure
- * means for the page cache. The list below is the answer for those that
- * don't: a new reader is added to it only with a reason.
+ * means for the page cache. The lists below are the answer for those that
+ * don't: a new reader is added to them only with a reason.
  */
 describe("a new reader of the public API", () => {
+    const APP = path.join(__dirname, "..");
+
     /** Each answers something the route refuses by itself, or isn't kept. */
     const NOT_ON_A_KEPT_PAGE: Record<string, string> = {
-        "catalogue.ts": "lookups with reason: the routes refuse",
-        "customer-session.ts": "one customer's: never kept",
-        "qr-resolve.ts": "a short link: /q is never kept",
-        "shop-confirmation.ts": "one order's: never kept",
-        "site-view.ts": "a beacon: sends, reads nothing onto a page",
-        "stock-watch.ts": "one customer's token: never kept",
-        "test-release.ts": "a test host: never kept",
-        "waitlist-claim.ts": "one customer's token: never kept",
+        "lib/catalogue.ts": "lookups with reason: the routes refuse",
+        "lib/customer-session.ts": "one customer's: never kept",
+        "lib/images/resize.ts": "a photo's route: no page is drawn from it",
+        "lib/qr-resolve.ts": "a short link: /q is never kept",
+        "lib/site-view.ts": "a beacon: sends, reads nothing onto a page",
+        "lib/stock-watch.ts": "one customer's token: never kept",
+        "lib/test-release.ts": "a test host: never kept",
+        "lib/waitlist-claim.ts": "one customer's token: never kept",
+    };
+    /** Some of each file's reads refuse; the routes answer for the rest. */
+    const SOME_READS_THE_ROUTE_REFUSES: Record<string, string> = {
+        "lib/booking-page.ts": "getBookingPage's lookup: /book refuses",
+        "lib/publication.ts":
+            "a site's read throws from the layout; previews aren't kept",
     };
 
+    /** The code alone: a comment naming a call isn't the call. */
+    const codeOf = (source: string) =>
+        source
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const isReader = (code: string) =>
+        /shopFetch\(|\/public\/(sites|services)\b/.test(code);
+    const calls = (code: string, pattern: RegExp) =>
+        code.match(pattern)?.length ?? 0;
+    /** Whether a reader has fewer refusals than reads. */
+    const refusesTooLittle = (code: string) =>
+        calls(code, /\bdontCachePage\(/g) <
+        Math.max(1, calls(code, /\b(?:shopFetch|fetch)\(/g));
+
+    function sources(dir: string): string[] {
+        return readdirSync(path.join(APP, dir), {
+            withFileTypes: true,
+        }).flatMap((entry) => {
+            const file = path.join(dir, entry.name);
+            if (entry.isDirectory()) return sources(file);
+            return /\.tsx?$/.test(entry.name) && !/\.test\./.test(entry.name)
+                ? [file]
+                : [];
+        });
+    }
+    const readers = ["lib", "components"]
+        .flatMap(sources)
+        .map((file) => ({
+            file,
+            code: codeOf(readFileSync(path.join(APP, file), "utf8")),
+        }))
+        .filter(({ code }) => isReader(code));
+
     it("refuses the page cache on a failure, or is listed here", () => {
-        const dir = __dirname;
-        const readers = readdirSync(dir).filter(
-            (file) =>
-                file.endsWith(".ts") &&
-                !file.endsWith(".test.ts") &&
-                /shopFetch\(|\/public\/sites\//.test(
-                    readFileSync(path.join(dir, file), "utf8"),
-                ),
-        );
         expect(readers.length).toBeGreaterThan(5);
-        const silent = readers.filter(
-            (file) =>
-                !(file in NOT_ON_A_KEPT_PAGE) &&
-                !readFileSync(path.join(dir, file), "utf8").includes(
-                    "dontCachePage",
-                ),
-        );
+        const silent = readers
+            .filter(
+                ({ file, code }) =>
+                    !(file in NOT_ON_A_KEPT_PAGE) &&
+                    !(file in SOME_READS_THE_ROUTE_REFUSES) &&
+                    refusesTooLittle(code),
+            )
+            .map(({ file }) => file);
         expect(silent).toEqual([]);
+    });
+
+    it("has no list entry it doesn't need", () => {
+        const found = readers.map(({ file }) => file);
+        for (const file of [
+            ...Object.keys(NOT_ON_A_KEPT_PAGE),
+            ...Object.keys(SOME_READS_THE_ROUTE_REFUSES),
+        ]) {
+            expect(found).toContain(file);
+        }
+    });
+
+    it("isn't fooled by the word, a second read, or a services read", () => {
+        const fetchThem = (url: string) =>
+            `const a = await fetch(\`\${API}${url}\`);`;
+        const refuse = 'dontCachePage("x");';
+        for (const silent of [
+            fetchThem("/public/services"),
+            `// dontCachePage here\n${fetchThem("/public/sites/x")}`,
+            `const words = "dontCachePage";\n${fetchThem("/public/sites/x")}`,
+            `${fetchThem("/public/sites/x")}\n${fetchThem("/public/sites/y")}\n${refuse}`,
+        ]) {
+            const code = codeOf(silent);
+            expect(isReader(code)).toBe(true);
+            expect(refusesTooLittle(code)).toBe(true);
+        }
+        const fine = codeOf(`${fetchThem("/public/sites/x")}\n${refuse}`);
+        expect(refusesTooLittle(fine)).toBe(false);
     });
 });
