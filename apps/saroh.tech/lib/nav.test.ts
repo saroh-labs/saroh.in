@@ -61,9 +61,9 @@ describe("the nav", () => {
     });
 
     it("has no compare page, in the site map or a menu", () => {
-        const gone = /^\/compare/;
-        expect(allLinks.filter((l) => gone.test(l.href))).toEqual([]);
-        expect(PAGES.filter((p) => gone.test(p.path))).toEqual([]);
+        const gone = "/compare";
+        expect(allLinks.filter((l) => l.href.startsWith(gone))).toEqual([]);
+        expect(PAGES.filter((p) => p.path.startsWith(gone))).toEqual([]);
     });
 
     it("builds /referral noindex, out of every menu, as saroh.in has none", () => {

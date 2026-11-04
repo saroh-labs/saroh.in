@@ -220,10 +220,11 @@ describe("saroh.tech's words", () => {
     });
 
     it("point the structured data at saroh.tech's own accounts", () => {
-        const [org] = pageSchema(pageAt("/")!) as { sameAs?: string[] }[];
-        expect(org?.sameAs).toEqual(SAROH_SOCIAL.map((s) => s.href));
-        expect(org?.sameAs).toContain("https://x.com/sarohtech");
-        expect(org?.sameAs).toContain("https://www.instagram.com/sarohtech");
+        const home = pageAt("/");
+        const sameAs = home && pageSchema(home)[0].sameAs;
+        expect(sameAs).toEqual(SAROH_SOCIAL.map((s) => s.href));
+        expect(sameAs).toContain("https://x.com/sarohtech");
+        expect(sameAs).toContain("https://www.instagram.com/sarohtech");
     });
 
     it("name only who handles data on Global", () => {
