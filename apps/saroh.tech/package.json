@@ -12,6 +12,7 @@
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
+        "shots:sizes": "node ../saroh.in/scripts/shot-sizes.mjs --app .",
         "check:hreflang": "node scripts/check-hreflang.mjs",
         "check:templates": "tsx scripts/check-templates.ts",
         "make:templates": "tsx scripts/make-template-files.ts",

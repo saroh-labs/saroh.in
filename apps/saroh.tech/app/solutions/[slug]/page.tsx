@@ -45,8 +45,11 @@ export default async function SolutionPage({ params }: Props) {
     // "See {feature} →" on the first segment of each area only.
     const linked = new Set<FeatureSlug>();
     // A lone screen leaves the other rows half empty: two columns of words
-    // until the trade has its own screens (the package's no-shot layout).
-    const drawShots = s.segments.every((seg) => shotView(seg.shot));
+    // until most of the trade's segments have their own screens (the package's
+    // no-shot layout).
+    const drawShots =
+        s.segments.filter((seg) => shotView(seg.shot)).length >
+        s.segments.length / 2;
 
     return (
         <div data-page-type={page.type}>

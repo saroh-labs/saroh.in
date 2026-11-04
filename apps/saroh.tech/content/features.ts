@@ -6,9 +6,9 @@
  * page says plainly what works today in `worksToday`.
  *
  * Left out on purpose: payment links, deposits, reminders and invoice email,
- * your own domain, the online shop, and saroh.in's tax words. Screenshots keep
- * saroh.in's keys, and each `who` names the demo business in that screenshot,
- * until saroh.tech has its own (plan U11).
+ * your own domain, the online shop, and saroh.in's tax words. Screenshots are
+ * this site's own, of the Global demo businesses (plan U11), and each `who`
+ * names the business in that screenshot.
  */
 import type {
     FeatureSlug,
@@ -46,25 +46,25 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "The most urgent thing is at the top",
                 body: "Late orders, stock short for orders and overdue invoices, each with its next step. Mark an order sent right from the list.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-home",
             },
             {
                 title: "Today's people, in order",
                 body: "Who's booked, at what time and with whom. Anything the team should know is beside their name.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-home",
             },
             {
                 title: "Money that's owed",
                 body: "Overdue invoices are listed, so you know who to ask.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-home",
             },
             {
                 title: "Zoom out to the month",
                 body: "The calendar shows every day's orders, bookings and invoices, with money in, out and due.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "r-calendar",
             },
         ],
@@ -118,19 +118,19 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Add it once",
                 body: "Give it a name, a price and photos. Add sizes if it comes in more than one, each with its own price and SKU.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "p-editor",
             },
             {
                 title: "Stock follows every order",
                 body: "Each sale takes it off the shelf, for the location it was sold at. Count in the morning, move stock between locations, and every change is kept in a log.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "p-stock",
             },
             {
                 title: "See everything tied to it",
                 body: "One page shows what can be sold now, the orders waiting on it and the discounts that apply.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "p-detail",
             },
         ],
@@ -205,19 +205,19 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "r-order",
             },
             {
                 title: "Orders that take several visits",
                 body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-order",
             },
             {
                 title: "Make its invoice",
                 body: "Make a numbered invoice from the order, in your currency. It has no tax line. To add yours, write the invoice by hand.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "r-invoice",
             },
         ],
@@ -275,25 +275,26 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Everything about them on one page",
                 body: "What they've spent, how they usually get their order, and what they buy most, down to the size.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-customer",
             },
             {
                 title: "Regulars, with what they have left",
                 body: "Classes left in their pack and their next booking.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-customer",
+                who: "Ironvale Fitness (demo gym)",
+                // Class packs aren't offered yet: no screen shows one left.
+                shot: "g-packs",
             },
             {
                 title: "Notes they send reach the team",
                 body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-customer",
             },
             {
                 title: "Flags only for the right people",
                 body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to those allowed to see them.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-customers",
             },
         ],
@@ -353,25 +354,25 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Customers book themselves",
                 body: "Your booking page shows only real free times, from your team's hours.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-book",
             },
             {
                 title: "Classes and courses with places",
                 body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's paid.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-courses",
             },
             {
                 title: "Class packs",
                 body: "Sell five or ten classes at a price, at the desk. Credits are used as they're booked, and expire when you say.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-packs",
             },
             {
                 title: "Treatments over several visits",
                 body: "A course of treatment can be three visits of an hour. Patients book the first visit and tell you what you need to know. Your team books the rest.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-book",
             },
         ],
@@ -433,14 +434,14 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Each plan renews on its day",
                 body: "You sign members up at the desk, and each plan renews on its day.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-subs",
                 notYet: true,
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, and your customer pays it by hand.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "s-billing",
                 notYet: true,
             },
@@ -487,19 +488,19 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Write it, or make it from an order",
                 body: "Your business's details, the customer, each line and the total, numbered in order.",
-                who: "Rye & Co. (demo bakery)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "r-invoice",
             },
             {
                 title: "Add your tax line",
                 body: "On an invoice you write, add one tax line you name yourself, like VAT 20%, on top of the total. It's kept on the invoice with your tax number. You choose the rate: Saroh doesn't work out tax.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-billing",
+                who: "Larkspur & Vane (demo salon)",
+                shot: "l-invoice",
             },
             {
                 title: "See what's overdue",
                 body: "Overdue invoices are listed. Record a payment and the invoice becomes a receipt.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-billing",
             },
         ],
@@ -559,13 +560,13 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "It reads what you already entered",
                 body: "A services list shows each service with how long it takes and its price. Opening hours, today's free times, your phone and your address are read the same way, so a change in Saroh shows on your site without editing the page.",
-                who: "Kavi Dental (demo clinic)",
+                who: "Wrenfield Dental (demo clinic)",
                 shot: "d-site",
             },
             {
                 title: "Customers book from it",
                 body: "With Bookings on, your site has a booking page that offers only real free times, and you see the booking straight away.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Ironvale Fitness (demo gym)",
                 shot: "g-book",
             },
         ],
@@ -626,19 +627,19 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             {
                 title: "Four numbers for your site",
                 body: "Site views, unique visitors, enquiries and orders, side by side for the days you pick.",
-                who: "Northwind Supply (demo business)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-compare",
             },
             {
                 title: "Views, day by day",
                 body: "A bar for each day shows when people came to your site.",
-                who: "Northwind Supply (demo business)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-weeks",
             },
             {
                 title: "The pages people open most",
                 body: "See which pages get the most views, so you know what people come for.",
-                who: "Northwind Supply (demo business)",
+                who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-store",
             },
         ],

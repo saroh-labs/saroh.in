@@ -28,6 +28,7 @@
         "db:guard": "tsx src/database-target.cli.ts",
         "db:seed:reset": "tsx src/seed.ts --reset",
         "db:seed:showcase": "tsx src/seed.ts --showcase",
+        "db:seed:global": "tsx src/seed.ts --global",
         "db:verify:replay": "tsx src/verify-migration-replay.cli.ts",
         "db:verify:migration-fold": "tsx src/verify-billing-profiles-fold.cli.ts",
         "db:demo-businesses": "tsx src/backfill/demo-businesses.cli.ts"

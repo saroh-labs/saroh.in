@@ -32,7 +32,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
         hero: {
             shot: "p-products",
         },
-        heroNote: "Shown with Rye & Co., a demo bakery.",
+        heroNote: "Shown with Thistlewick Bakery, a demo bakery.",
         changeTitle:
             "The problems every shop knows, and what Saroh does about each.",
         segments: [
@@ -103,6 +103,8 @@ export const solutions: Record<SolutionSlug, Solution> = {
         },
         headline: "Appointments, stylists and packs, in one place.",
         sub: "Salon booking software for salons, barbers and spas. Clients book a real free time with the stylist they want, and your site shows your services and prices.",
+        hero: { shot: "l-site" },
+        heroNote: "Shown with Larkspur & Vane, a demo salon.",
         changeTitle:
             "The problems every salon knows, and what Saroh does about each.",
         segments: [
@@ -110,6 +112,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 feature: "dashboard",
                 pain: "“I find out who's coming when they walk in.”",
                 title: "Today's appointments, first thing",
+                shot: "l-home",
                 body: "Who's booked, at what time and with which stylist. An allergy, or anything else the team should know, is beside their name.",
             },
             {
@@ -117,6 +120,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Your booking page",
                 pain: "“My evening goes on messages, finding people a time.”",
                 title: "Clients book themselves, with the stylist they want",
+                shot: "l-book",
                 body: "Your booking page shows only the times your team is free. A client picks the service, and chooses a stylist or Anyone.",
             },
             {
@@ -124,6 +128,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Your team",
                 pain: "“Two stylists, different days off, one paper diary.”",
                 title: "Each person's hours and time off",
+                shot: "l-team",
                 body: "Set when each person works, add time off, and mark the days the whole salon is closed. Say who takes each service, how long it runs and the break after it, and only those times are offered.",
             },
             {
@@ -131,6 +136,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Who came",
                 pain: "“People book a Saturday afternoon and don't turn up.”",
                 title: "See who keeps not coming",
+                shot: "l-bookings",
                 body: "Mark who came and who didn't, and no-shows are counted on the client's page.",
             },
             {
@@ -138,24 +144,28 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Packs of sessions",
                 pain: "“Regulars ask for a package, and I keep count on paper.”",
                 title: "Sell a pack of sessions",
+                shot: "l-packs",
                 body: "Five blow-dries or ten sessions at one price, sold at the desk. A credit comes off when your team books the client, and you set how long a pack lasts.",
             },
             {
                 feature: "customers",
                 pain: "“She told me about the allergy last time, and I forgot.”",
                 title: "Know every client before they sit down",
+                shot: "l-customer",
                 body: "Their visits, what they've spent, their no-shows and your team's notes on one page. Allergies show on their bookings and on today's list.",
             },
             {
                 feature: "billing",
                 pain: "“A client asks for a proper invoice, and I write it on paper.”",
                 title: "A numbered invoice when they ask",
+                shot: "l-invoice",
                 body: "Write an invoice in your currency, with your own tax line and number. Record the payment, and it becomes a receipt.",
             },
             {
                 feature: "website",
                 pain: "“My price list is a photo on Instagram, and it's always out of date.”",
                 title: "A site with your services and prices",
+                shot: "l-site",
                 body: "Your site lists each service with how long it takes and its price, read from the same list clients book from, so a new price shows without touching the page. Your opening hours and how to reach you are read the same way.",
             },
         ],
@@ -186,7 +196,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
         hero: {
             shot: "g-site",
         },
-        heroNote: "Shown with Pulse Fitness, a demo gym.",
+        heroNote: "Shown with Ironvale Fitness, a demo gym.",
         changeTitle:
             "The problems every studio knows, and what Saroh does about each.",
         segments: [
@@ -219,7 +229,8 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 pain: "“Tracking who has classes left in their pack is a notebook of tally marks.”",
                 title: "Class packs and courses that count themselves",
                 body: "Sell 5 or 10 classes at the desk. Credits are used as members are booked and expire when you say. Courses show who's paid.",
-                shot: "g-packs",
+                // The course half: class packs aren't offered yet (DEC-099).
+                shot: "g-courses",
             },
             {
                 feature: "customers",
@@ -263,7 +274,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
         hero: {
             shot: "d-site",
         },
-        heroNote: "Shown with Kavi Dental, a demo clinic.",
+        heroNote: "Shown with Wrenfield Dental, a demo clinic.",
         changeTitle:
             "The problems every clinic knows, and what Saroh does about each.",
         segments: [

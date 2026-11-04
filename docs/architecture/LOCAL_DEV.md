@@ -511,6 +511,24 @@ it. Re-seeding a database that already has versions keeps them and puts the
 demo businesses on the live version's `pro` plan, so a dev catalogue without
 a `pro` plan stops the seed: seed first, then import.
 
+### Global demo businesses (saroh.tech's screenshots)
+
+```bash
+pnpm --filter @saroh/database db:seed:global   # base seed, then four Global businesses
+```
+
+Thistlewick Bakery, Larkspur & Vane (pounds, VAT), Ironvale Fitness and
+Wrenfield Dental (`seed/global/`), owned by `demo@saroh.dev`: `edition: GLOBAL`,
+on Free, no payment provider, sample data only, rewritten whole each run. Local
+addresses have no edition (`editionOfHost` returns null), so the seed sets it
+on the business, and app and accounts need `NEXT_PUBLIC_EDITION=GLOBAL` to list
+them and read money their way. Their zone is one where it's mid-morning when
+seeded (`morning-zone.ts`), so a capture at any hour shows a working day. Keep
+them on their own database. Then:
+`pnpm --filter @saroh/e2e shots --edition=global` (`marketing-shots/shots.global.ts`)
+and `pnpm --filter tech shots:sizes --force`. If the app reloads itself in a
+loop in a capture, restart its `next dev`.
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a

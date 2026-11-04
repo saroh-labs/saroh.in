@@ -60,6 +60,14 @@ export const SHOT_KEYS = [
     "r-calendar",
     "d-site",
     "g-subs",
+    "l-home",
+    "l-book",
+    "l-team",
+    "l-bookings",
+    "l-packs",
+    "l-customer",
+    "l-invoice",
+    "l-site",
 ] as const;
 export type ShotKey = (typeof SHOT_KEYS)[number];
 

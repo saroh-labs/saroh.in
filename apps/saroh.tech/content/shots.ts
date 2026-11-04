@@ -1,51 +1,44 @@
 /**
- * The screenshots this site may show: copies of saroh.in's, read one by one for
- * rupees, GST, UPI, +91 and India's places, and only the clean ones kept. A key
- * missing here draws no frame (global edition plan, U11 captures the rest).
+ * The screenshots this site shows: its own, taken from the real app on the
+ * Global demo businesses (`e2e/marketing-shots/shots.global.ts`) and each read
+ * by a person for rupees, GST, UPI, +91 and India's places (plan U11). A key
+ * with no shot draws no frame.
  */
 import type { ShotKey } from "@saroh/marketing/content-types";
 import type { Shot, ShotView } from "@saroh/marketing/shot";
 
-const shot = (key: ShotKey, alt: string, width = 2880, height = 1800): Shot => {
-    const src = `/shots/v2/${key}.webp`;
-    const copies = [640, 960, 1280, 1920].map(
-        (w) => `/shots/v2/sized/${key}-${w}.webp ${w}w`,
-    );
-    return {
-        src,
-        alt,
-        width,
-        height,
-        srcSet: [...copies, `${src} ${width}w`].join(", "),
-    };
+import { CAPTURED } from "./shots.captured";
+
+/**
+ * Keys pages name but this site doesn't show, each with why. Retake them after
+ * the app edition work; `lib/shots.test.ts` fails on any other missing image.
+ */
+export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
+    "r-subdetail": "Subscriptions isn't usable on Global yet.",
+    "s-subs": "Subscriptions isn't usable on Global yet.",
+    "g-packs": "Class packs aren't offered to any business yet (DEC-099).",
+    "l-packs": "Class packs aren't offered to any business yet (DEC-099).",
 };
 
-export const GLOBAL_SHOTS: Partial<Record<ShotKey, Shot>> = {
-    "s-insights": shot(
-        "s-insights",
-        "Insights: site views, visitors, enquiries and orders over the last 30 days, with views by day and top pages",
-    ),
-    "i-compare": shot(
-        "i-compare",
-        "Insights for 30 days: site views, unique visitors, enquiries and orders, views by day and the most-viewed pages",
-        2340,
-        1838,
-    ),
-    "i-weeks": shot(
-        "i-weeks",
-        "Ninety days of site views, a bar for each day",
-        2340,
-        632,
-    ),
-    "i-store": shot(
-        "i-store",
-        "Insights for the last seven days: site views, enquiries, orders and the most-viewed pages",
-    ),
-    "p-stock": shot(
-        "p-stock",
-        "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
-    ),
-};
+/** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */
+export const SHOT_WIDTHS = [640, 960, 1280, 1920] as const;
+
+const shot = (key: string, c: (typeof CAPTURED)[string]): Shot => ({
+    src: c.src,
+    alt: c.alt,
+    width: c.width,
+    height: c.height,
+    srcSet: [
+        ...SHOT_WIDTHS.filter((w) => w < c.width).map(
+            (w) => `/shots/v2/sized/${key}-${w}.webp ${w}w`,
+        ),
+        `${c.src} ${c.width}w`,
+    ].join(", "),
+});
+
+export const GLOBAL_SHOTS: Partial<Record<ShotKey, Shot>> = Object.fromEntries(
+    Object.entries(CAPTURED).map(([key, c]) => [key, shot(key, c)]),
+);
 
 /** The shot as `@saroh/marketing` draws it, or nothing when this site has none. */
 export function shotView(key?: ShotKey, alt?: string): ShotView | undefined {
