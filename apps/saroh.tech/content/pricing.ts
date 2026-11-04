@@ -1,7 +1,7 @@
 /**
  * /pricing's words. Only Free can be used on this edition: plans aren't on sale
  * until stage 9, so nothing here names a price, a limit or what a paid plan
- * would include. Free's limits come from the published catalogue at build
+ * would include, and there's nothing to add at a limit. Free's limits come from the published catalogue at build
  * (`lib/plans.ts`). Plan names and taglines are saroh.in's public ones.
  */
 export const PRICING = {
@@ -40,4 +40,13 @@ export const PRICING = {
     freeAlways: ["One page per customer", "Numbered invoices in your currency"],
     paidLead: "We'll say what it includes when it's on sale.",
     footnote: "Free has limits on how much you can use.",
+    /** saroh.in's "Usage beyond your plan", for the one plan you can use. */
+    usageTitle: "What happens at Free's limits",
+    usageLead: "What Free includes, and what happens when you reach it.",
+    usageNotes: [
+        "Saroh warns you as you near a limit, and it never deletes what you already have.",
+        "A limit counted by the month starts again on the 1st, in your business's time zone.",
+        "Bookings you add yourself and the sessions of a course don't count towards online bookings.",
+        "You can't buy more yet: paid plans aren't on sale.",
+    ],
 } as const;

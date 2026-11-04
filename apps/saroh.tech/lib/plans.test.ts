@@ -11,6 +11,7 @@ import {
     freeCardModel,
     freeLimitLines,
     freePlanLine,
+    freeUsage,
     pricingModel,
     readCatalog,
 } from "./plans";
@@ -98,6 +99,45 @@ const fake = (edit?: (c: CatalogInput) => void) => {
     edit?.(input);
     return parseCatalog(input);
 };
+
+describe("what happens at Free's limits", () => {
+    const cellsOf = (usage: ReturnType<typeof freeUsage>) =>
+        (usage?.rows ?? []).map((r) =>
+            r.kind === "line" ? [r.label, r.cells[0]] : [r.label],
+        );
+
+    it("says each capped row's line and its own words at the limit", () => {
+        expect(cellsOf(freeUsage(fake()))).toEqual([
+            ["7 things", "You can't add more products."],
+            [
+                "1 GB of photos and videos",
+                "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
+            ],
+        ]);
+    });
+
+    it("leaves the team out, and any price or paid plan", () => {
+        const usage = freeUsage(
+            fake((c) => {
+                c.modules.push({
+                    id: "members",
+                    name: "Team",
+                    group: "one",
+                    cells: { free: { inc: true, text: "1", limit: 1 } },
+                });
+            }),
+        );
+        const text = JSON.stringify(usage);
+        expect(text).not.toMatch(/team|invite/i);
+        for (const word of ["111", "222", "333", "Plan B", "Addon words"]) {
+            expect(text).not.toContain(word);
+        }
+    });
+
+    it("draws nothing with no catalogue", () => {
+        expect(freeUsage(null)).toBeNull();
+    });
+});
 
 describe("Free's limits, from a catalogue", () => {
     it("lists Free's card lines, and a capped row's own words, and nothing else", () => {

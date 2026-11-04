@@ -2,12 +2,18 @@ import { ButtonLink } from "@saroh/marketing/button";
 import { Container } from "@saroh/marketing/container";
 import { CtaBand } from "@saroh/marketing/cta-band";
 import { PricingHero } from "@saroh/marketing/pricing-hero";
+import { UsageTable } from "@saroh/marketing/usage-table";
 
 import { Plans } from "@/components/pricing/plans";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CTA_BAND } from "@/content/home";
 import { PRICING } from "@/content/pricing";
-import { pricingModel, readCatalog } from "@/lib/plans";
+import {
+    freeCardModel,
+    freeUsage,
+    pricingModel,
+    readCatalog,
+} from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -17,8 +23,9 @@ const page = pageOf("/pricing");
 
 export const metadata = pageMetadata(page);
 
-/** saroh.in's pricing page, without the tables: only Free's limits are read. */
+/** saroh.in's pricing page, with one table: only Free's limits are read. */
 export default async function PricingPage() {
+    const catalog = await readCatalog();
     return (
         <div data-page-type={page.type}>
             <JsonLd data={pageSchema(page)} />
@@ -35,8 +42,14 @@ export default async function PricingPage() {
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
-                <Plans model={pricingModel(await readCatalog())} />
+                <Plans model={pricingModel(catalog)} />
             </Container>
+            <UsageTable
+                plans={freeCardModel(catalog).views["month-excl"].plans}
+                usage={freeUsage(catalog)}
+                title={PRICING.usageTitle}
+                lead={PRICING.usageLead}
+            />
             <CtaBand
                 title={PRICING.closer}
                 body={CTA_BAND.body}

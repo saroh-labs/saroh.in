@@ -2,6 +2,7 @@ import type {
     PlanCardView,
     PricingPageModel,
     PricingView,
+    UsageView,
 } from "@saroh/marketing/pricing-model";
 import { placeholderPricingModel } from "@saroh/marketing/pricing-view";
 import { sentenceList } from "@saroh/marketing/sentence-list";
@@ -9,6 +10,7 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import {
     cellOf,
     countedWhat,
+    LIMIT_WORDS,
     limitWordsFor,
     parseCatalog,
 } from "@saroh/pricing-catalog";
@@ -115,6 +117,37 @@ export function freeLimitLines(catalog: Catalog): string[] | null {
         return line && !INDIA_ONLY.test(line) ? [line] : [];
     });
     return lines.length ? lines : null;
+}
+
+/**
+ * What Free's limits do, for /pricing: each capped row's line, and what its own
+ * notices say happens at the limit (`LIMIT_WORDS`, the words the API refuses
+ * in). The team's row stays out, since these pages speak to one person (DEC-203).
+ * Null with no catalogue: the page keeps its footnote.
+ */
+export function freeUsage(catalog: Catalog | null): UsageView | null {
+    const free = catalog && freePlanOf(catalog);
+    if (!catalog || !free) return null;
+    const rows = catalog.modules.flatMap((m): UsageView["rows"] => {
+        if (m.pricing !== "show") return [];
+        const cell = cellOf(m, free.id);
+        const words = limitWordsFor(m.id);
+        if (
+            !cell.inc ||
+            cell.limit === null ||
+            !words ||
+            words === LIMIT_WORDS.teamMembers
+        ) {
+            return [];
+        }
+        const label =
+            cell.card ||
+            `${cell.limit.toLocaleString("en-US")} ${countedWhat(words.what, cell.limit)}`;
+        return INDIA_ONLY.test(label)
+            ? []
+            : [{ kind: "line", label, what: "", cells: [words.paused] }];
+    });
+    return rows.length ? { rows, notes: [...PRICING.usageNotes] } : null;
 }
 
 /**
