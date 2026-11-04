@@ -12,8 +12,8 @@ vi.mock("next/link", () => ({
 }));
 
 const s = stage();
-beforeEach(s.mount);
-afterEach(s.unmount);
+beforeEach(() => s.mount());
+afterEach(() => s.unmount());
 
 describe("Rows: Last order", () => {
     it("is written in the business's zone, as the Orders list writes it", () => {
