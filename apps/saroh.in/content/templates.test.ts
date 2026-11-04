@@ -129,11 +129,7 @@ describe("what the pages say", () => {
         for (const t of templates) {
             for (const word of t.uses) expect(word).not.toMatch(/^[A-Z_]+$/);
         }
-        expect(galleryTemplate("gym")?.uses).toEqual([
-            "Bookings",
-            "Payments",
-            "Class packs",
-        ]);
+        expect(galleryTemplate("gym")?.uses).toEqual(["Bookings", "Payments"]);
         expect(galleryTemplate("blogs")?.uses).toEqual(["Posts"]);
         expect(Object.keys(USES_WORDS)).not.toContain("WEBSITE");
     });

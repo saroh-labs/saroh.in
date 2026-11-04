@@ -1168,6 +1168,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
     - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
 - Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+- 4 Nov 2026 (owner): marketing no longer claims packs while they aren't offered. The screenshots and the module's code stay.
 
 ## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
 

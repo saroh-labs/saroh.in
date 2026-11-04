@@ -172,7 +172,7 @@ describe("solution pages", () => {
         expect(bookings.map((v) => v.label)).toEqual([
             "Bookings · Your booking page",
             "Bookings · Your week",
-            "Bookings · Class packs and courses",
+            "Bookings · Classes and courses",
         ]);
         expect(views[0]).toMatchObject({
             label: "Dashboard",

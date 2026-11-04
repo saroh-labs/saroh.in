@@ -15,7 +15,7 @@ import { numberWord } from "@/lib/format/number-words";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-04";
 
 /**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
@@ -168,12 +168,13 @@ const NEUTRAL_COLOURS: PreviewColours = {
  * Modules), from the manifest's `uses`. `WEBSITE` is every site's, so it is
  * named only where it means the business's posts (a journal). A module
  * missing here fails the content test rather than showing its key.
+ * `CLASS_PACKS` is left out everywhere here: no plan offers it for now
+ * (DEC-099), so no gallery page says it or draws what needs it.
  */
 export const USES_WORDS: Readonly<Partial<Record<string, string>>> = {
     COMMERCE: "Products",
     APPOINTMENTS: "Bookings",
     PAYMENTS: "Payments",
-    CLASS_PACKS: "Class packs",
     SUBSCRIPTIONS: "Memberships",
     CRM: "Enquiries",
 };
@@ -249,8 +250,12 @@ function previewColours(t: TemplateManifest, slug: string): PreviewColours {
     return DESIGN_COLOURS[slug] ?? NEUTRAL_COLOURS;
 }
 
+function offeredUses(t: TemplateManifest): string[] {
+    return (t.uses ?? []).filter((key) => key !== "CLASS_PACKS");
+}
+
 function usesWords(t: TemplateManifest, pages: PreviewPage[]): string[] {
-    const words = (t.uses ?? []).flatMap((key) => {
+    const words = offeredUses(t).flatMap((key) => {
         if (key === "WEBSITE") {
             const journal = pages.some((p) =>
                 p.sections.some((s) => s.type === "journal"),
@@ -331,7 +336,7 @@ function previewPages(t: TemplateManifest): PreviewPage[] {
     const sample = t.sample ?? { name: t.name, host: "" };
     const built = instantiateTemplate(t, {
         organizationName: sample.name,
-        modules: ["WEBSITE", ...(t.uses ?? [])],
+        modules: ["WEBSITE", ...offeredUses(t)],
     });
     return built.pages.map((p) => ({
         path: p.path,

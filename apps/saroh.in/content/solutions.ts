@@ -28,7 +28,7 @@ import { SOLUTION_SLUGS } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-04";
 
 export const solutions: Record<SolutionSlug, Solution> = {
     shops: {
@@ -123,16 +123,16 @@ export const solutions: Record<SolutionSlug, Solution> = {
      * It says only what a business can do today (claims ledger §16, SA
      * rows). Left out because nothing backs them: reminders before a
      * booking (none exists on any channel), memberships that pay for
-     * one-to-one services (a membership pays for classes only; a pack of
-     * sessions is what a salon sells), and a client moving or cancelling
-     * their own booking or buying a pack online (`SITE_ACCOUNT_AREA`).
+     * one-to-one services (a membership pays for classes only), a client
+     * moving or cancelling their own booking (`SITE_ACCOUNT_AREA`), and
+     * packs of sessions, which no plan offers for now (DEC-099).
      */
     salons: {
         slug: "salons",
         phrase: "salon booking software",
         seoTitle: "Salon booking software for salons and parlours",
         seoDescription:
-            "Salon booking software for salons, parlours, barbers and spas: online booking by stylist, deposits, packs of sessions and GST invoices.",
+            "Salon booking software for salons, parlours, barbers and spas: online booking by stylist, deposits, client records and GST invoices.",
         name: "Salons",
         navLine: "Appointments, stylists and deposits",
         longName: "Salons and parlours",
@@ -140,7 +140,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
             name: "Salons and parlours",
             body: "Appointments by stylist, deposits at booking, and a site with your services and prices.",
             day: "Start: see today's appointments, who's with whom and who pays at the desk.",
-            uses: "Bookings · Packs · Billing · Website",
+            uses: "Bookings · Customers · Billing · Website",
             link: "See Saroh for salons",
         },
         headline: "Appointments, stylists and deposits, in one place.",
@@ -177,10 +177,10 @@ export const solutions: Record<SolutionSlug, Solution> = {
             },
             {
                 feature: "bookings",
-                label: "Bookings · Packs of sessions",
-                pain: "“Regulars ask for a package, and I keep count on paper.”",
-                title: "Sell a pack of sessions",
-                body: "Five blow-dries or ten sessions at one price, sold at the desk. A credit comes off when the client books, on your booking page or with your team, and goes back if they cancel in time. You set how long a pack lasts.",
+                label: "Bookings · Treatments over several visits",
+                pain: "“A colour correction takes three visits, and I keep count on paper.”",
+                title: "Treatments over several visits",
+                body: "A treatment can be three visits of an hour. The client books the first, and your team books the rest.",
             },
             {
                 feature: "customers",
@@ -212,19 +212,19 @@ export const solutions: Record<SolutionSlug, Solution> = {
         phrase: "gym and yoga studio management software",
         seoTitle: "Gym and yoga studio management software",
         seoDescription:
-            "Gym and yoga studio management software: class bookings with places, class packs, memberships that renew and an invoice for each payment.",
+            "Gym and yoga studio management software: class bookings with places, courses, memberships that renew and an invoice for each payment.",
         name: "Gyms & studios",
-        navLine: "Classes, memberships and class packs",
+        navLine: "Classes, memberships and courses",
         longName: "Gyms and studios",
         card: {
             name: "Gyms and studios",
             body: "Classes with places, memberships that renew, and a booking page on your site.",
             day: "Start: see today's classes, who's booked and who paid at the desk.",
-            uses: "Bookings · Subscriptions · Class packs · Website",
+            uses: "Bookings · Subscriptions · Billing · Website",
             link: "See Saroh for gyms",
         },
         headline: "Classes, members and payments, without the paper diary.",
-        sub: "Gym and yoga studio management software, for dance studios and personal trainers too. Members book on your site, packs and memberships count themselves down, and memberships can renew on their own by UPI Autopay.",
+        sub: "Gym and yoga studio management software, for dance studios and personal trainers too. Members book on your site, each class shows its places left, and memberships can renew on their own by UPI Autopay.",
         hero: {
             shot: "g-site",
         },
@@ -244,7 +244,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Your booking page",
                 pain: "“Half my evening goes on WhatsApp, finding people a slot.”",
                 title: "Members book themselves, into real free times",
-                body: "Your booking page shows only the times your trainers are free. Members pick, and pay or use a credit.",
+                body: "Your booking page shows only the times your trainers are free. Members pick, and pay or use their membership.",
                 shot: "g-book",
             },
             {
@@ -257,17 +257,17 @@ export const solutions: Record<SolutionSlug, Solution> = {
             },
             {
                 feature: "bookings",
-                label: "Bookings · Class packs and courses",
-                pain: "“Tracking who has classes left in their pack is a notebook of tally marks.”",
-                title: "Class packs and courses that count themselves",
-                body: "Sell 5 or 10 classes. Credits are used as members book and expire when you say. Courses show who's paid.",
-                shot: "g-packs",
+                label: "Bookings · Classes and courses",
+                pain: "“Tracking who's on which course is a notebook of tally marks.”",
+                title: "Classes and courses",
+                body: "Set how many places a class has. Courses run for several weeks: enrol people and see who's paid.",
+                shot: "g-courses",
             },
             {
                 feature: "customers",
                 pain: "“A member tells me about her knee, and next week I've forgotten.”",
                 title: "Every member on one page",
-                body: "Classes left, membership, next booking and notes from the trainers, on one page.",
+                body: "Classes left on their membership, next booking and notes from the trainers, on one page.",
                 shot: "g-customer",
             },
             {
@@ -281,7 +281,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 feature: "billing",
                 pain: "“I can't tell who's paid for what.”",
                 title: "Every payment has its invoice",
-                body: "Sessions, packs and memberships each make an invoice. Overdue ones are flagged with a reminder ready.",
+                body: "Sessions, courses and memberships each make an invoice. Overdue ones are flagged with a reminder ready.",
                 shot: "g-billing",
             },
         ],
