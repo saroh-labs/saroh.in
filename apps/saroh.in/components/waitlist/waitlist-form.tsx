@@ -9,8 +9,8 @@ import { openingDay, WAITLIST_MESSAGES } from "@/lib/waitlist";
 import { EMPTY_WAITLIST } from "@/lib/waitlist-schema";
 
 import { Button } from "@saroh/marketing/button";
+import { ChoiceChip } from "@saroh/marketing/choice-chip";
 import { textLinkClasses } from "@saroh/marketing/text-link";
-import { ChoiceChip } from "../shared/fields/choice-chips";
 import { fieldClasses } from "../shared/fields/field-classes";
 import { useWaitlistForm } from "./use-waitlist-form";
 import { WaitlistDone } from "./waitlist-done";

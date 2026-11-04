@@ -11,12 +11,10 @@ import {
 import { sectionOf } from "./nav-section";
 import { PAGES } from "./site-map";
 
-/** Linked, and built by U6 (features, solutions) and U8. Remove as each lands. */
+/** Linked, and built by U6 (features, solutions). Remove as each lands. */
 const PENDING = new Set([
     ...FEATURES.map((f) => f.href),
     ...SOLUTIONS.map((s) => s.href),
-    "/integrations",
-    "/contact",
 ]);
 
 const menuLinks = [

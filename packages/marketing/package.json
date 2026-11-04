@@ -60,7 +60,8 @@
         "./pricing-plans": "./src/pricing/pricing-plans.tsx",
         "./pricing-section": "./src/pricing/pricing-section.tsx",
         "./pricing-hero": "./src/pricing/pricing-hero.tsx",
-        "./plan-cards": "./src/pricing/plan-cards.tsx"
+        "./plan-cards": "./src/pricing/plan-cards.tsx",
+        "./choice-chip": "./src/fields/choice-chip.tsx"
     },
     "scripts": {
         "lint": "eslint src/",

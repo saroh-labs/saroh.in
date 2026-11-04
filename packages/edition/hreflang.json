@@ -10,6 +10,18 @@
             "tech": "/pricing",
             "in": "/pricing"
         },
+        {
+            "tech": "/about",
+            "in": "/about"
+        },
+        {
+            "tech": "/contact",
+            "in": "/contact"
+        },
+        {
+            "tech": "/integrations",
+            "in": "/integrations"
+        },
         { "tech": "/customers", "in": "/customers" },
         {
             "tech": "/changelog",

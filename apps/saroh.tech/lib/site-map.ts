@@ -2,9 +2,17 @@ import hreflang from "@saroh/edition/hreflang";
 
 import { templateEntries } from "./templates/pages";
 
+import { ABOUT } from "@/content/about";
+
 import { CHANGELOG, changelogPath } from "@/content/changelog";
 
+import { CONTACT } from "@/content/contact";
+
 import { HELP } from "@/content/help";
+
+import { INTEGRATIONS } from "@/content/integrations";
+
+import { PRICING } from "@/content/pricing";
 
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
 
@@ -12,13 +20,15 @@ import { home, UPDATED as HOME_UPDATED } from "@/content/home";
  * Every page, as the site map and page-spec boards list them. Title,
  * description and H1 are the specs' own words. An `unreviewed` page is noindex
  * and out of the sitemap. The pricing line
- * names no price until the USD catalogue reads them in (phase 3).
+ * names no price until the USD catalogue reads them in (stage 9).
  */
 export type PageType =
     | "home"
     | "pricing"
     | "changelog"
     | "about"
+    | "contact"
+    | "integrations"
     | "referral"
     | "help"
     | "legal"
@@ -164,13 +174,13 @@ export const PAGES: SitePage[] = [
         ...hub(
             "/pricing",
             "pricing",
-            "Pricing and plans, with 0% fees | Saroh",
-            "See Saroh's plans. Start free, no card needed. We never hold your money. Cancel any time.",
-            "We never hold your money.",
+            "Pricing and plans | Saroh",
+            "Start free with no card. Free is the plan you can use today, and paid plans aren't available yet.",
+            PRICING.title,
             "Pricing",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     },
     {
         ...hub(
@@ -197,12 +207,36 @@ export const PAGES: SitePage[] = [
             "/about",
             "about",
             "About Saroh: let's rise together",
-            "Saroh (सारोह) means rising together. A small team building simple tools for freelancers and small businesses, with no fees on your money.",
-            "Let's rise together.",
+            "Saroh (सारोह) means rising together. Who Saroh is for, what the name means and the company that makes it.",
+            ABOUT.title,
             "About",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
+            "/contact",
+            "contact",
+            "Contact us: questions, help and ideas | Saroh",
+            "Write to the Saroh team with a question before you sign up, something not working or an idea. A person reads every message.",
+            CONTACT.title,
+            "Contact",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
+            "/integrations",
+            "integrations",
+            "Integrations: what Saroh works with | Saroh",
+            "What Saroh works with today, and what isn't built yet.",
+            INTEGRATIONS.title,
+            "Integrations",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
     },
     {
         ...hub(

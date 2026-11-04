@@ -6,7 +6,7 @@ import type { GalleryTemplate } from "@/content/templates";
 import { cn } from "@saroh/marketing/cn";
 import { ring } from "@saroh/marketing/ring";
 
-import { ChoiceChip } from "../shared/fields/choice-chips";
+import { ChoiceChip } from "@saroh/marketing/choice-chip";
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
 import type { PreviewDevice } from "./template-preview";

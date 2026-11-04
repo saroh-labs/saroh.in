@@ -186,10 +186,7 @@ const RULES: Rule[] = [
             `\\bcursor-pointer\\b${RUN}\\bbg-foreground\\b${RUN}\\btext-background\\b|\\bbg-foreground\\b${RUN}\\bcursor-pointer\\b${RUN}\\btext-background\\b|<button\\b[^>]*?className=[^>]*?\\bbg-foreground\\b`,
         ),
         // ChoiceChip's chosen state is Ink too.
-        home: [
-            `${MK}/buttons/button.tsx`,
-            "components/shared/fields/choice-chips.tsx",
-        ],
+        home: [`${MK}/buttons/button.tsx`, `${MK}/fields/choice-chip.tsx`],
         allow: {},
         files: SITE,
     },
@@ -258,7 +255,7 @@ const RULES: Rule[] = [
     {
         name: "a choice chip is ChoiceChip (V9, A13)",
         pattern: both("\\bh-9\\b", "\\brounded-full\\b"),
-        home: ["components/shared/fields/choice-chips.tsx"],
+        home: [`${MK}/fields/choice-chip.tsx`],
         allow: {},
         files: SITE,
     },

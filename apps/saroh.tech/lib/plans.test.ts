@@ -1,42 +1,35 @@
-import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
-import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { readPlans } from "./plans";
+import { pricingModel } from "./plans";
 
-const answer =
-    (status: number, body: unknown = {}): typeof fetch =>
-    () =>
-        Promise.resolve(new Response(JSON.stringify(body), { status }));
+describe("the pricing page's plans", () => {
+    const model = pricingModel();
+    const view = model.views["month-excl"];
 
-describe("readPlans", () => {
-    beforeEach(() => {
-        vi.stubEnv("API_URL", "https://api.example.com");
-        vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    });
-    afterEach(() => {
-        vi.unstubAllEnvs();
-        vi.restoreAllMocks();
-    });
-
-    it("is null without API_URL, on a 404, a failure or a bad catalogue", async () => {
-        expect(await readPlans(answer(404))).toBeNull();
-        expect(await readPlans(answer(500))).toBeNull();
-        expect(await readPlans(answer(200, { catalog: {} }))).toBeNull();
-        expect(
-            await readPlans(() => Promise.reject(new Error("down"))),
-        ).toBeNull();
-        vi.stubEnv("API_URL", "");
-        expect(
-            await readPlans(answer(200, { catalog: SEED_CATALOG })),
-        ).toBeNull();
+    it("offers Free alone, with no toggle, tables or tax", () => {
+        expect(model.tax.toggle).toBe(false);
+        expect(model.yearly).toBeNull();
+        expect(view.usage).toBeNull();
+        expect(model.rows).toEqual([]);
+        expect(view.plans.map((p) => [p.name, p.cta.paid, p.featured])).toEqual(
+            [
+                ["Free", false, true],
+                ["Grow", true, false],
+                ["Pro", true, false],
+            ],
+        );
     });
 
-    it("draws the catalogue's offered plans with its own money", async () => {
-        const cards = await readPlans(answer(200, { catalog: SEED_CATALOG }));
-        const offered = offeredPlans(SEED_CATALOG);
-        expect(cards?.map((c) => c.name)).toEqual(offered.map((p) => p.name));
-        expect(cards?.[0]?.price).toBe(formatInr(offered[0]?.pricePaise ?? -1));
-        expect(cards?.[1]?.lead).toContain(offered[0]?.name);
+    it("gives the paid plans no price, and says nothing they would include", () => {
+        for (const plan of view.plans.filter((p) => p.cta.paid)) {
+            expect(plan.price).toBe("—");
+            expect(plan.lines).toEqual([]);
+        }
+    });
+
+    it("names no money, limit, tax or provider", () => {
+        expect(JSON.stringify(view)).not.toMatch(
+            /₹|\$|rupee|GST|\bVAT\b|\btax\b|\d|stripe|paypal|razorpay|cashfree/i,
+        );
     });
 });

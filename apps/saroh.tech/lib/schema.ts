@@ -68,6 +68,7 @@ export function pageSchema(page: SitePage): Ld[] {
         case "home":
             return [organization, website, application(page)];
         case "about":
+        case "contact":
             return [organization, ...breadcrumbs(page)];
         case "pricing":
         case "tool":
