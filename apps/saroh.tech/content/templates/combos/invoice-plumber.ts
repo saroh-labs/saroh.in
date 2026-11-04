@@ -38,8 +38,4 @@ export const invoicePlumber: Combo = {
             answer: "Ask before you arrive. If the landlord or agent is paying, get their approval and billing details, then show the rental as the job address. Billing the tenant by mistake can delay you for weeks while they pass it along.",
         },
     ],
-    band: {
-        title: "Paid before you're back in the van.",
-        line: "Send the invoice from your phone at the job, and let the customer pay through your own link. 0% fees.",
-    },
 };

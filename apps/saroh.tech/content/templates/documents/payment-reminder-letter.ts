@@ -123,8 +123,4 @@ export const paymentReminderLetter: DocumentData = {
             answer: "Get an honest figure and date from them, and offer to split the balance into stages if you can. Write down what you both agreed. A slow payment plan beats a dispute, and it keeps the door open for later work.",
         },
     ],
-    band: {
-        title: "Stop writing the same chase.",
-        line: "Saroh shows who hasn't paid and when they opened the invoice, then sends a reminder from your email in one tap.",
-    },
 };

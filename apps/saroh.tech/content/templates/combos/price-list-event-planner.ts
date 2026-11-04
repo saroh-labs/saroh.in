@@ -101,8 +101,4 @@ export const priceListEventPlanner: Combo = {
             answer: "Leave it out of the main rates, and add one line saying that travel and nights away are quoted for each job. It's honest, keeps the page short and invites the client to ask.",
         },
     ],
-    band: {
-        title: "Clear packages, before the first call.",
-        line: "Send your list, and take the booking fee through your own link when they choose. 0% fees.",
-    },
 };

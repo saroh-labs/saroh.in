@@ -56,8 +56,4 @@ export const quoteCanada: Combo = {
             answer: "It works as an offer you stand behind until its end date, in the usual sense of the word. Provincial contract law decides the fine detail, and the CRA pages don't cover it, so ask a lawyer about a large job.",
         },
     ],
-    band: {
-        title: "A clear quote for any province.",
-        line: "Send it from Saroh with a deposit and a sign line, and keep the answer with the client's other documents.",
-    },
 };

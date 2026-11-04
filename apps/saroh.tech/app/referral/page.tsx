@@ -52,8 +52,8 @@ export default function ReferralPage() {
                         {page.h1}
                     </h1>
                     <p className="m-0 text-[17px] leading-[1.6] text-body md:text-xl">
-                        Know another freelancer or small business who&apos;s
-                        tired of fees on their own money? Share your link.
+                        Know another freelancer or small business who could use
+                        Saroh? Share your link.
                     </p>
                     <ConfirmTag>The offer · confirm before launch</ConfirmTag>
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
@@ -134,7 +134,7 @@ export default function ReferralPage() {
 
             <CtaBand
                 title="Let's rise together."
-                line="The more of us who stop paying fees on our own money, the better."
+                line="Share Saroh with someone who runs a small business."
                 action="Get your link"
                 href={APP_LINK}
                 from="get-referral-link-band"

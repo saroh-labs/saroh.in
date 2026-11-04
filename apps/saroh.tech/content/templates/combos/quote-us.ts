@@ -61,8 +61,4 @@ export const quoteUs: Combo = {
             answer: "Nothing we read asks for it. Clients who pay contractors sometimes want your details on a Form W-9 before the first payment, so have that ready instead of crowding the quote.",
         },
     ],
-    band: {
-        title: "A US quote they can say yes to.",
-        line: "Send it from Saroh with a sign line and a deposit, and keep the answer beside the client's other documents.",
-    },
 };

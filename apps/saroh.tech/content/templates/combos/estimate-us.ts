@@ -59,8 +59,4 @@ export const estimateUs: Combo = {
             answer: "Tell the client before the extra cost lands, and write down what they agreed. Then send a fresh estimate or a change note, so the final invoice lines up with what they saw and approved.",
         },
     ],
-    band: {
-        title: "Estimates that turn into invoices.",
-        line: "Send a US estimate from Saroh, and when the client agrees, carry the lines across without typing them again.",
-    },
 };

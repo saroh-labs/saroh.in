@@ -114,8 +114,4 @@ export const quotePhotographer: Combo = {
             answer: "Say in the quote whether the deposit carries over if you're free on the new date. If you aren't free, state what happens to the money. Writing the rule early saves a hard talk with an upset couple.",
         },
     ],
-    band: {
-        title: "Say yes, and the date is theirs.",
-        line: "The couple accepts online and pays the deposit through your own link, so your calendar stays honest. 0% fees.",
-    },
 };

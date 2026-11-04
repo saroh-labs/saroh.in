@@ -39,8 +39,4 @@ export const invoiceCanada: Combo = {
             answer: "RC4022 says on the earlier of the day you're paid or the day payment is due, and the CRA usually treats it as due on the invoice date or a date set in an agreement. So it can fall due before your client pays.",
         },
     ],
-    band: {
-        title: "The right rate for each province.",
-        line: "Save your GST/HST number once in Saroh, then send invoices in Canadian dollars that clients can pay through your own link.",
-    },
 };

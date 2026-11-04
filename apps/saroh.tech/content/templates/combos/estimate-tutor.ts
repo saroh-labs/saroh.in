@@ -92,8 +92,4 @@ export const estimateTutor: Combo = {
             answer: "Good news for everyone. Bill only what you teach, and tell the family early. Being honest here earns referrals to other parents at the school, which is worth more than the few extra hours.",
         },
     ],
-    band: {
-        title: "A plan parents can budget for.",
-        line: "Share the rough plan after your first call, then bill the lessons as they happen. 0% fees.",
-    },
 };

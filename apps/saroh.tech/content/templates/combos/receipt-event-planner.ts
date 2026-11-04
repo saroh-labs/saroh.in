@@ -111,8 +111,4 @@ export const receiptEventPlanner: Combo = {
             answer: "Better not. Give each payer their own receipt with their own amount, since they may wish to keep track apart. Add a shared event reference, so you can still see the full total in one view.",
         },
     ],
-    band: {
-        title: "Months of payments, one clear trail.",
-        line: "Take each stage through your own payment link, and let the receipt go out with it. 0% fees.",
-    },
 };

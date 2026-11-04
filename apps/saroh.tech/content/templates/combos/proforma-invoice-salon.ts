@@ -103,8 +103,4 @@ export const proformaInvoiceSalon: Combo = {
             answer: "It's fine for the first approval. Use it to set the monthly minimum and the rates. After that, send real monthly bills from your account records, each one listing guests and dates.",
         },
     ],
-    band: {
-        title: "Approved first, then in the chair.",
-        line: "Send the proforma, then the true invoice and the vouchers when the payment lands. 0% fees.",
-    },
 };

@@ -110,8 +110,4 @@ export const receiptPersonalTrainer: Combo = {
             answer: "No. One receipt for each payment is enough, with the month it covers. If the plan includes a set number of sessions, put that number in the description so they know what the month paid for.",
         },
     ],
-    band: {
-        title: "Paid at the gym, on record by the bench.",
-        line: "Send a receipt from your phone the moment the money lands. Your own payment link, 0% fees.",
-    },
 };

@@ -46,8 +46,4 @@ export const estimateElectrician: Combo = {
             answer: "Yes. Whether the supply can take the load is unknown until you check, and a supplier may be involved. List the charger, the cable run and any board work apart, so each can move alone.",
         },
     ],
-    band: {
-        title: "Before the boards come up.",
-        line: "Send a rough figure today, and turn it into a firm quote after the survey. 0% fees.",
-    },
 };

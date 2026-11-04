@@ -104,8 +104,4 @@ export const proformaInvoicePersonalTrainer: Combo = {
             answer: "Only if you can afford to. A proforma commits nobody, so say how long you'll hold the slots, and when they go back in your diary. The pay by date is a good place to set that limit.",
         },
     ],
-    band: {
-        title: "Signed off before the first class.",
-        line: "Send the proforma, then raise the true invoice from the same details once it's approved. 0% fees.",
-    },
 };

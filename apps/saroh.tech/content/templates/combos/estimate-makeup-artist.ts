@@ -89,8 +89,4 @@ export const estimateMakeupArtist: Combo = {
             answer: "You can, but a message gets lost and details blur. A short written estimate records the headcount and date you assumed, so when the party grows by three there's a clear reason the number moved.",
         },
     ],
-    band: {
-        title: "A wedding figure they can plan around.",
-        line: "Send the estimate, then turn it into a booking with a retainer once the date is theirs. 0% fees.",
-    },
 };

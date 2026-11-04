@@ -14,17 +14,16 @@ const page = pageOf("/tools");
 
 export const metadata = pageMetadata(page);
 
-/** A tool without an `href` isn't built yet: it's listed, never linked. */
 const GROUPS: {
     title: string;
-    tools: { name: string; line: string; href?: string }[];
+    tools: { name: string; line: string; href: string }[];
 }[] = [
     {
         title: "Make a document",
         tools: [
             {
                 name: "Invoice generator",
-                line: "A clean PDF in two minutes, any currency.",
+                line: "A clean PDF in two minutes, in nine currencies.",
                 href: "/tools/invoice-generator",
             },
             {
@@ -36,10 +35,6 @@ const GROUPS: {
                 name: "Receipt maker",
                 line: "Show a client they've paid.",
                 href: "/tools/receipt-maker",
-            },
-            {
-                name: "Proforma invoice",
-                line: "For deposits and advance payments.",
             },
         ],
     },
@@ -55,10 +50,6 @@ const GROUPS: {
                 name: "Late fee calculator",
                 line: "Work out the fee on an overdue invoice.",
                 href: "/tools/late-fee-calculator",
-            },
-            {
-                name: "Invoice number generator",
-                line: "A numbering format that won't trip you up.",
             },
         ],
     },
@@ -80,29 +71,12 @@ const GROUPS: {
                 line: "Australia, Canada, NZ, Singapore.",
                 href: "/tools/gst-calculator",
             },
-            { name: "Hourly rate calculator", line: "Price your time right." },
-            { name: "Markup and margin", line: "Price with profit in mind." },
-        ],
-    },
-    {
-        title: "Show your prices and take payments",
-        tools: [
-            { name: "Payment QR code", line: "Let clients pay by scanning." },
-            {
-                name: "Price list maker",
-                line: "A service menu for print or Instagram.",
-            },
-            {
-                name: "Digital business card",
-                line: "Your details in one link.",
-            },
-            { name: "Booking page", line: "Let clients pick a time." },
         ],
     },
 ];
 
-const live = GROUPS.flatMap((g) => g.tools).flatMap((t) =>
-    t.href ? [{ name: t.name, path: t.href }] : [],
+const live = GROUPS.flatMap((g) =>
+    g.tools.map((t) => ({ name: t.name, path: t.href })),
 );
 
 const CARD =
@@ -143,35 +117,20 @@ export default function ToolsHubPage() {
                         {group.title}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
-                        {group.tools.map((t) =>
-                            t.href ? (
-                                <Link
-                                    key={t.name}
-                                    prefetch={false}
-                                    href={t.href}
-                                    className={`${CARD} border border-line bg-surface no-underline transition-colors duration-150 hover:border-ink`}
-                                >
-                                    <span className={NAME}>
-                                        {t.name}
-                                        <span aria-hidden="true">→</span>
-                                    </span>
-                                    <p className={LINE}>{t.line}</p>
-                                </Link>
-                            ) : (
-                                <div
-                                    key={t.name}
-                                    className={`${CARD} border border-dashed border-line`}
-                                >
-                                    <span className={NAME}>
-                                        {t.name}
-                                        <span className="rounded-full border border-dashed border-[#8A887F] px-2 py-[3px] font-sans text-[11px] font-semibold uppercase tracking-[.08em] text-quiet">
-                                            Soon
-                                        </span>
-                                    </span>
-                                    <p className={LINE}>{t.line}</p>
-                                </div>
-                            ),
-                        )}
+                        {group.tools.map((t) => (
+                            <Link
+                                key={t.name}
+                                prefetch={false}
+                                href={t.href}
+                                className={`${CARD} border border-line bg-surface no-underline transition-colors duration-150 hover:border-ink`}
+                            >
+                                <span className={NAME}>
+                                    {t.name}
+                                    <span aria-hidden="true">→</span>
+                                </span>
+                                <p className={LINE}>{t.line}</p>
+                            </Link>
+                        ))}
                     </div>
                 </section>
             ))}
@@ -187,8 +146,8 @@ export default function ToolsHubPage() {
             </section>
 
             <CtaBand
-                title="Keep it all in one place."
-                line="Everything you make here can be saved, sent and tracked in Saroh. Free plan, no card."
+                title="Keep your invoices in one place."
+                line="Numbered invoices in your currency, and a record of what's paid. Free plan, no card."
                 action="Start free"
                 href={signupHref(page.type)}
                 from="start-free-band"

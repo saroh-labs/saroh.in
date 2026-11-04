@@ -63,11 +63,7 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
     const [today] = useState(todayIso);
     const message = useMemo(() => reminderMessage(d, today), [d, today]);
     const late = daysOverdue(d.wasDue, today);
-    const handoff = useMemo(
-        () => ({ tool: TOOL, kind: "reminder", draft: d }),
-        [d],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(TOOL);
     const email = d.channel === "email";
     const copied = () =>
         moment.finished(email ? "Reminder copied" : "Message copied");
@@ -199,15 +195,11 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                 <span className="text-[13px] text-quiet">
                     Opens your own app with the message filled in. You tap send.
                 </span>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={TOOL}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

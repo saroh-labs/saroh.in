@@ -110,7 +110,7 @@ export const quote: DocumentData = {
     faqs: [
         {
             question: "What's the difference between a quote and an estimate?",
-            answer: "A quote is a fixed price: if the client accepts, that's what the listed work costs. An estimate is a best guess that can move. Pick the word on purpose, because your client will hold you to what it says.",
+            answer: "A quote is a fixed price: if the client says yes, that's what the listed work costs. An estimate is a best guess that can move. Pick the word on purpose, because your client will hold you to what it says.",
         },
         {
             question: "How long should a quote stay valid?",
@@ -118,15 +118,11 @@ export const quote: DocumentData = {
         },
         {
             question: "Can I change a quote after sending it?",
-            answer: "Yes, until the client accepts it. Send a new version with a new number and say clearly that it replaces the old one. After acceptance, any change should be agreed in writing and added as its own line.",
+            answer: "Yes, until the client says yes to it. Send a new version with a new number and say clearly that it replaces the old one. After acceptance, any change should be agreed in writing and added as its own line.",
         },
         {
             question: "How much deposit should I ask for on a quote?",
             answer: "It's your call, and it depends on how much you spend before the work is delivered. Many freelancers choose somewhere between 20% and 50%. A higher share makes sense when you buy materials up front or turn other work away.",
         },
     ],
-    band: {
-        title: "Get a yes you can see.",
-        line: "Your client taps Accept, you see the time it happened, and the quote turns into an invoice in one tap.",
-    },
 };

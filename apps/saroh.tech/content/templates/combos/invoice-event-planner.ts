@@ -45,8 +45,4 @@ export const invoiceEventPlanner: Combo = {
             answer: "It depends on where you work, and whether you bought the service yourself or only paid as the client's agent. The two can be treated differently. Ask an accountant once, then bill all your events the same way.",
         },
     ],
-    band: {
-        title: "The event is over. The bills are clear.",
-        line: "Send each stage through your own payment link, and keep the full picture of one event in one place. 0% fees.",
-    },
 };

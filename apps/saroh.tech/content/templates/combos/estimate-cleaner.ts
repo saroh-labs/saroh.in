@@ -116,8 +116,4 @@ export const estimateCleaner: Combo = {
             answer: "Yes. Always see it first, and take care over how you word things, as the person may feel ashamed. Work in stages, each with its own figure and a stopping point. Note any sharp items or hazards you may need help with.",
         },
     ],
-    band: {
-        title: "No surprises at the door.",
-        line: "Send the estimate from your phone after a walk-through, and let the client approve it online before you start.",
-    },
 };

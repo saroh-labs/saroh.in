@@ -54,8 +54,4 @@ export const creditNoteAustralia: Combo = {
             answer: "Quietly replacing an invoice leaves two versions of one number, and a client may already have filed the first one. A separate note, with its own number, keeps every step visible.",
         },
     ],
-    band: {
-        title: "Put an Australian bill right.",
-        line: "Issue a credit note in Saroh and it stays attached to the tax invoice and the client, so your numbers still add up.",
-    },
 };

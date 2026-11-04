@@ -109,8 +109,4 @@ export const priceListSalon: Combo = {
             answer: "Yes, for long colour and big groups at least. One short sentence at the bottom saves an awkward message later. Name which services need one and how much notice gets it back.",
         },
     ],
-    band: {
-        title: "Your menu, in every client's pocket.",
-        line: "Share one page on your site or by message, and take bookings on your own link. 0% fees.",
-    },
 };

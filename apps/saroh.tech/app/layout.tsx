@@ -44,7 +44,7 @@ const fontWordmark = localFont({
 export const metadata: Metadata = {
     metadataBase: new URL(site.url),
     title: site.name,
-    description: "Quotes, invoices and one page for every client.",
+    description: "Orders, bookings, invoices and your website, in one place.",
 };
 
 export const viewport: Viewport = {

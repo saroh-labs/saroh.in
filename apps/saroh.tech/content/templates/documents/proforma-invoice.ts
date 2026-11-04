@@ -124,8 +124,4 @@ export const proformaInvoice: DocumentData = {
             answer: "A quote offers a price and waits for a yes. A proforma usually comes after the yes and sets out exactly what the invoice will say, including freight and quantities. If the buyer hasn't decided yet, send a quote first.",
         },
     ],
-    band: {
-        title: "Paid before you pack the crate.",
-        line: "Send the proforma from Saroh, take the money through your own payment account, then turn it into the real invoice.",
-    },
 };

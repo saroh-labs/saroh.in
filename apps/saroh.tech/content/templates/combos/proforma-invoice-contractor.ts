@@ -93,8 +93,4 @@ export const proformaInvoiceContractor: Combo = {
             answer: "Plenty of purchasing teams need one to raise a payment order. Ask for their order number, print it in the facts at the top, and check who should receive the paperwork, since it's rarely the site manager.",
         },
     ],
-    band: {
-        title: "Funds first, trusses second.",
-        line: "Ask for the advance through your own payment link, then move it onto the stage bills. 0% fees.",
-    },
 };

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 
 import { buttonClass } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
@@ -56,11 +55,7 @@ export function TaxTool({
     const rate = parseNumber(d.rate);
     const b = taxBreakdown(d.mode, toCents(parseNumber(d.amount)), rate);
     const money = (cents: number) => formatMoney(cents, d.currency);
-    const handoff = useMemo(
-        () => ({ tool, kind: "tax", draft: { ...d, tax: kind } }),
-        [d, tool, kind],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(tool);
     const rows: [string, string][] = [
         [`Before ${k.lower}`, money(b.net)],
         [`${k.name} at ${rate}%`, money(b.tax)],
@@ -192,15 +187,11 @@ export function TaxTool({
                         </Link>
                     </div>
                 </section>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={tool} done={moment.done} />
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={tool}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

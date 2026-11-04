@@ -181,8 +181,6 @@ describe("the real content", () => {
                 c.lede,
                 ...c.tips.flatMap((t) => [t.title, t.text]),
                 ...c.faqs.flatMap((f) => [f.question, f.answer]),
-                c.band.title,
-                c.band.line,
             ].join(" ");
             expect(
                 own.split(/\s+/).length,

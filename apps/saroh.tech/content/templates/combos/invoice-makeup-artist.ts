@@ -45,8 +45,4 @@ export const invoiceMakeupArtist: Combo = {
             answer: "Only if you promised that when they booked. If it counts, show the trial as a full-price line and a matching deduction, so your records still show the work. If it doesn't, keep it as a plain line.",
         },
     ],
-    band: {
-        title: "Paid before the first brush.",
-        line: "Send the retainer request and the balance through your own payment link, and arrive with it done. 0% fees.",
-    },
 };

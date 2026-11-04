@@ -89,8 +89,4 @@ export const priceListTutor: Combo = {
             answer: "It helps, because a parent gets a straight answer without messaging you. Check the group's rules on advertising first, and share a dated picture of the sheet so that a later screenshot shows its age.",
         },
     ],
-    band: {
-        title: "One page for every parent.",
-        line: "Share your lesson list with a link, and turn each enquiry into a booked weekly slot. 0% fees.",
-    },
 };

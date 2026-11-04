@@ -44,8 +44,4 @@ export const invoiceElectrician: Combo = {
             answer: "On its own line with the make and size, fitted. It's the largest single part on most upgrades, and a clear entry helps the client with any later warranty claim against the manufacturer.",
         },
     ],
-    band: {
-        title: "Tested, signed off, paid.",
-        line: "Send the bill and report from the van, and take payment through your own link. 0% fees.",
-    },
 };

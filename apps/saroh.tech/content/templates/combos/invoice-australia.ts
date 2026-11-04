@@ -39,8 +39,4 @@ export const invoiceAustralia: Combo = {
             answer: "No, you can invoice without it. You must register once your GST turnover reaches $75,000, with a higher figure for non-profits, and you have 21 days from knowing you'll pass it. Below that, registering is your choice.",
         },
     ],
-    band: {
-        title: "Your ABN and GST, on every invoice.",
-        line: "Save your ABN once in Saroh, then send tax invoices in Australian dollars that clients can pay through your own link.",
-    },
 };

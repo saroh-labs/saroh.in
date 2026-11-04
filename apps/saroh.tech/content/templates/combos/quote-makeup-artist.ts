@@ -48,8 +48,4 @@ export const quoteMakeupArtist: Combo = {
             answer: "A plain line asking the client to tell you about allergies or sensitive skin before the trial is sensible. It protects them first. Ask every person in the party, not only the bride.",
         },
     ],
-    band: {
-        title: "The date is yours when the retainer lands.",
-        line: "Send the quote, take the retainer through your own link and put the wedding in your diary. 0% fees.",
-    },
 };

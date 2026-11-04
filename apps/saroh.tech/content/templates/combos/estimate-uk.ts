@@ -57,8 +57,4 @@ export const estimateUk: Combo = {
             answer: "Only if you're registered. HMRC's rules we read are about invoices, not estimates, but showing your number tells a client the VAT line is real. If you aren't registered, leave both the number and the line off.",
         },
     ],
-    band: {
-        title: "From estimate to VAT invoice.",
-        line: "Send a UK estimate from Saroh, then turn it into a VAT invoice with the same lines when the client agrees.",
-    },
 };

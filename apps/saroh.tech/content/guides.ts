@@ -632,7 +632,7 @@ export const GUIDE_CONTENT: readonly Guide[] = [
         tool: { name: "invoice generator", href: "/tools/invoice-generator" },
         band: {
             title: "Make an invoice with a clear due date.",
-            line: "Any terms, any currency. Free, no sign-up.",
+            line: "Any terms, nine currencies. Free, no sign-up.",
         },
     },
     {

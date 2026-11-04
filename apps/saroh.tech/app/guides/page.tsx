@@ -62,7 +62,7 @@ export default function Page() {
 
             <CtaBand
                 title="Keep it all in one place."
-                line="Send quotes and invoices and get paid in Saroh. Free plan, no card."
+                line="Numbered invoices in your currency, and a record of what's paid. Free plan, no card."
                 action="Start free"
                 href={signupHref("guides")}
                 from="start-free-band"

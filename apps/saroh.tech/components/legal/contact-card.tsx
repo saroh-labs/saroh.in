@@ -11,9 +11,6 @@ export function ContactCard() {
             <p className="m-0 text-[15.5px] leading-normal text-body">
                 <Marked text={placeholders.supportEmail} />
             </p>
-            <p className="m-0 text-[15.5px] leading-normal text-body">
-                A person replies within one working day.
-            </p>
         </Card>
     );
 }

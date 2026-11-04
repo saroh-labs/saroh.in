@@ -45,11 +45,9 @@ export const placeholders = {
     companyDetails: "[confirm: registered address and number]",
     legalUpdated: "[confirm: date]",
     dataLocation: "[confirm: country or region]",
-    merchantOfRecord: "[confirm: merchant of record's name]",
     processors: "[confirm: names of the services]",
     dataAfterCancel:
         "[confirm: how long we keep your data after you cancel or leave]",
-    refunds: "[confirm: refund policy]",
     liability: "[confirm: liability wording, from a lawyer]",
     governingLaw: "[confirm: governing law and courts]",
     postHogIp: "[confirm: IP recording is off in the PostHog project]",

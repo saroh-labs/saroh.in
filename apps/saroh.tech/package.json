@@ -7,7 +7,7 @@
         "dev:app": "next dev",
         "prebuild": "tsx scripts/make-template-files.ts && tsx scripts/check-templates.ts",
         "build": "next build",
-        "postbuild": "node scripts/check-claims.mjs --report-only",
+        "postbuild": "node scripts/check-claims.mjs",
         "check:claims": "node scripts/check-claims.mjs",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",

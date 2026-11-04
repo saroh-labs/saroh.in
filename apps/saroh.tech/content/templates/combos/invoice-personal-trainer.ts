@@ -41,8 +41,4 @@ export const invoicePersonalTrainer: Combo = {
             answer: "No second bill is needed. Send a receipt for the payment, and keep the count of sessions used on your own record. Only invoice again when the pack runs out or they add extras such as a new programme.",
         },
     ],
-    band: {
-        title: "Trained, billed, paid.",
-        line: "Keep every session and every invoice in one place. 0% fees.",
-    },
 };

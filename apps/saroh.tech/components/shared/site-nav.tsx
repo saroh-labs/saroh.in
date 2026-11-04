@@ -1,5 +1,6 @@
 "use client";
 
+import { ButtonLink } from "@saroh/marketing/button";
 import { cn } from "@saroh/marketing/cn";
 import { IntentLink } from "@saroh/marketing/intent-link";
 import { MenuPanel } from "@saroh/marketing/menu-panel";
@@ -14,7 +15,6 @@ import { useEffect, useRef, useState } from "react";
 import type { NavMenus } from "@/lib/nav";
 import { sectionOf } from "@/lib/nav-section";
 
-import { HeaderStart } from "./header-start";
 import { PhoneMenu } from "./phone-menu";
 
 type MenuId = "features" | "solutions" | "resources" | "tools" | "templates";
@@ -156,10 +156,14 @@ export function SiteNav({
             >
                 Sign in
             </a>
-            <HeaderStart
+            <ButtonLink
+                size="sm"
                 href={start}
+                data-cta="start-free"
                 className="hidden min-[1100px]:inline-flex"
-            />
+            >
+                Start free
+            </ButtonLink>
 
             <PhoneMenu
                 {...menus}

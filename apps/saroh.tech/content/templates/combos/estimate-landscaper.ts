@@ -52,8 +52,4 @@ export const estimateLandscaper: Combo = {
             answer: "After you've measured properly, checked levels and drains, and the client has picked materials. Then issue a fixed price naming the stone and plant sizes, so nothing about the finished garden is left to memory.",
         },
     ],
-    band: {
-        title: "A rough figure for a real garden.",
-        line: "Send it after the first walk round, then firm it up once levels are taken. 0% fees.",
-    },
 };

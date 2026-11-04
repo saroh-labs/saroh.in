@@ -59,8 +59,4 @@ export const receiptAustralia: Combo = {
             answer: "The receipt list we read doesn't include a GST line, only the price. A customer who needs to claim the GST back will want a tax invoice, so offer one when they ask.",
         },
     ],
-    band: {
-        title: "A receipt ready the moment they pay.",
-        line: "Saroh keeps every Australian receipt with the client it belongs to, and sends it when a payment is marked paid.",
-    },
 };

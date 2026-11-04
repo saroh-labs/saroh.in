@@ -41,8 +41,4 @@ export const invoiceUs: Combo = {
             answer: "We found no federal rule on the tax pages we read, so this one is marked for checking. Your contract and your state's law decide it. Agree any fee before the work begins, then print it on the invoice.",
         },
     ],
-    band: {
-        title: "A clean US invoice, state by state.",
-        line: "Save your EIN and your sales tax rate once in Saroh, then send invoices in dollars that clients can pay through your own link.",
-    },
 };

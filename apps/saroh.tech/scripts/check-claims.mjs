@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 /**
  * What saroh.tech may not say. The product has no quotes to accept, no client
- * approvals and no Stripe or PayPal connection yet, and its tax and pay links
- * work only for India (the private ledger, DEC-203). Runs over the built HTML,
- * because that's what a visitor reads, whichever file the words came from.
+ * approvals, and no online payment or plan on sale yet (the private ledger,
+ * DEC-203). Runs over the built HTML as `postbuild`, because that's what a
+ * visitor reads, whichever file the words came from, so a hit fails the build.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Documents and tax guides may name these things; a product claim may not. */
+// The allow-list. Nothing else may say these; each says why it may.
+
+/** A template or tax tool tells people what a tax invoice is in their country. */
 const ABOUT_TAX =
     /^\/(templates|guides|tools\/(gst|vat|sales-tax)-calculator)(\/|$)/;
 
-/** The free tools, templates and guides are about the document, not the product. */
+/** The free tools and guides make the paper itself: a quote is a document there. */
 const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
 
-/** The one list of what's coming names these, marked "Not available yet". */
-const NAMES_A_PROVIDER =
-    /^\/(tools|templates|guides|changelog|integrations)(\/|$)/;
+/** A receipt says how it was paid; the one list of what's coming says "Not available yet". */
+const NAMES_A_PROVIDER = /^\/(tools\/receipt-maker|changelog|integrations)(\/|$)/;
 
 export const BANNED = [
     { phrase: /\b(tap|taps|tapped) accept\b/i },
@@ -39,7 +40,7 @@ export const BANNED = [
     { phrase: /\bfrom quote to paid\b/i },
     { phrase: /\bsend a quote\b/i, except: ABOUT_DOCS },
     { phrase: /\bquotes?(,| and) invoices\b/i, except: ABOUT_DOCS },
-    { phrase: /\bany currency\b/i, except: ABOUT_DOCS },
+    { phrase: /\bany currency\b/i },
     { phrase: /\bSMS\b/ },
     { phrase: /\b0% fees?\b/i },
     { phrase: /\bwe take 0%/i },
@@ -51,16 +52,24 @@ export const BANNED = [
     { phrase: /\bstripe, paypal\b/i },
     { phrase: /\bpay link\b/i },
     { phrase: /\bpayable link\b/i },
+    { phrase: /\byour own (payment )?link\b/i },
+    { phrase: /\bcustomer accepts\b/i },
+    { phrase: /\bapprove it online\b/i },
+    { phrase: /\bwhen they opened\b/i },
+    { phrase: /\bin one tap\b/i },
+    { phrase: /\bclass packs?\b/i },
     { phrase: /\btax invoices?\b/i, except: ABOUT_TAX },
     { phrase: /\bGST invoices?\b/i, except: ABOUT_TAX },
     { phrase: /\bVAT invoices?\b/i, except: ABOUT_TAX },
-    { phrase: /\bUPI\b/, except: /^\/$/ },
+    { phrase: /\bUPI\b/ },
     { phrase: /\b(razorpay|cashfree)\b/i },
 ];
 
-/** The words a visitor reads: no scripts, no markup. The India bar is the Worker's. */
+/** The words a visitor or a search engine reads. The India bar is the Worker's. */
 export function visibleText(html) {
-    return html
+    const description =
+        /<meta name="description" content="([^"]*)"/.exec(html)?.[1] ?? "";
+    return `${description} ${html}`
         .replace(/<aside[^>]*data-region-bar[\s\S]*?<\/aside>/g, " ")
         .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, " ")
         .replace(/<[^>]+>/g, " ")
@@ -104,7 +113,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
     for (const f of found) console.error(`${f.path}: "${f.phrase}"`);
     console.log(`check-claims: ${found.length} found`);
-    // shortcut: reports only until U9 of the global edition plan rewrites the old pages; drop the flag then.
-    if (found.length && !process.argv.includes("--report-only"))
-        process.exit(1);
+    if (found.length) process.exit(1);
 }

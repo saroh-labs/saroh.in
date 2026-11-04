@@ -115,8 +115,4 @@ export const receiptPhotographer: Combo = {
             answer: "The first receipt stays as it was, because the money did arrive. Record the refund as a new document that names the first number, with its date and amount. Then your records show both events honestly.",
         },
     ],
-    band: {
-        title: "Deposit in, date safe.",
-        line: "Saroh sends a receipt the moment a booking payment lands, with the shoot date and the balance still to pay.",
-    },
 };

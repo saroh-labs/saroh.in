@@ -48,8 +48,4 @@ export const invoiceTutor: Combo = {
             answer: "It's normally built into your hourly price. If a family asks for custom exam packs or written reports, that's different. Agree it first, then bill it as a named piece of work with its own line.",
         },
     ],
-    band: {
-        title: "Teach more, chase less.",
-        line: "Send every family's monthly bill in one go, and let them pay through your own link. 0% fees.",
-    },
 };

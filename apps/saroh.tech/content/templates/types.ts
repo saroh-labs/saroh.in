@@ -101,8 +101,6 @@ export interface PageWords {
     tips: Tip[];
     /** 3 to 5. No question or answer may repeat on a sibling page. */
     faqs: Faq[];
-    /** The closing band. */
-    band: { title: string; line: string };
     /** A person read this page and it passes the gate. Until then: noindex. */
     reviewed: boolean;
 }

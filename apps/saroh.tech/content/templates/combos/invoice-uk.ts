@@ -39,8 +39,4 @@ export const invoiceUk: Combo = {
             answer: "GOV.UK sets out statutory interest of 8% plus the Bank of England base rate on business to business debts, unless your contract sets another rate. Check the current base rate before you work out the amount you're claiming.",
         },
     ],
-    band: {
-        title: "Your VAT line, done right each time.",
-        line: "Save your VAT number once in Saroh, then send invoices in pounds that clients can pay through your own link.",
-    },
 };

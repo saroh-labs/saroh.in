@@ -39,8 +39,4 @@ export const invoiceSingapore: Combo = {
             answer: "IRAS says a tax invoice isn't needed for one. If you do show GST on the bill, state that it's charged at 0%, and keep the proper records of the sale.",
         },
     ],
-    band: {
-        title: "A tax invoice laid out the IRAS way.",
-        line: "Save your GST number once in Saroh, then send tax invoices in Singapore dollars that clients can pay through your own link.",
-    },
 };

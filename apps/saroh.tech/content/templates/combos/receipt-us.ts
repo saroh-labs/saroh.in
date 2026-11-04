@@ -59,8 +59,4 @@ export const receiptUs: Combo = {
             answer: "Show the rate and the amount apart from the price where your state expects that. Texas accepts a tax-included price only if you've told the customer in writing and posted a sign. Other states may differ.",
         },
     ],
-    band: {
-        title: "Every payment, on paper.",
-        line: "Saroh records payments against each client, so a US receipt is ready to send the moment the money arrives.",
-    },
 };

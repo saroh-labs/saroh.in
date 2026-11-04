@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { addDays, daysBetween, formatDate, todayIso } from "./dates";
 import type { DocDraft } from "./document";
 import { applyCarry, documentView, dueFor, totals } from "./document";
-import { carryHref, decodeDraft, encodeDraft, importHref } from "./handoff";
+import { carryHref, decodeDraft, encodeDraft } from "./handoff";
 import { lateFee } from "./late-fee";
 import { formatMoney, parseNumber, toCents } from "./money";
 import { canDrawPdf, drawPdf } from "./pdf";
@@ -372,25 +372,6 @@ describe("the hand-off", () => {
     it("ignores a fragment that isn't a draft", () => {
         expect(decodeDraft("%%%")).toBeNull();
         expect(decodeDraft("aGVsbG8")).toBeNull();
-    });
-
-    it("sends the app a draft, without the logo", () => {
-        const href = importHref({
-            tool: "invoice-generator",
-            kind: "invoice",
-            draft: { number: "1" },
-            from: { name: "A", logo: "data:image/png;base64,AAAA" },
-        });
-        expect(
-            href.startsWith(
-                "https://app.saroh.tech/import?from=tool&tool=invoice-generator#",
-            ),
-        ).toBe(true);
-        const sent = decodeDraft(href.split("#")[1]) as {
-            from: { name: string; logo?: string };
-        };
-        expect(sent.from.name).toBe("A");
-        expect(sent.from.logo).toBeUndefined();
     });
 
     it("carries a line into another tool", () => {

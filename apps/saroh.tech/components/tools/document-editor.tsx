@@ -125,11 +125,7 @@ export function DocumentEditor({
     const t = useMemo(() => totals(d), [d]);
     const view = useMemo(() => documentView(kind, d, from), [kind, d, from]);
     const money = (cents: number) => formatMoney(cents, d.currency);
-    const handoff = useMemo(
-        () => ({ tool, kind, draft: d, from }),
-        [tool, kind, d, from],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(tool);
     const { busy, problem, download } = useDownload(
         view,
         tool,
@@ -579,7 +575,6 @@ export function DocumentEditor({
                             <div className="grid gap-3 md:grid-cols-2">
                                 <Field
                                     label="Payment link"
-                                    hint="(Stripe, PayPal…)"
                                     type="url"
                                     placeholder="https://"
                                     value={d.payLink}
@@ -711,7 +706,7 @@ export function DocumentEditor({
                         <DownloadProblem problem={problem} />
                         <NextStepCard
                             copy={copy}
-                            handoff={handoff}
+                            tool={tool}
                             done={moment.done}
                         />
                     </div>
@@ -754,11 +749,7 @@ export function DocumentEditor({
             </div>
 
             <div className="flex flex-col gap-3 lg:hidden">
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={tool} done={moment.done} />
             </div>
 
             {invoice ? null : (
@@ -789,7 +780,7 @@ export function DocumentEditor({
 
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={tool}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

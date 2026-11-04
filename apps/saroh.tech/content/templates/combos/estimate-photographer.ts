@@ -115,8 +115,4 @@ export const estimatePhotographer: Combo = {
             answer: "If you're organising them, yes. Show each as an allowance, marked as the other person's fee, and bill the real amount. If the client is booking them, say so, so your figure doesn't seem to include them.",
         },
     ],
-    band: {
-        title: "A shot list with a price beside it.",
-        line: "Send it as a link, let the marketing team approve it online, then turn it into a firm booking.",
-    },
 };

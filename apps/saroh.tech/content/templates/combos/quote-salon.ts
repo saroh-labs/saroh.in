@@ -96,8 +96,4 @@ export const quoteSalon: Combo = {
             answer: "A flat day rate with a limit on people, or a per-person rate with a minimum. Add travel if you go to them, and any tax number they ask for. Ask who pays for extras such as products.",
         },
     ],
-    band: {
-        title: "The whole party, one signed price.",
-        line: "Send the quote, take the deposit through your own payment link and hold the chairs. 0% fees.",
-    },
 };

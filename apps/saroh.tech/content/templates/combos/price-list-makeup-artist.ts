@@ -102,8 +102,4 @@ export const priceListMakeupArtist: Combo = {
             answer: "Yes, if it uses different products or takes longer. A small add-on line per person makes it a clear choice. Anyone who doesn't know the term can ask, and that's a useful chat to have.",
         },
     ],
-    band: {
-        title: "Answer how much in one message.",
-        line: "Send your list, then take the retainer through your own link when they're ready to book. 0% fees.",
-    },
 };

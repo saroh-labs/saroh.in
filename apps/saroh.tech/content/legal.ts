@@ -21,7 +21,7 @@ const CUSTOMER_MONEY =
     "Your customers pay you directly. We don't hold or move your customers' money. You record in Saroh that a payment happened.";
 
 const PAID_PLANS =
-    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech yet. This page will say how they're charged before they are.";
+    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech. This page will say how they work before they are.";
 
 export const TERMS: readonly LegalSection[] = [
     {
@@ -50,7 +50,7 @@ export const TERMS: readonly LegalSection[] = [
         title: "Your content",
         paragraphs: [
             "What you put in Saroh stays yours. That means your customers, invoices and notes. We use it only to run Saroh for you.",
-            `You can export your data at any time. ${p.appSteps}`,
+            `The owner of a business can export its data. ${p.appSteps}`,
         ],
     },
     {
@@ -63,7 +63,7 @@ export const TERMS: readonly LegalSection[] = [
     {
         title: "Paying for Saroh",
         paragraphs: [PAID_PLANS],
-        links: [{ name: "Billing and cancelling", href: "/legal/billing" }],
+        links: [{ name: "Billing", href: "/legal/billing" }],
     },
     {
         title: "What you can't do",
@@ -186,7 +186,7 @@ export const PRIVACY: readonly LegalSection[] = [
         title: "The free tools: your drafts stay in your browser",
         paragraphs: [
             "What you type into a free tool stays in your browser. It is saved on your device and isn't sent to us. The PDF is made on your device too.",
-            "If you choose to carry a draft into Saroh, it travels in the part of the link after the #, which browsers don't send to web servers. The app reads it once you're there. Nothing from the draft is stored by us unless you sign up.",
+            "Signing up for Saroh from a tool doesn't bring your draft with it. The draft stays in your browser.",
         ],
     },
     {
@@ -237,7 +237,7 @@ export const PRIVACY: readonly LegalSection[] = [
         title: "How long we keep it, and your choices",
         paragraphs: [
             `${p.dataAfterCancel}`,
-            "You can ask us for a copy of your data, ask us to correct it, or ask us to delete it. Email us and a person will reply.",
+            "You can ask us for a copy of your data, ask us to correct it, or ask us to delete it. Email us.",
         ],
     },
 ];
@@ -250,10 +250,5 @@ export const BILLING: readonly LegalSection[] = [
     {
         title: "How paying for Saroh works",
         paragraphs: [PAID_PLANS],
-        links: [{ name: "See the plans", href: "/pricing" }],
-    },
-    {
-        title: "Leaving",
-        paragraphs: ["You can leave at any time.", `${p.dataAfterCancel}`],
     },
 ];

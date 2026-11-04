@@ -9,8 +9,6 @@ import { useEffect, useRef, useState } from "react";
 
 import type { NavMenus } from "@/lib/nav";
 
-import { HeaderStart } from "./header-start";
-
 /** The sheet, fetched on the first tap of Menu. */
 const PhoneSheet = dynamic(
     () => import("@saroh/marketing/phone-sheet").then((m) => m.PhoneSheet),
@@ -66,7 +64,14 @@ export function PhoneMenu({
                 className,
             )}
         >
-            <HeaderStart href={start} className="px-4 max-[399px]:px-3.5" />
+            <ButtonLink
+                size="sm"
+                href={start}
+                data-cta="start-free"
+                className="px-4 max-[399px]:px-3.5"
+            >
+                Start free
+            </ButtonLink>
             <button
                 ref={button}
                 type="button"

@@ -31,8 +31,9 @@ The closest examples to copy: `trades/photographer.ts`,
   country file with a source, or stays `confirm: true`.
 - Write tips and FAQs a person in that trade or country would actually miss on
   the page next to it. If only the trade's name changes, don't write the page.
-- No prices, plan amounts or limits of Saroh's own. "0% fees" and "free plan, no
-  card" are fine. This repo is public.
+- Nothing about Saroh itself: no prices or limits (this repo is public), and no
+  product claim. A page's closing band is one per document, in
+  `lib/templates/pages.ts`, and `scripts/check-claims.mjs` reads the built pages.
 
 ## Add a combo for a trade
 
@@ -49,7 +50,6 @@ The closest examples to copy: `trades/photographer.ts`,
         lede: "One or two sentences under the H1.",
         tips: [/* exactly 3: { title, text } */],
         faqs: [/* 3 to 5: { question, answer } */],
-        band: { title: "The closing band.", line: "One line under it." },
         // Optional. Left out, they come from the trade, then the document:
         // items, payment, fields, example: { number: "Q-0101", ... }
     };
@@ -58,7 +58,7 @@ The closest examples to copy: `trades/photographer.ts`,
 3. Import it in `combos/index.ts` and add it to `COMBOS`.
 4. Run the check (below).
 
-`lede`, `tips`, `faqs` and `band` together must reach **250 words on their own**.
+`lede`, `tips` and `faqs` together must reach **250 words on their own**.
 The trade's items and payment terms are shared with its other documents, so they
 stop counting the moment a second document for that trade exists. A vitest test
 holds every combo to this.

@@ -91,8 +91,4 @@ export const quoteEventPlanner: Combo = {
             answer: "Separate your planning fee, which is earned as work is done, from each supplier's cancellation terms. Suggest the client asks about event insurance. Set out what stays payable at each date before the event.",
         },
     ],
-    band: {
-        title: "One fee. A clear scope. No small favours.",
-        line: "Send the quote, take the booking stage through your own payment link and start planning. 0% fees.",
-    },
 };

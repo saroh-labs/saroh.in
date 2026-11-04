@@ -115,8 +115,4 @@ export const receiptWebDeveloper: Combo = {
             answer: "It can, in one line with a date. That helps at the end of a build, when logins and code change hands. Keep the full handover details somewhere safer, and never print a password or login on a receipt.",
         },
     ],
-    band: {
-        title: "Every renewal on record.",
-        line: "Saroh keeps a client's milestone and care plan receipts in one place, and sends each when the payment lands.",
-    },
 };

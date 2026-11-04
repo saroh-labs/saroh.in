@@ -55,8 +55,4 @@ export const estimateAustralia: Combo = {
             answer: "None of the government pages we read sets a period, so you choose. Base it on how quickly your costs change, and print the exact end date so an old figure can't return.",
         },
     ],
-    band: {
-        title: "From a likely cost to a tax invoice.",
-        line: "Send an Australian estimate from Saroh, then turn it into a tax invoice with the same lines when the client agrees.",
-    },
 };

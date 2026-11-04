@@ -12,10 +12,9 @@ const page = pageOf("/compare");
 export const metadata = pageMetadata(page);
 
 const RULES = [
-    "Facts about other tools come from their public pages, with a link and the date we checked.",
-    "Every page says where the other tool may be the better pick.",
+    "These pages say what Saroh does today, and what it doesn't.",
+    "A fact about another tool goes here only with a link to its own public page and the date we checked. None has been checked yet, so none is stated.",
     "No made-up quotes or ratings, and none of their logos.",
-    "We recheck every 3 months.",
 ];
 
 export default function Page() {
@@ -31,8 +30,8 @@ export default function Page() {
                     {page.h1}
                 </h1>
                 <p className="m-0 text-[17px] leading-[1.55] text-body md:text-[19px]">
-                    Honest comparisons of Saroh and other invoice apps: fees,
-                    client pages, and where the other tool may suit you better.
+                    What Saroh does today and what it doesn&apos;t, to set
+                    beside the invoice app you use now.
                 </p>
             </div>
 
@@ -46,7 +45,7 @@ export default function Page() {
                             key={slug}
                             href={`/compare/${slug}-alternative`}
                             title={`${name} alternative`}
-                            line={`An honest look at Saroh and ${name}.`}
+                            line={`What Saroh does today, to set beside ${name}.`}
                         />
                     ))}
                 </div>
@@ -65,7 +64,7 @@ export default function Page() {
 
             <CtaBand
                 title="Try it with your next invoice."
-                line="Free plan, no card. Import your clients by CSV."
+                line="Free plan, no card. Import your customers by CSV."
                 action="Start free"
                 href={signupHref("compare")}
                 from="start-free-band"

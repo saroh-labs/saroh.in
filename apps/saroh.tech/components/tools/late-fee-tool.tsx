@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 
 import { buttonClass } from "@/components/shared/button";
 import { Field } from "@/components/shared/field";
@@ -70,11 +69,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
     const line = flat
         ? `Late fee (flat, invoice ${r.charged} days overdue): ${money(r.fee)}`
         : `Late fee: ${rate}% a ${d.type === "month" ? "month" : "year"} on ${money(amount)} for ${r.charged} days: ${money(r.fee)}`;
-    const handoff = useMemo(
-        () => ({ tool: TOOL, kind: "late-fee", draft: d }),
-        [d],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(TOOL);
     return (
         <div className="grid items-start gap-7 lg:grid-cols-2">
             <Section title="The invoice">
@@ -183,11 +178,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                         </Link>
                     </div>
                 </section>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
                 <p className="m-0 rounded-card border border-line bg-surface p-4 text-[15px] leading-normal">
                     <b>Before you charge it</b>
                     <br />
@@ -202,7 +193,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={TOOL}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

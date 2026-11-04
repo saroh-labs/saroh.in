@@ -323,7 +323,7 @@ export const PAGES: SitePage[] = [
     ),
     legal(
         "billing",
-        "Billing and cancelling",
+        "Billing",
         "How paying for Saroh works, what happens to your customers' money, and how to leave.",
     ),
     {
@@ -353,7 +353,7 @@ export const PAGES: SitePage[] = [
         "invoice-generator",
         "Invoice generator",
         "Free invoice generator: no sign-up, no watermark | Saroh",
-        "Make an invoice in your browser and download a clean PDF. No sign-up, no watermark. Any currency, your own tax lines.",
+        "Make an invoice in your browser and download a clean PDF. No sign-up, no watermark. Nine currencies, your own tax lines.",
         "Free invoice generator",
     ),
     tool(
@@ -443,7 +443,7 @@ export const PAGES: SitePage[] = [
             "/compare",
             "compare",
             "Compare Saroh with other invoice apps | Saroh",
-            "Honest comparisons of Saroh and other invoice apps: prices, fees and client pages.",
+            "What Saroh does today, to set beside the invoice app you use now.",
             "Compare Saroh",
             "Compare",
         ),
@@ -452,8 +452,8 @@ export const PAGES: SitePage[] = [
     ...ALTERNATIVES.map(([slug, name]) => ({
         path: `/compare/${slug}-alternative`,
         type: "alternative" as const,
-        title: `${name} alternative with no payment fees | Saroh`,
-        description: `An honest look at Saroh and ${name}: prices, fees, client pages and where ${name} is still the better pick.`,
+        title: `${name} alternative | Saroh`,
+        description: `What Saroh does today and what it doesn't, to set beside ${name}.`,
         h1: `Looking for ${/^[aeiou]/i.test(name) ? "an" : "a"} ${name} alternative?`,
         crumb: under("Compare", "/compare", `${name} alternative`),
         ...CONTENT_BUILT,

@@ -64,8 +64,4 @@ export const creditNoteSingapore: Combo = {
             answer: "IRAS allows for this, but you then need other evidence showing you accounted for GST on the original sale. Keep whatever links the two together, such as the order and the payment record.",
         },
     ],
-    band: {
-        title: "Put a Singapore bill right.",
-        line: "Issue a credit note in Saroh and it stays attached to the tax invoice and the client, so your numbers still add up.",
-    },
 };

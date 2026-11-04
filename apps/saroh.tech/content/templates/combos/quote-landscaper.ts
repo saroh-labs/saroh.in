@@ -51,8 +51,4 @@ export const quoteLandscaper: Combo = {
             answer: "Work out the volume from depth and area, then show it in tonnes as a line. Say that any extra needed once levels are set gets charged at the same per-tonne rate, already agreed here.",
         },
     ],
-    band: {
-        title: "Measured, named, agreed.",
-        line: "Send the quote with its photos of the stone, and take the payment for materials through your own link. 0% fees.",
-    },
 };

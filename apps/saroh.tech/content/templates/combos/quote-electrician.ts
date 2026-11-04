@@ -51,8 +51,4 @@ export const quoteElectrician: Combo = {
             answer: "Choose a date you can honestly hold, considering how often copper cable and board prices shift at your wholesaler. Print the expiry clearly, and re-price anything accepted after it instead of absorbing the difference yourself.",
         },
     ],
-    band: {
-        title: "Every point, priced.",
-        line: "Send the quote from site, collect the first payment through your own link and book in the first fix. 0% fees.",
-    },
 };

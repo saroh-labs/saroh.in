@@ -53,8 +53,4 @@ export const creditNoteUs: Combo = {
             answer: "Keep it beside the invoice it changes, for as long as you keep that invoice. The IRS gives 3 years as its general period, longer in some cases, so count from your return and not the memo.",
         },
     ],
-    band: {
-        title: "Correct a US bill without the mess.",
-        line: "Issue a credit note in Saroh and it stays attached to the invoice and the client, with the tax already worked out.",
-    },
 };

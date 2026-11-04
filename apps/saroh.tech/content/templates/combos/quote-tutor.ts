@@ -53,8 +53,4 @@ export const quoteTutor: Combo = {
             answer: "Send each one their own, with their child's name, the group size and the per-student price. Add the minimum number needed for the group to run, so a late drop-out doesn't leave you teaching at a loss.",
         },
     ],
-    band: {
-        title: "Slot held, term booked.",
-        line: "Send the course offer, and collect the first payment through your own link. 0% fees.",
-    },
 };

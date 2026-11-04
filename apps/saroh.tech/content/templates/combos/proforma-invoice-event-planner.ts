@@ -104,8 +104,4 @@ export const proformaInvoiceEventPlanner: Combo = {
             answer: "Show the number you've assumed and the rate per delegate, so someone can scale it. Add a date when the final count is due, and say the real invoice uses that count.",
         },
     ],
-    band: {
-        title: "Approved in time to hold the hall.",
-        line: "Send the proforma, then bill each stage on a true invoice from the same details. 0% fees.",
-    },
 };

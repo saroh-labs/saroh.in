@@ -3,6 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
+import {
+    MOMENT_INVOICE,
+    MOMENT_LATE_FEE,
+    MOMENT_QUOTE,
+    MOMENT_RECEIPT,
+    MOMENT_REMINDER,
+    MOMENT_TAX,
+} from "../content/tools";
+
 import { checkSite, findClaims, visibleText } from "./check-claims.mjs";
 
 describe("what saroh.tech may not say", () => {
@@ -56,14 +65,30 @@ describe("what saroh.tech may not say", () => {
         expect(findClaims("/changelog", "Stripe: Not available yet")).toEqual(
             [],
         );
+        expect(findClaims("/tools/quote-maker", "Send a quote")).toEqual([]);
         expect(
-            findClaims("/tools/quote-maker", "Send a quote in any currency"),
-        ).toEqual([]);
+            findClaims("/tools/quote-maker", "in any currency"),
+        ).toHaveLength(1);
+    });
+
+    it("holds the sign-up moments too, which no built page shows until a download", () => {
+        for (const copy of [
+            MOMENT_INVOICE,
+            MOMENT_QUOTE,
+            MOMENT_RECEIPT,
+            MOMENT_REMINDER,
+            MOMENT_LATE_FEE,
+            MOMENT_TAX,
+        ]) {
+            expect(findClaims("/", JSON.stringify(copy))).toEqual([]);
+        }
     });
 
     it("reads what a visitor reads", () => {
         const html =
             '<aside hidden data-region-bar>GST and UPI</aside><script>"pay link"</script><p>A &amp; B</p>';
+        const described = '<meta name="description" content="0% fees"/>';
+        expect(findClaims("/", visibleText(described))).toHaveLength(1);
         expect(visibleText(html).trim()).toBe("A & B");
     });
 

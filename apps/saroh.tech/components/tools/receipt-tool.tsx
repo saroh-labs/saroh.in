@@ -56,11 +56,7 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
         set(applyReceiptCarry(decodeDraft(hash.slice("#carry=".length))));
     }, [set]);
     const view = useMemo(() => receiptView(d, from), [d, from]);
-    const handoff = useMemo(
-        () => ({ tool: TOOL, kind: "receipt", draft: d, from }),
-        [d, from],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(TOOL);
     const { busy, problem, download } = useDownload(
         view,
         TOOL,
@@ -194,15 +190,11 @@ export function ReceiptTool({ copy }: { copy: MomentCopy }) {
                         {busy ? "Making…" : "Download PDF"}
                     </Button>
                 </div>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
             </aside>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={TOOL}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

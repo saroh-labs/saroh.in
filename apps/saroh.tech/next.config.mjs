@@ -16,7 +16,7 @@ export default {
     poweredByHeader: false,
     pageExtensions: dev ? ["dev.tsx", "tsx", "ts"] : ["tsx", "ts"],
     transpilePackages: ["@saroh/ui", "@saroh/marketing"],
-    // A tool's "Save it in Saroh" is built in the browser, and its address
-    // follows the deploy (`site.config.ts`). Only ever set on a deploy.
+    // A tool's sign-up link is built in the browser, and its address follows
+    // the deploy (`site.config.ts`). Only ever set on a deploy.
     ...(globalDevDomain && { env: { GLOBAL_DEV_DOMAIN: globalDevDomain } }),
 };
