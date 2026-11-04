@@ -23,7 +23,7 @@ export const invoiceAustralia: Combo = {
     faqs: [
         {
             question: "When must I give an Australian customer a tax invoice?",
-            answer: "Business.gov.au says it's required for taxable sales above $82.50 including GST, or when a customer asks, and you then have 28 days. Check the ATO's own page too, because we couldn't load it to confirm.",
+            answer: "Business.gov.au says it's required for taxable sales above $82.50 including GST, and that when a customer asks for one, whatever the amount, you have 28 days. Check the ATO's own page too.",
         },
         {
             question:

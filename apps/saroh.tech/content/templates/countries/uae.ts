@@ -60,18 +60,17 @@ export const uae: CountryData = {
         },
         {
             label: "Electronic invoicing",
-            value: "The Ministry of Finance has published e-invoicing guidelines. Check whether they apply to you, and from when.",
-            confirm: true,
+            value: "Businesses with annual revenue of AED 50 million or more implement the system from 1 January 2027, and those below it from 1 July 2027. Check how it applies to you.",
+            source: {
+                name: "Timelines for the Electronic Invoicing System, Ministry of Finance",
+                url: "https://mof.gov.ae/en/news/ministry-of-finance-announces-the-issuance-of-two-ministerial-decisions-on-the-scope-of-obligations-and-the-timelines-for-implementing-the-electronic-invoicing-system-2/",
+            },
+            checkedOn: "2026-11-04",
         },
         {
             label: "Late payment",
-            value: "Set by your contract. The VAT rules we read don't cover charging a client for late payment.",
-            confirm: true,
-        },
-        {
-            label: "Paper size",
-            value: "A4. No FTA page we read sets a paper size.",
-            confirm: true,
+            value: "Set by your contract. Check with a legal adviser before you charge it.",
+            general: true,
         },
     ],
     payment: {

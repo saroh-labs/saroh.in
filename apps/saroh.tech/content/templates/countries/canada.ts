@@ -76,18 +76,13 @@ export const canada: CountryData = {
         },
         {
             label: "Heading",
-            value: "Invoice. The CRA pages we read list what must appear, not a heading.",
-            confirm: true,
+            value: "Usually the word Invoice. The CRA lists what must appear, not a heading. Check with the CRA if you're unsure.",
+            general: true,
         },
         {
             label: "Late payment",
-            value: "Set by your contract and provincial law. The CRA pages we read cover interest you owe the CRA, not interest you charge a client.",
-            confirm: true,
-        },
-        {
-            label: "Paper size",
-            value: "Letter. No CRA page we read sets a paper size.",
-            confirm: true,
+            value: "Set by your contract and provincial law. Check with your province or a legal adviser before you charge it.",
+            general: true,
         },
     ],
     payment: {

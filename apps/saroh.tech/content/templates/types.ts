@@ -130,7 +130,7 @@ export interface TradeData {
     reviewed: boolean;
 }
 
-/** A fact is sourced and dated, or it says on the page that it isn't confirmed. */
+/** A fact is sourced and dated, or it's general advice that says to check. Never a claim of law with no source. */
 export type CountryFact =
     | {
           label: string;
@@ -139,7 +139,7 @@ export type CountryFact =
           /** yyyy-mm-dd; recheck every 6 months. */
           checkedOn: string;
       }
-    | { label: string; value: string; confirm: true };
+    | { label: string; value: string; general: true };
 
 export interface CountryData {
     lede: string;

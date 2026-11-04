@@ -120,10 +120,10 @@ describe("the quality gate", () => {
         expect(audit({ ...good, rates: ["47.33"] })[0]).toMatch(/isn't round/);
     });
 
-    it("wants a source and a date on every country fact", () => {
+    it("lets general advice go unsourced, and wants a link and a date on the rest", () => {
         expect(
-            factProblems({ label: "Rate", value: "20%", confirm: true })[0],
-        ).toMatch(/\[confirm\]/);
+            factProblems({ label: "Terms", value: "Check.", general: true }),
+        ).toEqual([]);
         expect(
             factProblems({
                 label: "Rate",
@@ -167,10 +167,8 @@ describe("the quality gate", () => {
 describe("the real content", () => {
     it("passes the gate on all pages, downloads aside", () => {
         const pages = auditAll(yes);
-        // An unsourced fact stays marked [confirm] until a person sources it: that's the rule, not a failure here.
         for (const r of pages) {
-            const real = r.problems.filter((x) => !/confirm/i.test(x));
-            expect(real, r.path).toEqual([]);
+            expect(r.problems, r.path).toEqual([]);
         }
         // Reads and compares every page: 6s beside a full gate, 2s alone.
     }, 30_000);

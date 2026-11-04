@@ -66,18 +66,17 @@ export const singapore: CountryData = {
         },
         {
             label: "E-invoicing",
-            value: "IRAS has a page on a GST InvoiceNow Requirement. Check whether it applies to you, and from when.",
-            confirm: true,
+            value: "Phased in. New voluntary registrants from 1 April 2026. New compulsory registrants and existing registered businesses from 1 April 2028 to 1 April 2031, by their annual supplies. Check your date with IRAS.",
+            source: {
+                name: "GST InvoiceNow Requirement, IRAS",
+                url: "https://www.iras.gov.sg/taxes/goods-services-tax-(gst)/gst-invoicenow-requirement",
+            },
+            checkedOn: "2026-11-04",
         },
         {
             label: "Late payment",
-            value: "Set by your contract. The IRAS pages we read don't cover charging a client for late payment.",
-            confirm: true,
-        },
-        {
-            label: "Paper size",
-            value: "A4. No IRAS page we read sets a paper size.",
-            confirm: true,
+            value: "Set by your contract. Check with a legal adviser before you charge it.",
+            general: true,
         },
     ],
     payment: {

@@ -275,8 +275,9 @@ export function CountryFacts({
                                             </span>
                                         </>
                                     ) : (
-                                        <span className="rounded-full bg-mk-soon px-2 py-[3px] text-xs font-semibold text-brand-700">
-                                            [confirm]
+                                        <span className={HINT}>
+                                            General advice, not from a
+                                            government page
                                         </span>
                                     )}
                                 </td>

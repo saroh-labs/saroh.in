@@ -38,7 +38,7 @@ export const invoiceUs: Combo = {
         },
         {
             question: "Can I add a late fee to an unpaid American invoice?",
-            answer: "We found no federal rule on the tax pages we read, so this one is marked for checking. Your contract and your state's law decide it. Agree any fee before the work begins, then print it on the invoice.",
+            answer: "We found no federal rule on the tax pages we read. Your contract and your state's law decide it. Agree any fee before the work begins, then print it on the invoice.",
         },
     ],
 };

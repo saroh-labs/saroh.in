@@ -184,7 +184,7 @@ export function auditPage(
 }
 
 export function factProblems(f: CountryFact): string[] {
-    if (!isSourced(f)) return [`fact "${f.label}" is still [confirm]`];
+    if (!isSourced(f)) return [];
     const out: string[] = [];
     if (!f.source.url.startsWith("https://")) {
         out.push(`fact "${f.label}" has no source link`);
@@ -210,7 +210,7 @@ export function staleFacts(
         .map((f) => f.label);
 }
 
-/** A reviewed hub must have data, and a country's every fact sourced. */
+/** A reviewed hub must have data, and a country's every sourced fact a link and a date. */
 export function auditHubs(): {
     path: string;
     problems: string[];

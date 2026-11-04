@@ -84,18 +84,13 @@ export const us: CountryData = {
         },
         {
             label: "Heading and required fields",
-            value: "The word Invoice, with no federal list of fields. None of the IRS pages we read sets a heading or a list.",
-            confirm: true,
+            value: "Usually the word Invoice. We found no federal list of fields, so check with your state tax office what you must show.",
+            general: true,
         },
         {
             label: "Late payment",
-            value: "Set by your contract and state law. None of the federal or state tax pages we read gives a rule.",
-            confirm: true,
-        },
-        {
-            label: "Paper size",
-            value: "US Letter. No tax agency page we read sets a paper size.",
-            confirm: true,
+            value: "Set by your contract and state law. Check with your state or a legal adviser before you charge it.",
+            general: true,
         },
     ],
     payment: {

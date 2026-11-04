@@ -28,7 +28,7 @@ The closest examples to copy: `trades/photographer.ts`,
   what a trade "usually charges". The page already labels them Example.
 - Sample data is invented: `@example.com` emails, made-up businesses.
 - Never invent a law, a rate, a review or a number. A tax or legal fact goes in a
-  country file with a source, or stays `confirm: true`.
+  country file with a source, or is cut or softened to `general: true`.
 - Write tips and FAQs a person in that trade or country would actually miss on
   the page next to it. If only the trade's name changes, don't write the page.
 - Nothing about Saroh itself: no prices or limits (this repo is public), and no
@@ -106,12 +106,12 @@ Each fact is one of these two, and nothing else:
     source: { name: "VAT rates, GOV.UK", url: "https://www.gov.uk/vat-rates" },
     checkedOn: "2026-11-02",
 }
-// You could not check it. The page shows [confirm], and it cannot be reviewed:
-{ label: "Standard VAT rate", value: "20%.", confirm: true }
+// Not a fact of law, and it says who to ask. You could not source a fact? Cut it.
+{ label: "Late payment", value: "Set by your contract. Check with a legal adviser.", general: true }
 ```
 
 Sources are official sites only: HMRC / GOV.UK, the IRS or a state revenue
-office, the CRA, the ATO, the UAE FTA, IRAS. Open the page and read it. Don't
+office, the CRA, the ATO or business.gov.au, the UAE FTA or Ministry of Finance, IRAS. Open the page and read it. Don't
 state a fact from memory. Facts older than 6 months are reported for rechecking.
 
 ## Which tool "Fill it online" opens
