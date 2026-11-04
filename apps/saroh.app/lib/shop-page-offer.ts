@@ -52,12 +52,11 @@ export function shopPageFeeds(
     feeds: readonly (ProductGridFeed | undefined)[] | undefined,
     sold: readonly { slug: string }[],
 ): (ProductGridFeed | undefined)[] | null {
+    const failed = feeds?.some((feed) => feed?.failed === true) ?? false;
     const drawn = new Set<string>();
-    let failed = false;
     sections.forEach((section, i) => {
         const feed = feeds?.[i];
         if (!feed) return;
-        failed ||= feed.failed === true;
         const count =
             (section.content as { count?: number } | null)?.count ??
             PRODUCT_GRID_DEFAULT_COUNT;

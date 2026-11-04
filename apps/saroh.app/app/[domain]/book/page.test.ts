@@ -35,9 +35,9 @@ const OFFERED = [
     },
 ];
 
-const site = vi.hoisted(() => ({
-    resolved: null as unknown,
-    lookup: { ok: true } as unknown,
+const site = vi.hoisted((): { resolved: unknown; lookup: unknown } => ({
+    resolved: null,
+    lookup: { ok: true },
 }));
 
 const LIST_OF_GONE = {
@@ -131,8 +131,15 @@ vi.mock("./actions", () => ({
 }));
 
 const params = Promise.resolve({ domain: "rye.saroh.test" });
-const open = (query = {}) =>
-    BookPage({ params, searchParams: Promise.resolve(query) });
+interface Drawn {
+    type: unknown;
+    props: Record<string, unknown>;
+}
+const open = async (query = {}) =>
+    (await BookPage({
+        params,
+        searchParams: Promise.resolve(query),
+    })) as unknown as Drawn;
 
 function siteWith(sections: unknown[]) {
     site.resolved = {
@@ -154,12 +161,9 @@ function offering(services: unknown[], open_ = true) {
 }
 
 /** The server's answer for the plain address: one element, or a fragment. */
-function drawn(element: { type: unknown; props: Record<string, unknown> }) {
-    const children = element.props.children as
-        { type: unknown; props: Record<string, unknown> }[] | undefined;
-    return Array.isArray(children)
-        ? (children.at(-1) as typeof element)
-        : element;
+function drawn(element: Drawn): Drawn {
+    const children = element.props.children;
+    return Array.isArray(children) ? (children.at(-1) as Drawn) : element;
 }
 
 describe("/book on a site with a published Book page", () => {
