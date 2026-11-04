@@ -680,6 +680,16 @@ describe("the header's account entry", () => {
         expect(router.push).toHaveBeenCalledWith("/account");
     });
 
+    it("the header's Sign in stays on a booking open on the page", async () => {
+        const flow = document.createElement("div");
+        flow.setAttribute("data-booking-step", "when");
+        document.body.append(flow);
+        await signInThrough("header");
+        flow.remove();
+        expect(router.push).not.toHaveBeenCalled();
+        expect(router.refresh).toHaveBeenCalled();
+    });
+
     it("Sign in opens the sheet at once and reads its options behind it (#838)", async () => {
         let land: (options: typeof OPTIONS) => void = () => undefined;
         const loadOptions = vi.fn(

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { bookingOnPage, flowTookSignIn } from "../booking-flow/header-sign-in";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { SignedInCustomer, SignInApi, SignInOptions } from "./api";
@@ -20,6 +21,13 @@ import { SignInSheet } from "./sign-in-sheet";
  * `account` slot (G17) draws it on every page of the site while the
  * account area is switched on. On the account's own sign-in
  * prompt ("page") a sign-in stays on the page that asked for it (UX-052).
+ *
+ * With a booking open on the page (`[data-booking-step]`) the header's Sign
+ * in never leaves it (owner, 4 Nov 2026), since the phone and note are only
+ * in the page's memory. The flow takes the press where it has a sign-in of
+ * its own (`header-sign-in.ts`): Classic's sheet on any step, a look's code
+ * on Your details. A look's earlier steps have none, so this sheet opens,
+ * stays on the step, and the flow adopts the customer on the page's redraw.
  *
  * The sheet's options (the business's phone, whether a challenge is likely)
  * are read when "Sign in" is pressed, not on every page view — but the sheet
@@ -70,6 +78,7 @@ export function AccountEntry({
     }
 
     function openSheet() {
+        if (variant === "header" && flowTookSignIn()) return;
         setOpen(true);
         // Read afresh on every open: whether a challenge is likely changes.
         // Until it lands the sheet goes without the phone line; a challenge
@@ -113,8 +122,10 @@ export function AccountEntry({
                         // The account's own prompt keeps the page that
                         // asked (UX-052): signed out on /account/plan, they
                         // land on their plan. The header's entry opens
-                        // the account.
-                        if (variant !== "page") router.push("/account");
+                        // the account, unless a booking is open here.
+                        if (variant !== "page" && !bookingOnPage()) {
+                            router.push("/account");
+                        }
                         router.refresh();
                     }}
                 />

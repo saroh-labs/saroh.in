@@ -1,7 +1,7 @@
 "use client";
 
 import type { LookId } from "@saroh/block-contract";
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 
 import { SignInSheet } from "../account/sign-in-sheet";
 import { DEFAULT_API_URL } from "../api-url";
@@ -18,6 +18,7 @@ import { FlowOutcome } from "./flow-outcome";
 import { BookingHeader, ClosedCard } from "./flow-parts";
 import type { Phase } from "./flow-state";
 import { NAME_LEFT } from "./flow-words";
+import { useHeaderSignIn } from "./header-sign-in";
 import { LookBookingFlow } from "./look-flow";
 import { visitsOf } from "./model";
 import { PhoneBar, SummaryAside } from "./summary";
@@ -78,6 +79,14 @@ function ClassicBookingFlow(props: BookingFlowProps) {
     const { service } = times;
     const { phase, customer } = s;
     const { waiting, pay } = words;
+    // Opened from the header, the sheet says who they are and books nothing:
+    // they pressed Sign in, not Book.
+    const [fromHeader, setFromHeader] = useState(false);
+    useHeaderSignIn(() => {
+        setFromHeader(true);
+        s.setSheetOpen(true);
+        return true;
+    });
     const services = page.services;
 
     const summary = {
@@ -250,11 +259,18 @@ function ClassicBookingFlow(props: BookingFlowProps) {
 
             <SignInSheet
                 open={s.sheetOpen}
-                onClose={() => s.setSheetOpen(false)}
+                onClose={() => {
+                    s.setSheetOpen(false);
+                    setFromHeader(false);
+                }}
                 options={account.options}
                 api={account.signIn}
-                purpose="book"
-                onSignedIn={(who) => void act.signedIn(who)}
+                purpose={fromHeader ? "sign-in" : "book"}
+                onSignedIn={(who) =>
+                    void (fromHeader
+                        ? act.signedInHere(who)
+                        : act.signedIn(who))
+                }
             />
 
             <TestReleaseStopSheet

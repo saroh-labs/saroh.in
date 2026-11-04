@@ -50,6 +50,8 @@ import { lookField, lookFieldBad, lookLink } from "./look-styles";
 export interface InlineCodeHandle {
     /** The step's button was pressed: send the code, or ask for it. */
     press: () => void;
+    /** Focus the field to fill next, and send nothing (the header's Sign in). */
+    focus: () => void;
 }
 
 /** The words before a code is sent: the same for every address. */
@@ -243,6 +245,7 @@ export function InlineCode({
     }
 
     useImperativeHandle(handle, () => ({
+        focus: () => (codeField.current ?? emailField.current)?.focus(),
         press: () => {
             if (sentTo !== null) {
                 codeField.current?.focus();
