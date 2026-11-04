@@ -11,4 +11,9 @@ export const NOT_AVAILABLE = [
     /saroh sends/,
     /buy now/,
     /cart\b/,
+    // Class and session packs aren't offered on any plan for now (DEC-099).
+    /\b(class|session|lesson) packs?\b/,
+    /\bpacks? of (\d|classes|lessons)/,
+    /\b(her|his|your) pack\b/,
+    /\bcomes? off (each|when)\b/,
 ];

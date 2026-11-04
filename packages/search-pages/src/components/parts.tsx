@@ -47,14 +47,14 @@ export const PRESETS = {
     appointments: {
         big: "booking",
         small: ["deposit", "today", "customer", "bill", "website"],
-        also: ["pack", "clock", "link", "shield", "calendar", "noshow"],
+        also: ["layers", "clock", "link", "shield", "calendar", "noshow"],
         button: "Book",
         kind: "services",
         close: "Set up your site and bookings for free, and move up when you need more.",
     },
     classes: {
         big: "timetable",
-        small: ["pack", "today", "customer", "bill", "website"],
+        small: ["today", "customer", "bill", "website"],
         also: ["list", "video", "clock", "link", "shield", "calendar"],
         button: "Book",
         kind: "services",
@@ -71,7 +71,7 @@ export const PRESETS = {
 } as const;
 
 export type SmallKey =
-    "deposit" | "today" | "customer" | "bill" | "website" | "pack" | "stock";
+    "deposit" | "today" | "customer" | "bill" | "website" | "stock";
 
 /** The shape's small tiles; a page that takes no deposit has no deposit tile. */
 export function smallKeys(p: SearchPageData): SmallKey[] {
@@ -85,7 +85,6 @@ const LABELS: Record<string, string> = {
     today: "Today",
     bill: "Bill",
     website: "Website",
-    pack: "Pack",
     stock: "Stock",
 };
 const CUSTOMER_WORD = {
@@ -739,9 +738,7 @@ function bookingPage(s: Scene): Big {
 
 function classTimetable(s: Scene): Big {
     const t = s.timetable;
-    const pk = s.pack;
-    if (!t || !pk)
-        throw new Error("timetable without scene.timetable and scene.pack");
+    if (!t) throw new Error("timetable without scene.timetable");
     const it = s.items[t.item];
     if (!it) throw new Error("timetable.item is not one of the items");
     const right = (x: Scene["items"][number]) => (
@@ -792,10 +789,10 @@ function classTimetable(s: Scene): Big {
                 ["When", `${s.day}, ${it.time ?? ""}`],
                 ["Teacher", it.teacher ?? ""],
             ]}
-            bigLabel="From your pack"
-            bigValue="1 class"
+            bigLabel="To pay"
+            bigValue={rupee(it.price)}
             button="Book my place"
-            foot={`${pk.left - 1} of ${pk.size} classes left after this. Cancel in time and it goes back.`}
+            foot="Pay when you book, or at the class."
         />
     );
     const phone = (
@@ -814,7 +811,7 @@ function classTimetable(s: Scene): Big {
                 l1={`${s.day.split(" ")[0]} ${it.time ?? ""} · ${it.teacher ?? ""}`}
                 l2={
                     <>
-                        From your pack <span className="vc-b">1 class</span>
+                        To pay <span className="vc-b">{rupee(it.price)}</span>
                     </>
                 }
                 button="Book my place"
@@ -1215,75 +1212,6 @@ function WebsiteList({ p }: { p: SearchPageData }) {
     );
 }
 
-function Dots({
-    size,
-    used,
-    cols,
-    px,
-}: {
-    size: number;
-    used: number;
-    cols: number;
-    px: number;
-}) {
-    return (
-        <div
-            style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 5,
-            }}
-        >
-            {Array.from({ length: size }, (_, k) => (
-                <span
-                    key={k}
-                    style={{
-                        boxSizing: "content-box",
-                        height: px,
-                        borderRadius: 999,
-                        background: k < used ? V("ink") : V("white"),
-                        border: `1px solid ${k < used ? V("ink") : V("line")}`,
-                    }}
-                />
-            ))}
-        </div>
-    );
-}
-
-function PackCard({ s }: { s: Scene }) {
-    const pk = s.pack;
-    if (!pk) return null;
-    return (
-        <>
-            <span className="vc-sm vc-b" style={{ color: V("ink") }}>
-                {pk.size} classes · {rupee(pk.price)}{" "}
-                <span style={{ fontWeight: 400, color: V("muted") }}>
-                    {rupee(pk.price / pk.size)} a class
-                </span>
-            </span>
-            <Dots
-                size={pk.size}
-                used={pk.size - pk.left}
-                cols={pk.size}
-                px={12}
-            />
-            <div
-                className="vc-card vc-row"
-                style={{ padding: "10px 12px", marginTop: 4 }}
-            >
-                <span style={{ fontSize: 13 }}>
-                    <span className="vc-b">{pk.name}</span>
-                    <br />
-                    <span className="vc-sm">
-                        {pk.left} of {pk.size} left
-                    </span>
-                </span>
-                <span className="vc-sp vc-pill vc-paid">Paid</span>
-            </div>
-        </>
-    );
-}
-
 function ProductStock({ s }: { s: Scene }) {
     const st = s.stock;
     if (!st) return null;
@@ -1339,8 +1267,6 @@ export function SmallPicture({ k, p }: { k: SmallKey; p: SearchPageData }) {
             return <GstBill s={s} />;
         case "website":
             return <WebsiteList p={p} />;
-        case "pack":
-            return <PackCard s={s} />;
         case "stock":
             return <ProductStock s={s} />;
     }

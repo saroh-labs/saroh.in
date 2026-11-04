@@ -85,14 +85,13 @@ describe("<SearchPage>", () => {
             screen.getByRole("group", { name: "Jump to" }),
         ).getAllByRole("button");
         expect(labs.map((b) => b.textContent)).toEqual([
-            "Pack",
             "Today",
             "Student",
             "Bill",
             "Website",
         ]);
         expect(labs[0]?.getAttribute("aria-pressed")).toBe("true");
-        const student = labs[2];
+        const student = labs[1];
         if (!student) throw new Error("no third label");
         fireEvent.click(student);
         expect(student.getAttribute("aria-pressed")).toBe("true");
