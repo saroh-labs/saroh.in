@@ -1,8 +1,8 @@
 import { placeholders as p } from "./placeholders";
 
 /**
- * Drafts for a lawyer to read, not in force. Anything we can't yet stand behind
- * is a [confirm] placeholder. What the cookies and privacy pages say about this
+ * Drafts for a lawyer to read, not in force. What only the owner can supply is a
+ * [confirm] placeholder. What the cookies and privacy pages say about this
  * site comes from worker/index.ts, lib/analytics.ts and lib/tools/draft-store.ts.
  */
 export interface LegalSection {
@@ -50,7 +50,7 @@ export const TERMS: readonly LegalSection[] = [
         title: "Your content",
         paragraphs: [
             "What you put in Saroh stays yours. That means your customers, invoices and notes. We use it only to run Saroh for you.",
-            `The owner of a business can export its data. ${p.appSteps}`,
+            "The owner of a business can export its data.",
         ],
     },
     {
@@ -163,8 +163,8 @@ export const COOKIES: readonly LegalSection[] = [
     {
         title: "Cookies from others",
         paragraphs: [
-            `There are no ad tags on saroh.tech. Cloudflare serves this site and may set its own security cookie if it needs to check a visitor. ${p.cloudflareCookie}`,
-            `The Saroh app at app.saroh.tech uses cookies to keep you signed in. ${p.appSteps}`,
+            "There are no ad tags on saroh.tech. Cloudflare serves this site and may set its own security cookie if it needs to check a visitor.",
+            "The Saroh app uses cookies to keep you signed in.",
         ],
     },
     {
@@ -193,13 +193,13 @@ export const PRIVACY: readonly LegalSection[] = [
         title: "What we count on this site",
         paragraphs: [
             "With PostHog, in the EU, we count page views, clicks on a page's main button, and the first time you use a tool. Each comes with the page's address (without anything after a ? or #), the kind of page, and a random ID that lasts one visit. We don't build a profile of you, and nothing you type into a tool is sent.",
-            `Like any web request, this can show PostHog your IP address. ${p.postHogIp}`,
+            "Like any web request, this can show PostHog your IP address.",
         ],
     },
     {
         title: "Serving the site",
         paragraphs: [
-            `Cloudflare serves saroh.tech. It tells our code which country a request comes from, and we use that only to show visitors in India a link to saroh.in. Cloudflare keeps request logs for a short time. ${p.cloudflareLogs}`,
+            `Cloudflare serves saroh.tech. It tells our code which country a request comes from, and we use that only to show visitors in India a link to saroh.in. Cloudflare may keep request logs.`,
         ],
     },
     {
@@ -213,7 +213,6 @@ export const PRIVACY: readonly LegalSection[] = [
         title: "If you sign up for Saroh",
         paragraphs: [
             "We keep your sign-in details, your business details, and what you put in the app: your customers, invoices, payments you record and notes. We use them to run Saroh and to send you emails about your account.",
-            p.appSteps,
         ],
     },
     {

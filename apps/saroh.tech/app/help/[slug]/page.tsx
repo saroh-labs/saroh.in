@@ -7,11 +7,9 @@ import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { ButtonLink } from "@/components/shared/button";
 import { Card } from "@/components/shared/card";
 import { JsonLd } from "@/components/shared/json-ld";
-import { Marked } from "@/components/shared/marked";
 import { RelatedGrid } from "@/components/shared/related-grid";
 import { StepList } from "@/components/shared/step-list";
 import { HELP, helpArticle } from "@/content/help";
-import { placeholders } from "@/content/placeholders";
 import { howToSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -68,11 +66,6 @@ export default async function Page({ params }: Props) {
                         <ButtonLink href={next.href} data-cta="help-next-step">
                             {next.label}
                         </ButtonLink>
-                        {next.inApp ? (
-                            <p className="m-0 text-[13px] leading-normal text-mk-copy">
-                                <Marked text={placeholders.helpDeepLinks} />
-                            </p>
-                        ) : null}
                     </Card>
                     <ContactCard />
                 </aside>

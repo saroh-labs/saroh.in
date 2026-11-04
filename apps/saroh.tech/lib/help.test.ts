@@ -3,9 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { HELP, helpArticle } from "@/content/help";
+import { HELP, HELP_GROUPS, helpArticle } from "@/content/help";
 import { SITE_COOKIES, SITE_STORAGE } from "@/content/legal";
-import { placeholders } from "@/content/placeholders";
 import { site } from "@/site.config";
 
 import { pageOf } from "./site-map";
@@ -38,12 +37,13 @@ describe("help articles", () => {
         }
     });
 
-    it("mark app steps as unchecked while the app isn't built", () => {
-        for (const a of HELP.filter((x) => x.next.inApp)) {
+    it("carry no draft marks, and cover what /help says they do", () => {
+        expect(JSON.stringify(HELP)).not.toContain("[confirm");
+        for (const group of HELP_GROUPS) {
             expect(
-                a.steps.some((s) => s.text.includes(placeholders.appSteps)),
-                a.slug,
-            ).toBe(true);
+                HELP.filter((a) => a.group === group).length,
+                group,
+            ).toBeGreaterThan(0);
         }
     });
 });

@@ -265,12 +265,12 @@ export const PAGES: SitePage[] = [
             "/help",
             "help",
             "Saroh help",
-            "Step by step answers for setting up and using Saroh.",
+            "Step by step help with setting up your business, products, orders, bookings, your website and invoices, and the free tools.",
             "How can we help?",
             "Help",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     },
     ...HELP.map(({ slug, task, minutes }): SitePage => ({
         path: `/help/${slug}`,
@@ -280,7 +280,7 @@ export const PAGES: SitePage[] = [
         h1: task,
         crumb: under("Help", "/help", task),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     })),
     legal(
         "terms",

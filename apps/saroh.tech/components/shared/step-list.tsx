@@ -1,5 +1,3 @@
-import { Marked } from "./marked";
-
 /** Numbered steps as cards: a tool's, a template's or a help article's "how". */
 export function StepList({
     steps,
@@ -20,7 +18,7 @@ export function StepList({
                     </span>
                     <b className="text-[17px]">{s.title}</b>
                     <span className="text-[15px] leading-normal text-mk-copy">
-                        <Marked text={s.text} />
+                        {s.text}
                     </span>
                 </li>
             ))}
