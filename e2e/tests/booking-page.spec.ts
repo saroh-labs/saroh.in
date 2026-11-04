@@ -1,4 +1,4 @@
-// @covers app:/open app:/services api:sites api:capabilities api:bookings api:admin site:/book
+// @covers app:/open app:/services api:sites api:capabilities api:bookings api:admin site:/book pkg:site-blocks
 import type { Browser, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -149,4 +149,40 @@ test("Bookings makes the booking page, and Publish booking page puts it live", a
             { timeout: 20_000 },
         )
         .toBe(200);
+
+    // The page lists what the flow offers, with no republish: its list was
+    // written with the first service, and a site this one made would stay
+    // at that one. In a new address, as a kept page may wait out its minute.
+    const services = `${urls.API_URL}/organizations/${business.id}/services`;
+    const headers = { origin: urls.APP_URL };
+    const made = await page.request.post(services, {
+        headers,
+        data: {
+            name: "Follow-up",
+            durationMinutes: 30,
+            priceCents: 50_000,
+            currency: "INR",
+            timezone: "Asia/Kolkata",
+            showOnBookingPage: true,
+        },
+    });
+    expect(made.ok(), `add a service: ${await made.text()}`).toBe(true);
+    const { id } = (await made.json()) as { id: string };
+    const rules = await page.request.put(`${services}/${id}/rules`, {
+        headers,
+        data: {
+            rules: [1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                dayOfWeek,
+                startMinute: 600,
+                endMinute: 1140,
+            })),
+        },
+    });
+    expect(rules.ok(), `its hours: ${await rules.text()}`).toBe(true);
+    await page.goto(`${bookUrl(business.address)}?since=${stamp(testInfo)}`);
+    for (const name of ["Physio session", "Follow-up"]) {
+        await expect(
+            page.getByRole("link", { name: `Choose a time: ${name}` }),
+        ).toBeVisible();
+    }
 });
