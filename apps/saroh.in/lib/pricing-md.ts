@@ -2,8 +2,9 @@ import type { Catalog } from "@saroh/pricing-catalog";
 
 import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 
-import type { PlanCardView } from "./pricing-model";
-import { NOT_INCLUDED } from "./pricing-model";
+import type { PlanCardView } from "@saroh/marketing/pricing-model";
+import { NOT_INCLUDED } from "@saroh/marketing/pricing-model";
+
 import { pricingPageModel } from "./pricing-view";
 
 /**

@@ -11,16 +11,11 @@
  * names its business as a demo (DEC-075, D14). No amounts in captions: the
  * shot shows the figures, the caption says what it is.
  */
+import type { Shot } from "@saroh/marketing/shot";
+
 import { CAPTURED } from "./shots.captured";
 
-export interface Shot {
-    /** Under /public, e.g. `/shots/v2/s-home.webp`; null until captured. */
-    src: string | null;
-    alt: string;
-    /** Intrinsic size of the captured image; the placeholder uses 16:10. */
-    width: number;
-    height: number;
-}
+export type { Shot };
 
 const pending = (alt: string): Shot => ({
     src: null,

@@ -1,11 +1,9 @@
 import { Fragment } from "react";
 
-import { PRICING_COPY } from "@/content/pricing";
-import type { PlanCardView, UsageView } from "@/lib/pricing-model";
-import { NOT_INCLUDED } from "@/lib/pricing-model";
-
-import { Section } from "@saroh/marketing/section";
+import { Section } from "../sections/section";
 import { PlanTable } from "./plan-table";
+import type { PlanCardView, UsageView } from "./pricing-model";
+import { NOT_INCLUDED } from "./pricing-model";
 
 /**
  * "Usage beyond your plan": the rows a business can add to, by group, one
@@ -16,23 +14,27 @@ import { PlanTable } from "./plan-table";
 export function UsageTable({
     plans,
     usage,
+    title,
+    lead,
 }: {
     plans: PlanCardView[];
     usage: UsageView | null;
+    title: string;
+    lead: string;
 }) {
     if (!usage) return null;
     return (
         <Section
             id="usage"
             titleId="usage-title"
-            title={PRICING_COPY.usageTitle}
-            lead={PRICING_COPY.usageLead}
+            title={title}
+            lead={lead}
             size="sm"
             className="grid scroll-mt-6 gap-[18px] pt-[72px]"
         >
             <PlanTable
                 label="Usage table"
-                caption={PRICING_COPY.usageTitle}
+                caption={title}
                 corner="What you use"
                 plans={plans}
                 rows={usage.rows}

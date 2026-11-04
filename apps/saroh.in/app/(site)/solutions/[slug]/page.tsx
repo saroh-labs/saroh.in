@@ -4,16 +4,10 @@ import { notFound } from "next/navigation";
 import { PricingSection } from "@/components/pricing/pricing-section";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
+import { SolutionChanges } from "@/components/solution/solution-changes";
 import { SolutionHero } from "@/components/solution/solution-hero";
-import { SolutionSegment } from "@/components/solution/solution-segment";
 import { solutionFaq } from "@/content/faq";
-import { features } from "@/content/features";
-import {
-    isSolutionSlug,
-    segmentViews,
-    solutionHref,
-    solutions,
-} from "@/content/solutions";
+import { isSolutionSlug, solutionHref, solutions } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
 import { LAUNCH_MODE } from "@/lib/links";
 import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
@@ -21,9 +15,7 @@ import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
-import { Container } from "@saroh/marketing/container";
 import { Faq } from "@saroh/marketing/faq";
-import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
  * `/solutions/shops`, `/solutions/salons`, `/solutions/gyms`,
@@ -61,7 +53,6 @@ export default async function SolutionPage({ params }: Props) {
     const { slug } = await params;
     if (!isSolutionSlug(slug)) notFound();
     const s = solutions[slug];
-    const segments = segmentViews(s.segments, (f) => features[f].name);
     // Not read before the launch switch opens (DEC-136), as on a feature
     // page: the line under the hero then names no plan's contents.
     const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
@@ -82,32 +73,7 @@ export default async function SolutionPage({ params }: Props) {
             />
             <SolutionHero solution={s} freeLine={freePlanLine(catalog)} />
 
-            <Container as="section" aria-labelledby="changes-title">
-                <SectionHeading
-                    id="changes-title"
-                    eyebrow="What changes"
-                    title={s.changeTitle}
-                    className="pt-[120px]"
-                />
-                {/* With screens, one problem to a row beside its screen.
-                    With none captured for the trade yet, two columns of
-                    words: a row each would be mostly empty. */}
-                <div
-                    className={
-                        segments.some((seg) => seg.shot)
-                            ? "grid gap-24 pt-16"
-                            : "grid gap-x-14 gap-y-16 pt-16 md:grid-cols-2"
-                    }
-                >
-                    {segments.map((seg, i) => (
-                        <SolutionSegment
-                            key={seg.title}
-                            segment={seg}
-                            reverse={i % 2 === 1}
-                        />
-                    ))}
-                </div>
-            </Container>
+            <SolutionChanges solution={s} />
 
             {/* Plans show once the launch switch opens (Gate W). */}
             {LAUNCH_MODE === "open" ? (

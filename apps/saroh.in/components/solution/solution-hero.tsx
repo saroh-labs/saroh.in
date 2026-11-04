@@ -1,7 +1,10 @@
+import { ProductHero } from "@saroh/marketing/product-hero";
+
 import type { Solution } from "@/content/types";
 import { demoHref, demoTrade } from "@/lib/demos";
 
-import { ProductHero } from "../shared/sections/product-hero";
+import { HeroActions } from "../shared/buttons/hero-actions";
+import { shotView } from "../shared/media/shot-view";
 
 /**
  * The top of a solution page, drawn by `ProductHero`: "Solutions / Gyms &
@@ -24,16 +27,22 @@ export function SolutionHero({
             name={solution.name}
             headline={solution.headline}
             sub={solution.sub}
-            actions={{
-                src: `solutions-${solution.slug}-hero`,
-                demo: {
-                    href: demoHref(trade),
-                    page: `solutions-${solution.slug}`,
-                    trade,
-                },
-            }}
+            actions={
+                <HeroActions
+                    src={`solutions-${solution.slug}-hero`}
+                    demo={{
+                        href: demoHref(trade),
+                        page: `solutions-${solution.slug}`,
+                        trade,
+                    }}
+                />
+            }
             freeLine={freeLine}
-            shot={solution.hero}
+            shot={
+                solution.hero
+                    ? shotView(solution.hero.shot, solution.hero.alt)
+                    : undefined
+            }
             note={solution.heroNote}
         />
     );

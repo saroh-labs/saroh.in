@@ -3,9 +3,9 @@
 import type { KeyboardEvent } from "react";
 import { useRef } from "react";
 
-import { cn } from "@saroh/marketing/cn";
-import { ring } from "@saroh/marketing/ring";
-import { nextIndex } from "@saroh/marketing/roving";
+import { cn } from "../cn";
+import { ring } from "../ring";
+import { nextIndex } from "../roving";
 
 /**
  * The Pricing design's Monthly / "Yearly · N months free" switch: a

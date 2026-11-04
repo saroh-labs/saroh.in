@@ -2,7 +2,7 @@
     "name": "@saroh/marketing",
     "version": "0.0.0",
     "private": true,
-    "description": "What every edition's public site draws with: tokens, the Tailwind theme, and the link, button, layout, section and nav primitives. Words, links and switches come in as props.",
+    "description": "What every edition's public site draws with: tokens, the Tailwind theme, the link, button, layout, nav and media primitives, page sections and pricing tables. Words, links, money and switches come in as props.",
     "license": "MIT",
     "sideEffects": [
         "*.css"
@@ -33,7 +33,33 @@
         "./column-heading": "./src/nav/column-heading.tsx",
         "./nav-types": "./src/nav/nav-types.ts",
         "./menu-panel": "./src/nav/menu-panel.tsx",
-        "./phone-sheet": "./src/nav/phone-sheet.tsx"
+        "./phone-sheet": "./src/nav/phone-sheet.tsx",
+        "./sentence-list": "./src/sentence-list.ts",
+        "./breadcrumbs": "./src/nav/breadcrumbs.tsx",
+        "./shot": "./src/media/shot.ts",
+        "./shot-image": "./src/media/shot-image.tsx",
+        "./screenshot-frame": "./src/media/screenshot-frame.tsx",
+        "./cta-band": "./src/sections/cta-band.tsx",
+        "./product-hero": "./src/sections/product-hero.tsx",
+        "./coming-list": "./src/sections/coming-list.tsx",
+        "./home-hero": "./src/sections/home-hero.tsx",
+        "./works-for": "./src/sections/works-for.tsx",
+        "./feature-cards": "./src/sections/feature-cards.tsx",
+        "./solution-cards": "./src/sections/solution-cards.tsx",
+        "./feature-steps": "./src/sections/feature-steps.tsx",
+        "./feature-points": "./src/sections/feature-points.tsx",
+        "./feature-works-with": "./src/sections/feature-works-with.tsx",
+        "./feature-used-by": "./src/sections/feature-used-by.tsx",
+        "./solution-changes": "./src/sections/solution-changes.tsx",
+        "./pricing-model": "./src/pricing/pricing-model.ts",
+        "./pricing-view": "./src/pricing/pricing-view.ts",
+        "./pricing-usage": "./src/pricing/pricing-usage.ts",
+        "./use-pricing-switches": "./src/pricing/use-pricing-switches.ts",
+        "./pricing-cards": "./src/pricing/pricing-cards.tsx",
+        "./pricing-plans": "./src/pricing/pricing-plans.tsx",
+        "./pricing-section": "./src/pricing/pricing-section.tsx",
+        "./pricing-hero": "./src/pricing/pricing-hero.tsx",
+        "./plan-cards": "./src/pricing/plan-cards.tsx"
     },
     "scripts": {
         "lint": "eslint src/",
@@ -41,6 +67,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@saroh/pricing-catalog": "workspace:*",
         "@saroh/ui": "workspace:*",
         "clsx": "^2.1.1",
         "lucide-react": "catalog:",

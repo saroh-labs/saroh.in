@@ -129,14 +129,14 @@ const RULES: Rule[] = [
     {
         name: "a breadcrumb is Breadcrumbs (V2, A4)",
         pattern: /aria-label="Breadcrumbs?"/,
-        home: ["components/shared/nav/breadcrumbs.tsx"],
+        home: [`${MK}/nav/breadcrumbs.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "the Ink closing band is CtaBand (V4, A10)",
         pattern: both("\\brounded-mk-band\\b", "\\bbg-foreground\\b"),
-        home: ["components/shared/sections/cta-band.tsx"],
+        home: [`${MK}/sections/cta-band.tsx`],
         allow: {
             "components/about/about-page.tsx":
                 "step 6 (V4): About's closing band (its 56px title, no body) becomes CtaBand; its सह name band is its own Ink block and stays",
@@ -196,7 +196,7 @@ const RULES: Rule[] = [
     {
         name: "a plan's price is drawn by PlanCards only (A1, the teaser)",
         pattern: /\btext-mk-price\b/,
-        home: ["components/pricing/plan-cards.tsx"],
+        home: [`${MK}/pricing/plan-cards.tsx`],
         allow: {},
         files: SITE,
     },
@@ -206,7 +206,7 @@ const RULES: Rule[] = [
         // The pricing feature (cards, the two tables, the staff preview)
         // and the lib that builds the views; a page elsewhere takes
         // PricingCards.
-        home: ["components/pricing/", "lib/"],
+        home: [`${MK}/pricing/`, "components/pricing/", "lib/"],
         allow: {},
         files: SITE,
     },
@@ -250,7 +250,7 @@ const RULES: Rule[] = [
         pattern: /\bbg-mk-soon\b/,
         home: [`${MK}/links/pill.tsx`],
         allow: {
-            "components/pricing/plan-cards.tsx":
+            [`${MK}/pricing/plan-cards.tsx`]:
                 "keep: the staff preview's changed-part highlight, not a badge",
         },
         files: SITE,
@@ -301,7 +301,7 @@ const RULES: Rule[] = [
     {
         name: '"a, b and c" is sentenceList() (B5)',
         pattern: /\.slice\(0,\s*-1\)\.join\(", "\)/,
-        home: ["lib/format/"],
+        home: [`${MK}/sentence-list.ts`],
         allow: {},
         files: SITE,
     },
@@ -509,7 +509,7 @@ describe("the scan catches a redraw", () => {
 
     it("the piece's own home passes", () => {
         const home: Source = {
-            rel: "components/pricing/plan-cards.tsx",
+            rel: `${MK}/pricing/plan-cards.tsx`,
             code: `<span className="font-display text-mk-price-lg" />`,
         };
         expect(offenders(rule("a plan's price"), [home])).toEqual([]);

@@ -1,28 +1,36 @@
-import type { PlanCardView } from "@/lib/pricing-model";
-import { cn } from "@saroh/marketing/cn";
+import type { ReactNode } from "react";
 
-import { CtaLink } from "../shared/buttons/cta-link";
+import type { ButtonSize, ButtonVariant } from "../buttons/button";
+import { cn } from "../cn";
+import type { PlanCardView } from "./pricing-model";
+
+/** How a card's button looks; the button itself, its label and address are the site's. */
+export interface PlanCtaLook {
+    size: ButtonSize;
+    variant: ButtonVariant;
+    className: string;
+}
+
+export type PlanCta = (plan: PlanCardView, look: PlanCtaLook) => ReactNode;
 
 /**
  * The Pricing design's plan cards: name and tagline, the price with its
  * "a month" and the line under it, the start button, then what the plan
  * includes. The catalogue's highlighted plan is Ink with the Saffron button;
  * the rest are white with an outlined one. Every word comes ready-made from
- * `lib/pricing-view.ts`; the button's label and address from the one CTA
- * builder (KTD-16).
+ * `pricing-view.ts`; the button comes from the site (`cta`).
  */
 export function PlanCards({
     plans,
-    src = "pricing-plans",
+    cta,
 }: {
     plans: PlanCardView[];
-    /** Where a sign-up came from (`?src=`): the pricing page, or a /for/ page. */
-    src?: string;
+    cta: PlanCta;
 }) {
     return (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] items-stretch gap-4">
             {plans.map((p) => (
-                <PlanCard key={p.id} plan={p} src={src} />
+                <PlanCard key={p.id} plan={p} cta={cta} />
             ))}
         </div>
     );
@@ -35,7 +43,7 @@ function Changed() {
     return <span className="sr-only"> (changed)</span>;
 }
 
-function PlanCard({ plan: p, src }: { plan: PlanCardView; src: string }) {
+function PlanCard({ plan: p, cta }: { plan: PlanCardView; cta: PlanCta }) {
     const f = p.featured;
     const muted = f ? "text-mk-on-ink-muted" : "text-muted-foreground";
     const ch = p.changed;
@@ -83,21 +91,15 @@ function PlanCard({ plan: p, src }: { plan: PlanCardView; src: string }) {
                 </span>
                 <span className={cn("text-mk-note", muted)}>{p.sub}</span>
             </div>
-            <CtaLink
-                src={src}
-                plan={p.cta.plan}
-                planName={p.cta.planName}
-                paid={p.cta.paid}
-                trialDays={p.cta.trialDays}
-                cycle={p.cta.cycle}
-                size="md"
-                variant={f ? "saffron" : "secondary"}
-                className={cn(
+            {cta(p, {
+                size: "md",
+                variant: f ? "saffron" : "secondary",
+                className: cn(
                     "focus-visible:outline-brand-500 active:scale-[0.98]",
                     f && "h-12",
                     !f && "hover:bg-background",
-                )}
-            />
+                ),
+            })}
             <ul
                 className={cn(
                     "m-0 mt-1 grid list-none gap-2.5 border-t p-0 pt-4 text-[15px] leading-[1.45]",

@@ -9,7 +9,6 @@ import { OnThisPage } from "@/components/resources/on-this-page";
 import { ResourceShell } from "@/components/resources/resource-shell";
 import { SideNav } from "@/components/resources/side-nav";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     areasWithArticles,
     HELP_PATH,
@@ -28,6 +27,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
 import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
 import { Arrow } from "@saroh/marketing/arrow";
+import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { PageTitle } from "@saroh/marketing/page-title";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 

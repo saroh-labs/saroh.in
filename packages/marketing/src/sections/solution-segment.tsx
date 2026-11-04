@@ -1,18 +1,27 @@
-import { cn } from "@saroh/marketing/cn";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-import { featureHref } from "@/content/features";
-import type { SegmentView } from "@/content/solutions";
+import { cn } from "../cn";
+import { Arrow } from "../links/arrow";
+import { textLinkClasses } from "../links/text-link";
+import { ScreenshotFrame } from "../media/screenshot-frame";
+import type { ShotView } from "../media/shot";
+import { Eyebrow } from "./eyebrow";
 
-import { Arrow } from "@saroh/marketing/arrow";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { textLinkClasses } from "@saroh/marketing/text-link";
-import { ScreenshotFrame } from "../shared/media/screenshot-frame";
+export interface SegmentProps {
+    label: string;
+    pain: string;
+    title: string;
+    body: string;
+    /** "See {feature} →", on the first segment of each area only. */
+    see?: { href: string; label: ReactNode };
+    shot?: ShotView;
+}
 
 /**
  * One "What changes" problem: the area's label, the pain quote with its left
- * rule, the title, the body, "See {feature} →" on the first segment of each
- * area only, and the shot. Every second segment puts the shot on the left.
+ * rule, the title, the body, the link to its feature and the shot. Every
+ * second segment puts the shot on the left.
  *
  * A segment with no shot (a trade with no screen captured yet) is its words
  * alone, at a width that reads: no empty frame, and never another trade's
@@ -22,7 +31,7 @@ export function SolutionSegment({
     segment,
     reverse,
 }: {
-    segment: SegmentView;
+    segment: SegmentProps;
     reverse: boolean;
 }) {
     return (
@@ -50,15 +59,15 @@ export function SolutionSegment({
                 <p className="m-0 text-mk-body text-mk-copy [text-wrap:pretty]">
                     {segment.body}
                 </p>
-                {segment.seeLink ? (
+                {segment.see ? (
                     <Link
-                        href={featureHref(segment.feature)}
+                        href={segment.see.href}
                         className={textLinkClasses({
                             className:
                                 "justify-self-start text-[15px] font-semibold",
                         })}
                     >
-                        See {segment.featureName}
+                        {segment.see.label}
                         <Arrow />
                     </Link>
                 ) : null}
@@ -66,7 +75,6 @@ export function SolutionSegment({
             {segment.shot ? (
                 <ScreenshotFrame
                     shot={segment.shot}
-                    alt={segment.alt}
                     zoomable
                     className="flex-[1.4_1_420px]"
                 />

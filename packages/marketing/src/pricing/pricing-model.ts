@@ -1,14 +1,14 @@
 /**
- * The pricing page's model: the shapes `lib/pricing-view.ts` fills on the
- * server and the page's client part reads. Kept apart from the builder so
- * the browser bundle never carries the catalogue package.
+ * The pricing page's model: the shapes `pricing-view.ts` fills on the server
+ * and the page's client part reads. Kept apart from the builder so the browser
+ * bundle never carries the catalogue package.
  */
 
 export type Cycle = "month" | "year";
 export type ViewKey = `${Cycle}-${"excl" | "incl"}`;
 
-export function viewKey(yearly: boolean, withGst: boolean): ViewKey {
-    return `${yearly ? "year" : "month"}-${withGst ? "incl" : "excl"}`;
+export function viewKey(yearly: boolean, withTax: boolean): ViewKey {
+    return `${yearly ? "year" : "month"}-${withTax ? "incl" : "excl"}`;
 }
 
 export interface PlanCardView {
@@ -20,7 +20,7 @@ export interface PlanCardView {
     price: string;
     /** "a month", "a year"; empty beside the placeholder. */
     per: string;
-    /** "Free for good", "+ GST", "Incl. GST", "About … a month + GST". */
+    /** "Free for good", or what the site says about tax and the yearly sum. */
     sub: string;
     /** What the CTA builder needs (KTD-16). */
     cta: {
@@ -38,7 +38,7 @@ export interface PlanCardView {
     lines: { t: string; soon: boolean }[];
     /**
      * What the staff draft preview marks as changed from live, with "Show
-     * what changed" on (`lib/pricing-marks.ts`); never set on the public page.
+     * what changed" on; never set on the public page.
      */
     changed?: { name: boolean; price: boolean; lines: string[] };
 }
@@ -90,8 +90,55 @@ export interface PricingPageModel {
     placeholder: boolean;
     /** The Monthly/Yearly switch, only when the catalogue offers yearly. */
     yearly: { freeMonths: number } | null;
-    /** The "Show prices with GST" box, and whether it starts ticked. */
-    gst: { toggle: boolean; initial: boolean };
+    /** The site's own tax toggle, if it has one, and whether it starts ticked. */
+    tax: { toggle: boolean; initial: boolean };
     views: Record<ViewKey, PricingView>;
     rows: CompareRow[];
+}
+
+/** Which view a visitor is looking at; `usePricingSwitches` holds it. */
+export interface PricingSwitches {
+    yearly: boolean;
+    setYearly: (v: boolean) => void;
+    withTax: boolean;
+    setWithTax: (v: boolean) => void;
+    view: PricingView;
+}
+
+/**
+ * What a site says about tax, when it adds any: how a sum is taxed and every
+ * word around it. A site with no tax to mention has none, so no toggle.
+ */
+export interface PricingTax {
+    add: (minor: number) => number;
+    /** Under a monthly price. */
+    subExcl: string;
+    subIncl: string;
+    /** After a sum in a sentence, with its leading space. */
+    afterExcl: string;
+    afterIncl: string;
+    /** The sentence the cards' footnote ends with. */
+    footnoteExcl: string;
+    footnoteIncl: string;
+    /** The last note under the usage table. */
+    noteExcl: string;
+    noteIncl: string;
+}
+
+/** What a site brings to the builder: its currency, numbers and tax. */
+export interface PricingSite {
+    money: (minor: number) => string;
+    count: (n: number) => string;
+    tax: PricingTax | null;
+}
+
+/** The page with no catalogue: the plans a site names, and its stand-in words. */
+export interface PricingPlaceholder {
+    plans: readonly { plan: string; name: string; featured: boolean }[];
+    /** Where a figure would be. */
+    price: string;
+    /** Under it. */
+    note: string;
+    /** Where a plan's details would be. */
+    details: string;
 }

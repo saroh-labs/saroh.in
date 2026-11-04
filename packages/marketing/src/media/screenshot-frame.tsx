@@ -1,8 +1,5 @@
-import { cn } from "@saroh/marketing/cn";
-
-import type { ShotKey } from "@/content/shots";
-import { shots } from "@/content/shots";
-
+import { cn } from "../cn";
+import type { ShotView } from "./shot";
 import { ShotImage } from "./shot-image";
 import { ZoomableShot } from "./zoomable-shot";
 
@@ -16,11 +13,10 @@ import { ZoomableShot } from "./zoomable-shot";
  *
  * `zoomable` makes the image a button that opens the lightbox ("Click to
  * enlarge"); focus returns to it when the lightbox closes. Drawn on the
- * server, so the browser gets this one shot, never the whole manifest.
+ * server, so the browser gets this one shot, never the site's whole manifest.
  */
 export function ScreenshotFrame({
     shot,
-    alt,
     variant = "shot",
     zoomable = false,
     priority = false,
@@ -28,9 +24,7 @@ export function ScreenshotFrame({
     sizes = "(min-width: 1280px) 760px, 100vw",
     className,
 }: {
-    shot: ShotKey;
-    /** This place's caption; defaults to the manifest's. */
-    alt?: string;
+    shot: ShotView;
     variant?: "shot" | "hero" | "home";
     zoomable?: boolean;
     priority?: boolean;
@@ -39,8 +33,8 @@ export function ScreenshotFrame({
     sizes?: string;
     className?: string;
 }) {
-    const entry = shots[shot];
-    const text = alt ?? entry.alt;
+    const entry = shot.image;
+    const text = shot.alt ?? entry.alt;
     const image = (
         <ShotImage
             shot={entry}
@@ -52,7 +46,7 @@ export function ScreenshotFrame({
     );
     return (
         <div
-            data-shot={shot}
+            data-shot={shot.id}
             className={cn(
                 "min-w-0 overflow-hidden border border-border bg-card",
                 variant === "shot" && "rounded-xl shadow-mk-shot",

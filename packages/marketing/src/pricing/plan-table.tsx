@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
-import type { PlanCardView } from "@/lib/pricing-model";
-import { cn } from "@saroh/marketing/cn";
-import { eyebrowClasses } from "@saroh/marketing/eyebrow";
-import { ring } from "@saroh/marketing/ring";
+import { cn } from "../cn";
+import { ring } from "../ring";
+import { eyebrowClasses } from "../sections/eyebrow";
+import type { PlanCardView } from "./pricing-model";
 
 interface LineRow {
     kind: "line";

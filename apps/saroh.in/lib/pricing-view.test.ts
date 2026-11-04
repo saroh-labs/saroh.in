@@ -77,7 +77,7 @@ describe("pricingPageModel", () => {
                 c.gst = { show: "incl" };
             }),
         );
-        expect(model.gst).toEqual({ toggle: true, initial: true });
+        expect(model.tax).toEqual({ toggle: true, initial: true });
     });
 
     it("a trial: the card says so and the CTA gets its days", () => {
@@ -157,7 +157,7 @@ describe("placeholderPricingModel", () => {
         const model = placeholderPricingModel();
         expect(model.placeholder).toBe(true);
         expect(model.yearly).toBeNull();
-        expect(model.gst.toggle).toBe(false);
+        expect(model.tax.toggle).toBe(false);
         const { plans } = model.views["month-excl"];
         expect(plans.map((p) => p.name)).toEqual(["Free", "Grow", "Pro"]);
         expect(plans.every((p) => p.price === PRICE_PLACEHOLDER)).toBe(true);

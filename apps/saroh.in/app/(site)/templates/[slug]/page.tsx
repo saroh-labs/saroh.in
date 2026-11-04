@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { TemplateCard } from "@/components/templates/template-card";
 import { TemplateViewer } from "@/components/templates/template-viewer";
@@ -19,6 +18,7 @@ import {
 } from "@/content/templates";
 import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
+import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Container } from "@saroh/marketing/container";
 
 import { pageMetadata, pageTitle } from "@/lib/seo";

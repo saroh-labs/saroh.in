@@ -1,16 +1,14 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import type { ShotRef } from "@/content/types";
-
-import { Container } from "@saroh/marketing/container";
-import { HeroActions } from "../buttons/hero-actions";
+import { Container } from "../layout/container";
 import { ScreenshotFrame } from "../media/screenshot-frame";
+import type { ShotView } from "../media/shot";
 import type { Crumb } from "../nav/breadcrumbs";
 import { Breadcrumbs } from "../nav/breadcrumbs";
 
 /**
  * A feature or solution page's opening (DEC-195, A5): the breadcrumb, the
- * headline, the sub, the hero's buttons (`HeroActions`), the free-plan line,
+ * headline, the sub, the site's buttons (`actions`), the free-plan line,
  * then the page's screenshot, which enlarges on click, and its note. A page
  * with no screen captured yet has neither.
  */
@@ -33,10 +31,10 @@ export function ProductHero({
     sub: string;
     /** The feature template's 16ch headline; a solution's is 17ch. */
     narrow?: boolean;
-    actions: ComponentProps<typeof HeroActions>;
-    /** The free-plan line, from the catalogue (`freePlanLine`). */
+    actions?: ReactNode;
+    /** The free-plan line, from the site's read of its plans. */
     freeLine: string;
-    shot?: ShotRef;
+    shot?: ShotView;
     note?: string;
 }) {
     return (
@@ -54,7 +52,7 @@ export function ProductHero({
                 <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
                     {sub}
                 </p>
-                <HeroActions {...actions} />
+                {actions}
                 <p className="m-0 text-mk-note text-muted-foreground">
                     {freeLine}
                 </p>
@@ -62,8 +60,7 @@ export function ProductHero({
             {shot ? (
                 <Container className="pt-14">
                     <ScreenshotFrame
-                        shot={shot.shot}
-                        alt={shot.alt}
+                        shot={shot}
                         variant="hero"
                         zoomable
                         priority

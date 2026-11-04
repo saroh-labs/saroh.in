@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
@@ -14,6 +13,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
 import { Arrow } from "@saroh/marketing/arrow";
+import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article } from "@saroh/marketing/container";
 import { PageTitle } from "@saroh/marketing/page-title";
 import { textLinkClasses } from "@saroh/marketing/text-link";

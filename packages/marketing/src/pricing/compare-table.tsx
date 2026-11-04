@@ -1,11 +1,9 @@
 import { Fragment } from "react";
 
-import { PRICE_NOTE } from "@/content/types";
-import type { CompareRow, PlanCardView } from "@/lib/pricing-model";
-
-import { Pill } from "@saroh/marketing/pill";
-import { Section } from "@saroh/marketing/section";
+import { Pill } from "../links/pill";
+import { Section } from "../sections/section";
 import { PlanTable } from "./plan-table";
+import type { CompareRow, PlanCardView } from "./pricing-model";
 
 /**
  * "Compare the plans": the catalogue's modules by group in a `PlanTable`,
@@ -16,11 +14,14 @@ export function CompareTable({
     plans,
     rows,
     placeholder,
+    placeholderNote,
 }: {
     plans: PlanCardView[];
     rows: CompareRow[];
     /** No catalogue: every cell says the details are still to come. */
     placeholder: boolean;
+    /** What a screen reader hears for such a cell. */
+    placeholderNote: string;
 }) {
     return (
         <Section
@@ -68,7 +69,9 @@ export function CompareTable({
                                     —
                                 </span>
                                 <span className="sr-only">
-                                    {placeholder ? PRICE_NOTE : "Not included"}
+                                    {placeholder
+                                        ? placeholderNote
+                                        : "Not included"}
                                 </span>
                             </Fragment>
                         )}

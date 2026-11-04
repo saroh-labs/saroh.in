@@ -1593,6 +1593,9 @@ importers:
 
   packages/marketing:
     dependencies:
+      '@saroh/pricing-catalog':
+        specifier: workspace:*
+        version: link:../pricing-catalog
       '@saroh/ui':
         specifier: workspace:*
         version: link:../ui

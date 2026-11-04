@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -17,6 +16,7 @@ import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { Arrow } from "@saroh/marketing/arrow";
+import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article, Container } from "@saroh/marketing/container";
 import { Faq } from "@saroh/marketing/faq";
 import { PageTitle } from "@saroh/marketing/page-title";

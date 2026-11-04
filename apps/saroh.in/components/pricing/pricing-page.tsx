@@ -1,9 +1,9 @@
+import { PricingHero } from "@saroh/marketing/pricing-hero";
+import type { PricingPageModel } from "@saroh/marketing/pricing-model";
+
 import { PRICING_COPY } from "@/content/pricing";
 import { demoHref } from "@/lib/demos";
-import type { PricingPageModel } from "@/lib/pricing-model";
 
-import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { DemoLink } from "../shared/buttons/demo-link";
 import { CtaBand } from "../shared/sections/cta-band";
 import { PricingPlans } from "./pricing-plans";
@@ -15,23 +15,18 @@ import { PricingPlans } from "./pricing-plans";
 export function PricingPage({ model }: { model: PricingPageModel }) {
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-start gap-[18px] pt-[72px]"
-            >
-                <Eyebrow>{PRICING_COPY.eyebrow}</Eyebrow>
-                <h1 className="m-0 max-w-[16ch] font-display text-mk-pricing-hero font-bold [text-wrap:balance]">
-                    {PRICING_COPY.title}
-                </h1>
-                <p className="m-0 max-w-[58ch] text-mk-intro text-mk-copy [text-wrap:pretty]">
-                    {PRICING_COPY.intro}
-                </p>
-                <DemoLink
-                    href={demoHref("salon")}
-                    page="pricing"
-                    trade="salon"
-                />
-            </Container>
+            <PricingHero
+                eyebrow={PRICING_COPY.eyebrow}
+                title={PRICING_COPY.title}
+                intro={PRICING_COPY.intro}
+                actions={
+                    <DemoLink
+                        href={demoHref("salon")}
+                        page="pricing"
+                        trade="salon"
+                    />
+                }
+            />
             <PricingPlans model={model} />
             <CtaBand
                 title={PRICING_COPY.closer}

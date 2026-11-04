@@ -295,27 +295,27 @@
   `check:dupes` reads its `app`, `components` and `lib`. Every phone field
   in accounts is `PhoneInput lockCountry="IN"`.
 
-    | Piece                                     | The one                                                                             | Don't hand-draw                                                               |
-    | ----------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                                 | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
-    | A page's pricing section, plan tables     | `PricingSection`, `PlanTable` (`components/pricing/`)                               | its own title + `PricingCards` block, its own table frame                     |
-    | Focus ring                                | `ring()`, `@saroh/marketing/ring`                                                   | the `focus-visible:outline-…` string                                          |
-    | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `@saroh/marketing/text-link`                          | `text-brand-700 no-underline` or a muted `no-underline` link class            |
-    | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`          | an `aria-label="Breadcrumb"` list                                             |
-    | FAQ                                       | `Faq`, `@saroh/marketing/faq`                                                       | a `<details>` list                                                            |
-    | Ink closing band                          | `CtaBand` (`template`, `note`, `size`), `components/shared/sections/`               | `rounded-mk-band bg-foreground`                                               |
-    | Section H2, page title                    | `Section` / `SectionHeading`, `PageTitle` (`text-mk-page`, `text-mk-article`)       | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
-    | Reading column                            | `Container width="article" \| "list"`                                               | `max-w-[720…900px]`                                                           |
-    | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                          | `uppercase tracking-[0.1em]`                                                  |
-    | Link card                                 | `CardLink`                                                                          | its own hover shadow                                                          |
-    | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                         | `bg-mk-soon` badges                                                           |
-    | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `@saroh/marketing/button`                | an Ink `<button>` with `bg-foreground text-background`                        |
-    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`         | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
-    | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                              | the label typed in a component                                                |
-    | Feature / solution hero, ruled points     | `ProductHero` (`components/shared/sections/`), `@saroh/marketing/point-grid`        | its own crumb–H1–sub–buttons–shot header, a `border-t pt-4` point list        |
-    | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()` | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
-    | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)             | `navigator.clipboard`, `URL.createObjectURL`                                  |
-    | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                               | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
+    | Piece                                     | The one                                                                               | Don't hand-draw                                                               |
+    | ----------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `@saroh/marketing` (each site wraps its button, toggle) | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
+    | A page's pricing section, plan tables     | `PricingSection`, `PlanTable` (`packages/marketing/src/pricing/`)                     | its own title + `PricingCards` block, its own table frame                     |
+    | Focus ring                                | `ring()`, `@saroh/marketing/ring`                                                     | the `focus-visible:outline-…` string                                          |
+    | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `@saroh/marketing/text-link`                            | `text-brand-700 no-underline` or a muted `no-underline` link class            |
+    | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `@saroh/marketing/breadcrumbs`                     | an `aria-label="Breadcrumb"` list                                             |
+    | FAQ                                       | `Faq`, `@saroh/marketing/faq`                                                         | a `<details>` list                                                            |
+    | Ink closing band                          | `CtaBand` (`components/shared/sections/`, over `@saroh/marketing/cta-band`)           | `rounded-mk-band bg-foreground`                                               |
+    | Section H2, page title                    | `Section` / `SectionHeading`, `PageTitle` (`text-mk-page`, `text-mk-article`)         | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
+    | Reading column                            | `Container width="article" \| "list"`                                                 | `max-w-[720…900px]`                                                           |
+    | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                            | `uppercase tracking-[0.1em]`                                                  |
+    | Link card                                 | `CardLink`                                                                            | its own hover shadow                                                          |
+    | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                           | `bg-mk-soon` badges                                                           |
+    | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `@saroh/marketing/button`                  | an Ink `<button>` with `bg-foreground text-background`                        |
+    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`           | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
+    | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                                | the label typed in a component                                                |
+    | Feature / solution hero, ruled points     | `ProductHero`, `PointGrid`: `@saroh/marketing/product-hero`, `/point-grid`            | its own crumb–H1–sub–buttons–shot header, a `border-t pt-4` point list        |
+    | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()`   | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
+    | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)               | `navigator.clipboard`, `URL.createObjectURL`                                  |
+    | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                                 | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,

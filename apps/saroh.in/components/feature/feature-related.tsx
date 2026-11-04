@@ -1,19 +1,15 @@
+import { FeaturePoints as Points } from "@saroh/marketing/feature-points";
+import { FeatureUsedBy as UsedBy } from "@saroh/marketing/feature-used-by";
+import { FeatureWorksWith as WorksWith } from "@saroh/marketing/feature-works-with";
+
 import { featureHref, features } from "@/content/features";
 import { solutions } from "@/content/solutions";
 import type { Feature } from "@/content/types";
 import type { LaunchMode } from "@/lib/links";
 import { solutionLink } from "@/lib/search-pages";
 
-import { CardLink } from "@saroh/marketing/card-link";
-import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { PillLink } from "@saroh/marketing/pill";
-import { PointGrid } from "@saroh/marketing/point-grid";
-import { SectionHeading } from "@saroh/marketing/section-heading";
-
 /**
- * "What it does": the page's points, each under a hairline, as many columns
- * as fit at 280px. A point's `openNote` (what a plan has to do with it) is
+ * "What it does". A point's `openNote` (what a plan has to do with it) is
  * added only once the launch switch is open (DEC-136).
  */
 export function FeaturePoints({
@@ -24,74 +20,40 @@ export function FeaturePoints({
     mode: LaunchMode;
 }) {
     return (
-        <Container
-            as="section"
-            aria-labelledby="what-it-does"
-            className="grid gap-9 pt-[130px]"
-        >
-            <SectionHeading id="what-it-does" title="What it does" size="md" />
-            <PointGrid
-                points={feature.points.map((point) => ({
-                    title: point.title,
-                    body:
-                        mode === "open" && point.openNote
-                            ? `${point.body} ${point.openNote}`
-                            : point.body,
-                }))}
-            />
-        </Container>
+        <Points
+            points={feature.points.map((point) => ({
+                title: point.title,
+                body:
+                    mode === "open" && point.openNote
+                        ? `${point.body} ${point.openNote}`
+                        : point.body,
+            }))}
+        />
     );
 }
 
-/**
- * "Works with": the page's lead, then a card for each feature it works with
- * (its name, its short line, "See {name} →"), four across on a desk.
- */
+/** "Works with": a card for each feature it works with. */
 export function FeatureWorksWith({ feature }: { feature: Feature }) {
     return (
-        <Container
-            as="section"
-            aria-labelledby="works-with"
-            className="grid gap-7 pt-[130px]"
-        >
-            <div className="grid gap-2">
-                <SectionHeading id="works-with" title="Works with" size="md" />
-                <p className="m-0 text-[16.5px] text-mk-copy [text-wrap:pretty]">
-                    {feature.worksLead}
-                </p>
-            </div>
-            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,max(220px,calc((100%_-_48px)/4))),1fr))]">
-                {feature.worksWith.map((slug) => (
-                    <CardLink
-                        key={slug}
-                        href={featureHref(slug)}
-                        title={features[slug].name}
-                        body={features[slug].cardLine}
-                    />
-                ))}
-            </div>
-        </Container>
+        <WorksWith
+            lead={feature.worksLead}
+            items={feature.worksWith.map((slug) => ({
+                href: featureHref(slug),
+                title: features[slug].name,
+                body: features[slug].cardLine,
+            }))}
+        />
     );
 }
 
 /** "Used by": a chip for each solution page the feature serves. */
 export function FeatureUsedBy({ feature }: { feature: Feature }) {
     return (
-        <Container
-            as="section"
-            aria-labelledby="used-by"
-            className="grid gap-4 pt-[130px]"
-        >
-            <Eyebrow id="used-by" role="heading" aria-level={2}>
-                Used by
-            </Eyebrow>
-            <div className="flex flex-wrap gap-3">
-                {feature.usedBy.map((slug) => (
-                    <PillLink key={slug} href={solutionLink(slug)} size="lg">
-                        {solutions[slug].longName}
-                    </PillLink>
-                ))}
-            </div>
-        </Container>
+        <UsedBy
+            items={feature.usedBy.map((slug) => ({
+                href: solutionLink(slug),
+                name: solutions[slug].longName,
+            }))}
+        />
     );
 }
