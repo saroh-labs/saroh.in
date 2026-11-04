@@ -155,8 +155,8 @@ describe("a module route with nothing to show (kept out of search)", () => {
         expect(routeHasNothing({ draw: "builtin" }, false)).toBe(false);
     });
 
-    it("is never a published module page: that is the merchant's own", () => {
-        expect(routeHasNothing({ draw: "page" }, true)).toBe(false);
+    it("follows the read for a published module page too", () => {
+        expect(routeHasNothing({ draw: "page" }, true)).toBe(true);
         expect(routeHasNothing({ draw: "page" }, false)).toBe(false);
     });
 

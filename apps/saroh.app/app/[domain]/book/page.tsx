@@ -19,10 +19,12 @@ import { PublishedPage } from "@/components/published-page";
 import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn, getBooking, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
+import { bookPageOffer } from "@/lib/book-page-offer";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import {
+    bookRoute,
     findModulePage,
     isBookingDeepLink,
     moduleLabel,
@@ -30,7 +32,10 @@ import {
     NOT_FOR_SEARCH,
     routeHasNothing,
 } from "@/lib/module-pages";
-import { dontCachePage } from "@/lib/page-cache/site-rules";
+import {
+    dontCachePage,
+    showsServicesOffered,
+} from "@/lib/page-cache/site-rules";
 import { getSiteForHost, siteOriginFor } from "@/lib/publication";
 import { serviceJsonLdScript } from "@/lib/service-json-ld";
 import { getSignInOptions } from "@/lib/sign-in";
@@ -106,6 +111,14 @@ import {
  * page's address says "This isn't available right now" with a link home.
  * A site with no Book page gets today's flow, unchanged.
  *
+ * **It offers what the flow offers** (`lib/book-page-offer.ts`): its list is
+ * drawn from this page's own read, not the ids its snapshot froze, so a new
+ * service shows with no republish and the list can't come up empty while
+ * the flow has services. With nothing to offer, or a read that failed, the
+ * route draws the flow, which says so with how to reach the business
+ * (`bookRoute`). No service write revalidates a kept page, so `/book` is kept
+ * a minute at most.
+ *
  * A booking page with nothing to book (the module is off, the read failed,
  * online booking isn't open or offers no service) is kept out of search: it
  * answers 200, and "not available" is not a page to rank. One paused at its
@@ -135,14 +148,9 @@ export async function generateMetadata({
         business: name,
         services: booking?.ok ? booking.page.services.map((s) => s.name) : [],
     });
-    const route = moduleRoute(
-        resolved.snapshot.pages,
-        resolved.modules,
-        "BOOK",
-    );
     return shareable(resolved, {
         ...(routeHasNothing(
-            route,
+            moduleRoute(resolved.snapshot.pages, resolved.modules, "BOOK"),
             !booking?.ok ||
                 !booking.page.open ||
                 booking.page.services.length === 0,
@@ -204,11 +212,15 @@ export default async function BookPage({
 
     // The Book page (G15): its sections on a plain /book, or its address
     // taken off while Appointments is off. Deep links go on to the flow.
-    const route = moduleRoute(
-        resolved.snapshot.pages,
-        resolved.modules,
-        "BOOK",
-        isBookingDeepLink({ service, date, start, step, staff, ref }),
+    showsServicesOffered();
+    const route = bookRoute(
+        moduleRoute(
+            resolved.snapshot.pages,
+            resolved.modules,
+            "BOOK",
+            isBookingDeepLink({ service, date, start, step, staff, ref }),
+        ),
+        await getBookingPage(resolved.siteId),
     );
     if (route.draw === "unavailable") {
         return (
@@ -219,11 +231,18 @@ export default async function BookPage({
         );
     }
     if (route.draw === "page") {
+        const lookup = await getBookingPage(resolved.siteId);
+        const { sections, serviceLists } = bookPageOffer(
+            route.page.sections,
+            lookup.ok ? lookup.page.services : [],
+            lookOf(resolved.snapshot.site.look),
+        );
         return (
             <PublishedPage
-                page={route.page}
+                page={{ ...route.page, sections }}
                 snapshot={resolved.snapshot}
                 siteId={resolved.siteId}
+                serviceLists={serviceLists}
             />
         );
     }

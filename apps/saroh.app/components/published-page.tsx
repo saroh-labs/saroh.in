@@ -3,6 +3,8 @@ import type {
     PacksFeed,
     PlansFeed,
     PricesActions,
+    ProductGridFeed,
+    ServicesFeed,
     SignInOptions,
 } from "@saroh/site-blocks";
 import { modulePageTopOf, PageSections, reachOf } from "@saroh/site-blocks";
@@ -47,20 +49,27 @@ export async function PublishedPage({
     page,
     snapshot,
     siteId,
+    serviceLists,
+    productGrids: givenGrids,
 }: {
     page: PublicationPage;
     snapshot: PublicationSnapshot;
     siteId: string | null;
+    /** Each services list's services, by section index: a Book page's. */
+    serviceLists?: readonly (ServicesFeed | undefined)[];
+    /** The Product grids' feeds, when the route read them (a Shop page). */
+    productGrids?: readonly (ProductGridFeed | undefined)[];
 }) {
     const [journal, plans, packs, productGrids] = await Promise.all([
         getJournalFeed(page.sections, snapshot, siteId),
         getPlansFeed(page.sections, snapshot, siteId),
         getPacksFeed(page.sections, snapshot, siteId),
-        getProductGridFeeds(
-            page.sections,
-            siteId,
-            page.kind === "SHOP" || page.path === "/shop",
-        ),
+        givenGrids ??
+            getProductGridFeeds(
+                page.sections,
+                siteId,
+                page.kind === "SHOP" || page.path === "/shop",
+            ),
     ]);
     const [prices, thread, contact, frontDoor] = await Promise.all([
         pricesActions(snapshot.site.name, plans, packs),
@@ -96,6 +105,7 @@ export async function PublishedPage({
             prices={prices}
             thread={thread}
             productGrids={productGrids}
+            serviceLists={serviceLists}
             reach={reachOf(contact)}
             // For a closing band whose content gives no heading.
             siteName={snapshot.site.name}

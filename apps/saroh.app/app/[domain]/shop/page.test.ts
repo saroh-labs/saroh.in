@@ -143,10 +143,10 @@ describe("a shop with nothing to show is kept out of search", () => {
         expect(metadata?.robots).toEqual(NOT_FOR_SEARCH);
     });
 
-    it("leaves a published Shop page to be indexed whatever the catalogue says", async () => {
+    it("follows the catalogue for a published Shop page too", async () => {
         site.draw = "page";
         site.lookup = { ok: false, reason: "unavailable" };
         const metadata = await generateMetadata({ params });
-        expect(metadata?.robots).toBeUndefined();
+        expect(metadata?.robots).toEqual({ index: false, follow: true });
     });
 });
