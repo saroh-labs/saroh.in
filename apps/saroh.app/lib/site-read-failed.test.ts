@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/env", () => ({
@@ -12,7 +13,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/page-cache/site-rules", () => ({ dontCachePage: vi.fn() }));
 // One request, as the server's `cache` gives one: its value is shared.
 vi.mock("react", async (original) => ({
-    ...(await original<typeof import("react")>()),
+    ...(await original<typeof React>()),
     cache: (make: () => unknown) => {
         let made: unknown;
         const memo = () => (made ??= make());

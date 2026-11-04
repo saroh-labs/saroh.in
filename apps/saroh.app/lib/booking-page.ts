@@ -139,7 +139,7 @@ export function getTimetableClasses(
         return Promise.resolve([]);
     }
     return Promise.all(
-        sections.map((s) =>
+        sections.map(async (s) =>
             s.type === "timetable"
                 ? classesOnTimetable(
                       siteId,

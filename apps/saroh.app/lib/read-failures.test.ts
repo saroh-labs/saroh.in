@@ -245,7 +245,7 @@ describe("a new reader of the public API", () => {
         }).flatMap((entry) => {
             const file = path.join(dir, entry.name);
             if (entry.isDirectory()) return sources(file);
-            return /\.tsx?$/.test(entry.name) && !/\.test\./.test(entry.name)
+            return /\.tsx?$/.test(entry.name) && !entry.name.includes(".test.")
                 ? [file]
                 : [];
         });
