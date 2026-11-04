@@ -1,188 +1,122 @@
-import Link from "next/link";
+import { CardLink } from "@saroh/marketing/card-link";
+import { CtaBand } from "@saroh/marketing/cta-band";
+import { Faq } from "@saroh/marketing/faq";
+import { FeatureCards } from "@saroh/marketing/feature-cards";
+import { HomeHero } from "@saroh/marketing/home-hero";
+import { Section } from "@saroh/marketing/section";
+import { SolutionCards } from "@saroh/marketing/solution-cards";
+import { TextLink } from "@saroh/marketing/text-link";
+import { WorksFor } from "@saroh/marketing/works-for";
 
-import { ButtonLink } from "@/components/shared/button";
-import { Card, LinkCard } from "@/components/shared/card";
-import { CtaBand } from "@/components/shared/cta-band";
-import { FaqList } from "@/components/shared/faq-list";
+import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
-import { TextLink } from "@/components/shared/text-link";
-import { CHANGELOG, changelogPath } from "@/content/changelog";
+import { PricingTeaser } from "@/components/shared/pricing-teaser";
 import { faqItems, HOME_FAQ } from "@/content/faq";
-import { featureList } from "@/content/features";
-import { CTA_BAND, home } from "@/content/home";
-import { pageSchema } from "@/lib/schema";
+import { featureHref, featureList } from "@/content/features";
+import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
+import { shotView } from "@/content/shots";
+import { solutionHref, solutionList } from "@/content/solutions";
+import { ALL_TOOLS } from "@/lib/nav";
+import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
-import { pageAt, pageOf } from "@/lib/site-map";
-import { signupHref } from "@/site.config";
+import { pageOf } from "@/lib/site-map";
 
 const page = pageOf("/");
 
 export const metadata = pageMetadata(page);
 
-const WRAP = "mx-auto w-full max-w-mk-page px-mk-gutter";
-const H2 =
-    "m-0 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.045em] md:text-5xl md:leading-[1.02]";
-const LEAD =
-    "m-0 text-[16.5px] leading-normal text-body md:text-[19px] md:leading-[1.55]";
-
-const FAQS = faqItems(HOME_FAQ).map(({ q, a }) => ({
-    question: q,
-    answer: a,
-}));
-
-// An entry still marked example would make this page hold a placeholder.
-const LATEST = CHANGELOG.filter((e) => !e.example).slice(0, 3);
-
+/**
+ * saroh.in's Home, section for section (`apps/saroh.in/app/(site)/page.tsx`).
+ * The one addition is the free tools, because tools are how people arrive.
+ */
 export default function HomePage() {
+    const faq = faqItems(HOME_FAQ);
     return (
-        <div data-page-type={page.type} className="flex flex-col">
-            <JsonLd data={pageSchema(page)} />
-
-            <section
-                className={`${WRAP} flex flex-col gap-[18px] pt-7 md:gap-6 xl:pt-16`}
+        <div data-page-type={page.type}>
+            <JsonLd
+                data={[
+                    ...pageSchema(page),
+                    faqSchema(
+                        faq.map(({ q, a }) => ({ question: q, answer: a })),
+                    ),
+                ]}
+            />
+            <HomeHero
+                eyebrow={home.eyebrow}
+                headlineLabel={home.headlineLabel}
+                headline={home.headline}
+                sub={home.sub}
+                actions={<HeroActions src="home-hero" />}
+                freeLine={FREE_PLAN_LINE.fallback}
+                chips={home.chips}
+                shot={shotView(home.hero.shot)}
+            />
+            <WorksFor
+                label={home.worksFor}
+                items={solutionList.map((s) => ({
+                    href: solutionHref(s.slug),
+                    name: s.card.name,
+                }))}
+            />
+            <FeatureCards
+                eyebrow={home.featuresEyebrow}
+                title={home.featuresTitle}
+                items={featureList.map((f) => ({
+                    href: featureHref(f.slug),
+                    title: f.name,
+                    body: f.homeBody,
+                }))}
+            />
+            <SolutionCards
+                title={home.solutionsTitle}
+                items={solutionList.map((s) => ({
+                    href: solutionHref(s.slug),
+                    title: s.card.name,
+                    body: s.card.body,
+                    meta: s.card.uses,
+                    action: s.card.link,
+                }))}
+            />
+            <Section
+                id="tools"
+                titleId="tools-title"
+                title={home.toolsTitle}
+                lead={home.toolsLead}
+                className="grid scroll-mt-6 gap-[18px] pt-[110px]"
             >
-                <span className="text-[13px] font-semibold text-quiet md:text-sm md:tracking-[.02em]">
-                    {home.eyebrow}
-                </span>
-                <h1 className="m-0 font-display text-[44px] font-bold leading-none tracking-[-0.05em] md:text-[76px] md:leading-[0.98]">
-                    {page.h1}
-                </h1>
-                <p className={`${LEAD} max-w-[760px]`}>{home.sub}</p>
-                <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-5">
-                    <ButtonLink
-                        href={signupHref(page.type)}
-                        data-cta="start-free-page"
-                    >
-                        Start free
-                    </ButtonLink>
-                    <TextLink
-                        href="/tools/invoice-generator"
-                        className="justify-center"
-                    >
-                        Try the free invoice generator →
-                    </TextLink>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2 text-[13px] text-body md:justify-start md:gap-5 md:text-[14.5px]">
-                    {home.chips.map((chip) => (
-                        <span key={chip}>{chip}</span>
-                    ))}
-                </div>
-            </section>
-
-            <section
-                className={`${WRAP} flex flex-col gap-3.5 pb-4 pt-12 md:gap-9 md:pb-10 md:pt-24`}
-            >
-                <h2 className={H2}>{home.featuresTitle}</h2>
-                <ul className="m-0 grid list-none gap-2.5 p-0 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
-                    {featureList.map((f) => (
-                        <li key={f.slug}>
-                            <Card className="h-full !gap-1.5 !p-[18px] md:!gap-2.5 md:!p-6">
-                                <span className="font-display text-[19px] font-bold tracking-[-0.03em] md:text-[21px]">
-                                    {f.name}
-                                </span>
-                                <p className="m-0 text-[15px] leading-normal text-body md:text-[15.5px]">
-                                    {f.homeBody}
-                                </p>
-                            </Card>
-                        </li>
-                    ))}
-                </ul>
-            </section>
-
-            <section
-                className={`${WRAP} flex flex-col gap-3 pb-4 pt-9 md:gap-7 md:py-14`}
-            >
-                <div className="flex items-end justify-between gap-6">
-                    <div className="flex flex-col gap-3">
-                        <h2 className={H2}>{home.toolsTitle}</h2>
-                        <p className={LEAD}>{home.toolsLead}</p>
-                    </div>
-                    <TextLink
-                        href="/tools"
-                        className="hidden shrink-0 md:inline-flex"
-                    >
-                        All tools →
-                    </TextLink>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-4">
                     {home.tools.map((tool) => (
-                        <LinkCard
+                        <CardLink
                             key={tool.href}
-                            title={tool.title}
-                            line={tool.line}
                             href={tool.href}
-                            className={"desk" in tool ? "hidden md:flex" : ""}
+                            title={tool.title}
+                            body={tool.line}
+                            className={
+                                "desk" in tool ? "hidden md:grid" : undefined
+                            }
                         />
                     ))}
                 </div>
-                <TextLink href="/tools" className="md:hidden">
-                    All tools →
-                </TextLink>
-            </section>
-
-            <section className={`${WRAP} pt-9 md:py-14`}>
-                <Card className="items-start !gap-2.5 !p-[22px] md:!gap-3.5 md:!p-9">
-                    <h2 className={`${H2} !text-[28px] md:!text-[40px]`}>
-                        Free to start.
-                    </h2>
-                    <p className="m-0 text-[15px] leading-normal text-body md:text-[17px]">
-                        {CTA_BAND.note}
-                    </p>
-                    <TextLink href="/pricing">See all plans →</TextLink>
-                </Card>
-            </section>
-
-            <section
-                className={`${WRAP} grid gap-1.5 pt-9 md:py-14 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-14`}
-            >
-                <h2 className={H2}>{home.faqTitle}</h2>
-                <FaqList items={FAQS} />
-            </section>
-
-            {LATEST.length > 0 ? (
-                <section
-                    className={`${WRAP} flex flex-col gap-3 pt-9 md:gap-5 md:pb-14 md:pt-0`}
+                <TextLink
+                    href={ALL_TOOLS.href}
+                    arrow
+                    className="justify-self-start text-[15px] font-semibold"
                 >
-                    <div className="flex items-end justify-between gap-6">
-                        <h2 className={H2}>What&apos;s new</h2>
-                        <TextLink href="/changelog" className="shrink-0">
-                            Changelog →
-                        </TextLink>
-                    </div>
-                    <div className="grid gap-3 md:gap-5 xl:grid-cols-3">
-                        {LATEST.map((e) => (
-                            <Link
-                                key={e.slug}
-                                prefetch={false}
-                                href={
-                                    pageAt(changelogPath(e))
-                                        ? changelogPath(e)
-                                        : "/changelog"
-                                }
-                                className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-[18px] no-underline transition-colors duration-150 hover:border-strong md:p-6"
-                            >
-                                <span className="font-mono text-[13px] text-quiet">
-                                    {e.date}
-                                </span>
-                                <b className="text-[17px]">{e.title}</b>
-                                <span className="text-[15px] leading-normal text-body">
-                                    {e.summary}
-                                </span>
-                            </Link>
-                        ))}
-                    </div>
-                </section>
-            ) : null}
-
-            <div className={`${WRAP} pt-9 md:pt-10`}>
-                <CtaBand
-                    title={home.closer}
-                    line={`${CTA_BAND.body} ${CTA_BAND.note}`}
-                    action="Start free"
-                    href={signupHref(page.type)}
-                    from="start-free-band"
-                />
-            </div>
+                    {ALL_TOOLS.name}
+                </TextLink>
+            </Section>
+            <PricingTeaser
+                id="pricing"
+                title={home.pricingTitle}
+                className="scroll-mt-6 pt-[110px]"
+            />
+            <Faq items={faq} title={home.faqTitle} />
+            <CtaBand
+                title={home.closer}
+                body={CTA_BAND.body}
+                note={CTA_BAND.note}
+                actions={<HeroActions src="home-band" onInk />}
+            />
         </div>
     );
 }

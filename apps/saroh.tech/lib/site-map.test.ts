@@ -1,5 +1,13 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import hreflang from "@saroh/edition/hreflang";
 import { describe, expect, it } from "vitest";
+
+import { featureHref, featureList } from "@/content/features";
+import { home } from "@/content/home";
+import { GLOBAL_SHOTS } from "@/content/shots";
+import { solutionHref, solutionList } from "@/content/solutions";
 
 import { pageSchema } from "./schema";
 import { canonicalOf, pageMetadata } from "./seo";
@@ -47,6 +55,50 @@ describe("the site map", () => {
             for (const ld of pageSchema(p)) {
                 expect(ld["@context"], p.path).toBe("https://schema.org");
                 expect(ld["@type"], p.path).toBeTruthy();
+            }
+        }
+    });
+
+    it("has a page for each feature and solution, unreviewed, with its trail", () => {
+        const product = PAGES.filter(
+            (p) => p.type === "feature" || p.type === "solution",
+        );
+        expect(product.map((p) => p.path)).toEqual([
+            ...featureList.map((f) => featureHref(f.slug)),
+            ...solutionList.map((s) => solutionHref(s.slug)),
+        ]);
+        for (const p of product) {
+            expect(p.title.length, p.path).toBeLessThan(60);
+            expect(p.description.length, p.path).toBeLessThan(155);
+            expect(p.unreviewed, p.path).toBe(true);
+            expect(
+                pageSchema(p).some((ld) => ld["@type"] === "BreadcrumbList"),
+                p.path,
+            ).toBe(true);
+            expect(
+                hreflang.pairs.some((pair) => pair.tech === p.path),
+                p.path,
+            ).toBe(true);
+        }
+    });
+
+    it("keeps the sitemap to its ten pages", () => {
+        expect(indexedPages()).toHaveLength(10);
+    });
+
+    it("every tool card on Home lands on a built page", () => {
+        const paths = new Set(PAGES.map((p) => p.path));
+        for (const tool of home.tools) {
+            expect(paths.has(tool.href), tool.href).toBe(true);
+        }
+    });
+
+    it("every screenshot it may show has its files", () => {
+        const pub = join(__dirname, "../public");
+        for (const shot of Object.values(GLOBAL_SHOTS)) {
+            for (const entry of shot.srcSet?.split(", ") ?? []) {
+                const file = entry.split(" ")[0];
+                expect(existsSync(join(pub, file)), file).toBe(true);
             }
         }
     });

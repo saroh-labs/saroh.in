@@ -8,6 +8,12 @@ import { CHANGELOG, changelogPath } from "@/content/changelog";
 
 import { CONTACT } from "@/content/contact";
 
+import {
+    featureHref,
+    featureList,
+    UPDATED as FEATURES_UPDATED,
+} from "@/content/features";
+
 import { HELP } from "@/content/help";
 
 import { INTEGRATIONS } from "@/content/integrations";
@@ -15,6 +21,12 @@ import { INTEGRATIONS } from "@/content/integrations";
 import { PRICING } from "@/content/pricing";
 
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
+
+import {
+    solutionHref,
+    solutionList,
+    UPDATED as SOLUTIONS_UPDATED,
+} from "@/content/solutions";
 
 /**
  * Every page, as the site map and page-spec boards list them. Title,
@@ -24,6 +36,8 @@ import { home, UPDATED as HOME_UPDATED } from "@/content/home";
  */
 export type PageType =
     | "home"
+    | "feature"
+    | "solution"
     | "pricing"
     | "changelog"
     | "about"
@@ -170,6 +184,26 @@ export const PAGES: SitePage[] = [
         h1: home.headlineLabel,
         updated: HOME_UPDATED,
     },
+    ...featureList.map((f): SitePage => ({
+        path: featureHref(f.slug),
+        type: "feature",
+        title: `${f.seoTitle} | Saroh`,
+        description: f.seoDescription,
+        h1: f.headline,
+        crumb: [{ name: "Features", path: "/#features" }, { name: f.name }],
+        unreviewed: true,
+        updated: FEATURES_UPDATED,
+    })),
+    ...solutionList.map((s): SitePage => ({
+        path: solutionHref(s.slug),
+        type: "solution",
+        title: `${s.seoTitle} | Saroh`,
+        description: s.seoDescription,
+        h1: s.headline,
+        crumb: [{ name: "Solutions", path: "/#solutions" }, { name: s.name }],
+        unreviewed: true,
+        updated: SOLUTIONS_UPDATED,
+    })),
     {
         ...hub(
             "/pricing",

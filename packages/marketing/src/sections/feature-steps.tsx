@@ -13,7 +13,8 @@ import { SectionHeading } from "./section-heading";
  * alternating sides (text left on the first, right on the second…). A step
  * is a numbered Saffron ring (40px inside its 2px line, as drawn), its title, body and the business it is shown
  * at. Below 788px the two halves wrap, text above the shot. A step with no
- * shot is its words at full measure, no empty frame.
+ * shot is its words at a width that reads, no empty frame; with no shot at all,
+ * two columns of words, as a solution page's "What changes" does.
  *
  * Under the steps, a quiet "How to … →" link to each matching Help article
  * that is shown; none before Help opens.
@@ -28,7 +29,7 @@ export function FeatureSteps({
         title: string;
         body: string;
         /** The demo business it is shown at, e.g. "Rye & Co. (demo bakery)". */
-        who: string;
+        who?: string;
         shot?: ShotView;
     }[];
     help?: readonly { href: string; label: string }[];
@@ -43,16 +44,30 @@ export function FeatureSteps({
                     title={title}
                 />
             </Container>
-            <Container as="ol" className="grid list-none gap-[88px] pt-14">
+            <Container
+                as="ol"
+                className={cn(
+                    "grid list-none pt-14",
+                    steps.some((step) => step.shot)
+                        ? "gap-[88px]"
+                        : "gap-x-14 gap-y-16 md:grid-cols-2",
+                )}
+            >
                 {steps.map((step, i) => (
                     <li
                         key={step.title}
                         className={cn(
-                            "flex flex-wrap items-center gap-12",
-                            i % 2 === 1 && "flex-row-reverse",
+                            "flex flex-wrap gap-12",
+                            step.shot ? "items-center" : "items-start",
+                            step.shot && i % 2 === 1 && "flex-row-reverse",
                         )}
                     >
-                        <div className="grid flex-[1_1_320px] content-center gap-3">
+                        <div
+                            className={cn(
+                                "grid content-center gap-3",
+                                step.shot ? "flex-[1_1_320px]" : "max-w-[68ch]",
+                            )}
+                        >
                             <span
                                 aria-hidden
                                 className="grid size-11 place-items-center rounded-full border-2 border-brand-500 font-display text-[17px] font-bold text-brand-700"
@@ -66,9 +81,11 @@ export function FeatureSteps({
                             <p className="m-0 text-mk-body text-mk-copy [text-wrap:pretty]">
                                 {step.body}
                             </p>
-                            <span className="text-mk-note text-muted-foreground">
-                                {step.who}
-                            </span>
+                            {step.who ? (
+                                <span className="text-mk-note text-muted-foreground">
+                                    {step.who}
+                                </span>
+                            ) : null}
                         </div>
                         {step.shot ? (
                             <ScreenshotFrame

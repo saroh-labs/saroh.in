@@ -116,6 +116,17 @@ describe("FeatureSteps", () => {
         expect(frames(container)).toHaveLength(1);
     });
 
+    it("no shots: two columns of words, and no business named", () => {
+        const { container } = render(
+            <FeatureSteps
+                title="How"
+                steps={[{ title: "S", body: "B" }, step]}
+            />,
+        );
+        expect(container.querySelector(".md\\:grid-cols-2")).not.toBeNull();
+        expect(screen.getAllByText("Rye")).toHaveLength(1);
+    });
+
     it("draws no help row with no links", () => {
         render(<FeatureSteps title="How" steps={[step]} />);
         expect(screen.queryByRole("link")).toBeNull();

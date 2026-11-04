@@ -22,7 +22,10 @@
             "tech": "/integrations",
             "in": "/integrations"
         },
-        { "tech": "/customers", "in": "/customers" },
+        {
+            "tech": "/customers",
+            "in": "/customers"
+        },
         {
             "tech": "/changelog",
             "in": "/changelog"
@@ -46,6 +49,58 @@
         {
             "tech": "/tools/gst-calculator",
             "in": "/tools/gst-calculator"
+        },
+        {
+            "tech": "/features/dashboard",
+            "in": "/features/dashboard"
+        },
+        {
+            "tech": "/features/products",
+            "in": "/features/products"
+        },
+        {
+            "tech": "/features/orders",
+            "in": "/features/orders"
+        },
+        {
+            "tech": "/features/customers",
+            "in": "/features/customers"
+        },
+        {
+            "tech": "/features/bookings",
+            "in": "/features/bookings"
+        },
+        {
+            "tech": "/features/subscriptions",
+            "in": "/features/subscriptions"
+        },
+        {
+            "tech": "/features/billing",
+            "in": "/features/billing"
+        },
+        {
+            "tech": "/features/website",
+            "in": "/features/website"
+        },
+        {
+            "tech": "/features/insights",
+            "in": "/features/insights"
+        },
+        {
+            "tech": "/solutions/shops",
+            "in": "/solutions/shops"
+        },
+        {
+            "tech": "/solutions/salons",
+            "in": "/solutions/salons"
+        },
+        {
+            "tech": "/solutions/gyms",
+            "in": "/solutions/gyms"
+        },
+        {
+            "tech": "/solutions/clinics",
+            "in": "/solutions/clinics"
         }
     ]
 }
