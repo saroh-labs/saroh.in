@@ -441,7 +441,7 @@ export function sourceLine(read: MoneyRead): string {
 
 /** "How these are counted", on every tab's foot. */
 export const HOW_INSIGHTS_ARE_COUNTED: readonly string[] = [
-    "Money in is money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
+    "Money in is money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each amount is counted once.",
     "A period ends today in your business's time zone, and is compared with as many days just before it.",
     "The weekly bars are seven days at a time, back from today, so a period's bars add up to its money in.",
     "What sells counts what was paid for, and bookings that weren't cancelled.",
