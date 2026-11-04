@@ -221,7 +221,7 @@ export function AttentionCard({
                             size="inline"
                             className="mt-1.5"
                             title="Nothing yet"
-                            description="An allergy, a medical note or an access need goes here, and the team sees it by their name and on their bookings."
+                            description="An allergy, a medical note or an access need goes here, and it shows by their name and on their bookings."
                         />
                     ) : null}
                     {hidden ? (

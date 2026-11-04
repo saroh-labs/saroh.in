@@ -369,7 +369,7 @@ test.describe("needs attention", () => {
         await sheet.getByRole("radio", { name: "Access" }).click();
         // Access isn't sensitive unless someone ticks it.
         await expect(sheet.getByRole("checkbox")).not.toBeChecked();
-        await sheet.getByLabel("Short label for the team").fill("Wheelchair");
+        await sheet.getByLabel("Short label").fill("Wheelchair");
         await sheet
             .getByRole("button", { name: "Add to Needs attention" })
             .click();
@@ -406,7 +406,7 @@ test.describe("needs attention", () => {
             name: "Add to Needs attention",
         });
         await sheet.getByRole("radio", { name: "Access" }).click();
-        await sheet.getByLabel("Short label for the team").fill("Wheelchair");
+        await sheet.getByLabel("Short label").fill("Wheelchair");
         // The Server Action's POST never reaches the server.
         await page.route(`**/contacts/${contact}**`, (route) =>
             route.request().method() === "POST"
@@ -419,9 +419,7 @@ test.describe("needs attention", () => {
         await expect(sheet.getByRole("alert")).toContainText(
             "Nothing was saved",
         );
-        await expect(sheet.getByLabel("Short label for the team")).toHaveValue(
-            "Wheelchair",
-        );
+        await expect(sheet.getByLabel("Short label")).toHaveValue("Wheelchair");
         await expect(
             sheet.getByRole("radio", { name: "Access" }),
         ).toHaveAttribute("aria-checked", "true");

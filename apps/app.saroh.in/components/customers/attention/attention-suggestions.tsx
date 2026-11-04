@@ -146,8 +146,8 @@ export function AttentionSuggestions({
                     {suggestionsTitle(shown)}
                 </span>
                 <span className="text-pretty text-[12px] text-muted-foreground">
-                    Check it with them, then add it to Needs attention so the
-                    team sees it on every booking.
+                    Check it with them, then add it to Needs attention so it
+                    shows on every booking.
                 </span>
             </div>
             {shown.map((s) => (
@@ -284,7 +284,7 @@ function SuggestionCard({
                             htmlFor={`${id}-label`}
                             className="text-[12px] font-medium"
                         >
-                            Short label for the team
+                            Short label
                         </Label>
                         <Input
                             dense

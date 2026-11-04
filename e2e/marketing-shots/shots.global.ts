@@ -201,7 +201,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "p-detail",
         `/commerce/products/${SHOP}_product_0`,
         "The Sourdough loaf's page at Thistlewick Bakery (demo bakery): what can be sold now, with open orders and the website",
-        // Below the page's head, whose switch reads "Team view" to one person.
+        // Below the page's head, whose switch names the view.
         {
             viewport: { width: 1440, height: 1300 },
             clip: {

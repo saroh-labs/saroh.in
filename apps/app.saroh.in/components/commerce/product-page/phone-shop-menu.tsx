@@ -78,7 +78,7 @@ export function PhoneShopMenu({
                         >
                             {view === "customer" ? <Users /> : <Eye />}
                             {view === "customer"
-                                ? "Team view"
+                                ? "Your view"
                                 : "Customer view"}
                         </Link>
                     </DropdownMenuItem>

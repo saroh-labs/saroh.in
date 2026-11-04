@@ -367,7 +367,7 @@ export const SUGGESTION_KINDS: AttentionKind[] = [
     "ACCESS",
 ];
 
-/** The card's "Short label for the team" is kept short, as in the design. */
+/** The card's "Short label" is kept short, as in the design. */
 export const SUGGESTION_LABEL_MAX = 40;
 
 /**
