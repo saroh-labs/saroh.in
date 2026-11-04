@@ -6406,3 +6406,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: a zero asks `useStartingCurrency()`, the shell's `Organization.currency` or rupees; the public booking page sends `currency` too. `components/shared/money-icon.tsx` is the one money icon.
 **Rule**: money with no currency of its own is in the business's, never a literal. Use `MoneyIcon`, not `IndianRupee` (`frontend-design-system.md`).
 **Category**: currency · editions
+
+---
+
+## Customers wrote an order's time an hour behind Orders
+
+**Symptom**: 4 Nov, a saroh.tech shot had Maya's last order at 9:40 on Customers and 10:40 on Orders.
+**Cause**: Customers used `ViewerDate` (the browser's zone) and Orders `BusinessDate` (DEC-033). The capture's browser had moved on the hour from the zone the seed gave the business, as `morningZone` does, so the two parted. A real owner travelling sees the same split.
+**Fix**: Customers' Last order is a `BusinessDate`, with a test. The capture takes the seed's zone from `SHOTS_ZONE`.
+**Rule**: an order's time is written in the business's zone, on every screen (`BusinessDate`).
+**Category**: dates · screenshots

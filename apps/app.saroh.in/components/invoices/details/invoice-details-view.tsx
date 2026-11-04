@@ -179,7 +179,12 @@ export function InvoiceDetailsView({
                 onRemove={run.removePayment}
                 onBounce={run.bouncePayment}
             />
-            <ConnectedPanel invoice={i} others={details.others} />
+            <ConnectedPanel
+                invoice={i}
+                others={details.others}
+                ordersOn={details.ordersOn}
+                paymentsOn={details.paymentsOn}
+            />
             {i.online ? (
                 <PaymentsToRefund
                     payments={i.online.payments}
@@ -228,7 +233,8 @@ export function InvoiceDetailsView({
                 holdsData
                 className="mb-4 print:hidden"
                 breadcrumb={[
-                    "Payments",
+                    // Invoices sit under Payments only while it is on (DEC-070).
+                    ...(details.paymentsOn ? ["Payments"] : []),
                     <Link key="list" href="/billing/invoices">
                         Invoices
                     </Link>,

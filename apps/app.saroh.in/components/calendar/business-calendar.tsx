@@ -20,6 +20,7 @@ import {
     layersFor,
     mainCurrency,
     monthTitle,
+    readFromWords,
     shiftMonth,
 } from "@/lib/calendar/layers";
 import { calendarCash, moneyByDate, monthEntries } from "@/lib/calendar/money";
@@ -323,8 +324,8 @@ export function BusinessCalendar({
             ) : null}
 
             <p className="!mt-3 text-[12.5px] text-muted-foreground max-[759px]:hidden">
-                Everything here is read from orders, subscriptions, invoices and
-                bookings. Nothing is entered on the calendar itself.
+                {readFromWords(data.layers)} Nothing is entered on the calendar
+                itself.
                 {cash
                     ? " Each day's money is what came in (+) and went out (−) that day."
                     : ""}

@@ -31,6 +31,16 @@ export function SidePanel({
     );
 }
 
+/** What the customer's page holds, naming only the modules this business runs. */
+export function customerLinkSub(ordersOn: boolean, paymentsOn: boolean) {
+    const has = [
+        ...(ordersOn ? ["orders"] : []),
+        ...(paymentsOn ? ["subscriptions"] : []),
+        "all invoices",
+    ];
+    return `Customer: ${new Intl.ListFormat("en-GB").format(has)}`;
+}
+
 interface ConnectedLink {
     label: string;
     sub: string;
@@ -46,8 +56,13 @@ interface ConnectedLink {
 export function ConnectedPanel({
     invoice: i,
     others,
+    ordersOn,
+    paymentsOn,
 }: {
     invoice: Invoice;
+    /** Commerce and Payments are on: what the customer's page has to show. */
+    ordersOn: boolean;
+    paymentsOn: boolean;
     /** The customer's other invoices; null when they could not be read. */
     others: Invoice[] | null;
 }) {
@@ -98,7 +113,7 @@ export function ConnectedPanel({
         who.contactId
             ? {
                   label: who.name,
-                  sub: "Customer: orders, subscriptions and all invoices",
+                  sub: customerLinkSub(ordersOn, paymentsOn),
                   href: customerHref(who.contactId, true),
               }
             : null,

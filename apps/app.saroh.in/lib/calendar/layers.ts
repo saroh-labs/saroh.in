@@ -124,6 +124,16 @@ export const LABELS: Record<
     }),
 };
 
+/** "orders, invoices and bookings": what this calendar reads, of the footnote's four. */
+export function readFromWords(layers: readonly LayerKey[]): string {
+    const named = (
+        ["orders", "subscriptions", "invoices", "bookings"] as const
+    ).filter((k) => layers.includes(k));
+    return named.length
+        ? `Everything here is read from ${new Intl.ListFormat("en-GB").format(named)}.`
+        : "Everything here is read from your records.";
+}
+
 /** The layers switched off, by key. */
 export type Off = Partial<Record<LayerKey, boolean>>;
 

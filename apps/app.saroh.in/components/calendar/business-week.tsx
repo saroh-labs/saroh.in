@@ -15,7 +15,12 @@ import { WeekDay, WeekStrip } from "@/components/calendar/week-strip";
 import { WhatToShow } from "@/components/calendar/what-to-show";
 import { dayOffLine } from "@/lib/calendar/days-off";
 import type { Off } from "@/lib/calendar/layers";
-import { dayCount, layersFor, mainCurrency } from "@/lib/calendar/layers";
+import {
+    dayCount,
+    layersFor,
+    mainCurrency,
+    readFromWords,
+} from "@/lib/calendar/layers";
 import { calendarCash, minorMoney, sumEntries } from "@/lib/calendar/money";
 import type { ProblemCan } from "@/lib/calendar/problems";
 import { calendarRange, dayShortcuts, inRange } from "@/lib/calendar/range";
@@ -356,8 +361,7 @@ export function BusinessWeek({
                 {can.book && takesBookings
                     ? ", or Book to add one on that day"
                     : ""}
-                . Everything here is read from orders, subscriptions, invoices
-                and bookings.
+                . {readFromWords(data.layers)}
                 {cash
                     ? " Each day's money is what came in (+) and went out (−) that day."
                     : ""}
