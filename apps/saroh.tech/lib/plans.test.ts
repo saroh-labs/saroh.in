@@ -101,18 +101,13 @@ const fake = (edit?: (c: CatalogInput) => void) => {
 };
 
 describe("what happens at Free's limits", () => {
-    const cellsOf = (usage: ReturnType<typeof freeUsage>) =>
-        (usage?.rows ?? []).map((r) =>
-            r.kind === "line" ? [r.label, r.cells[0]] : [r.label],
-        );
-
     it("says each capped row's line and its own words at the limit", () => {
-        expect(cellsOf(freeUsage(fake()))).toEqual([
-            ["7 things", "You can't add more products."],
-            [
-                "1 GB of photos and videos",
-                "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
-            ],
+        expect(freeUsage(fake())).toEqual([
+            { label: "7 things", at: "You can't add more products." },
+            {
+                label: "1 GB of photos and videos",
+                at: "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
+            },
         ]);
     });
 

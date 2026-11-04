@@ -56,7 +56,6 @@
         "./pricing-model": "./src/pricing/pricing-model.ts",
         "./pricing-view": "./src/pricing/pricing-view.ts",
         "./pricing-usage": "./src/pricing/pricing-usage.ts",
-        "./usage-table": "./src/pricing/usage-table.tsx",
         "./use-pricing-switches": "./src/pricing/use-pricing-switches.ts",
         "./pricing-cards": "./src/pricing/pricing-cards.tsx",
         "./pricing-plans": "./src/pricing/pricing-plans.tsx",

@@ -2,7 +2,6 @@ import type {
     PlanCardView,
     PricingPageModel,
     PricingView,
-    UsageView,
 } from "@saroh/marketing/pricing-model";
 import { placeholderPricingModel } from "@saroh/marketing/pricing-view";
 import { sentenceList } from "@saroh/marketing/sentence-list";
@@ -125,10 +124,12 @@ export function freeLimitLines(catalog: Catalog): string[] | null {
  * in). The team's row stays out, since these pages speak to one person (DEC-203).
  * Null with no catalogue: the page keeps its footnote.
  */
-export function freeUsage(catalog: Catalog | null): UsageView | null {
+export function freeUsage(
+    catalog: Catalog | null,
+): { label: string; at: string }[] | null {
     const free = catalog && freePlanOf(catalog);
     if (!catalog || !free) return null;
-    const rows = catalog.modules.flatMap((m): UsageView["rows"] => {
+    const rows = catalog.modules.flatMap((m) => {
         if (m.pricing !== "show") return [];
         const cell = cellOf(m, free.id);
         const words = limitWordsFor(m.id);
@@ -143,11 +144,9 @@ export function freeUsage(catalog: Catalog | null): UsageView | null {
         const label =
             cell.card ||
             `${cell.limit.toLocaleString("en-US")} ${countedWhat(words.what, cell.limit)}`;
-        return INDIA_ONLY.test(label)
-            ? []
-            : [{ kind: "line", label, what: "", cells: [words.paused] }];
+        return INDIA_ONLY.test(label) ? [] : [{ label, at: words.paused }];
     });
-    return rows.length ? { rows, notes: [...PRICING.usageNotes] } : null;
+    return rows.length ? rows : null;
 }
 
 /**
