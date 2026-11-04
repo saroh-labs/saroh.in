@@ -44,6 +44,8 @@ import { morningZone } from "./morning-zone";
  */
 
 const PREFIX = "seed_gl_";
+/** Free's `orders` and `bookings` rows in dev's catalogue. */
+const FREE_MONTHLY_CAP = 20;
 const DAY = 86_400_000;
 const money = (cents: number) => (cents / 100).toFixed(2);
 
@@ -138,6 +140,9 @@ export async function seedGlobal(clock: Date = new Date()): Promise<void> {
     console.log(`[global] target: ${target.database} on ${target.host}`);
     const { prisma } = await import("../../client");
     const now = new Date(Math.floor(clock.getTime() / 1_800_000) * 1_800_000);
+    console.log(
+        `[global] zone (SHOTS_ZONE for the capture): ${morningZone(now)}`,
+    );
     const demo = await prisma.user.findUniqueOrThrow({
         where: { email: OWNER_EMAIL },
         select: { id: true },
@@ -637,6 +642,7 @@ async function seedOne(
         orderId?: string;
         visitNumber?: number;
         intakeNote?: string;
+        courseEnrollmentId?: string;
         status?: "CONFIRMED" | "CANCELLED";
         roll: number;
     }) => {
@@ -665,7 +671,10 @@ async function seedOne(
         const madeIn = monthOf(madeAt, biz.zone);
         const made = onlineByMonth.get(madeIn) ?? 0;
         const bookedOnline =
-            !cancelled && b.roll < 0.4 && made < ONLINE_BOOKINGS_A_MONTH;
+            !cancelled &&
+            !b.courseEnrollmentId &&
+            b.roll < 0.4 &&
+            made < ONLINE_BOOKINGS_A_MONTH;
         if (bookedOnline) onlineByMonth.set(madeIn, made + 1);
         bookings.push({
             id: b.id,
@@ -689,6 +698,7 @@ async function seedOne(
             orderId: b.orderId,
             visitNumber: b.visitNumber,
             intakeNote: b.intakeNote,
+            courseEnrollmentId: b.courseEnrollmentId,
             snapshot: {
                 service: {
                     id: sid("service", b.service.key),
@@ -739,6 +749,81 @@ async function seedOne(
         }
         return { outcome, endAt, cancelled };
     };
+
+    // Courses, before the rows that point at them. Each session is a booking,
+    // and with Payments off the enrolment issues no invoice, as the API's does.
+    const enrolments: Prisma.CourseEnrollmentCreateManyInput[] = [];
+    const sessions: Prisma.CourseSessionCreateManyInput[] = [];
+    const courseRows: Prisma.CourseCreateManyInput[] = [];
+    (biz.courses ?? []).forEach((c, ci) => {
+        const service = biz.services.find((s) => s.key === c.service);
+        if (!service) throw new Error(`${biz.name}: no service ${c.service}`);
+        const courseId = sid("course", ci);
+        // The gym is shut on Sundays: the course runs on the Monday instead.
+        const firstDay =
+            c.startsInDays +
+            (weekdayOf(now, biz.zone, c.startsInDays) === 0 ? 1 : 0);
+        const opened = at(firstDay - 21, 600);
+        courseRows.push({
+            id: courseId,
+            organizationId: orgId,
+            serviceId: sid("service", c.service),
+            name: c.name,
+            description: c.description,
+            price: money(c.price),
+            currency: biz.currency,
+            seats: c.seats,
+            status: "OPEN",
+            createdAt: opened,
+            updatedAt: opened,
+        });
+        const starts = Array.from({ length: c.sessions }, (_, k) =>
+            at(firstDay + k * 7, minuteOf(c.at)),
+        );
+        starts.forEach((startAt, si) =>
+            sessions.push({
+                id: sid("coursesession", ci, si),
+                organizationId: orgId,
+                courseId,
+                startAt,
+                endAt: new Date(startAt.getTime() + service.minutes * 60_000),
+                createdAt: opened,
+            }),
+        );
+        for (let e = 0; e < c.enrolled; e++) {
+            const person = people[e];
+            const joined = at(firstDay - 14 + e, 700);
+            const enrollmentId = sid("enrollment", ci, e);
+            enrolments.push({
+                id: enrollmentId,
+                organizationId: orgId,
+                courseId,
+                contactId: person.contactId,
+                status: "ACTIVE",
+                price: money(c.price),
+                currency: biz.currency,
+                createdByUserId: demoUserId,
+                createdAt: joined,
+                updatedAt: joined,
+            });
+            starts.forEach((startAt, si) =>
+                book({
+                    id: sid("coursebooking", ci, e, si),
+                    service,
+                    person,
+                    startAt,
+                    staffKey: biz.staff[0].key,
+                    courseEnrollmentId: enrollmentId,
+                    roll: ((e * 7 + si * 3) % 10) / 13,
+                }),
+            );
+        }
+    });
+    if (courseRows.length) {
+        await prisma.course.createMany({ data: courseRows });
+        await prisma.courseSession.createMany({ data: sessions });
+        await prisma.courseEnrollment.createMany({ data: enrolments });
+    }
 
     // Treatments sold as orders (E9): a root canal part-way through its visits.
     const treatments =
@@ -1890,14 +1975,15 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[]) {
         }
     }
     const scoped = { organizationId: { in: [...orgIds] } };
-    // What a default Free business is: one person, and no Payments or courses.
+    // What a Free business can be: one person, no Payments and no class packs.
+    // Insights and Courses are switches it may turn on (no catalogue row).
     const [members, otherStaff, modules] = await Promise.all([
         prisma.membership.count({ where: scoped }),
         prisma.staffMember.count({ where: { ...scoped, membershipId: null } }),
         prisma.organizationModule.count({
             where: {
                 ...scoped,
-                moduleKey: { in: ["PAYMENTS", "COURSES", "CLASS_PACKS"] },
+                moduleKey: { in: ["PAYMENTS", "CLASS_PACKS"] },
             },
         }),
     ]);
@@ -1905,6 +1991,40 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[]) {
         throw new Error(
             `[global] more than Free: ${members} members, ${otherStaff} staff with no login, ${modules} paid modules`,
         );
+    }
+    // Free's monthly caps, counted in each business's own months.
+    const zones = await prisma.businessProfile.findMany({
+        where: scoped,
+        select: { organizationId: true, timezone: true },
+    });
+    for (const { organizationId, timezone } of zones) {
+        const zone = timezone ?? "UTC";
+        const [orders, online] = await Promise.all([
+            prisma.order.findMany({
+                where: { organizationId },
+                select: { createdAt: true },
+            }),
+            prisma.booking.findMany({
+                where: { organizationId, bookedOnline: true },
+                select: { createdAt: true },
+            }),
+        ]);
+        const worst = (rows: { createdAt: Date }[]) => {
+            const per = new Map<string, number>();
+            for (const r of rows) {
+                const m = monthOf(r.createdAt, zone);
+                per.set(m, (per.get(m) ?? 0) + 1);
+            }
+            return Math.max(0, ...Array.from(per.values()));
+        };
+        if (
+            worst(orders) > FREE_MONTHLY_CAP ||
+            worst(online) > FREE_MONTHLY_CAP
+        ) {
+            throw new Error(
+                `[global] ${organizationId} over Free's ${FREE_MONTHLY_CAP} a month: ${worst(orders)} orders, ${worst(online)} online bookings`,
+            );
+        }
     }
     const rupees = await Promise.all([
         prisma.invoice.count({ where: { ...scoped, currency: "INR" } }),

@@ -105,11 +105,19 @@ function nextMonday(timeZone: string): string {
     return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 }
 
+/**
+ * The zone the seed gave the Global businesses, which the page is read in: its
+ * log says it (`SHOTS_ZONE`). Else today's, which moves on the hour, so a run
+ * crossing one writes screens an hour apart from those in the business's zone.
+ */
+// eslint-disable-next-line turbo/no-undeclared-env-vars -- set by hand for one capture; not a build input
+const zoneOfTheSeed = () => process.env.SHOTS_ZONE ?? morningZone(new Date());
+
 /** The locale and zone a shot's page is read in. */
 function clockOf(shot: Shot): { locale: string; timezoneId: string } {
     const business = shot.business && BUSINESSES[shot.business];
     return business && "locale" in business
-        ? { locale: business.locale, timezoneId: morningZone(new Date()) }
+        ? { locale: business.locale, timezoneId: zoneOfTheSeed() }
         : { locale: "en-IN", timezoneId: "Asia/Kolkata" };
 }
 

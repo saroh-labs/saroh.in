@@ -144,7 +144,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Treatments over several visits",
                 pain: "“A colour correction takes three visits, and I keep count on paper.”",
                 title: "Treatments over several visits",
-                shot: "l-bookings",
+                shot: "d-order",
                 body: "With Sell turned on, a treatment can be three visits of an hour. The client books the first, and you book the rest.",
             },
             {
@@ -228,7 +228,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 label: "Bookings · Classes and courses",
                 pain: "“Tracking who's on which course is a notebook of tally marks.”",
                 title: "Classes and courses",
-                body: "Set how many places a class has. Courses run for several weeks: enrol people and see who's paid.",
+                body: "Set how many places a class has. Courses run for several weeks: enrol people and see who's on each.",
                 shot: "g-courses",
             },
             {

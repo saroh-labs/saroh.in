@@ -5,10 +5,10 @@
  *
  * A person looks at every image: nothing checks pixels for ₹ or GST. A screen
  * that still shows India's details, or a feature a Global business can't use
- * (working subscriptions, online payments, pay links), or one a default Free
- * business doesn't have on (Insights, courses), isn't listed here, and its key
- * stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS. Nothing is hidden
- * from a shot: what's on the page is what a Free business sees.
+ * (working subscriptions, online payments, pay links) isn't listed here, and its
+ * key stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS. Nothing is
+ * hidden from a shot: what's on the page is what a Free business sees, with
+ * Insights (the bakery) and Courses (the gym) turned on, as Free can.
  *
  * Read-only, like every shot: nothing here saves. `alt` is true to the image
  * and names the business as a demo.
@@ -87,10 +87,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "r-invoice",
         `/billing/invoices/${SHOP}_invoice_manual_cedar`,
         "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
-        {
-            viewport: { width: 1440, height: 1100 },
-            clip: { selector: ".invoice-paper", pad: 16 },
-        },
     ),
     shop(
         "r-customers",
@@ -111,7 +107,49 @@ export const GLOBAL_SHOTS: Shot[] = [
         "r-calendar",
         "/calendar",
         "This month on the calendar at Thistlewick Bakery (demo bakery), with each day's money and a strip of totals",
-        { viewport: { width: 1440, height: 845 } },
+    ),
+    shop(
+        "s-insights",
+        "/analytics?tab=money",
+        "Insights at Thistlewick Bakery (demo bakery): money in dollars over the last four weeks, against the four before",
+    ),
+    shop(
+        "i-compare",
+        "/analytics?tab=from",
+        "Four numbers for the site of Thistlewick Bakery (demo bakery): visits, visitors, enquiries, and paid orders and bookings",
+        {
+            viewport: { width: 1440, height: 1100 },
+            clip: {
+                selector:
+                    'main section:has(h2:text-is("Your website")) > div.grid > :first-child',
+                pad: 12,
+            },
+        },
+    ),
+    shop(
+        "i-weeks",
+        "/analytics?tab=from&period=3m",
+        "Three months of visits to the site of Thistlewick Bakery (demo bakery), a bar for each day",
+        {
+            viewport: { width: 1440, height: 1800 },
+            clip: {
+                selector: 'main section:has(h3:text-is("Visits each day"))',
+                pad: 8,
+            },
+        },
+    ),
+    shop(
+        "i-store",
+        "/analytics?tab=from",
+        "The pages people open most on the site of Thistlewick Bakery (demo bakery), with their visits",
+        {
+            viewport: { width: 1440, height: 2000 },
+            clip: {
+                selector:
+                    'main section:has(h3:text-is("Which pages do people open?"))',
+                pad: 16,
+            },
+        },
     ),
     shop(
         "p-products",
@@ -166,10 +204,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "l-invoice",
         `/billing/invoices/${SALON}_invoice_manual_bridal`,
         "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
-        {
-            viewport: { width: 1440, height: 1100 },
-            clip: { selector: ".invoice-paper", pad: 16 },
-        },
     ),
     salon(
         "l-site",
@@ -194,6 +228,11 @@ export const GLOBAL_SHOTS: Shot[] = [
         "site:/book",
         "The booking page of Ironvale Fitness (demo gym), with services, classes and a summary",
         bookingPage("Personal training"),
+    ),
+    gym(
+        "g-courses",
+        "/courses",
+        "Courses at Ironvale Fitness (demo gym): a four-week strength course with the places taken",
     ),
     gym(
         "g-customer",

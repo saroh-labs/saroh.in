@@ -55,6 +55,19 @@ export interface GlobalStaff {
     hours: readonly { days: readonly number[]; from: string; to: string }[];
 }
 
+export interface GlobalCourse {
+    name: string;
+    description: string;
+    service: string;
+    price: number;
+    seats: number;
+    enrolled: number;
+    /** Weekly: first session this many days from today, at this time. */
+    startsInDays: number;
+    at: string;
+    sessions: number;
+}
+
 export interface GlobalVariant {
     title: string;
     sku: string;
@@ -139,6 +152,8 @@ export interface GlobalBusiness {
     taxRate: number | null;
     taxId: string | null;
     modules: readonly string[];
+    /** With Payments off an enrolment issues no invoice, so none is written. */
+    courses?: readonly GlobalCourse[];
     invoiceStyle?: string;
     invoiceColour?: string;
     stores: readonly { key: string; name: string; kind?: "SHOP" | "ONLINE" }[];
@@ -215,7 +230,7 @@ export const THISTLEWICK: GlobalBusiness = {
     taxName: "Sales tax",
     taxRate: 5.5,
     taxId: "00-0000000",
-    modules: ["COMMERCE", "CRM", "WEBSITE"],
+    modules: ["COMMERCE", "CRM", "WEBSITE", "INSIGHTS"],
     invoiceStyle: "CLASSIC",
     stores: [
         { key: "main", name: "Downtown" },
@@ -757,7 +772,7 @@ export const IRONVALE: GlobalBusiness = {
     taxName: null,
     taxRate: null,
     taxId: null,
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE"],
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COURSES"],
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Front desk" }],
     hours: hoursFrom({
@@ -825,6 +840,16 @@ export const IRONVALE: GlobalBusiness = {
             ],
             fill: [5, 13],
         },
+        {
+            key: "foundations",
+            name: "Strength foundations",
+            description: "The four-week course for beginners.",
+            minutes: 75,
+            capacity: 10,
+            price: 0,
+            weight: 0,
+            hidden: true,
+        },
     ],
     staff: [
         {
@@ -832,13 +857,33 @@ export const IRONVALE: GlobalBusiness = {
             name: "Jordan Reyes",
             title: "Owner and coach",
             owner: true,
-            services: ["pt", "assess", "trial", "strength", "yoga"],
+            services: [
+                "pt",
+                "assess",
+                "trial",
+                "strength",
+                "yoga",
+                "foundations",
+            ],
             hours: [
                 { days: [1, 3, 5], from: "09:00", to: "18:30" },
                 { days: [2], from: "06:30", to: "18:30" },
                 { days: [4], from: "06:30", to: "15:00" },
                 { days: [6], from: "08:30", to: "12:00" },
             ],
+        },
+    ],
+    courses: [
+        {
+            name: "Strength foundations, four weeks",
+            description: "Learn the big lifts safely, in a group of ten.",
+            service: "foundations",
+            price: 18000,
+            seats: 10,
+            enrolled: 7,
+            startsInDays: -9,
+            at: "10:00",
+            sessions: 4,
         },
     ],
     categories: [{ key: "gear", name: "Gear" }],

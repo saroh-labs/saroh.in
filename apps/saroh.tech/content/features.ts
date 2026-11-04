@@ -346,7 +346,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Classes and courses with places",
-                body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's paid.",
+                body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's on each.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-courses",
             },

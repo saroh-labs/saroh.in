@@ -38,8 +38,8 @@ export const CAPTURED: Record<
     "r-invoice": {
         src: "/shots/v2/r-invoice.webp",
         alt: "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
-        width: 1456,
-        height: 1254,
+        width: 2880,
+        height: 1800,
     },
     "r-customers": {
         src: "/shots/v2/r-customers.webp",
@@ -63,7 +63,31 @@ export const CAPTURED: Record<
         src: "/shots/v2/r-calendar.webp",
         alt: "This month on the calendar at Thistlewick Bakery (demo bakery), with each day's money and a strip of totals",
         width: 2880,
-        height: 1690,
+        height: 1800,
+    },
+    "s-insights": {
+        src: "/shots/v2/s-insights.webp",
+        alt: "Insights at Thistlewick Bakery (demo bakery): money in dollars over the last four weeks, against the four before",
+        width: 2880,
+        height: 1800,
+    },
+    "i-compare": {
+        src: "/shots/v2/i-compare.webp",
+        alt: "Four numbers for the site of Thistlewick Bakery (demo bakery): visits, visitors, enquiries, and paid orders and bookings",
+        width: 2348,
+        height: 250,
+    },
+    "i-weeks": {
+        src: "/shots/v2/i-weeks.webp",
+        alt: "Three months of visits to the site of Thistlewick Bakery (demo bakery), a bar for each day",
+        width: 2332,
+        height: 762,
+    },
+    "i-store": {
+        src: "/shots/v2/i-store.webp",
+        alt: "The pages people open most on the site of Thistlewick Bakery (demo bakery), with their visits",
+        width: 1198,
+        height: 400,
     },
     "p-products": {
         src: "/shots/v2/p-products.webp",
@@ -122,8 +146,8 @@ export const CAPTURED: Record<
     "l-invoice": {
         src: "/shots/v2/l-invoice.webp",
         alt: "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
-        width: 1456,
-        height: 1220,
+        width: 2880,
+        height: 1800,
     },
     "l-site": {
         src: "/shots/v2/l-site.webp",
@@ -148,6 +172,12 @@ export const CAPTURED: Record<
         alt: "The booking page of Ironvale Fitness (demo gym), with services, classes and a summary",
         width: 2184,
         height: 2012,
+    },
+    "g-courses": {
+        src: "/shots/v2/g-courses.webp",
+        alt: "Courses at Ironvale Fitness (demo gym): a four-week strength course with the places taken",
+        width: 2880,
+        height: 1800,
     },
     "g-customer": {
         src: "/shots/v2/g-customer.webp",
