@@ -11,6 +11,7 @@ import type {
     BookingStart,
 } from "../model";
 import { visitsOf } from "../model";
+import { StillFinding } from "../still-finding";
 import { card, quietFill, textAction } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { OneToOne } from "./one-to-one";
@@ -112,6 +113,7 @@ export function WhenBody({
                     data-times-loading=""
                     className="grid gap-2.5"
                 >
+                    <StillFinding />
                     <div className={cn("h-3.5 w-2/5 rounded-md", quietFill)} />
                     {isClass ? (
                         <div className="grid gap-2">
