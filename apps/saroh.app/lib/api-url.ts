@@ -33,3 +33,15 @@ export function publicApiUrl(): string {
 export function serverApiUrl(): string {
     return env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
 }
+
+/**
+ * How long a page waits on one server read of the API, which is sometimes
+ * reached in 5 to 45 seconds. A read given up on is a failed read: it lands
+ * in that reader's own failure path, and the page says so and isn't kept.
+ */
+export const SERVER_READ_TIMEOUT_MS = 8_000;
+
+/** A fresh signal for one read: a Worker can't share one across requests. */
+export function serverReadSignal(): AbortSignal {
+    return AbortSignal.timeout(SERVER_READ_TIMEOUT_MS);
+}

@@ -6,7 +6,7 @@ import { siteUrlOf } from "@saroh/edition";
 import type { SiteCredit, SiteSeller } from "@saroh/site-blocks";
 import { madeWithSarohHref, sellerLead, soldByLine } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
@@ -146,7 +146,7 @@ export const getFooterFacts = cache(async function footerFactsFor(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/footer`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) throw new Error(`Footer read failed: ${res.status}`);
         return footerFacts(await res.json().catch(() => null));

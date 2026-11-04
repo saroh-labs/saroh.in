@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { PublicContact } from "@saroh/site-blocks";
 import { NO_CONTACT, publicContactOf } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
@@ -46,7 +46,7 @@ export const getSiteContact = cache(async function siteContactFor(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/contact`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) return noContact();
         return (

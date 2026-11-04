@@ -11,7 +11,7 @@ import type { SiteIcon } from "@/lib/site-icon";
 import { siteIconOf } from "@/lib/site-icon";
 import { relayFor, SITE_RELAY_HEADER } from "@/lib/site-relay";
 import { TEST_RELEASE_HEADER } from "@/lib/test-host";
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 
 /**
  * A test release, as its test host shows it (DEC-071, T5).
@@ -118,7 +118,7 @@ export async function fetchTestRelease(
     try {
         res = await fetch(
             `${API_URL}/public/sites/test-release?host=${encodeURIComponent(host)}`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
     } catch {
         return { ok: false, reason: "unavailable", liveUrl: null };

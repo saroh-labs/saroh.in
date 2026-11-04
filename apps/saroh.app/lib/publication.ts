@@ -14,7 +14,7 @@ import { SITE_RELAY_HEADER } from "@/lib/site-relay";
 import type { TestReleaseInfo } from "@/lib/test-release";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -262,7 +262,11 @@ export async function getPublicationBySubdomain(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-subdomain/${encodeURIComponent(subdomain)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         // Network/DNS error — treat as "not renderable" rather than throwing a
@@ -299,7 +303,11 @@ export async function getPublicationByHostname(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return null;
@@ -583,6 +591,7 @@ export async function readPublishedPosts(
         res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
             cache: "no-store",
             headers: { accept: "application/json" },
+            signal: serverReadSignal(),
         });
     } catch {
         dontCachePage("posts unavailable");
@@ -653,7 +662,11 @@ export async function getPublishedPost(
 ): Promise<PublishedPost | null> {
     const res = await fetch(
         `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
-        { cache: "no-store", headers: { accept: "application/json" } },
+        {
+            cache: "no-store",
+            headers: { accept: "application/json" },
+            signal: serverReadSignal(),
+        },
     );
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Post read failed: ${res.status}`);
@@ -753,6 +766,7 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         res = await fetch(`${API_URL}/public/sites/${suffix}`, {
             cache: "no-store",
             headers: { accept: "application/json" },
+            signal: serverReadSignal(),
         });
     } catch {
         return null;
@@ -777,7 +791,11 @@ async function fetchHostnameView(
     try {
         res = await fetch(
             `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return null;
@@ -917,7 +935,7 @@ export async function getMovedTo(
     try {
         const res = await fetch(
             `${API_URL}/public/sites/moved/${encodeURIComponent(address)}`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) return null;
         const body = (await res.json().catch(() => null)) as {

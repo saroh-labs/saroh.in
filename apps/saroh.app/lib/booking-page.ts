@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { BookingPageData, PublicVisit } from "@saroh/site-blocks";
 import { isBookingPage, isPublicVisit } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { dontCachePage } from "./page-cache/site-rules";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
@@ -34,7 +34,11 @@ export const getBookingPage = cache(async function getBookingPage(
     try {
         res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/booking`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return { ok: false, reason: "unavailable" };
@@ -81,7 +85,7 @@ export const getBookingVisit = cache(async function bookingVisit(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/visit`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         // Absent is a business with nothing to show; a failure isn't kept.
         if (res.status === 404) return null;
