@@ -2717,6 +2717,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     10. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
 - Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.
 
+**Free's limits on /pricing (4 Nov, owner).** Paid plans come later, and Free keeps the limits it already has. So until the USD catalogue exists, Free's card on saroh.tech reads Free's own rows from the published catalogue at build (`apps/saroh.tech/lib/plans.ts`), and nothing else in it: no price, no paid plan. With no catalogue at build, the card keeps its general lines and footnote.
+
 ## DEC-204 Two editions from one codebase: one database, the business decides
 
 **Status: Accepted — 2026-11-02** · owner
