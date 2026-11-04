@@ -1,8 +1,10 @@
-// @covers site:/book api:bookings api:site-accounts pkg:site-blocks
+// @covers site:/book api:bookings api:site-accounts api:staff pkg:site-blocks
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { stamp } from "../fixtures/own-data";
+import { northwind, phone, stamp } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
+import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import {
     asNewVisitor,
@@ -231,6 +233,181 @@ test.describe("the booking step in the address", () => {
         ).toHaveCount(1);
         expect(stepOf(page)).toBe("details");
     });
+
+    // @serial: two people of its own on Northwind's diary, which count toward
+    // the business's team (as `booking-change-who.spec.ts`).
+    test(
+        "signing in on a later day stays on details with the time, the person and what was typed, and books them",
+        { tag: "@serial" },
+        async ({ page, browser }, testInfo) => {
+            test.setTimeout(150_000);
+            // The owner's calls in their own context: the page stays a new
+            // visitor to the site.
+            const ownerContext = await browser.newContext({
+                baseURL: urls.APP_URL,
+                ignoreHTTPSErrors,
+            });
+            const ownerPage = await ownerContext.newPage();
+            await useSession(ownerPage, "owner");
+            const nw = northwind(ownerPage.request);
+
+            const email = `later-${stamp(testInfo)}@example.in`;
+            const service = await nw.post<{ id: string }>("/services", {
+                name: `E2E Sign-in ${stamp(testInfo)}`,
+                durationMinutes: 60,
+                priceCents: 0,
+                currency: "INR",
+                timezone: "Asia/Kolkata",
+                locationType: "ONLINE",
+                meetingUrl: "https://meet.example.com/e2e-sign-in",
+                showOnBookingPage: true,
+            });
+            const staffIds: string[] = [];
+            let bookingId: string | null = null;
+            try {
+                const everyDay = [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                    dayOfWeek,
+                    startMinute: 0,
+                    endMinute: 1440,
+                }));
+                await nw.put(`/services/${service.id}/rules`, {
+                    rules: everyDay,
+                });
+                const people = ["Asha", "Meera"].map(
+                    (first) => `${first} ${stamp(testInfo)}`,
+                );
+                for (const name of people) {
+                    const made = await nw.post<{ id: string }>("/staff", {
+                        name,
+                        serviceIds: [service.id],
+                        hours: everyDay,
+                    });
+                    staffIds.push(made.id);
+                }
+                const person = people[1];
+
+                await page.goto(`${NORTHWIND}/book?service=${service.id}`);
+                const withGroup = page.getByRole("radiogroup", {
+                    name: "With",
+                });
+                const chosenPerson = withGroup.getByRole("radio", {
+                    name: person,
+                    checked: true,
+                });
+                await pressUntil(
+                    withGroup.getByRole("radio", { name: person }),
+                    chosenPerson,
+                );
+                await expect(page).toHaveURL(/staff=/);
+                await page
+                    .getByRole("button", { name: "Show later dates" })
+                    .click();
+                const later = page.getByText("Later dates", { exact: true });
+                await expect(later).toBeVisible({ timeout: 15_000 });
+                await page
+                    .getByRole("radio", { name: /times? free/ })
+                    .first()
+                    .click();
+                const time = timeRadios(page).first();
+                await expect(time).toBeVisible({ timeout: 15_000 });
+                const label = (await time.innerText()).trim();
+                await time.click();
+                await expect(page).toHaveURL(/step=details/);
+                const address = new URL(page.url()).searchParams;
+                const startAt = new Date(
+                    `${address.get("date")}T${address.get("start")}:00+05:30`,
+                ).toISOString();
+
+                // The field shows the number without its country code.
+                const typedPhone = phone().replace("+91 ", "");
+                await page.getByLabel("Phone (optional)").fill(typedPhone);
+                await page
+                    .getByLabel("Anything we should know?")
+                    .fill("Side door, please");
+
+                // From here on, signing in must read no days and load no page.
+                const asked: string[] = [];
+                page.on("request", (r) => {
+                    if (
+                        r.resourceType() === "document" ||
+                        /\/public\/services\/[^/]+\/days/.test(r.url())
+                    ) {
+                        asked.push(r.url());
+                    }
+                });
+                await page
+                    .getByRole("button", { name: "Continue to sign in" })
+                    .filter({ visible: true })
+                    .first()
+                    .click();
+                await signInOnSheet(page, email);
+
+                await expect(page.getByLabel("Name")).toBeVisible({
+                    timeout: 15_000,
+                });
+                expect(stepOf(page)).toBe("details");
+                await expect(
+                    page.getByRole("heading", { name: "Your details" }),
+                ).toBeVisible();
+                await expect(later).toBeVisible();
+                await expect(chosenPerson).toBeVisible();
+                await expect(
+                    timeRadios(page).filter({ hasText: label }).first(),
+                ).toHaveAttribute("aria-checked", "true");
+                await expect(page.getByLabel("Phone (optional)")).toHaveValue(
+                    typedPhone,
+                );
+                await expect(
+                    page.getByLabel("Anything we should know?"),
+                ).toHaveValue("Side door, please");
+                expect(asked).toEqual([]);
+
+                await nameThenBook(page, "Asha Rao");
+                await bookUntilOurs(
+                    page,
+                    page.getByRole("heading", { name: /You're booked/ }),
+                );
+
+                // Booked for what was on screen: that time, that person.
+                const from = new Date().toISOString();
+                const to = new Date(Date.now() + 40 * 86_400_000).toISOString();
+                const calendar = await nw.get<{
+                    diaries: {
+                        bookings: {
+                            id: string;
+                            bookerEmail: string | null;
+                            startAt: string;
+                        }[];
+                    }[];
+                }>(`/services/bookings?from=${from}&to=${to}`);
+                const mine = calendar.diaries
+                    .flatMap((d) => d.bookings)
+                    .find((b) => b.bookerEmail === email);
+                expect(mine, "the booking in the team's calendar").toBeTruthy();
+                bookingId = mine?.id ?? null;
+                const read = await nw.get<{ staffId: string | null }>(
+                    `/services/bookings/${bookingId}`,
+                );
+                expect(read.staffId).toBe(staffIds[1]);
+                expect(new Date(mine?.startAt ?? 0).toISOString()).toBe(
+                    startAt,
+                );
+            } finally {
+                if (bookingId) {
+                    const read = await nw.get<{
+                        contact: { id: string } | null;
+                    }>(`/services/bookings/${bookingId}`);
+                    await nw.delete(`/services/bookings/${bookingId}`);
+                    if (read.contact) {
+                        await nw.delete(`/contacts/${read.contact.id}`);
+                    }
+                }
+                for (const id of staffIds) await nw.delete(`/staff/${id}`);
+                await nw.delete(`/services/${service.id}`);
+                await ownerContext.close();
+            }
+        },
+    );
 
     test("a pay-now hold survives a step back: nothing is let go, and Forward pays it", async ({
         page,
