@@ -409,6 +409,66 @@ test.describe("the booking step in the address", () => {
         },
     );
 
+    test("the header's Sign in stays on the booking: its sheet before a time, and after one everything typed is kept and nothing booked", async ({
+        page,
+    }, testInfo) => {
+        test.skip(
+            process.env.SITE_ACCOUNT_AREA !== "on",
+            "SITE_ACCOUNT_AREA is off on this stack",
+        );
+        test.setTimeout(90_000);
+        const headerSignIn = page
+            .getByRole("banner")
+            .getByRole("button", { name: "Sign in" });
+        await page.goto(`${NORTHWIND}/book?step=what`);
+        await page
+            .getByRole("radio", { name: new RegExp(WALKTHROUGH) })
+            .click();
+        const time = timeRadios(page).last();
+        await expect(time).toBeVisible({ timeout: 15_000 });
+
+        // No time yet: the sheet takes a sign-in here, and Escape leaves all.
+        const stepBefore = page.url();
+        await headerSignIn.click();
+        await expect(
+            page.getByRole("dialog").getByLabel("Email"),
+        ).toBeFocused();
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden();
+        expect(page.url()).toBe(stepBefore);
+
+        await time.click();
+        await expect(page).toHaveURL(/step=details/);
+        const typedPhone = phone().replace("+91 ", "");
+        await page.getByLabel("Phone (optional)").fill(typedPhone);
+        await page
+            .getByLabel("Anything we should know?")
+            .fill("Side door, please");
+
+        const documents: string[] = [];
+        page.on("request", (r) => {
+            if (r.resourceType() === "document") documents.push(r.url());
+        });
+        await headerSignIn.click();
+        await signInOnSheet(page, `header-${stamp(testInfo)}@example.in`);
+
+        // The redraw has come: the header says they're in.
+        await expect(headerSignIn).toHaveCount(0, { timeout: 15_000 });
+        expect(new URL(page.url()).pathname).toBe("/book");
+        expect(stepOf(page)).toBe("details");
+        await expect(time).toHaveAttribute("aria-checked", "true");
+        await expect(page.getByLabel("Phone (optional)")).toHaveValue(
+            typedPhone,
+        );
+        await expect(page.getByLabel("Anything we should know?")).toHaveValue(
+            "Side door, please",
+        );
+        await expect(
+            page.getByRole("heading", { name: /You're booked/ }),
+        ).toHaveCount(0);
+        expect(documents).toEqual([]);
+    });
+
     test("a pay-now hold survives a step back: nothing is let go, and Forward pays it", async ({
         page,
         request,

@@ -224,6 +224,10 @@ storage, and a signed-in customer's phone comes back from their account.
   brings a draft back only on the address it was made on, looks the time up
   in the times free now, and says what it kept (or that the time went and
   which it chose instead).
+- **Signing in from the header doesn't leave a booking** (owner, 4 Nov 2026).
+  While `[data-booking-step]` is on the page the header's Sign in stays there,
+  by a page event the flow can take (`booking-flow/header-sign-in.ts`), no
+  store. It books nothing; only the step's own button does.
 - **A returning customer's delivery address is not a draft.** It is read
   from their last placed order (`GET public/sites/:siteId/checkout/address`)
   and nothing new is stored for it.

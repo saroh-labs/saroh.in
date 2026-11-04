@@ -37,10 +37,15 @@ address at the last draw, not a request to start again. Read them once.
 and `look-sign-in.test.tsx` draw the page again mid-booking under Classic and
 each look; `site-booking-steps.spec.ts` signs in on a later day and reads what
 was booked.
-**Still open, the owner's call**: the header's Sign in leaves for `/account`
-(A5), and coming back brings the choices from the address and the draft but not
-the phone or note, which are kept out of storage. A reload on a look's `?step=pay`
-opens on when (`openedStep`), a different cause from this one.
+**The header's Sign in, same day (owner)**: it left for `/account` after signing
+in (A5), and coming back lost the phone and note, which are kept out of storage.
+With `[data-booking-step]` on the page it now stays: Classic's sheet on any step
+(opened from the header it books nothing, unlike Continue to sign in), a look's
+code on Your details, and the header's own sheet on a look's earlier steps
+(`booking-flow/header-sign-in.ts`). A look's phone menu and footer links still
+go through `/account` and come back by `sign-in-return.ts`, without the phone or
+note. Still open: a reload on a look's `?step=pay` opens on when (`openedStep`),
+a different cause from this one.
 
 ---
 

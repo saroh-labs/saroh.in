@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AccountEntry } from "../account/account-entry";
 import type { SignedInCustomer } from "../account/api";
 import type { BookingAccount } from "./booking-flow";
 import BookingFlow from "./booking-flow";
@@ -136,6 +137,81 @@ const action = () => {
     if (!found) throw new Error("the step has no button");
     return found;
 };
+
+describe.each(["quiet", "live"] as const)("the header under %s", (look) => {
+    const draw = () => {
+        const flow = account(null);
+        render(
+            <>
+                <AccountEntry
+                    customer={null}
+                    businessName="Prana Yoga"
+                    api={flow.signIn}
+                    loadOptions={vi.fn().mockResolvedValue(null)}
+                />
+                <BookingFlow
+                    page={PAGE}
+                    apiUrl={API}
+                    account={flow}
+                    look={look}
+                />
+            </>,
+        );
+    };
+    const pressHeader = () =>
+        fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    it("before Your details, opens the header's own sheet on the step", () => {
+        draw();
+        fireEvent.click(screen.getByRole("radio", { name: /Private session/ }));
+        pressHeader();
+        expect(screen.getByRole("dialog")).toHaveTextContent(
+            "Sign in to Prana Yoga",
+        );
+        expect(screen.getByLabelText("Email")).toHaveFocus();
+        expect(
+            screen.getByRole("radio", { name: /Private session/ }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
+    it("on Your details, goes to the code there and keeps what was typed", async () => {
+        draw();
+        fireEvent.click(screen.getByRole("radio", { name: /Private session/ }));
+        fireEvent.click(action());
+        fireEvent.click(await screen.findByRole("radio", { name: /8:00/ }));
+        await waitFor(() =>
+            expect(action()).not.toHaveAttribute("aria-disabled"),
+        );
+        fireEvent.click(action());
+        await waitFor(() => expect(stepNow()).toBe("details"));
+        fireEvent.change(screen.getByLabelText("Anything we should know?"), {
+            target: { value: "Bad knee" },
+        });
+
+        pressHeader();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(screen.getByLabelText("Email")).toHaveFocus();
+        expect(stepNow()).toBe("details");
+        expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
+            "Bad knee",
+        );
+        // Nothing is said wrong for an empty field they only just reached.
+        expect(screen.queryByRole("alert")).toBeNull();
+
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "asha.kumar@example.com" },
+        });
+        fireEvent.blur(screen.getByLabelText("Email"));
+        fireEvent.change(await screen.findByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        await screen.findByText(/Booking as/);
+        expect(stepNow()).toBe("details");
+        expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
+            "Bad knee",
+        );
+    });
+});
 
 describe.each(["folio", "quiet", "live"] as const)("under %s", (look) => {
     it("stays on Your details with the later time, what was typed and no new read", async () => {
