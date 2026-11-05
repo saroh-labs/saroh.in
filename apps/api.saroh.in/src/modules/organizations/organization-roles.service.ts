@@ -382,7 +382,7 @@ export class OrganizationRolesService {
             .toLowerCase()
             .normalize("NFKD")
             .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "");
+            .replace(/^-|-$/g, "");
         return KEY_PATTERN.test(key) ? key : "";
     }
 }

@@ -174,6 +174,8 @@ export function writeSearchContent(
         .readdirSync(path.join(SEARCH_PAGES, "content/tools"))
         .filter((f) => f.endsWith(".mdx"))
         .map((f) => f.slice(0, -4))
+        // A slug goes into generated code: only a plain one gets there.
+        .filter((slug) => /^[a-z0-9-]+$/.test(slug))
         .filter((slug) => !live || live.includes(`/tools/${slug}`))
         // An app tool (`inApp`) has its own route and no component here.
         .filter((slug) =>

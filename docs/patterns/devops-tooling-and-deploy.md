@@ -234,6 +234,11 @@ and blocked real deploys. So work reaches GitHub in batches:
    by its PR (a merge commit), and a release is `development` into `main`
    by a PR (a merge commit), never squashed. Work only flows that way:
    `main` is never merged back into `development` (owner, 18 Oct 2026).
+   A fix that goes straight to `main` is copied onto `development` the same
+   day, before more work lands on its files. If they still conflict at
+   release, a `release-<date>` branch off `development` takes `main` and goes
+   up instead; its tree must equal `development`'s, because an auto-merge can
+   leave a stale copy behind (5 Nov 2026).
 
 ### How the gate stays fast — **Current** (2026-09-29)
 

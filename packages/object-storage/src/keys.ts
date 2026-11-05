@@ -25,9 +25,8 @@ export function sanitizeSegment(value: string): string {
     return value
         .normalize("NFKD")
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "");
+        .replace(/[^a-z0-9]+/g, "-") // one dash at most, so a trim needs no `+`
+        .replace(/^-|-$/g, "");
 }
 
 /**
@@ -49,7 +48,7 @@ export function sanitizeFilename(filename: string): string {
         .replace(/\.{2,}/g, ".") // collapse `..` (and longer) to a single dot
         .replace(/-+/g, "-")
         .replace(/^[.-]+/, "") // no leading dot/dash (no hidden/traversal)
-        .replace(/-+$/, ""); // no trailing dash
+        .replace(/-$/, ""); // no trailing dash; runs are one by now
 
     return cleaned.length > 0 ? cleaned : "file";
 }
