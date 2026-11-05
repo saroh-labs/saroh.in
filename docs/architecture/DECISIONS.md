@@ -2767,3 +2767,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Decision (owner, 4 Nov 2026): whoever opens `/book` can pick anything the business offers. A published Book page lists every service offered: its stored ids first, in their order, then the rest. Its layout, prices, button label and heading stay the merchant's. Home, Prices and other pages keep their stored selection.
 - Why: "if we open all bookings page, it should list down all so that we can select one, but it was showing empty, so ideally we should be seeing all". A snapshot can't tell a merchant's choice from a list written when one service existed.
 - Rules: `apps/saroh.app/lib/book-page-offer.ts`, `frontend-data-and-state.md`.
+
+## DEC-206 Classic's booking page folds each step, and the header's Sign in stays on the booking
+
+- Decision (owner, 4 Nov 2026): on Classic, a service, a day and a time each fold to one row with Edit once answered, and a day's times show only after the day is pressed. The summary card stays in view below the site's header. Pressing Sign in in the header while a booking is open signs in on the page and keeps everything chosen and typed; with no booking open it goes to the account as before.
+- Why: "This makes the space little and easy for the user to navigate in the booking page", and "the progress is lost" at sign-in.
+- Unchanged: no control is removed (owner, "do not remove anything"): other services, the person choice, later dates and other times sit behind Edit. The looks already ask one thing a screen and draw as before, and so does the account's Move sheet.
+- Consequences: one more press than before, since times used to show for the first free day. A look's phone menu and footer links still go to the account.
+- Rules: `packages/site-blocks/src/booking-flow/choose-steps.tsx`, `steps/chosen-row.tsx`, `header-sign-in.ts`; `frontend-data-and-state.md`.

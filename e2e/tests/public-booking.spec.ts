@@ -375,8 +375,9 @@ test.describe("the booking page", () => {
                 name: /^(Cancel and pick another time|Pick another time)$/,
             })
             .click();
+        // Choosing again: the service stays folded, and the time is theirs to pick.
         await expect(
-            page.getByRole("heading", { name: "What would you like?" }),
+            page.getByRole("button", { name: /^Edit what you're booking/ }),
         ).toBeVisible();
         const after = await page.request.get(
             `${urls.API_URL}/public/services/holds/${payToken}`,

@@ -6507,3 +6507,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: shots clip to the true region (`shots.global.ts`), the salon has its own treatment order, `checkGlobal` asserts a quiet diary (`BOOKINGS_A_MONTH`), and `lib/shots.test.ts` refuses "team" and "plan" in an alt and a `who` naming another business.
 **Rule**: read every shot against its page's claims as well as for rupees, and clip or drop what a screen says to everyone until the app's words are fixed. Never retouch.
 **Category**: screenshots · editions
+
+---
+
+## Folding a list broke two browser specs, seen only after the merge
+
+**Symptom**: 5 Nov, main's CI failed `public-booking:316` and `site-booking-steps:173` once Classic's booking page folded its steps: one waited for a heading that now folds, one looped over a service list that had folded after its first pick. The page itself was right.
+**Cause**: the specs were updated by reading them, typechecked and never run. The PR merged before its checks finished, so the first run was on main.
+**Fix**: the first checks the folded row, the second presses Edit between picks.
+**Rule**: a spec changed for a new behaviour is not done until it has run. Say so plainly when a PR is asked to merge before its browser checks finish.
+**Category**: tests · booking
