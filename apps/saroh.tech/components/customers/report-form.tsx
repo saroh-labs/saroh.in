@@ -92,15 +92,9 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
             ref={form}
             noValidate
             onSubmit={onSubmit}
-            aria-labelledby="report-title"
+            aria-label={copy.title}
             className="grid max-w-[600px] gap-4"
         >
-            <h2
-                id="report-title"
-                className="m-0 font-display text-[22px] font-semibold tracking-[-0.02em]"
-            >
-                {copy.title}
-            </h2>
             {REPORT_FIELDS.map((field) => {
                 const shared = {
                     id: `report-${field.name}`,
