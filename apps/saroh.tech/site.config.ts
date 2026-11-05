@@ -2,12 +2,21 @@ import { hostsFor, urlOf } from "@saroh/edition";
 
 /**
  * Global's addresses. A development deploy builds with `GLOBAL_DEV_DOMAIN`
- * (scripts/cf-global-dev.mjs), which next.config.mjs hands to the browser's code.
+ * (scripts/cf-global-dev.mjs), a production one with `GLOBAL_PRODUCTION_HOSTS=on`
+ * (wrangler.jsonc's production vars, through scripts/cf-env.mjs), and next.config.mjs
+ * hands both to the browser's code. Any other build talks to the local stack,
+ * so a test form never writes a real message or emails staff.
  */
-const hosts = hostsFor(
-    "GLOBAL",
-    process.env.GLOBAL_DEV_DOMAIN?.trim() ? "development" : "production",
-);
+const LOCAL_HOSTS = {
+    app: "app.saroh.localhost",
+    api: "api.saroh.localhost",
+    accounts: "accounts.saroh.localhost",
+};
+const hosts = process.env.GLOBAL_DEV_DOMAIN?.trim()
+    ? hostsFor("GLOBAL", "development")
+    : process.env.GLOBAL_PRODUCTION_HOSTS === "on"
+      ? hostsFor("GLOBAL", "production")
+      : LOCAL_HOSTS;
 
 const ACCOUNTS_URL = urlOf(hosts.accounts);
 

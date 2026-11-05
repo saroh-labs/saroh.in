@@ -8,8 +8,8 @@ import {
     Ip,
     Post,
 } from "@nestjs/common";
-import { editionOfHost } from "@saroh/edition";
 
+import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { ContactMessagesService } from "./contact-messages.service";
@@ -62,7 +62,7 @@ export class PublicContactMessagesController {
             kind: dto.kind,
             message: dto.message,
             ipHash,
-            edition: editionOfHost(host ?? "") ?? "INDIA",
+            edition: editionOfFormHost(host),
         });
     }
 }

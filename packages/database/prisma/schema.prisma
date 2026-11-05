@@ -8912,6 +8912,9 @@ model SarohInvoiceSequence {
 // (reports:resolve). Kept when the business is deleted.
 model BusinessReport {
   id             String               @id @default(cuid())
+  // The edition whose address it came through (DEC-204). Staff see a report
+  // under its business's edition, and this one when it names no business.
+  edition        Edition              @default(INDIA)
   organizationId String?
   organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   // The host as typed and normalised ("shop.example.com"), not a full URL.

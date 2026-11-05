@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { appVars } from "../../../scripts/cf-env.mjs";
 import { prefilledSite, reportProblem, sendReport } from "./business-report";
 
 const good = {
@@ -86,11 +87,27 @@ describe("where a report goes", () => {
         return (await import("@/site.config")).site.apiUrl;
     };
 
-    it("is the edition's address, in production and on Global's development deploy", async () => {
+    it("is the local API unless a deploy says otherwise", async () => {
         vi.stubEnv("GLOBAL_DEV_DOMAIN", "");
+        vi.stubEnv("GLOBAL_PRODUCTION_HOSTS", "");
+        expect(await apiUrl()).toBe("https://api.saroh.localhost");
+        vi.stubEnv("GLOBAL_PRODUCTION_HOSTS", "yes");
+        expect(await apiUrl()).toBe("https://api.saroh.localhost");
+    });
+
+    it("is the edition's address on a production or Global development deploy", async () => {
+        vi.stubEnv("GLOBAL_DEV_DOMAIN", "");
+        vi.stubEnv("GLOBAL_PRODUCTION_HOSTS", "on");
         expect(await apiUrl()).toBe("https://api.saroh.tech");
         vi.stubEnv("GLOBAL_DEV_DOMAIN", "global.example");
         expect(await apiUrl()).toBe("https://api.global.example");
+    });
+
+    it("opts in on production's deploy settings only", () => {
+        const app = join(__dirname, "..");
+        const vars = (at: string) => appVars(app, at) as Record<string, string>;
+        expect(vars("production").GLOBAL_PRODUCTION_HOSTS).toBe("on");
+        expect(vars("development").GLOBAL_PRODUCTION_HOSTS).toBeUndefined();
     });
 
     it("is the address Contact posts to, with no setting to send it elsewhere", () => {

@@ -41,6 +41,21 @@ export function viaBusinessOrNone(edition: Edition | null) {
 }
 
 /**
+ * For `BusinessReport`: the edition of the business it's about (DEC-204 item
+ * 4), else, with no business, the edition of the site it was sent through.
+ */
+export function reportInEdition(edition: Edition | null) {
+    return edition
+        ? {
+              OR: [
+                  { organizationId: null, edition },
+                  { organization: { edition } },
+              ],
+          }
+        : {};
+}
+
+/**
  * For a row with a bare `organizationId` and no relation (`BillingAction`,
  * `BillingWebhookEvent`, `BillingRefund`, `CommissionLine`, kept so they
  * outlive the business). A row of no business shows on both.

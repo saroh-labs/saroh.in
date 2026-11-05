@@ -65,7 +65,11 @@ function samePath(request: Request): string {
     if (!referer) return "/";
     try {
         const from = new URL(referer);
-        return from.host === new URL(request.url).host ? from.pathname : "/";
+        // A path of `//evil.com/` is another site to a browser.
+        return from.host === new URL(request.url).host &&
+            !from.pathname.startsWith("//")
+            ? from.pathname
+            : "/";
     } catch {
         return "/";
     }

@@ -106,6 +106,13 @@ describe("the saroh.tech Worker", () => {
             { ASSETS: assets() },
         );
         expect(back.headers.get("location")).toBe("/pricing");
+        const elsewhere = await handle(
+            get("https://saroh.tech/region/hide", {
+                referer: "https://saroh.tech//evil.com/",
+            }),
+            { ASSETS: assets() },
+        );
+        expect(elsewhere.headers.get("location")).toBe("/");
     });
 
     it("points at the matching saroh.in page, or its home", () => {

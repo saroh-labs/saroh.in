@@ -5,8 +5,8 @@ import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "./contact";
  * are saroh.in's words (`apps/saroh.in/content/{terms,privacy,refunds}.ts`), left
  * out or changed only where they're India's alone. What the cookies and privacy
  * pages say about this site comes from worker/index.ts, lib/analytics.ts and
- * lib/tools/draft-store.ts. Who handles data is the code's: Razorpay isn't here,
- * because a Global business has no billing profile (DEC-203).
+ * lib/tools/draft-store.ts. Who handles data is the code's: the billing provider
+ * isn't here, because a Global business has no billing profile (DEC-203).
  */
 export const LEGAL_UPDATED = "2026-11-04";
 

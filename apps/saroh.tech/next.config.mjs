@@ -7,6 +7,7 @@
  */
 const dev = process.env.NODE_ENV !== "production";
 const globalDevDomain = process.env.GLOBAL_DEV_DOMAIN?.trim();
+const productionHosts = process.env.GLOBAL_PRODUCTION_HOSTS;
 
 /** @type {import("next").NextConfig} */
 export default {
@@ -18,5 +19,8 @@ export default {
     transpilePackages: ["@saroh/ui", "@saroh/marketing"],
     // A tool's sign-up link is built in the browser, and its address follows
     // the deploy (`site.config.ts`). Only ever set on a deploy.
-    ...(globalDevDomain && { env: { GLOBAL_DEV_DOMAIN: globalDevDomain } }),
+    env: {
+        ...(globalDevDomain && { GLOBAL_DEV_DOMAIN: globalDevDomain }),
+        ...(productionHosts && { GLOBAL_PRODUCTION_HOSTS: productionHosts }),
+    },
 };

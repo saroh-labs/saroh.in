@@ -9,6 +9,7 @@ import {
     Post,
 } from "@nestjs/common";
 
+import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { BusinessReportsService } from "./business-reports.service";
@@ -43,6 +44,7 @@ export class PublicBusinessReportsController {
         @Body() dto: SubmitBusinessReportDto,
         @Ip() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+        @Headers("host") host?: string,
     ): Promise<{ ok: true }> {
         const ipHash = visitorKey(ip, relay);
         if (
@@ -60,6 +62,7 @@ export class PublicBusinessReportsController {
             email: dto.email,
             phone: dto.phone,
             ipHash,
+            edition: editionOfFormHost(host),
         });
     }
 }

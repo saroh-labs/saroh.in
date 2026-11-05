@@ -310,7 +310,7 @@
     | Link card                                 | `CardLink`                                                                            | its own hover shadow                                                          |
     | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                           | `bg-mk-soon` badges                                                           |
     | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `@saroh/marketing/button`                  | an Ink `<button>` with `bg-foreground text-background`                        |
-    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`           | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
+    | Choice chip, text field                   | `ChoiceChip` (`@saroh/marketing/choice-chip`), `fieldClasses()` (`shared/fields/`)    | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
     | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                                | the label typed in a component                                                |
     | Feature / solution hero, ruled points     | `ProductHero`, `PointGrid`: `@saroh/marketing/product-hero`, `/point-grid`            | its own crumb–H1–sub–buttons–shot header, a `border-t pt-4` point list        |
     | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()`   | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |

@@ -265,6 +265,19 @@ describe("BusinessReportsService.submit", () => {
         expect(db.businessReport.create).not.toHaveBeenCalled();
     });
 
+    it("stores the edition it's given", async () => {
+        await new BusinessReportsService().submit({
+            site: "glow.in",
+            message: "Took my money.",
+            email: "first.last@example.com",
+            phone: "+91 98450 12345",
+            edition: "GLOBAL",
+        });
+        expect(db.businessReport.create.mock.calls[0]?.[0]).toMatchObject({
+            data: { edition: "GLOBAL" },
+        });
+    });
+
     it("logs the host only, never the email or the number", async () => {
         const said: string[] = [];
         const log = jest
@@ -300,6 +313,39 @@ describe("PublicBusinessReportsController", () => {
         expect(call.ipHash).toBeDefined();
         expect(call.ipHash).not.toContain("203.0.113.5");
         expect(call).toMatchObject(REPORT);
+    });
+
+    it("files a report under the edition of the address it came through", async () => {
+        const submit = jest.fn().mockResolvedValue({ ok: true });
+        const controller = new PublicBusinessReportsController({
+            submit,
+        } as unknown as BusinessReportsService);
+        await controller.submit(
+            REPORT,
+            "203.0.113.6",
+            undefined,
+            "api.saroh.tech",
+        );
+        expect(submit.mock.calls[0]?.[0]).toMatchObject({ edition: "GLOBAL" });
+    });
+
+    it("files an unknown address under India, and warns naming it", async () => {
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
+        const submit = jest.fn().mockResolvedValue({ ok: true });
+        const controller = new PublicBusinessReportsController({
+            submit,
+        } as unknown as BusinessReportsService);
+        await controller.submit(
+            REPORT,
+            "203.0.113.7",
+            undefined,
+            "odd.example",
+        );
+        expect(submit.mock.calls[0]?.[0]).toMatchObject({ edition: "INDIA" });
+        expect(warn.mock.calls[0]?.[0]).toContain('host="odd.example"');
+        warn.mockRestore();
     });
 
     it("refuses a fourth report in a minute from one address with 429", async () => {
