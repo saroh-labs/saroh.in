@@ -145,18 +145,29 @@ export class DeliveryAddressInput {
     @MaxLength(100)
     city!: string;
 
-    /** The state — U5 reads it as the place of supply. */
+    /**
+     * The state: U5 reads it as the place of supply. Required, and what it
+     * may hold, by the business's edition (`delivery-address.ts`): a body
+     * can't say which edition it is about.
+     */
+    @IsOptional()
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "Add the state" })
     @MaxLength(100)
-    state!: string;
+    state?: string | null;
 
+    @IsOptional()
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "Add the PIN code" })
     @MaxLength(16)
-    postalCode!: string;
+    postalCode?: string | null;
+
+    /** ISO code, a Global business's delivery only. Unset: its own country. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(2)
+    country?: string | null;
 }
 
 export class OrderItemInput {

@@ -21,6 +21,8 @@ export interface FooterFacts {
     credit: SiteCredit | null;
     /** The edition the business runs under, for Saroh's links. */
     edition: Edition;
+    /** The business's country, ISO code: where its phone fields start. */
+    country: string | null;
     /**
      * Who a customer is buying from (DEC-121), from Settings › Business:
      * each null when the business has set none.
@@ -43,6 +45,7 @@ const NONE: FooterFacts = {
     email: null,
     credit: null,
     edition: "INDIA",
+    country: null,
     seller: NO_SELLER,
 };
 
@@ -97,20 +100,24 @@ const REFERRAL_CODE = /^[a-hj-km-np-z2-9]{8}$/;
  */
 export function footerFacts(body: unknown): FooterFacts {
     if (body === null || typeof body !== "object") return NONE;
-    const { email, credit, seller } = body as {
+    const { email, credit, seller, edition, country } = body as {
         email?: unknown;
         credit?: unknown;
         seller?: unknown;
+        edition?: unknown;
+        country?: unknown;
     };
-    const { referralCode: code, edition } =
+    const { referralCode: code, edition: creditEdition } =
         credit !== null && typeof credit === "object"
             ? (credit as { referralCode?: unknown; edition?: unknown })
             : { referralCode: undefined, edition: undefined };
     // A release of the API that doesn't say yet: India, as every business was.
-    const editionOfSite = edition === "GLOBAL" ? "GLOBAL" : "INDIA";
+    const editionOfSite =
+        edition === "GLOBAL" || creditEdition === "GLOBAL" ? "GLOBAL" : "INDIA";
     return {
         email: typeof email === "string" && email.trim() ? email.trim() : null,
         edition: editionOfSite,
+        country: text(country),
         credit:
             typeof code === "string" && REFERRAL_CODE.test(code)
                 ? { href: madeWithSarohHref(code, siteUrlOf(editionOfSite)) }

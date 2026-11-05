@@ -132,6 +132,29 @@ describe("what stops the button", () => {
         );
     });
 
+    it("needs no state or PIN code for a Global business", () => {
+        const address = {
+            line1: "1 Main St",
+            city: "",
+            state: "",
+            postalCode: "",
+        };
+        const abroad = {
+            ...base,
+            way: "LOCAL_DELIVERY" as const,
+            looseAddress: true,
+        };
+        expect(sheetProblem({ ...abroad, address })).toBe(
+            "Add the town or city.",
+        );
+        expect(
+            sheetProblem({
+                ...abroad,
+                address: { ...address, city: "Austin" },
+            }),
+        ).not.toMatch(/town|state|PIN/);
+    });
+
     it("needs the whole address and someone to reach for a delivery", () => {
         expect(sheetProblem({ ...base, way: "LOCAL_DELIVERY" })).toBe(
             "Add the delivery address.",

@@ -20,6 +20,7 @@ import {
     supersedeOpenDifferenceIntents,
 } from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
+import { settleDeliveryAddress } from "./delivery-address";
 import type { FulfilmentType } from "./fulfilment";
 import {
     allowedTypes,
@@ -105,6 +106,12 @@ export class OrderFulfilmentChangeService {
         authorize(ctx, "order:edit");
         const newShippingCents = toCents(dto.shipping);
 
+        if (dto.address) {
+            dto.address = await settleDeliveryAddress(
+                ctx.organizationId,
+                dto.address,
+            );
+        }
         const result = await prisma.$transaction(async (tx) => {
             const order = await lockOrder(tx, ctx, orderId);
             if (order.status === "CANCELLED") {

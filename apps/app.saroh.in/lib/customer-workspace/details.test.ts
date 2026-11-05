@@ -40,6 +40,11 @@ const home = {
 };
 
 describe("draftFrom", () => {
+    it("starts a new address on the business's country", () => {
+        expect(draftFrom(contact({ country: null }), "GB").country).toBe("GB");
+        expect(draftFrom(contact({ country: null })).country).toBe("IN");
+    });
+
     it("starts a new address in India, with nothing filled", () => {
         const d = draftFrom(contact());
         expect(d).toMatchObject({

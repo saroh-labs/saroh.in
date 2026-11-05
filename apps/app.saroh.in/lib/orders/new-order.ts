@@ -253,6 +253,8 @@ export function sheetProblem(input: {
     payOff: string | null;
     cash: CashChange;
     format: (cents: number) => string;
+    /** A Global business's delivery needs no state or PIN code. */
+    looseAddress?: boolean;
 }): string | null {
     if (input.lines === 0) return "Add at least one item.";
     if (!input.pick) return "Pick a customer, or take a walk-in's name.";
@@ -260,7 +262,9 @@ export function sheetProblem(input: {
     if (goesToAddress(input.way)) {
         const a = input.address;
         if (!a.line1.trim()) return "Add the delivery address.";
-        if (!a.city.trim() || !a.state.trim() || !a.postalCode.trim()) {
+        if (input.looseAddress) {
+            if (!a.city.trim()) return "Add the town or city.";
+        } else if (!a.city.trim() || !a.state.trim() || !a.postalCode.trim()) {
             return "Add the town, state and PIN code.";
         }
         if (!reachOf(input.pick)) {

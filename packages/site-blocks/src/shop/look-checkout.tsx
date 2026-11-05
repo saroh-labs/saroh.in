@@ -19,6 +19,7 @@ import { pickupReadyWords } from "../lib/shop-facts";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 import { readQrSource } from "../qr-source";
+import { useSiteBusiness } from "../site-business";
 import { SoldByLine } from "../sold-by";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
@@ -237,6 +238,7 @@ export function LookCheckout({
     const router = useRouter();
     const items = useBag(site);
     const testRelease = useTestRelease() !== null;
+    const { edition } = useSiteBusiness();
     const code = useRef<InlineCodeHandle>(null);
     const [customer, setCustomer] = useState(account.customer);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
@@ -257,17 +259,17 @@ export function LookCheckout({
     // The visit's draft, read after the first paint (the server has none).
     useEffect(() => {
         /* eslint-disable-next-line react-hooks/set-state-in-effect -- restored once after hydration */
-        setDraft(readBagDraft(site));
+        setDraft(readBagDraft(site, edition));
         setDrafted(true);
         // The header's bag changes the code: take it, keep the rest.
         return onBagDraft((changed) => {
             if (changed !== site) return;
-            const kept = readBagDraft(site);
+            const kept = readBagDraft(site, edition);
             setDraft((d) =>
                 d.code === kept.code ? d : { ...d, code: kept.code },
             );
         });
-    }, [site]);
+    }, [site, edition]);
     useEffect(() => {
         if (drafted) writeBagDraft(site, draft);
     }, [site, draft, drafted]);
@@ -334,14 +336,17 @@ export function LookCheckout({
                     return {
                         ...d,
                         address: last,
-                        saved: addressLeft(last) === null ? "shown" : "typing",
+                        saved:
+                            addressLeft(last, edition) === null
+                                ? "shown"
+                                : "typing",
                     };
                 });
             });
         return () => {
             live = false;
         };
-    }, [askSaved]);
+    }, [askSaved, edition]);
 
     // Paid in the window: ask the server until it has placed the order.
     const confirmTries = paying.kind === "confirming" ? paying.tries : null;
@@ -407,7 +412,9 @@ export function LookCheckout({
 
     const quote = load.kind === "ready" ? load.quote : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
-    const addressNote = needsAddress(way) ? addressLeft(draft.address) : null;
+    const addressNote = needsAddress(way)
+        ? addressLeft(draft.address, edition)
+        : null;
     const pays =
         quote?.payments ??
         (quote ? [{ type: "ONLINE" as const, label: "Pay online" }] : []);
@@ -495,7 +502,9 @@ export function LookCheckout({
         const body: Omit<StartCheckout, "key"> = {
             lines: [...items],
             fulfilment: way,
-            ...(needsAddress(way) ? { address: trimmed(draft.address) } : {}),
+            ...(needsAddress(way)
+                ? { address: trimmed(draft.address, edition) }
+                : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
             ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),
             ...(applied ? { discountCode: applied } : {}),

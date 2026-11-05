@@ -1,11 +1,19 @@
 "use client";
 
-import { phoneNumberProblem } from "@saroh/block-contract";
+import {
+    listedCountry,
+    PHONE_COUNTRIES,
+    phoneNumberProblem,
+    POSTCODE_MAX,
+    REGION_MAX,
+} from "@saroh/block-contract";
 
 import { focusRing, inputFill } from "../booking-flow/styles";
 import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
+import type { SiteEdition as Edition } from "../site-business";
+import { useSiteBusiness } from "../site-business";
 import type { DeliveryAddress, ShopWay } from "./api";
 import { INDIA_STATES, stateIn } from "./india-states";
 
@@ -17,6 +25,10 @@ import { INDIA_STATES, stateIn } from "./india-states";
  * rider at the gate, the courier with a parcel); Pick-up asks for none of
  * it. State is a choice from India's states and union territories, since
  * it decides the order's GST. The API checks the same.
+ *
+ * A Global business's delivery asks for a country instead (starting on the
+ * business's own), and its region and postcode are optional free text: no
+ * tax reads them. The API decides by the business's edition, not by this.
  */
 
 export const needsAddress = (way: ShopWay | null) =>
@@ -44,12 +56,15 @@ export function addressBlank(a: DeliveryAddress): boolean {
  * sentence for the line beside the button; null when nothing is. The lines
  * first, then the phone.
  */
-export function addressLeft(a: DeliveryAddress): string | null {
+export function addressLeft(
+    a: DeliveryAddress,
+    edition: Edition = "INDIA",
+): string | null {
     if (
         a.line1.trim() === "" ||
         a.city.trim() === "" ||
-        stateIn(a.state) === "" ||
-        a.postalCode.trim() === ""
+        (edition === "INDIA" &&
+            (stateIn(a.state) === "" || a.postalCode.trim() === ""))
     ) {
         return "Add the address to deliver to.";
     }
@@ -69,17 +84,24 @@ export function deliveryPhoneOk(phone: string): boolean {
     return !phone.trim().startsWith("+") || phoneNumberProblem(phone) === null;
 }
 
-export function addressReady(a: DeliveryAddress): boolean {
-    return addressLeft(a) === null;
+export function addressReady(
+    a: DeliveryAddress,
+    edition: Edition = "INDIA",
+): boolean {
+    return addressLeft(a, edition) === null;
 }
 
-export function trimmed(a: DeliveryAddress): DeliveryAddress {
+export function trimmed(
+    a: DeliveryAddress,
+    edition: Edition = "INDIA",
+): DeliveryAddress {
     const out: DeliveryAddress = {
         line1: a.line1.trim(),
         city: a.city.trim(),
-        state: stateIn(a.state),
+        state: edition === "INDIA" ? stateIn(a.state) : a.state.trim(),
         postalCode: a.postalCode.trim(),
     };
+    if (edition !== "INDIA" && a.country) out.country = a.country;
     if (a.name?.trim()) out.name = a.name.trim();
     if (a.phone?.trim()) out.phone = a.phone.trim();
     if (a.line2?.trim()) out.line2 = a.line2.trim();
@@ -96,6 +118,7 @@ export function addressLines(a: DeliveryAddress): string[] {
         a.line1.trim(),
         a.line2?.trim() ?? "",
         [town, a.postalCode.trim()].filter(Boolean).join(" "),
+        listedCountry(a.country)?.name ?? "",
         phoneText(a.phone?.trim() ?? ""),
     ].filter((line) => line !== "");
 }
@@ -157,6 +180,8 @@ export function AddressFields({
     address: DeliveryAddress;
     onChange: (name: keyof DeliveryAddress) => (value: string) => void;
 }) {
+    const business = useSiteBusiness();
+    const global = business.edition !== "INDIA";
     const phone = address.phone?.trim() ?? "";
     // Only once something is typed: an empty required field is said beside
     // the button, never as an error before the customer has started.
@@ -174,8 +199,18 @@ export function AddressFields({
                 type="text"
                 // Digits for a PIN code (six of them). The phone is its own
                 // field, below.
-                inputMode={name === "postalCode" ? "numeric" : undefined}
-                maxLength={name === "postalCode" ? 6 : undefined}
+                inputMode={
+                    name === "postalCode" && !global ? "numeric" : undefined
+                }
+                maxLength={
+                    name === "postalCode"
+                        ? global
+                            ? POSTCODE_MAX
+                            : 6
+                        : name === "state"
+                          ? REGION_MAX
+                          : undefined
+                }
                 autoComplete={auto}
                 required={required}
                 value={address[name] ?? ""}
@@ -215,30 +250,65 @@ export function AddressFields({
                     </p>
                 ) : null}
             </div>
+            {global ? (
+                <label className="block text-[13.5px] font-medium">
+                    Country
+                    <span aria-hidden="true"> *</span>
+                    <select
+                        autoComplete="country"
+                        required
+                        value={address.country ?? business.country ?? ""}
+                        onChange={(e) => onChange("country")(e.target.value)}
+                        className={cn(field, "cursor-pointer")}
+                    >
+                        {PHONE_COUNTRIES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            ) : null}
             {input("line1", "Address", "address-line1", true)}
-            {input("line2", "Flat, floor or landmark", "address-line2")}
-            <div className="grid grid-cols-2 gap-2.5">
-                {input("city", "Town or city", "address-level2", true)}
-                {input("postalCode", "PIN code", "postal-code", true)}
-            </div>
-            <label className="block text-[13.5px] font-medium">
-                State
-                <span aria-hidden="true"> *</span>
-                <select
-                    autoComplete="address-level1"
-                    required
-                    value={stateIn(address.state)}
-                    onChange={(e) => onChange("state")(e.target.value)}
-                    className={cn(field, "cursor-pointer")}
-                >
-                    <option value="">Choose a state</option>
-                    {INDIA_STATES.map((name) => (
-                        <option key={name} value={name}>
-                            {name}
-                        </option>
-                    ))}
-                </select>
-            </label>
+            {input(
+                "line2",
+                global ? "Flat, floor or building" : "Flat, floor or landmark",
+                "address-line2",
+            )}
+            {global ? (
+                <>
+                    {input("city", "Town or city", "address-level2", true)}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {input("state", "State or region", "address-level1")}
+                        {input("postalCode", "Postcode", "postal-code")}
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {input("city", "Town or city", "address-level2", true)}
+                        {input("postalCode", "PIN code", "postal-code", true)}
+                    </div>
+                    <label className="block text-[13.5px] font-medium">
+                        State
+                        <span aria-hidden="true"> *</span>
+                        <select
+                            autoComplete="address-level1"
+                            required
+                            value={stateIn(address.state)}
+                            onChange={(e) => onChange("state")(e.target.value)}
+                            className={cn(field, "cursor-pointer")}
+                        >
+                            <option value="">Choose a state</option>
+                            {INDIA_STATES.map((name) => (
+                                <option key={name} value={name}>
+                                    {name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </>
+            )}
         </div>
     );
 }

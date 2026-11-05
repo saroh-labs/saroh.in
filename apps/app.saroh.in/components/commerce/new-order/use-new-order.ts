@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useIndiaAddress } from "@/components/shared/fields/business-country";
 import { readCustomerAttention } from "@/lib/customers/actions";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { isOpeningPick } from "@/lib/customers/prefill";
@@ -200,7 +201,9 @@ export function useNewOrder({
     const change = cashChange(given, total);
     // Null where it doesn't apply: a delivery, a link, pay later.
     const handedOver = canHandOver(pay, way) ? handedOverChoice : null;
+    const india = useIndiaAddress();
     const problem = sheetProblem({
+        looseAddress: !india,
         lines: lines.length,
         pick,
         way,

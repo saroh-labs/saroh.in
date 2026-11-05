@@ -1,5 +1,6 @@
 "use client";
 
+import type { SiteEdition as Edition } from "../site-business";
 import type { DeliveryAddress, ShopPayment, ShopWay } from "./api";
 import type { BagDraft } from "./bag-sheet";
 import { EMPTY_DRAFT } from "./bag-sheet";
@@ -37,6 +38,7 @@ const ADDRESS_FIELDS = [
     "city",
     "state",
     "postalCode",
+    "country",
 ] as const satisfies readonly (keyof DeliveryAddress)[];
 /** Longer than any field the checkout takes. */
 const FIELD_MAX = 200;
@@ -50,7 +52,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /** What is stored, narrowed field by field: anything else reads as unset. */
-export function parseBagDraft(raw: string | null): BagDraft {
+export function parseBagDraft(
+    raw: string | null,
+    edition: Edition = "INDIA",
+): BagDraft {
     if (!raw) return EMPTY_DRAFT;
     let stored: unknown;
     try {
@@ -69,7 +74,7 @@ export function parseBagDraft(raw: string | null): BagDraft {
         }
     }
     // State is a choice now: one typed before reads as the list names it.
-    address.state = stateIn(address.state);
+    if (edition === "INDIA") address.state = stateIn(address.state);
 
     const checkout = isRecord(stored.checkout) ? stored.checkout : null;
     return {
@@ -102,9 +107,15 @@ function isEmpty(draft: BagDraft): boolean {
     );
 }
 
-export function readBagDraft(site: string): BagDraft {
+export function readBagDraft(
+    site: string,
+    edition: Edition = "INDIA",
+): BagDraft {
     try {
-        return parseBagDraft(window.sessionStorage.getItem(keyOf(site)));
+        return parseBagDraft(
+            window.sessionStorage.getItem(keyOf(site)),
+            edition,
+        );
     } catch {
         return EMPTY_DRAFT;
     }

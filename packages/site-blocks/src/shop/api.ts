@@ -132,8 +132,11 @@ export interface DeliveryAddress {
     line1: string;
     line2?: string;
     city: string;
+    /** A GST state in India; a Global business's free-text region. */
     state: string;
     postalCode: string;
+    /** ISO code, a Global business's delivery only. */
+    country?: string;
 }
 
 export interface StartCheckout {

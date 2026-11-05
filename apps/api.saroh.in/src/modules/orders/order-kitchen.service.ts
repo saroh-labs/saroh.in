@@ -33,6 +33,7 @@ import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactNotice } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
+import { settleDeliveryAddress } from "./delivery-address";
 import type {
     EditOrderDto,
     MoveStageDto,
@@ -433,6 +434,12 @@ export class OrderKitchenService {
          */
         trackingNotice: boolean;
     }> {
+        if (dto.address) {
+            dto.address = await settleDeliveryAddress(
+                ctx.organizationId,
+                dto.address,
+            );
+        }
         const touchesItems =
             (dto.lines?.length ?? 0) > 0 || (dto.add?.length ?? 0) > 0;
         const touchesDelivery =

@@ -13,6 +13,8 @@ import EnquirySection from "../blocks/enquiry";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import type { ProductPageData } from "../product/product-page";
 import ProductPage from "../product/product-page";
+import type { SiteBusiness } from "../site-business";
+import { SiteBusinessProvider } from "../site-business";
 import { TestReleaseProvider } from "../test-release/context";
 import { AddToBag } from "./add-to-bag";
 import type {
@@ -366,6 +368,8 @@ function setup(
         outcome?: CheckoutOutcome;
         /** Drawn on a test release (DEC-071, T6). */
         testRelease?: boolean;
+        /** The site's business; India's when left out. */
+        business?: SiteBusiness;
         /** The signed-in customer's last delivery; none when left out. */
         saved?: DeliveryAddress;
     } = {},
@@ -430,13 +434,17 @@ function setup(
         />
     );
     render(
-        over.testRelease ? (
-            <TestReleaseProvider release={{ name: "Diwali menu" }}>
-                {bag}
-            </TestReleaseProvider>
-        ) : (
-            bag
-        ),
+        <SiteBusinessProvider
+            value={over.business ?? { edition: "INDIA", country: null }}
+        >
+            {over.testRelease ? (
+                <TestReleaseProvider release={{ name: "Diwali menu" }}>
+                    {bag}
+                </TestReleaseProvider>
+            ) : (
+                bag
+            )}
+        </SiteBusinessProvider>,
     );
     return { quote, start, standing, openCheckout, signIn, savedAddress };
 }
@@ -445,6 +453,63 @@ async function openTheBag() {
     fireEvent.click(screen.getByRole("button", { name: "Your bag, 2 items" }));
     await screen.findByText("Sourdough");
 }
+
+describe("the bag's delivery for a Global business", () => {
+    it("asks a country on the business's own, and no state list or PIN", async () => {
+        const { start } = setup({
+            signedIn: true,
+            business: { edition: "GLOBAL", country: "GB" },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    fulfilment: "LOCAL_DELIVERY",
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: null,
+                        },
+                    ],
+                }),
+            },
+        });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
+        const country = await screen.findByLabelText(/^Country \*/);
+        expect(country).toHaveValue("GB");
+        expect(screen.queryByLabelText(/^PIN code/)).toBeNull();
+        expect(screen.getByLabelText(/^State or region/).tagName).toBe("INPUT");
+        expect(screen.getByLabelText(/^Country code/)).toHaveValue("GB");
+        for (const [label, value] of [
+            ["Phone", "7911 123456"],
+            ["Address", "1 High Street"],
+            ["Town or city", "Dubai"],
+            ["Country \\*", "AE"],
+        ] as const) {
+            fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), {
+                target: { value },
+            });
+        }
+        // By text: roles grow slow over two lists of every country.
+        const place = screen.getByText(/^Place order/);
+        expect(place).toBeEnabled();
+        fireEvent.click(place);
+        await waitFor(() =>
+            expect(start).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    address: {
+                        line1: "1 High Street",
+                        city: "Dubai",
+                        state: "",
+                        postalCode: "",
+                        country: "AE",
+                        phone: "+447911123456",
+                    },
+                }),
+            ),
+        );
+    });
+});
 
 describe("the header's bag", () => {
     it("shows the bag with its count, priced by the server", async () => {
