@@ -94,8 +94,4 @@ export const proformaInvoiceTutor: Combo = {
             answer: "Say in your terms how the numbers get settled. You might bill the agreed minimum regardless, or adjust per student on the final invoice, then return any difference. Decide before they send you the funds.",
         },
     ],
-    band: {
-        title: "Funded before the first lesson.",
-        line: "Send the paper to the finance office, then take payment through your own link once approved. 0% fees.",
-    },
 };

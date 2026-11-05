@@ -10,6 +10,7 @@ import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { signupHref } from "@/site.config";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 const page = pageOf("/help");
 
@@ -19,22 +20,20 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-10 px-4 pt-6 md:gap-14 md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-6 md:gap-14 md:pt-7"
         >
             <JsonLd data={[...pageSchema(page), faqSchema(HELP_FAQS)]} />
             <div className="flex flex-col gap-4">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">
-                    {page.h1}
-                </h1>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-body md:text-[19px]">
+                <PageTitle size="page">{page.h1}</PageTitle>
+                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
                     {page.description}
                 </p>
             </div>
 
             {HELP_GROUPS.map((group) => (
                 <section key={group} className="flex flex-col gap-4">
-                    <h2 className="m-0 font-display text-2xl font-bold tracking-[-0.04em] md:text-[32px]">
+                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                         {group}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2 md:gap-6 xl:grid-cols-3">

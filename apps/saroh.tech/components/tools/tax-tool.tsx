@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 
 import { buttonClass } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
-import { Field } from "@/components/shared/field";
+import { Field, SelectField } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref } from "@/lib/tools/handoff";
@@ -19,7 +18,7 @@ import {
 import type { TaxKind, TaxMode } from "@/lib/tools/tax";
 import { TAX_KINDS, taxBreakdown } from "@/lib/tools/tax";
 
-import { CopyButton, SelectField } from "./fields";
+import { CopyButton } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -56,11 +55,7 @@ export function TaxTool({
     const rate = parseNumber(d.rate);
     const b = taxBreakdown(d.mode, toCents(parseNumber(d.amount)), rate);
     const money = (cents: number) => formatMoney(cents, d.currency);
-    const handoff = useMemo(
-        () => ({ tool, kind: "tax", draft: { ...d, tax: kind } }),
-        [d, tool, kind],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(tool);
     const rows: [string, string][] = [
         [`Before ${k.lower}`, money(b.net)],
         [`${k.name} at ${rate}%`, money(b.tax)],
@@ -70,7 +65,7 @@ export function TaxTool({
             <div className="flex min-w-0 flex-col gap-3.5">
                 <nav
                     aria-label="Tax type"
-                    className="grid grid-cols-3 gap-1 rounded-button bg-[#EAE6DE] p-1"
+                    className="grid grid-cols-3 gap-1 rounded-mk-btn bg-mk-hover p-1"
                 >
                     {(Object.keys(TAX_KINDS) as TaxKind[]).map((id) => (
                         <Link
@@ -78,17 +73,15 @@ export function TaxTool({
                             prefetch={false}
                             href={TAX_KINDS[id].path}
                             aria-current={id === kind ? "page" : undefined}
-                            className={`flex min-h-11 items-center justify-center rounded-control text-[14.5px] font-semibold no-underline md:min-h-10 ${
-                                id === kind
-                                    ? "bg-surface shadow-[0_1px_2px_rgba(28,28,26,.18)]"
-                                    : ""
+                            className={`flex min-h-11 items-center justify-center rounded-mk-control text-[14.5px] font-semibold no-underline md:min-h-10 ${
+                                id === kind ? "bg-card shadow-sm" : ""
                             }`}
                         >
                             {TAX_KINDS[id].name}
                         </Link>
                     ))}
                 </nav>
-                <section className="flex flex-col gap-3.5 rounded-card border border-line bg-surface p-4 md:p-6">
+                <section className="flex flex-col gap-3.5 rounded-mk-card border border-border bg-card p-4 md:p-6">
                     <SegmentedControl
                         legend="Add or remove"
                         value={d.mode}
@@ -105,7 +98,7 @@ export function TaxTool({
                                 : `Total including ${k.lower}`
                         }
                         inputMode="decimal"
-                        className="[&_input]:!h-[52px] [&_input]:font-mono [&_input]:!text-xl"
+                        className="[&_input]:font-mono"
                         value={d.amount}
                         onChange={(e) => set({ amount: e.target.value })}
                     />
@@ -139,7 +132,7 @@ export function TaxTool({
                             </Chip>
                         ))}
                     </div>
-                    <span className="text-[13px] text-quiet">
+                    <span className="text-[13px] text-muted-foreground">
                         {k.note}{" "}
                         <Link
                             prefetch={false}
@@ -154,20 +147,20 @@ export function TaxTool({
                 <section
                     aria-live="polite"
                     aria-label="Result"
-                    className="flex flex-col rounded-card border border-ink bg-surface p-4 md:p-6"
+                    className="flex flex-col rounded-mk-card border border-foreground bg-card p-4 md:p-6"
                 >
                     {rows.map(([label, value], i) => (
                         <div
                             key={label}
                             className={`flex justify-between gap-3 py-2.5 ${
-                                i ? "border-t border-line" : ""
+                                i ? "border-t border-border" : ""
                             }`}
                         >
                             <span>{label}</span>
                             <span className="font-mono">{value}</span>
                         </div>
                     ))}
-                    <div className="flex justify-between gap-3 border-t border-line py-2.5 text-xl font-bold">
+                    <div className="flex justify-between gap-3 border-t border-border py-2.5 text-xl font-bold">
                         <span>Total</span>
                         <span className="font-mono">{money(b.gross)}</span>
                     </div>
@@ -192,15 +185,11 @@ export function TaxTool({
                         </Link>
                     </div>
                 </section>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={tool} done={moment.done} />
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={tool}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

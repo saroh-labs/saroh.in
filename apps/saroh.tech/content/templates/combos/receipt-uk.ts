@@ -59,8 +59,4 @@ export const receiptUk: Combo = {
             answer: "Note that it was by card and, if you want, the last four digits. Leave out the full number and security code. A receipt often gets forwarded around an accounts team, and it doesn't need more than that.",
         },
     ],
-    band: {
-        title: "Proof of payment, in pounds.",
-        line: "Saroh keeps every UK receipt with the client it belongs to, and sends it when a payment is marked paid.",
-    },
 };

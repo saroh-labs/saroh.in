@@ -17,7 +17,7 @@ jest.mock("../saroh-leads/lead-intake", () => ({
     recordWebsiteLead: jest.fn().mockResolvedValue("created"),
 }));
 
-import { HttpException } from "@nestjs/common";
+import { HttpException, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -240,6 +240,24 @@ describe("PublicContactMessagesController", () => {
         const call = send.mock.calls[0]?.[0] as { ipHash?: string };
         expect(call.ipHash).toBeDefined();
         expect(call.ipHash).not.toContain("203.0.113.5");
+    });
+
+    it("files an unknown address under India, and warns naming it", async () => {
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
+        const send = jest.fn().mockResolvedValue({ ok: true });
+        const controller = new PublicContactMessagesController({
+            send,
+        } as unknown as ContactMessagesService);
+        await controller.send(dto, "203.0.113.7", undefined, "odd.example");
+        expect(send.mock.calls[0]?.[0]).toMatchObject({ edition: "INDIA" });
+        expect(warn.mock.calls[0]?.[0]).toContain('host="odd.example"');
+        warn.mockClear();
+        await controller.send(dto, "203.0.113.8", undefined, "api.saroh.tech");
+        expect(send.mock.calls[1]?.[0]).toMatchObject({ edition: "GLOBAL" });
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
     });
 
     it("refuses a fourth message in a minute from one address with 429", async () => {

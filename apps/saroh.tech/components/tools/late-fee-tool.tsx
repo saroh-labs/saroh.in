@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 
 import { buttonClass } from "@/components/shared/button";
-import { Field } from "@/components/shared/field";
+import { Field as FieldFrame } from "@saroh/ui/field";
+
+import { Field, SelectField } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref } from "@/lib/tools/handoff";
@@ -19,7 +20,7 @@ import {
     toCents,
 } from "@/lib/tools/money";
 
-import { CopyButton, Section, SelectField } from "./fields";
+import { CopyButton, Section } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -70,11 +71,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
     const line = flat
         ? `Late fee (flat, invoice ${r.charged} days overdue): ${money(r.fee)}`
         : `Late fee: ${rate}% a ${d.type === "month" ? "month" : "year"} on ${money(amount)} for ${r.charged} days: ${money(r.fee)}`;
-    const handoff = useMemo(
-        () => ({ tool: TOOL, kind: "late-fee", draft: d }),
-        [d],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(TOOL);
     return (
         <div className="grid items-start gap-7 lg:grid-cols-2">
             <Section title="The invoice">
@@ -100,15 +97,14 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                     options={CURRENCY_OPTIONS}
                     onChange={(currency) => set({ currency })}
                 />
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Fee type</span>
+                <FieldFrame group label="Fee type">
                     <SegmentedControl
                         legend="Fee type"
                         value={d.type}
                         options={TYPES}
                         onChange={(type) => set({ type })}
                     />
-                </div>
+                </FieldFrame>
                 <div className="grid grid-cols-2 gap-3">
                     <Field
                         label={flat ? "Fee amount" : "Rate %"}
@@ -130,9 +126,11 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                 <section
                     aria-live="polite"
                     aria-label="Late fee"
-                    className="flex flex-col gap-2 rounded-card border border-ink bg-surface p-4 md:p-6"
+                    className="flex flex-col gap-2 rounded-mk-card border border-foreground bg-card p-4 md:p-6"
                 >
-                    <span className="text-[13px] text-quiet">Late fee</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        Late fee
+                    </span>
                     <span className="font-mono text-4xl font-semibold tracking-tight">
                         {money(r.fee)}
                     </span>
@@ -144,15 +142,15 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                         ].map(([label, value]) => (
                             <div
                                 key={label}
-                                className="flex justify-between gap-3 border-t border-line py-2.5"
+                                className="flex justify-between gap-3 border-t border-border py-2.5"
                             >
                                 <span>{label}</span>
                                 <span className="font-mono">{value}</span>
                             </div>
                         ))}
                     </div>
-                    <div className="rounded-control bg-paper p-3 text-[15px]">
-                        <span className="text-[13px] text-quiet">
+                    <div className="rounded-mk-control bg-background p-3 text-[15px]">
+                        <span className="text-[13px] text-muted-foreground">
                             Line to add to the invoice
                         </span>
                         <br />
@@ -183,12 +181,8 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
                         </Link>
                     </div>
                 </section>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
-                <p className="m-0 rounded-card border border-line bg-surface p-4 text-[15px] leading-normal">
+                <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
+                <p className="m-0 rounded-mk-card border border-border bg-card p-4 text-[15px] leading-normal">
                     <b>Before you charge it</b>
                     <br />
                     Only add a late fee if your terms said so before the work
@@ -202,7 +196,7 @@ export function LateFeeTool({ copy }: { copy: MomentCopy }) {
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={TOOL}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

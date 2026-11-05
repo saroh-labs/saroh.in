@@ -1,14 +1,14 @@
 "use client";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import type { Visitor } from "@/lib/browser/session";
 import { DASHBOARD_URL } from "@/lib/links";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
-import { ButtonLink } from "../buttons/button";
+import { ButtonLink } from "@saroh/marketing/button";
 import { CtaLink } from "../buttons/cta-link";
 import type { NavMenus, NavSection } from "./nav-section";
 

@@ -239,8 +239,11 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
         const fromEnd = testInfo.project.name.startsWith("phone") ? 2 : 1;
         const time = times.nth((await times.count()) - fromEnd);
+        const label = (await time.innerText()).trim();
         await time.click();
-        await expect(time).toHaveAttribute("aria-checked", "true");
+        await expect(
+            phone.getByRole("button", { name: `Edit the time, ${label}` }),
+        ).toBeVisible();
 
         // The steps stay on the page the scan opened, its tag kept.
         await phone.getByRole("radio", { name: /Pay at the desk/ }).click();

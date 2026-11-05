@@ -5,6 +5,7 @@ import { PostArticle } from "@/components/post-view";
 import {
     getPublishedPost,
     getSiteForHost,
+    getSiteForPage,
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
@@ -73,7 +74,7 @@ export default async function PostPage({
     params: Promise<{ domain: string; slug: string; postSlug: string }>;
 }) {
     const { domain, slug, postSlug } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
 
     // The prefix is the whole reason this route exists; a different first

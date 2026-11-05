@@ -114,8 +114,4 @@ export const receiptGraphicDesigner: Combo = {
             answer: "Treat it as money you received. Add it as a clear line with its own name, or write a separate receipt. Then ask your accountant how to record it, because it may still count as income where you work.",
         },
     ],
-    band: {
-        title: "Paid, delivered, on record.",
-        line: "Saroh keeps each receipt with the client and the project it belongs to, so you can find it years from now.",
-    },
 };

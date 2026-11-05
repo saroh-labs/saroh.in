@@ -60,8 +60,4 @@ export const quoteUae: Combo = {
             answer: "Ask for someone who can commit the business, and have them add their name and role. Tax rules don't cover this, so if the amount is large, check with your legal adviser.",
         },
     ],
-    band: {
-        title: "A UAE quote with VAT made plain.",
-        line: "Send it from Saroh, see when your client accepts, and turn it into a tax invoice without typing anything twice.",
-    },
 };

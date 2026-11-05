@@ -60,8 +60,4 @@ export const receiptSingapore: Combo = {
             answer: "IRAS gives at least 5 years for tax invoices you issue and receive. It asks for duplicates of receipts too, so keep those on the same timetable unless your accountant advises otherwise.",
         },
     ],
-    band: {
-        title: "Serial numbers that keep themselves.",
-        line: "Saroh keeps every Singapore receipt with the client it belongs to, and sends it when a payment is marked paid.",
-    },
 };

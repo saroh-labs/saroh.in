@@ -47,6 +47,7 @@ vi.mock("@/lib/invoices/service", () => ({
 }));
 vi.mock("@/lib/invoices/payments-on", () => ({
     payLinkPossible: () => Promise.resolve(true),
+    paymentsModuleOn: () => Promise.resolve(true),
 }));
 const canPick = vi.fn(() => Promise.resolve(true));
 vi.mock("@/lib/invoices/can-pick-products", () => ({

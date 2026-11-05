@@ -4,7 +4,7 @@ import { CUSTOMERS } from "@/content/customers";
 import { REPORT_LIMITS } from "@/lib/business-report";
 import { PhoneInput } from "@saroh/ui/phone-input";
 
-import { Button } from "../shared/buttons/button";
+import { Button } from "@saroh/marketing/button";
 import { fieldClasses } from "../shared/fields/field-classes";
 import { useReportForm } from "./use-report-form";
 

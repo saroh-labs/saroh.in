@@ -92,7 +92,9 @@ async function pickTime(
     const time = times.first();
     const label = (await time.innerText()).trim();
     await time.click();
-    await expect(time).toHaveAttribute("aria-checked", "true");
+    await expect(
+        page.getByRole("button", { name: `Edit the time, ${label}` }),
+    ).toBeVisible();
     return { label, serviceId };
 }
 
@@ -219,8 +221,10 @@ test.describe("the booking page", () => {
             `${SITE}/book?service=${encodeURIComponent(serviceId)}`,
         );
         await expect(
-            page.getByRole("radio", { name: new RegExp(SERVICE) }),
-        ).toHaveAttribute("aria-checked", "true");
+            page.getByRole("button", {
+                name: `Edit what you're booking, ${SERVICE}`,
+            }),
+        ).toBeVisible();
     });
 
     test("the header names the clinic's place and phone, read on the server (E6)", async ({
@@ -251,7 +255,9 @@ test.describe("the booking page", () => {
 
         // Days say what they are: how many are free, Full, Closed, or No
         // times (open, but nobody takes this service then: the first day is
-        // today, and on a weekend that is what Northwind's says).
+        // today, and on a weekend that is what Northwind's says). The strip
+        // has folded to its row: Edit shows it, and the time stands.
+        await page.getByRole("button", { name: /^Edit the day/ }).click();
         await expect(
             page
                 .getByRole("radiogroup", { name: "Day" })
@@ -369,8 +375,9 @@ test.describe("the booking page", () => {
                 name: /^(Cancel and pick another time|Pick another time)$/,
             })
             .click();
+        // Choosing again: the service stays folded, and the time is theirs to pick.
         await expect(
-            page.getByRole("heading", { name: "What would you like?" }),
+            page.getByRole("button", { name: /^Edit what you're booking/ }),
         ).toBeVisible();
         const after = await page.request.get(
             `${urls.API_URL}/public/services/holds/${payToken}`,

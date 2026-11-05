@@ -3,10 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { HelpSearch } from "@/components/help/help-search";
-import { Container } from "@/components/shared/layout/container";
-import { textLinkClasses } from "@/components/shared/links/text-link";
-import { Eyebrow } from "@/components/shared/sections/eyebrow";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     groupsWithArticles,
     HELP_EMAIL,
@@ -20,6 +16,10 @@ import { helpArticles } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /** A link inside a sentence: underlined, not told apart by colour alone. */
 const RUNNING_TEXT = "underline underline-offset-[3px]";

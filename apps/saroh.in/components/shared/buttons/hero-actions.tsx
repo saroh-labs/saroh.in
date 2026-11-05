@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { TOUR_LABEL, TOUR_VIDEO } from "@/content/home";
 import type { PlanId } from "@/lib/links";
 
-import { ButtonLink } from "./button";
+import { ButtonLink } from "@saroh/marketing/button";
 import { CtaLink } from "./cta-link";
 import { DemoLink } from "./demo-link";
 

@@ -90,8 +90,4 @@ export const estimateSalon: Combo = {
             answer: "There's no set rule, so choose your own limit and write it down. Telling them before you pass it matters most. A quick word mid-service is better than a shock at the desk.",
         },
     ],
-    band: {
-        title: "No shocks at the desk.",
-        line: "Send the estimate after the consultation, and take a deposit for the long appointment by link. 0% fees.",
-    },
 };

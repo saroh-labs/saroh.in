@@ -44,8 +44,4 @@ export const invoicePhotographer: Combo = {
             answer: "Only if you're registered for tax where you work. Add it as one line after the subtotal, with its name and rate. A couple usually can't claim it back, so show it clearly in the first quote to avoid a surprise later.",
         },
     ],
-    band: {
-        title: "Booked, shot, paid.",
-        line: "Send the quote, take the deposit and the balance through your own payment link. 0% fees.",
-    },
 };

@@ -59,7 +59,7 @@ export function FromSection({
             title="From"
             aside={
                 <>
-                    <span className="hidden text-[13px] text-quiet md:inline">
+                    <span className="hidden text-[13px] text-muted-foreground md:inline">
                         Remembered for next time
                     </span>
                     {folded ? (
@@ -77,7 +77,7 @@ export function FromSection({
             {folded ? (
                 <div className="text-[15px] md:hidden">
                     <b>{from.name}</b>
-                    <div className="text-[13px] text-quiet">
+                    <div className="text-[13px] text-muted-foreground">
                         {[from.email, from.taxId].filter(Boolean).join(" · ")}
                     </div>
                 </div>
@@ -109,7 +109,7 @@ export function FromSection({
                     <button
                         type="button"
                         onClick={() => file.current?.click()}
-                        className="flex size-[88px] cursor-pointer items-center justify-center overflow-hidden rounded-button border border-dashed border-[rgba(28,28,26,.35)] bg-paper p-0 font-sans text-[13px] text-body"
+                        className="flex size-[88px] cursor-pointer items-center justify-center overflow-hidden rounded-mk-btn border border-dashed border-border-strong bg-background p-0 font-sans text-[13px] text-mk-copy"
                     >
                         {from.logo ? (
                             // A data URL from this browser.
@@ -135,7 +135,7 @@ export function FromSection({
                     {logoError ? (
                         <span
                             role="alert"
-                            className="w-[88px] text-xs text-body"
+                            className="w-[88px] text-xs text-mk-copy"
                         >
                             That file didn't work. Try a PNG or JPG.
                         </span>
@@ -165,7 +165,7 @@ export function FromSection({
                     />
                     <Field
                         label="Tax ID"
-                        hint="(optional)"
+                        optional
                         value={from.taxId}
                         onChange={(e) => onChange({ taxId: e.target.value })}
                     />

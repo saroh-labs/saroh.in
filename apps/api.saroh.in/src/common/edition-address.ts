@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, Logger } from "@nestjs/common";
 import type { Edition } from "@saroh/edition";
 import { editionOfHost } from "@saroh/edition";
 
@@ -21,4 +21,22 @@ export function assertEditionMatchesAddress(
             details: { reason: "edition_address" },
         });
     }
+}
+
+const logger = new Logger("EditionAddress");
+
+/**
+ * The edition a public form files under, from the address it came through. An
+ * address of no edition files under India, as every form did before there were
+ * two. WARN: local development or a stray Host header now and then; a steady
+ * stream means an edition's address is missing from `@saroh/edition`, and its
+ * messages are landing with the wrong team.
+ */
+export function editionOfFormHost(host: string | undefined): Edition {
+    const edition = editionOfHost(host ?? "");
+    if (edition) return edition;
+    logger.warn(
+        `form_host_of_no_edition host=${JSON.stringify((host ?? "").slice(0, 120))}: filed under INDIA`,
+    );
+    return "INDIA";
 }

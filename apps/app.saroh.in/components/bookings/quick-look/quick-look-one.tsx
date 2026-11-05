@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { chipClass } from "@saroh/ui/chip";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,7 +11,6 @@ import {
     CalendarDays,
     CalendarPlus,
     CircleCheck,
-    IndianRupee,
     Layers,
     Mail,
     Phone,
@@ -228,7 +228,7 @@ export function OneLook({
         },
         take: {
             label: amount ? `Take ${amount}` : "Take payment",
-            icon: <IndianRupee aria-hidden className="size-5" />,
+            icon: <MoneyIcon aria-hidden className="size-5" />,
             run: onTake,
         },
         next: {
@@ -263,9 +263,7 @@ export function OneLook({
                 ) : null}
                 <div className="mt-1.5 min-[760px]:mt-0">
                     <Fact
-                        icon={
-                            <IndianRupee aria-hidden className="size-[18px]" />
-                        }
+                        icon={<MoneyIcon aria-hidden className="size-[18px]" />}
                         label="Payment"
                     >
                         {b.treatment ? (

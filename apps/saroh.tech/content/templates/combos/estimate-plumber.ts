@@ -114,8 +114,4 @@ export const estimatePlumber: Combo = {
             answer: "Often, yes, but ask the customer what their insurer wants. They may need the cause of the damage, photos and separate figures for tracing and repairing. Stick to what you saw, and don't guess at the cause.",
         },
     ],
-    band: {
-        title: "The price before the floor comes up.",
-        line: "Send it from the job and let the customer or landlord approve it online, with the time recorded.",
-    },
 };

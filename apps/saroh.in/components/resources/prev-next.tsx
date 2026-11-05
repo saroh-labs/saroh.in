@@ -1,9 +1,9 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-import { Arrow } from "../shared/links/arrow";
-import { cardLinkClasses } from "../shared/links/card-link";
+import { Arrow } from "@saroh/marketing/arrow";
+import { cardLinkClasses } from "@saroh/marketing/card-link";
 
 interface Neighbour {
     name: string;

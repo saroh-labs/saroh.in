@@ -90,8 +90,4 @@ export const estimateEventPlanner: Combo = {
             answer: "Show categories and allowances, not named suppliers, until the client has booked you. They get what they need to decide, while the contacts and ideas you've gathered stay yours until the work has started.",
         },
     ],
-    band: {
-        title: "See the whole event before it's booked.",
-        line: "Send the budget, agree the fee, and move on to the stage payments when they say yes. 0% fees.",
-    },
 };

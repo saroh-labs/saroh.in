@@ -29,18 +29,11 @@ const PLAN_OR_PRICE =
     /\b(plans?|free|grow|pro|starter|premium|paid|price[ds]?|pricing|rupees?|rs\.?|inr|a month|per month|monthly|yearly|weeks?|sprints?)\b|₹/i;
 
 describe("the groups", () => {
-    it("are the nearest months, then Early 2027, then Later", () => {
+    it("are Coming next, then Later, with no date", () => {
         expect(COMING_GROUPS.map((group) => group.label)).toEqual([
-            "Nov–Dec 2026",
-            "Early 2027",
+            "Coming next",
             "Later",
         ]);
-    });
-
-    it("give only the nearest group its months, and Later no date", () => {
-        const [, early, later] = COMING_GROUPS;
-        expect(early.label).not.toMatch(/jan|feb|mar|apr|–/i);
-        expect(later.label).not.toMatch(/\d/);
     });
 
     it("put rows under their group, nearest first, and leave out an empty one", () => {
@@ -55,7 +48,7 @@ describe("the groups", () => {
                 group.rows.map((row) => row.name),
             ]),
         ).toEqual([
-            ["Nov–Dec 2026", ["a", "b"]],
+            ["Coming next", ["a", "b"]],
             ["Later", ["c"]],
         ]);
     });
@@ -68,7 +61,7 @@ describe.each(lists)("%s", (_title, rows) => {
         expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 
-    it("has all three groups", () => {
+    it("has both groups", () => {
         expect(byComingGroup(rows).map((group) => group.key)).toEqual(
             COMING_GROUPS.map((group) => group.key),
         );
@@ -111,13 +104,11 @@ describe.each(lists)("%s", (_title, rows) => {
         }
     });
 
-    it("keeps social publishing in Later: it is not a current priority", () => {
-        const social = rows.filter((row) => /social|canva/i.test(row.name));
-        expect(social.map((row) => row.name).sort()).toEqual([
-            "Canva",
-            "Social publishing",
-        ]);
-        expect(social.every((row) => row.group === "later")).toBe(true);
+    it("has Saroh Social coming next, and Canva later (owner, 4 Nov 2026)", () => {
+        const groupOf = (name: string) =>
+            rows.find((row) => row.name === name)?.group;
+        expect(groupOf("Saroh Social")).toBe("next");
+        expect(groupOf("Canva")).toBe("later");
     });
 
     it("writes no em-dash aside", () => {
@@ -141,12 +132,12 @@ describe("the two lists together", () => {
             "Automatic WhatsApp messages",
             "Google Calendar sync",
             "Google Meet and Zoom links",
+            "Saroh Social",
             "Shopify import",
             "PhonePe",
             "Shiprocket",
             "Google Business Profile",
             "Tally and Zoho Books export",
-            "Social publishing",
             "Canva",
         ]);
         const planned = plannedIntegrations.map((row) => row.line);

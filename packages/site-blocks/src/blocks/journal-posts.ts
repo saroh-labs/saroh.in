@@ -27,6 +27,8 @@ export interface JournalFeed {
     posts: JournalPost[];
     /** The posts index; each post is at `${basePath}/${slug}`. */
     basePath: string;
+    /** The read failed: not "none", so the section says so (`FeedFailed`). */
+    failed?: boolean;
 }
 
 /** How many posts the block shows when the count is not set. */

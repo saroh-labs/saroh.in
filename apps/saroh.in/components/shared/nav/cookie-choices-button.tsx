@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/cn";
 import { writeConsent } from "@/lib/consent";
+import { cn } from "@saroh/marketing/cn";
 
 /**
  * "Cookie choices" in the footer: forgets the visitor's answer, so the

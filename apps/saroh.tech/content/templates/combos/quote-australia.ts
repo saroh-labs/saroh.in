@@ -48,7 +48,7 @@ export const quoteAustralia: Combo = {
             answer: "If you're registered and the sale is taxable, your price should include it, and the quote should say so. If you aren't registered, say nothing about GST and don't add a line for it.",
         },
         {
-            question: "What happens when an Australian client accepts?",
+            question: "What happens when an Australian client says yes?",
             answer: "Nothing about the tax changes until there's a sale to record. Keep the signed quote with the job, then send a tax invoice with the same lines. A quote isn't one, and shouldn't claim to be.",
         },
         {
@@ -57,8 +57,4 @@ export const quoteAustralia: Combo = {
             answer: "Treat a change as a new agreement. Write down what's different, get a fresh yes, then bill to that. Consumer and contract rules aren't on the tax pages we read, so ask for advice if it's disputed.",
         },
     ],
-    band: {
-        title: "A quote Australians can say yes to.",
-        line: "Send it from Saroh, see when it's accepted, and turn it into a tax invoice without typing anything twice.",
-    },
 };

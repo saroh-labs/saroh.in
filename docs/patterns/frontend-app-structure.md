@@ -326,7 +326,7 @@ business's own trackers would need listing first.
   browser**, through `readAddress` (`lib/page-address.ts`), so the page
   stays one built file: the waitlist form, the link preview tool.
 - **A screenshot is files with a `srcset`**, never `next/image`
-  (`components/shared/media/shot-image.tsx`). After a capture run
+  (`@saroh/marketing/shot-image`, sized by `apps/saroh.in/lib/shot-sources.ts`). After a capture run
   `pnpm --filter web shots:sizes --force`.
 - **Files Cloudflare serves without the Worker take their headers from
   `public/_headers`**: caching for `/_next/static/*` and `/shots/*`, and

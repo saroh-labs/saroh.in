@@ -11,6 +11,7 @@ import { modulesOrUnknown } from "@/lib/modules/guard";
 import { rolledOut } from "@/lib/modules/rollout";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
 import { readBookingLink } from "@/lib/services/booking-link-read";
 import {
@@ -132,7 +133,11 @@ export default async function ServicesPage() {
                     services={services}
                     staff={staffList?.staff ?? null}
                     usage={usage}
-                    currency={businessCurrencyOf(services)}
+                    currency={
+                        services.some((s) => s.currency)
+                            ? businessCurrencyOf(services)
+                            : await startingCurrency()
+                    }
                     canEdit={canEdit}
                     hasPage={hasPage}
                     payment={payment}

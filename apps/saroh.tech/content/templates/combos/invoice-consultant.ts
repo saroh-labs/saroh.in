@@ -39,8 +39,4 @@ export const invoiceConsultant: Combo = {
             answer: "It can. Some large companies need bills submitted through their own portal, with details matching your supplier record exactly. Register early, because it can take weeks, and match your name, bank details and PO number to what they hold.",
         },
     ],
-    band: {
-        title: "Good advice, paid on time.",
-        line: "Send each month's bill to finance in a click, and take payment through your own link. 0% fees.",
-    },
 };

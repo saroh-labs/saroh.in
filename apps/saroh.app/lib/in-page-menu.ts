@@ -23,9 +23,10 @@ import {
  * Asked by the layout, which draws the header on every page. The feeds are
  * read the way the home page reads them (`PublishedPage`), for the linked,
  * feed-backed home sections only, so a site without such an entry reads
- * nothing more. On the home page Next memoizes identical `fetch` GETs
+ * nothing more. On the home page each reader's `cache` shares its answer
  * across the layout and the page within one request, so the page's own
- * reads are not repeated.
+ * reads are not repeated. Next's `fetch` dedupe doesn't: every read carries
+ * a timeout signal, which turns it off.
  */
 export function liveMenu(
     snapshot: PublicationSnapshot,

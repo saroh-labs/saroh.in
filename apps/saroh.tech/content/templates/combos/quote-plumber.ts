@@ -115,8 +115,4 @@ export const quotePlumber: Combo = {
             answer: "Yes, if you've seen them or they truly match. Quote a per-flat price, and list each address. Say that a flat with different pipework or poor access will be priced separately, so one odd flat doesn't eat your margin.",
         },
     ],
-    band: {
-        title: "Parts ordered, date booked.",
-        line: "Your customer accepts the quote online and pays the deposit through your own link, so you can order the boiler. 0% fees.",
-    },
 };

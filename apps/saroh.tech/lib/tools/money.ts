@@ -1,5 +1,10 @@
-/** Money in whole cents, so a total never drifts. */
-export const CURRENCIES = {
+import type { GLOBAL_CURRENCIES } from "@saroh/edition";
+
+/** Money in whole cents, so a total never drifts. The same nine as a Global business's setup. */
+export const CURRENCIES: Record<
+    (typeof GLOBAL_CURRENCIES)[number],
+    { symbol: string; label: string }
+> = {
     GBP: { symbol: "£", label: "GBP £" },
     USD: { symbol: "$", label: "USD $" },
     EUR: { symbol: "€", label: "EUR €" },
@@ -8,7 +13,8 @@ export const CURRENCIES = {
     NZD: { symbol: "NZ$", label: "NZD $" },
     SGD: { symbol: "S$", label: "SGD $" },
     AED: { symbol: "AED ", label: "AED" },
-} as const;
+    ZAR: { symbol: "R", label: "ZAR R" },
+};
 
 export type Currency = keyof typeof CURRENCIES;
 

@@ -92,7 +92,7 @@ function ShopControls({
                                 : "text-muted-foreground hover:text-foreground",
                         )}
                     >
-                        {v === "team" ? "Team" : "Customer"} view
+                        {v === "team" ? "Your" : "Customer"} view
                     </Link>
                 ))}
             </div>

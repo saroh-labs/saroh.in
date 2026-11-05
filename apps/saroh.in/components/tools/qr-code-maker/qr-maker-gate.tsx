@@ -4,7 +4,7 @@ import { EmailGate, ToolGateProvider } from "@saroh/search-pages";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 
-import { Button } from "../../shared/buttons/button";
+import { Button } from "@saroh/marketing/button";
 import { toolGateSubmit } from "../tool-gate";
 
 /** Nothing to download yet: the one disabled treatment, with the reason beside it. */

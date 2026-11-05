@@ -38,8 +38,4 @@ export const invoiceGraphicDesigner: Combo = {
             answer: "Show the printer's cost on its own line, apart from your artwork fee. If you add a charge for managing the print run, name that too. Better still, ask the printer to bill the client direct when the run is large.",
         },
     ],
-    band: {
-        title: "Artwork out, money in.",
-        line: "Bill the client when the proofs are approved, and let them pay through your own link. 0% fees.",
-    },
 };

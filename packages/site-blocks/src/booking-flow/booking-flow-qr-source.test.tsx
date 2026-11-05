@@ -12,6 +12,7 @@ import type { BookSignedIn, SignedInBookRequest } from "./api";
 import type { BookingAccount } from "./booking-flow";
 import BookingFlow from "./booking-flow";
 import type { BookingPageData } from "./model";
+import { pressDay } from "./test-press-day";
 
 vi.mock("./checkout", () => ({
     openProviderCheckout: () => ({
@@ -133,6 +134,7 @@ function openAt(address: string) {
 
 async function chooseAndPay() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
+    await pressDay();
     fireEvent.click(
         await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
@@ -193,6 +195,7 @@ describe("the QR code a booking came from", () => {
                 account={account(book, { customer: null })}
             />,
         );
+        await pressDay();
         fireEvent.click(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",

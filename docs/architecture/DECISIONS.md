@@ -1168,6 +1168,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
     - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
 - Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+- 4 Nov 2026 (owner): marketing no longer claims packs while they aren't offered. The screenshots and the module's code stay.
 
 ## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
 
@@ -1358,7 +1359,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 **Status: Accepted — 2026-10-10** · owner
 
 - Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
-- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
+- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: "Coming next" or "Later". Never a date (owner, 4 Nov 2026: it was months, then "Early 2027", until then, and those dates went stale). The same day the owner moved Saroh for Android, Invoice layouts, Sign in with Google, Bring your own login, API keys and webhooks, and social publishing, now named Saroh Social, up to Coming next.
 - Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
 
 ## DEC-120 A business scheduled for deletion winds down, and an owner can download its data
@@ -2716,6 +2717,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     10. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
 - Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.
 
+**Free's limits on /pricing (4 Nov, owner).** Paid plans come later, and Free keeps the limits it already has. So until the USD catalogue exists, Free's card on saroh.tech reads Free's own rows from the published catalogue at build (`apps/saroh.tech/lib/plans.ts`), and nothing else in it: no price, no paid plan. With no catalogue at build, the card keeps its general lines and footnote.
+
+**The free tools and the claims check (4 Nov, owner).** saroh.tech says only what's verified, and `apps/saroh.tech/scripts/check-claims.mjs` runs as `postbuild`, so a phrase the product can't back fails the build, in CI's Build job too. A tool's sign-up goes to the real sign-up with the tool's `src`: the app has no import page, so a draft stays in the browser and no line says otherwise. This departs from the plan's "destinations stay". Comparison pages state Saroh's side only, until a fact about another tool has its own public page and a date.
+
+**One person, and no compare or referral pages, for now (owner, 4 Nov).** While plans can't be bought abroad, saroh.tech's pages speak to one person running their business. Anything that needs a second person is out, a diary person with no login included, since they take a team seat (DEC-155): `ONE_PERSON` in `apps/saroh.tech/scripts/check-claims.mjs` fails the build on those words. Teams aren't listed as coming. `/compare`, its six alternatives and `/referral` are removed from saroh.tech, and come back through git, with no feature flag.
+
+**Referral links stay, compare pages stay out (owner, 4 Nov).** `/referral` is back, noindex and in no menu (saroh.in has no referral page or link), and it says what a link does today: the "Made with Saroh" credit records who referred a new business (DEC-156), with no reward while plans can't be bought abroad. saroh.tech's Worker keeps `?ref=` and shares `saroh_ref` with the app's domain, as saroh.in's page does. The app still has no referral screen.
+
+**Saroh.tech's facts (owner, 4 Nov).** The address is support@saroh.tech. Its legal pages take saroh.in's company facts and limits, in saroh.in's words where they hold abroad, and stay marked "Draft: not yet in force" until the owner's legal read. Guides are signed as saroh.in's are. /pricing says what happens at each of Free's limits, in the words the API refuses in, read from the catalogue at build.
+
 ## DEC-204 Two editions from one codebase: one database, the business decides
 
 **Status: Accepted — 2026-11-02** · owner
@@ -2750,3 +2761,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 **Shared data is listed (2 Nov).** `scripts/shared-data.json` names the 35 models that belong to no one business, each with why, and `check:shared-data` fails on a new one that isn't listed.
 
 **Sign-in on two domains (2 Nov).** A browser takes a session cookie only for the address's own domain, so the one running API keeps one Better Auth instance per edition address, chosen from a fixed list by the request's address. The configured `BETTER_AUTH_URL` stays the default, and a second instance is only built when someone reaches that address. Reading a session needs only the shared secret and database, so the guard uses one instance. Signed-in state stays separate per domain, as agreed.
+
+## DEC-205 A Book page lists everything offered
+
+- Decision (owner, 4 Nov 2026): whoever opens `/book` can pick anything the business offers. A published Book page lists every service offered: its stored ids first, in their order, then the rest. Its layout, prices, button label and heading stay the merchant's. Home, Prices and other pages keep their stored selection.
+- Why: "if we open all bookings page, it should list down all so that we can select one, but it was showing empty, so ideally we should be seeing all". A snapshot can't tell a merchant's choice from a list written when one service existed.
+- Rules: `apps/saroh.app/lib/book-page-offer.ts`, `frontend-data-and-state.md`.
+
+## DEC-206 Classic's booking page folds each step, and the header's Sign in stays on the booking
+
+- Decision (owner, 4 Nov 2026): on Classic, a service, a day and a time each fold to one row with Edit once answered, and a day's times show only after the day is pressed. The summary card stays in view below the site's header. Pressing Sign in in the header while a booking is open signs in on the page and keeps everything chosen and typed; with no booking open it goes to the account as before.
+- Why: "This makes the space little and easy for the user to navigate in the booking page", and "the progress is lost" at sign-in.
+- Unchanged: no control is removed (owner, "do not remove anything"): other services, the person choice, later dates and other times sit behind Edit. The looks already ask one thing a screen and draw as before, and so does the account's Move sheet.
+- Consequences: one more press than before, since times used to show for the first free day. A look's phone menu and footer links still go to the account.
+- Rules: `packages/site-blocks/src/booking-flow/choose-steps.tsx`, `steps/chosen-row.tsx`, `header-sign-in.ts`; `frontend-data-and-state.md`.

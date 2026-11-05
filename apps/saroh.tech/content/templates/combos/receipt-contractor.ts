@@ -48,8 +48,4 @@ export const receiptContractor: Combo = {
             answer: "Tell them straight away, and mark that receipt as cancelled in your own files. Issue a new one when cleared funds arrive. For big stage sums, consider waiting for the bank to clear before you write anything.",
         },
     ],
-    band: {
-        title: "Every stage on paper.",
-        line: "A receipt goes out when each payment lands through your own link, so the owner never has to ask. 0% fees.",
-    },
 };

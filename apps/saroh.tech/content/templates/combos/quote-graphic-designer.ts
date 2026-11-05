@@ -114,8 +114,4 @@ export const quoteGraphicDesigner: Combo = {
             answer: "Point to your past work rather than starting theirs. If they need to see their own brand first, offer a small paid first stage. That covers your time, and the fee can come off the full price if they carry on.",
         },
     ],
-    band: {
-        title: "Scope agreed. Pencils out.",
-        line: "Your client accepts the quote online, pays the start fee through your own link, and you begin. 0% fees.",
-    },
 };

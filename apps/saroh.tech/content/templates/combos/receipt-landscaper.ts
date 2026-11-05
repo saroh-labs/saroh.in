@@ -90,8 +90,4 @@ export const receiptLandscaper: Combo = {
             answer: "Yes. Describe the plants and say that you bought them for this garden, and keep the nursery's own slip. If the shrub later fails, it shows who paid and where it came from.",
         },
     ],
-    band: {
-        title: "Cash at the gate, on the record.",
-        line: "Log the payment on your phone and send a slip before you start the next garden. 0% fees.",
-    },
 };

@@ -11,7 +11,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { dontCachePage } from "@/lib/page-cache/site-rules";
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForHost, getSiteForPage } from "@/lib/publication";
 import { getWaitlistClaim } from "@/lib/waitlist-claim";
 
 /**
@@ -57,7 +57,7 @@ export default async function WaitlistClaimRoute({
     const { domain, token } = await params;
     // About one customer's place, and changing by the minute.
     dontCachePage("a waitlist offer");
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
     const look = lookOf(resolved.snapshot.site.look);
 

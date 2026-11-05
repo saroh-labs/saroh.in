@@ -1,9 +1,4 @@
-import { site } from "@/site.config";
-
-/**
- * A draft travels in the address's fragment, which never reaches a server, so
- * nothing is typed twice and nothing is stored unless they sign up.
- */
+/** A draft goes from one tool to another in the address's fragment, which never reaches a server. */
 export function encodeDraft(draft: unknown): string {
     const bytes = new TextEncoder().encode(JSON.stringify(draft));
     return btoa(String.fromCharCode(...bytes))
@@ -21,30 +16,6 @@ export function decodeDraft(encoded: string): unknown {
     } catch {
         return null;
     }
-}
-
-export interface Handoff {
-    tool: string;
-    kind: string;
-    draft: unknown;
-    from?: unknown;
-}
-
-/** The app takes it from here. A logo is left out: it's too long for an address. */
-export function importHref(
-    { from, ...rest }: Handoff,
-    method?: string,
-): string {
-    const details =
-        from && typeof from === "object"
-            ? { ...from, logo: undefined }
-            : undefined;
-    const query = new URLSearchParams({
-        from: "tool",
-        tool: rest.tool,
-        ...(method && { method }),
-    });
-    return `${site.appUrl}/import?${query.toString()}#${encodeDraft({ ...rest, from: details })}`;
 }
 
 /** Into another tool on this site: the invoice generator adds a line, say. */

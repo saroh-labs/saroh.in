@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { dontCachePage } from "./page-cache/record";
 import type { SiteHead } from "./site-head-shape";
@@ -52,10 +52,13 @@ export const getSiteHead = cache(async function siteHeadFor(
         }
         const res = await fetch(
             `${API_URL}/public/sites/${encodeURIComponent(siteId)}/head`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) return unreadHead();
-        return siteHeadOf(await res.json().catch(() => null));
+        // A 200 whose body didn't arrive whole is a failed read, not no head.
+        const body: unknown = await res.json().catch(() => null);
+        if (typeof body !== "object" || body === null) return unreadHead();
+        return siteHeadOf(body);
     } catch {
         return unreadHead();
     }

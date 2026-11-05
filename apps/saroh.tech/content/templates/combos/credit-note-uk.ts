@@ -63,8 +63,4 @@ export const creditNoteUk: Combo = {
             answer: "Yes, as a plain correction. Your own books still need it, so use your usual numbering. Just leave out the VAT number and VAT line, as there's no tax for your customer to reverse.",
         },
     ],
-    band: {
-        title: "A UK credit note HMRC can follow.",
-        line: "Issue it in Saroh and it stays attached to the VAT invoice and the client, so your numbers still add up.",
-    },
 };

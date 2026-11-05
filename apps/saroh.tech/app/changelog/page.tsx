@@ -1,10 +1,18 @@
+import { ComingList } from "@saroh/marketing/coming-list";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 
+import { ChangelogBand } from "@/components/content/changelog-entry";
 import { ChangelogList } from "@/components/content/changelog-list";
-import { CtaBand } from "@/components/shared/cta-band";
+import {
+    COMING,
+    COMING_INTRO,
+    COMING_TITLE,
+    NOT_AVAILABLE_YET,
+} from "@/content/coming";
 import { canonicalOf, pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
-import { signupHref } from "@/site.config";
 
 const page = pageOf("/changelog");
 const base = pageMetadata(page);
@@ -22,30 +30,38 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-[1440px] px-4 pt-6 md:px-20 md:pt-12"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-6 md:pt-12"
         >
             <div className="flex max-w-[940px] flex-col gap-6">
                 <div className="flex flex-col gap-3.5">
-                    <h1 className="m-0 font-display text-[38px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[72px]">
-                        {page.h1}
-                    </h1>
-                    <p className="m-0 text-[17px] leading-[1.6] text-body md:text-[19px]">
+                    <PageTitle size="page">{page.h1}</PageTitle>
+                    <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-[19px]">
                         Every change to Saroh, newest first. <b>Global</b> means
                         saroh.tech only. <b>Both</b> means saroh.tech and
                         saroh.in.
                     </p>
                 </div>
                 <ChangelogList />
+                <section aria-labelledby="coming" className="grid gap-1 pt-10">
+                    <Eyebrow
+                        as="h2"
+                        id="coming"
+                        tone="muted"
+                        className="m-0 pb-1"
+                    >
+                        {COMING_TITLE}
+                    </Eyebrow>
+                    <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
+                        {COMING_INTRO}
+                    </p>
+                    <ComingList
+                        groups={COMING}
+                        idPrefix="coming"
+                        mark={NOT_AVAILABLE_YET}
+                    />
+                </section>
             </div>
-            <div className="pt-10 md:pt-16">
-                <CtaBand
-                    title="We ship every week."
-                    line="Try what's new on the free plan."
-                    action="Start free"
-                    href={signupHref("changelog")}
-                    from="start-free-band"
-                />
-            </div>
+            <ChangelogBand />
         </div>
     );
 }

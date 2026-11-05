@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { GalleryTemplate } from "@/content/templates";
 
-import { ChoiceChip } from "../shared/fields/choice-chips";
+import { ChoiceChip } from "@saroh/marketing/choice-chip";
 import { TemplateCard } from "./template-card";
 
 export interface GalleryChip {

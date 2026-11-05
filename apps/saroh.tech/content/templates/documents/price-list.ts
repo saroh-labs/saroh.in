@@ -119,8 +119,4 @@ export const priceList: DocumentData = {
             answer: "No. A list is general and open to anyone, while a quote is one price for one client and one job. When an order needs anything beyond the list, follow up with a quote that says exactly what you've agreed to.",
         },
     ],
-    band: {
-        title: "From price list to paid order.",
-        line: "Put your prices on your own Saroh page, and let customers ask, book and pay without the back and forth.",
-    },
 };

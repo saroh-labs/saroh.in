@@ -112,8 +112,4 @@ export const receiptMakeupArtist: Combo = {
             answer: "Your first receipt stands, so you don't need another. Send a brief note saying the booking is cancelled and the retainer kept, as your terms said. A credit note covers any part you return.",
         },
     ],
-    band: {
-        title: "Every part of the booking, on record.",
-        line: "Take each payment through your own link, and send a receipt from your phone the same minute. 0% fees.",
-    },
 };

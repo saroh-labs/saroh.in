@@ -115,8 +115,4 @@ export const estimateConsultant: Combo = {
             answer: "Bring it to the checkpoint rather than quietly working more days. Write down the new question, what it adds, and the revised figure. Then the sponsor can get more budget, or tell you to leave it out.",
         },
     ],
-    band: {
-        title: "A budget the sponsor can sign.",
-        line: "Share a clear estimate with the person holding the budget, and see when they approve it online.",
-    },
 };

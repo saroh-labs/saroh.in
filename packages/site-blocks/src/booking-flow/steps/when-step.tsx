@@ -11,6 +11,7 @@ import type {
     BookingStart,
 } from "../model";
 import { visitsOf } from "../model";
+import { StillFinding } from "../still-finding";
 import { card, quietFill, textAction } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { OneToOne } from "./one-to-one";
@@ -50,6 +51,12 @@ export interface WhenProps {
     reach?: BusinessReach | null;
     /** A look's frame: its own day strip and time chips. */
     look?: LookId;
+    /**
+     * Classic: a day, then its times, then the time chosen, each folding
+     * to a row with Edit. `dayPicked`: the visitor has picked the day, not
+     * just the first free one being on show.
+     */
+    stepped?: { dayPicked: boolean };
 }
 
 /** Step 2: when — a day and a start, or a class session. */
@@ -98,6 +105,7 @@ export function WhenBody({
     onSkip,
     reach = null,
     look,
+    stepped,
 }: WhenProps) {
     const weeks = { skip, later, onSkip };
     return (
@@ -112,6 +120,7 @@ export function WhenBody({
                     data-times-loading=""
                     className="grid gap-2.5"
                 >
+                    <StillFinding />
                     <div className={cn("h-3.5 w-2/5 rounded-md", quietFill)} />
                     {isClass ? (
                         <div className="grid gap-2">
@@ -138,12 +147,14 @@ export function WhenBody({
                                     />
                                 ))}
                             </div>
-                            <div
-                                className={cn(
-                                    "mt-2 h-[45px] rounded-[calc(var(--site-radius)+7px)]",
-                                    quietFill,
-                                )}
-                            />
+                            {stepped ? null : (
+                                <div
+                                    className={cn(
+                                        "mt-2 h-[45px] rounded-[calc(var(--site-radius)+7px)]",
+                                        quietFill,
+                                    )}
+                                />
+                            )}
                         </>
                     )}
                 </div>
@@ -180,6 +191,7 @@ export function WhenBody({
                     weeks={weeks}
                     reach={reach}
                     look={look}
+                    stepped={stepped}
                 />
             ) : days ? (
                 <Sessions
@@ -193,6 +205,7 @@ export function WhenBody({
                     waitlist={waitlist}
                     weeks={weeks}
                     reach={reach}
+                    stepped={!!stepped}
                 />
             ) : null}
         </>

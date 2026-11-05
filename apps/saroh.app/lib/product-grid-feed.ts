@@ -22,7 +22,8 @@ export async function productGridFeeds(
     basePath: string | null,
     /** The grid's read, by its query; null when there is nothing to read. */
     query: (content: unknown) => string | null,
-    read: (query: string) => Promise<ProductGridFeed["products"]>,
+    /** Its products; null when the read failed, which is not "none". */
+    read: (query: string) => Promise<ProductGridFeed["products"] | null>,
     /** The page is the Shop page itself: no "Shop →" back to it (UX-082). */
     atShop = false,
 ): Promise<(ProductGridFeed | undefined)[] | undefined> {
@@ -37,13 +38,15 @@ export async function productGridFeeds(
     await Promise.all(
         grids.map(async ({ section, index }) => {
             const q = query(section.content);
-            // A failed read, the shop not open or nothing on sale is an empty
-            // list (the reader never throws), and an empty grid draws
-            // nothing: the page still serves.
+            // The shop not open or nothing on sale is an empty list, and an
+            // empty grid draws nothing: the page still serves. A failed read
+            // says so instead (the reader never throws).
+            const products = q ? await read(q) : [];
             feeds[index] = {
-                products: q ? await read(q) : [],
+                products: products ?? [],
                 basePath,
                 ...(atShop ? { atShop } : {}),
+                ...(products ? {} : { failed: true }),
             };
         }),
     );

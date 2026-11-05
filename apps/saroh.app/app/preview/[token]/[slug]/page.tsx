@@ -41,6 +41,8 @@ export default async function PreviewPage({
     // same path and silently win depending on nothing the merchant can see.
     if (slug === postsPrefix(preview.snapshot)) {
         const posts = await getPreviewPosts(token);
+        // To the error boundary, with Try again, as the live index does.
+        if (!posts) throw new Error("Posts read failed");
         const base = `/preview/${encodeURIComponent(token)}/${slug}`;
         return (
             <PostIndex

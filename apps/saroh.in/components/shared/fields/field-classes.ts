@@ -1,5 +1,5 @@
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
+import { cn } from "@saroh/marketing/cn";
+import { ring } from "@saroh/marketing/ring";
 
 /**
  * A text field's classes (DEC-195, V11): 16px text, so iOS doesn't zoom in

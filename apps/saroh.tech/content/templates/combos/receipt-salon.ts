@@ -112,8 +112,4 @@ export const receiptSalon: Combo = {
             answer: "That's your policy to set, within local consumer rules. If you do refund it, issue a new note saying what came back, with the amount and date. Leave the first receipt as it was.",
         },
     ],
-    band: {
-        title: "Paid, printed, booked again.",
-        line: "Send a receipt by email from the desk, and keep the record with the client's name. 0% fees.",
-    },
 };

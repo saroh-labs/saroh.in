@@ -10,12 +10,12 @@ import type { PublishContext } from "@/content/resources";
 import { linkShown } from "@/content/resources";
 import type { LaunchMode } from "@/lib/links";
 
+import { Arrow } from "@saroh/marketing/arrow";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Section } from "@saroh/marketing/section";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { CtaLink } from "../shared/buttons/cta-link";
-import { Container } from "../shared/layout/container";
-import { Arrow } from "../shared/links/arrow";
-import { textLinkClasses } from "../shared/links/text-link";
-import { Eyebrow } from "../shared/sections/eyebrow";
-import { Section } from "../shared/sections/section";
 
 /** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */
 const HINDI = "font-[family-name:var(--font-devanagari)]";

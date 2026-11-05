@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import type { WaitlistContent } from "@/content/waitlist";
-import { ring } from "@/lib/ring";
 import { openingLong } from "@/lib/waitlist";
+import { ring } from "@saroh/marketing/ring";
 
 import { ReferralLink } from "./referral-link";
 

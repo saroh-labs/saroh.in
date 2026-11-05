@@ -8,14 +8,14 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
     return (
         <div
             data-print
-            className={`flex flex-col overflow-hidden rounded-[14px] border border-line bg-surface text-[13px] leading-normal shadow-[0_18px_40px_-18px_rgba(28,28,26,.28)] [overflow-wrap:anywhere] ${
+            className={`flex flex-col overflow-hidden rounded-mk-card border border-border bg-card text-[13px] leading-normal shadow-mk-card [overflow-wrap:anywhere] ${
                 compact ? "gap-3 p-6" : "gap-[22px] p-5 md:p-10 md:pb-9"
             } ${bold ? "!pt-0" : ""}`}
         >
             <div
                 className={`flex justify-between gap-4 ${
                     bold
-                        ? "-mx-5 bg-ink px-5 py-6 text-paper md:-mx-10 md:px-10"
+                        ? "-mx-5 bg-foreground px-5 py-6 text-background md:-mx-10 md:px-10"
                         : ""
                 }`}
             >
@@ -27,7 +27,7 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                         alt=""
                         width={48}
                         height={48}
-                        className="size-12 rounded-control object-contain"
+                        className="size-12 rounded-mk-control object-contain"
                     />
                 ) : (
                     <span />
@@ -37,12 +37,12 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                         {view.heading}
                     </div>
                     <div
-                        className={`font-mono ${bold ? "text-[#D8D5CC]" : "text-quiet"}`}
+                        className={`font-mono ${bold ? "text-mk-on-ink" : "text-muted-foreground"}`}
                     >
                         {view.number}
                     </div>
                     {view.stamp ? (
-                        <span className="mt-1 inline-block rounded-full bg-[#F7E8D2] px-2.5 py-0.5 text-xs font-bold text-saffron-text">
+                        <span className="mt-1 inline-block rounded-full bg-mk-soon px-2.5 py-0.5 text-xs font-bold text-brand-700">
                             {view.stamp}
                         </span>
                     ) : null}
@@ -72,7 +72,7 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
             {view.rows.length ? (
                 <table className="w-full border-collapse">
                     <thead>
-                        <tr className="border-b border-ink text-left">
+                        <tr className="border-b border-foreground text-left">
                             <th scope="col" className="py-2 font-semibold">
                                 Description
                             </th>
@@ -100,7 +100,7 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                     </thead>
                     <tbody>
                         {view.rows.map((r, i) => (
-                            <tr key={i} className="border-b border-line">
+                            <tr key={i} className="border-b border-border">
                                 <td className="py-2 pr-2">{r.description}</td>
                                 <td className="py-2">{r.qty}</td>
                                 {rateHeader ? (
@@ -123,7 +123,9 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                     {view.extras.map((e, i) => (
                         <div key={i} className="flex justify-between gap-4">
                             <span>{e.description}</span>
-                            <span className="font-mono">{e.amount}</span>
+                            <span className="whitespace-nowrap font-mono">
+                                {e.amount}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -135,12 +137,14 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                         key={t.label}
                         className={`flex justify-between gap-3 ${
                             t.strong
-                                ? "border-t border-ink pt-1.5 text-base font-bold"
+                                ? "border-t border-foreground pt-1.5 text-base font-bold"
                                 : ""
                         }`}
                     >
                         <span>{t.label}</span>
-                        <span className="font-mono">{t.value}</span>
+                        <span className="whitespace-nowrap font-mono">
+                            {t.value}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -148,7 +152,7 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
             {view.blocks.map((b, i) => (
                 <div
                     key={i}
-                    className="whitespace-pre-line border-t border-line pt-3"
+                    className="whitespace-pre-line border-t border-border pt-3"
                 >
                     {b.label ? <b className="block">{b.label}</b> : null}
                     {b.lines.map((l, j) => (
@@ -158,11 +162,11 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
             ))}
 
             {view.signLine ? (
-                <div className="grid grid-cols-[2fr_1fr] gap-6 pt-8 text-quiet">
-                    <div className="border-t border-ink pt-1">
+                <div className="grid grid-cols-[2fr_1fr] gap-6 pt-8 text-muted-foreground">
+                    <div className="border-t border-foreground pt-1">
                         Client signature
                     </div>
-                    <div className="border-t border-ink pt-1">Date</div>
+                    <div className="border-t border-foreground pt-1">Date</div>
                 </div>
             ) : null}
         </div>

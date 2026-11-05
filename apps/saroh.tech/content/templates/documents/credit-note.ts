@@ -127,8 +127,4 @@ export const creditNote: DocumentData = {
             answer: "It reduces your sales for the period, along with any tax on it. Most accounting tools have a credit note option that handles this for you. If you keep a simple spreadsheet, enter it as a negative line beside the invoice.",
         },
     ],
-    band: {
-        title: "Fix a bill without the mess.",
-        line: "Saroh keeps the invoice, the credit note and the refund together under the client, so your numbers still add up.",
-    },
 };

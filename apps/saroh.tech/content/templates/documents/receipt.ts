@@ -9,9 +9,9 @@ export const receipt: DocumentData = {
     lede: "A receipt shows that money has changed hands. This one lists what was paid for, the date, how it was paid and who paid it, so nobody has to ask twice.",
     items: [
         {
-            line: "Class pack",
-            billedBy: "Per pack",
-            description: "Yoga class pack, 10 classes",
+            line: "Block of classes",
+            billedBy: "Per block",
+            description: "Yoga, 10 classes",
             qty: "1",
             rate: "120",
         },
@@ -123,8 +123,4 @@ export const receipt: DocumentData = {
             answer: "Longer than you'd think. Tax offices commonly expect records to be kept for several years, and the exact period depends on where you are. A folder of PDFs per year is plenty, as long as you can find them again.",
         },
     ],
-    band: {
-        title: "Receipts that file themselves.",
-        line: "Saroh keeps every receipt with the client it belongs to, and sends it the moment a payment is marked paid.",
-    },
 };

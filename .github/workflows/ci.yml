@@ -239,6 +239,10 @@ jobs:
       - name: Date inputs
         run: pnpm run check:date-inputs
 
+      # Every list on saroh.tech is the shadcn select, never a native one.
+      - name: Native selects
+        run: pnpm run check:native-selects
+
       # An address written in place is one Next's router follows (null state).
       - name: History state
         run: pnpm run check:history-state
@@ -288,7 +292,7 @@ jobs:
         run: pnpm run check:copy
 
       # One copy of each block (DEC-195): no new run of six lines copied
-      # across saroh.in and @saroh/search-pages; the baseline only shrinks.
+      # across saroh.in, @saroh/marketing and @saroh/search-pages; the baseline only shrinks.
       - name: One copy of each block
         run: pnpm run check:dupes
 

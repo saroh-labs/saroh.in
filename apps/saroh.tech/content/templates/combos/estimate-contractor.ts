@@ -94,8 +94,4 @@ export const estimateContractor: Combo = {
             answer: "A rough figure doesn't commit either side to the price. Once the drawings are done, send a fixed quote or a building contract and have that signed before any crew turns up or any steel gets ordered.",
         },
     ],
-    band: {
-        title: "A rough number, honestly labelled.",
-        line: "Turn the estimate into a fixed quote when the drawings land, then bill it stage by stage. 0% fees.",
-    },
 };

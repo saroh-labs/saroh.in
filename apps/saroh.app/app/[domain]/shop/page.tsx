@@ -27,12 +27,23 @@ import {
 } from "@/lib/module-pages";
 import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
-import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
+import {
+    findPageByPath,
+    getSiteForHost,
+    getSiteForPage,
+    postsPrefix,
+} from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { shopCutOff } from "@/lib/shop-cut-off";
+import {
+    ALL_PRODUCTS_HREF,
+    shopPageFeeds,
+    withShopGrid,
+} from "@/lib/shop-page-offer";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical, shopDescription } from "@/lib/site-meta";
+import { getProductGridFeeds } from "@/lib/site-product-grids";
 import { shareable } from "@/lib/test-metadata";
 
 import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
@@ -49,7 +60,9 @@ import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
  * 2. **The Shop page** (G15), when the site has published one: its
  *    sections, in place of the built-in grid. While Commerce is off (or the
  *    shop isn't rolled out) its address says "This isn't available right
- *    now" with a link home.
+ *    now" with a link home. Everything sold stays within reach of it
+ *    (`lib/shop-page-offer.ts`): "See all products" opens `?all=1`, the
+ *    built-in listing, and grids that draw nothing give way to it.
  * 3. **The shop**, when the API serves one. It 404s — as `/shop` did before
  *    — unless the shop is open for the business (the API's `SITE_SHOP`
  *    flag), Commerce is on, the site sells from a storefront and something
@@ -60,8 +73,9 @@ import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
  * The built-in shop says how an order reaches the customer in one line
  * under its heading, from the location's checkout (`shopLeadLine`), and
  * nothing when the site takes no online orders. A page that has nothing to
- * show (the module is off, the read failed, nothing is on sale) is kept out
- * of search: it answers 200, and "not available" is not a page to rank.
+ * show (the module is off, nothing is on sale) is kept out of search: it
+ * answers 200, and "not available" is not a page to rank. A read that failed
+ * says nothing about that, so a blip keeps the page indexed.
  */
 
 export async function generateMetadata({
@@ -130,9 +144,8 @@ async function shopIsMissing(
 
 /**
  * Whether `/shop` draws no shop now: its page is taken off while Commerce
- * is off, or the built-in shop's read failed or came back with nothing on
- * sale. A published Shop page is the merchant's own and always has
- * something to say.
+ * is off, or the shop's read came back with nothing on sale. A read that
+ * failed doesn't say so.
  */
 function shopHasNothing(
     resolved: NonNullable<Awaited<ReturnType<typeof getSiteForHost>>>,
@@ -140,7 +153,9 @@ function shopHasNothing(
 ): boolean {
     return routeHasNothing(
         moduleRoute(resolved.snapshot.pages, resolved.modules, "SHOP"),
-        !catalogue?.ok || catalogue.data.products.length === 0,
+        catalogue?.ok
+            ? catalogue.data.products.length === 0
+            : catalogue?.reason !== "unavailable",
     );
 }
 
@@ -154,11 +169,14 @@ function servedBySlug(snapshot: PublicationSnapshot): boolean {
 
 export default async function ShopPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ domain: string }>;
+    searchParams: Promise<{ all?: string | string[] }>;
 }) {
     const { domain } = await params;
-    const resolved = await getSiteForHost(domain);
+    const { all } = await searchParams;
+    const resolved = await getSiteForPage(domain);
     if (!resolved) notFound();
     const { snapshot, siteId } = resolved;
 
@@ -166,7 +184,12 @@ export default async function ShopPage({
         return <SlugPage params={Promise.resolve({ domain, slug: "shop" })} />;
     }
 
-    const route = moduleRoute(snapshot.pages, resolved.modules, "SHOP");
+    const route = moduleRoute(
+        snapshot.pages,
+        resolved.modules,
+        "SHOP",
+        all !== undefined,
+    );
     if (route.draw === "unavailable") {
         return (
             <ModulePageUnavailable
@@ -175,9 +198,8 @@ export default async function ShopPage({
             />
         );
     }
-    // The page's main landmark (UX-082), as the product page has: the
-    // header and footer sit outside it.
-    if (route.draw === "page") {
+    if (!siteId) {
+        if (route.draw !== "page") notFound();
         return (
             <main className="w-full">
                 <PublishedPage
@@ -188,34 +210,57 @@ export default async function ShopPage({
             </main>
         );
     }
-
-    if (!siteId) notFound();
-    const [lookup, checkout] = await Promise.all([
+    const page = route.draw === "page" ? withShopGrid(route.page) : null;
+    const [lookup, checkout, feeds] = await Promise.all([
         getCatalogue(siteId),
         getCheckoutOptions(siteId),
+        page ? getProductGridFeeds(page.sections, siteId, true) : undefined,
     ]);
-    if (!lookup.ok) {
-        if (lookup.reason === "missing") notFound();
+    const failed = !lookup.ok && lookup.reason !== "missing";
+    if (page && !failed) {
+        const grids = shopPageFeeds(
+            page.sections,
+            feeds,
+            lookup.ok ? lookup.data.products : [],
+        );
+        // The page's main landmark (UX-082), as the product page has: the
+        // header and footer sit outside it.
+        if (grids) {
+            return (
+                <main className="w-full">
+                    <PublishedPage
+                        page={page}
+                        snapshot={snapshot}
+                        siteId={siteId}
+                        productGrids={grids}
+                    />
+                </main>
+            );
+        }
+    }
+    // A Shop page with nothing on sale says so below; with no page, a 404.
+    if (!lookup.ok && !failed && route.draw !== "page") notFound();
+    if (failed) {
         dontCachePage("shop unavailable");
         return (
             <ShopUnavailable
                 business={snapshot.site.name}
-                retryHref="/shop"
+                // The address as it was opened, past a Shop page too.
+                retryHref={all !== undefined ? ALL_PRODUCTS_HREF : "/shop"}
                 look={lookOf(snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(siteId))}
             />
         );
     }
+    const products = lookup.ok ? lookup.data.products : [];
     // Every listed product's price and stock is on this page (#863).
     listsProducts(siteId);
     // Each card's Add to bag (the design's shop), only where the site takes
     // online orders now; otherwise the cards open the product, whose page
     // offers "Ask about ordering".
     const reach =
-        lookup.data.products.length === 0
-            ? reachOf(await getSiteContact(siteId))
-            : null;
+        products.length === 0 ? reachOf(await getSiteContact(siteId)) : null;
     // Folio, Quiet or Live (DEC-172, U11): the look's shop, with the
     // owner's own cut-off line and what an order costs to receive, said
     // once. Absent: Classic's shop, exactly as before.
@@ -229,7 +274,7 @@ export default async function ShopPage({
                 <LookShopListing
                     look={look}
                     title={moduleLabel(snapshot.pages, "SHOP", "Shop")}
-                    products={lookup.data.products}
+                    products={products}
                     bagSite={checkout?.canOrder ? siteId : null}
                     lead={shopLeadLine(checkout)}
                     facts={checkout?.canOrder ? shopFactsLine(checkout) : null}
@@ -248,7 +293,7 @@ export default async function ShopPage({
                 <NotTakingOrders banner demo={checkout.demo === true} />
             ) : null}
             <ShopListing
-                products={lookup.data.products}
+                products={products}
                 bagSite={checkout?.canOrder ? siteId : null}
                 // How an order reaches the customer, only from what this
                 // location's checkout offers now; nothing otherwise.

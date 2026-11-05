@@ -47,6 +47,31 @@ export const BUSINESSES = {
         name: "Asha's Bakery",
         site: "first-run-business",
     },
+    // The Global edition's, from `db:seed:global`; `shots.global.ts` takes them.
+    thistlewick: {
+        id: "seed_gl_shop_org",
+        name: "Thistlewick Bakery",
+        site: "thistlewick-bakery",
+        locale: "en-US",
+    },
+    larkspur: {
+        id: "seed_gl_salon_org",
+        name: "Larkspur & Vane",
+        site: "larkspur-and-vane",
+        locale: "en-GB",
+    },
+    ironvale: {
+        id: "seed_gl_gym_org",
+        name: "Ironvale Fitness",
+        site: "ironvale-fitness",
+        locale: "en-US",
+    },
+    wrenfield: {
+        id: "seed_gl_clinic_org",
+        name: "Wrenfield Dental",
+        site: "wrenfield-dental",
+        locale: "en-US",
+    },
 } as const;
 
 export type Business = keyof typeof BUSINESSES;

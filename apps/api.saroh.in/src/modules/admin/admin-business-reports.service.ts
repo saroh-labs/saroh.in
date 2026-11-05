@@ -4,7 +4,7 @@ import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
-import { viaBusinessOrNone } from "./admin-edition";
+import { reportInEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 const PAGE_SIZE = 50;
@@ -56,7 +56,7 @@ export class AdminBusinessReportsService {
         edition: Edition | null = null,
     ): Promise<BusinessReportPage> {
         const status = query.status ?? "open";
-        const inEdition = viaBusinessOrNone(edition);
+        const inEdition = reportInEdition(edition);
         const where = {
             ...inEdition,
             ...(status === "all"
@@ -128,14 +128,15 @@ export class AdminBusinessReportsService {
                     where: { id },
                     select: {
                         status: true,
+                        edition: true,
                         organizationId: true,
                         organization: { select: { edition: true } },
                     },
                 });
                 const elsewhere =
                     edition &&
-                    report?.organization &&
-                    report.organization.edition !== edition;
+                    (report?.organization?.edition ?? report?.edition) !==
+                        edition;
                 if (!report || elsewhere) {
                     throw new NotFoundException("No such report");
                 }

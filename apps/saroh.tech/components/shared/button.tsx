@@ -1,23 +1,19 @@
+import { buttonClasses } from "@saroh/marketing/button";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
-const BASE =
-    "inline-flex items-center justify-center rounded-button font-semibold no-underline transition-colors duration-150";
-
 const LOOK = {
     /** One per screen: the page's next step. */
-    primary: "h-[52px] bg-ink px-6 text-base text-paper hover:bg-[#33332f]",
-    secondary:
-        "h-11 border border-strong bg-transparent px-4 text-[15px] text-ink hover:bg-black/5",
-    /** The header's "Start free". */
-    compact:
-        "h-11 border border-strong bg-transparent px-4 text-[15px] text-ink hover:bg-black/5 md:h-10",
+    primary: { variant: "primary", size: "lg" },
+    secondary: { variant: "secondary", size: "sm" },
+    compact: { variant: "secondary", size: "sm" },
 } as const;
 
 export type ButtonLook = keyof typeof LOOK;
 
+/** saroh.in's buttons, under the names these pages use until U9 refits them. */
 export const buttonClass = (look: ButtonLook = "primary", className = "") =>
-    `${BASE} ${LOOK[look]} ${className}`.trim();
+    buttonClasses({ ...LOOK[look], className });
 
 export function ButtonLink({
     look,
@@ -42,7 +38,7 @@ export function Button({
     return (
         <button
             type={type}
-            className={`${buttonClass(look, className)} cursor-pointer`}
+            className={buttonClass(look, className)}
             {...props}
         />
     );

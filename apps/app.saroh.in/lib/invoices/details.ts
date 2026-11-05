@@ -6,6 +6,8 @@ import {
     INVOICE_EMAIL_WORDS,
 } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
+import { moduleOn } from "@/lib/contacts/panels";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 
@@ -35,6 +37,8 @@ export interface InvoiceDetails {
     registered: boolean;
     /** The Payments module is on (unknown reads as on). */
     paymentsOn: boolean;
+    /** The Commerce module is on (unknown reads as on). */
+    ordersOn: boolean;
     /**
      * Why it can't be emailed when the business has no email provider of
      * its own, with the way to fix it for this person.
@@ -51,12 +55,14 @@ export async function readInvoiceDetails(
     invoiceId: string,
     read: (id: string) => Promise<Invoice | null> = getInvoice,
 ): Promise<InvoiceDetails | null> {
-    const [invoice, business, paymentsOn, organization] = await Promise.all([
-        read(invoiceId),
-        getInvoiceBusiness(),
-        paymentsModuleOn(),
-        resolveActiveOrganization(),
-    ]);
+    const [invoice, business, paymentsOn, modules, organization] =
+        await Promise.all([
+            read(invoiceId),
+            getInvoiceBusiness(),
+            paymentsModuleOn(),
+            modulesOrUnknown(),
+            resolveActiveOrganization(),
+        ]);
     if (!invoice) return null;
 
     const others = invoice.contact
@@ -90,6 +96,7 @@ export async function readInvoiceDetails(
         can,
         registered: invoice.gst != null || (business?.registered ?? false),
         paymentsOn,
+        ordersOn: moduleOn(modules, "COMMERCE"),
         emailNote,
     };
 }

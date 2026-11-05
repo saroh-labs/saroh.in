@@ -103,7 +103,7 @@ test("opens on the Overview for the last 4 weeks, three answers each leading to 
     // How it was counted, folded at the foot; it says how often.
     await main.getByText("How these are counted").click();
     await expect(main).toContainText(
-        "Your website's visits, enquiries and online orders are updated every hour.",
+        "Your website's visits, enquiries and paid orders are updated every hour.",
     );
     // Never a "0%" place or "100% below".
     await expect(main).not.toContainText(/100% below|\b0%/);

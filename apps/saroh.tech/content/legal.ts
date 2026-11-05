@@ -1,10 +1,17 @@
-import { placeholders as p } from "./placeholders";
+import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "./contact";
 
 /**
- * Drafts for a lawyer to read, not in force. Anything we can't yet stand behind
- * is a [confirm] placeholder. What the cookies and privacy pages say about this
- * site comes from worker/index.ts, lib/analytics.ts and lib/tools/draft-store.ts.
+ * Drafts for a lawyer to read, not in force. The company's facts and its limits
+ * are saroh.in's words (`apps/saroh.in/content/{terms,privacy,refunds}.ts`), left
+ * out or changed only where they're India's alone. What the cookies and privacy
+ * pages say about this site comes from worker/index.ts, lib/analytics.ts and
+ * lib/tools/draft-store.ts. Who handles data is the code's: the billing provider
+ * isn't here, because a Global business has no billing profile (DEC-203).
  */
+export const LEGAL_UPDATED = "2026-11-04";
+
+const COMPANY = `Virashi Softwares LLP, ${REGISTERED_OFFICE.join(", ")}`;
+
 export interface LegalSection {
     title: string;
     paragraphs?: readonly string[];
@@ -17,14 +24,17 @@ export interface LegalSection {
     links?: readonly { name: string; href: string }[];
 }
 
-const CLIENT_MONEY =
-    "Your clients pay you directly, through your own Stripe, PayPal or bank. We never hold or move your clients' money. We only record that a payment happened.";
+const CUSTOMER_MONEY =
+    "Your customers pay you directly. We don't hold or move your customers' money. You record in Saroh that a payment happened.";
+
+const PAID_PLANS =
+    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech. This page will say how they work before they are.";
 
 export const TERMS: readonly LegalSection[] = [
     {
         title: "Who we are",
         paragraphs: [
-            `Saroh is a product of Virashi Softwares LLP (${p.companyDetails}). "We" means Virashi Softwares LLP. "You" means the person or business using Saroh.`,
+            `Saroh is a product of ${COMPANY}. "We" means Virashi Softwares LLP. "You" means the person or business using Saroh. Write to us at ${SUPPORT_EMAIL}.`,
             "These terms cover saroh.tech, its free tools and the Saroh app.",
         ],
     },
@@ -40,29 +50,27 @@ export const TERMS: readonly LegalSection[] = [
         items: [
             "Give us true details, and keep them up to date.",
             "Keep your sign-in safe. You are responsible for what happens in your account.",
-            "Only send quotes, invoices and messages you have the right to send.",
+            "Only send invoices and messages you have the right to send.",
         ],
     },
     {
         title: "Your content",
         paragraphs: [
-            "What you put in Saroh stays yours. That means your clients, quotes, invoices and notes. We use it only to run Saroh for you.",
-            `You can export your data at any time. ${p.appSteps}`,
+            "What you put in Saroh stays yours. That means your customers, invoices and notes. We use it only to run Saroh for you.",
+            "The owner of a business can export its data.",
         ],
     },
     {
-        title: "Your clients' money",
+        title: "Your customers' money",
         paragraphs: [
-            CLIENT_MONEY,
-            "Your payment provider's own terms and fees apply. Refunds and disputes with your clients are between you and them.",
+            CUSTOMER_MONEY,
+            "Refunds and disputes with your customers are between you and them.",
         ],
     },
     {
         title: "Paying for Saroh",
-        paragraphs: [
-            `Paid plans are prepaid. ${p.merchantOfRecord} is the merchant of record: it sells you the plan and charges any tax on it. Cancel in Settings, and you keep access until the end of the paid period.`,
-        ],
-        links: [{ name: "Billing and cancelling", href: "/legal/billing" }],
+        paragraphs: [PAID_PLANS],
+        links: [{ name: "Billing", href: "/legal/billing" }],
     },
     {
         title: "What you can't do",
@@ -75,16 +83,17 @@ export const TERMS: readonly LegalSection[] = [
     {
         title: "If things end",
         paragraphs: [
-            "You can leave at any time. We may suspend an account that breaks these terms.",
-            `${p.dataAfterCancel}`,
+            "You can close your account at any time. We may close it if you seriously or repeatedly break these terms.",
+            "You can download your data yourself before you close your account. After that, access ends at once. We keep the data for 180 days, as the Privacy Policy says, and you can ask us for a copy in that time, unless the law or safety requires otherwise.",
         ],
     },
     {
         title: "Changes, limits and law",
         paragraphs: [
             "We will change Saroh over time. If we change these terms in a way that matters to you, we will tell you first.",
-            `Limits on our liability: ${p.liability}`,
-            `The law that applies: ${p.governingLaw}`,
+            "Saroh is provided as it is. To the extent the law allows, we're not liable for lost profits or indirect losses. Our total liability for any claim is limited to what you paid us in the 3 months before it arose. Nothing here limits liability that the law doesn't allow us to limit.",
+            "We're not responsible for the goods, services, conduct or content of any business that uses Saroh, or for disputes between a business and its customers.",
+            `These terms are governed by the laws of India. Courts in Gurugram, Haryana, have jurisdiction. Write to ${SUPPORT_EMAIL} first. Most things are sorted out that way.`,
         ],
     },
 ];
@@ -162,8 +171,8 @@ export const COOKIES: readonly LegalSection[] = [
     {
         title: "Cookies from others",
         paragraphs: [
-            `There are no ad tags on saroh.tech. Cloudflare serves this site and may set its own security cookie if it needs to check a visitor. ${p.cloudflareCookie}`,
-            `The Saroh app at app.saroh.tech uses cookies to keep you signed in. ${p.appSteps}`,
+            "There are no ad tags on saroh.tech. Cloudflare serves this site and may set its own security cookie if it needs to check a visitor.",
+            "The Saroh app uses cookies to keep you signed in.",
         ],
     },
     {
@@ -178,116 +187,98 @@ export const PRIVACY: readonly LegalSection[] = [
     {
         title: "Who is responsible for your data",
         paragraphs: [
-            `Virashi Softwares LLP (${p.companyDetails}) runs Saroh and is responsible for the data on this page.`,
+            `${COMPANY}, runs Saroh and is responsible for the data on this page. Write to us at ${SUPPORT_EMAIL}.`,
         ],
     },
     {
         title: "The free tools: your drafts stay in your browser",
         paragraphs: [
             "What you type into a free tool stays in your browser. It is saved on your device and isn't sent to us. The PDF is made on your device too.",
-            "If you choose to carry a draft into Saroh, it travels in the part of the link after the #, which browsers don't send to web servers. The app reads it once you're there. Nothing from the draft is stored by us unless you sign up.",
+            "Signing up for Saroh from a tool doesn't bring your draft with it. The draft stays in your browser.",
         ],
     },
     {
         title: "What we count on this site",
         paragraphs: [
             "With PostHog, in the EU, we count page views, clicks on a page's main button, and the first time you use a tool. Each comes with the page's address (without anything after a ? or #), the kind of page, and a random ID that lasts one visit. We don't build a profile of you, and nothing you type into a tool is sent.",
-            `Like any web request, this can show PostHog your IP address. ${p.postHogIp}`,
+            "Like any web request, this can show PostHog your IP address.",
         ],
     },
     {
         title: "Serving the site",
         paragraphs: [
-            `Cloudflare serves saroh.tech. It tells our code which country a request comes from, and we use that only to show visitors in India a link to saroh.in. Cloudflare keeps request logs for a short time. ${p.cloudflareLogs}`,
+            `Cloudflare serves saroh.tech. It tells our code which country a request comes from, and we use that only to show visitors in India a link to saroh.in. Cloudflare may keep request logs.`,
         ],
     },
     {
         title: "If you open a referral link",
         paragraphs: [
-            "We set a cookie holding the referral code, so your friend can be credited if you sign up.",
+            "We keep that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.",
         ],
         links: [{ name: "Cookies", href: "/legal/cookies" }],
     },
     {
         title: "If you sign up for Saroh",
         paragraphs: [
-            "We keep your sign-in details, your business details, and what you put in the app: your clients, quotes, invoices, payments you record and notes. We use them to run Saroh and to send you emails about your account.",
-            p.appSteps,
+            "We keep your sign-in details, your business details, and what you put in the app: your customers, invoices, payments you record and notes. We use them to run Saroh and to send you emails about your account.",
+            "We also keep security logs: IP address, browser, sign-in times and errors. They keep accounts safe and help us fix problems.",
+            "In the app, errors, the setup steps your business has completed, and how signed-in people use the screens go to PostHog, kept against an internal id, not your name or email. Your customers' details, your figures and anything you type are hidden. You can turn this off in Settings › Your profile.",
         ],
     },
     {
-        title: "Your clients' details",
+        title: "Your customers' details",
         paragraphs: [
-            "You decide what you put in Saroh about your clients, and you're responsible for having the right to. We use those details only to run Saroh for you.",
-            CLIENT_MONEY,
+            "You decide what you put in Saroh about your customers, and you're responsible for having the right to. We use those details only to run Saroh for you.",
+            CUSTOMER_MONEY,
         ],
     },
     {
         title: "Where your data is stored",
-        paragraphs: [`Account data is stored in: ${p.dataLocation}`],
+        paragraphs: [
+            "Our servers and database are in India. Some of the services below may process data outside India.",
+        ],
     },
     {
         title: "Who else handles it",
         paragraphs: [
-            `Services that help us run Saroh handle some of this data for us: ${p.processors}`,
-            `${p.merchantOfRecord} takes payment for our plans and handles your card details.`,
+            "We don't sell personal data. We share it with authorities only when the law requires it. What you connect yourself, such as your own email account, is handled by that provider under its own terms.",
+            "Otherwise, only the companies that help us run Saroh, each for its own job, and only what that job needs:",
+        ],
+        items: [
+            "Hostinger: running our servers and database.",
+            "Cloudflare: serving our websites and apps, network security and speed, and keeping the photos and videos you upload.",
+            "Amazon Web Services (SES): sending the emails Saroh sends, from India.",
+            "Google (Workspace): our mailboxes, when you write to us.",
+            "PostHog: counting visits to this site, finding and fixing errors in Saroh, seeing which setup steps businesses complete, and keeping the recordings of use. Stored in the EU.",
+            "Google or GitHub: only if you choose to sign in with them.",
         ],
     },
     {
-        title: "How long we keep it, and your choices",
+        title: "How long we keep it",
+        items: [
+            "Your account and your business's data: while your account is open.",
+            "After you close your account: access ends at once. We keep the account's data for 180 days, as Indian law requires, then remove it from live systems. Backups roll off within 30 days more.",
+            "A message you send us through this site: 12 months.",
+            "Security logs: 1 year.",
+            "Recordings of use: 30 days.",
+            "A suspended account under investigation: as long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested.",
+        ],
+    },
+    {
+        title: "Your choices",
         paragraphs: [
-            `${p.dataAfterCancel}`,
-            "You can ask us for a copy of your data, ask us to correct it, or ask us to delete it. Email us and a person will reply.",
+            `You can ask us for a copy of your data, ask us to correct it, or ask us to delete it. Write to ${SUPPORT_EMAIL}. We reply within 30 days.`,
         ],
     },
 ];
 
 export const BILLING: readonly LegalSection[] = [
     {
-        title: "Your clients' money is never ours",
-        paragraphs: [
-            CLIENT_MONEY,
-            "We take 0% of what your clients pay you. Your payment provider's own fees still apply.",
-        ],
+        title: "Your customers' money is never ours",
+        paragraphs: [CUSTOMER_MONEY],
     },
     {
         title: "How paying for Saroh works",
-        paragraphs: [
-            "There's a free plan, and it needs no card. Paid plans are prepaid: you pay at the start of each month or year.",
-            `How our prices can change: ${p.pricePromise}`,
-        ],
-        links: [{ name: "See the plans", href: "/pricing" }],
-    },
-    {
-        title: "Who charges you, and tax",
-        paragraphs: [
-            `${p.merchantOfRecord} is the merchant of record for our plans. It takes your payment, charges any tax due on the plan, and gives you the receipt. That name is what you'll see on your statement.`,
-        ],
-    },
-    {
-        title: "Before we renew",
-        paragraphs: [
-            `We email you 7 days before a yearly renewal. ${p.appSteps}`,
-        ],
-    },
-    {
-        title: "Cancelling",
-        paragraphs: [
-            "Cancel in Settings in two taps. No calls, no forms. You keep access until the end of the period you paid for, and we don't charge you again.",
-        ],
-        links: [
-            {
-                name: "How to cancel, step by step",
-                href: "/help/cancel-your-plan",
-            },
-        ],
-    },
-    {
-        title: "Refunds",
-        paragraphs: [p.refunds],
-    },
-    {
-        title: "Your data after you cancel",
-        paragraphs: [`${p.dataAfterCancel}`],
+        paragraphs: [PAID_PLANS],
     },
 ];

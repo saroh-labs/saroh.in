@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { SignedInCustomer } from "../account/api";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
@@ -22,8 +24,9 @@ import type { WaitlistPlace } from "./waitlist";
 /**
  * Choosing, on the booking page as it has always looked (Classic): what,
  * when (with who where more than one person takes it), the booker's
- * details and how they'll pay, one under the other as each is reached. The
- * step in the address (U9) moves with each choice; the page looks the same.
+ * details and how they'll pay, one under the other as each is reached. A
+ * step answered folds to one row with Edit, so the page stays short (owner,
+ * 4 Nov). The step in the address (U9) moves with each choice.
  */
 export function ChooseSteps({
     ids,
@@ -74,16 +77,29 @@ export function ChooseSteps({
 }) {
     const { service } = times;
     const { choices, gstWords, waiting, unpayable } = words;
+    // Reopened with Edit: the steps after it wait until one is picked.
+    const [changing, setChanging] = useState(false);
     return (
         <>
             <ServiceStep
                 services={page.services}
                 serviceId={times.serviceId}
-                onPick={onService}
+                editing={changing}
+                onEdit={() => setChanging(true)}
+                onPick={(id) => {
+                    setChanging(false);
+                    onService(id);
+                }}
             />
 
-            {service ? (
+            {service && !changing ? (
                 <WhenStep
+                    stepped={{
+                        dayPicked:
+                            !!chosen ||
+                            (times.date !== null &&
+                                times.date === times.day?.date),
+                    }}
                     daysState={times.daysState}
                     days={times.days}
                     isClass={times.isClass}
@@ -132,7 +148,7 @@ export function ChooseSteps({
                 />
             ) : null}
 
-            {chosen ? (
+            {chosen && !changing ? (
                 <DetailsStep
                     ids={ids}
                     business={page.businessName}
@@ -141,7 +157,7 @@ export function ChooseSteps({
                 />
             ) : null}
 
-            {chosen && whoOk && !waiting && choices.length > 0 ? (
+            {chosen && !changing && whoOk && !waiting && choices.length > 0 ? (
                 <PayStep
                     choices={choices}
                     pay={payChoice.pay}

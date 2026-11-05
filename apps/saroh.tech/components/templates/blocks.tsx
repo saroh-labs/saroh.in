@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -13,13 +14,13 @@ import type { TemplateCardData, TemplatePage } from "@/lib/templates/pages";
 import { downloads, fillHref, templateView } from "@/lib/templates/pages";
 
 export const H2 =
-    "m-0 font-display text-[28px] font-bold leading-[1.05] tracking-[-0.04em] md:text-4xl";
-const COPY = "m-0 text-[16.5px] leading-relaxed text-body";
-const HINT = "text-[13px] text-quiet";
+    "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+const COPY = "m-0 text-[16.5px] leading-relaxed text-mk-copy";
+const HINT = "text-[13px] text-muted-foreground";
 
 const TH =
-    "border-b border-strong px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-quiet";
-const TD = "border-b border-line p-3 align-top";
+    "border-b border-border-strong px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const TD = "border-b border-border p-3 align-top";
 
 /** A filter or a related link: looks like a chip, but it's a page. */
 export function ChipLink({
@@ -38,8 +39,8 @@ export function ChipLink({
             aria-current={on ? "page" : undefined}
             className={`inline-flex h-11 items-center rounded-full border px-3.5 text-[14.5px] no-underline md:h-9 ${
                 on
-                    ? "border-ink bg-ink text-paper"
-                    : "border-control bg-surface text-ink"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border-strong bg-card text-foreground"
             }`}
         >
             {children}
@@ -50,10 +51,8 @@ export function ChipLink({
 export function TemplateHero({ page }: { page: TemplatePage }) {
     return (
         <>
-            <h1 className="m-0 font-display text-[40px] font-bold leading-none tracking-[-0.05em] md:text-[60px]">
-                {page.h1}
-            </h1>
-            <p className="m-0 text-[17px] leading-relaxed text-body md:text-[18.5px]">
+            <PageTitle size="article">{page.h1}</PageTitle>
+            <p className="m-0 text-[17px] leading-relaxed text-mk-copy md:text-[18.5px]">
                 {page.lede}
             </p>
             <ButtonLink
@@ -70,7 +69,7 @@ export function TemplateHero({ page }: { page: TemplatePage }) {
 /** The page's own data, drawn: every page shows a different filled document. */
 export function PreviewImage({ page }: { page: TemplatePage }) {
     return (
-        <div className="rounded-[20px] bg-[#EAE6DE] p-3 md:p-4">
+        <div className="rounded-[20px] bg-mk-hover p-3 md:p-4">
             <div
                 role="img"
                 aria-label={`Preview: ${page.h1}, filled with example items`}
@@ -81,7 +80,7 @@ export function PreviewImage({ page }: { page: TemplatePage }) {
     );
 }
 
-const FILE_BUTTON = buttonClass("secondary", "!h-12 bg-surface !px-3.5");
+const FILE_BUTTON = buttonClass("secondary", "!h-12 bg-card !px-3.5");
 
 export function DownloadRow({ page }: { page: TemplatePage }) {
     const files = downloads(page);
@@ -128,7 +127,7 @@ export function ExampleItems({
             {items.length ? (
                 <div className="flex items-center gap-3">
                     <h2 className={H2}>What's on it</h2>
-                    <span className="rounded-full bg-[#F7E8D2] px-2 py-[3px] text-[11px] font-semibold uppercase tracking-[0.08em] text-saffron-text">
+                    <span className="rounded-full bg-mk-soon px-2 py-[3px] text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
                         Example
                     </span>
                 </div>
@@ -166,10 +165,10 @@ export function ExampleItems({
                     >
                         Fields to add
                     </h3>
-                    <ul className="m-0 flex list-disc flex-col gap-2 pl-5 text-[15.5px] leading-normal text-body">
+                    <ul className="m-0 flex list-disc flex-col gap-2 pl-5 text-[15.5px] leading-normal text-mk-copy">
                         {fields.map((f) => (
                             <li key={f.name}>
-                                <b className="font-semibold text-ink">
+                                <b className="font-semibold text-foreground">
                                     {f.name}.
                                 </b>{" "}
                                 {f.why}
@@ -212,10 +211,10 @@ export function TipsList({ tips }: { tips: readonly Tip[] }) {
                 {tips.map((t) => (
                     <div
                         key={t.title}
-                        className="flex flex-col gap-2 rounded-card border border-line bg-surface p-6"
+                        className="flex flex-col gap-2 rounded-mk-card border border-border bg-card p-6"
                     >
                         <b className="text-lg">{t.title}</b>
-                        <p className="m-0 text-[15.5px] leading-relaxed text-body">
+                        <p className="m-0 text-[15.5px] leading-relaxed text-mk-copy">
                             {t.text}
                         </p>
                     </div>
@@ -276,8 +275,9 @@ export function CountryFacts({
                                             </span>
                                         </>
                                     ) : (
-                                        <span className="rounded-full bg-[#F7E8D2] px-2 py-[3px] text-xs font-semibold text-saffron-text">
-                                            [confirm]
+                                        <span className={HINT}>
+                                            General advice, not from a
+                                            government page
                                         </span>
                                     )}
                                 </td>
@@ -296,33 +296,33 @@ export function TemplateCard({ card }: { card: TemplateCardData }) {
         <Link
             prefetch={false}
             href={card.href}
-            className="flex flex-col overflow-hidden rounded-card border border-line bg-surface text-ink no-underline transition-colors duration-150 hover:border-strong"
+            className="flex flex-col overflow-hidden rounded-mk-card border border-border bg-card text-foreground no-underline transition-colors duration-150 hover:border-border-strong"
         >
             <span
                 aria-hidden="true"
-                className="flex h-[220px] items-end justify-center bg-[#EAE6DE] pt-6"
+                className="flex h-[220px] items-end justify-center bg-mk-hover pt-6"
             >
-                <span className="flex h-[196px] w-[170px] flex-col gap-[7px] rounded-t-md bg-surface px-3.5 py-4 shadow-[0_6px_18px_-8px_rgba(28,28,26,.35)]">
+                <span className="flex h-[196px] w-[170px] flex-col gap-[7px] rounded-t-md bg-card px-3.5 py-4 shadow-mk-card">
                     <span className="font-display text-xs font-bold">
                         {card.doc}
                     </span>
-                    <span className="h-[5px] w-3/5 rounded-[3px] bg-[#D9D5CC]" />
+                    <span className="h-[5px] w-3/5 rounded-[3px] bg-mk-line-soft" />
                     <span className="h-1.5" />
                     {card.lines.map((l) => (
                         <span
                             key={l}
-                            className="flex justify-between gap-1.5 border-b border-[#ECE8E0] pb-[3px] text-[7.5px] leading-[1.2] text-body"
+                            className="flex justify-between gap-1.5 border-b border-mk-line-row pb-[3px] text-[7.5px] leading-[1.2] text-mk-copy"
                         >
                             <span>{l}</span>
-                            <span className="h-1 w-[18px] shrink-0 self-center rounded-sm bg-[#D9D5CC]" />
+                            <span className="h-1 w-[18px] shrink-0 self-center rounded-sm bg-mk-line-soft" />
                         </span>
                     ))}
-                    <span className="mt-auto h-[5px] w-1/2 self-end rounded-[3px] bg-ink" />
+                    <span className="mt-auto h-[5px] w-1/2 self-end rounded-[3px] bg-foreground" />
                 </span>
             </span>
             <span className="flex flex-col gap-1 px-[18px] pb-[18px] pt-4">
                 <span className="text-base font-semibold">{card.title}</span>
-                <span className="text-[13px] text-quiet">
+                <span className="text-[13px] text-muted-foreground">
                     PDF · Word · Docs · Sheets
                 </span>
             </span>
@@ -346,7 +346,7 @@ export function CardGrid({ cards }: { cards: readonly TemplateCardData[] }) {
             </div>
             {rest.length ? (
                 <details className="group flex flex-col">
-                    <summary className="mx-auto flex h-12 w-fit cursor-pointer list-none items-center justify-center rounded-button border border-strong px-[22px] text-[15px] font-semibold group-open:hidden [&::-webkit-details-marker]:hidden">
+                    <summary className="mx-auto flex h-12 w-fit cursor-pointer list-none items-center justify-center rounded-mk-btn border border-border-strong px-[22px] text-[15px] font-semibold group-open:hidden [&::-webkit-details-marker]:hidden">
                         Show more templates
                     </summary>
                     <div className={CARD_GRID}>

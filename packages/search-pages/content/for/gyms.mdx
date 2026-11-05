@@ -6,20 +6,20 @@ pickAs: gyms
 family: Fitness and classes
 search: gym software
 searchWords: gym fitness crossfit studio
-title: Gym software for classes, packs and fees
-description: "Gym software for gyms, yoga studios and dance classes: members book on your website, packs count down, and each fee gets a payment link."
-updated: 2026-10-26
+title: Gym software for classes, members and fees
+description: "Gym software for gyms, yoga studios and dance classes: members book on your website, places count down, and each fee gets a payment link."
+updated: 2026-11-04
 shape: classes
 h1: Know who's coming, and who has paid this month.
-lead: Gym and yoga studio software, for dance classes and personal trainers too. Members book on your website, packs count down by themselves, and each fee is billed with a payment link.
-phoneLead: Gym and studio software. Members book on your website, and packs count down by themselves.
+lead: Gym and yoga studio software, for dance classes and personal trainers too. Members book on your website, places count down by themselves, and each fee is billed with a payment link.
+phoneLead: Gym and studio software. Members book on your website, and places count down by themselves.
 demo: See a live gym demo
 problemsTitle: What gets easier in your gym or studio.
 problems:
   - quote: I find out someone hasn't paid when they're already on the mat.
   - quote: Half my evening goes on WhatsApp, finding people a slot.
   - quote: I never know how full the 7am class is until people turn up.
-  - quote: Tracking who has classes left in their pack is a notebook of tally marks.
+  - quote: Tracking who's on which course is a notebook of tally marks.
   - quote: A member tells me about her knee, and next week I've forgotten.
   - quote: Chasing monthly fees is the worst part of the job.
   - quote: I can't tell who's paid for what.
@@ -57,7 +57,7 @@ scene:
   business: Ironwood Fitness
   site: ironwood-fitness.saroh.app
   day: Sat 25 Oct
-  heroAlt: "What a gym's day looks like in Saroh: today's classes with places booked, Arjun booked into the 07:00 HIIT class from his pack of 10, a monthly membership paid by UPI Autopay set up on the gym's own Razorpay, and a trainer's note about his knee."
+  heroAlt: "What a gym's day looks like in Saroh: today's classes with places booked, Arjun booked into the 07:00 HIIT class, a monthly membership paid by UPI Autopay set up on the gym's own Razorpay, and a trainer's note about his knee."
   hero:
     title: Today · Sat 25 Oct
     count: 5 classes
@@ -78,7 +78,7 @@ scene:
   chips:
     - icon: cal
       title: Booked · Sat 07:00 · HIIT
-      sub: Arjun Mehra · 1 class from his pack
+      sub: Arjun Mehra · 1 place booked
     - icon: ok
       title: ₹3,000 membership paid · UPI Autopay
       sub: Set up on your own Razorpay
@@ -86,7 +86,7 @@ scene:
       title: "Bill #415 · November membership"
       sub: CGST 2.5% + SGST 2.5% shown
     - icon: person
-      title: Arjun · 7 of 10 classes left
+      title: Arjun · 41 classes so far
       pill: "Knee: no jumping lunges"
   labels:
     customer: Member
@@ -122,11 +122,6 @@ scene:
       - Fri
       - Sat
     dayTab: Sat
-  pack:
-    name: Arjun Mehra
-    size: 10
-    left: 7
-    price: 3500
   today:
     - time: 07:00
       name: HIIT
@@ -150,11 +145,11 @@ scene:
     name: Arjun Mehra
     initials: AM
     stats:
-      - 41 classes
-      - 7 of 10 left
+      - 41 classes so far
+      - Booked today
     tag: "Knee: no jumping lunges"
-    note: Membership renews 1 Nov. Pack ends 30 Nov.
-    noteBy: Note from Aman · 20 Oct
+    note: November's membership is paid. It renews 1 Dec.
+    noteBy: Note from Aman · 25 Oct
   bill:
     no: 415
     status:
@@ -177,18 +172,14 @@ scene:
       title: Members book a place in each class
       line: Your website shows each class and how many places are left.
       phoneLine: Your website shows each class and the places left.
-    pack:
-      title: Class packs that count themselves
-      line: One comes off when they book, and the pack ends on the date you choose.
-      phoneLine: One comes off each booking.
     today:
       title: See who's coming today
       line: Today's classes with who's booked, and which are full.
       phoneLine: Who's booked, and which are full.
     customer:
       title: Every member on one page
-      line: Classes left, their membership and your trainers' notes.
-      phoneLine: Classes left and your notes.
+      line: Classes so far, their membership and your trainers' notes.
+      phoneLine: Classes so far and your notes.
     bill:
       title: Each month's fee, billed on the day
       line: By UPI Autopay where set up on your own Razorpay, or a payment link.
@@ -219,9 +210,9 @@ scene:
 
 You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
 
-## Can a member have a class pack and a membership?
+## Can a member's page show their membership?
 
-Yes. Their page shows the classes left in their pack and when their membership renews.
+Yes. Their page shows their next booking and when their membership renews.
 
 ## Can I give GST bills?
 

@@ -23,7 +23,7 @@ export const invoiceAustralia: Combo = {
     faqs: [
         {
             question: "When must I give an Australian customer a tax invoice?",
-            answer: "Business.gov.au says it's required for taxable sales above $82.50 including GST, or when a customer asks, and you then have 28 days. Check the ATO's own page too, because we couldn't load it to confirm.",
+            answer: "Business.gov.au says it's required for taxable sales above $82.50 including GST, and that when a customer asks for one, whatever the amount, you have 28 days. Check the ATO's own page too.",
         },
         {
             question:
@@ -39,8 +39,4 @@ export const invoiceAustralia: Combo = {
             answer: "No, you can invoice without it. You must register once your GST turnover reaches $75,000, with a higher figure for non-profits, and you have 21 days from knowing you'll pass it. Below that, registering is your choice.",
         },
     ],
-    band: {
-        title: "Your ABN and GST, on every invoice.",
-        line: "Save your ABN once in Saroh, then send tax invoices in Australian dollars that clients can pay through your own link.",
-    },
 };

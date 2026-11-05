@@ -1,3 +1,5 @@
+import type { Shot } from "@saroh/marketing/shot";
+
 import WIDTHS from "@/content/shot-widths.json";
 
 /**
@@ -48,4 +50,14 @@ export function shotSources(shot: { src: string; width: number }): ShotSources {
             `${shot.src} ${shot.width}w`,
         ].join(", "),
     };
+}
+
+/** The shot as `@saroh/marketing` draws it: with its sized copies, when it has any. */
+export function sizedShot(shot: Shot): Shot {
+    return shot.src === null
+        ? shot
+        : {
+              ...shot,
+              srcSet: shotSources({ src: shot.src, width: shot.width }).srcSet,
+          };
 }

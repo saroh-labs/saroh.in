@@ -114,6 +114,11 @@ export interface BookingPageData {
      * and a provider is connected.
      */
     payOnline: boolean;
+    /**
+     * What a Global business chose at setup, for a zero before a priced
+     * service is chosen. Null or absent otherwise, and it reads as rupees.
+     */
+    currency?: string | null;
     rules: BookingRules;
     services: BookingService[];
 }

@@ -1,3 +1,4 @@
+import "@saroh/marketing/tokens.css";
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";

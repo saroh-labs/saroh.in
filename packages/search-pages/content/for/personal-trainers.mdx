@@ -6,13 +6,13 @@ pickAs: personal trainers
 family: Fitness and classes
 search: personal trainer app
 searchWords: trainer coach pt
-title: Personal trainer app for sessions and packs
-description: "Personal trainer app: clients book a session when you're free, buy a pack of 12, and get a bill for every payment."
-updated: 2026-10-26
+title: Personal trainer app for sessions and fees
+description: "Personal trainer app: clients book a session when you're free, pay per session or monthly, and get a bill for every payment."
+updated: 2026-11-04
 shape: appointments
-h1: Your clients, sessions and packs, all on your phone.
-lead: An app for personal trainers. Clients book a session when you're free, buy a pack of 12, and get a bill for every payment.
-phoneLead: An app for personal trainers. Clients book when you're free and buy a pack of 12.
+h1: Your clients, sessions and fees, all on your phone.
+lead: An app for personal trainers. Clients book a session when you're free, pay per session or monthly, and get a bill for every payment.
+phoneLead: An app for personal trainers. Clients book when you're free and pay per session or monthly.
 demo: See a live gym demo
 problemsTitle: What gets easier in your week.
 problems:
@@ -25,10 +25,10 @@ problems:
     quote: I train at two gyms on different days.
     title: Your hours, your way
     body: Set your hours each day, a break after each booking and your days off. Clients only see those times.
-  - area: Session packs
-    quote: Who has how many sessions left is in my head.
-    title: Packs that count themselves
-    body: Sell 12 sessions at one price. One comes off with each booking, and goes back if they cancel in time.
+  - area: Monthly coaching
+    quote: Who has paid for this month is in my head.
+    title: Monthly coaching, billed on the day
+    body: The bill is ready on the day, with a payment link to send.
   - area: Online clients
     quote: Some clients train with me from another city.
     title: Online sessions, with the link on the booking
@@ -36,18 +36,18 @@ problems:
   - area: Your clients
     quote: A client tells me about his knee, and next month I've forgotten.
     title: Remember every client
-    body: Sessions left, next booking, what he's paid and your notes on one page.
+    body: Past sessions, next booking, what he's paid and your notes on one page.
     link: Customers
   - area: Getting paid
     quote: Clients pay by UPI and I can't tell who's paid for what.
     title: Know who paid for what
-    body: Packs, sessions and monthly coaching each get a numbered bill. Add your GST number and GST shows on it.
+    body: Sessions and monthly coaching each get a numbered bill. Add your GST number and GST shows on it.
     link: Billing
 services:
   - name: 1:1 session
     detail: 60 min
-  - name: 12-session pack
-    detail: 12 sessions
+  - name: Fitness assessment
+    detail: 45 min
   - name: Online coaching
     detail: monthly
 related:
@@ -57,13 +57,13 @@ related:
     slug: yoga-studios
   - name: Martial arts
     slug: martial-arts
-ctaTitle: Every session booked, and every pack paid.
+ctaTitle: Every session booked, and every fee paid.
 scene:
   business: Train with Kabir
   site: train-with-kabir.saroh.app
   day: Tue 27 Oct
   place: gym
-  heroAlt: "What a personal trainer's day looks like in Saroh: Sneha booked for a 1:1 session at 18:30 with a ₹300 deposit paid by UPI, Rohan's ₹12,000 pack of 12 sessions paid by UPI, a bill for it with GST, and 5 of 12 sessions left with a note about his knee."
+  heroAlt: "What a personal trainer's day looks like in Saroh: Sneha booked for a 1:1 session at 18:30 with a ₹300 deposit paid by UPI, Rohan's ₹12,000 monthly coaching paid by UPI, a bill for it with GST, and a note about his knee."
   hero:
     title: Today · Tue 27 Oct
     count: 6 sessions
@@ -71,7 +71,7 @@ scene:
     rows:
       - time: 06:00
         name: Meghna Iyer
-        right: From her pack
+        right: 1:1 session
       - time: 07:00
         name: Rohan Bhatia
         right: 1:1 session
@@ -86,14 +86,14 @@ scene:
       title: Booked · Tue 18:30 · 1:1
       sub: Sneha Rao · 60 min at the gym
     - icon: ok
-      title: ₹12,000 pack paid · UPI
+      title: ₹12,000 monthly coaching · UPI
       sub: Into your own Razorpay account
       phoneSub: Into your own Razorpay
     - icon: bill
-      title: "Bill #64 · 12 sessions"
+      title: "Bill #64 · monthly coaching"
       sub: CGST 2.5% + SGST 2.5% shown
     - icon: person
-      title: Rohan · 5 of 12 sessions left
+      title: Rohan · 26 sessions so far
       pill: "Left knee: no deep squats"
   staff: []
   items:
@@ -102,10 +102,10 @@ scene:
       len: 60 min
       who: at the gym
       price: 1200
-    - name: Pack of 12 sessions
-      short: 12-pack
-      len: 12 × 60 min
-      who: one comes off each booking
+    - name: Monthly coaching
+      short: Monthly
+      len: a month
+      who: billed on the day
       price: 12000
     - name: Online session
       short: Online
@@ -152,13 +152,13 @@ scene:
       who: 1:1
       status:
         tone: grey
-        text: Pack · 9 left
+        text: Monthly
     - time: 07:00
       name: Rohan
       who: 1:1
       status:
         tone: amb
-        text: Pack · knee
+        text: Knee
     - time: 08:30
       name: Farhan
       who: Online
@@ -169,8 +169,8 @@ scene:
     name: Rohan Bhatia
     initials: RB
     stats:
-      - 26 sessions
-      - 5 of 12 left
+      - 26 sessions so far
+      - Booked today
     tag: "Left knee: no deep squats"
     note: Box squats only. Add 2.5 kg on the deadlift next week.
     noteBy: Your note · 20 Oct
@@ -183,7 +183,7 @@ scene:
     showCodes: true
     rate: 5
     lines:
-      - name: Pack of 12 sessions
+      - name: Monthly coaching
         code: SAC 999723
         codeStatus: to-confirm
         amount: 11428.57
@@ -202,16 +202,16 @@ scene:
       phoneLine: Paid into your own Razorpay or Cashfree.
     today:
       title: Today's sessions, first thing
-      line: Who's coming, at which gym or online, and who's on a pack.
-      phoneLine: Who's coming, and who's on a pack.
+      line: Who's coming, and at which gym or online.
+      phoneLine: Who's coming, and where.
     customer:
-      title: Sessions left, counted for you
-      line: Sessions left, what he's paid and your notes on one page.
-      phoneLine: Sessions left and your notes.
+      title: Know every client
+      line: Past sessions, what he's paid and your notes on one page.
+      phoneLine: Past sessions and your notes.
     bill:
       title: Know who paid for what
-      line: Packs and sessions each get a numbered bill, with GST once you add your number.
-      phoneLine: A numbered bill for every pack.
+      line: Sessions and monthly coaching each get a numbered bill, with GST once you add your number.
+      phoneLine: A numbered bill for every payment.
     website:
       title: Your sessions and prices online
       line: Change a price once, and your website shows it.
@@ -220,8 +220,8 @@ scene:
     text: I spend my evenings on WhatsApp moving people's sessions.
     caption: Sound like your evenings? Your booking page shows clients the free times, so they pick one themselves.
   also:
-    - title: A pack of 12 sessions
-      line: Sell 12 at one price. One comes off each booking, and goes back if they cancel in time.
+    - title: Monthly coaching
+      line: The bill is ready on the day, with a payment link to send.
     - title: Your hours, your way
       line: Hours for each day, a break after each booking, and your days off.
     - title: Payment links
@@ -239,9 +239,9 @@ scene:
 
 You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
 
-## Can I sell a pack of sessions?
+## Can I bill monthly coaching?
 
-Yes, sell a pack of 12 sessions at one price at the desk. One comes off each time they book, and goes back if they cancel in time.
+Yes. Set up a monthly plan, and the bill is ready on the day, with a payment link to send.
 
 ## Can clients book online sessions?
 

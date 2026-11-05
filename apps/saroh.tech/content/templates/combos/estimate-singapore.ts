@@ -58,8 +58,4 @@ export const estimateSingapore: Combo = {
             answer: "IRAS says not following the rule may result in a fine of up to $5,000. That's a good reason to check saved templates and email footers, because old wording is the easiest place for it to hide.",
         },
     ],
-    band: {
-        title: "An estimate with GST already in.",
-        line: "Send a Singapore estimate from Saroh, then turn it into a tax invoice with the same lines when the client agrees.",
-    },
 };

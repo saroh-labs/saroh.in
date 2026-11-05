@@ -1,70 +1,81 @@
 import type { CountryData } from "../types";
 
 /*
- * The ATO refused to serve its pages to our reader on 2 Nov 2026 (HTTP 403), so
- * nothing here is sourced yet. These values were read on business.gov.au that
- * day, not on the ATO's site: check each on ato.gov.au, then add its source.
+ * The ATO refuses our reader (HTTP 403, 2 and 4 Nov 2026), so these are from the
+ * Australian Government's business.gov.au, read on 4 Nov 2026. Recheck on
+ * ato.gov.au when someone can open it.
  */
+const HOW_TO_INVOICE = {
+    name: "How to invoice, business.gov.au",
+    url: "https://business.gov.au/finance/payments-and-invoicing/how-to-invoice",
+};
+const REGISTER = {
+    name: "Register for GST, business.gov.au",
+    url: "https://business.gov.au/registrations/register-for-taxes/register-for-goods-and-services-tax-gst",
+};
+const CHECKED = "2026-11-04";
+
 export const australia: CountryData = {
     reviewed: false,
-    lede: "Invoices and quotes in Australian dollars, with your ABN and a GST line ready. Facts on this page still need checking against the ATO, so each one is marked until they are.",
+    lede: "Invoices and quotes in Australian dollars, with your ABN and a GST line ready. Check the source links on this page before you rely on them.",
     paper: "a4",
     dateLocale: "en-GB",
     facts: [
         {
             label: "Tax number",
             value: "Your Australian Business Number (ABN).",
-            confirm: true,
+            source: HOW_TO_INVOICE,
+            checkedOn: CHECKED,
         },
         {
             label: "GST rate",
             value: "10% on most goods, services and other items. You collect one-eleventh of the sale price.",
-            confirm: true,
+            source: REGISTER,
+            checkedOn: CHECKED,
         },
         {
             label: "Registering for GST",
-            value: "You must register when your GST turnover is $75,000 or more, or $150,000 or more for a non-profit. Below that it's optional.",
-            confirm: true,
+            value: "You must register when your GST turnover is $75,000 or more, or $150,000 or more for a non-profit. Otherwise it's optional.",
+            source: REGISTER,
+            checkedOn: CHECKED,
         },
         {
             label: "Heading",
             value: "The words tax invoice if you're registered for GST. If you aren't, use the word invoice instead.",
-            confirm: true,
+            source: HOW_TO_INVOICE,
+            checkedOn: CHECKED,
         },
         {
             label: "What a tax invoice shows",
-            value: "Your business name and ABN, the issue date, a short description with quantity and price, and the GST payable, or a statement that the total includes GST.",
-            confirm: true,
+            value: "The words tax invoice, your business name and ABN, the issue date, a short description with quantity and price, and the amount of GST payable, if any.",
+            source: HOW_TO_INVOICE,
+            checkedOn: CHECKED,
         },
         {
             label: "Larger sales",
-            value: "Also the buyer's identity or ABN, at $1,000 or more. Please check the wording, as one government page reads over $1,000.",
-            confirm: true,
+            value: "Also the buyer's identity or ABN, on sales over $1,000.",
+            source: HOW_TO_INVOICE,
+            checkedOn: CHECKED,
         },
         {
             label: "When one is required",
-            value: "For taxable sales above $82.50 including GST, or when a customer asks. You then have 28 days.",
-            confirm: true,
+            value: "For a taxable sale of more than $82.50 including GST. If a customer asks for one, whatever the amount, you have 28 days to give it.",
+            source: HOW_TO_INVOICE,
+            checkedOn: CHECKED,
         },
         {
             label: "Receipts",
-            value: "Must be given at the time of sale above $75 excluding GST. Below that, within 7 days if the customer asks.",
-            confirm: true,
-        },
-        {
-            label: "Credit notes and GST",
-            value: "What a credit note must show for GST hasn't been checked. Read the ATO's page before you rely on this template for it.",
-            confirm: true,
+            value: "Must be given at the time of sale for purchases over $75 excluding GST. For smaller ones, within 7 days of a customer asking.",
+            source: {
+                name: "Receipts and proof of purchase, business.gov.au",
+                url: "https://business.gov.au/finance/payments-and-invoicing/receipts-and-proof-of-purchase",
+            },
+            checkedOn: CHECKED,
         },
         {
             label: "Late payment",
-            value: "We found no general legal rate of interest. Government advice is a reminder, then a letter of demand or a debt collector.",
-            confirm: true,
-        },
-        {
-            label: "Paper size",
-            value: "A4. No government page we read sets a paper size.",
-            confirm: true,
+            value: "Set by your contract. Check with a legal adviser before you charge it.",
+            general: true,
         },
     ],
     payment: {
@@ -82,11 +93,11 @@ export const australia: CountryData = {
         },
         {
             name: "Buyer's name or ABN",
-            why: "A larger sale needs it. Printing it on every invoice means you never have to check.",
+            why: "A sale over $1,000 needs it. Printing it on every invoice means you never have to check.",
         },
         {
-            name: "GST for each item, or a total statement",
-            why: "Show the GST on each line, or say the total price includes GST.",
+            name: "The GST payable",
+            why: "A tax invoice shows the amount of GST, if any.",
         },
     ],
     example: {

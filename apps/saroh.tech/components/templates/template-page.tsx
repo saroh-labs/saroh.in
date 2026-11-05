@@ -3,6 +3,7 @@ import { CtaBand } from "@/components/shared/cta-band";
 import { FaqList } from "@/components/shared/faq-list";
 import { JsonLd } from "@/components/shared/json-ld";
 import { RelatedGrid } from "@/components/shared/related-grid";
+import { StepList } from "@/components/shared/step-list";
 import { faqSchema, howToSchema, pageSchema } from "@/lib/schema";
 import type { SitePage } from "@/lib/site-map";
 import type { TemplatePage as Data } from "@/lib/templates/pages";
@@ -52,7 +53,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-10 px-4 pt-4 md:gap-16 md:px-20 md:pt-8"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-4 md:gap-16 md:pt-8"
         >
             <JsonLd
                 data={[
@@ -70,7 +71,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
                     {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
                     <TemplateHero page={data} />
                     <DownloadRow page={data} />
-                    <span className="text-[13px] text-quiet">
+                    <span className="text-[13px] text-muted-foreground">
                         No sign-up, no watermark. Example prices are
                         placeholders, not advice on what to charge.
                     </span>
@@ -103,22 +104,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
 
             <section className="flex flex-col gap-3 md:gap-[18px]">
                 <h2 className={H2}>How to fill it</h2>
-                <ol className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 md:gap-5 xl:grid-cols-4">
-                    {steps.map((s, i) => (
-                        <li
-                            key={s.title}
-                            className="flex flex-col gap-2 rounded-card border border-line bg-surface p-5"
-                        >
-                            <span className="font-mono text-quiet">
-                                {String(i + 1).padStart(2, "0")}
-                            </span>
-                            <b className="text-[17px]">{s.title}</b>
-                            <span className="text-[15px] text-body">
-                                {s.text}
-                            </span>
-                        </li>
-                    ))}
-                </ol>
+                <StepList steps={steps} />
             </section>
 
             <section className="grid gap-4 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-14">
@@ -149,7 +135,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
 
             {similar.length ? (
                 <section className="flex flex-col gap-3.5">
-                    <h2 className="m-0 font-display text-[28px] font-bold tracking-[-0.04em]">
+                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                         {data.country
                             ? `${doc} templates for other countries`
                             : data.trade

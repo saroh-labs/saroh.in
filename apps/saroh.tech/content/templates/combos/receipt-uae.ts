@@ -59,8 +59,4 @@ export const receiptUae: Combo = {
             answer: "It can. Article 25 sets the date of supply as the earliest of several events, including receipt of payment. So a receipt for an advance is a useful reminder to check your 14-day limit.",
         },
     ],
-    band: {
-        title: "Payments you can trace in dirhams.",
-        line: "Saroh keeps every UAE receipt with the client it belongs to, and sends it when a payment is marked paid.",
-    },
 };

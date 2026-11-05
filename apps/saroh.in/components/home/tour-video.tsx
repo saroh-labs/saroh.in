@@ -1,6 +1,6 @@
 import { TOUR_VIDEO } from "@/content/home";
 
-import { Container } from "../shared/layout/container";
+import { Container } from "@saroh/marketing/container";
 
 /**
  * Home's `#video`: the 2-minute tour in the design's Ink 16:9 frame. Renders

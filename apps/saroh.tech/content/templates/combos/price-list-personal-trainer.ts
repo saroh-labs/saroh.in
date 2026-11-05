@@ -103,8 +103,4 @@ export const priceListPersonalTrainer: Combo = {
             answer: "Yes. Date this list, and tell existing clients in person when their rate will move. Some coaches keep a rate until a pack runs out. Whichever you choose, say it plainly, so nobody finds out from a stranger's copy.",
         },
     ],
-    band: {
-        title: "Every way to train with you, on one page.",
-        line: "Send it from your phone, then take the booking and the payment through your own link. 0% fees.",
-    },
 };

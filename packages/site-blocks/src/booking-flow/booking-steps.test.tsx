@@ -17,6 +17,7 @@ import BookingFlow from "./booking-flow";
 import type { CheckoutOutcome, CheckoutRequest } from "./checkout";
 import type { BookingPageData } from "./model";
 import { isBookResult } from "./model";
+import { pressDay } from "./test-press-day";
 
 /** The provider's window (E11), stood in for, as the flow's own suite does. */
 const checkouts = vi.hoisted(() => ({
@@ -301,6 +302,7 @@ async function serviceThenPersonThenTime() {
     expect(here().get("step")).toBe("who");
     fireEvent.click(screen.getByRole("radio", { name: "Ritu Kapoor" }));
     await waitFor(() => expect(here().get("step")).toBe("when"));
+    await pressDay();
     fireEvent.click(
         await screen.findByRole("radio", { name: "9:00 am with Ritu Kapoor" }),
     );
@@ -343,11 +345,13 @@ describe("the step in the address (U9)", () => {
             ).toHaveAttribute("aria-checked", "false"),
         );
         expect(
-            screen.getByRole("radio", { name: /Personal training/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", {
+                name: "Edit what you're booking, Personal training",
+            }),
+        ).toBeVisible();
         expect(
-            screen.getByRole("radio", { name: "Ritu Kapoor" }),
-        ).toHaveAttribute("aria-checked", "true");
+            document.querySelector('[data-chosen-row="the day"]'),
+        ).toHaveTextContent("With Ritu Kapoor");
         // The step's own heading has focus, for a screen reader.
         expect(document.activeElement).toBe(
             screen.getByRole("heading", { name: "When?" }),
@@ -360,16 +364,18 @@ describe("the step in the address (U9)", () => {
             ).toHaveAttribute("aria-checked", "true"),
         );
         expect(
-            screen.getByRole("radio", { name: /Personal training/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            screen.getByRole("button", {
+                name: "Edit what you're booking, Personal training",
+            }),
+        ).toBeVisible();
 
         await forward("when");
         await forward("details");
-        await waitFor(() =>
-            expect(
-                screen.getByRole("radio", { name: "9:00 am with Ritu Kapoor" }),
-            ).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: "Edit the time, 9:00 am",
+            }),
+        ).toBeVisible();
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
             "98450 12345",
         );
@@ -478,7 +484,10 @@ describe("a pay-now hold through Back and Forward (U9)", () => {
     it("another time after Back lets the kept hold go before booking it", async () => {
         const hold = await holding();
         await back("details");
+        // Who with is on the day strip: Edit opens it again.
+        fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
         fireEvent.click(screen.getByRole("radio", { name: "Anyone" }));
+        await pressDay();
         fireEvent.click(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",
@@ -540,11 +549,11 @@ describe("a link, or a reload, on a step (U9)", () => {
                 initialStep="details"
             />,
         );
-        await waitFor(() =>
-            expect(
-                screen.getByRole("radio", { name: "9:00 am with Ritu Kapoor" }),
-            ).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: "Edit the time, 9:00 am",
+            }),
+        ).toBeVisible();
         // The person's own times were read.
         expect(calls[0]?.url).toBe(
             `${API}/public/services/svc_pt/days?staffId=staff_ritu`,
@@ -574,11 +583,11 @@ describe("a link, or a reload, on a step (U9)", () => {
                 initialStep="pay"
             />,
         );
-        await waitFor(() =>
-            expect(
-                screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
-            ).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: "Edit the time, 7:00 am",
+            }),
+        ).toBeVisible();
         await waitFor(() => expect(here().get("step")).toBe("when"));
         expect(here().get("start")).toBe("07:00");
         expect(pushes).toHaveLength(0);
@@ -623,14 +632,206 @@ describe("a link, or a reload, on a step (U9)", () => {
                 initialStep="details"
             />,
         );
-        await waitFor(() =>
-            expect(
-                screen.getByRole("radio", { name: /6:30 to 7:15 pm/ }),
-            ).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: /Edit the class, 6:30 to/,
+            }),
+        ).toBeVisible();
         expect(
             screen.getByRole("heading", { name: "Your details" }),
         ).toBeVisible();
+    });
+});
+
+describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
+    const EDIT_SERVICE = "Edit what you're booking, Personal training";
+    const EDIT_DAY = "Edit the day, Sunday 20 September";
+    const EDIT_SEVEN = "Edit the time, 7:00 am";
+    const SUN = "Sun 20 Sep: 2 times free";
+    const MON = "Mon 21 Sep: 1 time free";
+    const SEVEN = "7:00 am with Karan Mehta";
+    const NINE = "9:00 am with Ritu Kapoor";
+
+    const button = (name: string | RegExp) =>
+        screen.getByRole("button", { name });
+    const radio = (name: string | RegExp) =>
+        screen.getByRole("radio", { name });
+    const rowOf = (el: HTMLElement) => el.closest("[data-chosen-row]");
+
+    /** Two free days, so another day can be pressed. */
+    function open(page: BookingPageData = PAGE, serviceId?: string) {
+        serve((url) => {
+            if (url.includes("/svc_hiit/days")) return json(CLASS_DAYS);
+            const days = oneDays(null);
+            return json({
+                ...days,
+                days: [
+                    ...days.days,
+                    {
+                        date: "2026-09-21",
+                        open: true,
+                        starts: [
+                            {
+                                ...days.days[0].starts[0],
+                                startAt: "2026-09-21T01:30:00.000Z",
+                                endAt: "2026-09-21T02:30:00.000Z",
+                            },
+                        ],
+                    },
+                ],
+            });
+        });
+        render(
+            <BookingFlow
+                page={page}
+                apiUrl={API}
+                account={account()}
+                initialServiceId={serviceId}
+            />,
+        );
+    }
+    async function toSeven() {
+        fireEvent.click(radio(/Personal training/));
+        fireEvent.click(await screen.findByRole("radio", { name: SUN }));
+        fireEvent.click(radio(SEVEN));
+    }
+
+    it("folds the service to its row, focused, and Edit shows the list with the later steps put away", async () => {
+        open();
+        fireEvent.click(radio(/Personal training/));
+        const edit = button(EDIT_SERVICE);
+        expect(rowOf(edit)).toHaveTextContent("₹1,200");
+        expect(rowOf(edit)).toHaveTextContent("60 min");
+        expect(document.activeElement).toBe(rowOf(edit));
+        expect(screen.queryByRole("radio", { name: /HIIT class/ })).toBeNull();
+
+        await screen.findByRole("radio", { name: SUN });
+        fireEvent.click(radio(SUN));
+        fireEvent.click(radio(SEVEN));
+        expect(
+            screen.getByRole("heading", { name: "Your details" }),
+        ).toBeVisible();
+
+        fireEvent.click(button(EDIT_SERVICE));
+        expect(radio(/HIIT class/)).toBeVisible();
+        expect(radio(/Personal training/)).toHaveAttribute(
+            "aria-checked",
+            "true",
+        );
+        expect(screen.queryByRole("heading", { name: "When?" })).toBeNull();
+        expect(
+            screen.queryByRole("heading", { name: "Your details" }),
+        ).toBeNull();
+    });
+
+    it("the same service picked after Edit just closes, and the time stands", async () => {
+        open();
+        await toSeven();
+        const reads = calls.length;
+        fireEvent.click(button(EDIT_SERVICE));
+        fireEvent.click(radio(/Personal training/));
+
+        expect(button(EDIT_SERVICE)).toBeVisible();
+        expect(button(EDIT_SEVEN)).toBeVisible();
+        expect(
+            screen.getByRole("heading", { name: "Your details" }),
+        ).toBeVisible();
+        expect(calls).toHaveLength(reads);
+    });
+
+    it("has no Edit when there is one service to book", async () => {
+        open({ ...PAGE, services: [PAGE.services[0]] }, "svc_pt");
+        await screen.findByRole("radio", { name: SUN });
+        expect(
+            document.querySelector('[data-chosen-row="what you\'re booking"]'),
+        ).toHaveTextContent("Personal training");
+        expect(
+            screen.queryByRole("button", { name: /Edit what you're booking/ }),
+        ).toBeNull();
+    });
+
+    it("draws no times until a day is pressed, though the first free one is held", async () => {
+        open();
+        fireEvent.click(radio(/Personal training/));
+        await screen.findByRole("radio", { name: SUN });
+        expect(screen.queryByRole("radio", { name: SEVEN })).toBeNull();
+        expect(screen.queryByRole("radio", { name: NINE })).toBeNull();
+        expect(screen.queryByRole("button", { name: EDIT_DAY })).toBeNull();
+    });
+
+    it("a day pressed folds the strip to its row, and that day's times show under focus", async () => {
+        open();
+        fireEvent.click(radio(/Personal training/));
+        fireEvent.click(await screen.findByRole("radio", { name: MON }));
+
+        expect(screen.queryByRole("radiogroup", { name: "Day" })).toBeNull();
+        expect(button("Edit the day, Monday 21 September")).toBeVisible();
+        const time = radio(SEVEN);
+        expect(time).toHaveAttribute("aria-checked", "false");
+        expect(screen.queryByRole("radio", { name: NINE })).toBeNull();
+        expect(document.activeElement).toContainElement(time);
+    });
+
+    it("the same day after Edit keeps the time", async () => {
+        open();
+        await toSeven();
+        fireEvent.click(button(EDIT_DAY));
+        expect(radio(SUN)).toHaveAttribute("aria-checked", "true");
+        fireEvent.click(radio(SUN));
+
+        expect(button(EDIT_DAY)).toBeVisible();
+        expect(button(EDIT_SEVEN)).toBeVisible();
+    });
+
+    it("another day after Edit lets the time go", async () => {
+        open();
+        await toSeven();
+        fireEvent.click(button(EDIT_DAY));
+        fireEvent.click(radio(MON));
+
+        expect(button("Edit the day, Monday 21 September")).toBeVisible();
+        expect(
+            screen.queryByRole("button", { name: /Edit the time/ }),
+        ).toBeNull();
+        expect(radio(SEVEN)).toHaveAttribute("aria-checked", "false");
+        expect(
+            screen.queryByRole("heading", { name: "Your details" }),
+        ).toBeNull();
+    });
+
+    it("a time pressed folds to its row, focused, with the details under it, and Edit shows the times", async () => {
+        open();
+        await toSeven();
+        const edit = button(EDIT_SEVEN);
+        expect(rowOf(edit)).toHaveTextContent("With Karan Mehta");
+        expect(document.activeElement).toBe(rowOf(edit));
+        expect(screen.queryByRole("radio", { name: NINE })).toBeNull();
+        expect(
+            screen.getByRole("heading", { name: "Your details" }),
+        ).toBeVisible();
+
+        fireEvent.click(edit);
+        expect(radio(SEVEN)).toHaveAttribute("aria-checked", "true");
+        fireEvent.click(radio(NINE));
+        expect(button("Edit the time, 9:00 am")).toBeVisible();
+    });
+
+    it("a class chosen folds to its row, focused, and Edit shows the sessions", async () => {
+        open();
+        fireEvent.click(radio(/HIIT class/));
+        fireEvent.click(
+            await screen.findByRole("radio", { name: /6:30 to 7:15 pm/ }),
+        );
+        const edit = button("Edit the class, 6:30 to 7:15 pm · 20 Sep");
+        expect(rowOf(edit)).toHaveTextContent("With Ritu Kapoor");
+        expect(document.activeElement).toBe(rowOf(edit));
+        expect(screen.queryByRole("radiogroup", { name: "Class" })).toBeNull();
+
+        fireEvent.click(edit);
+        expect(radio(/6:30 to 7:15 pm/)).toHaveAttribute(
+            "aria-checked",
+            "true",
+        );
     });
 });
 

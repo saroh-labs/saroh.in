@@ -37,7 +37,7 @@
  */
 import type { Prisma } from "@saroh/database";
 import type { LimitPeriod, LimitWords } from "@saroh/pricing-catalog";
-import { LIMIT_WORDS, MODULE_MAP } from "@saroh/pricing-catalog";
+import { LIMIT_WORDS, MODULE_MAP, quietAtLimit } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
@@ -97,18 +97,13 @@ export const METER_WORDS: Readonly<Record<MeteredLimitKey, MeterWords>> =
     ) as Record<MeteredLimitKey, MeterWords>;
 
 /**
- * A total limit of one says nothing at 80% or at the cap (UX-041): the one
- * thing a plan comes with (its website, its owner) is filled by setting the
- * business up, so "you've reached your 1 website" on day one is noise. Only
- * going past it (a soft cap) is told. A monthly one still warns: reaching
- * this month's one booking is news.
+ * {@link quietAtLimit}, by limit key. Only going past it (a soft cap) is told.
  */
 export function quietAtOne(
     key: MeteredLimitKey | undefined,
     limit: number,
 ): boolean {
-    if (limit > 1) return false;
-    return key !== undefined && !METER_WORDS[key].monthly;
+    return key !== undefined && quietAtLimit(METER_WORDS[key], limit);
 }
 
 /** The catalogue rows whose limit metering counts, by row id. */

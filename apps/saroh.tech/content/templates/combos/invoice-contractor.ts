@@ -45,8 +45,4 @@ export const invoiceContractor: Combo = {
             answer: "A text is better than nothing. Quote the date of the message on the variation line, and from then on send a one-line written price for each change before any of that extra work starts.",
         },
     ],
-    band: {
-        title: "Stage done, stage paid.",
-        line: "Send each stage's bill the day the work is finished, and take payment through your own link. 0% fees.",
-    },
 };

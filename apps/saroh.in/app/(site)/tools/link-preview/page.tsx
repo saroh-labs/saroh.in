@@ -4,9 +4,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Faq } from "@/components/shared/sections/faq";
-import { PageTitle } from "@/components/shared/sections/page-title";
-import { PointGrid } from "@/components/shared/sections/point-grid";
 import { LinkPreviewTool } from "@/components/tools/link-preview/link-preview-tool";
 import { SarohSharePreview } from "@/components/tools/link-preview/saroh-share-preview";
 import { linkPreview as copy } from "@/content/link-preview";
@@ -14,6 +11,9 @@ import { linkShown } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { faqPageLd, toolLd } from "@/lib/structured-data";
+import { Faq } from "@saroh/marketing/faq";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { PointGrid } from "@saroh/marketing/point-grid";
 
 /**
  * The link preview checker (resources plan U2; design "Saroh Resources -

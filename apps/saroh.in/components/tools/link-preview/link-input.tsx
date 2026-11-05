@@ -2,7 +2,7 @@
 
 import { linkPreview as copy } from "@/content/link-preview";
 import { splitScheme } from "@/lib/link-preview";
-import { Button } from "../../shared/buttons/button";
+import { Button } from "@saroh/marketing/button";
 import { fieldClasses } from "../../shared/fields/field-classes";
 
 /**

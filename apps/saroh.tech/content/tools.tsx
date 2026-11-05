@@ -5,8 +5,8 @@ import type { ToolContent } from "@/components/tools/tool-page";
 import { H2 } from "@/components/tools/tool-page";
 
 const LIST = "m-0 list-disc pl-5 text-[17px] leading-[1.9]";
-const COPY = "m-0 text-[17px] leading-relaxed text-body";
-const FINE = "m-0 text-sm text-quiet";
+const COPY = "m-0 text-[17px] leading-relaxed text-mk-copy";
+const FINE = "m-0 text-sm text-muted-foreground";
 
 const to = (href: string, name: string) => (
     <Link prefetch={false} href={href}>
@@ -23,106 +23,104 @@ const TEMPLATES = (doc: string) => [
     { name: `${doc} template`, href: `/templates/${doc.toLowerCase()}` },
 ];
 
-export const MOMENT_INVOICE: MomentCopy = {
-    cardTitle: "Downloaded. Want to send it and get paid?",
-    sheetTitle: "Want to send it and get paid?",
-    cardLine:
-        "Send it as a link your client can pay from, through your own Stripe, PayPal or bank. See when they open it. We never touch the money.",
-    sheetLines: [
-        "Send it as a link your client can pay from, through your own Stripe, PayPal or bank.",
-        "See when they open it. Remind them in one tap from your email or WhatsApp.",
-        "0% fees. We never touch your money.",
-    ],
-    sheetNote:
-        "Free plan, no card. This invoice and your details come with you.",
-    action: "Save, send and get paid",
-    hint: "Free plan · this invoice comes with you",
-};
+/** Nothing typed here travels: what's in a tool stays in the browser. */
+const MOMENT_NOTE =
+    "Free plan, no card. What you made here stays in this browser.";
 
-export const MOMENT_QUOTE: MomentCopy = {
-    cardTitle: "Downloaded. Want your client to accept it online?",
-    sheetTitle: "Want your client to accept it online?",
-    cardLine:
-        "In Saroh they tap Accept, you see the time it happened, and it turns into an invoice in one tap.",
-    sheetLines: [
-        "Your client taps Accept, and you see the time it happened.",
-        "Turn an accepted quote into an invoice in one tap.",
-        "Every change and every yes is kept in one place.",
-    ],
-    sheetNote: "Free plan, no card. This quote and your details come with you.",
-    action: "Send it from Saroh",
-    hint: "Free plan · this quote comes with you",
-    quiet: {
-        title: "Want your client to accept it online?",
-        line: "In Saroh they tap Accept, you see the time it happened, and it turns into an invoice in one tap.",
-        link: "Send it from Saroh →",
-    },
-};
-
-export const MOMENT_RECEIPT: MomentCopy = {
-    cardTitle: "Downloaded. Want every receipt kept for you?",
-    sheetTitle: "Want every receipt kept for you?",
-    cardLine:
-        "Record a payment in Saroh and the receipt is made and saved with the client.",
-    sheetLines: [
-        "Record a payment and the receipt is made for you.",
-        "Every receipt is saved with the client.",
-        "0% fees. We never touch your money.",
-    ],
-    sheetNote:
-        "Free plan, no card. This receipt and your details come with you.",
-    action: "Keep it in Saroh",
-    hint: "Free plan · this receipt comes with you",
-};
-
-export const MOMENT_REMINDER: MomentCopy = {
-    cardTitle: "Ready. Chasing more than one invoice?",
-    sheetTitle: "Chasing more than one invoice?",
-    cardLine:
-        "Saroh writes the right reminder for every overdue invoice and tells you when to send it. It still comes from you, so it gets read.",
-    sheetLines: [
-        "The right reminder for every overdue invoice.",
-        "Saroh tells you when to send it.",
-        "It still comes from your own email or WhatsApp, so it gets read.",
-    ],
-    sheetNote: "Free plan, no card.",
-    action: "Try one-tap reminders",
+const moment = (
+    what: string,
+    title: string,
+    line: string,
+    sheetLines: readonly string[],
+    quiet?: MomentCopy["quiet"],
+): MomentCopy => ({
+    cardTitle: `${what} ${title}`,
+    sheetTitle: title,
+    cardLine: line,
+    sheetLines,
+    sheetNote: MOMENT_NOTE,
+    action: "Start free",
     hint: "Free plan, no card",
-    quiet: {
+    quiet,
+});
+
+const SHARE_LINE =
+    "Share an invoice by link, or open WhatsApp with the words typed. You press send.";
+const OVERDUE_LINE = "Saroh lists your overdue invoices.";
+
+export const MOMENT_INVOICE = moment(
+    "Downloaded.",
+    "Want your invoices in one place?",
+    "In Saroh you write numbered invoices in your currency, with your own tax line and number, and record what's paid.",
+    [
+        "Numbered invoices in your currency, with your own tax line and number.",
+        SHARE_LINE,
+        "Record a payment, and the invoice becomes a receipt.",
+    ],
+);
+
+const AFTER_QUOTE =
+    "Saroh doesn't make quotes. Once the job's agreed, write the invoice there and record what's paid.";
+
+export const MOMENT_QUOTE = moment(
+    "Downloaded.",
+    "Agreed the job? Bill it in Saroh.",
+    AFTER_QUOTE,
+    [
+        "Numbered invoices in your currency, with your own tax line and number.",
+        SHARE_LINE,
+        "Record a payment, and the invoice becomes a receipt.",
+    ],
+    {
+        title: "Agreed the job? Bill it in Saroh.",
+        line: AFTER_QUOTE,
+        link: "Start free →",
+    },
+);
+
+export const MOMENT_RECEIPT = moment(
+    "Downloaded.",
+    "Want your receipts made for you?",
+    "Record a payment in Saroh, and the invoice becomes a receipt you can share.",
+    [
+        "Record a payment, and the invoice becomes a receipt.",
+        "Share it by link or on WhatsApp.",
+    ],
+);
+
+const REMINDER_LINE = `${OVERDUE_LINE} ${SHARE_LINE}`;
+
+export const MOMENT_REMINDER = moment(
+    "Ready.",
+    "Chasing more than one invoice?",
+    REMINDER_LINE,
+    [OVERDUE_LINE, SHARE_LINE],
+    {
         title: "Chasing more than one invoice?",
-        line: "Saroh writes the right reminder for every overdue invoice and tells you when to send it. It still comes from you, so it gets read.",
-        link: "Try one-tap reminders →",
+        line: REMINDER_LINE,
+        link: "Start free →",
     },
-};
+);
 
-export const MOMENT_LATE_FEE: MomentCopy = {
-    cardTitle: "Copied. Want to see every overdue invoice?",
-    sheetTitle: "Want to see every overdue invoice?",
-    cardLine: "Saroh shows what's late, by how much, and who to remind today.",
-    sheetLines: [
-        "See every overdue invoice by age.",
-        "Know who to remind today, and remind them in one tap.",
-        "0% fees. We never touch your money.",
-    ],
-    sheetNote: "Free plan, no card.",
-    action: "See what's late",
-    hint: "Free plan, no card",
-};
+export const MOMENT_LATE_FEE = moment(
+    "Copied.",
+    "Want to see what's overdue?",
+    REMINDER_LINE,
+    [OVERDUE_LINE, SHARE_LINE],
+);
 
-export const MOMENT_TAX: MomentCopy = {
-    cardTitle: "Copied. Want your tax lines on every invoice?",
-    sheetTitle: "Want your tax lines on every invoice?",
-    cardLine:
-        "Save your tax lines in Saroh and they're on every invoice you send.",
-    sheetLines: [
-        "Your tax lines, saved on every invoice.",
-        "Send invoices your client can pay from your own link.",
-        "0% fees. We never touch your money.",
+const TAX_LINE =
+    "In Saroh you add your own tax line and tax number to an invoice you write. You name it and set the rate. Saroh doesn't work it out for you.";
+
+export const MOMENT_TAX = moment(
+    "Copied.",
+    "Want your tax line on an invoice?",
+    TAX_LINE,
+    [
+        "Add your tax line to an invoice you write.",
+        "You name it and set the rate. Saroh doesn't work it out for you.",
     ],
-    sheetNote: "Free plan, no card.",
-    action: "Save my tax lines",
-    hint: "Free plan, no card",
-};
+);
 
 const FREE_AND_PRIVATE = [
     {
@@ -138,7 +136,7 @@ const FREE_AND_PRIVATE = [
 export const INVOICE: ToolContent = {
     tool: "invoice-generator",
     lede: "Fill it in, download a clean PDF. No sign-up, no watermark.",
-    ticks: ["Any currency", "Your own tax lines", "Stays in this browser"],
+    ticks: ["Nine currencies", "Your own tax lines", "Stays in this browser"],
     how: {
         title: "How to make an invoice in 2 minutes",
         steps: [
@@ -155,8 +153,8 @@ export const INVOICE: ToolContent = {
                 text: "Items, quantity and rate. Tax and totals add up as you type.",
             },
             {
-                title: "Download or send",
-                text: "Get the PDF, or send it as a payable link from Saroh.",
+                title: "Download it",
+                text: "Get the PDF, and send it to your client yourself.",
             },
         ],
     },
@@ -189,7 +187,7 @@ export const INVOICE: ToolContent = {
     faqs: [
         {
             question: "Is it really free?",
-            answer: "Yes. Make and download as many invoices as you like. No sign-up, no watermark. The app is for sending, tracking and getting paid.",
+            answer: "Yes. Make and download as many invoices as you like. No sign-up, no watermark.",
         },
         ...FREE_AND_PRIVATE,
         {
@@ -198,7 +196,7 @@ export const INVOICE: ToolContent = {
         },
         {
             question: "Can my client pay online?",
-            answer: "Put your own Stripe, PayPal or other payment link on the invoice and they can pay from it. We never touch the money.",
+            answer: "If you have a payment link from your own provider, put it in the invoice's notes and they can pay from it. Saroh doesn't take the payment.",
         },
         {
             question: "How do I number my invoices?",
@@ -229,8 +227,8 @@ export const INVOICE: ToolContent = {
     ],
     templates: TEMPLATES("Invoice"),
     band: {
-        title: "Send it, track it, get paid.",
-        line: "0% fees. Your client pays you directly.",
+        title: "Write your next invoice in Saroh.",
+        line: "Numbered invoices in your currency, with your own tax line and number, and a record of what's paid.",
     },
 };
 
@@ -253,18 +251,18 @@ export const QUOTE: ToolContent = {
                 text: "And what isn't, and how long the price is good for.",
             },
             {
-                title: "Download or send",
-                text: "Get the PDF, or let your client accept it online from Saroh.",
+                title: "Download it",
+                text: "Get the PDF, and send it to your client yourself.",
             },
         ],
     },
     explain: (
         <>
             <h2 className={H2}>Quote or estimate?</h2>
-            <div className="overflow-x-auto rounded-card border border-line bg-surface">
+            <div className="overflow-x-auto rounded-mk-card border border-border bg-card">
                 <table className="w-full border-collapse text-left text-[15px]">
                     <thead>
-                        <tr className="border-b border-line">
+                        <tr className="border-b border-border">
                             <td className="p-3" />
                             <th scope="col" className="p-3">
                                 Quote
@@ -288,7 +286,7 @@ export const QUOTE: ToolContent = {
                                 "Explain why, before you bill",
                             ],
                         ].map(([row, quote, estimate]) => (
-                            <tr key={row} className="border-t border-line">
+                            <tr key={row} className="border-t border-border">
                                 <th scope="row" className="p-3">
                                     {row}
                                 </th>
@@ -316,7 +314,7 @@ export const QUOTE: ToolContent = {
     faqs: [
         {
             question: "Can I turn a quote into an invoice?",
-            answer: "Yes. Open it in the invoice generator with one tap, or in Saroh after the client accepts.",
+            answer: "Yes. Choose Turn this into an invoice, and it opens in the invoice generator with your lines filled in.",
         },
         {
             question: "How long should a quote be valid?",
@@ -348,7 +346,10 @@ export const QUOTE: ToolContent = {
             href: "/templates/quote",
         },
     ],
-    band: { title: "Every quote, every change, every “yes”, in one place." },
+    band: {
+        title: "Agreed the job? Bill it in Saroh.",
+        line: AFTER_QUOTE,
+    },
 };
 
 export const RECEIPT: ToolContent = {
@@ -408,8 +409,8 @@ export const RECEIPT: ToolContent = {
         },
     ],
     band: {
-        title: "Every receipt, kept with the client.",
-        line: "Record a payment in Saroh and the receipt is made and saved for you.",
+        title: "Record a payment, and the invoice becomes a receipt.",
+        line: "In Saroh, an invoice reads as a receipt once it's paid. Share it by link or on WhatsApp.",
     },
 };
 
@@ -434,12 +435,14 @@ export const REMINDER: ToolContent = {
                 ].map(([when, what]) => (
                     <div
                         key={when}
-                        className="flex flex-col gap-1 border-t border-line py-3 md:flex-row md:gap-4"
+                        className="flex flex-col gap-1 border-t border-border py-3 md:flex-row md:gap-4"
                     >
                         <dt className="font-bold md:w-32 md:shrink-0">
                             {when}
                         </dt>
-                        <dd className="m-0 text-[15.5px] text-body">{what}</dd>
+                        <dd className="m-0 text-[15.5px] text-mk-copy">
+                            {what}
+                        </dd>
                     </div>
                 ))}
             </dl>
@@ -480,7 +483,7 @@ export const REMINDER: ToolContent = {
             href: "/templates/payment-reminder-letter",
         },
     ],
-    band: { title: "Reminders that come from you, so they get read." },
+    band: { title: "See what's overdue in Saroh.", line: SHARE_LINE },
 };
 
 export const LATE_FEE: ToolContent = {
@@ -544,8 +547,8 @@ export const LATE_FEE: ToolContent = {
         },
     ],
     band: {
-        title: "See every overdue invoice by age.",
-        line: "Saroh shows what's late, by how much, and who to remind today.",
+        title: "See what's overdue in Saroh.",
+        line: SHARE_LINE,
     },
 };
 
@@ -556,10 +559,10 @@ const formula = (name: string, rate: number, base: number, symbol: string) => {
         .toFixed(2)
         .replace(/\.00$/, "");
     return (
-        <div className="rounded-[14px] border border-line bg-surface p-4 text-[15.5px] leading-[1.7]">
+        <div className="rounded-[14px] border border-border bg-card p-4 text-[15.5px] leading-[1.7]">
             <b>Add {name}:</b> price × (1 + rate)
             <br />
-            <span className="font-mono text-[13.5px] text-quiet">
+            <span className="font-mono text-[13.5px] text-muted-foreground">
                 {symbol}
                 {base} × {factor} = {symbol}
                 {gross}
@@ -567,13 +570,13 @@ const formula = (name: string, rate: number, base: number, symbol: string) => {
             <br />
             <b>Remove {name}:</b> total ÷ (1 + rate)
             <br />
-            <span className="font-mono text-[13.5px] text-quiet">
+            <span className="font-mono text-[13.5px] text-muted-foreground">
                 {symbol}
                 {gross} ÷ {factor} = {symbol}
                 {base}
             </span>
             <br />
-            <span className="text-quiet">
+            <span className="text-muted-foreground">
                 A common mistake: taking {rate}% off {symbol}
                 {gross} gives {symbol}
                 {wrong}, not {symbol}
@@ -586,7 +589,7 @@ const formula = (name: string, rate: number, base: number, symbol: string) => {
 const TAX_MORE = [
     {
         title: "Invoice generator",
-        line: "Your own tax lines, any currency.",
+        line: "Your own tax lines, nine currencies.",
         href: "/tools/invoice-generator",
     },
     {
@@ -601,7 +604,10 @@ const TAX_MORE = [
     },
 ];
 
-const TAX_BAND = { title: "Your tax lines, saved on every invoice." };
+const TAX_BAND = {
+    title: "Add your tax line to an invoice you write.",
+    line: "You name it and set the rate. Saroh doesn't work it out for you.",
+};
 
 export const VAT: ToolContent = {
     tool: "vat-calculator",

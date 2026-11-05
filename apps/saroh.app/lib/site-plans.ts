@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { PlansFeed } from "@saroh/site-blocks";
 import {
     plansAutopayMethods,
@@ -8,6 +10,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { shopFetch } from "./catalogue";
+import { dontCachePage } from "./page-cache/site-rules";
 import type { PlansRead } from "./plans-feed";
 import { plansFeed, underPrefix } from "./plans-feed";
 import { enquiryPagePath } from "./shop-checkout-shape";
@@ -15,18 +18,27 @@ import { enquiryPagePath } from "./shop-checkout-shape";
 /**
  * The business's plans on sale (round-2 G9), server to server, never
  * cached: `GET /public/sites/:siteId/plans`. The API serves only plans on
- * sale with their published values, and 404s while Payments is off. Either
- * way a miss is an empty list here, so the Plans block draws nothing. The
+ * sale with their published values, and 404s while Payments is off. A
+ * 404 is an empty list here, so the Plans block draws nothing; a read that
+ * failed is not, and is never kept by the page cache. The
  * read also says whether Join can be paid online now (G20); an API that
  * doesn't say is a no. The call carries the signed relay, as the shop's
- * reads do, so the API's per-visitor limit counts the visitor.
+ * reads do, so the API's per-visitor limit counts the visitor. `cache` is one
+ * read for the menu and the page within a request.
  */
-export async function getPublicPlans(siteId: string): Promise<PlansRead> {
+export const getPublicPlans = cache(async function getPublicPlans(
+    siteId: string,
+): Promise<PlansRead> {
     const res = await shopFetch(`${encodeURIComponent(siteId)}/plans`);
-    if (!res?.ok) return { plans: [], payOnline: false };
-    const body: unknown = await res.json().catch(() => null);
+    if (res?.status === 404) return { plans: [], payOnline: false };
+    const body: unknown = res?.ok ? await res.json().catch(() => null) : null;
+    const plans = plansOf(body);
+    if (!plans) {
+        dontCachePage("plans unavailable");
+        return { plans: [], payOnline: false, failed: true };
+    }
     return {
-        plans: plansOf(body) ?? [],
+        plans,
         payOnline: plansPayOnline(body),
         // D12: the join sheet's "Pay with"; none from an older API.
         autopayMethods: plansAutopayMethods(body),
@@ -35,7 +47,7 @@ export async function getPublicPlans(siteId: string): Promise<PlansRead> {
         // DEC-172 U7: how long members may pause; none from an older API.
         pauseWeeks: plansPauseWeeks(body),
     };
-}
+});
 
 type Snapshot = Parameters<typeof enquiryPagePath>[0];
 

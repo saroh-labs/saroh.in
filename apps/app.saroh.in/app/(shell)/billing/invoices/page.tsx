@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/shared/page/page-container";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { listQueryFrom, readsOnServer } from "@/lib/invoices/list-view";
+import { paymentsModuleOn } from "@/lib/invoices/payments-on";
 import {
     listInvoicesIn,
     scopeFromQuery,
@@ -84,6 +85,7 @@ export default async function InvoicesPage({
         scope,
         missingRates,
         summary,
+        paymentsOn,
     ] = await Promise.all([
         narrowedRead ?? (only ? listInvoicesIn(only) : listInvoices()),
         getInvoiceBusiness(),
@@ -95,6 +97,7 @@ export default async function InvoicesPage({
         readMissingRates(),
         // The money strip; null when it couldn't be read.
         readInvoiceSummary(),
+        paymentsModuleOn(),
     ]);
     const canWrite = permits(organization, "invoice:write");
 
@@ -122,6 +125,7 @@ export default async function InvoicesPage({
                 timeZone={invoiceZone(business)}
                 missingRates={missingRates}
                 summary={summary}
+                paymentsOn={paymentsOn}
                 // Signs a reminder's preview in Remind many (U12).
                 businessName={organization?.name ?? "This business"}
             />

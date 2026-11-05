@@ -51,8 +51,4 @@ export const quoteContractor: Combo = {
             answer: "For a small job, a signed quote with clear terms may be enough. A big extension deserves a proper building contract, and a local solicitor or trade body can point you to a suitable form.",
         },
     ],
-    band: {
-        title: "Priced, signed, on site.",
-        line: "Send the quote from your phone, take the first stage payment through your own link. 0% fees.",
-    },
 };

@@ -403,7 +403,7 @@ export function sellsRows(read: SellsRead): SellsRow[] {
 
 /**
  * "Where do customers come from?" until sources are tracked (U16): "1,689
- * visits from 1,109 visitors, 23 enquiries and 159 online orders." Before the
+ * visits from 1,109 visitors, 23 enquiries and 159 paid orders." Before the
  * first sale it adds that no order has come yet (`IBNoSalesD`).
  */
 export function fromAnswer(
@@ -422,8 +422,8 @@ export function fromAnswer(
             : "no enquiries";
     const orders =
         summary.orders > 0
-            ? count(summary.orders, "online order")
-            : "no online orders";
+            ? count(summary.orders, "paid order")
+            : "no paid orders";
     return `${visits}, ${enquiries} and ${orders}.`;
 }
 
@@ -441,11 +441,11 @@ export function sourceLine(read: MoneyRead): string {
 
 /** "How these are counted", on every tab's foot. */
 export const HOW_INSIGHTS_ARE_COUNTED: readonly string[] = [
-    "Money in is money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
+    "Money in is money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each amount is counted once.",
     "A period ends today in your business's time zone, and is compared with as many days just before it.",
     "The weekly bars are seven days at a time, back from today, so a period's bars add up to its money in.",
     "What sells counts what was paid for, and bookings that weren't cancelled.",
-    "Your website's visits, enquiries and online orders are updated every hour.",
+    "Your website's visits, enquiries and paid orders are updated every hour.",
     "Visitors are counted each day: a visitor who comes back on another day is counted again.",
     "Where visits come from counts each visit once, by the site or app it came from, and by the links made here. Nothing about the visitor is kept.",
     "A visit is counted as paid when it paid online there and then. A refund later isn't taken off where it came from.",

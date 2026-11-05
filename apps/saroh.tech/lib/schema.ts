@@ -1,3 +1,5 @@
+import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
+import { SAROH_SOCIAL } from "@/content/social";
 import { site } from "@/site.config";
 
 import { canonicalOf } from "./seo";
@@ -14,6 +16,22 @@ const organization: Ld = {
     url: site.url,
     logo: `${site.url}/apple-icon.png`,
     parentOrganization: { "@type": "Organization", name: site.company },
+    email: SUPPORT_EMAIL,
+    contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        email: SUPPORT_EMAIL,
+        url: `${site.url}/contact`,
+    },
+    sameAs: SAROH_SOCIAL.map((link) => link.href),
+    address: {
+        "@type": "PostalAddress",
+        streetAddress: REGISTERED_OFFICE[0],
+        addressLocality: "Gurgaon",
+        addressRegion: "Haryana",
+        postalCode: "122001",
+        addressCountry: "IN",
+    },
 };
 
 const website: Ld = {
@@ -26,7 +44,8 @@ const website: Ld = {
 const application = (page: SitePage): Ld => ({
     "@context": context,
     "@type": "SoftwareApplication",
-    name: page.h1,
+    // Home's H1 is a line of copy. The product's name is Saroh.
+    name: page.type === "home" ? site.name : page.h1,
     url: canonicalOf(page.path),
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
@@ -68,6 +87,7 @@ export function pageSchema(page: SitePage): Ld[] {
         case "home":
             return [organization, website, application(page)];
         case "about":
+        case "contact":
             return [organization, ...breadcrumbs(page)];
         case "pricing":
         case "tool":
@@ -75,7 +95,6 @@ export function pageSchema(page: SitePage): Ld[] {
         case "tools-hub":
         case "templates":
         case "guides":
-        case "compare":
             return [collection(page), ...breadcrumbs(page)];
         default:
             return breadcrumbs(page);
@@ -97,14 +116,19 @@ export const itemListSchema = (
     })),
 });
 
-/** Author and dates stay the organisation and the real edit day until a person signs the page. */
-export const articleSchema = (page: SitePage): Ld => ({
+/** The author is who signs the page (a guide), else the organisation; dates are the real edit day. */
+export const articleSchema = (
+    page: SitePage,
+    author?: { name: string; role: string },
+): Ld => ({
     "@context": context,
     "@type": "Article",
     headline: page.h1,
     description: page.description,
     url: canonicalOf(page.path),
-    author: { "@type": "Organization", name: site.name, url: site.url },
+    author: author
+        ? { "@type": "Person", name: author.name, jobTitle: author.role }
+        : { "@type": "Organization", name: site.name, url: site.url },
     publisher: { "@type": "Organization", name: site.name, url: site.url },
     ...(page.updated && {
         datePublished: page.updated,

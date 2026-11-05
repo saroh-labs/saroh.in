@@ -1,8 +1,9 @@
+import { cardLinkClasses } from "@saroh/marketing/card-link";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
 const CARD =
-    "flex flex-col gap-2.5 rounded-card border border-line bg-surface p-6";
+    "flex flex-col gap-2.5 rounded-mk-card border border-border bg-card p-6";
 
 export function Card({ className = "", ...props }: ComponentProps<"div">) {
     return <div className={`${CARD} ${className}`} {...props} />;
@@ -21,13 +22,11 @@ export function LinkCard({
     return (
         <Link
             prefetch={false}
-            className={`${CARD} no-underline transition-colors duration-150 hover:border-strong ${className}`}
+            className={cardLinkClasses(`gap-2 p-[22px] ${className}`)}
             {...props}
         >
-            <span className="font-display text-[21px] font-bold tracking-[-0.03em]">
-                {title}
-            </span>
-            <span className="text-[15.5px] leading-normal text-body">
+            <span className="font-display text-mk-card font-bold">{title}</span>
+            <span className="text-mk-card-body text-mk-copy [text-wrap:pretty]">
                 {line}
             </span>
         </Link>

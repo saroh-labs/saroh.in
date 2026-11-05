@@ -172,6 +172,7 @@ function details(
         can,
         registered: false,
         paymentsOn: true,
+        ordersOn: true,
         emailNote: null,
     };
 }

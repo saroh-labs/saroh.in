@@ -23,6 +23,52 @@ describe("the saroh.tech Worker", () => {
         expect(res.headers.get("x-robots-tag")).toBe("noindex");
     });
 
+    it("shares the referral cookie with the app, which reads it at setup", async () => {
+        const res = await handle(get("https://saroh.tech/r/abc123"), {
+            ASSETS: assets(),
+        });
+        expect(res.headers.get("set-cookie")).toContain("Domain=saroh.tech");
+    });
+
+    describe("?ref= on a page, the Made with Saroh credit's link", () => {
+        const page = async (url: string) => {
+            vi.stubGlobal(
+                "HTMLRewriter",
+                class {
+                    on() {
+                        return this;
+                    }
+                    transform(r: Response) {
+                        return r;
+                    }
+                },
+            );
+            const res = await handle(get(url), {
+                ASSETS: assets("<html></html>", "text/html"),
+            });
+            vi.unstubAllGlobals();
+            return res;
+        };
+
+        it("keeps a business's code, and still serves the page", async () => {
+            const res = await page("https://saroh.tech/?ref=abcd2345");
+            expect(res.status).toBe(200);
+            const set = res.headers.get("set-cookie");
+            expect(set).toContain("saroh_ref=abcd2345");
+            expect(set).toContain("Domain=saroh.tech");
+            expect(set).toContain("Max-Age=7776000");
+        });
+
+        it("leaves anything not shaped like a code", async () => {
+            for (const ref of ["short", "abcd2345;x=y", "abcd234l"]) {
+                const res = await page(
+                    `https://saroh.tech/?ref=${encodeURIComponent(ref)}`,
+                );
+                expect(res.headers.get("set-cookie"), ref).toBeNull();
+            }
+        });
+    });
+
     it("doesn't take an odd code for a referral link", async () => {
         const env = { ASSETS: assets() };
         const res = await handle(get("https://saroh.tech/r/a;b=c"), env);
@@ -60,6 +106,13 @@ describe("the saroh.tech Worker", () => {
             { ASSETS: assets() },
         );
         expect(back.headers.get("location")).toBe("/pricing");
+        const elsewhere = await handle(
+            get("https://saroh.tech/region/hide", {
+                referer: "https://saroh.tech//evil.com/",
+            }),
+            { ASSETS: assets() },
+        );
+        expect(elsewhere.headers.get("location")).toBe("/");
     });
 
     it("points at the matching saroh.in page, or its home", () => {

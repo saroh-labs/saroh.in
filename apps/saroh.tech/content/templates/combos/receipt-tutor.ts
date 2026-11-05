@@ -46,8 +46,4 @@ export const receiptTutor: Combo = {
             answer: "Don't alter the old slip. Write a new note showing the lessons returned and money sent back, referring to that first receipt number, so the family and your own books both tell the same story.",
         },
     ],
-    band: {
-        title: "Lessons bought, lessons counted.",
-        line: "Each payment through your own link sends its slip to the parent straight away. 0% fees.",
-    },
 };

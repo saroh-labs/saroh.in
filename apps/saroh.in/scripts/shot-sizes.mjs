@@ -19,16 +19,23 @@
  * Run it after a capture, with `--force` for a screenshot taken again:
  * `lib/shot-sources.test.ts` fails on a missing copy and on one left behind.
  * A copy whose screenshot is gone is removed.
+ *
+ * `--app <dir>` makes the copies for another site's shots, at the same widths:
+ * saroh.tech's (`pnpm --filter tech shots:sizes`).
  */
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const APP = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DIRS = ["v2", "help"].map((dir) => path.join(APP, "public/shots", dir));
+const HOME = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const appArg = process.argv.indexOf("--app");
+const APP = appArg > -1 ? path.resolve(process.argv[appArg + 1]) : HOME;
+const DIRS = ["v2", "help"]
+    .map((dir) => path.join(APP, "public/shots", dir))
+    .filter((dir) => fs.existsSync(dir));
 const WIDTHS = JSON.parse(
-    fs.readFileSync(path.join(APP, "content/shot-widths.json"), "utf8"),
+    fs.readFileSync(path.join(HOME, "content/shot-widths.json"), "utf8"),
 );
 /** As the capture encodes them, a little higher: these are encoded twice. */
 const WEBP = { quality: 76, effort: 6 };

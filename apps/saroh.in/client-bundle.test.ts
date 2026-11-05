@@ -27,6 +27,12 @@ const EXPORTS = (
         exports: Record<string, string | undefined>;
     }
 ).exports;
+const MARKETING = resolve(ROOT, "../../packages/marketing");
+const MARKETING_EXPORTS = (
+    JSON.parse(readFileSync(join(MARKETING, "package.json"), "utf8")) as {
+        exports: Record<string, string | undefined>;
+    }
+).exports;
 /**
  * Every page's words (plan 2026-10-31-002, R3): the /for/ and tool pages',
  * every GST page's, guide's and download's (admin's), and this build's
@@ -64,6 +70,13 @@ function resolveImport(from: string, spec: string): string | null {
         const target = EXPORTS[`.${sub[1]}`];
         return target && /\.(ts|tsx|js|mjs)$/.test(target)
             ? join(PACKAGE, target)
+            : null;
+    }
+    const mk = /^@saroh\/marketing(\/.*)$/.exec(spec);
+    if (mk) {
+        const target = MARKETING_EXPORTS[`.${mk[1]}`];
+        return target && /\.(ts|tsx)$/.test(target)
+            ? join(MARKETING, target)
             : null;
     }
     const base = spec.startsWith("@/")
@@ -184,6 +197,31 @@ describe("saroh.in's browser JS", () => {
                 .map((path) => `${relative(ROOT, entry)} → ${path}`),
         );
         expect(found).toEqual([]);
+    });
+
+    it("never loads the pricing catalogue: plans reach the browser as a worked-out model", () => {
+        const CATALOGUE =
+            /^import (?!type )[^;]*?from "@saroh\/pricing-catalog"/m;
+        const found = clientEntries().flatMap((entry) =>
+            [...reach(entry)]
+                .filter(
+                    (path) =>
+                        // The package's own tools aren't this test's.
+                        !path.startsWith(PACKAGE) &&
+                        existsSync(path) &&
+                        CATALOGUE.test(readFileSync(path, "utf8")),
+                )
+                .map(
+                    (path) =>
+                        `${relative(ROOT, entry)} → ${relative(ROOT, path)}`,
+                ),
+        );
+        expect(found).toEqual([]);
+        expect(
+            [...reach(join(MARKETING, "src/pricing/pricing-view.ts"))].some(
+                (p) => p.endsWith("pricing-usage.ts"),
+            ),
+        ).toBe(true);
     });
 
     it("never loads a page's words (plan 2026-10-31-002, R3)", () => {

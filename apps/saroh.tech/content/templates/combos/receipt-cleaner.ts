@@ -115,8 +115,4 @@ export const receiptCleaner: Combo = {
             answer: "Yes, if one agent pays for them together. List each flat on its own line with the date of the clean. The agent can then pass the right share to each landlord, without asking you to break it down.",
         },
     ],
-    band: {
-        title: "Cash or card, it's on record.",
-        line: "Mark a payment from your phone, and Saroh sends the receipt and files it under the client and address.",
-    },
 };

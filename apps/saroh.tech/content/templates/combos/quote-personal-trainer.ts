@@ -93,8 +93,4 @@ export const quotePersonalTrainer: Combo = {
             answer: "Yes, one sentence is enough. State whether unused sessions can be refunded, moved to someone else or simply expire on the end date. Check what your local consumer rules allow before you make it final.",
         },
     ],
-    band: {
-        title: "Twelve weeks, one clear price.",
-        line: "Send the quote, take the first half by payment link, and start on Monday. 0% fees.",
-    },
 };

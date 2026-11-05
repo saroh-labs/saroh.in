@@ -1,9 +1,10 @@
 "use client";
 
+import { Field as FieldFrame } from "@saroh/ui/field";
 import { useEffect, useMemo, useState } from "react";
 
 import { buttonClass } from "@/components/shared/button";
-import { Field } from "@/components/shared/field";
+import { DateField, Field } from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { todayIso } from "@/lib/tools/dates";
 import { useDraft } from "@/lib/tools/draft-store";
@@ -16,7 +17,7 @@ import {
     reminderMessage,
 } from "@/lib/tools/reminder";
 
-import { CopyButton, DateField, Section } from "./fields";
+import { CopyButton, Section } from "./fields";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
 
@@ -63,11 +64,7 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
     const [today] = useState(todayIso);
     const message = useMemo(() => reminderMessage(d, today), [d, today]);
     const late = daysOverdue(d.wasDue, today);
-    const handoff = useMemo(
-        () => ({ tool: TOOL, kind: "reminder", draft: d }),
-        [d],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(TOOL);
     const email = d.channel === "email";
     const copied = () =>
         moment.finished(email ? "Reminder copied" : "Message copied");
@@ -123,48 +120,46 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                     </div>
                     <Field
                         label="Payment link"
-                        hint="(optional)"
+                        optional
                         type="url"
                         placeholder="https://"
                         value={d.payLink}
                         onChange={(e) => set({ payLink: e.target.value })}
                     />
                     {d.wasDue ? (
-                        <span className="text-[13px] text-quiet">
+                        <span className="text-[13px] text-muted-foreground">
                             {late > 0
                                 ? `${late} day${late === 1 ? "" : "s"} overdue`
                                 : "Not overdue yet"}
                         </span>
                     ) : null}
                 </Section>
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Tone</span>
+                <FieldFrame group label="Tone">
                     <SegmentedControl
                         legend="Tone"
                         value={d.tone}
                         options={TONES}
                         onChange={(tone) => set({ tone })}
                     />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-semibold">Send by</span>
+                </FieldFrame>
+                <FieldFrame group label="Send by">
                     <SegmentedControl
                         legend="Channel"
                         value={d.channel}
                         options={CHANNELS}
                         onChange={(channel) => set({ channel })}
                     />
-                </div>
+                </FieldFrame>
             </div>
             <div className="flex min-w-0 flex-col gap-3.5">
                 <section
                     aria-live="polite"
                     aria-label="Your message"
-                    className="flex flex-col gap-3 rounded-card border border-ink bg-surface p-4 text-[15.5px] leading-normal md:p-6"
+                    className="flex flex-col gap-3 rounded-mk-card border border-foreground bg-card p-4 text-[15.5px] leading-normal md:p-6"
                 >
                     {email ? (
                         <div>
-                            <span className="text-[13px] text-quiet">
+                            <span className="text-[13px] text-muted-foreground">
                                 Subject
                             </span>
                             <br />
@@ -196,18 +191,14 @@ export function ReminderTool({ copy }: { copy: MomentCopy }) {
                         {email ? "Open in my email" : "Open WhatsApp"}
                     </a>
                 </div>
-                <span className="text-[13px] text-quiet">
+                <span className="text-[13px] text-muted-foreground">
                     Opens your own app with the message filled in. You tap send.
                 </span>
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={TOOL} done={moment.done} />
             </div>
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={TOOL}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

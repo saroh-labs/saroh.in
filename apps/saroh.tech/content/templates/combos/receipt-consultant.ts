@@ -115,8 +115,4 @@ export const receiptConsultant: Combo = {
             answer: "Put their full name on it, along with the session dates and a plain description, such as leadership coaching. Their employer may ask for those details. Don't add private notes about what you talked about in the sessions.",
         },
     ],
-    band: {
-        title: "Records finance can match.",
-        line: "Saroh sends a numbered receipt when you mark a payment, and keeps it with the client and the invoices it settles.",
-    },
 };

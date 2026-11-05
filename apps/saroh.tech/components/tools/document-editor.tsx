@@ -1,13 +1,22 @@
 "use client";
 
+import { CheckRow } from "@saroh/ui/check-row";
+import { Field as FieldFrame } from "@saroh/ui/field";
+import { IconButton } from "@saroh/ui/icon-button";
+import { X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/shared/button";
 import { Chip } from "@/components/shared/chip";
-import { Field, INPUT_CLASS } from "@/components/shared/field";
+import {
+    DateField,
+    Field,
+    SelectField,
+    TextArea,
+} from "@/components/shared/field";
 import { SegmentedControl } from "@/components/shared/segmented-control";
-import { addDays, todayIso } from "@/lib/tools/dates";
+import { addDays, endAfterMove, todayIso } from "@/lib/tools/dates";
 import type {
     DepositPlan,
     DocDraft,
@@ -29,9 +38,14 @@ import { useDraft } from "@/lib/tools/draft-store";
 import { carryHref, decodeDraft } from "@/lib/tools/handoff";
 import { CURRENCY_OPTIONS, formatMoney } from "@/lib/tools/money";
 
-import { DeskActions, DownloadProblem, useDownload } from "./document-actions";
+import {
+    DeskActions,
+    DownloadProblem,
+    SavedNote,
+    useDownload,
+} from "./document-actions";
 import { DocumentPreview } from "./document-preview";
-import { DateField, Section, SelectField, TextArea } from "./fields";
+import { Section } from "./fields";
 import { FromSection, NO_FROM } from "./from-section";
 import type { MomentCopy } from "./signup-moment";
 import { NextStepCard, SignupSheet, useSignupMoment } from "./signup-moment";
@@ -125,11 +139,7 @@ export function DocumentEditor({
     const t = useMemo(() => totals(d), [d]);
     const view = useMemo(() => documentView(kind, d, from), [kind, d, from]);
     const money = (cents: number) => formatMoney(cents, d.currency);
-    const handoff = useMemo(
-        () => ({ tool, kind, draft: d, from }),
-        [tool, kind, d, from],
-    );
-    const moment = useSignupMoment(handoff);
+    const moment = useSignupMoment(tool);
     const { busy, problem, download } = useDownload(
         view,
         tool,
@@ -153,9 +163,8 @@ export function DocumentEditor({
     const setTerms = (terms: Terms) =>
         set({ terms, due: dueFor(d.issued, terms, d.due) });
 
-    const totalLabel = invoice
-        ? "Total due"
-        : `${d.estimate ? "Estimate" : "Quote"} total`;
+    const noun = invoice ? "Invoice" : d.estimate ? "Estimate" : "Quote";
+    const totalLabel = invoice ? "Total due" : `${noun} total`;
     const totalValue = money(invoice ? t.due : t.total);
 
     return (
@@ -191,7 +200,7 @@ export function DocumentEditor({
                                     { value: "estimate", label: "Estimate" },
                                 ]}
                             />
-                            <span className="text-[13px] text-quiet">
+                            <span className="text-[13px] text-muted-foreground">
                                 A quote is a fixed price. An estimate is your
                                 best guess and can change.{" "}
                                 <Link
@@ -226,7 +235,7 @@ export function DocumentEditor({
                             <div className="md:col-span-2">
                                 <Field
                                     label="Client address"
-                                    hint="(optional)"
+                                    optional
                                     value={d.clientAddress}
                                     onChange={(e) =>
                                         set({ clientAddress: e.target.value })
@@ -236,37 +245,14 @@ export function DocumentEditor({
                         </div>
                     </Section>
 
-                    <Section title="Details">
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <Section title={`${noun} details`}>
+                        <div className="grid grid-cols-2 gap-3">
                             <Field
-                                label={invoice ? "Invoice number" : "Number"}
+                                label={`${noun} number`}
                                 className="[&_input]:font-mono"
                                 value={d.number}
                                 onChange={(e) =>
                                     set({ number: e.target.value })
-                                }
-                            />
-                            <DateField
-                                label={invoice ? "Issue date" : "Date"}
-                                value={d.issued}
-                                onChange={(issued) =>
-                                    set({
-                                        issued,
-                                        due: invoice
-                                            ? dueFor(issued, d.terms, d.due)
-                                            : d.due,
-                                    })
-                                }
-                            />
-                            <DateField
-                                label={invoice ? "Due date" : "Valid until"}
-                                value={d.due}
-                                onChange={(due) =>
-                                    set(
-                                        invoice
-                                            ? { due, terms: "custom" }
-                                            : { due },
-                                    )
                                 }
                             />
                             <SelectField
@@ -275,6 +261,35 @@ export function DocumentEditor({
                                 options={CURRENCY_OPTIONS}
                                 onChange={(currency) => set({ currency })}
                             />
+                            <DateField
+                                label={invoice ? "Issue date" : "Date"}
+                                value={d.issued}
+                                onChange={(issued) => {
+                                    const due = endAfterMove(
+                                        d.issued,
+                                        issued,
+                                        d.due,
+                                    );
+                                    set({
+                                        issued,
+                                        due: invoice
+                                            ? dueFor(issued, d.terms, due)
+                                            : due,
+                                    });
+                                }}
+                            />
+                            <DateField
+                                label={invoice ? "Due date" : "Valid until"}
+                                value={d.due}
+                                min={d.issued}
+                                onChange={(due) =>
+                                    set(
+                                        invoice
+                                            ? { due, terms: "custom" }
+                                            : { due },
+                                    )
+                                }
+                            />
                         </div>
                         {invoice ? (
                             <div
@@ -282,7 +297,7 @@ export function DocumentEditor({
                                 aria-label="Payment terms"
                                 className="flex flex-wrap items-center gap-2"
                             >
-                                <span className="text-[13px] text-quiet">
+                                <span className="text-[13px] text-muted-foreground">
                                     Payment terms
                                 </span>
                                 {(Object.keys(TERM_LABELS) as Terms[]).map(
@@ -303,21 +318,11 @@ export function DocumentEditor({
                     <Section
                         title={invoice ? "Items" : "Work and prices"}
                         aside={
-                            <span className="text-[13px] text-quiet md:hidden">
+                            <span className="text-[13px] text-muted-foreground md:hidden">
                                 {d.items.length}
                             </span>
                         }
                     >
-                        <div
-                            aria-hidden="true"
-                            className="hidden grid-cols-[minmax(0,1fr)_70px_110px_110px_28px] gap-2.5 text-xs font-semibold uppercase tracking-[.08em] text-quiet md:grid"
-                        >
-                            <span>Description</span>
-                            <span>Qty</span>
-                            <span>Rate</span>
-                            <span className="text-right">Amount</span>
-                            <span />
-                        </div>
                         {d.items.map((item, i) => {
                             const folded =
                                 i >= 2 &&
@@ -329,7 +334,7 @@ export function DocumentEditor({
                                         <button
                                             type="button"
                                             onClick={() => setOpenItem(item.id)}
-                                            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-0 text-left font-sans text-[15px] text-ink md:hidden"
+                                            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-0 text-left font-sans text-[15px] text-foreground md:hidden"
                                         >
                                             <span>
                                                 {item.description} · {item.qty}{" "}
@@ -341,11 +346,16 @@ export function DocumentEditor({
                                         </button>
                                     ) : null}
                                     <div
-                                        className={`grid-cols-[56px_minmax(0,1fr)_minmax(84px,auto)_44px] items-center gap-2.5 md:grid-cols-[minmax(0,1fr)_70px_110px_110px_28px] ${
-                                            folded ? "hidden md:grid" : "grid"
-                                        }`}
+                                        role="group"
+                                        aria-label={`Item ${i + 1}`}
+                                        className={`flex-col gap-2.5 ${
+                                            i > 0
+                                                ? "border-t border-border pt-3.5"
+                                                : ""
+                                        } ${folded ? "hidden md:flex" : "flex"}`}
                                     >
-                                        <input
+                                        <Field
+                                            label="Description"
                                             aria-label={`Item ${i + 1} description`}
                                             placeholder={
                                                 item.optional
@@ -358,49 +368,59 @@ export function DocumentEditor({
                                                     description: e.target.value,
                                                 })
                                             }
-                                            className={`${INPUT_CLASS} col-span-4 md:col-span-1`}
                                         />
-                                        <input
-                                            aria-label={`Item ${i + 1} quantity`}
-                                            inputMode="decimal"
-                                            value={item.qty}
-                                            onChange={(e) =>
-                                                setItem(item.id, {
-                                                    qty: e.target.value,
-                                                })
-                                            }
-                                            className={INPUT_CLASS}
-                                        />
-                                        <input
-                                            aria-label={`Item ${i + 1} rate`}
-                                            inputMode="decimal"
-                                            placeholder="0.00"
-                                            value={item.rate}
-                                            onChange={(e) =>
-                                                setItem(item.id, {
-                                                    rate: e.target.value,
-                                                })
-                                            }
-                                            className={INPUT_CLASS}
-                                        />
-                                        <span className="text-right font-mono text-sm">
-                                            {money(lineCents(item))}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            aria-label={`Remove item ${i + 1}`}
-                                            disabled={d.items.length === 1}
-                                            onClick={() =>
-                                                set({
-                                                    items: d.items.filter(
-                                                        (x) => x.id !== item.id,
-                                                    ),
-                                                })
-                                            }
-                                            className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink disabled:cursor-default disabled:opacity-30 md:h-10"
-                                        >
-                                            ×
-                                        </button>
+                                        <div className="grid grid-cols-[64px_minmax(0,1fr)_minmax(84px,auto)_auto] items-end gap-2.5 max-[359px]:grid-cols-2">
+                                            <Field
+                                                label="Qty"
+                                                aria-label={`Item ${i + 1} quantity`}
+                                                inputMode="decimal"
+                                                value={item.qty}
+                                                onChange={(e) =>
+                                                    setItem(item.id, {
+                                                        qty: e.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <Field
+                                                label="Rate"
+                                                aria-label={`Item ${i + 1} rate`}
+                                                inputMode="decimal"
+                                                placeholder="0.00"
+                                                value={item.rate}
+                                                onChange={(e) =>
+                                                    setItem(item.id, {
+                                                        rate: e.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <FieldFrame
+                                                label="Amount"
+                                                className="text-right"
+                                            >
+                                                <output
+                                                    aria-live="off"
+                                                    className="flex h-[38px] items-center justify-end font-mono text-sm coarse:h-11"
+                                                >
+                                                    {money(lineCents(item))}
+                                                </output>
+                                            </FieldFrame>
+                                            <IconButton
+                                                size="md"
+                                                label={`Remove item ${i + 1}`}
+                                                className="max-[359px]:justify-self-end"
+                                                disabled={d.items.length === 1}
+                                                onClick={() =>
+                                                    set({
+                                                        items: d.items.filter(
+                                                            (x) =>
+                                                                x.id !==
+                                                                item.id,
+                                                        ),
+                                                    })
+                                                }
+                                                icon={<X />}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -424,7 +444,7 @@ export function DocumentEditor({
                         {d.taxes.map((tax, i) => (
                             <div
                                 key={tax.id}
-                                className="grid grid-cols-[minmax(0,1fr)_96px_44px] items-end gap-3 md:grid-cols-[minmax(0,1fr)_120px_44px]"
+                                className="grid grid-cols-[minmax(0,1fr)_96px_auto] items-end gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto]"
                             >
                                 <Field
                                     label="Tax name"
@@ -461,9 +481,9 @@ export function DocumentEditor({
                                         })
                                     }
                                 />
-                                <button
-                                    type="button"
-                                    aria-label={`Remove tax line ${i + 1}`}
+                                <IconButton
+                                    size="md"
+                                    label={`Remove tax line ${i + 1}`}
                                     onClick={() =>
                                         set({
                                             taxes: d.taxes.filter(
@@ -471,13 +491,11 @@ export function DocumentEditor({
                                             ),
                                         })
                                     }
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
-                                >
-                                    ×
-                                </button>
+                                    icon={<X />}
+                                />
                             </div>
                         ))}
-                        <span className="text-[13px] text-quiet">
+                        <span className="text-[13px] text-muted-foreground">
                             You choose the rate.{" "}
                             <Link
                                 prefetch={false}
@@ -487,7 +505,7 @@ export function DocumentEditor({
                             </Link>
                         </span>
                         {d.discount !== null ? (
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-end gap-3">
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3">
                                 <Field
                                     label="Discount"
                                     inputMode="decimal"
@@ -507,18 +525,16 @@ export function DocumentEditor({
                                         set({ discountMode })
                                     }
                                 />
-                                <button
-                                    type="button"
-                                    aria-label="Remove discount"
+                                <IconButton
+                                    size="md"
+                                    label="Remove discount"
                                     onClick={() => set({ discount: null })}
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
-                                >
-                                    ×
-                                </button>
+                                    icon={<X />}
+                                />
                             </div>
                         ) : null}
                         {invoice && d.depositPaid !== null ? (
-                            <div className="grid grid-cols-[minmax(0,1fr)_44px] items-end gap-3">
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                                 <Field
                                     label="Deposit paid"
                                     inputMode="decimal"
@@ -527,14 +543,12 @@ export function DocumentEditor({
                                         set({ depositPaid: e.target.value })
                                     }
                                 />
-                                <button
-                                    type="button"
-                                    aria-label="Remove deposit paid"
+                                <IconButton
+                                    size="md"
+                                    label="Remove deposit paid"
                                     onClick={() => set({ depositPaid: null })}
-                                    className="h-11 cursor-pointer border-0 bg-transparent text-lg text-ink md:h-10"
-                                >
-                                    ×
-                                </button>
+                                    icon={<X />}
+                                />
                             </div>
                         ) : null}
                         <div className="flex flex-wrap gap-2.5">
@@ -579,7 +593,6 @@ export function DocumentEditor({
                             <div className="grid gap-3 md:grid-cols-2">
                                 <Field
                                     label="Payment link"
-                                    hint="(Stripe, PayPal…)"
                                     type="url"
                                     placeholder="https://"
                                     value={d.payLink}
@@ -589,7 +602,7 @@ export function DocumentEditor({
                                 />
                                 <Field
                                     label="Bank details"
-                                    hint="(optional)"
+                                    optional
                                     value={d.bank}
                                     onChange={(e) =>
                                         set({ bank: e.target.value })
@@ -652,17 +665,12 @@ export function DocumentEditor({
                                         set({ termsText: e.target.value })
                                     }
                                 />
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] md:min-h-0">
-                                    <input
-                                        type="checkbox"
-                                        checked={d.signLine}
-                                        onChange={(e) =>
-                                            set({ signLine: e.target.checked })
-                                        }
-                                        className="size-5 accent-ink"
-                                    />
+                                <CheckRow
+                                    checked={d.signLine}
+                                    onChange={(signLine) => set({ signLine })}
+                                >
                                     Add a line for the client to sign
-                                </label>
+                                </CheckRow>
                             </Section>
                         </>
                     )}
@@ -689,21 +697,13 @@ export function DocumentEditor({
                                 </Chip>
                             ))}
                         </div>
-                        <span className="flex items-center gap-2 text-[13px] text-quiet">
-                            {d.savedAt
-                                ? `Saved in this browser · ${d.savedAt}`
-                                : "Stays in this browser"}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    clearDraft();
-                                    clearFrom();
-                                }}
-                                className="min-h-11 cursor-pointer border-0 bg-transparent p-0 font-sans text-[13px] text-ink underline md:min-h-0"
-                            >
-                                Clear
-                            </button>
-                        </span>
+                        <SavedNote
+                            savedAt={d.savedAt}
+                            onClear={() => {
+                                clearDraft();
+                                clearFrom();
+                            }}
+                        />
                     </div>
                     <DocumentPreview view={view} />
                     <div className="hidden flex-col gap-3.5 lg:flex">
@@ -711,16 +711,18 @@ export function DocumentEditor({
                         <DownloadProblem problem={problem} />
                         <NextStepCard
                             copy={copy}
-                            handoff={handoff}
+                            tool={tool}
                             done={moment.done}
                         />
                     </div>
                 </aside>
             </div>
 
-            <div className="sticky bottom-2 z-10 flex flex-col gap-2.5 rounded-card border border-[rgba(28,28,26,.2)] bg-surface p-3 shadow-[0_-8px_24px_-12px_rgba(28,28,26,.25)] lg:hidden print:hidden">
+            <div className="sticky bottom-2 z-10 flex flex-col gap-2.5 rounded-mk-card border border-border-strong bg-card p-3 shadow-mk-panel lg:hidden print:hidden">
                 <div className="flex items-baseline justify-between px-1">
-                    <span className="text-[13px] text-quiet">{totalLabel}</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {totalLabel}
+                    </span>
                     <span
                         className="font-mono text-[17px] font-semibold"
                         aria-live="polite"
@@ -754,11 +756,7 @@ export function DocumentEditor({
             </div>
 
             <div className="flex flex-col gap-3 lg:hidden">
-                <NextStepCard
-                    copy={copy}
-                    handoff={handoff}
-                    done={moment.done}
-                />
+                <NextStepCard copy={copy} tool={tool} done={moment.done} />
             </div>
 
             {invoice ? null : (
@@ -789,7 +787,7 @@ export function DocumentEditor({
 
             <SignupSheet
                 copy={copy}
-                handoff={handoff}
+                tool={tool}
                 done={moment.sheet}
                 onClose={moment.closeSheet}
             />

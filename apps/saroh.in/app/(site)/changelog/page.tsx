@@ -6,11 +6,11 @@ import {
     FirstEntrySoon,
 } from "@/components/changelog/changelog-list";
 import { ChangelogSignup } from "@/components/changelog/changelog-signup";
-import { Container } from "@/components/shared/layout/container";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import { CHANGELOG, changelogView } from "@/content/changelog";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { Container } from "@saroh/marketing/container";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 export const metadata: Metadata = pageMetadata({
     title: CHANGELOG.metaTitle,

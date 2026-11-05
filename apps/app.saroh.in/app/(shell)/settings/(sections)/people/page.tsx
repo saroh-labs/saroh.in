@@ -1,7 +1,7 @@
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { TeamScreen } from "@/components/organizations/team/team-screen";
 import { SettingsPanel } from "@/components/settings/page/settings-panel";
-import { rowNotice } from "@/lib/billing/access";
+import { rowLimit } from "@/lib/billing/access";
 import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
@@ -90,7 +90,7 @@ export default async function PeoplePage() {
         canManage || canEditRoles ? await billingAccessOrNull() : null;
     // The plan's team seats (U14, DEC-155): everyone, whatever their role,
     // plus open invites, as the API counts. A soft cap never stops an invite.
-    const team = canManage ? rowNotice(access, "members") : null;
+    const team = canManage ? rowLimit(access, "members") : null;
     const seats = team?.on && !team.soft ? team : null;
     const teamLimit = seats ? { full: seats.full, why: seats.why } : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);

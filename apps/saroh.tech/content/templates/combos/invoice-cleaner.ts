@@ -38,8 +38,4 @@ export const invoiceCleaner: Combo = {
             answer: "Decide your rule first and keep to it. With enough notice, most cleaners simply leave that visit off the monthly bill. A skip with no warning might carry a fee, as long as your client already knows about it.",
         },
     ],
-    band: {
-        title: "Spend your time cleaning, not chasing.",
-        line: "Bill regular clients in one tap each month, and let them pay through your own link. 0% fees.",
-    },
 };

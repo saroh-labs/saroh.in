@@ -1,6 +1,6 @@
 "use client";
 
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 /** The Pricing design's "Show prices with GST" box; its default comes from the catalogue. */
 export function GstToggle({

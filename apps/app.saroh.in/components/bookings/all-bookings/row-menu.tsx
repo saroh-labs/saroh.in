@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -14,7 +15,6 @@ import {
     Ban,
     CalendarClock,
     FileText,
-    IndianRupee,
     MoreHorizontal,
     UserCheck,
     UserRound,
@@ -48,7 +48,7 @@ export interface RowMenuItems {
 
 const ICONS: Record<RowAction, ReactNode> = {
     arrived: <UserCheck aria-hidden />,
-    take: <IndianRupee aria-hidden />,
+    take: <MoneyIcon aria-hidden />,
     move: <CalendarClock aria-hidden />,
     open: <FileText aria-hidden />,
     person: <UserRound aria-hidden />,

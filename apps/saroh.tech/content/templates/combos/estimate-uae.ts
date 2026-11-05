@@ -55,8 +55,4 @@ export const estimateUae: Combo = {
             answer: "Tell the client before you spend the extra, and get their agreement in writing. Then send a revised estimate, with a new number, so the final tax invoice matches what they accepted.",
         },
     ],
-    band: {
-        title: "From estimate to tax invoice, cleanly.",
-        line: "Send a dirham estimate from Saroh, then turn it into a tax invoice with the same lines when the client agrees.",
-    },
 };

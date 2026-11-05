@@ -36,6 +36,8 @@ const SOURCES = [
     "apps/saroh.in/content",
     "apps/saroh.in/app",
     "apps/saroh.in/components",
+    "packages/marketing/src",
+    "apps/saroh.tech/content",
 ];
 const HELP = ["apps/help.saroh.in/content", "apps/saroh.in/content/help"];
 
@@ -96,7 +98,7 @@ const MARKETING_RETIRED = [
     ],
     [/\b(?:for|get) early access\b/i, "for early access", "Start free"],
 ];
-const MARKETING = "apps/saroh.in/";
+const MARKETING = ["apps/saroh.in/", "apps/saroh.tech/", "packages/marketing/"];
 /** The waitlist page's own files, until the follow-up removes them. */
 const WAITLIST_PAGE = [
     "apps/saroh.in/app/(standalone)/waitlist",
@@ -114,7 +116,7 @@ const ALLOWED = [];
 const usedAllowance = new Set();
 
 function retiredIn(text, file) {
-    if (file.startsWith(MARKETING)) {
+    if (MARKETING.some((root) => file.startsWith(root))) {
         if (WAITLIST_PAGE.some((w) => file.startsWith(w))) return [];
         return MARKETING_RETIRED.filter(([re]) => re.test(text)).map(
             ([, word]) => word,

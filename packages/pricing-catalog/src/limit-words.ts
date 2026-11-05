@@ -135,6 +135,16 @@ export function countedWhat(what: string, count: number): string {
     return words?.one ?? what;
 }
 
+/**
+ * A total limit of one says nothing at 80% or at the cap (UX-041): the one
+ * thing a plan comes with (its website, its owner) is filled by setting the
+ * business up, so "you've reached your 1 website" on day one is noise. A
+ * monthly one still warns: reaching this month's one booking is news.
+ */
+export function quietAtLimit(words: LimitWords, limit: number): boolean {
+    return limit <= 1 && !words.monthly;
+}
+
 /** The words for a catalogue row's limit, or null for a row nothing counts. */
 export function limitWordsFor(moduleId: string): LimitWords | null {
     const key = Object.prototype.hasOwnProperty.call(MODULE_MAP, moduleId)

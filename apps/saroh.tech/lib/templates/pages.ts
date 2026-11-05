@@ -20,6 +20,42 @@ import { formatPlain, parseNumber, toCents } from "@/lib/tools/money";
 
 const REVIEW_DATE = "2026-11-02";
 
+const INVOICES =
+    "Numbered invoices in your currency, with your own tax line and number, and a record of what's paid.";
+
+/**
+ * The closing band says what Saroh does, so it's one per document and never
+ * per page: the app's claims live here, not in the template data.
+ */
+const BAND: Record<DocumentSlug, { title: string; line: string }> = {
+    invoice: { title: "Write your next invoice in Saroh.", line: INVOICES },
+    estimate: {
+        title: "Agreed the job? Bill it in Saroh.",
+        line: `Saroh doesn't make estimates. It's where the invoice comes next. ${INVOICES}`,
+    },
+    quote: {
+        title: "Agreed the job? Bill it in Saroh.",
+        line: `Saroh doesn't make quotes. It's where the invoice comes next. ${INVOICES}`,
+    },
+    receipt: {
+        title: "Record a payment, and the invoice becomes a receipt.",
+        line: "In Saroh, an invoice reads as a receipt once it's paid. Share it by link or on WhatsApp.",
+    },
+    "credit-note": { title: "Keep your invoices in Saroh.", line: INVOICES },
+    "price-list": {
+        title: "Put your services on your own site.",
+        line: "Publish a site on a saroh.app address, with your live services, hours and booking page.",
+    },
+    "proforma-invoice": {
+        title: "Once it's agreed, write the invoice in Saroh.",
+        line: INVOICES,
+    },
+    "payment-reminder-letter": {
+        title: "See what's overdue in Saroh.",
+        line: "Share an invoice by link, or open WhatsApp with the words typed. You press send.",
+    },
+};
+
 /** How each document differs from an invoice or a quote, and where "Fill it online" goes. */
 const LOOK: Record<
     DocumentSlug,
@@ -120,6 +156,7 @@ export interface TemplatePage extends PageWords {
     document: DocumentData;
     trade?: TradeEntry;
     country?: CountryEntry;
+    band: { title: string; line: string };
     items: ExampleItem[];
     payment: Payment;
     fields: FieldNote[];
@@ -133,6 +170,7 @@ const lower = (d: DocumentData) => d.name.toLowerCase();
 
 const documentPage = (d: DocumentData): TemplatePage => ({
     ...d,
+    band: BAND[d.slug],
     key: d.slug,
     path: `/templates/${d.slug}`,
     h1: `${d.name} template`,
@@ -157,7 +195,7 @@ function comboPage(c: Combo): TemplatePage {
         lede: c.lede,
         tips: c.tips,
         faqs: c.faqs,
-        band: c.band,
+        band: BAND[c.document],
         reviewed: c.reviewed,
         key: `${document.slug}-${own.slug}`,
         path: `/templates/${document.slug}/${own.slug}`,
@@ -199,8 +237,6 @@ export function pageText(p: TemplatePage): string {
         ...p.facts.flatMap((f) => [f.label, f.value]),
         ...p.tips.flatMap((t) => [t.title, t.text]),
         ...p.faqs.flatMap((f) => [f.question, f.answer]),
-        p.band.title,
-        p.band.line,
         p.example.letter ?? "",
         p.example.note ?? "",
         p.example.termsText ?? "",

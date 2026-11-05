@@ -84,8 +84,4 @@ export const invoiceSalon: Combo = {
             answer: "Your bill should already show what was agreed, and when. Ask what went wrong, and offer a fix if it was promised. Issue a credit note for any amount you take off, rather than changing the old invoice.",
         },
     ],
-    band: {
-        title: "The accounts that happen after the chair.",
-        line: "Send a monthly bill to your account clients with a payment link of your own. 0% fees.",
-    },
 };

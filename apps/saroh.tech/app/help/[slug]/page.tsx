@@ -1,3 +1,4 @@
+import { PageTitle } from "@saroh/marketing/page-title";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -6,10 +7,9 @@ import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { ButtonLink } from "@/components/shared/button";
 import { Card } from "@/components/shared/card";
 import { JsonLd } from "@/components/shared/json-ld";
-import { Marked } from "@/components/shared/marked";
 import { RelatedGrid } from "@/components/shared/related-grid";
+import { StepList } from "@/components/shared/step-list";
 import { HELP, helpArticle } from "@/content/help";
-import { placeholders } from "@/content/placeholders";
 import { howToSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -35,59 +35,37 @@ export default async function Page({ params }: Props) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 pt-6 md:gap-10 md:px-20 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-6 md:gap-10 md:pt-7"
         >
             <JsonLd data={[...pageSchema(page), howToSchema(task, steps)]} />
             <div className="flex flex-col gap-4">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.045em] md:text-[56px] md:leading-none">
-                    {page.h1}
-                </h1>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-body md:text-[19px]">
+                <PageTitle size="article">{page.h1}</PageTitle>
+                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
                     {intro}
                 </p>
-                <p className="m-0 text-[15px] text-quiet">
+                <p className="m-0 text-[15px] text-muted-foreground">
                     Takes about {minutes} {minutes === 1 ? "minute" : "minutes"}
                 </p>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,720px)_360px] lg:justify-between">
                 <div className="flex flex-col gap-4">
-                    <ol className="m-0 flex list-none flex-col gap-3 p-0">
-                        {steps.map((s, i) => (
-                            <li
-                                key={s.title}
-                                className="flex flex-col gap-2 rounded-card border border-line bg-surface p-5"
-                            >
-                                <span className="font-mono text-quiet">
-                                    {String(i + 1).padStart(2, "0")}
-                                </span>
-                                <b className="text-[17px]">{s.title}</b>
-                                <span className="text-[15px] leading-normal text-body">
-                                    <Marked text={s.text} />
-                                </span>
-                            </li>
-                        ))}
-                    </ol>
+                    <StepList steps={steps} className="" />
                     {note ? (
-                        <p className="m-0 text-[15px] leading-normal text-body">
+                        <p className="m-0 text-[15px] leading-normal text-mk-copy">
                             {note}
                         </p>
                     ) : null}
                 </div>
-                <aside className="flex flex-col gap-3 lg:sticky lg:top-[calc(var(--st-header-h)+16px)] lg:self-start">
+                <aside className="flex flex-col gap-3 lg:sticky lg:top-[calc(var(--mk-nav-h)+16px)] lg:self-start">
                     <Card>
-                        <h2 className="m-0 font-display text-[21px] font-bold tracking-[-0.03em]">
+                        <h2 className="m-0 font-display text-mk-card font-bold [text-wrap:balance]">
                             Ready?
                         </h2>
                         <ButtonLink href={next.href} data-cta="help-next-step">
                             {next.label}
                         </ButtonLink>
-                        {next.inApp ? (
-                            <p className="m-0 text-[13px] leading-normal text-body">
-                                <Marked text={placeholders.helpDeepLinks} />
-                            </p>
-                        ) : null}
                     </Card>
                     <ContactCard />
                 </aside>

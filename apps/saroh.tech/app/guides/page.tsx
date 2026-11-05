@@ -1,10 +1,8 @@
-import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { ButtonLink } from "@/components/shared/button";
 import { LinkCard } from "@/components/shared/card";
 import { CtaBand } from "@/components/shared/cta-band";
-import { JsonLd } from "@/components/shared/json-ld";
+import { HubHead } from "@/components/shared/hub-head";
 import { GUIDE_CONTENT, GUIDE_GROUPS } from "@/content/guides";
-import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { signupHref } from "@/site.config";
@@ -17,32 +15,28 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-[1440px] flex-col gap-9 px-4 pt-4 md:gap-[52px] md:px-20 md:pt-10"
+            className="mx-auto flex max-w-mk-page flex-col gap-9 px-mk-gutter pt-4 md:gap-[52px] md:pt-10"
         >
-            <JsonLd data={pageSchema(page)} />
-            <div className="flex max-w-[860px] flex-col gap-4">
-                {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <h1 className="m-0 font-display text-[38px] font-bold leading-[0.98] tracking-[-0.05em] md:text-[72px]">
-                    {page.h1}
-                </h1>
-                <p className="m-0 text-[17px] leading-[1.55] text-body md:text-[19px]">
-                    Plain answers on writing invoices and quotes, asking for
-                    payment and setting your rate. Start with how to write an
-                    invoice.
-                </p>
-                <div>
-                    <ButtonLink
-                        href="/guides/how-to-write-an-invoice"
-                        data-cta="guides-first"
-                    >
-                        How to write an invoice
-                    </ButtonLink>
-                </div>
-            </div>
+            <HubHead
+                page={page}
+                action={
+                    <div>
+                        <ButtonLink
+                            href="/guides/how-to-write-an-invoice"
+                            data-cta="guides-first"
+                        >
+                            How to write an invoice
+                        </ButtonLink>
+                    </div>
+                }
+            >
+                Plain answers on writing invoices and quotes, asking for payment
+                and setting your rate. Start with how to write an invoice.
+            </HubHead>
 
             {GUIDE_GROUPS.map((group) => (
                 <section key={group} className="flex flex-col gap-[18px]">
-                    <h2 className="m-0 font-display text-[28px] font-bold tracking-[-0.035em]">
+                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
                         {group}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
@@ -62,7 +56,7 @@ export default function Page() {
 
             <CtaBand
                 title="Keep it all in one place."
-                line="Send quotes and invoices and get paid in Saroh. Free plan, no card."
+                line="Numbered invoices in your currency, and a record of what's paid. Free plan, no card."
                 action="Start free"
                 href={signupHref("guides")}
                 from="start-free-band"

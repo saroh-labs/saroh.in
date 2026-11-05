@@ -22,6 +22,7 @@
         "@saroh/auth": "workspace:*",
         "@saroh/error-tracking": "workspace:*",
         "@saroh/integrations": "workspace:*",
+        "@saroh/marketing": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
         "@saroh/search-pages": "workspace:*",
         "@saroh/site-blocks": "workspace:*",

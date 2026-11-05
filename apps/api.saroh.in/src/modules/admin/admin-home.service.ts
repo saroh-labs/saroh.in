@@ -6,6 +6,7 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import {
     byBusinessIds,
     editionWhere,
+    reportInEdition,
     viaBusiness,
     viaBusinessOrNone,
 } from "./admin-edition";
@@ -177,7 +178,7 @@ export class AdminHomeService {
             case "reports": {
                 const where = {
                     status: "OPEN" as const,
-                    ...viaBusinessOrNone(edition),
+                    ...reportInEdition(edition),
                 };
                 const [count, oldest] = await Promise.all([
                     prisma.businessReport.count({ where }),

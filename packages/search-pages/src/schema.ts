@@ -26,7 +26,6 @@ export const FAMILIES = [
 ] as const;
 export const CHIP_ICONS = ["cal", "ok", "bill", "person"] as const;
 export const ALSO_ICONS = [
-    "pack",
     "clock",
     "link",
     "shield",
@@ -138,14 +137,6 @@ export const sceneSchema = z.object({
             item: z.number().int().min(0).max(2),
             days: z.array(text).min(1),
             dayTab: text,
-        })
-        .optional(),
-    pack: z
-        .object({
-            name: text,
-            size: z.number().int().positive(),
-            left: z.number().int(),
-            price: z.number().positive(),
         })
         .optional(),
     orders: z
@@ -262,7 +253,7 @@ export const frontmatterSchema = z
         const need: Record<(typeof SHAPES)[number], (keyof typeof fm.scene)[]> =
             {
                 appointments: ["staff", "place", "booking", "today"],
-                classes: ["timetable", "pack", "today"],
+                classes: ["timetable", "today"],
                 orders: ["orders", "stock"],
             };
         for (const k of need[fm.shape]) {

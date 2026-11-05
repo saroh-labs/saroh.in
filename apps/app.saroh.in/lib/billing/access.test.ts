@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     createBlock,
@@ -9,6 +9,7 @@ import {
     ownAccountsRoom,
     planLocks,
     rowIncluded,
+    rowLimit,
     rowLock,
     rowNotice,
     takesOnlinePayment,
@@ -196,6 +197,49 @@ describe("upgradeLine and upgradeHref", () => {
         expect(upgradeHref(null)).toBe("/settings/billing/plans");
     });
 });
+
+describe.each(["INDIA", "GLOBAL"])(
+    "a total limit of one, on %s (UX-041)",
+    (edition) => {
+        const seats = (usage: number) =>
+            access({
+                modules: [row({ moduleId: "members", limit: 1, usage })],
+            });
+
+        beforeEach(() => vi.stubEnv("NEXT_PUBLIC_EDITION", edition));
+        afterEach(() => vi.unstubAllEnvs());
+
+        it("says nothing to the owner who fills it", () => {
+            expect(rowNotice(seats(1), "members").on).toBe(false);
+            expect(rowNotice(seats(0), "members").on).toBe(false);
+        });
+
+        it("still tells a business past it", () => {
+            expect(rowNotice(seats(2), "members")).toMatchObject({
+                on: true,
+                full: true,
+            });
+        });
+
+        it("still turns adding another off", () => {
+            expect(rowLimit(seats(1), "members")).toMatchObject({
+                on: true,
+                full: true,
+                why: "You've reached your team members limit on Plan A",
+            });
+            expect(createBlock(seats(1), "members")).toBe(
+                "You've reached your team members limit on Plan A",
+            );
+        });
+
+        it("warns at a month's limit of one, as the API does", () => {
+            const view = access({
+                modules: [row({ moduleId: "bookings", limit: 1, usage: 1 })],
+            });
+            expect(rowNotice(view, "bookings").on).toBe(true);
+        });
+    },
+);
 
 describe("rowNotice on a soft cap", () => {
     const storage = (usage: number) =>

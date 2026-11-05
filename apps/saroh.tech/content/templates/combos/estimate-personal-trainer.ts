@@ -90,8 +90,4 @@ export const estimatePersonalTrainer: Combo = {
             answer: "Ask them to confirm they are cleared to train, and note that the plan depends on it. Add a line saying the session count may change on medical advice. You are pricing the coaching, not giving medical advice.",
         },
     ],
-    band: {
-        title: "A number before the first rep.",
-        line: "Send the estimate, then turn it into a pack or a monthly plan once they say yes. 0% fees.",
-    },
 };

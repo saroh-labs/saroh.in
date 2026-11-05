@@ -146,7 +146,7 @@ function drawingsText(p: SearchPageData): string {
             {p.scene.also.map((a, i) => (
                 <p key={a.title}>
                     <AlsoSvg
-                        icon={a.icon ?? PRESETS[p.shape].also[i] ?? "pack"}
+                        icon={a.icon ?? PRESETS[p.shape].also[i] ?? "list"}
                     />{" "}
                     {a.title} {a.line}
                 </p>
@@ -313,8 +313,6 @@ export function searchPageChecks(p: SearchPageData): SearchPageCheck[] {
         fit.push(
             "booking.depositBy is missing: the deposit tile shows who paid.",
         );
-    if (s.pack && !(s.pack.left > 0 && s.pack.left <= s.pack.size))
-        fit.push("pack.left must be between 1 and the pack's size.");
     if (s.orders && !s.orders.list[0]?.items)
         fit.push(
             "The selected order (the first) needs items, due, payLabel and detail.",

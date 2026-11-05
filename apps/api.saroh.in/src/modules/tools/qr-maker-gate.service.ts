@@ -68,7 +68,7 @@ export class QrMakerGateService {
         edition?: Edition;
         now?: Date;
     }): Promise<QrMakerUnlock> {
-        const mail = toolEmail(input.tool);
+        const mail = toolEmail(input.tool, input.edition);
         const now = input.now ?? new Date();
         const { email, key } = normaliseEmail(input.email);
         const id = await this.store({

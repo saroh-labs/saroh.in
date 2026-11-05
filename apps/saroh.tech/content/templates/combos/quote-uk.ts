@@ -53,7 +53,7 @@ export const quoteUk: Combo = {
         },
         {
             question:
-                "What if a UK business client accepts and then pays late?",
+                "What if a UK business client says yes and then pays late?",
             answer: "You can usually claim interest and debt recovery costs from another business that pays late. Your quote's agreed payment date helps here, since it sets the day from which the money is overdue.",
         },
         {
@@ -61,8 +61,4 @@ export const quoteUk: Combo = {
             answer: "It can. Notice 700 says most deposits serve as advance payments and create a tax point on receipt. A deposit held only as security for hired goods is one of the kinds that doesn't.",
         },
     ],
-    band: {
-        title: "A UK quote that fixes the date.",
-        line: "Send it from Saroh, see when your client accepts, and turn it into a VAT invoice without typing anything twice.",
-    },
 };

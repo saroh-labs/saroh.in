@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { AccountEntry } from "../account/account-entry";
 import type { SignedInCustomer } from "../account/api";
 import { viewport } from "../test-viewport";
 import type { SignedInBookRequest } from "./api";
@@ -23,11 +24,17 @@ import type { BookingAccount } from "./booking-flow";
 import BookingFlow, { accountPhone } from "./booking-flow";
 import type { BookingPageData } from "./model";
 import { googleCalendarHref, isBookResult, laterSkip } from "./model";
+import { pressDay } from "./test-press-day";
 
 /**
  * The booking page for a customer coming back: what the page already knows
  * about them is there, and nothing they chose is asked for twice.
  */
+
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+    usePathname: () => "/book",
+}));
 
 const API = "https://api.test";
 
@@ -159,6 +166,7 @@ afterEach(() => {
 
 async function chooseOneToOne() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
+    await pressDay();
     fireEvent.click(
         await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
@@ -240,7 +248,8 @@ describe("the booking page on a phone", () => {
 
         viewport("phone");
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
-        await chooseOneToOne();
+        // The time chosen above is kept for this tab, and brought back.
+        await screen.findByRole("button", { name: "Edit the time, 7:00 am" });
         expect(
             screen
                 .getByRole("button", { name: /^Book/ })
@@ -269,6 +278,7 @@ describe("the booking page on a phone", () => {
             "coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))]",
         );
         // A time is 45px tall already.
+        await pressDay();
         expect(
             screen.getByRole("radio", { name: "7:00 am with Karan Mehta" })
                 .className,
@@ -348,6 +358,8 @@ describe("choosing on the booking page", () => {
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
+        // The weeks are on the day strip: Edit opens it again.
+        fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Show later dates" }),
         );
@@ -356,16 +368,19 @@ describe("choosing on the booking page", () => {
                 `${API}/public/services/svc_pt/days?skip=14`,
             ),
         );
+        // The business books 21 days ahead: nothing later than these.
+        await screen.findByRole("radiogroup", { name: "Day" });
+        expect(
+            screen.queryByRole("button", { name: "Show later dates" }),
+        ).toBeNull();
         // Other weeks are other times: the one chosen is let go.
+        await pressDay();
         expect(
             await screen.findByRole("radio", {
                 name: "7:00 am with Karan Mehta",
             }),
         ).toHaveAttribute("aria-checked", "false");
-        // The business books 21 days ahead: nothing later than these.
-        expect(
-            screen.queryByRole("button", { name: "Show later dates" }),
-        ).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Show earlier dates" }),
         );
@@ -476,15 +491,16 @@ describe("the booking through a reload", () => {
         cleanup();
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
-        const seven = await screen.findByRole("radio", {
-            name: "7:00 am with Karan Mehta",
-        });
-        await waitFor(() =>
-            expect(seven).toHaveAttribute("aria-checked", "true"),
-        );
+        // Each brought back folded, as they left it.
         expect(
-            screen.getByRole("radio", { name: /Personal training/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            await screen.findByRole("button", {
+                name: "Edit the time, 7:00 am",
+            }),
+        ).toBeVisible();
+        // The one service: chosen, with nothing else to Edit to.
+        expect(
+            document.querySelector('[data-chosen-row="what you\'re booking"]'),
+        ).toHaveTextContent("Personal training");
         expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
             "",
@@ -521,12 +537,11 @@ describe("the booking through a reload", () => {
             }),
         );
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
-        const nine = await screen.findByRole("radio", {
-            name: "9:00 am with Karan Mehta",
-        });
-        await waitFor(() =>
-            expect(nine).toHaveAttribute("aria-checked", "true"),
-        );
+        expect(
+            await screen.findByRole("button", {
+                name: "Edit the time, 9:00 am",
+            }),
+        ).toBeVisible();
         expect(
             screen.getAllByText(
                 "That time has gone. We've chosen the next free one: Sun 20 Sep at 9:00 am.",
@@ -654,5 +669,154 @@ describe("the booked card's calendar", () => {
                 }),
             ).searchParams.has("location"),
         ).toBe(false);
+    });
+});
+
+describe("the header's Sign in during a booking", () => {
+    const entry = (signIn: BookingAccount["signIn"]) => (
+        <AccountEntry
+            customer={null}
+            businessName="Pulse Fitness"
+            api={signIn}
+            loadOptions={vi.fn().mockResolvedValue(null)}
+        />
+    );
+    const pressHeader = () =>
+        fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    it("opens Classic's sheet before a time, focused, with no last-step words", () => {
+        serve(() => json(ONE_DAYS));
+        const flow = account({ customer: null });
+        render(
+            <>
+                {entry(flow.signIn)}
+                <BookingFlow page={PAGE} apiUrl={API} account={flow} />
+            </>,
+        );
+        pressHeader();
+        const sheet = screen.getByRole("dialog");
+        expect(sheet).toHaveTextContent("Sign in to Pulse Fitness");
+        expect(sheet).not.toHaveTextContent("Last step");
+        expect(screen.getByLabelText("Email")).toHaveFocus();
+    });
+
+    it("signs in on Classic's sheet with everything kept and nothing booked", async () => {
+        serve(() => json(ONE_DAYS));
+        const flow = account({ customer: null });
+        render(
+            <>
+                {entry(flow.signIn)}
+                <BookingFlow page={PAGE} apiUrl={API} account={flow} />
+            </>,
+        );
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: "98450 00000" },
+        });
+        fireEvent.change(screen.getByLabelText("Anything we should know?"), {
+            target: { value: "Bad knee" },
+        });
+        pressHeader();
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "asha@example.com" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+        fireEvent.change(await screen.findByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        await screen.findByText(/Booking as/);
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Edit the time, 7:00 am" }),
+        ).toBeVisible();
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
+            "98450 00000",
+        );
+        expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
+            "Bad knee",
+        );
+        expect(calls.some(({ url }) => url.includes("/book"))).toBe(false);
+    });
+});
+
+describe("the customer the server's next draw brings", () => {
+    const signedOut = () => account({ customer: null });
+    const drawnAgain = (customer: SignedInCustomer | null) => (
+        <BookingFlow
+            page={PAGE}
+            apiUrl={API}
+            account={account({ customer })}
+            initialServiceId="svc_pt"
+            initialDate="2026-09-20"
+            initialStart="07:00"
+            initialStep="details"
+        />
+    );
+    const seven = () =>
+        screen.getByRole("button", { name: "Edit the time, 7:00 am" });
+
+    it("keeps what was chosen and typed, says who is booking, and asks for no code", async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: "98450 00000" },
+        });
+        fireEvent.change(screen.getByLabelText("Anything we should know?"), {
+            target: { value: "Bad knee" },
+        });
+        expect(
+            screen.getAllByRole("button", { name: "Continue to sign in" })
+                .length,
+        ).toBeGreaterThan(0);
+
+        rerender(drawnAgain(ASHA));
+
+        expect(screen.getByText(/Booking as/)).toHaveTextContent(
+            "Booking as Asha Rao",
+        );
+        expect(seven()).toBeVisible();
+        // What they typed stands over the phone on their account.
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
+            "98450 00000",
+        );
+        expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
+            "Bad knee",
+        );
+        expect(
+            screen.queryByRole("button", { name: "Continue to sign in" }),
+        ).toBeNull();
+        expect(screen.queryByLabelText("Code")).toBeNull();
+    });
+
+    it("fills an empty phone from their account", async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+        );
+        await chooseOneToOne();
+        rerender(drawnAgain(ASHA));
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
+            "98450 12345",
+        );
+    });
+
+    it('doesn\'t undo "Not you?" when a draw still carries the old customer', async () => {
+        serve(() => json(ONE_DAYS));
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("button", { name: "Not you?" }));
+        await waitFor(() =>
+            expect(screen.queryByText(/Booking as/)).toBeNull(),
+        );
+
+        rerender(drawnAgain(ASHA));
+
+        expect(screen.queryByText(/Booking as/)).toBeNull();
+        expect(seven()).toBeVisible();
     });
 });

@@ -9,7 +9,7 @@ import { formatDay } from "@/lib/format/day";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-04";
 
 /**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its
@@ -246,7 +246,7 @@ export const CHANGELOG = {
     signupNote:
         "Only email about Saroh: what ships, and an invite to early access. Write to contact@saroh.in to be taken off the list.",
     signupDone: "Done. We'll email you when something ships.",
-    comingTitle: "Coming next",
+    comingTitle: "Planned",
     comingSub:
         "None of these is available yet. Times are rough and can move. When one ships, it gets its own entry above.",
     notYet: NOT_AVAILABLE_YET,

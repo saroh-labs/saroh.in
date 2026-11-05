@@ -123,8 +123,4 @@ export const invoice: DocumentData = {
             answer: "Start with a short, friendly note the day after it's due, and attach the invoice again. Most late payments are forgotten, not refused. If it runs on, send a firmer letter, and add a late fee only if your terms already said so.",
         },
     ],
-    band: {
-        title: "Send it, then see it get paid.",
-        line: "Send the invoice as a link your client can pay from, through your own payment account. 0% fees.",
-    },
 };

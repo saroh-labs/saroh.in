@@ -9,7 +9,7 @@ export function RelatedGrid({
 }) {
     return (
         <section className="flex flex-col gap-4">
-            <h2 className="m-0 font-display text-[28px] font-bold tracking-[-0.04em] md:text-[40px]">
+            <h2 className="m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]">
                 {title}
             </h2>
             <div className="grid gap-3 md:grid-cols-3 md:gap-6">

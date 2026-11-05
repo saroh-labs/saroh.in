@@ -45,8 +45,4 @@ export const invoiceLandscaper: Combo = {
             answer: "If it wasn't in the agreed price, yes. Give it its own line and mention when the client approved it. A short message on the day saves you defending that sum weeks after the fence went up.",
         },
     ],
-    band: {
-        title: "Planted, then paid.",
-        line: "Send the bill while the patio is still clean, and take payment through your own link. 0% fees.",
-    },
 };

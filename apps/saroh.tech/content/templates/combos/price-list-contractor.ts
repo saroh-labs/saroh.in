@@ -86,8 +86,4 @@ export const priceListContractor: Combo = {
             answer: "If they send steady work, perhaps. Keep that as a separate sheet carrying their company's name, rather than a discount on your public list, so another landlord who finds your rates sees the standard ones.",
         },
     ],
-    band: {
-        title: "Small jobs, sorted faster.",
-        line: "Share your rates with a link, then turn any enquiry into a written quote. 0% fees.",
-    },
 };

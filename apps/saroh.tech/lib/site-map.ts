@@ -2,21 +2,49 @@ import hreflang from "@saroh/edition/hreflang";
 
 import { templateEntries } from "./templates/pages";
 
+import { ABOUT } from "@/content/about";
+
 import { CHANGELOG, changelogPath } from "@/content/changelog";
 
+import { CONTACT } from "@/content/contact";
+
+import {
+    featureHref,
+    featureList,
+    UPDATED as FEATURES_UPDATED,
+} from "@/content/features";
+
 import { HELP } from "@/content/help";
+
+import { INTEGRATIONS } from "@/content/integrations";
+
+import { LEGAL_UPDATED } from "@/content/legal";
+
+import { PRICING } from "@/content/pricing";
+
+import { home, UPDATED as HOME_UPDATED } from "@/content/home";
+
+import {
+    solutionHref,
+    solutionList,
+    UPDATED as SOLUTIONS_UPDATED,
+} from "@/content/solutions";
 
 /**
  * Every page, as the site map and page-spec boards list them. Title,
  * description and H1 are the specs' own words. An `unreviewed` page is noindex
  * and out of the sitemap. The pricing line
- * names no price until the USD catalogue reads them in (phase 3).
+ * names no price until the USD catalogue reads them in (stage 9).
  */
 export type PageType =
     | "home"
+    | "feature"
+    | "solution"
     | "pricing"
     | "changelog"
     | "about"
+    | "contact"
+    | "integrations"
     | "referral"
     | "help"
     | "legal"
@@ -26,8 +54,6 @@ export type PageType =
     | "template"
     | "guides"
     | "guide"
-    | "compare"
-    | "alternative"
     | "not-found";
 
 export interface SitePage {
@@ -111,15 +137,6 @@ const GUIDES = [
     ],
 ] as const;
 
-export const ALTERNATIVES = [
-    ["invoice-simple", "Invoice Simple"],
-    ["joist", "Joist"],
-    ["honeybook", "HoneyBook"],
-    ["bonsai", "Bonsai"],
-    ["invoice2go", "Invoice2go"],
-    ["freshbooks", "FreshBooks"],
-] as const;
-
 const CONTENT_BUILT = { unreviewed: true, updated: "2026-11-02" };
 
 const legal = (slug: string, name: string, description: string): SitePage => ({
@@ -130,7 +147,7 @@ const legal = (slug: string, name: string, description: string): SitePage => ({
     h1: name,
     crumb: [{ name: "Home", path: "/" }, { name }],
     unreviewed: true,
-    updated: "2026-11-02",
+    updated: LEGAL_UPDATED,
 });
 
 const hub = (
@@ -153,23 +170,42 @@ export const PAGES: SitePage[] = [
     {
         path: "/",
         type: "home",
-        title: "Quotes, invoices and client pages with 0% fees | Saroh",
-        description:
-            "Send quotes and invoices, get paid through your own Stripe, PayPal or bank link, and give every client one page. Free plan, no card needed.",
-        h1: "Quotes, invoices and one page for every client.",
-        updated: "2026-11-02",
+        title: `${home.seoTitle} | Saroh`,
+        description: home.seoDescription,
+        h1: home.headlineLabel,
+        updated: HOME_UPDATED,
     },
+    ...featureList.map((f): SitePage => ({
+        path: featureHref(f.slug),
+        type: "feature",
+        title: `${f.seoTitle} | Saroh`,
+        description: f.seoDescription,
+        h1: f.headline,
+        crumb: [{ name: "Features", path: "/#features" }, { name: f.name }],
+        unreviewed: true,
+        updated: FEATURES_UPDATED,
+    })),
+    ...solutionList.map((s): SitePage => ({
+        path: solutionHref(s.slug),
+        type: "solution",
+        title: `${s.seoTitle} | Saroh`,
+        description: s.seoDescription,
+        h1: s.headline,
+        crumb: [{ name: "Solutions", path: "/#solutions" }, { name: s.name }],
+        unreviewed: true,
+        updated: SOLUTIONS_UPDATED,
+    })),
     {
         ...hub(
             "/pricing",
             "pricing",
-            "Pricing and plans, with 0% fees | Saroh",
-            "See Saroh's plans. Start free, no card needed. We never hold your money. Cancel any time.",
-            "We never hold your money.",
+            "Pricing and plans | Saroh",
+            "Start free with no card. Free is the plan you can use today, and paid plans aren't available yet.",
+            PRICING.title,
             "Pricing",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     },
     {
         ...hub(
@@ -196,36 +232,60 @@ export const PAGES: SitePage[] = [
             "/about",
             "about",
             "About Saroh: let's rise together",
-            "Saroh (सारोह) means rising together. A small team building simple tools for freelancers and small businesses, with no fees on your money.",
-            "Let's rise together.",
+            "Saroh (सारोह) means rising together. Who Saroh is for, what the name means and the company that makes it.",
+            ABOUT.title,
             "About",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
+            "/contact",
+            "contact",
+            "Contact us: questions, help and ideas | Saroh",
+            "Write to the Saroh team with a question before you sign up, something not working or an idea. A person reads every message.",
+            CONTACT.title,
+            "Contact",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
+    },
+    {
+        ...hub(
+            "/integrations",
+            "integrations",
+            "Integrations: what Saroh works with | Saroh",
+            "What Saroh works with today, and what isn't built yet.",
+            INTEGRATIONS.title,
+            "Integrations",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
     },
     {
         ...hub(
             "/referral",
             "referral",
             "Refer a friend | Saroh",
-            "Share Saroh with a friend. The rules are on this page.",
+            "Send a friend the link from your site. It records who sent them, and there's no reward today.",
             "Refer a friend",
             "Referral",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     },
     {
         ...hub(
             "/help",
             "help",
             "Saroh help",
-            "Step by step answers for setting up and using Saroh.",
+            "Step by step help with setting up your business, products, orders, bookings, your website and invoices, and the free tools.",
             "How can we help?",
             "Help",
         ),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     },
     ...HELP.map(({ slug, task, minutes }): SitePage => ({
         path: `/help/${slug}`,
@@ -235,12 +295,12 @@ export const PAGES: SitePage[] = [
         h1: task,
         crumb: under("Help", "/help", task),
         unreviewed: true,
-        updated: "2026-11-02",
+        updated: "2026-11-04",
     })),
     legal(
         "terms",
         "Terms of service",
-        "The terms for using Saroh and its free tools. We never hold or move your clients' money.",
+        "The terms for using Saroh and its free tools.",
     ),
     legal(
         "privacy",
@@ -254,9 +314,21 @@ export const PAGES: SitePage[] = [
     ),
     legal(
         "billing",
-        "Billing and cancelling",
-        "How paying for Saroh works: prepaid plans, tax, cancelling and refunds.",
+        "Billing",
+        "How paying for Saroh works, what happens to your customers' money, and how to leave.",
     ),
+    {
+        ...hub(
+            "/customers",
+            "legal",
+            "For customers: your order, or report a business | Saroh",
+            "For customers of a business that uses Saroh: who is responsible for your order or booking, how to reach them, and how to report a business.",
+            "Bought from a business that uses Saroh?",
+            "For customers",
+        ),
+        unreviewed: true,
+        updated: "2026-11-04",
+    },
     {
         ...hub(
             "/tools",
@@ -272,7 +344,7 @@ export const PAGES: SitePage[] = [
         "invoice-generator",
         "Invoice generator",
         "Free invoice generator: no sign-up, no watermark | Saroh",
-        "Make an invoice in your browser and download a clean PDF. No sign-up, no watermark. Any currency, your own tax lines.",
+        "Make an invoice in your browser and download a clean PDF. No sign-up, no watermark. Nine currencies, your own tax lines.",
         "Free invoice generator",
     ),
     tool(
@@ -355,26 +427,6 @@ export const PAGES: SitePage[] = [
         description,
         h1: name,
         crumb: under("Guides", "/guides", name),
-        ...CONTENT_BUILT,
-    })),
-    {
-        ...hub(
-            "/compare",
-            "compare",
-            "Compare Saroh with other invoice apps | Saroh",
-            "Honest comparisons of Saroh and other invoice apps: prices, fees and client pages.",
-            "Compare Saroh",
-            "Compare",
-        ),
-        ...CONTENT_BUILT,
-    },
-    ...ALTERNATIVES.map(([slug, name]) => ({
-        path: `/compare/${slug}-alternative`,
-        type: "alternative" as const,
-        title: `${name} alternative with no payment fees | Saroh`,
-        description: `An honest look at Saroh and ${name}: prices, fees, client pages and where ${name} is still the better pick.`,
-        h1: `Looking for ${/^[aeiou]/i.test(name) ? "an" : "a"} ${name} alternative?`,
-        crumb: under("Compare", "/compare", `${name} alternative`),
         ...CONTENT_BUILT,
     })),
 ];

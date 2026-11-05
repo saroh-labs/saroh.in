@@ -8,7 +8,7 @@ search: art class booking
 searchWords: drawing painting sketching kids art
 title: Art class booking for batches and workshops
 description: "Art class booking: parents book a kids' batch or a weekend workshop, pay when they book, and see your materials kit and its price."
-updated: 2026-10-26
+updated: 2026-11-04
 shape: classes
 h1: Kids' batches and weekend workshops, booked and paid.
 lead: Online booking for art classes. Let parents book a kids' batch or a weekend workshop, pay when they book, and see your materials kit and its price.
@@ -26,8 +26,8 @@ problems:
     body: Set the batch's dates, seats and fee. Parents pay once, and every class goes in your diary.
   - area: Kids who drop in
     quote: Some kids come every week, some when they can.
-    title: Class packs for drop-ins
-    body: Sell a pack of 4 or 8 classes. One is used each time they book, until the date you set.
+    title: One class at a time
+    body: Parents book a place in one class when their child can come, and see the places left.
   - area: Materials kits
     quote: Every parent asks where to buy the right brushes.
     title: Show the materials kit
@@ -36,7 +36,7 @@ problems:
   - area: Each child
     quote: Parents message about each child separately.
     title: Every student on one page
-    body: Classes, packs left and your notes, on one page.
+    body: Classes so far and your notes, on one page.
     link: Customers
   - area: Getting paid
     quote: Parents want a bill for the workshop.
@@ -62,7 +62,7 @@ scene:
   business: Paper Kite Art Studio
   site: paper-kite-art.saroh.app
   day: Sun 26 Oct
-  heroAlt: "What an art class's Sunday looks like in Saroh: today's classes with places booked, Aarohi booked into the 10:00 kids' drawing class from her pack of 4, a ₹1,800 workshop paid when it was booked, a bill with GST, and a note that she's left-handed."
+  heroAlt: "What an art class's Sunday looks like in Saroh: today's classes with places booked, Aarohi booked into the 10:00 kids' drawing class, a ₹1,800 workshop paid when it was booked, a bill with GST, and a note that she's left-handed."
   hero:
     title: Today · Sun 26 Oct
     count: 4 classes
@@ -83,7 +83,7 @@ scene:
   chips:
     - icon: cal
       title: Booked · Sun 10:00 · Kids' drawing
-      sub: Aarohi Sen · 1 class from her pack
+      sub: Aarohi Sen · 1 place booked
     - icon: ok
       title: ₹1,800 paid · UPI
       sub: Watercolour workshop · paid when booked
@@ -91,7 +91,7 @@ scene:
       title: "Bill #93 · workshop"
       sub: CGST 9% + SGST 9% shown
     - icon: person
-      title: Aarohi · 3 of 4 classes left
+      title: Aarohi · 11 classes so far
       pill: Left-handed
   items:
     - name: Kids' drawing class
@@ -124,11 +124,6 @@ scene:
       - Sat
       - Sun
     dayTab: Sun
-  pack:
-    name: Aarohi Sen
-    size: 4
-    left: 3
-    price: 1600
   today:
     - time: 10:00
       name: Kids' drawing
@@ -152,8 +147,8 @@ scene:
     name: Aarohi Sen
     initials: AS
     stats:
-      - 11 classes
-      - 3 of 4 left
+      - 11 classes so far
+      - Booked today
     tag: Left-handed
     note: Bought her materials kit at the class on 12 Oct. Her mum collects her at 11:30.
     noteBy: Note from Nisha · 19 Oct
@@ -179,18 +174,14 @@ scene:
       title: Parents book a place in each class
       line: Your website shows each class and how many places are left.
       phoneLine: Your website shows each class and the places left.
-    pack:
-      title: A pack of 4 drop-in classes
-      line: One comes off when they book, and goes back if they cancel in time.
-      phoneLine: One comes off each booking.
     today:
       title: Today's classes, first thing
       line: Who's coming to each one, and which are full.
       phoneLine: Who's coming to each one, and which are full.
     customer:
       title: Know every child before class
-      line: Classes left, and your notes on each child.
-      phoneLine: Classes left and your notes.
+      line: Classes so far, and your notes on each child.
+      phoneLine: Classes so far and your notes.
     bill:
       title: A bill for every workshop
       line: Paid when they book. With your GST number, bills show the tax.
@@ -201,7 +192,7 @@ scene:
       phoneLine: Change it once, and it shows.
   quote:
     text: Some kids come every week, some when they can.
-    caption: Sound like your weekends? Sell a pack of 4, and one comes off each time they book.
+    caption: Sound like your weekends? Parents book one class at a time, when their child can come.
   also:
     - title: A waitlist for full classes
       line: When someone cancels, the place goes to the next person.

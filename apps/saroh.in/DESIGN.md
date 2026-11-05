@@ -10,7 +10,7 @@ is fixed.
 
 - **Light only.** No dark theme, no `dark:` classes, no `prefers-color-scheme`
   styles, no theme toggle. `color-scheme: light` is set on `<html>` and in
-  `app/site.css`.
+  `@saroh/marketing/tokens.css`.
 - **No prices, limits or plan terms in this repo.** Pages read the published
   pricing catalogue through `lib/pricing.ts`; with none, every price is the
   `—` placeholder with "Prices aren't available right now". Plan names (Free, Grow,
@@ -26,7 +26,7 @@ is fixed.
   About and Contact, DEC-137), never cut from the component.
 - **A company fact comes from `content/company.ts`,** and one that isn't set
   there is not drawn: no placeholder, no bracketed blank (DEC-137).
-- **`cn` from `@/lib/cn`**, not `@saroh/ui/lib/utils`: it knows this app's
+- **`cn` from `@saroh/marketing/cn`**, not `@saroh/ui/lib/utils`: it knows the
   `mk-*` keys. Focus rings are written
   `focus-visible:[outline-style:solid] focus-visible:outline-2 …`, never
   `focus-visible:outline` (tailwind-merge drops the style).
@@ -36,8 +36,8 @@ is fixed.
 The shared ADR-005 tokens carry the brand: Paper (`background`, #F5F2EC),
 Ink (`foreground`), Saffron 500/700 (`brand-500`, `brand-700`), Ink 500
 (`muted-foreground`) and the two lines (`border`, `border-strong`). What the
-designs need beyond them lives in `app/site.css` as `--mk-*` channels and in
-Tailwind as `mk-*` colours (`tailwind.config.ts`): running copy, hovers, the
+designs need beyond them lives in `packages/marketing/src/tokens.css` as `--mk-*` channels and in
+Tailwind as `mk-*` colours (`src/tailwind.ts` there): running copy, hovers, the
 on-Ink band colours, the featured-plan tint and the "Coming soon" pill.
 
 Saffron is for the hero initials, the current-page underline, the button on

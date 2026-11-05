@@ -38,8 +38,4 @@ export const invoiceWebDeveloper: Combo = {
             answer: "Be careful, and check your contract and local law first. Taking down a live business can create more trouble than the debt. A written reminder, then pausing further work, is usually the safer way to start.",
         },
     ],
-    band: {
-        title: "Shipped and settled.",
-        line: "Send a bill for each milestone as it's signed off, and get paid through your own link. 0% fees.",
-    },
 };

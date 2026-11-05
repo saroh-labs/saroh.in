@@ -59,7 +59,7 @@ export function SummaryAside({
     return (
         <aside
             aria-label="Your booking"
-            className="bg-site-fg text-site-bg sticky top-4 min-w-0 flex-[1_1_300px] rounded-[calc(var(--site-radius)+14px)] p-[22px] shadow-[0_4px_12px_hsl(var(--site-fg)/0.10)] max-[699px]:hidden"
+            className="bg-site-fg text-site-bg sticky top-20 min-w-0 flex-[1_1_300px] rounded-[calc(var(--site-radius)+14px)] p-[22px] shadow-[0_4px_12px_hsl(var(--site-fg)/0.10)] max-[699px]:hidden"
         >
             <p className="text-site-accent-text mb-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
                 Your booking

@@ -5,6 +5,12 @@ import type { Faq } from "@/components/shared/faq-list";
  * loader this way, and the HowTo and FAQ schema read the same steps and answers
  * the page draws.
  */
+/** Who signs a guide, as saroh.in's guides are signed. */
+export const GUIDE_AUTHOR = {
+    name: "Yash Mehta",
+    role: "Founder at Saroh",
+} as const;
+
 export type GuideBlock =
     | { kind: "text"; text: string }
     | { kind: "list"; items: readonly string[] }
@@ -632,7 +638,7 @@ export const GUIDE_CONTENT: readonly Guide[] = [
         tool: { name: "invoice generator", href: "/tools/invoice-generator" },
         band: {
             title: "Make an invoice with a clear due date.",
-            line: "Any terms, any currency. Free, no sign-up.",
+            line: "Any terms, nine currencies. Free, no sign-up.",
         },
     },
     {

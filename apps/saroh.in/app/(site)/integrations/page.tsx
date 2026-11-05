@@ -1,12 +1,6 @@
 import Link from "next/link";
 
-import { Container } from "@/components/shared/layout/container";
-import { Arrow } from "@/components/shared/links/arrow";
-import { cardLinkClasses } from "@/components/shared/links/card-link";
-import { Pill } from "@/components/shared/links/pill";
 import { ComingList } from "@/components/shared/sections/coming-list";
-import { Eyebrow } from "@/components/shared/sections/eyebrow";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     integrationHref,
     INTEGRATIONS_PATH,
@@ -15,6 +9,12 @@ import {
     plannedIntegrations,
 } from "@/content/integrations";
 import { pageMetadata } from "@/lib/seo";
+import { Arrow } from "@saroh/marketing/arrow";
+import { cardLinkClasses } from "@saroh/marketing/card-link";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { Pill } from "@saroh/marketing/pill";
 
 /**
  * Integrations (Resources plan U3, design "Saroh Resources - Integrations"):

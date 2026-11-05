@@ -56,8 +56,4 @@ export const estimateCanada: Combo = {
             answer: "The chart we read covers receipts and invoices, not estimates. Showing it does no harm once you're registered, and it tells a business client that the tax on the final bill can be claimed.",
         },
     ],
-    band: {
-        title: "An estimate with the tax already right.",
-        line: "Send a Canadian estimate from Saroh, then turn it into an invoice with the same lines when the client agrees.",
-    },
 };

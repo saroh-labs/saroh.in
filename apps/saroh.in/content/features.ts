@@ -25,7 +25,7 @@ import { FEATURE_SLUGS } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-12";
+export const UPDATED = "2026-11-04";
 
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
@@ -279,7 +279,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Members, with what they have left",
-                body: "Classes left in their pack, their membership and their next booking.",
+                body: "Classes left on their membership and their next booking.",
                 who: "Pulse Fitness (demo gym)",
                 shot: "g-customer",
             },
@@ -332,7 +332,7 @@ export const features: Record<FeatureSlug, Feature> = {
         homeBody:
             "Classes, sessions and appointments with staff, places and hours.",
         headline: "A calendar customers can book into themselves.",
-        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with staff, places and hours. Customers book on your site, pay a deposit or use a credit, and you see it straight away.",
+        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with staff, places and hours. Customers book on your site, pay a deposit or use their membership, and you see it straight away.",
         hero: {
             shot: "g-bookings",
         },
@@ -349,12 +349,6 @@ export const features: Record<FeatureSlug, Feature> = {
                 body: "Set how many places a class has. Courses run for several weeks; enrol people and see who's paid.",
                 who: "Pulse Fitness (demo gym)",
                 shot: "g-courses",
-            },
-            {
-                title: "Class packs",
-                body: "Sell five or ten classes at a price. Credits are used as they book, and expire when you say.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-packs",
             },
             {
                 title: "Treatments over several visits",

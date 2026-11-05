@@ -46,8 +46,4 @@ export const receiptElectrician: Combo = {
             answer: "Your card reader may send its own slip, though it won't list a socket or a circuit. Send this as well, with the same amount and date, so the client knows what that charge bought.",
         },
     ],
-    band: {
-        title: "Paid before you pack the van.",
-        line: "Take payment on site through your own link, and the receipt reaches them while you're coiling cable. 0% fees.",
-    },
 };

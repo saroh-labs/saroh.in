@@ -115,8 +115,4 @@ export const quoteCleaner: Combo = {
             answer: "If you hold public liability cover, say so, and offer to show it. Add how a breakage should be reported, and by when. An office or a landlord often asks this first, so the answer on the page earns trust.",
         },
     ],
-    band: {
-        title: "A contract clean, signed off.",
-        line: "Send the quote from your phone, let the client accept online, and bill each month through your own link. 0% fees.",
-    },
 };

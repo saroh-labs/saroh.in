@@ -1,12 +1,12 @@
 "use client";
 
-import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
+import { cn } from "@saroh/marketing/cn";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { ring } from "@saroh/marketing/ring";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Eyebrow } from "../shared/sections/eyebrow";
 
 export interface SideNavGroup {
     title: string;

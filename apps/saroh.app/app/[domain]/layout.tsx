@@ -38,6 +38,7 @@ import {
     getSiteForHost,
     shareImages,
     siteOriginFor,
+    siteReadFailed,
 } from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
@@ -224,6 +225,11 @@ export default async function SiteLayout({
         if (test.mode !== "test") {
             const movedTo = await movedHere(domain);
             if (movedTo) redirect(movedTo);
+            // A read that failed isn't "no website here": the root's error
+            // page, with its Try again, and a 500 nothing keeps.
+            if (await siteReadFailed(domain)) {
+                throw new Error("Site read failed");
+            }
         }
         notFound();
     }
@@ -279,6 +285,8 @@ export default async function SiteLayout({
         liveHead: head.trackers.length > 0 || head.verifications.length > 0,
         catalogueFailed:
             catalogue?.ok === false && catalogue.reason === "unavailable",
+        bookingFailed:
+            booking?.ok === false && booking.reason === "unavailable",
     });
     // The site's one primary action: Book, else Order, else its contact
     // page (`sitePrimaryAction`). The menu beside it leaves that page out.

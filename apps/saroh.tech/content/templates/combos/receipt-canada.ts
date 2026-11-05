@@ -60,8 +60,4 @@ export const receiptCanada: Combo = {
             answer: "If you received one and it looks wrong, ask the supplier first. The CRA also offers a registry to confirm a number. Your own customers may run the same check on you, so print yours correctly.",
         },
     ],
-    band: {
-        title: "A receipt a client can claim from.",
-        line: "Saroh records each payment against the client, so a Canadian receipt with your number on it is ready the moment the money lands.",
-    },
 };

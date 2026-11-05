@@ -5,8 +5,8 @@ import type { LaunchMode } from "@/lib/links";
 import { ACCOUNTS_URL, cta } from "@/lib/links";
 import { keepButtonSource } from "@/lib/referral";
 
-import type { ButtonSize, ButtonVariant } from "./button";
-import { ButtonLink } from "./button";
+import type { ButtonSize, ButtonVariant } from "@saroh/marketing/button";
+import { ButtonLink } from "@saroh/marketing/button";
 
 /**
  * A "start" button: its label and address come from the one CTA builder

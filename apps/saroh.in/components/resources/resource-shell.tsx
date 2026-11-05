@@ -1,4 +1,4 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import type { ReactNode } from "react";
 
 /**

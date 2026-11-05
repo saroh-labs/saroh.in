@@ -114,8 +114,4 @@ export const quoteWebDeveloper: Combo = {
             answer: "It should. Say when rights pass to the client, and list anything that stays yours, such as tools you reuse across jobs. Open-source parts keep their own licences, and a single line saying so heads off confusion.",
         },
     ],
-    band: {
-        title: "Scope locked, build started.",
-        line: "Your client accepts online and pays the first stage through your own link, so the kick-off call can be about the work. 0% fees.",
-    },
 };

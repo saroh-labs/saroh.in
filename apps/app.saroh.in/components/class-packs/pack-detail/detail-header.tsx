@@ -17,7 +17,7 @@ export const GUTTER = "px-4 sm:px-[26px]";
 export type Lens = "team" | "customer";
 
 const LENSES: { key: Lens; label: string }[] = [
-    { key: "team", label: "Team view" },
+    { key: "team", label: "Your view" },
     { key: "customer", label: "Customer view" },
 ];
 

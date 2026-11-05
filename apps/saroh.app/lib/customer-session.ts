@@ -1,8 +1,9 @@
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 
 import type { SignedInCustomer } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
@@ -173,6 +174,8 @@ async function relayedFetch(
             method: init.method ?? "GET",
             cache: "no-store",
             headers: sent,
+            // A read only: a write that timed out may still have happened.
+            signal: init.method ? undefined : serverReadSignal(),
             body:
                 init.body !== undefined ? JSON.stringify(init.body) : undefined,
         });
@@ -257,9 +260,11 @@ export function sessionCustomer(body: unknown): SignedInCustomer | null {
     };
 }
 
-/** Who is signed in on this site, or null. */
-export async function getSignedInCustomer(): Promise<SignedInCustomer | null> {
-    const call = await accountFetch("session");
-    if (!call?.ok || !call.res.ok) return null;
-    return sessionCustomer(await call.res.json().catch(() => null));
-}
+/** Who is signed in on this site, or null. One read per request (`cache`). */
+export const getSignedInCustomer = cache(
+    async (): Promise<SignedInCustomer | null> => {
+        const call = await accountFetch("session");
+        if (!call?.ok || !call.res.ok) return null;
+        return sessionCustomer(await call.res.json().catch(() => null));
+    },
+);

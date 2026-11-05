@@ -114,8 +114,4 @@ export const quoteConsultant: Combo = {
             answer: "Ask for their format and deadline, and whether they score on price alone. Keep your stages easy to compare. Your sponsor may be able to explain what you offer that others don't, so tell them as well.",
         },
     ],
-    band: {
-        title: "Signed before the first workshop.",
-        line: "Send the quote as a link, see when the sponsor accepts it, and raise the first bill in one tap. 0% fees.",
-    },
 };

@@ -12,8 +12,8 @@ export function Chip({
             aria-pressed={on}
             className={`inline-flex h-11 cursor-pointer items-center rounded-full border px-3 text-sm md:h-8 ${
                 on
-                    ? "border-ink bg-ink text-paper"
-                    : "border-control bg-surface text-ink"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border-strong bg-card text-foreground"
             } ${className}`}
             {...props}
         />

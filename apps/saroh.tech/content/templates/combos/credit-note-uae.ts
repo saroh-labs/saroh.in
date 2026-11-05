@@ -67,8 +67,4 @@ export const creditNoteUae: Combo = {
             answer: "Article 60 asks for the difference and the tax on it in AED, so yes for those figures. Show the dollar amount as well if your client paid in dollars. It helps them match the note to their bank.",
         },
     ],
-    band: {
-        title: "A tax credit note done to the letter.",
-        line: "Issue one in Saroh and it stays attached to the tax invoice and the client, so your numbers still add up.",
-    },
 };

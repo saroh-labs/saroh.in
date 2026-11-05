@@ -42,8 +42,4 @@ export const invoiceUae: Combo = {
             answer: "The FTA's guide on tax invoices says errors should be corrected through tax credit notes or additional tax invoices. Don't edit one you've already sent. Issue the right document, so the numbering stays in order.",
         },
     ],
-    band: {
-        title: "A tax invoice with every part in place.",
-        line: "Save your TRN once in Saroh, then send tax invoices in dirhams that clients can pay through your own link.",
-    },
 };

@@ -1,4 +1,5 @@
 import type { LookId } from "@saroh/block-contract";
+import { useState } from "react";
 
 import { timeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
@@ -19,6 +20,7 @@ import {
     groupStarts,
 } from "../model";
 import { focusRing, quietFill } from "../styles";
+import { ChosenRow, useFocusOnChange } from "./chosen-row";
 import type { Weeks } from "./weeks";
 import { THESE_WEEKS, WeeksButtons } from "./weeks";
 
@@ -105,6 +107,7 @@ export function OneToOne({
     weeks = THESE_WEEKS,
     reach = null,
     look,
+    stepped,
 }: {
     days: BookingDays;
     day: BookingDay | null;
@@ -130,6 +133,8 @@ export function OneToOne({
     reach?: BusinessReach | null;
     /** The look's own days and chips; absent, Classic's. */
     look?: LookId;
+    /** Classic's page: day, then times, each folding once answered. */
+    stepped?: { dayPicked: boolean };
 }) {
     const lk = look ? WHEN_LOOK[look] : null;
     const list = days.days;
@@ -139,6 +144,17 @@ export function OneToOne({
     const onlyOne = staff.length === 1 ? staff[0] : null;
     const choosesWho = people.length > 1 && onPerson !== undefined;
     const asked = people.find((p) => p.id === person) ?? null;
+    const [editingDay, setEditingDay] = useState(false);
+    const [editingTime, setEditingTime] = useState(false);
+    const dayFolded = !!stepped && stepped.dayPicked && !!day && !editingDay;
+    const timeFolded = dayFolded && !!chosen && !editingTime;
+    const showDays = !dayFolded;
+    const showTimes = !stepped || (dayFolded && !timeFolded);
+    const focusRef = useFocusOnChange(
+        timeFolded ? "time" : dayFolded ? "times" : "days",
+    );
+    const dayPickedSame = (date: string) =>
+        !!stepped?.dayPicked && date === day?.date;
     const whoChip = (on: boolean) =>
         cn(
             "coarse:min-h-11 min-h-9 cursor-pointer rounded-full border px-3.5 text-sm font-semibold transition-[color,background-color,border-color,transform] duration-100 ease-out active:scale-[0.97]",
@@ -149,7 +165,29 @@ export function OneToOne({
         );
     return (
         <>
-            {choosesWho ? (
+            {dayFolded ? (
+                <ChosenRow
+                    what="the day"
+                    value={dayHeading(day.date)}
+                    sub={asked ? `With ${asked.name}` : undefined}
+                    onEdit={() => setEditingDay(true)}
+                />
+            ) : null}
+            {timeFolded ? (
+                <ChosenRow
+                    rowRef={focusRef}
+                    what="the time"
+                    value={timeWords(chosen.startAt, zone)}
+                    sub={
+                        chosen.staffName
+                            ? `With ${chosen.staffName}`
+                            : undefined
+                    }
+                    onEdit={() => setEditingTime(true)}
+                    className="border-site-border mt-3 border-t pt-3"
+                />
+            ) : null}
+            {showDays && choosesWho ? (
                 <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-2">
                     <span
                         aria-hidden="true"
@@ -186,97 +224,114 @@ export function OneToOne({
                     </div>
                 </div>
             ) : null}
-            <div className="mb-2 flex items-baseline gap-2">
-                <span className="text-site-fg text-[13px] font-semibold">
-                    {weeks.skip > 0 ? "Later dates" : "Next two weeks"}
-                </span>
-                {firstDay && lastDay ? (
-                    <span className="text-site-muted text-[12.5px]">
-                        {dateText(firstDay.date)} to {dateText(lastDay.date)}
-                    </span>
-                ) : null}
-            </div>
-            <div
-                role="radiogroup"
-                aria-label="Day"
-                // Seven across, a week a row. Under a finger each day is at
-                // least 44px wide, so a narrow phone wraps to more rows.
-                className="coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))] grid grid-cols-7 gap-1.5"
-            >
-                {list.map((d) => {
-                    const on = d.date === day?.date;
-                    const free = d.starts.length > 0;
-                    const { dow, n } = dayParts(d.date);
-                    return (
-                        <button
-                            key={d.date}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            aria-label={dayAria(d)}
-                            disabled={!free}
-                            onClick={() => onDay(d.date)}
-                            className={
-                                lk
-                                    ? cn(
-                                          "coarse:min-h-11 min-w-0 text-center transition-[color,background-color,border-color,box-shadow] duration-100 ease-out",
-                                          focusRing,
-                                          lk.day,
-                                          on
-                                              ? lk.dayOn
-                                              : free
-                                                ? lk.dayFree
-                                                : lk.dayOff,
-                                      )
-                                    : cn(
-                                          "coarse:min-h-11 min-w-0 border text-center transition-[color,background-color,border-color,transform] duration-100 ease-out",
-                                          focusRing,
-                                          compact
-                                              ? "rounded-[calc(var(--site-radius)+10px)] py-2"
-                                              : "rounded-[calc(var(--site-radius)+12px)] px-0.5 py-[9px] max-[699px]:rounded-[calc(var(--site-radius)+10px)] max-[699px]:px-0 max-[699px]:py-2",
-                                          on
-                                              ? "border-site-fg bg-site-fg text-site-bg cursor-pointer"
-                                              : free
-                                                ? "border-site-border bg-site-surface text-site-fg hover:border-site-fg cursor-pointer active:scale-[0.96]"
-                                                : cn(
-                                                      // Nothing free: quiet and dashed,
-                                                      // told from a free day by its
-                                                      // shape as well as its colour.
-                                                      "border-site-border text-site-muted cursor-not-allowed border-dashed",
-                                                      quietFill,
-                                                  ),
-                                      )
-                            }
-                        >
-                            <span className="block text-xs">{dow}</span>
-                            <span
-                                className={
-                                    lk?.num ??
-                                    "mt-0.5 block text-[17px] font-bold"
-                                }
-                            >
-                                {n}
+            {showDays ? (
+                <div
+                    ref={stepped ? focusRef : undefined}
+                    tabIndex={stepped ? -1 : undefined}
+                    className="outline-none"
+                >
+                    <div className="mb-2 flex items-baseline gap-2">
+                        <span className="text-site-fg text-[13px] font-semibold">
+                            {weeks.skip > 0 ? "Later dates" : "Next two weeks"}
+                        </span>
+                        {firstDay && lastDay ? (
+                            <span className="text-site-muted text-[12.5px]">
+                                {dateText(firstDay.date)} to{" "}
+                                {dateText(lastDay.date)}
                             </span>
-                            {/* "3" where it is narrow, "3 free" where
+                        ) : null}
+                    </div>
+                    <div
+                        role="radiogroup"
+                        aria-label="Day"
+                        // Seven across, a week a row. Under a finger each day is at
+                        // least 44px wide, so a narrow phone wraps to more rows.
+                        className="coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))] grid grid-cols-7 gap-1.5"
+                    >
+                        {list.map((d) => {
+                            // The first free day is only on show until one is pressed.
+                            const on =
+                                d.date === day?.date &&
+                                (!stepped || stepped.dayPicked);
+                            const free = d.starts.length > 0;
+                            const { dow, n } = dayParts(d.date);
+                            return (
+                                <button
+                                    key={d.date}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={on}
+                                    aria-label={dayAria(d)}
+                                    disabled={!free}
+                                    onClick={() => {
+                                        setEditingDay(false);
+                                        // The same day again keeps its time.
+                                        if (!dayPickedSame(d.date))
+                                            onDay(d.date);
+                                    }}
+                                    className={
+                                        lk
+                                            ? cn(
+                                                  "coarse:min-h-11 min-w-0 text-center transition-[color,background-color,border-color,box-shadow] duration-100 ease-out",
+                                                  focusRing,
+                                                  lk.day,
+                                                  on
+                                                      ? lk.dayOn
+                                                      : free
+                                                        ? lk.dayFree
+                                                        : lk.dayOff,
+                                              )
+                                            : cn(
+                                                  "coarse:min-h-11 min-w-0 border text-center transition-[color,background-color,border-color,transform] duration-100 ease-out",
+                                                  focusRing,
+                                                  compact
+                                                      ? "rounded-[calc(var(--site-radius)+10px)] py-2"
+                                                      : "rounded-[calc(var(--site-radius)+12px)] px-0.5 py-[9px] max-[699px]:rounded-[calc(var(--site-radius)+10px)] max-[699px]:px-0 max-[699px]:py-2",
+                                                  on
+                                                      ? "border-site-fg bg-site-fg text-site-bg cursor-pointer"
+                                                      : free
+                                                        ? "border-site-border bg-site-surface text-site-fg hover:border-site-fg cursor-pointer active:scale-[0.96]"
+                                                        : cn(
+                                                              // Nothing free: quiet and dashed,
+                                                              // told from a free day by its
+                                                              // shape as well as its colour.
+                                                              "border-site-border text-site-muted cursor-not-allowed border-dashed",
+                                                              quietFill,
+                                                          ),
+                                              )
+                                    }
+                                >
+                                    <span className="block text-xs">{dow}</span>
+                                    <span
+                                        className={
+                                            lk?.num ??
+                                            "mt-0.5 block text-[17px] font-bold"
+                                        }
+                                    >
+                                        {n}
+                                    </span>
+                                    {/* "3" where it is narrow, "3 free" where
                                 there is room: both drawn, one shown. The
                                 button's name is its aria-label. */}
-                            {compact ? null : (
-                                <span className="mt-0.5 block text-[11px] max-[699px]:hidden">
-                                    {dayCountLabel(d, false)}
-                                </span>
-                            )}
-                            <span
-                                className={cn(
-                                    "mt-0.5 block text-[11px]",
-                                    !compact && "min-[700px]:hidden",
-                                )}
-                            >
-                                {dayCountLabel(d, true)}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+                                    {compact ? null : (
+                                        <span className="mt-0.5 block text-[11px] max-[699px]:hidden">
+                                            {dayCountLabel(d, false)}
+                                        </span>
+                                    )}
+                                    <span
+                                        className={cn(
+                                            "mt-0.5 block text-[11px]",
+                                            !compact && "min-[700px]:hidden",
+                                        )}
+                                    >
+                                        {dayCountLabel(d, true)}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : null}
             {!day ? (
                 <div className="mt-3">
                     <p className="text-site-body text-sm">
@@ -290,12 +345,18 @@ export function OneToOne({
                     </p>
                     <ReachLinks reach={reach} className="mt-1" />
                 </div>
-            ) : (
-                <div className="border-site-border mt-[18px] border-t pt-4">
+            ) : showTimes ? (
+                <div
+                    ref={stepped ? focusRef : undefined}
+                    tabIndex={stepped ? -1 : undefined}
+                    className="border-site-border mt-[18px] border-t pt-4 outline-none"
+                >
                     <div className="flex flex-wrap items-baseline gap-2">
-                        <h3 className="font-site-heading text-site-fg text-base font-semibold tracking-[-0.01em]">
-                            {dayHeading(day.date)}
-                        </h3>
+                        {stepped ? null : (
+                            <h3 className="font-site-heading text-site-fg text-base font-semibold tracking-[-0.01em]">
+                                {dayHeading(day.date)}
+                            </h3>
+                        )}
                         <span className="text-site-muted text-[12.5px]">
                             {count} {count === 1 ? "time" : "times"} free
                             {onlyOne ? ` with ${onlyOne}` : ""}
@@ -328,7 +389,10 @@ export function OneToOne({
                                                         ? `${t} with ${s.staffName}`
                                                         : t
                                                 }
-                                                onClick={() => onStart(s)}
+                                                onClick={() => {
+                                                    setEditingTime(false);
+                                                    onStart(s);
+                                                }}
                                                 className={
                                                     lk
                                                         ? cn(
@@ -357,14 +421,14 @@ export function OneToOne({
                         ))}
                     </div>
                 </div>
-            )}
+            ) : null}
             {staff.length > 1 && !asked ? (
                 <p className="text-site-body mt-2.5 text-sm">
                     Times are with whoever is free. You&apos;ll see who before
                     you confirm.
                 </p>
             ) : null}
-            <WeeksButtons weeks={weeks} className="mt-3" />
+            {showDays ? <WeeksButtons weeks={weeks} className="mt-3" /> : null}
         </>
     );
 }

@@ -114,8 +114,4 @@ export const estimateWebDeveloper: Combo = {
             answer: "Not as a charge, but do mention it. Say how many days they'll need to check the work and give feedback. Slow replies push your dates back, and an estimate is the right place to say so early.",
         },
     ],
-    band: {
-        title: "Unknowns named, work approved.",
-        line: "Send the estimate as a link. When they approve it online, start the build with the numbers already agreed.",
-    },
 };

@@ -115,8 +115,4 @@ export const receiptPlumber: Combo = {
             answer: "List only the work and parts covered by this payment, then add a line naming what's left and when you're returning. If you're waiting on a part, say so. That prevents them thinking the fault should already be cured.",
         },
     ],
-    band: {
-        title: "Done, paid, gone by nine.",
-        line: "Take payment through your own link at the door, and Saroh sends the receipt before you start the van. 0% fees.",
-    },
 };

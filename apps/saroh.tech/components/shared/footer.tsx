@@ -1,90 +1,118 @@
+import { ring } from "@saroh/marketing/ring";
+import { SocialMark } from "@saroh/marketing/social-mark";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
-import { site } from "@/site.config";
+import { SAROH_SOCIAL } from "@/content/social";
+import { FOOTER_COLUMNS, LEGAL_LINKS } from "@/lib/nav";
+import { signInHref, site } from "@/site.config";
 
-const COLUMNS = [
-    {
-        title: "Product",
-        links: [
-            ["Pricing", "/pricing"],
-            ["Changelog", "/changelog"],
-            ["Referral", "/referral"],
-            ["Help", "/help"],
-        ],
-    },
-    {
-        title: "Free tools",
-        links: [
-            ["Invoice generator", "/tools/invoice-generator"],
-            ["Quote maker", "/tools/quote-maker"],
-            ["Receipt maker", "/tools/receipt-maker"],
-            ["All tools", "/tools"],
-        ],
-    },
-    {
-        title: "Learn",
-        links: [
-            ["Templates", "/templates"],
-            ["Guides", "/guides"],
-            ["Compare", "/compare"],
-            ["About", "/about"],
-        ],
-    },
-    {
-        title: "Legal",
-        links: [
-            ["Terms", "/legal/terms"],
-            ["Privacy", "/legal/privacy"],
-            ["Cookies", "/legal/cookies"],
-            ["Billing", "/legal/billing"],
-        ],
-    },
-] as const;
+const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
 
+const SOCIAL_LINK = textLinkClasses({
+    tone: "quiet",
+    className:
+        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
+});
+
+/**
+ * saroh.in's footer in layout and type, with this site's columns.
+ */
 export function Footer() {
     return (
-        <footer className="mt-16 border-t border-line">
-            <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-12 md:px-20">
-                <div className="grid grid-cols-2 gap-8 text-[15px] md:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
-                    <div className="col-span-2 flex flex-col gap-2 md:col-span-1">
-                        <Wordmark aria-hidden style={{ fontSize: 20 }} />
-                        <p className="m-0 text-body">
-                            सारोह · Let's rise together
+        <footer className="px-mk-gutter pb-10 pt-[88px] text-[14px] text-muted-foreground">
+            {/* Tighter than saroh.in's, for six columns against its five. */}
+            <div className="grid gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)]">
+                <div className="grid content-start gap-5">
+                    <Link
+                        prefetch={false}
+                        href="/"
+                        aria-label="Saroh home"
+                        className={`w-fit rounded-sm text-foreground no-underline ${ring()}`}
+                    >
+                        <Wordmark aria-hidden style={{ fontSize: 22 }} />
+                    </Link>
+                    <div className="grid gap-1.5">
+                        <p className="m-0 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
+                            Let's rise together.
+                        </p>
+                        <p className="m-0 text-[13.5px] leading-normal">
+                            <span lang="hi">सारोह</span>: sa (with) + aaroh
+                            (rising)
                         </p>
                     </div>
-                    {COLUMNS.map((column) => (
-                        <div key={column.title} className="flex flex-col">
-                            <h2 className="m-0 text-[15px] font-bold leading-[1.9]">
+                    <ul
+                        aria-label="Follow Saroh"
+                        className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
+                    >
+                        {SAROH_SOCIAL.map((link) => (
+                            <li key={link.href}>
+                                <a
+                                    href={link.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Saroh on ${link.label}`}
+                                    title={link.label}
+                                    className={SOCIAL_LINK}
+                                >
+                                    <SocialMark label={link.label} />
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,130px),1fr))] gap-x-6 gap-y-10">
+                    {FOOTER_COLUMNS.map((column) => (
+                        <div
+                            key={column.title}
+                            className="grid content-start gap-2.5"
+                        >
+                            <span className="mb-1 font-semibold text-foreground">
                                 {column.title}
-                            </h2>
-                            {column.links.map(([name, href]) => (
+                            </span>
+                            {column.links.map((link) => (
                                 <Link
                                     prefetch={false}
-                                    key={href}
-                                    href={href}
-                                    className="inline-flex min-h-11 items-center no-underline hover:underline hover:underline-offset-4 md:min-h-7"
+                                    key={link.href}
+                                    href={link.href}
+                                    className={LINK}
                                 >
-                                    {name}
+                                    {link.name}
                                 </Link>
                             ))}
+                            {column.title === "Saroh" ? (
+                                <a
+                                    href={signInHref}
+                                    data-cta="sign-in"
+                                    className={LINK}
+                                >
+                                    Sign in
+                                </a>
+                            ) : null}
                         </div>
                     ))}
                 </div>
-                <div className="flex flex-col gap-2 border-t border-line pt-5 text-sm text-body md:flex-row md:justify-between">
-                    <span>
-                        Region: Global ·{" "}
-                        <a
-                            data-region-link
-                            href={site.india}
-                            className="inline-flex min-h-11 items-center underline underline-offset-2 md:min-h-0"
+            </div>
+            <div className="mt-14 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-6 text-[13.5px]">
+                <span>
+                    A product of {site.company}. © {new Date().getFullYear()}.
+                    All rights reserved. Region: Global.{" "}
+                    <a data-region-link href={site.india} className={LINK}>
+                        In India? Go to saroh.in
+                    </a>
+                </span>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    {LEGAL_LINKS.map((link) => (
+                        <Link
+                            prefetch={false}
+                            key={link.href}
+                            href={link.href}
+                            className={LINK}
                         >
-                            In India? Go to saroh.in
-                        </a>
-                    </span>
-                    <span>
-                        A product of {site.company} · {site.social}
-                    </span>
+                            {link.name}
+                        </Link>
+                    ))}
                 </div>
             </div>
         </footer>

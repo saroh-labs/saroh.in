@@ -59,8 +59,7 @@ describe("/integrations", () => {
         if (!section) throw new Error("no Planned section");
         const labels = within(section).getAllByRole("heading", { level: 3 });
         expect(labels.map((h) => h.textContent)).toEqual([
-            "Nov–Dec 2026",
-            "Early 2027",
+            "Coming next",
             "Later",
         ]);
         const groups = byComingGroup(plannedIntegrations);
@@ -79,9 +78,11 @@ describe("/integrations", () => {
                 ),
             );
         });
-        // The label is said once: no row repeats a period.
-        expect(section.textContent.match(/Nov–Dec 2026/g)).toHaveLength(1);
-        expect(section.textContent).not.toMatch(/Jan–Mar|Apr–Jun/);
+        // The label is said once, and nothing promises a date.
+        expect(section.textContent.match(/Coming next/g)).toHaveLength(1);
+        expect(section.textContent).not.toMatch(
+            /20\d\d|Jan–Mar|Apr–Jun|Nov–Dec/,
+        );
     });
 
     it("names no plan or price in the planned list, and no provider logo", () => {

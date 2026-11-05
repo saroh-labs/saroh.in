@@ -12,6 +12,87 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Sites — signing in during a booking lost the date and time
+
+**Symptom**: 4 Nov 2026, the owner: "we do all the steps, then we click the
+sign in, and finish sign in... I was on the same page, but all the items
+selected like the date and time were reset, and had to select again." Worst on
+a day from "Show later dates". With a person chosen, the booking could go to
+someone else.
+**Cause**: the Server Action that sets the session cookie makes Next draw the
+page again, and the new props carry what the address now says. `use-times`
+loaded "the service the page was opened on" in an effect keyed on that prop, so
+`?service=` arriving read the first two weeks again with no person: the later
+day was gone, the time fell away (`chosen` is found again only among the days
+on show) and the step dropped from details to when. A chosen person was dropped
+from the read, and `chosen` matches by `startAt` alone. Separately `customer`
+read its prop once, so a draw that was first to say who it was went unseen.
+**Fix**: the opened service is held in a ref and loads once; another service is
+`pickService`. `use-flow-state` adopts a customer when the server names someone
+new (keyed on `customerHandle`, so "Not you?" and a refused session aren't
+undone by a draw still carrying the old prop), and fills an empty phone.
+**Rule**: on a page that takes Server Actions, `initial*` props describe the
+address at the last draw, not a request to start again. Read them once.
+**Where it lives**: `booking-flow.test.tsx`, `booking-flow-customer.test.tsx`
+and `look-sign-in.test.tsx` draw the page again mid-booking under Classic and
+each look; `site-booking-steps.spec.ts` signs in on a later day and reads what
+was booked.
+**The header's Sign in, same day (owner)**: it left for `/account` after signing
+in (A5), and coming back lost the phone and note, which are kept out of storage.
+With `[data-booking-step]` on the page it now stays: Classic's sheet on any step
+(opened from the header it books nothing, unlike Continue to sign in), a look's
+code on Your details, and the header's own sheet on a look's earlier steps
+(`booking-flow/header-sign-in.ts`). A look's phone menu and footer links still
+go through `/account` and come back by `sign-in-return.ts`, without the phone or
+note. Still open: a reload on a look's `?step=pay` opens on when (`openedStep`),
+a different cause from this one.
+
+---
+
+## Site — a merchant's Book page came up empty while booking one service worked
+
+**Symptom**: 4 Nov 2026, the owner showing a live site: `/book` was a title and
+"Pick a service, then a time that suits you." over nothing, or listed only some
+services. `/book?service=<id>` opened and booked. The API answered fine, with
+the right CORS, so nothing looked wrong in the network tab.
+
+**Cause**: two reads of one question. A published Book page draws `servicesList`,
+whose ids are frozen in the snapshot; the flow reads what is offered now. A
+list is written once, when the page is made (`defaultModuleSections`, the
+starter's context), and nothing adds to it later, not even a republish:
+
+- a site made by a business's first service (DEC-175) lists that one service,
+  so its second never shows ("not all services");
+- when every listed service is gone, deleted or archived, `/public/services`
+  returns `[]` and the block returns `null` ("empty");
+- a Book page made before there were real services has no list at all (the
+  contract asks for at least one id), so services added later never show.
+
+The same read lied elsewhere: `[]` on a failure drew as "none", and the layout's
+failed booking read took Book off the header of a page kept for five minutes. A
+failed site read told visitors there was no website at that address, and `/shop`
+drew at most a Shop page's grid (12 products) with no way to the rest.
+
+**Fix**: `/book` draws its list from `getBookingPage`, the flow's own read
+(`lib/book-page-offer.ts`), so existing snapshots are right with no republish
+and no data change. Nothing to offer or a failed read draws the flow's own words
+with how to reach the business. Failed reads refuse the page cache in the
+reader, and say so in the block (`FeedFailed`). `/shop` got the same rule.
+
+**A first cut guessed and was overruled**: it read a merchant's choice from a gap
+in the stored ids, and a merchant who narrowed `[A]` of `[A,B,C]` looks like a list
+written when only A existed, so the guess was wrong either way. The owner settled
+it the same day: `/book` lists everything offered, stored order first, and the
+stored ids choose only elsewhere (Home, Prices). Don't infer intent from data that
+can't hold it.
+
+**Where the rule lives**: `frontend-data-and-state.md` → "a read that failed, and
+what a page offers"; `lib/read-failures.test.ts` fails a new silent reader, and
+`book/page.test.ts` holds what `/book` draws. A snapshot holds choices, never the
+list of what is on offer: anything that must follow the business reads it live.
+
+---
+
 ## Seed — a seed's must-show item left to chance broke on 21 Oct
 
 **Symptom**: 21 Oct 2026, the gate's `db:seed:showcase` stopped with
@@ -6386,3 +6467,63 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the tests use `edition_emailKey`.
 **Rule**: when a `@unique` changes, grep the specs for the old key too, as `tsc` won't find them. Type-checking specs would catch this, but they have older type errors to clear first.
 **Category**: testing · database
+
+---
+
+## Prettier re-sorted classes in a package with no Tailwind config
+
+**Symptom**: 4 Nov, committing the move of saroh.in's primitives to `packages/marketing` changed `m-0 font-display` to `font-display m-0`, and `live-pages.snapshot.test.ts` failed on the committed tree after the gate had passed on the staged one.
+**Cause**: lint-staged runs prettier with the Tailwind plugin, which looks for a config near each file. The package has none, so its classes were sorted without the site's `mk-*` theme.
+**Fix**: a `prettier.config.js` override gives `packages/marketing/**` saroh.in's Tailwind config, and the moved files were restored.
+**Rule**: a package holding Tailwind classes needs that override when it's added. Run the gate again after a commit whose hook rewrote files: its tree isn't the one that passed.
+**Category**: tooling · formatting
+
+---
+
+## A zero with no currency was drawn in rupees on a Global business
+
+**Symptom**: 4 Nov, a Global business saw a ₹ icon on Money in today, "Drafts ₹0" on Invoices and "To pay ₹0" on its booking page.
+**Cause**: the API sends no totals for nothing and a null currency on a free service, and the screens filled the gap with a literal `"INR"` rather than the business's own. Icons were `IndianRupee` by name.
+**Fix**: a zero asks `useStartingCurrency()`, the shell's `Organization.currency` or rupees; the public booking page sends `currency` too. `components/shared/money-icon.tsx` is the one money icon.
+**Rule**: money with no currency of its own is in the business's, never a literal. Use `MoneyIcon`, not `IndianRupee` (`frontend-design-system.md`).
+**Category**: currency · editions
+
+---
+
+## Customers wrote an order's time an hour behind Orders
+
+**Symptom**: 4 Nov, a saroh.tech shot had Maya's last order at 9:40 on Customers and 10:40 on Orders.
+**Cause**: Customers used `ViewerDate` (the browser's zone) and Orders `BusinessDate` (DEC-033). The capture's browser had moved on the hour from the zone the seed gave the business, as `morningZone` does, so the two parted. A real owner travelling sees the same split.
+**Fix**: Customers' Last order is a `BusinessDate`, with a test. The capture takes the seed's zone from `SHOTS_ZONE`.
+**Rule**: an order's time is written in the business's zone, on every screen (`BusinessDate`).
+**Category**: dates · screenshots
+
+---
+
+## A saroh.tech shot contradicted the page it sat on
+
+**Symptom**: 4 Nov, a re-audit found a "You've reached your 1 team member… See plans" banner, "comes with a paid plan" and a dentist's root canal under "Shown with Larkspur & Vane", on pages saying one person and nothing to buy.
+**Cause**: a look through the images checked for India's details only, not for what the page around them claims. The demo diaries also ran far past what one person on Free looks like.
+**Fix**: shots clip to the true region (`shots.global.ts`), the salon has its own treatment order, `checkGlobal` asserts a quiet diary (`BOOKINGS_A_MONTH`), and `lib/shots.test.ts` refuses "team" and "plan" in an alt and a `who` naming another business.
+**Rule**: read every shot against its page's claims as well as for rupees, and clip or drop what a screen says to everyone until the app's words are fixed. Never retouch.
+**Category**: screenshots · editions
+
+---
+
+## Folding a list broke two browser specs, seen only after the merge
+
+**Symptom**: 5 Nov, main's CI failed `public-booking:316` and `site-booking-steps:173` once Classic's booking page folded its steps: one waited for a heading that now folds, one looped over a service list that had folded after its first pick. The page itself was right.
+**Cause**: the specs were updated by reading them, typechecked and never run. The PR merged before its checks finished, so the first run was on main.
+**Fix**: the first checks the folded row, the second presses Edit between picks.
+**Rule**: a spec changed for a new behaviour is not done until it has run. Say so plainly when a PR is asked to merge before its browser checks finish.
+**Category**: tests · booking
+
+---
+
+## A signal turned off fetch dedupe, and a live site could 404 on a blip
+
+**Symptom**: 5 Nov, review of the 8-second server read: a site's metadata, layout and page each read the API separately, so a layout that read fine and a page whose read failed called `notFound()`, a real 404 for a live site. Plans, packs, grids and posts read twice per render, spending the visitor's rate limit, and a 429 drew `FeedFailed`. A custom domain whose read failed or 404'd then asked by its first label, so `shop.client.com` could draw the merchant at `shop`.
+**Cause**: Next's `fetch` dedupe skips any request with a `signal` (`next/dist/server/lib/dedupe-fetch.js`), and `serverReadSignal()` went on every read. `lib/in-page-menu.ts` still said the reads were memoized. `getSiteForHost` was never in `cache()`, its callers read a failed read as "none", and `subdomainFromHost` fell back to the first label for any host.
+**Fix**: readers shared in a render are in React's `cache()`, with a normalised host as the key; pages read `getSiteForPage`, which throws on a failed read; a custom domain is looked up by hostname alone, in `getSiteForHost` and `siteReadFailed`; with no root domain set, behaviour is as it was. `lib/site-read-failed.test.ts` counts fetches through a `cache` stand-in and fails a page that reads the site and calls `notFound()`.
+**Rule**: a reader shared in one render goes in `cache()`, because a signal means nothing else shares it (`frontend-data-and-state.md`). A test of `cache()` outside a render proves nothing: the real one calls straight through.
+**Category**: data · merchant sites

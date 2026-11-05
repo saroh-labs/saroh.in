@@ -11,7 +11,7 @@ export function RegionBar() {
             data-region-bar
             hidden
             aria-label="Region"
-            className="flex items-center justify-center gap-3 bg-ink py-1 pl-4 pr-1 text-sm text-paper md:px-20"
+            className="flex items-center justify-center gap-3 bg-foreground py-1 pl-4 pr-1 text-sm text-background md:px-mk-gutter"
         >
             <span>
                 <span className="hidden md:inline">
@@ -36,7 +36,7 @@ export function RegionBar() {
             <a
                 href="/region/hide"
                 aria-label="Hide this message"
-                className="inline-flex size-11 shrink-0 items-center justify-center text-lg no-underline focus-visible:outline-paper"
+                className="inline-flex size-11 shrink-0 items-center justify-center text-lg no-underline focus-visible:outline-background"
             >
                 <span aria-hidden="true">×</span>
             </a>

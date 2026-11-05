@@ -23,6 +23,7 @@
  *   pnpm --filter @saroh/database db:seed:showcase -- --now=2027-01-01T09:00:00+05:30
  *                                                    # the showcase as seeded at another time
  *   pnpm --filter @saroh/database db:seed:reset      # removes both
+ *   pnpm --filter @saroh/database db:seed:global     # + the Global edition's demo businesses
  *
  * The target database is checked before any write — see `database-target.ts`.
  */
@@ -49,6 +50,10 @@ async function main() {
     }
     await seed();
     // The showcase is layered on the base seed, never instead of it.
+    if (process.argv.includes("--global")) {
+        const { seedGlobal } = await import("./seed/global/run");
+        await seedGlobal();
+    }
     if (process.argv.includes("--showcase")) {
         const { seedShowcase } = await import("./seed/showcase/run");
         const at = process.argv

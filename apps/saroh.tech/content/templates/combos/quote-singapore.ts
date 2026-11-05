@@ -60,8 +60,4 @@ export const quoteSingapore: Combo = {
             answer: "The rate has been 9% since 1 January 2024, and it has changed before. For a long job, check the IRAS rules on which rate applies to each payment and invoice when a change is announced.",
         },
     ],
-    band: {
-        title: "A quote with GST where IRAS wants it.",
-        line: "Send it from Saroh, see when your client accepts, and turn it into a tax invoice without typing anything twice.",
-    },
 };

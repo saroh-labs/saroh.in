@@ -511,6 +511,35 @@ it. Re-seeding a database that already has versions keeps them and puts the
 demo businesses on the live version's `pro` plan, so a dev catalogue without
 a `pro` plan stops the seed: seed first, then import.
 
+### Global demo businesses (saroh.tech's screenshots)
+
+```bash
+pnpm --filter @saroh/database db:seed:global   # base seed, then four Global businesses
+```
+
+Thistlewick Bakery, Larkspur & Vane (pounds, VAT), Ironvale Fitness and
+Wrenfield Dental (`seed/global/`), owned by `demo@saroh.dev`: `edition: GLOBAL`,
+on Free, no payment provider, sample data only, rewritten whole each run. Each
+is what a Free business can have: setup's modules, plus the Insights (the
+bakery), Courses (the gym) and Sell (the salon and clinic, for a treatment over
+several visits) switches Free offers, no Payments or class packs, one person
+(a diary person with no login would take a seat), a quiet diary
+(`BOOKINGS_A_MONTH`, asserted), plan limits enforced for these four. Local
+addresses have no edition (`editionOfHost` returns null), so the seed sets it
+on the business, and app and accounts need `NEXT_PUBLIC_EDITION=GLOBAL` to list
+them and read money their way. Their zone is one where it's mid-morning when
+seeded (`morning-zone.ts`), so a capture at any hour shows a working day. Keep
+them on their own database.
+
+For Free's real rows, import dev's catalogue (above), then seed again so they
+sit on it. Set `SAROH_RAZORPAY_KEY_ID`, `SAROH_RAZORPAY_KEY_SECRET` and
+`SAROH_RAZORPAY_WEBHOOK_SECRET` empty on the import and on the API: with the
+keys from `.env.local` the version waits for a sync that would call the provider.
+Then:
+`SHOTS_ZONE=<the zone the seed logged> pnpm --filter @saroh/e2e shots --edition=global`
+(`marketing-shots/shots.global.ts`) and `pnpm --filter tech shots:sizes --force`. If the app reloads itself in a
+loop in a capture, restart its `next dev`.
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a

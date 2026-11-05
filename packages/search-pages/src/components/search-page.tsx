@@ -282,7 +282,7 @@ export function SearchPage({
                             <li key={it.title}>
                                 <span className="va-icon">
                                     <AlsoSvg
-                                        icon={it.icon ?? alsoIcons[i] ?? "pack"}
+                                        icon={it.icon ?? alsoIcons[i] ?? "list"}
                                     />
                                 </span>
                                 <span className="sp-also-t">

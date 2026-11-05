@@ -113,8 +113,4 @@ export const estimateGraphicDesigner: Combo = {
             answer: "Only if you're arranging the print. Paper, finish and quantity can swing the cost a lot, so get a printer's figure and show it apart from your own fee, marked as their price and open to change.",
         },
     ],
-    band: {
-        title: "A loose brief, a clear number.",
-        line: "Share the estimate as a link, get the go-ahead online, and turn it into a bill when the artwork is done.",
-    },
 };

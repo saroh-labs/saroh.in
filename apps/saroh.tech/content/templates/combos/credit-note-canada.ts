@@ -54,8 +54,4 @@ export const creditNoteCanada: Combo = {
             answer: "The CRA's pages cover GST/HST, while its table shows Quebec's own 9.975% rate on top. If you charged both, your note should give back both. Check Revenu Québec's pages for its side of it.",
         },
     ],
-    band: {
-        title: "Fix a Canadian bill properly.",
-        line: "Issue a credit note in Saroh and it stays attached to the invoice and the client, with the GST or HST worked out for you.",
-    },
 };

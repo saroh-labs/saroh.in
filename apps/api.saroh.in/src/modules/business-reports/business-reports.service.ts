@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { isCustomerPhone } from "../../common/customer-phone";
 import { businessForHost, reportHost } from "./report-host";
@@ -13,6 +14,8 @@ export interface SubmitBusinessReportInput {
     phone: string;
     /** A digest of the reporter's address; never the address itself. */
     ipHash?: string;
+    /** The website's edition, from the address it was sent through. */
+    edition?: Edition;
 }
 
 /**
@@ -58,6 +61,7 @@ export class BusinessReportsService {
                     reporterEmail: input.email,
                     reporterPhone: phone,
                     ipHash: input.ipHash ?? null,
+                    edition: input.edition,
                 },
                 select: { id: true },
             }),

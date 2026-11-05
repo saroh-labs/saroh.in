@@ -125,8 +125,4 @@ export const estimate: DocumentData = {
             answer: "Tell the client as soon as you know, before you spend the extra. Explain what changed and give a new figure in writing. Surprises at the end of a job cause far more trouble than the extra amount does.",
         },
     ],
-    band: {
-        title: "From best guess to signed job.",
-        line: "Send the estimate as a link, let your client approve it online, and turn it into an invoice in one tap.",
-    },
 };

@@ -25,6 +25,7 @@ import { JoinSheet } from "../prices/join-sheet";
 import { planBrowsePrice, planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { FeedFailed } from "./feed-failed";
 import {
     PriceFrame,
     PriceParts,
@@ -45,8 +46,8 @@ import {
  *
  * - **`feed`** — handed in by the page that serves the site (live or behind
  *   a preview token), read on the server. No plans (none on sale, Payments
- *   off, memberships not on the business's Saroh plan, the read failed):
- *   the block renders NOTHING.
+ *   off, memberships not on the business's Saroh plan): the block renders
+ *   NOTHING. A read that failed says so, and offers Try again (`FeedFailed`).
  * - **no feed, a `siteId`** — the editor's canvas. The block reads the same
  *   public list itself so the merchant sees their real plans, and says why
  *   the section is empty rather than vanishing.
@@ -111,6 +112,8 @@ export interface PlansFeed {
      * offered, and nothing is said about it.
      */
     pauseWeeks?: number[];
+    /** The read failed: not "none", so the section says so (`FeedFailed`). */
+    failed?: boolean;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -215,6 +218,9 @@ export default function PlansSection({
 
     const title = said(content.title) ?? PLANS_TITLE;
 
+    if (feed?.failed) {
+        return <FeedFailed title={title} things="our plans" look={look} />;
+    }
     if (feed) {
         return (
             <PlanCards

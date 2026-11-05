@@ -19,7 +19,7 @@ export function SegmentedControl<T extends string>({
         <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="sr-only">{legend}</legend>
             <div
-                className="grid gap-1 rounded-button bg-[#EAE6DE] p-1"
+                className="grid gap-1 rounded-mk-btn bg-mk-hover p-1"
                 style={{
                     gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
                 }}
@@ -27,10 +27,8 @@ export function SegmentedControl<T extends string>({
                 {options.map((o) => (
                     <label
                         key={o.value}
-                        className={`flex min-h-11 cursor-pointer items-center justify-center rounded-control px-2 text-center text-[14.5px] font-semibold has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink md:min-h-10 ${
-                            value === o.value
-                                ? "bg-surface shadow-[0_1px_2px_rgba(28,28,26,.18)]"
-                                : ""
+                        className={`flex min-h-11 cursor-pointer items-center justify-center rounded-mk-control px-2 text-center text-[14.5px] font-semibold has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-foreground md:min-h-10 ${
+                            value === o.value ? "bg-card shadow-sm" : ""
                         }`}
                     >
                         <input

@@ -105,8 +105,4 @@ export const proformaInvoiceMakeupArtist: Combo = {
             answer: "Add the currency you're charging in, your bank details and who bears transfer costs. They might ask for a tax form as well. Ask their accounts team what they need, and check tax treatment locally.",
         },
     ],
-    band: {
-        title: "On the production sheet, ready to approve.",
-        line: "Send the proforma, then the final invoice after the wrap, with any overtime added. 0% fees.",
-    },
 };

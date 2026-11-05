@@ -7,6 +7,7 @@ import { Header } from "@/components/shared/header";
 import { RegionBar } from "@/components/shared/region-bar";
 import { site } from "@/site.config";
 
+import "@saroh/marketing/tokens.css";
 import "@saroh/ui/globals.css";
 import "./tech.css";
 
@@ -37,12 +38,13 @@ const fontWordmark = localFont({
     weight: "600",
     display: "swap",
     variable: "--font-wordmark",
+    preload: false,
 });
 
 export const metadata: Metadata = {
     metadataBase: new URL(site.url),
     title: site.name,
-    description: "Quotes, invoices and one page for every client.",
+    description: "Orders, bookings, invoices and your website, in one place.",
 };
 
 export const viewport: Viewport = {
@@ -61,11 +63,21 @@ export default function RootLayout({
             lang="en"
             className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable}`}
         >
-            <body className="min-h-screen bg-paper text-ink antialiased">
-                <RegionBar />
-                <Header />
-                <main id="main">{children}</main>
-                <Footer />
+            <body className="font-sans antialiased">
+                <a
+                    href="#main"
+                    className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"
+                >
+                    Skip to content
+                </a>
+                <div className="min-h-screen bg-background text-foreground [line-height:normal]">
+                    <RegionBar />
+                    <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
+                        <Header />
+                        <main id="main">{children}</main>
+                        <Footer />
+                    </div>
+                </div>
                 <Analytics />
             </body>
         </html>
