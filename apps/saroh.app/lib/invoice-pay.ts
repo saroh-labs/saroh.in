@@ -1,7 +1,7 @@
 import type { AutopayDoneState, AutopayStartResult } from "@saroh/site-blocks";
 import { payInstructionsOf } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
 import type { CheckoutIntent } from "./checkout-shape";
 import { isIntent } from "./checkout-shape";
@@ -44,6 +44,7 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
             {
                 cache: "no-store",
                 headers: await withRelay({ accept: "application/json" }),
+                signal: serverReadSignal(),
             },
         );
     } catch {
@@ -205,6 +206,7 @@ export async function getInvoiceAutopay(
             {
                 cache: "no-store",
                 headers: await withRelay({ accept: "application/json" }),
+                signal: serverReadSignal(),
             },
         );
     } catch {

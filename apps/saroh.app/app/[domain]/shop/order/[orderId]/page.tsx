@@ -18,7 +18,7 @@ import {
 
 import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn } from "@/lib/account-area";
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForPage } from "@/lib/publication";
 import { getOrderConfirmation } from "@/lib/shop-confirmation";
 import { getFooterFacts, soldByFor } from "@/lib/site-footer";
 
@@ -50,7 +50,7 @@ export default async function ShopOrderPage({
     params: Promise<{ domain: string; orderId: string }>;
 }) {
     const { domain, orderId } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
 
     const [lookup, facts] = await Promise.all([

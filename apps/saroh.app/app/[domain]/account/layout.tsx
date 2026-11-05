@@ -19,6 +19,7 @@ import { accountAreaOn, getAccount } from "@/lib/account-area";
 import { getAccountSite } from "@/lib/account-site";
 import { accountMetadata } from "@/lib/account-title";
 import { getBookingPage } from "@/lib/booking-page";
+import { getSiteForPage } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
 
 import {
@@ -84,7 +85,7 @@ export default async function AccountLayout({
         // area is off, so this is reached only without it (a preview).
         // Classic: a 404 here too. A look says what the site does instead
         // (DEC-172, plan U12), so the page never reads as broken.
-        const off = await getAccountSite(domain);
+        const off = await getSiteForPage(domain);
         const offLook = off ? lookOf(off.snapshot.site.look) : undefined;
         if (!off || !offLook) notFound();
         return (
@@ -100,7 +101,7 @@ export default async function AccountLayout({
         );
     }
     const [site, lookup] = await Promise.all([
-        getAccountSite(domain),
+        getSiteForPage(domain),
         getAccount(),
     ]);
     if (!site) notFound();

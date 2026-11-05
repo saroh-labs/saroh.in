@@ -40,6 +40,7 @@ const site = vi.hoisted(() => {
 
 vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),
+    getSiteForPage: vi.fn(() => Promise.resolve(site.resolved)),
     findPageByPath: vi.fn(() => null),
     postsPrefix: vi.fn(() => "blog"),
 }));

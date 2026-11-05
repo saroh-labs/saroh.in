@@ -40,7 +40,11 @@ import {
     dontCachePage,
     showsServicesOffered,
 } from "@/lib/page-cache/site-rules";
-import { getSiteForHost, siteOriginFor } from "@/lib/publication";
+import {
+    getSiteForHost,
+    getSiteForPage,
+    siteOriginFor,
+} from "@/lib/publication";
 import { serviceJsonLdScript } from "@/lib/service-json-ld";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getSiteContact } from "@/lib/site-contact";
@@ -197,7 +201,7 @@ export default async function BookPage({
     const { domain } = await params;
     const query = await searchParams;
     const { service, date, start, move, step, staff, ref } = query;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
 
     // Moving a class from the account (A6): its sessions, "Moving: ‹class›".

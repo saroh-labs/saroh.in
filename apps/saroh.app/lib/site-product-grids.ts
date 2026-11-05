@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { ProductGridFeed } from "@saroh/site-blocks";
 import { productCardsOf, productGridQuery } from "@saroh/site-blocks";
 
@@ -12,9 +14,10 @@ import { productGridFeeds } from "./product-grid-feed";
  * shop isn't open for the business, an empty list here, so the grid draws
  * nothing. A read that failed is null, and the page isn't kept. The call
  * carries the signed relay, as the shop's reads do, so the API's per-visitor
- * limit counts the visitor.
+ * limit counts the visitor. `cache` is one read for the menu and the page
+ * within a request.
  */
-async function getGridProducts(
+const getGridProducts = cache(async function getGridProducts(
     siteId: string,
     query: string,
 ): Promise<ProductGridFeed["products"] | null> {
@@ -31,7 +34,7 @@ async function getGridProducts(
         : null;
     if (!cards) dontCachePage("grid unavailable");
     return cards;
-}
+});
 
 /** The grid's query, from a snapshot section's content (JSON). */
 function queryOf(content: unknown): string | null {

@@ -22,6 +22,7 @@ import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
 import { productJsonLdScript } from "@/lib/product-json-ld";
 import {
     getSiteForHost,
+    getSiteForPage,
     postsPrefix,
     shareImages,
     siteOriginFor,
@@ -109,7 +110,7 @@ export default async function ShopProductPage({
     params: Promise<{ domain: string; productSlug: string }>;
 }) {
     const { domain, productSlug } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
 
     if (postsPrefix(resolved.snapshot) === "shop") {

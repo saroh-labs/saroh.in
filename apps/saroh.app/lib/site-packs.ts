@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { PacksFeed } from "@saroh/site-blocks";
 import { packsOf } from "@saroh/site-blocks";
 
@@ -14,8 +16,11 @@ import { enquiryPagePath } from "./shop-checkout-shape";
  * sale with their published values, and 404s while Class packs is off. A
  * 404 is an empty list here, so the block draws nothing; a read that failed
  * is not, and is never kept by the page cache. The call carries the signed relay, so the API's limit counts the visitor.
+ * `cache` is one read for the menu and the page within a request.
  */
-export async function getPublicPacks(siteId: string): Promise<PacksRead> {
+export const getPublicPacks = cache(async function getPublicPacks(
+    siteId: string,
+): Promise<PacksRead> {
     const res = await shopFetch(`${encodeURIComponent(siteId)}/packs`);
     if (res?.status === 404) return { packs: [], payOnline: false };
     const read = res?.ok ? packsOf(await res.json().catch(() => null)) : null;
@@ -24,7 +29,7 @@ export async function getPublicPacks(siteId: string): Promise<PacksRead> {
         return { packs: [], payOnline: false, failed: true };
     }
     return read;
-}
+});
 
 type Snapshot = Parameters<typeof enquiryPagePath>[0];
 

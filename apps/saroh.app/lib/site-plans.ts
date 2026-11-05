@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { PlansFeed } from "@saroh/site-blocks";
 import {
     plansAutopayMethods,
@@ -21,9 +23,12 @@ import { enquiryPagePath } from "./shop-checkout-shape";
  * failed is not, and is never kept by the page cache. The
  * read also says whether Join can be paid online now (G20); an API that
  * doesn't say is a no. The call carries the signed relay, as the shop's
- * reads do, so the API's per-visitor limit counts the visitor.
+ * reads do, so the API's per-visitor limit counts the visitor. `cache` is one
+ * read for the menu and the page within a request.
  */
-export async function getPublicPlans(siteId: string): Promise<PlansRead> {
+export const getPublicPlans = cache(async function getPublicPlans(
+    siteId: string,
+): Promise<PlansRead> {
     const res = await shopFetch(`${encodeURIComponent(siteId)}/plans`);
     if (res?.status === 404) return { plans: [], payOnline: false };
     const body: unknown = res?.ok ? await res.json().catch(() => null) : null;
@@ -42,7 +47,7 @@ export async function getPublicPlans(siteId: string): Promise<PlansRead> {
         // DEC-172 U7: how long members may pause; none from an older API.
         pauseWeeks: plansPauseWeeks(body),
     };
-}
+});
 
 type Snapshot = Parameters<typeof enquiryPagePath>[0];
 

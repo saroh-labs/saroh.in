@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import type { WatchView } from "@saroh/site-blocks";
 import { isWatchView } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { servedHost } from "./origin";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
@@ -40,7 +40,7 @@ export async function getStockWatch(
         }
         const res = await fetch(
             `${serverApiUrl()}/public/sites/${encodeURIComponent(siteId)}/stock-watch/${encodeURIComponent(token)}`,
-            { cache: "no-store", headers: sent },
+            { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (res.status === 404) return { ok: false, reason: "missing" };
         if (!res.ok) return { ok: false, reason: "unavailable" };

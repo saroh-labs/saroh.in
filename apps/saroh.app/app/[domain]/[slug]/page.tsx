@@ -9,6 +9,7 @@ import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
     getSiteForHost,
+    getSiteForPage,
     postsPrefix,
     readPublishedPosts,
     shareImages,
@@ -93,7 +94,7 @@ export default async function SitePostPage({
     params: Promise<{ domain: string; slug: string }>;
 }) {
     const { domain, slug } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
 
     if (!resolved) {
         notFound();

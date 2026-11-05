@@ -21,7 +21,7 @@ import { VisitStep } from "@/components/visit-step";
 import { publicApiUrl } from "@/lib/api-url";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForPage } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getFooterFacts, soldByFor } from "@/lib/site-footer";
@@ -49,7 +49,7 @@ export default async function LookCheckoutPage({
     params: Promise<{ domain: string }>;
 }) {
     const { domain } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
     const look = lookOf(resolved.snapshot.site.look);
     const checkout = await getCheckoutOptions(resolved.siteId);

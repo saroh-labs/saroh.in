@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type {
     CodeRequestResult,
     SignedInCustomer,
@@ -201,13 +203,16 @@ const KNOWN_WAYS = ["EMAIL", "WHATSAPP", "SMS"] as const;
 /**
  * What the sheet needs up front, for the site this request is on. Null when
  * the API can't say; the booking page then offers sign-in without a phone
- * line and learns about a challenge from the first answer.
+ * line and learns about a challenge from the first answer. One read per
+ * request (`cache`): the layout and the page both ask.
  */
-export async function getSignInOptions(): Promise<SignInOptions | null> {
-    const call = await siteAccountsFetch("options");
-    if (!call.ok || !call.res.ok) return null;
-    return optionsResult(await call.res.json().catch(() => null));
-}
+export const getSignInOptions = cache(
+    async (): Promise<SignInOptions | null> => {
+        const call = await siteAccountsFetch("options");
+        if (!call.ok || !call.res.ok) return null;
+        return optionsResult(await call.res.json().catch(() => null));
+    },
+);
 
 /** Fallback when the customer can't be read back right after signing in. */
 export function customerFromEmail(email: string): SignedInCustomer {

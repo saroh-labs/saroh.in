@@ -11,7 +11,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { dontCachePage } from "@/lib/page-cache/site-rules";
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForHost, getSiteForPage } from "@/lib/publication";
 import { getStockWatch } from "@/lib/stock-watch";
 
 import { stopWaiting } from "../../actions";
@@ -58,7 +58,7 @@ export default async function StopWaitingRoute({
     const { domain, token } = await params;
     // About one visitor's watch, and it changes when they press.
     dontCachePage("a back-in-stock watch");
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
     const look = lookOf(resolved.snapshot.site.look);
 

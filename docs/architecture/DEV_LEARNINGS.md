@@ -6517,3 +6517,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: the first checks the folded row, the second presses Edit between picks.
 **Rule**: a spec changed for a new behaviour is not done until it has run. Say so plainly when a PR is asked to merge before its browser checks finish.
 **Category**: tests · booking
+
+---
+
+## A signal turned off fetch dedupe, and a live site could 404 on a blip
+
+**Symptom**: 5 Nov, review of the 8-second server read: a site's metadata, layout and page each read the API separately, so a layout that read fine and a page whose read failed called `notFound()`, a real 404 for a live site. Plans, packs, grids and posts read twice per render, spending the visitor's rate limit, and a 429 drew `FeedFailed`. A custom domain whose read failed or 404'd then asked by its first label, so `shop.client.com` could draw the merchant at `shop`.
+**Cause**: Next's `fetch` dedupe skips any request with a `signal` (`next/dist/server/lib/dedupe-fetch.js`), and `serverReadSignal()` went on every read. `lib/in-page-menu.ts` still said the reads were memoized. `getSiteForHost` was never in `cache()`, its callers read a failed read as "none", and `subdomainFromHost` fell back to the first label for any host.
+**Fix**: readers shared in a render are in React's `cache()`, with a normalised host as the key; pages read `getSiteForPage`, which throws on a failed read; a custom domain is looked up by hostname alone, in `getSiteForHost` and `siteReadFailed`; with no root domain set, behaviour is as it was. `lib/site-read-failed.test.ts` counts fetches through a `cache` stand-in and fails a page that reads the site and calls `notFound()`.
+**Rule**: a reader shared in one render goes in `cache()`, because a signal means nothing else shares it (`frontend-data-and-state.md`). A test of `cache()` outside a render proves nothing: the real one calls straight through.
+**Category**: data · merchant sites

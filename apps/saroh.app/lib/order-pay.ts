@@ -1,6 +1,6 @@
 import { payInstructionsOf } from "@saroh/site-blocks";
 
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
 import { payContactOf, payOnlineOf, payUrlOf } from "./invoice-pay-shape";
@@ -30,7 +30,11 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
     try {
         res = await fetch(
             `${API_URL}/public/order-pay/${encodeURIComponent(token)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return { ok: false, reason: "unavailable" };

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const shop = vi.hoisted(() => ({
     answer: null as Response | null,
@@ -26,6 +26,7 @@ vi.mock("@/lib/page-cache/site-rules", () => ({
 }));
 
 import { getBookingVisit } from "./booking-page";
+import { newRecord, RECORD_STORE_KEY } from "./page-cache/record";
 import {
     getPublishedPost,
     getPublishedPosts,
@@ -35,6 +36,7 @@ import {
 import { getCheckoutOptions } from "./shop-checkout";
 import { getSiteContact } from "./site-contact";
 import { getFooterFacts } from "./site-footer";
+import { getSiteHead, NO_HEAD } from "./site-head";
 import { getPublicPacks } from "./site-packs";
 import { getPublicPlans } from "./site-plans";
 import { getProductGridFeeds } from "./site-product-grids";
@@ -182,6 +184,12 @@ describe("the footer and the header's facts", () => {
         await getBookingVisit("site_2");
         expect(shop.refused).toHaveBeenCalledWith("visit unavailable");
     });
+
+    it("aren't kept when the visit's 200 isn't a visit", async () => {
+        answerAll(json({ nope: true }));
+        await expect(getBookingVisit("site_2")).resolves.toBeNull();
+        expect(shop.refused).toHaveBeenCalledWith("visit unavailable");
+    });
 });
 
 describe("a host with no live site", () => {
@@ -196,6 +204,42 @@ describe("a host with no live site", () => {
         answerAll(json({}, 404));
         await expect(siteReadFailed("rye.saroh.app")).resolves.toBe(false);
         await expect(siteReadFailed("shop.example.com")).resolves.toBe(false);
+    });
+});
+
+describe("the head", () => {
+    /** The head refuses through the record itself, so ask the record. */
+    function renderRecord() {
+        const record = newRecord(0);
+        (globalThis as Record<symbol, unknown>)[RECORD_STORE_KEY] = {
+            getStore: () => record,
+        };
+        return record;
+    }
+    afterEach(() => {
+        delete (globalThis as Record<symbol, unknown>)[RECORD_STORE_KEY];
+    });
+
+    it.each([
+        ["a body cut off", new Response("{", { status: 200 })],
+        ["a body of null", json(null)],
+        ["a body that isn't an object", json("nope")],
+        ["a 500", json({}, 500)],
+    ])(
+        "isn't kept on %s, so trackers don't go missing from it",
+        async (_n, res) => {
+            const record = renderRecord();
+            answerAll(res);
+            await expect(getSiteHead("site_3")).resolves.toEqual(NO_HEAD);
+            expect(record.refused).toBe("head unavailable");
+        },
+    );
+
+    it("is kept when the API answers with nothing set", async () => {
+        const record = renderRecord();
+        answerAll(json({ verifications: [], trackers: [], privacyUrl: null }));
+        await expect(getSiteHead("site_3")).resolves.toEqual(NO_HEAD);
+        expect(record.refused).toBeNull();
     });
 });
 

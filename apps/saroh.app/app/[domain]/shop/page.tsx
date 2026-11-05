@@ -27,7 +27,12 @@ import {
 } from "@/lib/module-pages";
 import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
-import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
+import {
+    findPageByPath,
+    getSiteForHost,
+    getSiteForPage,
+    postsPrefix,
+} from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { shopCutOff } from "@/lib/shop-cut-off";
@@ -171,7 +176,7 @@ export default async function ShopPage({
 }) {
     const { domain } = await params;
     const { all } = await searchParams;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (!resolved) notFound();
     const { snapshot, siteId } = resolved;
 

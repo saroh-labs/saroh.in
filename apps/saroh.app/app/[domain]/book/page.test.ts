@@ -100,6 +100,7 @@ vi.mock("@/lib/page-cache/site-rules", () => ({
 }));
 vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),
+    getSiteForPage: vi.fn(() => Promise.resolve(site.resolved)),
     siteOriginFor: () => "https://rye.test",
 }));
 vi.mock("@/lib/service-json-ld", () => ({ serviceJsonLdScript: () => null }));
