@@ -3,7 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { MediaService } from "../media/media.service";
 import {
-    PAY_SELECT,
+    PAY_PUBLIC_SELECT,
     publicPayInstructions,
 } from "../organizations/business-pay-instructions";
 import { paperView } from "./invoice-paper-view";
@@ -55,7 +55,7 @@ export async function drawPaperPdf(
                 logoUrl: true,
                 logoMediaId: true,
                 // "How to pay us" on an unpaid invoice (#833).
-                ...PAY_SELECT,
+                ...PAY_PUBLIC_SELECT,
             },
         }),
     ]);

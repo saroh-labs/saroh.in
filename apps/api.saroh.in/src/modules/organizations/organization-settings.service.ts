@@ -6,6 +6,7 @@ import {
 import type { SocialLinks } from "@saroh/block-contract";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -315,6 +316,7 @@ interface ProfileRow {
 function splitProfile(
     p: ProfileRow | null,
     counters?: Record<NumberRestart, number>,
+    edition?: Edition,
 ) {
     if (!p) {
         return {
@@ -322,7 +324,7 @@ function splitProfile(
             tax: taxView(null, counters),
             registeredAddress: addressView(null),
             logo: null,
-            payInstructions: payInstructionsView(null),
+            payInstructions: payInstructionsView(null, edition),
             socialLinks: {},
             siteShowsRegisteredAddress: false,
             registeredAddressMapUrl: null,
@@ -367,7 +369,7 @@ function splitProfile(
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
-        payInstructions: payInstructionsView(p),
+        payInstructions: payInstructionsView(p, edition),
         socialLinks: socialLinksRead(socialLinks),
         siteShowsRegisteredAddress: siteShowsRegisteredAddress ?? false,
         registeredAddressMapUrl: mapLinkRead(registeredAddressMapUrl),
@@ -539,6 +541,7 @@ export class OrganizationSettingsService {
                       where: { organizationId: ctx.organizationId },
                       select: PAY_SELECT,
                   }),
+                  ctx.edition,
               )
             : {};
         // Social links (DEC-128): each sent one rebuilt into its canonical
@@ -600,6 +603,7 @@ export class OrganizationSettingsService {
                 name: true,
                 slug: true,
                 kind: true,
+                edition: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         } as const;
@@ -696,6 +700,7 @@ export class OrganizationSettingsService {
                     ctx.organizationId,
                     settings.businessProfile,
                 ),
+                settings.edition,
             ),
             tradingSince: await this.firstOrderAt(ctx.organizationId),
             setup: await this.setupFacts(ctx.organizationId),
@@ -886,6 +891,7 @@ export class OrganizationSettingsService {
                 name: true,
                 slug: true,
                 kind: true,
+                edition: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         });
@@ -903,6 +909,7 @@ export class OrganizationSettingsService {
                     organizationId,
                     organization.businessProfile,
                 ),
+                organization.edition,
             ),
             tradingSince: await this.firstOrderAt(organizationId),
             setup: await this.setupFacts(organizationId),

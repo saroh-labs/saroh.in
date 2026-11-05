@@ -1026,6 +1026,25 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
         expect(done({ ...none, note: "Pay at the counter" })).toBe(false);
     });
 
+    it("Free, Global: bank details with no code tick it, and a stale UPI ID doesn't", () => {
+        const done = (pay: Partial<typeof none>) =>
+            readyChecklist({
+                settings: {
+                    ...settled,
+                    setup: facts(false),
+                    payInstructions: {
+                        ...none,
+                        ...pay,
+                        edition: "GLOBAL",
+                    },
+                },
+                modules: selling,
+            }).steps.find((s) => s.key === "howToPay")?.done;
+        expect(done({ bankAccountNumber: "12345678" })).toBe(true);
+        expect(done({ upiId: "shop@okexample" })).toBe(false);
+        expect(done({ note: "Pay at the counter" })).toBe(false);
+    });
+
     it("Grow (online payments): not a step, connecting payments is", () => {
         const r = readyChecklist({
             settings: { ...settled, setup: facts(true), payInstructions: none },

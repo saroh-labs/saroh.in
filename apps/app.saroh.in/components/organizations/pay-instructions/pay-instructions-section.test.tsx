@@ -293,3 +293,73 @@ describe("How to pay us (R32)", () => {
         expect(sheetName()).toBe("How to pay us");
     });
 });
+
+describe("How to pay us for a Global business (DEC-204)", () => {
+    const GLOBAL: PayInstructionsSettings = { ...NONE, edition: "GLOBAL" };
+    const IBAN = "GB82 WEST 1234 5698 7654 32";
+
+    it("shows no UPI row or word, and bank details without a code count", () => {
+        draw({
+            ...GLOBAL,
+            upiId: UPI,
+            bankAccountName: "Northwind Supply",
+            bankAccountNumber: "GB82WEST12345698765432",
+        });
+        const panel = host.querySelector("#business-pay-panel");
+        expect(panel?.textContent).not.toContain("UPI");
+        expect(panel?.textContent).toContain(IBAN);
+        expect(host.textContent).not.toContain(UPI);
+        expect(preview()?.querySelector('[data-testid="upi-qr"]')).toBeNull();
+        expect(preview()?.textContent).toContain("Pay by bank transfer");
+    });
+
+    it("the sheet asks for its own fields, and sends an IBAN with no code", async () => {
+        draw(GLOBAL);
+        await press("Add bank details");
+        expect(sheet()?.querySelector('[name="upiId"]')).toBeNull();
+        const words = sheet()?.textContent;
+        expect(words).toContain("Account name");
+        expect(words).toContain("Account number or IBAN");
+        expect(words).toContain("Sort code, routing number or SWIFT");
+        expect(words).toContain("Bank name");
+        expect(words).not.toContain("IFSC");
+
+        await typeInto("bankAccountName", "Northwind Supply");
+        await typeInto("bankAccountNumber", IBAN);
+        expect(draft()?.textContent).toContain("Pay by bank transfer");
+        save.mockResolvedValue({ ok: true, data: {} });
+        await press("Save");
+        expect(save).toHaveBeenCalledWith({
+            payInstructions: {
+                bankAccountName: "Northwind Supply",
+                bankAccountNumber: IBAN,
+            },
+        });
+    });
+
+    it("sends a sort code as typed, and refuses nonsense on its field", async () => {
+        draw(GLOBAL);
+        await press("Add bank details");
+        await typeInto("bankAccountName", "Northwind Supply");
+        await typeInto("bankAccountNumber", "not@an-account");
+        await typeInto("bankIfsc", "12-34-56!");
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
+            "That isn't an account number or IBAN.",
+        );
+        expect(sheet()?.textContent).toContain("That isn't a bank code.");
+        expect(save).not.toHaveBeenCalled();
+
+        await typeInto("bankAccountNumber", "12345678");
+        await typeInto("bankIfsc", "12-34-56");
+        save.mockResolvedValue({ ok: true, data: {} });
+        await press("Save");
+        expect(save).toHaveBeenCalledWith({
+            payInstructions: {
+                bankAccountName: "Northwind Supply",
+                bankAccountNumber: "12345678",
+                bankIfsc: "12-34-56",
+            },
+        });
+    });
+});

@@ -353,7 +353,7 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
 
 /** "1234 5678 9012": an account number in fours, as the pay page groups it. */
 function groupedAccount(number: string): string {
-    return number.replace(/(\d{4})(?=\d)/g, "$1 ");
+    return number.replace(/([0-9A-Z]{4})(?=[0-9A-Z])/g, "$1 ");
 }
 
 /**
@@ -382,13 +382,19 @@ export function payInstructionLines(
 ): string[] | null {
     if (!pay) return null;
     const lines: string[] = [];
-    if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
-    if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {
+    const global = pay.edition === "GLOBAL";
+    if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);
+    if (
+        pay.bankAccountNumber &&
+        (pay.bankIfsc || global) &&
+        pay.bankAccountName
+    ) {
         lines.push(
             [
                 `Bank transfer: ${pay.bankAccountName}`,
-                `A/c ${groupedAccount(pay.bankAccountNumber)}`,
-                `IFSC ${pay.bankIfsc}`,
+                `${global ? "Account" : "A/c"} ${groupedAccount(pay.bankAccountNumber)}`,
+                pay.bankIfsc &&
+                    `${global ? "Bank code" : "IFSC"} ${pay.bankIfsc}`,
                 pay.bankName,
             ]
                 .filter(Boolean)

@@ -28,7 +28,7 @@ import {
     MAX_PAY_NOTE,
     PAY_FIELDS,
     payInputOf,
-    payInstructionsSchema,
+    payInstructionsSchemaOf,
     payPreviewOf,
     payValuesOf,
     UPI_EXAMPLE,
@@ -87,6 +87,37 @@ const FIELDS: {
     },
 ];
 
+/** A Global business (DEC-204): no UPI, and whatever its bank calls things. */
+const GLOBAL_FIELDS: typeof FIELDS = [
+    {
+        name: "bankAccountName",
+        label: "Account name",
+        width: "basis-full",
+        autoCapitalize: "words",
+    },
+    {
+        name: "bankAccountNumber",
+        label: "Account number or IBAN",
+        width: "basis-full",
+        autoCapitalize: "characters",
+        mono: true,
+    },
+    {
+        name: "bankIfsc",
+        label: "Sort code, routing number or SWIFT",
+        hint: "Optional. Add it if your bank gives you one.",
+        width: "basis-full",
+        autoCapitalize: "characters",
+        mono: true,
+    },
+    {
+        name: "bankName",
+        label: "Bank name (optional)",
+        width: "basis-full",
+        autoCapitalize: "words",
+    },
+];
+
 const WORDS = sheetWords("pay", { kind: undefined, registered: false });
 
 /**
@@ -122,9 +153,10 @@ export function PayInstructionsSheet({
      */
     save?: typeof saveOrganizationSettings;
 }) {
+    const edition = saved?.edition;
     const values = payValuesOf(saved);
     const form = useForm<PayValues>({
-        resolver: zodResolver(payInstructionsSchema),
+        resolver: zodResolver(payInstructionsSchemaOf(edition)),
         defaultValues: values,
     });
     const { isDirty, isSubmitting } = form.formState;
@@ -171,37 +203,41 @@ export function PayInstructionsSheet({
                         "[&_[data-slot=form-description]]:text-[11.5px] [&_[data-slot=form-description]]:leading-[1.5]",
                     )}
                 >
-                    {FIELDS.map((f) => (
-                        <FormField
-                            key={f.name}
-                            control={form.control}
-                            name={f.name}
-                            render={({ field }) => (
-                                <FormItem className={f.width}>
-                                    <FormLabel>{f.label}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            inputMode={f.inputMode}
-                                            autoCapitalize={f.autoCapitalize}
-                                            placeholder={f.placeholder}
-                                            className={cn(
-                                                f.mono && "font-mono",
-                                            )}
-                                        />
-                                    </FormControl>
-                                    {f.hint ? (
-                                        <FormDescription>
-                                            {f.hint}
-                                        </FormDescription>
-                                    ) : null}
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    ))}
+                    {(edition === "GLOBAL" ? GLOBAL_FIELDS : FIELDS).map(
+                        (f) => (
+                            <FormField
+                                key={f.name}
+                                control={form.control}
+                                name={f.name}
+                                render={({ field }) => (
+                                    <FormItem className={f.width}>
+                                        <FormLabel>{f.label}</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                inputMode={f.inputMode}
+                                                autoCapitalize={
+                                                    f.autoCapitalize
+                                                }
+                                                placeholder={f.placeholder}
+                                                className={cn(
+                                                    f.mono && "font-mono",
+                                                )}
+                                            />
+                                        </FormControl>
+                                        {f.hint ? (
+                                            <FormDescription>
+                                                {f.hint}
+                                            </FormDescription>
+                                        ) : null}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        ),
+                    )}
                     <FormField
                         control={form.control}
                         name="note"
@@ -229,7 +265,7 @@ export function PayInstructionsSheet({
                     placement="in-sheet"
                     live={isDirty}
                     businessName={businessName}
-                    preview={payPreviewOf(live)}
+                    preview={payPreviewOf(live, edition)}
                 />
             </FormSheet>
         </Form>

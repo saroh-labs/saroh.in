@@ -53,3 +53,27 @@ describe("howToPayLines (#833)", () => {
         ).toEqual(["UPI: rye@okhdfc"]);
     });
 });
+
+describe("howToPayLines for a Global business (DEC-204)", () => {
+    it("says Bank code, leaves out a UPI ID, and takes no code at all", () => {
+        const global = {
+            ...PAY,
+            edition: "GLOBAL" as const,
+            bankAccountNumber: "GB82WEST12345698765432",
+            bankIfsc: "12-34-56",
+            bankName: "Example Bank",
+        };
+        expect(howToPayLines({ standing: "ISSUED" }, global)).toEqual([
+            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Bank code 12-34-56 · Example Bank",
+            "Put the invoice number in the note.",
+        ]);
+        expect(
+            howToPayLines(
+                { standing: "ISSUED" },
+                { ...global, bankIfsc: null },
+            )?.[0],
+        ).toBe(
+            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Example Bank",
+        );
+    });
+});

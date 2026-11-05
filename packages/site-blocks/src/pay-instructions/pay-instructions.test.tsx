@@ -259,3 +259,60 @@ describe("PayInstructionsCard", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("a Global business's card (DEC-204)", () => {
+    const GLOBAL: PayInstructions = {
+        ...NONE,
+        edition: "GLOBAL",
+        bankAccountName: "Rye Studio",
+        bankAccountNumber: "GB82WEST12345698765432",
+        bankIfsc: "12-34-56",
+        bankName: "Example Bank",
+    };
+
+    it("names the code by edition, with no IFSC, UPI or QR, even with a stray UPI ID", () => {
+        const { container } = render(
+            <PayInstructionsCard
+                instructions={{ ...GLOBAL, upiId: UPI }}
+                businessName="Rye"
+            />,
+        );
+        const text = container.textContent;
+        expect(text).toContain("Bank code");
+        expect(text).toContain("12-34-56");
+        expect(text).toContain("Account number or IBAN");
+        expect(text).toContain("GB82 WEST 1234 5698 7654 32");
+        expect(text).not.toContain("IFSC");
+        expect(text).not.toContain("UPI");
+        expect(screen.queryByTestId("upi-qr")).toBeNull();
+    });
+
+    it("draws whole details without a code, and leaves that row out", () => {
+        const { container } = render(
+            <PayInstructionsCard
+                instructions={{ ...GLOBAL, bankIfsc: null }}
+                businessName="Rye"
+            />,
+        );
+        expect(container.textContent).toContain("Pay by bank transfer");
+        expect(container.textContent).not.toContain("Bank code");
+    });
+
+    it("reads the API's answer without a code, and ignores a UPI ID", () => {
+        const read = payInstructionsOf({
+            ...GLOBAL,
+            upiId: UPI,
+            bankIfsc: null,
+        });
+        expect(read?.bankAccountNumber).toBe("GB82WEST12345698765432");
+        expect(read?.upiId).toBeNull();
+        expect(payWaysText(read)).toBe("bank transfer");
+        expect(hasPayInstructions(read)).toBe(true);
+    });
+
+    it("still drops details with no name on the account", () => {
+        expect(
+            payInstructionsOf({ ...GLOBAL, bankAccountName: null }),
+        ).toBeNull();
+    });
+});

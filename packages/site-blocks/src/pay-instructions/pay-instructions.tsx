@@ -34,7 +34,8 @@ export interface PayInstructionsCardProps {
  * (R32): the business's UPI ID as a scannable UPI QR with a copy button and,
  * on a phone, a link that opens their UPI app; bank details with a copy
  * button on each; the business's note. Only what is set is drawn, and a
- * business that set nothing gets nothing — the page keeps its own line.
+ * business that set nothing gets nothing — the page keeps its own line. A
+ * Global business has no UPI, and its bank code is optional and named as such.
  *
  * Merchant chrome in the `--site-*` layer, never Saroh's. The QR itself is
  * black on white whatever the theme: a scanner reads dark modules on a light
@@ -52,9 +53,12 @@ export function PayInstructionsCard({
 }: PayInstructionsCardProps) {
     const headingId = useId();
     if (!hasPayInstructions(instructions)) return null;
-    const { upiId, bankAccountName, bankAccountNumber, bankIfsc, bankName } =
+    const { bankAccountName, bankAccountNumber, bankIfsc, bankName } =
         instructions;
-    const bank = bankAccountNumber && bankIfsc ? bankAccountNumber : null;
+    const global = instructions.edition === "GLOBAL";
+    const upiId = global ? null : instructions.upiId;
+    const bank =
+        bankAccountNumber && (bankIfsc || global) ? bankAccountNumber : null;
     const uri = upiId
         ? upiPayUri({
               upiId,
@@ -114,7 +118,7 @@ export function PayInstructionsCard({
                 </div>
             ) : null}
 
-            {bank && bankIfsc ? (
+            {bank ? (
                 <div
                     className={cn(
                         "mt-4",
@@ -132,14 +136,30 @@ export function PayInstructionsCard({
                             />
                         ) : null}
                         <CopyRow
-                            label="Account number"
-                            spoken="account number"
+                            label={
+                                global
+                                    ? "Account number or IBAN"
+                                    : "Account number"
+                            }
+                            spoken={
+                                global
+                                    ? "account number or IBAN"
+                                    : "account number"
+                            }
                             value={bank}
                             shown={groupedAccount(bank)}
                             mono
                             asFact
                         />
-                        <CopyRow label="IFSC" value={bankIfsc} mono asFact />
+                        {bankIfsc ? (
+                            <CopyRow
+                                label={global ? "Bank code" : "IFSC"}
+                                spoken={global ? "bank code" : "IFSC"}
+                                value={bankIfsc}
+                                mono
+                                asFact
+                            />
+                        ) : null}
                         {bankName ? (
                             <Fact label="Bank" value={bankName} />
                         ) : null}

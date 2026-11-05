@@ -11,6 +11,7 @@ import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import {
     accountLabel,
+    payBankSet,
     payPreviewOf,
     payValuesOf,
 } from "@/lib/organizations/pay-instructions";
@@ -26,8 +27,14 @@ export const PAY_SECTION = {
     lead: "UPI and bank details for customers who pay you directly",
 } as const;
 
+/** A Global business has no UPI: the words and the row go with it. */
+const GLOBAL_LEAD = "Bank details for customers who pay you directly";
+
 const NOTE =
     "Shown to customers on invoices and unpaid orders, so they can pay you by UPI or bank transfer. Only someone looking at their own invoice, order or booking sees them.";
+
+const GLOBAL_NOTE =
+    "Shown to customers on invoices and unpaid orders, so they can pay you by bank transfer. Only someone looking at their own invoice, order or booking sees them.";
 
 /** The three rows; each opens the one sheet and takes the keyboard back. */
 const ROW_EDIT = {
@@ -63,8 +70,9 @@ export function PayInstructionsSection({
     onSaved: (next: OrganizationSettings) => void;
     offerUndo: OfferUndo;
 }) {
+    const global = saved?.edition === "GLOBAL";
     const bank =
-        saved?.bankAccountNumber && saved.bankIfsc
+        saved?.bankAccountNumber && payBankSet(saved)
             ? [
                   saved.bankAccountName,
                   accountLabel(saved.bankAccountNumber),
@@ -95,31 +103,35 @@ export function PayInstructionsSection({
             >
                 <BusinessRows
                     title={PAY_SECTION.title}
-                    lead={PAY_SECTION.lead}
-                    note={NOTE}
+                    lead={global ? GLOBAL_LEAD : PAY_SECTION.lead}
+                    note={global ? GLOBAL_NOTE : NOTE}
                 >
+                    {global ? null : (
+                        <Row
+                            id={BUSINESS_ROW_ID.pay}
+                            label="UPI ID"
+                            action={edit(
+                                ROW_EDIT.upi,
+                                Boolean(saved?.upiId),
+                                "UPI ID",
+                                "Add UPI ID",
+                            )}
+                        >
+                            {saved?.upiId ? (
+                                <span className="block font-mono [overflow-wrap:anywhere]">
+                                    {saved.upiId}
+                                </span>
+                            ) : (
+                                <Absent>Not set</Absent>
+                            )}
+                        </Row>
+                    )}
                     <Row
-                        id={BUSINESS_ROW_ID.pay}
-                        label="UPI ID"
-                        action={edit(
-                            ROW_EDIT.upi,
-                            Boolean(saved?.upiId),
-                            "UPI ID",
-                            "Add UPI ID",
-                        )}
-                    >
-                        {saved?.upiId ? (
-                            <span className="block font-mono [overflow-wrap:anywhere]">
-                                {saved.upiId}
-                            </span>
-                        ) : (
-                            <Absent>Not set</Absent>
-                        )}
-                    </Row>
-                    <Row
+                        // With no UPI row, the first row is where a link lands.
+                        id={global ? BUSINESS_ROW_ID.pay : undefined}
                         label="Bank transfer"
                         action={edit(
-                            ROW_EDIT.bank,
+                            global ? ROW_EDIT.upi : ROW_EDIT.bank,
                             bank !== "",
                             "bank details",
                             "Add bank details",
@@ -156,7 +168,7 @@ export function PayInstructionsSection({
             <PayPreview
                 live={false}
                 businessName={businessName}
-                preview={payPreviewOf(payValuesOf(saved))}
+                preview={payPreviewOf(payValuesOf(saved), saved?.edition)}
             />
 
             {/* The open sheet, a fresh draft each time it opens. */}

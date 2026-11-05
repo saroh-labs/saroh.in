@@ -289,6 +289,181 @@ describe("payWaysWords (R32)", () => {
     });
 });
 
+describe("a Global business's pay instructions (DEC-204)", () => {
+    const write = (input: Parameters<typeof payInstructionsWrite>[0]) =>
+        payInstructionsWrite(input, null, "GLOBAL");
+    const bank = { bankAccountName: "Example Traders" };
+    const refusal = (fn: () => unknown) => {
+        try {
+            fn();
+        } catch (e) {
+            return (e as BadRequestException).getResponse();
+        }
+        throw new Error("It was not refused");
+    };
+
+    it("accepts an IBAN, spaces removed and in capitals, with no bank code", () => {
+        expect(
+            write({
+                ...bank,
+                bankAccountNumber: "gb82 west 1234 5698 7654 32",
+            }),
+        ).toEqual({
+            payBankAccountName: "Example Traders",
+            payBankAccountNumber: "GB82WEST12345698765432",
+        });
+    });
+
+    it("accepts a US account and routing number, and a UK account and sort code", () => {
+        expect(
+            write({
+                ...bank,
+                bankAccountNumber: "000123456789",
+                bankIfsc: "021000021",
+            }),
+        ).toMatchObject({
+            payBankAccountNumber: "000123456789",
+            payBankIfsc: "021000021",
+        });
+        expect(
+            write({
+                ...bank,
+                bankAccountNumber: "12345678",
+                bankIfsc: " 12-34-56 ",
+            }),
+        ).toMatchObject({
+            payBankAccountNumber: "12345678",
+            payBankIfsc: "12-34-56",
+        });
+    });
+
+    it("refuses a UPI ID on its field, and in the account number's", () => {
+        expect(refusal(() => write({ upiId: "asha@okexample" }))).toMatchObject(
+            { details: { field: "upiId" } },
+        );
+        expect(
+            refusal(() =>
+                write({ ...bank, bankAccountNumber: "asha@okexample" }),
+            ),
+        ).toMatchObject({ details: { field: "bankAccountNumber" } });
+    });
+
+    it("lets a stale UPI ID be cleared", () => {
+        expect(write({ upiId: "" })).toEqual({ payUpiId: null });
+    });
+
+    it.each([
+        ["bankAccountNumber", "not an account"],
+        ["bankAccountNumber", "12-34-56-78"],
+        ["bankAccountNumber", "1".repeat(35)],
+        ["bankIfsc", "???"],
+        ["bankIfsc", "---"],
+        ["bankIfsc", "1".repeat(35)],
+    ] as const)("refuses %s of %s", (field, value) => {
+        expect(normalisePayField(field, value, "GLOBAL")).toHaveProperty(
+            "problem",
+        );
+    });
+
+    it("takes 34 characters, once an account's spaces are removed", () => {
+        expect(
+            normalisePayField(
+                "bankAccountNumber",
+                `${"1".repeat(30)} ${"2".repeat(4)}`,
+                "GLOBAL",
+            ),
+        ).toEqual({ value: `${"1".repeat(30)}${"2".repeat(4)}` });
+    });
+
+    it("still wants the name and the number together", () => {
+        expect(
+            refusal(() => write({ bankAccountNumber: "12345678" })),
+        ).toMatchObject({ details: { field: "bankAccountName" } });
+        expect(refusal(() => write(bank))).toMatchObject({
+            details: { field: "bankAccountNumber" },
+        });
+    });
+
+    it("shows a customer no UPI ID, and whole details without a code", () => {
+        expect(
+            publicPayInstructions({
+                organization: { edition: "GLOBAL" },
+                payUpiId: "asha@okexample",
+                payBankAccountName: "Example Traders",
+                payBankAccountNumber: "12345678",
+                payBankIfsc: null,
+                payBankName: null,
+                payNote: null,
+            }),
+        ).toEqual({
+            upiId: null,
+            bankAccountName: "Example Traders",
+            bankAccountNumber: "12345678",
+            bankIfsc: null,
+            bankName: null,
+            note: null,
+            edition: "GLOBAL",
+        });
+    });
+
+    it("says only bank transfer in the invoice email's words", () => {
+        expect(
+            payWaysWords(
+                publicPayInstructions({
+                    organization: { edition: "GLOBAL" },
+                    payUpiId: "asha@okexample",
+                    payBankAccountName: "Example Traders",
+                    payBankAccountNumber: "12345678",
+                }),
+            ),
+        ).toBe("by bank transfer");
+    });
+
+    it("leaves India's rules as they were", () => {
+        expect(
+            normalisePayField("bankAccountNumber", "12345678", "INDIA"),
+        ).toEqual({ problem: "An account number is 9 to 18 digits." });
+        expect(
+            normalisePayField("bankIfsc", "021000021", "INDIA"),
+        ).toHaveProperty("problem");
+        expect(
+            refusal(() =>
+                payInstructionsWrite(
+                    { ...bank, bankAccountNumber: "123456789012" },
+                    null,
+                    "INDIA",
+                ),
+            ),
+        ).toMatchObject({ details: { field: "bankIfsc" } });
+    });
+
+    it("the save goes by the business's edition, not by anything sent", async () => {
+        const service = new OrganizationSettingsService(
+            { record: jest.fn() } as unknown as AuditService,
+            {} as MediaService,
+        );
+        profileFindUnique.mockResolvedValue(null);
+        const ctx = {
+            organizationId: "org_1",
+            userId: "user_1",
+            role: "OWNER" as const,
+            edition: "GLOBAL" as const,
+        };
+        await expect(
+            service.update(ctx, {
+                payInstructions: { upiId: "asha@okexample" },
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(
+            await validate(
+                plainToInstance(UpdateOrganizationDto, {
+                    payInstructions: { bankIfsc: "1".repeat(34) },
+                }),
+            ),
+        ).toEqual([]);
+    });
+});
+
 describe("UpdateOrganizationDto.payInstructions", () => {
     it("takes the six text fields and refuses anything else", async () => {
         const ok = plainToInstance(UpdateOrganizationDto, {
@@ -333,6 +508,25 @@ describe("OrganizationSettingsService: how to pay us (R32)", () => {
                 payUpiId: UPI,
             },
         });
+    });
+
+    it("tells the sheet a Global business's edition, and says nothing for India", async () => {
+        const india = await service.update(ctx(), {
+            payInstructions: { note: "Thanks" },
+        });
+        expect(india.payInstructions).not.toHaveProperty("edition");
+        orgFindUnique.mockResolvedValue({
+            id: "org_1",
+            name: "Rye",
+            slug: "rye",
+            edition: "GLOBAL",
+            businessProfile: null,
+        });
+        const global = await service.update(
+            { ...ctx(), edition: "GLOBAL" },
+            { payInstructions: { note: "Thanks" } },
+        );
+        expect(global.payInstructions.edition).toBe("GLOBAL");
     });
 
     it("saves for an Owner or Admin, and audits by name only", async () => {

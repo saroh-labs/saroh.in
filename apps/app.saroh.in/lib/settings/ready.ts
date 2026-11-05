@@ -346,9 +346,11 @@ function howToPay(
     if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
     const pay = settings.payInstructions;
     if (!pay) return null;
+    // A Global business has no UPI, and its bank code is optional.
+    const global = pay.edition === "GLOBAL";
     const set =
-        filled(pay.upiId) ||
-        (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
+        (!global && filled(pay.upiId)) ||
+        (filled(pay.bankAccountNumber) && (global || filled(pay.bankIfsc)));
     return {
         key: "howToPay",
         label: "Tell customers how to pay you",

@@ -130,7 +130,9 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
             return {
                 title: "How to pay us",
                 description:
-                    "UPI and bank details for customers who pay you directly.",
+                    EDITION === "GLOBAL"
+                        ? "Bank details for customers who pay you directly."
+                        : "UPI and bank details for customers who pay you directly.",
             };
         case "hours":
             return {

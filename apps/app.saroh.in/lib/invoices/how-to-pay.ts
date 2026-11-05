@@ -1,4 +1,5 @@
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
+import { accountLabel } from "@/lib/organizations/pay-instructions";
 
 import type { InvoiceStanding } from "./service";
 
@@ -17,13 +18,19 @@ export function howToPayLines(
     const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
     if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
     const lines: string[] = [];
-    if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
-    if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {
+    const global = pay.edition === "GLOBAL";
+    if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);
+    if (
+        pay.bankAccountNumber &&
+        (pay.bankIfsc || global) &&
+        pay.bankAccountName
+    ) {
         lines.push(
             [
                 `Bank transfer: ${pay.bankAccountName}`,
-                `A/c ${pay.bankAccountNumber.replace(/(\d{4})(?=\d)/g, "$1 ")}`,
-                `IFSC ${pay.bankIfsc}`,
+                `${global ? "Account" : "A/c"} ${accountLabel(pay.bankAccountNumber)}`,
+                pay.bankIfsc &&
+                    `${global ? "Bank code" : "IFSC"} ${pay.bankIfsc}`,
                 pay.bankName,
             ]
                 .filter(Boolean)

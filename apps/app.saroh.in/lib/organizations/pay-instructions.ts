@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import { z } from "zod";
 
 /**
@@ -5,7 +6,8 @@ import { z } from "zod";
  * customers see on their own unpaid invoices, orders and desk bookings.
  * The API is the judge (`organizations/business-pay-instructions.ts`
  * there); this says the same rules on each field as the merchant types, so
- * Save isn't the first to know. Pure.
+ * Save isn't the first to know. Pure. A Global business (DEC-204) has no UPI
+ * and an optional bank code, kept in `bankIfsc`; the API sends its `edition`.
  */
 
 /** The settings read's `payInstructions`: every field, null until set. */
@@ -16,9 +18,10 @@ export interface PayInstructionsSettings {
     bankIfsc: string | null;
     bankName: string | null;
     note: string | null;
+    edition?: "GLOBAL";
 }
 
-export type PayField = keyof PayInstructionsSettings;
+export type PayField = Exclude<keyof PayInstructionsSettings, "edition">;
 
 export const PAY_FIELDS: readonly PayField[] = [
     "upiId",
@@ -35,6 +38,8 @@ export type PayValues = Record<PayField, string>;
 const UPI_ID = /^[a-z0-9][a-z0-9._-]{1,255}@[a-z][a-z0-9.-]{1,63}$/;
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_NUMBER = /^\d{9,18}$/;
+const GLOBAL_ACCOUNT = /^(?=.*\d)[A-Z0-9]{1,34}$/;
+const GLOBAL_BANK_CODE = /^(?=.*[A-Z0-9])[A-Z0-9 -]{1,34}$/;
 
 export const MAX_ACCOUNT_NAME = 100;
 export const MAX_BANK_NAME = 100;
@@ -44,8 +49,18 @@ export const UPI_EXAMPLE = "yourname@okhdfc";
 export const IFSC_EXAMPLE = "HDFC0001234";
 
 /** As stored: the UPI ID lower-cased, the number digits only, IFSC capitals. */
-export function payStored(field: PayField, typed: string): string {
+export function payStored(
+    field: PayField,
+    typed: string,
+    edition: Edition = "INDIA",
+): string {
     const trimmed = typed.trim();
+    if (edition === "GLOBAL") {
+        if (field === "bankAccountNumber")
+            return trimmed.replace(/\s/g, "").toUpperCase();
+        if (field === "bankIfsc")
+            return trimmed.replace(/\s+/g, " ").toUpperCase();
+    }
     switch (field) {
         case "upiId":
             return trimmed.toLowerCase();
@@ -59,9 +74,26 @@ export function payStored(field: PayField, typed: string): string {
 }
 
 /** What is wrong with one typed value on its own, or null. */
-export function payFieldProblem(field: PayField, typed: string): string | null {
-    const value = payStored(field, typed);
+export function payFieldProblem(
+    field: PayField,
+    typed: string,
+    edition: Edition = "INDIA",
+): string | null {
+    const value = payStored(field, typed, edition);
     if (value === "") return null;
+    if (edition === "GLOBAL") {
+        if (field === "upiId") return "UPI only works for a business in India.";
+        if (field === "bankAccountNumber") {
+            return GLOBAL_ACCOUNT.test(value)
+                ? null
+                : "That isn't an account number or IBAN. Use letters, digits and spaces, up to 34 characters.";
+        }
+        if (field === "bankIfsc") {
+            return GLOBAL_BANK_CODE.test(value)
+                ? null
+                : "That isn't a bank code. Use letters, digits, spaces and hyphens, up to 34 characters.";
+        }
+    }
     switch (field) {
         case "upiId":
             return UPI_ID.test(value)
@@ -98,8 +130,9 @@ export function payFieldProblem(field: PayField, typed: string): string | null {
  */
 export function bankProblem(
     v: PayValues,
+    edition: Edition = "INDIA",
 ): { field: PayField; message: string } | null {
-    const has = (f: PayField) => payStored(f, v[f]) !== "";
+    const has = (f: PayField) => payStored(f, v[f], edition) !== "";
     const any =
         has("bankAccountName") ||
         has("bankAccountNumber") ||
@@ -115,10 +148,13 @@ export function bankProblem(
     if (!has("bankAccountNumber")) {
         return {
             field: "bankAccountNumber",
-            message: "Add the account number, or clear the bank details.",
+            message:
+                edition === "GLOBAL"
+                    ? "Add the account number or IBAN, or clear the bank details."
+                    : "Add the account number, or clear the bank details.",
         };
     }
-    if (!has("bankIfsc")) {
+    if (edition !== "GLOBAL" && !has("bankIfsc")) {
         return {
             field: "bankIfsc",
             message:
@@ -128,39 +164,53 @@ export function bankProblem(
     return null;
 }
 
-const field = (name: PayField) =>
-    z.string().superRefine((value, ctx) => {
-        const problem = payFieldProblem(name, value);
-        if (problem) ctx.addIssue({ code: "custom", message: problem });
-    });
-
 /** The form's schema: each field's shape, then the bank details whole. */
-export const payInstructionsSchema = z
-    .object({
-        upiId: field("upiId"),
-        bankAccountName: field("bankAccountName"),
-        bankAccountNumber: field("bankAccountNumber"),
-        bankIfsc: field("bankIfsc"),
-        bankName: field("bankName"),
-        note: field("note"),
-    })
-    .superRefine((v, ctx) => {
-        const problem = bankProblem(v);
-        if (problem) {
-            ctx.addIssue({
-                code: "custom",
-                path: [problem.field],
-                message: problem.message,
-            });
-        }
-    });
+export function payInstructionsSchemaOf(edition: Edition = "INDIA") {
+    const field = (name: PayField) =>
+        z.string().superRefine((value, ctx) => {
+            const problem = payFieldProblem(name, value, edition);
+            if (problem) ctx.addIssue({ code: "custom", message: problem });
+        });
+    return z
+        .object({
+            upiId: field("upiId"),
+            bankAccountName: field("bankAccountName"),
+            bankAccountNumber: field("bankAccountNumber"),
+            bankIfsc: field("bankIfsc"),
+            bankName: field("bankName"),
+            note: field("note"),
+        })
+        .superRefine((v, ctx) => {
+            const problem = bankProblem(v, edition);
+            if (problem) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: [problem.field],
+                    message: problem.message,
+                });
+            }
+        });
+}
+
+export const payInstructionsSchema = payInstructionsSchemaOf();
+
+/** Enough bank details to pay into: a Global business's code is optional. */
+export function payBankSet(
+    pay: PayInstructionsSettings | null | undefined,
+): boolean {
+    return !!(
+        pay?.bankAccountNumber &&
+        (!!pay.bankIfsc || pay.edition === "GLOBAL")
+    );
+}
 
 /** The form's starting values from the settings read (absent: none). */
 export function payValuesOf(
     saved: PayInstructionsSettings | null | undefined,
 ): PayValues {
     return {
-        upiId: saved?.upiId ?? "",
+        // A Global business has no such field, whatever an older save left.
+        upiId: saved?.edition === "GLOBAL" ? "" : (saved?.upiId ?? ""),
         bankAccountName: saved?.bankAccountName ?? "",
         bankAccountNumber: saved?.bankAccountNumber ?? "",
         bankIfsc: saved?.bankIfsc ?? "",
@@ -177,10 +227,14 @@ export function payInputOf(
     values: PayValues,
     saved: PayInstructionsSettings | null | undefined,
 ): Partial<PayValues> {
+    const edition = saved?.edition ?? "INDIA";
     const before = payValuesOf(saved);
     const input: Partial<PayValues> = {};
     for (const f of PAY_FIELDS) {
-        if (payStored(f, values[f]) !== payStored(f, before[f])) {
+        if (
+            payStored(f, values[f], edition) !==
+            payStored(f, before[f], edition)
+        ) {
             input[f] = values[f].trim();
         }
     }
@@ -191,10 +245,13 @@ export function payInputOf(
  * What the customer's card would show for these values — as the API would
  * store them, a field that isn't valid yet left out — for the live preview.
  */
-export function payPreviewOf(values: PayValues): PayInstructionsSettings {
+export function payPreviewOf(
+    values: PayValues,
+    edition: Edition = "INDIA",
+): PayInstructionsSettings {
     const clean = (f: PayField) => {
-        const v = payStored(f, values[f]);
-        return v !== "" && !payFieldProblem(f, values[f]) ? v : null;
+        const v = payStored(f, values[f], edition);
+        return v !== "" && !payFieldProblem(f, values[f], edition) ? v : null;
     };
     return {
         upiId: clean("upiId"),
@@ -203,20 +260,21 @@ export function payPreviewOf(values: PayValues): PayInstructionsSettings {
         bankIfsc: clean("bankIfsc"),
         bankName: clean("bankName"),
         note: clean("note"),
+        ...(edition === "GLOBAL" ? { edition } : {}),
     };
 }
 
-/** "1234 5678 9012", for reading back an account number. */
+/** "1234 5678 9012", for reading back an account number or IBAN. */
 export function accountLabel(stored: string | null | undefined): string {
-    return stored ? stored.replace(/(\d{4})(?=\d)/g, "$1 ") : "";
+    return stored ? stored.replace(/([0-9A-Z]{4})(?=[0-9A-Z])/g, "$1 ") : "";
 }
 
 /** Which ways a customer can pay, in a line, for the card's summary. */
 export function payWaysSummary(
     saved: PayInstructionsSettings | null | undefined,
 ): string {
-    const upi = !!saved?.upiId;
-    const bank = !!(saved?.bankAccountNumber && saved.bankIfsc);
+    const upi = !!saved?.upiId && saved.edition !== "GLOBAL";
+    const bank = payBankSet(saved);
     if (upi && bank) return "UPI and bank transfer";
     if (upi) return "UPI";
     if (bank) return "Bank transfer";

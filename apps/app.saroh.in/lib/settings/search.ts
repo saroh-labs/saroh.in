@@ -4,6 +4,7 @@ import {
     settingsPagesFor,
 } from "@/components/shared/navigation/nav-items";
 import { mayChangePlan } from "@/lib/billing/plan-access";
+import { EDITION } from "@/lib/edition";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
@@ -140,7 +141,25 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         ...business("How to pay us", "pay"),
         // What customers pay with when the business doesn't take payment
         // online (R32).
-        words: ["UPI", "UPI ID", "QR", "Bank details", "IFSC", "Bank transfer"],
+        words:
+            EDITION === "GLOBAL"
+                ? [
+                      "Bank details",
+                      "Bank transfer",
+                      "IBAN",
+                      "Account number",
+                      "Sort code",
+                      "Routing number",
+                      "SWIFT",
+                  ]
+                : [
+                      "UPI",
+                      "UPI ID",
+                      "QR",
+                      "Bank details",
+                      "IFSC",
+                      "Bank transfer",
+                  ],
     },
     {
         ...business("Registered address", "address"),
