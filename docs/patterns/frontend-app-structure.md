@@ -258,10 +258,16 @@ business's own trackers would need listing first.
 - **A /for/ trade page is one file in `@saroh/search-pages`** (DEC-193):
   `content/for/<slug>.mdx`, YAML frontmatter (the words, then the sample
   business under `scene`) and the questions as `## question` + plain
-  answer paragraphs. After editing one, run
+  answer paragraphs. `searchWords` holds the owner's other words for the trade
+  ("dentist teeth"), which the `/for` hub's search reads. After editing one, run
   `pnpm --filter @saroh/search-pages content`: the files are embedded in
   `src/content.gen.ts` because the admin preview runs on Workers (no file
-  system, no eval), and a test fails while that copy is stale.
+  system, no eval), and a test fails while that copy is stale. That copy
+  is `@saroh/search-pages/embedded`, admin's only: the package's root has
+  no words (`createSearchPagesLoader`), and saroh.in reads its build's own
+  copy, live pages only in production (`lib/search-pages.ts`
+  `searchPages`, written by `docs-content.config.ts`; DEC-193 amendment,
+  1 Nov).
   `searchPageChecks` (gen.py's data checks) must pass for every page. Both
   apps draw it with `<SearchPage>` and import
   `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
@@ -272,13 +278,31 @@ business's own trackers would need listing first.
   (name, group, line, search, title, description, updated, h1, lead,
   phoneLead, how/howPhone, ctaTitle/ctaLine, then the questions) and a
   default-exported client component in `src/tools/<slug>/index.tsx`,
-  one line in `src/tools/registry.ts`. Build it from `src/tools/parts.tsx`
+  one line in `src/tools/registry.ts` (admin's, `EveryToolSlot`).
+  `<ToolPage>` takes the tool as its `tool` prop: saroh.in passes
+  `SiteToolSlot`, which draws from the registry its build writes
+  (`lib/tool-registry.gen.ts`, one `@saroh/search-pages/tools/<slug>`
+  import per tool it carries), so a draft tool's code is in no
+  production chunk. A component never imports another tool's
+  `index.tsx`. Build it from `src/tools/parts.tsx`
   and put the file behind the one `<EmailGate>` (the email is all that
   leaves the browser; saroh.in sends it to the QR code maker's unlock
   route through `SiteToolGate`). `toolChecks` must pass. saroh.in draws it
   at `/tools/<slug>` with `<ToolPage>`; the two app tools (`inApp: true`)
   keep their own routes and obey the same publish list
   (`PublishContext.live`). Copy `no-show-cost-calculator` for a new one.
+- **A new search-page group (GST pages, guides, downloads; DEC-201) is one
+  entry in `packages/search-pages/kinds.js`**, a frontmatter schema in
+  `src/kinds/<group>-schema.ts`, a template built only from the shared
+  blocks (`src/components/BLOCKS.md`), and a route through the route kit
+  (`lib/search-page-route.ts`: params, metadata, JSON-LD, share card,
+  related). /for/ and /tools/ stay off the list. Pages are
+  `content/<group>/<slug>.mdx`; run the package's content embed after an
+  edit. A production build carries only live pages' words and files
+  (`docs-content.config.ts`); a live page whose checks fail is held out
+  with a warning, never a failed build. `/sitemap.xml` is an index of one
+  sitemap per group (`lib/sitemaps.ts`). In admin, Publish only stages;
+  Deploy changes rebuilds once for every staged page.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;
@@ -302,7 +326,7 @@ business's own trackers would need listing first.
   browser**, through `readAddress` (`lib/page-address.ts`), so the page
   stays one built file: the waitlist form, the link preview tool.
 - **A screenshot is files with a `srcset`**, never `next/image`
-  (`components/shared/media/shot-image.tsx`). After a capture run
+  (`@saroh/marketing/shot-image`, sized by `apps/saroh.in/lib/shot-sources.ts`). After a capture run
   `pnpm --filter web shots:sizes --force`.
 - **Files Cloudflare serves without the Worker take their headers from
   `public/_headers`**: caching for `/_next/static/*` and `/shots/*`, and

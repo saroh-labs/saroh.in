@@ -144,4 +144,22 @@ describe("HealthService readiness", () => {
         expect(JSON.stringify(report)).not.toContain("hunter2");
         expect(JSON.stringify(report)).not.toContain(secret);
     });
+
+    it("never sends a database driver's message, which names the host", async () => {
+        const driver = Object.assign(
+            new Error("Can't reach database server at `db.internal:5432`"),
+            { name: "PrismaClientInitializationError" },
+        );
+        const db = {
+            $queryRaw: jest.fn().mockRejectedValue(driver),
+            job: { count: jest.fn().mockResolvedValue(0) },
+        } as unknown as Db;
+
+        const report = await new HealthService(db).readiness();
+
+        expect(JSON.stringify(report)).not.toContain("db.internal");
+        expect(report.checks.find((c) => c.name === "database")?.detail).toBe(
+            "unreachable",
+        );
+    });
 });

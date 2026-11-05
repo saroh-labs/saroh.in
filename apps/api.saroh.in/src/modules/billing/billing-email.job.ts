@@ -3,7 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { withGstPaise } from "@saroh/pricing-catalog";
 
-import { appBase } from "../../common/app-url";
+import { appBaseOf } from "../../common/app-url";
 import type { EmailOutcome, SarohBillingEmail } from "../../common/email";
 import { sendSarohBillingEmail } from "../../common/email";
 import { dayWords, moneyWordsMinor } from "../../common/words-format";
@@ -195,12 +195,12 @@ export class BillingEmailHandler {
             // 3 days before an autopay charge (#804), re-read as the sweep
             // read it (`renewal-reminder.ts`).
             const key = `saroh-billing:renewal:${p.subscriptionId}:${p.renewsAt}`;
-            return this.once(job, p.organizationId, key, () =>
+            return this.once(job, p.organizationId, key, async () =>
                 composeRenewalReminder(
                     prisma,
                     p,
                     new Date(),
-                    `${appBase()}/settings/billing`,
+                    `${await appBaseOf(p.organizationId)}/settings/billing`,
                 ),
             );
         }
@@ -433,7 +433,7 @@ export class BillingEmailHandler {
                 changesOn: day(change.pendingFrom),
                 now: priceWords(change.fromPaise, change.interval),
                 next: priceWords(change.toPaise, change.interval),
-                url: `${appBase()}/settings/billing`,
+                url: `${await appBaseOf(p.organizationId)}/settings/billing`,
             });
         });
     }
@@ -476,7 +476,7 @@ export class BillingEmailHandler {
                     ending.nextPricePaise === null
                         ? null
                         : money(ending.nextPricePaise),
-                payUrl: `${appBase()}/settings/billing#change-plan`,
+                payUrl: `${await appBaseOf(p.organizationId)}/settings/billing#change-plan`,
                 chosenFree: ending.chosenFree,
                 pauses: p.pauses,
                 domain: p.domain,
@@ -518,7 +518,7 @@ export class BillingEmailHandler {
                 pausesOn: p.pausesOn,
                 lines: p.lines,
                 domain: p.domain,
-                url: `${appBase()}/settings/billing#change-plan`,
+                url: `${await appBaseOf(p.organizationId)}/settings/billing#change-plan`,
             });
         });
     }
@@ -554,7 +554,7 @@ export class BillingEmailHandler {
                     stopsOn: p.stopsOn,
                     address: p.address,
                 },
-                url: `${appBase()}/settings/billing#change-plan`,
+                url: `${await appBaseOf(p.organizationId)}/settings/billing#change-plan`,
             });
         });
     }

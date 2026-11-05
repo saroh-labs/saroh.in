@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 
 import type { SignedInCustomer } from "@saroh/site-blocks";
 
@@ -259,9 +260,11 @@ export function sessionCustomer(body: unknown): SignedInCustomer | null {
     };
 }
 
-/** Who is signed in on this site, or null. */
-export async function getSignedInCustomer(): Promise<SignedInCustomer | null> {
-    const call = await accountFetch("session");
-    if (!call?.ok || !call.res.ok) return null;
-    return sessionCustomer(await call.res.json().catch(() => null));
-}
+/** Who is signed in on this site, or null. One read per request (`cache`). */
+export const getSignedInCustomer = cache(
+    async (): Promise<SignedInCustomer | null> => {
+        const call = await accountFetch("session");
+        if (!call?.ok || !call.res.ok) return null;
+        return sessionCustomer(await call.res.json().catch(() => null));
+    },
+);

@@ -20,6 +20,7 @@ export const env = createEnv({
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
         NEXT_PUBLIC_BETTER_AUTH_URL: z.url().optional(),
+        NEXT_PUBLIC_EDITION: z.enum(["INDIA", "GLOBAL"]).optional(),
         // Where a verified user is handed off to (app.saroh.in/onboarding).
         // Optional: `lib/app-urls.ts` falls back to the standard dev/prod
         // origins, so a fresh clone needs no extra config.
@@ -50,6 +51,7 @@ export const env = createEnv({
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+        NEXT_PUBLIC_EDITION: process.env.NEXT_PUBLIC_EDITION,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
         NEXT_PUBLIC_SIGNUP_WELCOME_URL:
             process.env.NEXT_PUBLIC_SIGNUP_WELCOME_URL,

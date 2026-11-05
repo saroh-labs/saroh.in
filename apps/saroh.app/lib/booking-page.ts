@@ -98,8 +98,9 @@ export const getBookingVisit = cache(async function bookingVisit(
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`Visit read failed: ${res.status}`);
         const body: unknown = await res.json().catch(() => null);
-        // Narrowed, not cast (#264).
-        return isPublicVisit(body) ? body : null;
+        // Narrowed, not cast (#264). A bad body is a failure, not no facts.
+        if (!isPublicVisit(body)) throw new Error("Visit read failed: shape");
+        return body;
     } catch {
         dontCachePage("visit unavailable");
         return null;

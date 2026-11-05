@@ -29,7 +29,7 @@ import {
 } from "../sites/page-cache-revalidate";
 import type { PublicContact } from "./business-contact";
 import { businessPublicContactOf } from "./business-contact";
-import { refuseCountryOutsideIndia } from "./business-country";
+import { refuseCountryOutsideEdition } from "./business-country";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -258,6 +258,9 @@ const PROFILE_SELECT = {
     deliveryGstRate: true,
     deliverySacCode: true,
     gstPriceMode: true,
+    taxName: true,
+    taxRate: true,
+    yearStartMonth: true,
     logoMediaId: true,
     logoUrl: true,
     addressLine1: true,
@@ -273,6 +276,7 @@ const PROFILE_SELECT = {
 } as const;
 
 interface ProfileRow {
+    yearStartMonth?: number | null;
     legalName: string | null;
     type: string | null;
     country: string | null;
@@ -474,7 +478,7 @@ export class OrganizationSettingsService {
         const typeValue = businessTypeWrite(profileData.type);
         const businessType = typeValue === undefined ? {} : { type: typeValue };
         // Checked and made E.164 before anything is written; "" clears it.
-        const phone = phoneWrite(dto.profile?.phone);
+        const phone = phoneWrite(dto.profile?.phone, ctx.edition);
         const taxSent = {
             tax: dto.tax,
             taxId: profileData.taxId,
@@ -488,9 +492,13 @@ export class OrganizationSettingsService {
               })
             : null;
         // Sending a country always touches tax, so the stored one is read.
-        refuseCountryOutsideIndia(profileData.country, taxCurrent?.country);
+        refuseCountryOutsideEdition(
+            ctx.edition ?? "INDIA",
+            profileData.country,
+            taxCurrent?.country ?? "",
+        );
         const taxData = touchesTax(taxSent)
-            ? taxChanges(taxCurrent, taxSent)
+            ? taxChanges(taxCurrent, taxSent, ctx.edition)
             : {};
         // GST is part of MRP (`products/product-rules.ts`): a save that
         // adds GST to the business's prices is refused while it would take
@@ -909,12 +917,16 @@ export class OrganizationSettingsService {
      */
     private async counters(
         organizationId: string,
-        p: Pick<ProfileRow, "invoicePrefix" | "timezone"> | null,
+        p: Pick<
+            ProfileRow,
+            "invoicePrefix" | "timezone" | "yearStartMonth"
+        > | null,
     ): Promise<Record<NumberRestart, number>> {
         const keys = invoiceSeriesKeys(
             p?.invoicePrefix ?? null,
             new Date(),
             p?.timezone,
+            p?.yearStartMonth,
         );
         const rows = await prisma.invoiceSequence.findMany({
             where: { organizationId, series: { in: Object.values(keys) } },

@@ -32,6 +32,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { merchantApiOnly } from "./common/merchant-api";
 import {
     flushTelemetry,
     installTelemetry,
@@ -110,6 +111,9 @@ async function bootstrap() {
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.
     app.use(correlationIdMiddleware);
+
+    // Merchant sites' address serves its own short list of routes (DEC-204).
+    app.use(merchantApiOnly);
 
     app.use(helmet());
 

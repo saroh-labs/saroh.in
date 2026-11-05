@@ -86,8 +86,8 @@ export function needsRow(item: NeedsYouItem, now: Date = new Date()): NeedsRow {
                         ? "Someone asked for help this week"
                         : `${n} people asked for help this week`,
                 detail: when
-                    ? `From saroh.in/contact · the newest ${when}`
-                    : "From saroh.in/contact",
+                    ? `From the website's contact page · the newest ${when}`
+                    : "From the website's contact page",
                 href: "/messages?topic=help",
                 action: "Read them",
             };

@@ -9,7 +9,7 @@ import type { Prisma } from "@saroh/database";
 
 type Db = Pick<
     Prisma.TransactionClient,
-    "storeSettings" | "store" | "order" | "product"
+    "storeSettings" | "store" | "order" | "product" | "organization"
 >;
 
 /**
@@ -31,8 +31,8 @@ export async function storefrontCurrency(
 /**
  * The business's currency, for a storefront it opens: its first
  * storefront's settings, else the currency its orders were taken in, else
- * the one its products are priced in. Null for a business with none of
- * those yet (its first storefront chooses).
+ * the one its products are priced in, else what it chose at setup. Null for
+ * a business with none of those yet (its first storefront chooses).
  */
 export async function businessCurrency(
     db: Db,
@@ -55,7 +55,12 @@ export async function businessCurrency(
         orderBy: { createdAt: "asc" },
         select: { currency: true },
     });
-    return product?.currency ?? null;
+    if (product) return product.currency;
+    const organization = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { currency: true },
+    });
+    return organization?.currency ?? null;
 }
 
 /** Why a product can't be sold at a storefront in another currency. */

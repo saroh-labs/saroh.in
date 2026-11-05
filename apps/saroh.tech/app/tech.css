@@ -1,0 +1,53 @@
+/* The phone nav and page basics. Tokens are saroh.in's: @saroh/marketing/tokens.css, @saroh/ui/globals.css. */
+/* The phone nav runs to 1100px here, not saroh.in's 760: six items don't fit. */
+@media (max-width: 1099.98px) {
+    :root {
+        --mk-nav-h: 85px;
+    }
+}
+
+html {
+    scroll-padding-top: var(--mk-nav-h);
+    overflow-x: clip;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+}
+
+/* A link in a page looks like one, unless it's a button, a card or a menu item. */
+main a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* saroh.in's ring, on whatever hasn't taken `ring()` yet. */
+:focus-visible {
+    outline: 2px solid hsl(var(--brand-500));
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* Print is the document alone, whichever tab a phone was on. */
+@media print {
+    @page {
+        margin: 12mm;
+    }
+    body * {
+        visibility: hidden;
+    }
+    [data-print],
+    [data-print] * {
+        visibility: visible;
+    }
+    [data-print] {
+        position: absolute;
+        inset: 0 0 auto;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+}

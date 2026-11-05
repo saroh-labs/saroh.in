@@ -1,4 +1,4 @@
-import { siteMoney } from "./money";
+import { moneyLocaleOf, siteMoney } from "./money";
 
 /**
  * The GST words beside a price a customer is about to pay, one way on every
@@ -57,7 +57,7 @@ function money(cents: number, currency: string, locale: string): string {
 export function gstPriceWords(
     gst: GstOnPrice,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     const price = money(gst.listCents, currency, locale);
     return `${price}${gst.mode === "ADDED" ? " " : ", "}${gstNoteWords(gst, currency, locale)}`;
@@ -71,7 +71,7 @@ export function gstPriceWords(
 export function gstNoteWords(
     gst: GstOnPrice,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     const tax = money(gst.gstCents, currency, locale);
     return gst.mode === "ADDED"
@@ -83,7 +83,7 @@ export function gstNoteWords(
 export function gstPayWords(
     gst: GstOnPrice,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     return money(gst.payCents, currency, locale);
 }
@@ -106,7 +106,7 @@ export function browsePriceWords(price: string, gstAdded: boolean): string {
 export function gstLineWords(
     gst: GstOnPrice,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     return gst.mode === "ADDED"
         ? gstPriceWords(gst, currency, locale)
@@ -131,7 +131,7 @@ export function payPriceWords(
     price: string,
     value: unknown,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     const gst = gstOnPriceOf(value);
     return gst?.mode === "ADDED" ? gstPayWords(gst, currency, locale) : price;
@@ -144,7 +144,7 @@ export function payPriceWords(
 export function gstUnderWords(
     value: unknown,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string | null {
     const gst = gstOnPriceOf(value);
     return gst ? startOfLine(gstLineWords(gst, currency, locale)) : null;

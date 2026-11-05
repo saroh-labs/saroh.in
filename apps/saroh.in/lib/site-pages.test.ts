@@ -158,9 +158,14 @@ describe("lastModified", () => {
 });
 
 describe("sitemap.xml", () => {
+    /** Every page across the group sitemaps, as the routes build them. */
+    const allEntries = async () => {
+        const { builtSitemapGroups } = await import("./sitemaps");
+        return [...(await builtSitemapGroups()).values()].flat();
+    };
+
     it("lists the two new pages, on www, with no changefreq or priority", async () => {
-        const { default: sitemap } = await import("@/app/sitemap");
-        const entries = await sitemap();
+        const entries = await allEntries();
         const urls = entries.map((e) => e.url);
         expect(urls).toContain("https://www.saroh.in/features/website");
         expect(urls).toContain("https://www.saroh.in/solutions/salons");
@@ -173,9 +178,8 @@ describe("sitemap.xml", () => {
     });
 
     it("dates the pages that have a date, and only those", async () => {
-        const { default: sitemap } = await import("@/app/sitemap");
         const { lastModified } = await import("./site-pages");
-        const entries = await sitemap();
+        const entries = await allEntries();
         const dated = entries.filter((e) => e.lastModified !== undefined);
         expect(dated.length).toBeGreaterThan(0);
         for (const entry of entries) {

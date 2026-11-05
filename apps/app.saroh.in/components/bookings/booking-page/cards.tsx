@@ -1,8 +1,9 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check, CircleCheck, CircleX, IndianRupee } from "lucide-react";
+import { Check, CircleCheck, CircleX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FRONT_DESK_LINE } from "@/components/bookings/quick-look/quick-look-one";
@@ -215,7 +216,7 @@ export function MoneyCard({
                             label={r.label}
                             icon={
                                 r.key === "left" ? (
-                                    <IndianRupee
+                                    <MoneyIcon
                                         aria-hidden
                                         className="size-[18px]"
                                     />

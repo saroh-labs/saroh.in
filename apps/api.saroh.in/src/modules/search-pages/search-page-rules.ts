@@ -11,13 +11,27 @@ export const SEARCH_PAGE_ACTIONS = [
     "unpublish",
     "archive",
     "restore",
+    "cancel",
 ] as const;
 export type SearchPageAction = (typeof SEARCH_PAGE_ACTIONS)[number];
 
 export type SearchPageStatus = "LIVE" | "UNPUBLISHED" | "ARCHIVED" | "DRAFT";
 
-/** `/for/<slug>` (trade pages) or `/tools/<slug>` (free tools, #1253). */
-export const SEARCH_PAGE_PATH = /^\/(for|tools)\/[a-z0-9-]+$/;
+/**
+ * The page groups on the shared page kit, a copy of the ids in
+ * `packages/search-pages/kinds.js`: the API runs built JS and that package
+ * has no build. `packages/search-pages/src/kinds.test.ts` reads this line
+ * as text and fails when the two differ.
+ */
+export const DOC_KIND_IDS = ["gst", "guides", "downloads"] as const;
+
+/**
+ * `/for/<slug>` (trade pages), `/tools/<slug>` (free tools, #1253) or
+ * `/<group>/<slug>` for a group above.
+ */
+export const SEARCH_PAGE_PATH = new RegExp(
+    `^/(for|tools|${DOC_KIND_IDS.join("|")})/[a-z0-9-]+$`,
+);
 
 /** At most this many paths in one action. */
 export const MAX_PATHS_PER_ACTION = 100;
@@ -43,7 +57,23 @@ export function nextStatus(
             return current === "ARCHIVED" ? null : "ARCHIVED";
         case "restore":
             return current === "ARCHIVED" ? "DRAFT" : null;
+        case "cancel":
+            // Needs the released status too: `cancelStatus`.
+            return null;
     }
+}
+
+/**
+ * Cancel this change (DEC-201 amendment, 1 Nov): a staged change goes back
+ * to what the site has, the released status. Null when nothing is staged.
+ */
+export function cancelStatus(
+    status: SearchPageStatus | null,
+    released: SearchPageStatus | null,
+): SearchPageStatus | null {
+    const staged = status ?? "DRAFT";
+    const onSite = released ?? "DRAFT";
+    return staged === onSite ? null : onSite;
 }
 
 /** True when the change puts a page on the site or takes it off. */

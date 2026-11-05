@@ -131,10 +131,11 @@ export function DeleteDraftDialog({
         const res = await deleteInvoice(invoice.id);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Draft deleted.");
-        if (onDeleted) {
-            onDeleted();
-            router.refresh();
-        } else router.push("/billing/invoices");
+        // The action's revalidatePath already redraws the list. A second
+        // refresh raced it and, on a slow machine, Next fell back to a full
+        // page load that took the toast with it (gate, 1 Nov).
+        if (onDeleted) onDeleted();
+        else router.push("/billing/invoices");
     }
 
     return (

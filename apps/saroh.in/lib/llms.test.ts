@@ -4,6 +4,7 @@ import { summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
 import { galleryTemplates } from "@/content/templates";
 
+import { docPages } from "./docs-pages";
 import { helpArticles } from "./help-docs";
 import { llmsText } from "./llms";
 
@@ -230,5 +231,38 @@ describe("the Pricing section (#1187)", () => {
         );
         expect(text).not.toContain("## Pricing");
         expect(linked(text)).not.toContain("/pricing");
+    });
+});
+
+describe("GST pages, guides and downloads (plan 2026-10-31-002, U5)", () => {
+    const gst = docPages.list("gst")[0];
+    const routes = [...ALL_ROUTES, "/gst", "/gst/[slug]"];
+    const text = (live: string[], preview = false, r = routes) =>
+        llmsText(
+            BASE,
+            at(AFTER, { routes: r }),
+            articles,
+            undefined,
+            undefined,
+            "open",
+            { preview, live, takenOff: [] },
+        );
+
+    it("lists a live page under its hub", () => {
+        const out = text([gst.path]);
+        expect(out).toContain(
+            `## GST guides\n\n- [GST guides](${BASE}/gst)\n- [${gst.name}](${BASE}${gst.path}): ${gst.description}`,
+        );
+    });
+
+    it("leaves out a draft, on a preview too, and a page whose route isn't built", () => {
+        for (const out of [
+            text([]),
+            text([], true),
+            text([gst.path], false, ALL_ROUTES),
+        ]) {
+            expect(out).not.toContain("## GST guides");
+            expect(linked(out).some((p) => p.startsWith("/gst"))).toBe(false);
+        }
     });
 });

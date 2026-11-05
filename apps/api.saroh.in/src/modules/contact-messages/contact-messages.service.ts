@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { sendContactMessageNotice } from "../../common/email";
 import { recordWebsiteLead } from "../saroh-leads/lead-intake";
@@ -14,6 +15,8 @@ export interface SendContactMessageInput {
     message: string;
     /** A digest of the writer's address; never the address itself. */
     ipHash?: string;
+    /** The website's edition, from the address it wrote through. */
+    edition?: Edition;
 }
 
 /** The topic as the page words it, for the team's notice. */
@@ -52,6 +55,7 @@ export class ContactMessagesService {
                 kind: input.kind ?? null,
                 message: input.message.trim(),
                 ipHash: input.ipHash ?? null,
+                edition: input.edition,
             },
             select: { id: true },
         });
@@ -63,6 +67,7 @@ export class ContactMessagesService {
                 email: input.email,
                 name: input.name,
                 kind: input.kind,
+                edition: input.edition,
             }).catch(() => "failed" as const);
         }
         // Stored first, so the notice failing loses nothing: the message is

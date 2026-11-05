@@ -64,6 +64,12 @@ export const formSchema = z
         // character; here only its shape.
         gstRegistered: z.boolean(),
         gstState: z.string(),
+        // Global's tax line (DEC-204). The API checks the rate too.
+        taxName: z.string().trim().max(30),
+        taxRate: z.string().regex(/^(\d{1,2}(\.\d{1,2})?)?$/, {
+            error: "A rate like 20 or 7.5",
+        }),
+        yearStartMonth: z.enum(["1", "4"]),
         invoicePrefix: z
             .string()
             .trim()
@@ -91,6 +97,21 @@ export const formSchema = z
         ...registeredAddressShape,
     })
     .superRefine((v, ctx) => {
+        // A tax line needs both: one alone prints nothing on an invoice.
+        if (v.taxName && !(Number(v.taxRate) > 0)) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["taxRate"],
+                message: "Add the rate, or clear the name.",
+            });
+        }
+        if (!v.taxName && Number(v.taxRate) > 0) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["taxName"],
+                message: "Say what your tax is called, like VAT.",
+            });
+        }
         // Which part of the GSTIN is short or wrong, not just "15 characters".
         const gstin = v.gstRegistered ? gstinProblem(v.taxId ?? "") : null;
         if (gstin) {
@@ -122,6 +143,9 @@ const PROFILE_KEYS = [
 export const FIELD_OF: Record<string, FormField> = {
     taxId: "taxId",
     gstState: "gstState",
+    taxName: "taxName",
+    taxRate: "taxRate",
+    yearStartMonth: "yearStartMonth",
     invoicePrefix: "invoicePrefix",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
@@ -164,7 +188,7 @@ const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
     contactEmail: ["contactEmail"],
     phone: ["phone"],
     website: ["website"],
-    gst: ["gstRegistered", "taxId"],
+    gst: ["gstRegistered", "taxId", "taxName", "taxRate", "yearStartMonth"],
     taxId: ["taxId"],
     numbers: ["invoicePrefix", ...NUMBER_FIELDS],
     delivery: ["deliveryRate", "deliverySac"],
@@ -214,6 +238,9 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         timezone: settings.profile?.timezone ?? "",
         gstRegistered: settings.tax?.registered ?? false,
         gstState: settings.tax?.state ?? "",
+        taxName: settings.tax?.taxName ?? "",
+        taxRate: settings.tax?.taxRate ?? "",
+        yearStartMonth: settings.tax?.yearStartMonth === 1 ? "1" : "4",
         invoicePrefix: settings.tax?.invoicePrefix ?? "",
         deliveryRate: settings.tax?.deliveryRate ?? "18",
         deliverySac: settings.tax?.deliverySac ?? "",
@@ -281,6 +308,11 @@ export function settingsPatch(
     const tax: NonNullable<OrganizationSettingsInput["tax"]> = {
         ...(dirty.gstRegistered ? { registered: values.gstRegistered } : {}),
         ...(dirty.gstState ? { state: values.gstState } : {}),
+        ...(dirty.taxName ? { taxName: values.taxName.trim() } : {}),
+        ...(dirty.taxRate ? { taxRate: values.taxRate } : {}),
+        ...(dirty.yearStartMonth
+            ? { yearStartMonth: Number(values.yearStartMonth) }
+            : {}),
         ...(dirty.invoicePrefix
             ? { invoicePrefix: values.invoicePrefix.trim().toUpperCase() }
             : {}),
@@ -337,6 +369,7 @@ export function nextNumberOf(
 ): string {
     return nextInvoiceNumber(formatOf(x), {
         prefix: prefixOf(x.invoicePrefix),
+        yearStartMonth: Number(x.yearStartMonth),
         last: settings.tax?.invoiceNumber?.counters,
         samePrefix:
             prefixOf(x.invoicePrefix) ===

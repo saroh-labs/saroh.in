@@ -119,4 +119,34 @@ export async function useSession(
         );
     }
     await page.context().addCookies(state.cookies);
+    settleStreamedPages(page);
+}
+
+const SETTLED = Symbol("settles streamed pages");
+
+/**
+ * A page with a `loading.tsx` streams: until React reveals it, a hidden copy
+ * of the page waits in `<div hidden id="S:…">`, and a text, label or
+ * placeholder lookup finds both (the 1 Nov admin gate failures,
+ * DEV_LEARNINGS). After every `page.goto`, wait until no such copy is left,
+ * so a spec meets the page a person sees. One place for every spec that
+ * signs in; a page that doesn't stream answers at once.
+ */
+function settleStreamedPages(page: Page) {
+    const marked = page as Page & { [SETTLED]?: true };
+    if (marked[SETTLED]) return;
+    marked[SETTLED] = true;
+    const goto = page.goto.bind(page);
+    page.goto = async (url, options) => {
+        const response = await goto(url, options);
+        await page
+            .waitForFunction(
+                () => !document.querySelector('div[hidden][id^="S:"]'),
+                undefined,
+                { timeout: 10_000 },
+            )
+            // Still streaming after 10s: the spec's own waits say what's wrong.
+            .catch(() => undefined);
+        return response;
+    };
 }

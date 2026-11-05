@@ -20,6 +20,8 @@ export default defineConfig({
         // CI's runners are slower: a test that reads every changelog and Help
         // entry timed out at the default 5s there (27 Oct, #1256).
         testTimeout: 30_000,
+        // lib/docs-content.gen.ts, which `pnpm build` and `pnpm dev` write first.
+        globalSetup: ["./vitest.global-setup.ts"],
         include: [
             "*.test.ts",
             "content/**/*.test.ts",

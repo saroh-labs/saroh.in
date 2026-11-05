@@ -188,6 +188,79 @@ describe("free tool redirects (#1253)", () => {
     });
 });
 
+describe("taken-off pages of the groups on the shared kit (plan 2026-10-31-002)", () => {
+    const list = (live: string[], takenOff: string[], preview = false) => ({
+        preview,
+        live,
+        takenOff: takenOff.map((path) => ({ path, at: "2026-10-31" })),
+    });
+    const built = (p: string) => p !== "/gst/gone";
+
+    it("sends one to its hub (302) while the group has a live page in this build, else Home", () => {
+        expect(
+            searchRedirects(
+                list(
+                    ["/gst/salon-and-beauty-services"],
+                    ["/gst/composition-scheme", "/guides/reduce-no-shows"],
+                ),
+                () => null,
+                undefined,
+                built,
+            ),
+        ).toEqual([
+            {
+                source: "/gst/composition-scheme",
+                destination: "/gst",
+                statusCode: 302,
+            },
+            {
+                source: "/guides/reduce-no-shows",
+                destination: "/",
+                statusCode: 302,
+            },
+        ]);
+        // The only live GST page isn't in this build: no hub to land on.
+        expect(
+            searchRedirects(
+                list(["/gst/gone"], ["/gst/composition-scheme"]),
+                () => null,
+                undefined,
+                built,
+            ).map((r) => r.destination),
+        ).toEqual(["/"]);
+    });
+
+    it("goes Home while the build has none of the groups' pages, and leaves /for/ and tools as they were", () => {
+        const rules = searchRedirects(
+            list(["/gst/a", "/tools/qr-code-maker"], ["/downloads/b"]),
+            () => null,
+            () => true,
+        );
+        expect(rules).toEqual([
+            { source: "/downloads/b", destination: "/", statusCode: 302 },
+        ]);
+    });
+
+    it("leaves one alone on a preview, and never redirects a live one", () => {
+        expect(
+            searchRedirects(
+                list([], ["/gst/a"], true),
+                () => null,
+                undefined,
+                built,
+            ),
+        ).toEqual([]);
+        expect(
+            searchRedirects(
+                list(["/gst/a"], ["/gst/a"]),
+                () => null,
+                undefined,
+                built,
+            ),
+        ).toEqual([]);
+    });
+});
+
 describe("search page redirects (DEC-193)", () => {
     /** Families as the content says; "gyms" and "shops" are not in this stub's code. */
     const FAMILIES: Record<string, string> = {

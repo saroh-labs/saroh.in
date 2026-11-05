@@ -3,14 +3,16 @@ import type {
     Question,
     ToolPageEntry,
 } from "@saroh/search-pages";
-import { listSearchPages } from "@saroh/search-pages";
+import { createSearchPagesLoader } from "@saroh/search-pages";
 
 import type { PublishContext } from "@/content/resources";
 import { routeExists, shownTools } from "@/content/resources";
-import { solutionHref } from "@/content/solutions";
+import { solutionHref, solutionList } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 import { env } from "@/env";
 import { faqPageLd } from "@/lib/structured-data";
+
+import { SOURCES, TOOL_SOURCES } from "./search-content.gen";
 
 /**
  * The /for/ pages and free tools this build has (DEC-193, #1253). `search-pages.config.js` reads
@@ -23,6 +25,17 @@ import { faqPageLd } from "@/lib/structured-data";
  * - A preview build (dev, CI, local) builds every page in the code; a page
  *   not live says Draft and `noindex`, and is in no sitemap or list.
  */
+/**
+ * The /for/ pages' and tools' words this build carries: every page on a
+ * preview, only live ones in production (`docs-content.config.ts` writes
+ * `lib/search-content.gen.ts`; plan 2026-11-01-001). Server only, like the
+ * rest of this module.
+ */
+export const searchPages = createSearchPagesLoader({
+    sources: SOURCES,
+    toolSources: TOOL_SOURCES,
+});
+
 export interface PublishList {
     preview: boolean;
     live: string[];
@@ -77,9 +90,9 @@ export function builtSearchPages(
     list: PublishList = publishList(),
 ): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "for" }).filter(
-        (p) => list.preview || live.has(p.path),
-    );
+    return searchPages
+        .listSearchPages({ kind: "for" })
+        .filter((p) => list.preview || live.has(p.path));
 }
 
 /** The live /for/ pages in the code: the sitemap's, `/llms.txt`'s and the hub's on production. */
@@ -87,7 +100,25 @@ export function liveSearchPages(
     list: PublishList = publishList(),
 ): ForPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "for" }).filter((p) => live.has(p.path));
+    return searchPages
+        .listSearchPages({ kind: "for" })
+        .filter((p) => live.has(p.path));
+}
+
+/**
+ * "See all trades" under the Solutions menus and footer column, once a /for/
+ * page is live: the same rule as the Resources hubs (`docHubLinks`).
+ */
+export function tradesHubLinks(list: PublishList = publishList()) {
+    return liveSearchPages(list).length > 0
+        ? [
+              {
+                  name: "See all trades",
+                  line: "Find the page for your trade.",
+                  href: FOR_HUB.path,
+              },
+          ]
+        : [];
 }
 
 /** The /tools hub: the menus' "Free tools" and every tool's breadcrumb. */
@@ -100,15 +131,17 @@ export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
  */
 export function builtTools(list: PublishList = publishList()): ToolPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "tools" }).filter(
-        (p) => list.preview || live.has(p.path),
-    );
+    return searchPages
+        .listSearchPages({ kind: "tools" })
+        .filter((p) => list.preview || live.has(p.path));
 }
 
 /** The live tools in the code: the menus', the sitemap's and `/llms.txt`'s. */
 export function liveTools(list: PublishList = publishList()): ToolPageEntry[] {
     const live = new Set(list.live);
-    return listSearchPages({ kind: "tools" }).filter((p) => live.has(p.path));
+    return searchPages
+        .listSearchPages({ kind: "tools" })
+        .filter((p) => live.has(p.path));
 }
 
 /**
@@ -125,11 +158,73 @@ export function solutionLink(
         : solutionHref(slug);
 }
 
+/** Which /for/ family each solution's own page sits in: its column in the Solutions menu. */
+const SOLUTION_FAMILY: Record<SolutionSlug, string> = {
+    shops: "Shops and food",
+    salons: "Beauty",
+    gyms: "Fitness and classes",
+    clinics: "Health",
+};
+
+/**
+ * The desk Solutions menu: once a /for/ page is live, every trade under its
+ * family, the solutions first, names only (a trade's name says what it is).
+ * Before that, the solutions alone with their lines. The footer and the phone
+ * sheet keep the short list (`solutionItems`).
+ */
+export function solutionMenuItems(list: PublishList = publishList()) {
+    const trades = liveSearchPages(list);
+    if (trades.length === 0) return null;
+    const own = solutionList.map((s) => ({
+        name: s.name,
+        line: "",
+        href: solutionLink(s.slug, list),
+        group: SOLUTION_FAMILY[s.slug],
+    }));
+    const hrefs = new Set(own.map((i) => i.href));
+    return [
+        ...own,
+        ...trades
+            .filter((p) => !hrefs.has(p.path))
+            .map((p) => ({
+                name: p.name,
+                line: "",
+                href: p.path,
+                group: p.family,
+            })),
+    ];
+}
+
+/** The tools the footer names first: the ones most businesses come for. */
+const FOOTER_TOOLS = [
+    "/tools/gst-calculator",
+    "/tools/gst-invoice-generator",
+    "/tools/qr-code-maker",
+    "/tools/upi-qr-code-generator",
+    "/tools/whatsapp-link-generator",
+];
+
+/**
+ * The footer's Tools column: five tools, then the hub that lists them all, so
+ * the column stays as short as its neighbours however many are live.
+ */
+export function footerToolLinks<T extends { href: string }>(
+    tools: readonly T[],
+): T[] {
+    const rank = (t: T) => {
+        const at = FOOTER_TOOLS.indexOf(t.href);
+        return at === -1 ? FOOTER_TOOLS.length : at;
+    };
+    return [...tools].sort((a, b) => rank(a) - rank(b)).slice(0, 5);
+}
+
 /** A tool as the menus, the footer and `/llms.txt` list it. */
 export interface ToolLink {
     name: string;
     line: string;
     href: string;
+    /** The Tools menu's column. */
+    group?: string;
 }
 
 /**
@@ -142,14 +237,21 @@ export function shownToolLinks(
     ctx: PublishContext,
     list: PublishList = publishList(),
 ): ToolLink[] {
+    const live = liveTools(list);
     return [
         ...shownTools(ctx).map((p) => ({
             name: p.name,
             line: p.line,
             href: p.href,
+            group: live.find((t) => t.path === p.href)?.group,
         })),
-        ...liveTools(list)
+        ...live
             .filter((t) => !t.inApp && routeExists(t.path, ctx.routes))
-            .map((t) => ({ name: t.name, line: t.line, href: t.path })),
+            .map((t) => ({
+                name: t.name,
+                line: t.line,
+                href: t.path,
+                group: t.group,
+            })),
     ];
 }

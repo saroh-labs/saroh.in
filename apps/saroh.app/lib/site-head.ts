@@ -55,7 +55,10 @@ export const getSiteHead = cache(async function siteHeadFor(
             { cache: "no-store", headers: sent, signal: serverReadSignal() },
         );
         if (!res.ok) return unreadHead();
-        return siteHeadOf(await res.json().catch(() => null));
+        // A 200 whose body didn't arrive whole is a failed read, not no head.
+        const body: unknown = await res.json().catch(() => null);
+        if (typeof body !== "object" || body === null) return unreadHead();
+        return siteHeadOf(body);
     } catch {
         return unreadHead();
     }

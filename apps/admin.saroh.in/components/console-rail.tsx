@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Tip } from "@saroh/ui/tooltip";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useSyncExternalStore } from "react";
@@ -11,7 +12,9 @@ import type { AdminPermission } from "@/lib/control-plane";
 /**
  * The console's rail, at the three widths the workspace uses (design system
  * §21): above 1100px the full 238px rail; from 760 to 1100 a 64px icon rail
- * whose labels are announced but not drawn; below 760 no rail at all, and
+ * with a line between groups, each icon's label a hint on hover and on
+ * keyboard focus (`Tip`, not `title`), and drawn small under the icon for
+ * a touch pointer, which has no hover; below 760 no rail at all, and
  * `ConsoleDrawer` carries the same nav.
  *
  * The console is dark by default, so the rail sits ON the ground and the work
@@ -55,8 +58,17 @@ export function ConsoleRail({
                 icons ? "w-16 items-center px-2" : "w-[238px]",
             )}
         >
-            {groups.map((group) => (
-                <div key={group.label} className="flex flex-col gap-1">
+            {groups.map((group, index) => (
+                <div
+                    key={group.label}
+                    className={cn(
+                        "flex flex-col gap-1",
+                        // The headings aren't drawn here, so a line is.
+                        icons &&
+                            index > 0 &&
+                            "w-full items-center border-t border-border pt-4",
+                    )}
+                >
                     {group.plain ? null : icons ? (
                         // Announced, not drawn: the heading still names the
                         // group for anyone listening, and the icons below it
@@ -73,16 +85,15 @@ export function ConsoleRail({
                                 ? pathname === "/"
                                 : pathname.startsWith(item.href);
                         const Icon = item.icon;
-                        return (
+                        const link = (
                             <Link
                                 key={item.href}
                                 href={item.href}
                                 aria-current={on ? "page" : undefined}
-                                title={icons ? item.label : undefined}
                                 className={cn(
                                     "flex items-center gap-2.5 rounded-lg text-[13.5px] transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                     icons
-                                        ? "size-11 justify-center"
+                                        ? "size-11 justify-center coarse:h-auto coarse:w-12 coarse:flex-col coarse:gap-1 coarse:py-1.5"
                                         : "px-2.5 py-2",
                                     on
                                         ? "bg-card font-semibold text-foreground"
@@ -91,7 +102,7 @@ export function ConsoleRail({
                             >
                                 <Icon aria-hidden className="size-4 shrink-0" />
                                 {icons ? (
-                                    <span className="sr-only">
+                                    <span className="sr-only coarse:not-sr-only coarse:line-clamp-2 coarse:w-full coarse:break-words coarse:text-center coarse:text-[10px] coarse:leading-tight">
                                         {item.label}
                                     </span>
                                 ) : (
@@ -100,6 +111,17 @@ export function ConsoleRail({
                                     </span>
                                 )}
                             </Link>
+                        );
+                        return icons ? (
+                            <Tip
+                                key={item.href}
+                                label={item.label}
+                                side="right"
+                            >
+                                {link}
+                            </Tip>
+                        ) : (
+                            link
                         );
                     })}
                 </div>

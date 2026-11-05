@@ -350,3 +350,26 @@ describe("the draft", () => {
         expect(() => clearSetupDraft()).not.toThrow();
     });
 });
+
+describe("Global's setup", () => {
+    afterEach(() => {
+        vi.resetModules();
+        vi.unstubAllEnvs();
+    });
+
+    const country = async (code: string) => {
+        vi.stubEnv("NEXT_PUBLIC_EDITION", "GLOBAL");
+        vi.resetModules();
+        const { setupSchema: schema } = await import("./setup-steps");
+        return schema(false).safeParse({ ...ANSWERED, country: code }).success;
+    };
+
+    it("takes a country outside India", async () => {
+        await expect(country("GB")).resolves.toBe(true);
+    });
+
+    it("refuses India, and no country", async () => {
+        await expect(country("IN")).resolves.toBe(false);
+        await expect(country("")).resolves.toBe(false);
+    });
+});

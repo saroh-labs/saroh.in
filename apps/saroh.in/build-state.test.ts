@@ -157,6 +157,25 @@ describe("a production build", () => {
         }
     });
 
+    it("API down, a snapshot with the new page groups: builds from it; one with any other group fails (plan 2026-10-31-002 R10)", async () => {
+        const searchPages = {
+            live: ["/gst/salon-and-beauty-services", "/for/gyms"],
+            takenOff: [{ path: "/guides/reduce-no-shows", at: "x" }],
+        };
+        const ok = routes("down", { ...SNAPSHOT, searchPages });
+        expect(await prebuild(PROD, ok.fetcher, [1], noSleep, at)).toEqual({
+            preview: false,
+            ...searchPages,
+        });
+        const blog = routes("down", {
+            ...SNAPSHOT,
+            searchPages: { live: ["/blog/x"], takenOff: [] },
+        });
+        await expect(
+            prebuild(PROD, blog.fetcher, [1], noSleep, at),
+        ).rejects.toThrow(/search-pages failed/);
+    });
+
     it("before early access opens, pricing isn't read", async () => {
         const { fetcher, calls } = routes("up", SNAPSHOT);
         await prebuild(

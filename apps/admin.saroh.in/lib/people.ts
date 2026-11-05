@@ -63,6 +63,8 @@ export interface PersonDetail extends PersonRow {
         userAgent: string | null;
     }[];
     signIn: SignInState;
+    /** Their businesses this console doesn't show. Older API builds leave it out. */
+    otherEditionBusinesses?: number;
 }
 
 /** One line of the History tab: something staff did to this person. */
@@ -91,6 +93,12 @@ export function recentSignups(): Promise<RecentSignup[] | null> {
     return getJson<RecentSignup[]>("/people/recent");
 }
 
+/** One page of the Users list (50 a page), and the next page's number. */
+export interface PeoplePage {
+    items: PersonRow[];
+    nextPage?: number;
+}
+
 /**
  * The Users list: a search (two characters or more), the chips, both or
  * neither (the newest accounts). Each read is recorded.
@@ -98,14 +106,16 @@ export function recentSignups(): Promise<RecentSignup[] | null> {
 export function listPeople(input: {
     q?: string;
     chips?: readonly UserChip[];
-}): Promise<PersonRow[] | null> {
+    page?: number;
+}): Promise<PeoplePage | null> {
     const search = new URLSearchParams();
     if (input.q) search.set("q", input.q);
+    if (input.page && input.page > 1) search.set("page", String(input.page));
     if (input.chips && input.chips.length > 0) {
         search.set("filter", input.chips.join(","));
     }
     const suffix = search.size > 0 ? `?${search.toString()}` : "";
-    return getJson<PersonRow[]>(`/people${suffix}`);
+    return getJson<PeoplePage>(`/people${suffix}`);
 }
 
 /**

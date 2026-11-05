@@ -41,12 +41,6 @@ export function ChipSvg({ icon }: { icon: ChipIcon }) {
 }
 
 const ALSO: Record<AlsoIcon, React.ReactNode> = {
-    pack: (
-        <>
-            <rect x="3" y="6" width="18" height="13" rx="2" />
-            <path d="M7 6V4h10v2M3 11h18" />
-        </>
-    ),
     clock: (
         <>
             <circle cx="12" cy="12" r="8" />

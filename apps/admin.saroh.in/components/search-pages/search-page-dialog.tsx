@@ -1,7 +1,10 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
+import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -11,18 +14,26 @@ import { searchPageAction } from "@/lib/search-page-actions";
 import type { PageAction, PageRow } from "@/lib/search-page-words";
 import {
     dialogWords,
+    linkedFromWords,
+    linkWords,
+    publishLinks,
     refusalWords,
     successWords,
 } from "@/lib/search-page-words";
+import { DEPLOY_BAR_ID, showDeployBar } from "./deploy-bar-anchor";
 
 export interface SearchPageDialogProps {
     action: PageAction;
     /** The pages it acts on: those the action can be done to. */
     pages: PageRow[];
+    /** Every page in the code (all kinds): what the pages link to, and what links to them (U12). */
+    rows?: PageRow[];
     /** How many of the picked pages were left out, as the action can't be done to them. */
     skipped?: number;
     site: string;
     reviewSite: string;
+    /** The review site's address, for each page's Read link. */
+    reviewUrl?: string;
     /** Checks that didn't pass (one page). */
     checks?: number;
     /** List the pages in the dialog (the list's dialog does; a page's own doesn't). */
@@ -38,10 +49,12 @@ export interface SearchPageDialogProps {
  */
 export function SearchPageDialog({
     action,
-    pages,
+    pages: picked,
+    rows = picked,
     skipped = 0,
     site,
     reviewSite,
+    reviewUrl,
     checks = 0,
     showPages = true,
     onOpenChange,
@@ -50,7 +63,16 @@ export function SearchPageDialog({
     const id = useId();
     const router = useRouter();
     const [read, setRead] = useState(false);
+    // Pages added by "Publish these too": the linked pages that aren't live yet.
+    const [added, setAdded] = useState<PageRow[]>([]);
+    const pages = [...picked, ...added];
     const words = dialogWords(action, pages, site, reviewSite, checks);
+    const links = action === "publish" ? publishLinks(pages, rows) : null;
+    const linkNote = links ? linkWords(links, pages) : null;
+    const linkedFrom =
+        action === "unpublish" || action === "archive"
+            ? linkedFromWords(pages, rows)
+            : null;
 
     return (
         <OperatorDialog
@@ -60,7 +82,7 @@ export function SearchPageDialog({
             reasonRequired={false}
             destructive={words.destructive}
             submitLabel={words.confirm}
-            ready={!words.tick || read}
+            ready={(!words.tick || read) && !linkNote}
             effect={
                 <div className="grid gap-1.5">
                     <p className="font-medium text-foreground">What happens</p>
@@ -73,7 +95,47 @@ export function SearchPageDialog({
             }
             fields={
                 <div className="grid gap-3">
-                    {showPages && (
+                    {linkNote && links && (
+                        <Notice
+                            tone={links.blocking.length ? "error" : "warning"}
+                            title={linkNote.title}
+                            action={
+                                linkNote.button && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setAdded((was) => [
+                                                ...was,
+                                                ...links.add,
+                                            ]);
+                                            // They're read before they're published, like the rest.
+                                            setRead(false);
+                                        }}
+                                    >
+                                        {linkNote.button}
+                                    </Button>
+                                )
+                            }
+                        >
+                            <ul className="grid list-disc gap-1 pl-5">
+                                {linkNote.lines.map((line) => (
+                                    <li key={line}>{line}</li>
+                                ))}
+                            </ul>
+                        </Notice>
+                    )}
+                    {added.length > 0 && !linkNote && (
+                        <Notice tone="success">
+                            Added {added.length} linked{" "}
+                            {added.length === 1 ? "page" : "pages"}. Read{" "}
+                            {added.length === 1 ? "it" : "them"} before you
+                            publish.
+                        </Notice>
+                    )}
+                    {linkedFrom && <Notice tone="warning">{linkedFrom}</Notice>}
+                    {(showPages || added.length > 0) && (
                         <ul
                             aria-label="Pages"
                             className="max-h-56 overflow-y-auto rounded-md border"
@@ -86,9 +148,23 @@ export function SearchPageDialog({
                                     <span className="flex-1 font-medium">
                                         {page.name}
                                     </span>
+                                    {added.includes(page) && (
+                                        <Badge variant="info">Linked</Badge>
+                                    )}
                                     <code className="font-mono text-xs text-muted-foreground">
                                         {page.path}
                                     </code>
+                                    {reviewUrl && words.tick && (
+                                        <a
+                                            href={`${reviewUrl}${page.path}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label={`Read ${page.name} on ${reviewSite}`}
+                                            className="text-xs font-medium underline underline-offset-2"
+                                        >
+                                            Read ↗
+                                        </a>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -134,13 +210,23 @@ export function SearchPageDialog({
                     }
                     return { ok: false, error: result.error };
                 }
-                const said = successWords(
-                    action,
-                    paths.length,
-                    result.data.rebuildQueued,
-                    site,
+                const said = successWords(action, pages, site);
+                showSuccess(
+                    said.title,
+                    said.description,
+                    said.staged
+                        ? {
+                              label: "Show waiting changes",
+                              onClick: () => {
+                                  if (!showDeployBar()) {
+                                      router.push(
+                                          `/search-pages${pages[0]?.kind === "for" ? "" : `?kind=${pages[0]?.kind}`}#${DEPLOY_BAR_ID}`,
+                                      );
+                                  }
+                              },
+                          }
+                        : undefined,
                 );
-                showSuccess(said.title, said.description);
                 router.refresh();
                 onDone?.();
                 return { ok: true };

@@ -2,6 +2,7 @@ import { apiFetch, orgBase } from "@/lib/api/http";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { listSites } from "@/lib/sites/service";
 import type { BookingPaymentView, StaffList } from "@/lib/staff/service";
 import { listStaff, readBookingPayment } from "@/lib/staff/service";
@@ -132,7 +133,9 @@ export async function loadEditorContext(): Promise<
                 staff?.timezone ??
                 read.services.at(0)?.timezone ??
                 "Asia/Kolkata",
-            currency: businessCurrencyOf(read.services),
+            currency: read.services.some((s) => s.currency)
+                ? businessCurrencyOf(read.services)
+                : await startingCurrency(),
         },
     };
 }

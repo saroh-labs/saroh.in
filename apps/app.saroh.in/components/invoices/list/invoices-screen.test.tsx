@@ -327,6 +327,20 @@ describe("InvoicesScreen: states", () => {
     });
 });
 
+describe("InvoicesScreen: the breadcrumb", () => {
+    const crumbs = () => document.querySelector("nav")?.textContent ?? "";
+
+    it("sits under Payments while Payments is on", () => {
+        show({ invoices: [DUE], summary: SUMMARY });
+        expect(crumbs()).toContain("Payments");
+    });
+
+    it("names no Payments while it is off (DEC-070)", () => {
+        show({ invoices: [DUE], summary: SUMMARY, paymentsOn: false });
+        expect(crumbs()).not.toContain("Payments");
+    });
+});
+
 describe("InvoicesScreen: the cheques view", () => {
     const WAITING = invoice("0110", {
         status: "PAID",

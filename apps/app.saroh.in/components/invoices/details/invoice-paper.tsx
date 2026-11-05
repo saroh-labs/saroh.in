@@ -4,6 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { EDITION } from "@/lib/edition";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {
@@ -157,7 +158,7 @@ export function InvoicePaper({
         : typedTax
           ? [
                 ["Subtotal", money(i.subtotal)],
-                ["Tax", money(i.tax)],
+                [i.taxLabel ?? "Tax", money(i.tax)],
             ]
           : [];
 
@@ -194,7 +195,11 @@ export function InvoicePaper({
                 ))}
                 {gst || gstin
                     ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
-                    : "Not registered for GST"}
+                    : i.sellerTaxId
+                      ? `Tax ID ${i.sellerTaxId}`
+                      : EDITION === "GLOBAL"
+                        ? null
+                        : "Not registered for GST"}
             </p>
         </div>
     );

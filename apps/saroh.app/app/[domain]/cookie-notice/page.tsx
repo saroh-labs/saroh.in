@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { CookieNotice, lookOf } from "@saroh/site-blocks";
 
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForPage } from "@/lib/publication";
 import { getSiteHead } from "@/lib/site-head";
 import { needsConsent, TRACKER_NAMES, TRACKER_PURPOSES } from "@/lib/trackers";
 
@@ -23,7 +23,7 @@ export default async function CookieNoticePage({
     params: Promise<{ domain: string }>;
 }) {
     const { domain } = await params;
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
     if (resolved?.mode !== "live" || !resolved.siteId) notFound();
     const head = await getSiteHead(resolved.siteId);
     return (

@@ -1,13 +1,16 @@
 "use client";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
-import { ring } from "@/lib/ring";
+import type { Visitor } from "@/lib/browser/session";
+import { DASHBOARD_URL } from "@/lib/links";
+import { ring } from "@saroh/marketing/ring";
 
+import { ButtonLink } from "@saroh/marketing/button";
 import { CtaLink } from "../buttons/cta-link";
-import type { NavItem, NavSection } from "./nav-section";
+import type { NavMenus, NavSection } from "./nav-section";
 
 /** The sheet, fetched on the first tap of Menu. */
 const MobileSheet = dynamic(
@@ -16,27 +19,25 @@ const MobileSheet = dynamic(
 );
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
- * button that opens a full-screen sheet with Features, Solutions and (when
- * any page is live) Resources and Tools as accordions — the section the page is in
- * starts open — then Pricing and Sign in (once the launch switch is open)
- * and the start button. Esc or × closes it and returns focus to Menu; while
- * it is open, focus stays inside.
+ * button that opens a full-screen sheet: Features, Solutions, Pricing (once
+ * the launch switch is open) and (when any page is live) Resources and Tools,
+ * each menu a level of its own with a Back, and Sign in and the start button
+ * held at the bottom (owner, 1 Nov). Esc or × closes it and returns focus to
+ * Menu; while it is open, focus stays inside. Signed in, the start button is
+ * "Open dashboard" and the sheet's Sign in is the visitor, Account and Sign out.
  */
 export function MobileMenu({
     section,
     pathname,
-    features,
-    solutions,
-    resources = [],
-    tools = [],
+    visitor = null,
+    onSignOut,
     className,
-}: {
+    ...menus
+}: NavMenus & {
     section: NavSection;
     pathname: string;
-    features: NavItem[];
-    solutions: NavItem[];
-    resources?: NavItem[];
-    tools?: NavItem[];
+    visitor?: Visitor | null;
+    onSignOut?: () => Promise<void>;
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -63,12 +64,22 @@ export function MobileMenu({
                 className,
             )}
         >
-            <CtaLink
-                src="nav"
-                size="sm"
-                short
-                className="px-4 max-[399px]:px-3.5"
-            />
+            {visitor ? (
+                <ButtonLink
+                    href={DASHBOARD_URL}
+                    size="sm"
+                    className="px-4 max-[399px]:px-3.5"
+                >
+                    Open dashboard
+                </ButtonLink>
+            ) : (
+                <CtaLink
+                    src="nav"
+                    size="sm"
+                    short
+                    className="px-4 max-[399px]:px-3.5"
+                />
+            )}
             <button
                 type="button"
                 aria-label="Menu"
@@ -87,10 +98,18 @@ export function MobileMenu({
                 <MobileSheet
                     section={section}
                     pathname={pathname}
-                    resources={resources}
-                    tools={tools}
-                    featureItems={features}
-                    solutionItems={solutions}
+                    resources={menus.resources ?? []}
+                    tools={menus.tools ?? []}
+                    featureItems={menus.features}
+                    solutionItems={menus.solutions}
+                    solutionMenu={menus.solutionMenu}
+                    allTrades={menus.allTrades}
+                    allTools={menus.allTools}
+                    visitor={visitor}
+                    onSignOut={async () => {
+                        close();
+                        await onSignOut?.();
+                    }}
                     onClose={close}
                 />
             ) : null}

@@ -21,6 +21,8 @@ export async function amendStaffAction(
         roles: string[];
         reason: string;
         expiresAt?: string;
+        /** Left out: unchanged (a Platform owner opens every console anyway). */
+        editions?: string[];
         idempotencyKey: string;
     },
 ) {
@@ -69,6 +71,7 @@ export async function addTeammateAction(input: {
     roles: string[];
     onCommission: boolean;
     expiresAt?: string;
+    editions?: string[];
     reason: string;
     idempotencyKey: string;
 }): Promise<ControlPlaneResult<AddTeammateOutcome>> {
@@ -82,6 +85,7 @@ export async function addTeammateAction(input: {
             expiresAt: input.expiresAt,
             worksAs: input.worksAs,
             onCommission: input.onCommission,
+            editions: input.editions,
             idempotencyKey: input.idempotencyKey,
         },
         "Could not add them to the team.",
@@ -106,6 +110,7 @@ export async function addTeammateAction(input: {
             worksAs: input.worksAs,
             roles: input.roles,
             onCommission: input.onCommission,
+            editions: input.editions,
             reason: input.reason,
             idempotencyKey: input.idempotencyKey,
         },

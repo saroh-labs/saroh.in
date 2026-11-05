@@ -23,7 +23,7 @@ export interface ShopFactsInput {
 
 export function shopFactsLine(
     input: ShopFactsInput | null | undefined,
-    locale = "en-IN",
+    locale?: string,
 ): string | null {
     if (!input || input.ways.length === 0) return null;
     const parts = input.ways.map((way) =>
@@ -69,7 +69,7 @@ export interface ShopLeadInput {
  */
 export function shopLeadLine(
     input: ShopLeadInput | null | undefined,
-    locale = "en-IN",
+    locale?: string,
 ): string | null {
     if (!input?.canOrder || input.ways.length === 0) return null;
     const words: string[] = [];

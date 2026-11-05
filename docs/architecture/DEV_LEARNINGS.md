@@ -6326,3 +6326,204 @@ made online when none is (`seed/showcase/pulse.ts`).
 **Rule**: a state the seed's own check requires is placed, never left to a
 roll; a roll only adds variety on top.
 **Category**: seed · tests
+
+## /sitemap.xml disappeared when sitemaps were split by group
+
+**Symptom**: 31 Oct, with `generateSitemaps` in `app/sitemap.ts`, the build
+served `/sitemap/<id>.xml` but no `/sitemap.xml`; robots.txt pointed at a 404.
+**Cause**: Next 16's `generateSitemaps` writes no index file.
+**Fix**: `/sitemap.xml` is a route that writes the index, and each group is
+`app/sitemap/[group]/route.ts`, from `lib/sitemaps.ts`.
+**Rule**: `docs/patterns/frontend-app-structure.md` → saroh.in and search;
+`lib/sitemaps.test.ts`.
+**Category**: next · seo
+
+## A committed generated file would have shipped draft pages' words
+
+**Symptom**: 31 Oct, review of the share cards for GST pages, guides and
+downloads: they were planned to read `lib/og-cards.gen.ts`.
+**Cause**: that file is committed, so it holds every page's words, drafts
+too, and goes into every production build.
+**Fix**: share cards read the build's live-only generated module
+(`lib/docs-content.gen.ts`); `og-cards.test.ts` fails an import of
+`docs-embedded` or an `.mdx`.
+**Rule**: words of a page that may be a draft come only from the live-only
+build output (DEC-201); `pnpm check:draft-words` scans the built site.
+**Category**: build · content
+
+## client-bundle.test missed what packages pulled into the browser
+
+**Symptom**: 31 Oct, the test passed while a client file reached a package
+entry that carried every page's words.
+**Cause**: it followed only relative imports, not `@saroh/*` package imports.
+**Fix**: it now follows package imports, and saroh.in may not import
+`@saroh/search-pages/docs-embedded`.
+**Rule**: `apps/saroh.in/client-bundle.test.ts`.
+**Category**: tests · build
+
+## Prisma refused an agent's `db push --force-reset`
+
+**Symptom**: 31 Oct, the download gate's db specs couldn't set up the test
+database from an agent: Prisma stopped on the reset.
+**Cause**: Prisma refuses destructive commands when it detects an AI agent.
+**Fix**: the db specs run with `TEST_RLS=on` against the already-migrated
+test database instead of resetting it.
+**Rule**: `.agents/skills/saroh-migrations/SKILL.md`; never force a reset
+from an agent.
+**Category**: tests · database
+
+## A canvas board claimed a feature Saroh doesn't have
+
+**Symptom**: 31 Oct, the guides' canvas board said Saroh sends booking
+reminders; it doesn't.
+**Cause**: board copy was written without checking the claims list.
+**Fix**: the guides' "In Saroh" notes name only claimed features
+(BK2/BK8/BK9).
+**Rule**: content is checked against `docs/architecture/MARKETING_CLAIMS.md` before it is
+built, whatever the design says (`docs/patterns/saroh-product.md`).
+**Category**: content · claims
+
+## A dev database snapshot copied production's instead
+
+**Symptom**: 1 Nov, snapshotting saroh.io's database before the demo-businesses run, the dump came from production's database server. It only read data, nothing was written, and the copy was deleted at once.
+**Cause**: the two environments' databases share a name on different database servers. The step took the name from the dev API's connection string but ran `pg_dump` in a hard-coded database container.
+**Fix**: the snapshot takes the host from the target API's connection string, refuses unless it is the expected one, and runs `pg_dump` inside that host's container as its admin user (the app's role is under row-level security, so a dump as the app role fails or comes out partial).
+**Rule**: `docs/architecture/runbooks/DEMO_BUSINESSES.md` step 1; any server step that touches a database checks the host, never only the name.
+**Category**: operations · databases
+
+## A double refresh wiped a toast under load
+
+**Symptom**: 1 Nov, deleting a draft invoice sometimes showed no "Draft deleted." toast: the page reloaded instead. It failed the gate twice, and development failed 4 of 20 runs under CPU throttling.
+**Cause**: the dialog called `router.refresh()` while the delete server action's own `revalidatePath` was already refreshing the page. On a slow browser the two raced, Next gave up the soft navigation and reloaded the document, and the reload took the toast with it.
+**Fix**: the dialog no longer calls `router.refresh()`; the action's revalidation redraws the list (`components/invoices/details/invoice-actions.tsx`).
+**Rule**: after a server action that revalidates the page, don't also call `router.refresh()`. About 170 files in app.saroh.in call it; the ones paired with a revalidating action are a follow-up sweep. To reproduce such races, throttle the CPU (CDP) in a throwaway spec.
+**Category**: frontend · Next navigation
+
+## A new loading.tsx made browser specs see every control twice
+
+**Symptom**: 1 Nov, the batch gate failed five admin specs (Users' search, Team's "Show permission codes", and a flaky "Not authorized") with "strict mode violation: … resolved to 2 elements". Only on the production build; dev never showed it.
+**Cause**: the console-wide audit fix added `loading.tsx` to every admin section and the root. With a loading boundary, Next streams the page, and React 19.2 keeps the finished page in a hidden container for a moment before revealing it (and may draw a client copy beside it). The specs found controls by placeholder, label or text, which count hidden elements, so they saw two.
+**Fix**: the specs find them by role (`getByRole("searchbox" | "switch" | "heading", { name })`), which leaves hidden elements out. People never see the hidden copy.
+**Rule**: in browser specs, find a control by its role and name; placeholder, label and text lookups also match the hidden copy of a streaming page. Reproduce on a production build (`next build && portless <name> next start`), not `next dev`.
+**Then**: the next gate (1 Nov) hit four more admin specs the same way (Billing, a business's page, Modules, the owner refusal), at random: patching specs one by one can't keep up. `useSession` (`e2e/fixtures/sessions.ts`) now makes every `page.goto` wait until no `<div hidden id="S:…">` is left, so every spec that signs in meets the revealed page.
+**Category**: testing · Next streaming
+
+---
+
+## A GST page's side rail slid over the closing band
+
+**Symptom**: 1 Nov, the owner saw a GST page's cards ride down over the dark "Bills with the right rate" band, with the "More GST guides" links dark on dark. 239px of overlap at a 1800px wide window.
+**Cause**: `.sp-cl-aside` was a sticky grid item, and the band is a second row of the same grid (so a phone can put it between the main column and the rail). A sticky grid item here stopped at the bottom of the whole grid, not at the end of its own row, so it kept sticking past the main column.
+**Fix**: the aside stretches to its row and an inner `.sp-cl-aside-in` is the sticky box, so the rail stops where the main column ends.
+**Rule**: when a grid has a row below a sticky column, make an inner box sticky inside a stretched cell. Held by "a GST page's rail never sits on the closing band" in `e2e/tests/search-pages-content.spec.ts`, desk and phone.
+**Category**: frontend · CSS
+
+---
+
+## A rebuilt gate served no download files after a cached web build
+
+**Symptom**: 2 Nov, the gate's download spec waited 15s for a file and the page said "Your files are ready" with no download. `/downloads/<slug>/<file>` was a 404, on both desk and phone, though nothing about downloads had changed.
+**Cause**: `docs-content.config.ts` copies the files to `public/downloads` during `web:build`, and that folder wasn't one of the build's Turbo outputs. A rerun with the same code hit the cache: Turbo restored `.next` and replayed the logs, including the `[docs-content]` line, but the copy never ran, and the gate's worktree had been cleaned.
+**Fix**: `public/downloads/**` is a build output in `turbo.json`, so a cache hit restores it.
+**Rule**: a file a build writes outside `.next` and needs at run time is a Turbo output. "cache hit, replaying logs" means the build's scripts did not run, whatever the log says.
+**Category**: tooling · Turbo cache
+
+---
+
+## A package's `exports` named files its build never wrote
+
+**Symptom**: 2 Nov, `@saroh/edition` failed to resolve under Vitest ("Failed to resolve entry"), while the API's Jest and type check had passed on the same package.
+**Cause**: its `exports` were copied from `@saroh/pricing-catalog`, which isn't `type: module`. Under `type: module` tsup writes `index.js` (ESM) and `index.cjs`, not `index.mjs` and `index.js`, so `require` would have loaded ESM in the running API.
+**Fix**: `exports` name `index.js` and `index.cjs`, with a test holding them there, and both entries were run in plain Node.
+**Rule**: after adding a built package, load it the way its consumers do (`node -e 'require(...)'` from the API). A green Jest doesn't prove it.
+**Category**: tooling · packages
+
+---
+
+## A test that reads every page timed out only beside the full gate
+
+**Symptom**: 2 Nov, saroh.tech's template gate test passed alone and hit Vitest's 5s limit during `prepush --all`.
+**Cause**: it audits all pages at once, which took over 6s with the integration and browser runs on the same machine.
+**Fix**: that test has its own 30s limit. Admin's search pages table hit the same limit on two different tests, on the gate and on CI, so that file sets 30s for all of its tests.
+**Rule**: a test that walks all of a site's content, or draws a whole table with its menus, sets its own timeout, per file when it's more than one test. A pass alone says little about the same test under the gate's load.
+**Category**: testing · timeouts
+
+---
+
+## A shared builder's new behaviour reached every caller
+
+**Symptom**: 3 Nov, code review found a Global desk payment of 100 writing an invoice total of 120, against a payment of 100. Tests and the full gate were green, and the change had been described as affecting manual invoices only.
+**Cause**: the tax line was put on the profile that `buildManualInvoice` reads, and six other callers (bookings, plans, packs, renewals) share that builder and profile.
+**Fix**: the tax line is now an argument only the manual invoice path passes, with a test that a caller without it adds nothing.
+**Rule**: before changing a shared function's behaviour, grep every caller. New behaviour for one caller is an explicit argument, not something read from shared data.
+**Category**: backend · invoices
+
+---
+
+## A changed unique key still type-checked, in tests that no longer ran
+
+**Symptom**: 4 Nov, after one lead per email became one per edition, the full gate failed four tests in `saroh-leads.db.spec.ts` with a Prisma validation error. Type checks and unit tests had passed.
+**Cause**: those tests look a lead up with `where: { emailKey }`, which stopped being a unique key. The API's `tsconfig.json` leaves specs out, and ts-jest doesn't fail on type errors, so only running them against a database showed it.
+**Fix**: the tests use `edition_emailKey`.
+**Rule**: when a `@unique` changes, grep the specs for the old key too, as `tsc` won't find them. Type-checking specs would catch this, but they have older type errors to clear first.
+**Category**: testing · database
+
+---
+
+## Prettier re-sorted classes in a package with no Tailwind config
+
+**Symptom**: 4 Nov, committing the move of saroh.in's primitives to `packages/marketing` changed `m-0 font-display` to `font-display m-0`, and `live-pages.snapshot.test.ts` failed on the committed tree after the gate had passed on the staged one.
+**Cause**: lint-staged runs prettier with the Tailwind plugin, which looks for a config near each file. The package has none, so its classes were sorted without the site's `mk-*` theme.
+**Fix**: a `prettier.config.js` override gives `packages/marketing/**` saroh.in's Tailwind config, and the moved files were restored.
+**Rule**: a package holding Tailwind classes needs that override when it's added. Run the gate again after a commit whose hook rewrote files: its tree isn't the one that passed.
+**Category**: tooling · formatting
+
+---
+
+## A zero with no currency was drawn in rupees on a Global business
+
+**Symptom**: 4 Nov, a Global business saw a ₹ icon on Money in today, "Drafts ₹0" on Invoices and "To pay ₹0" on its booking page.
+**Cause**: the API sends no totals for nothing and a null currency on a free service, and the screens filled the gap with a literal `"INR"` rather than the business's own. Icons were `IndianRupee` by name.
+**Fix**: a zero asks `useStartingCurrency()`, the shell's `Organization.currency` or rupees; the public booking page sends `currency` too. `components/shared/money-icon.tsx` is the one money icon.
+**Rule**: money with no currency of its own is in the business's, never a literal. Use `MoneyIcon`, not `IndianRupee` (`frontend-design-system.md`).
+**Category**: currency · editions
+
+---
+
+## Customers wrote an order's time an hour behind Orders
+
+**Symptom**: 4 Nov, a saroh.tech shot had Maya's last order at 9:40 on Customers and 10:40 on Orders.
+**Cause**: Customers used `ViewerDate` (the browser's zone) and Orders `BusinessDate` (DEC-033). The capture's browser had moved on the hour from the zone the seed gave the business, as `morningZone` does, so the two parted. A real owner travelling sees the same split.
+**Fix**: Customers' Last order is a `BusinessDate`, with a test. The capture takes the seed's zone from `SHOTS_ZONE`.
+**Rule**: an order's time is written in the business's zone, on every screen (`BusinessDate`).
+**Category**: dates · screenshots
+
+---
+
+## A saroh.tech shot contradicted the page it sat on
+
+**Symptom**: 4 Nov, a re-audit found a "You've reached your 1 team member… See plans" banner, "comes with a paid plan" and a dentist's root canal under "Shown with Larkspur & Vane", on pages saying one person and nothing to buy.
+**Cause**: a look through the images checked for India's details only, not for what the page around them claims. The demo diaries also ran far past what one person on Free looks like.
+**Fix**: shots clip to the true region (`shots.global.ts`), the salon has its own treatment order, `checkGlobal` asserts a quiet diary (`BOOKINGS_A_MONTH`), and `lib/shots.test.ts` refuses "team" and "plan" in an alt and a `who` naming another business.
+**Rule**: read every shot against its page's claims as well as for rupees, and clip or drop what a screen says to everyone until the app's words are fixed. Never retouch.
+**Category**: screenshots · editions
+
+---
+
+## Folding a list broke two browser specs, seen only after the merge
+
+**Symptom**: 5 Nov, main's CI failed `public-booking:316` and `site-booking-steps:173` once Classic's booking page folded its steps: one waited for a heading that now folds, one looped over a service list that had folded after its first pick. The page itself was right.
+**Cause**: the specs were updated by reading them, typechecked and never run. The PR merged before its checks finished, so the first run was on main.
+**Fix**: the first checks the folded row, the second presses Edit between picks.
+**Rule**: a spec changed for a new behaviour is not done until it has run. Say so plainly when a PR is asked to merge before its browser checks finish.
+**Category**: tests · booking
+
+---
+
+## A signal turned off fetch dedupe, and a live site could 404 on a blip
+
+**Symptom**: 5 Nov, review of the 8-second server read: a site's metadata, layout and page each read the API separately, so a layout that read fine and a page whose read failed called `notFound()`, a real 404 for a live site. Plans, packs, grids and posts read twice per render, spending the visitor's rate limit, and a 429 drew `FeedFailed`. A custom domain whose read failed or 404'd then asked by its first label, so `shop.client.com` could draw the merchant at `shop`.
+**Cause**: Next's `fetch` dedupe skips any request with a `signal` (`next/dist/server/lib/dedupe-fetch.js`), and `serverReadSignal()` went on every read. `lib/in-page-menu.ts` still said the reads were memoized. `getSiteForHost` was never in `cache()`, its callers read a failed read as "none", and `subdomainFromHost` fell back to the first label for any host.
+**Fix**: readers shared in a render are in React's `cache()`, with a normalised host as the key; pages read `getSiteForPage`, which throws on a failed read; a custom domain is looked up by hostname alone, in `getSiteForHost` and `siteReadFailed`; with no root domain set, behaviour is as it was. `lib/site-read-failed.test.ts` counts fetches through a `cache` stand-in and fails a page that reads the site and calls `notFound()`.
+**Rule**: a reader shared in one render goes in `cache()`, because a signal means nothing else shares it (`frontend-data-and-state.md`). A test of `cache()` outside a render proves nothing: the real one calls straight through.
+**Category**: data · merchant sites

@@ -1,3 +1,4 @@
+import { EDITIONS, environmentOfHost, hostsFor } from "@saroh/edition";
 import type { Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
@@ -98,6 +99,20 @@ export function sendPasswordResetEmail(
     return Promise.resolve();
 }
 
+/** Whether an origin is one edition's own accounts address. */
+function isAccountsOfEdition(origin: string): boolean {
+    try {
+        const { host } = new URL(origin);
+        const environment = environmentOfHost(host);
+        return (
+            environment !== null &&
+            EDITIONS.some((e) => hostsFor(e, environment).accounts === host)
+        );
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Where the sign-in pages are, for a link in an email: `ACCOUNTS_URL`, else
  * the origin the request came from (already checked against the trusted
@@ -108,7 +123,13 @@ export function accountsBase(
     source: { ACCOUNTS_URL?: string; NODE_ENV?: string },
     origin?: string,
 ): string | null {
+    // A sign-up on another edition's accounts is answered there (DEC-204).
+    const otherEdition =
+        origin && isAccountsOfEdition(origin) && source.ACCOUNTS_URL
+            ? origin
+            : undefined;
     const base =
+        otherEdition ??
         source.ACCOUNTS_URL ??
         origin ??
         (source.NODE_ENV === "development"

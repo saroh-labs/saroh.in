@@ -24,6 +24,10 @@ export interface ContactMessageRow {
     kind: string | null;
     message: string;
     createdAt: string;
+    /** When staff marked it handled; null while open. */
+    handledAt: string | null;
+    /** Where else this person appears, for read-only links. */
+    links: { lead: boolean; waitlist: boolean; userId: string | null };
 }
 
 export interface ContactMessagePage {
@@ -47,12 +51,25 @@ export function topicLabel(topic: string): string {
     return isTopic(topic) ? CONTACT_TOPIC_LABELS[topic] : topic;
 }
 
+/** Open (not handled yet) or handled; both unless one is asked for. */
+export type MessageState = "open" | "handled";
+
+export function messageState(
+    value: string | undefined,
+): MessageState | undefined {
+    return value === "open" || value === "handled" ? value : undefined;
+}
+
 export function listContactMessages(params: {
     topic?: ContactTopic;
+    state?: MessageState;
+    email?: string;
     cursor?: string;
 }): Promise<ContactMessagePage | null> {
     const search = new URLSearchParams();
     if (params.topic) search.set("topic", params.topic);
+    if (params.state) search.set("state", params.state);
+    if (params.email) search.set("email", params.email);
     if (params.cursor) search.set("cursor", params.cursor);
     const query = search.toString();
     return getJson<ContactMessagePage>(

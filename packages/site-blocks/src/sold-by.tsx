@@ -40,11 +40,10 @@ export function soldByLine(seller: {
  * Where a Free site's "Report" goes: saroh.in's page for customers, with
  * the site's address filled in for the report.
  */
-export function reportBusinessHref(host: string): string {
+export function reportBusinessHref(host: string, sarohSite: string): string {
+    const page = `${sarohSite}/customers`;
     const site = host.trim().toLowerCase();
-    return site
-        ? `https://saroh.in/customers?site=${encodeURIComponent(site)}`
-        : "https://saroh.in/customers";
+    return site ? `${page}?site=${encodeURIComponent(site)}` : page;
 }
 
 const said = (value: string | null | undefined): string | null => {

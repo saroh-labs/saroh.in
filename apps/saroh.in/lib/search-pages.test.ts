@@ -1,4 +1,3 @@
-import { listSearchPages } from "@saroh/search-pages";
 import { describe, expect, it, vi } from "vitest";
 
 import { llmsText } from "./llms";
@@ -6,17 +5,20 @@ import type { PublishList } from "./search-pages";
 import {
     builtSearchPages,
     builtTools,
+    footerToolLinks,
     liveSearchPages,
     liveTools,
     parsePublishList,
+    searchPages,
     shownToolLinks,
     solutionLink,
+    tradesHubLinks,
 } from "./search-pages";
 import { indexedPaths, lastModified } from "./site-pages";
 
 vi.mock("@/env", () => ({ env: {} }));
 
-const ALL = listSearchPages({ kind: "for" });
+const ALL = searchPages.listSearchPages({ kind: "for" });
 const salons = ALL.find((p) => p.slug === "salons");
 const draft = ALL.find((p) => p.slug !== "salons");
 if (!salons || !draft) throw new Error("the pilot pages are missing");
@@ -79,6 +81,14 @@ describe("which /for/ pages are built", () => {
             "/solutions/salons",
         );
         expect(solutionLink("gyms", list(false))).toBe("/solutions/gyms");
+    });
+
+    it("adds See all trades to Solutions once a /for/ page is live, on a preview too only then", () => {
+        expect(tradesHubLinks(list(false)).map((l) => l.href)).toEqual([
+            "/for",
+        ]);
+        expect(tradesHubLinks(list(false, []))).toEqual([]);
+        expect(tradesHubLinks(list(true, []))).toEqual([]);
     });
 });
 
@@ -176,5 +186,28 @@ describe("free tools (#1253)", () => {
         const noshow = liveTools(list(true, [NOSHOW]))[0];
         expect(lastModified(NOSHOW)).toBe(`${noshow.updated}T00:00:00+05:30`);
         expect(lastModified(QR)).toBe("2026-10-27T00:00:00+05:30");
+    });
+});
+
+describe("footerToolLinks", () => {
+    const tool = (slug: string) => ({ href: `/tools/${slug}` });
+    it("names five, the ones most come for first, then others to fill", () => {
+        const links = footerToolLinks(
+            [
+                "link-preview",
+                "qr-code-maker",
+                "receipt-maker",
+                "gst-calculator",
+                "quotation-maker",
+                "gift-voucher-maker",
+            ].map(tool),
+        );
+        expect(links.map((t) => t.href)).toEqual([
+            "/tools/gst-calculator",
+            "/tools/qr-code-maker",
+            "/tools/link-preview",
+            "/tools/receipt-maker",
+            "/tools/quotation-maker",
+        ]);
     });
 });

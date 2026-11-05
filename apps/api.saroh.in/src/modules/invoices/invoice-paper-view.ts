@@ -344,6 +344,8 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
               : i.standing === "CREDITED"
                 ? "Cancelled by credit note. "
                 : "";
+    // GST is only ever about rupees (DEC-204).
+    if (i.currency !== "INR") return paid.trim();
     return Number(i.tax) > 0
         ? `${paid}${businessName} is not registered for GST.`
         : `${paid}${businessName} is not registered for GST, so no tax is charged.`;
@@ -456,7 +458,7 @@ export function paperView(
         : typedTax
           ? [
                 ["Subtotal", money(i.subtotal)],
-                ["Tax", money(i.tax)],
+                [i.taxLabel ?? "Tax", money(i.tax)],
             ]
           : [];
 
@@ -477,7 +479,12 @@ export function paperView(
             ),
             tax: gst
                 ? `GSTIN ${gst.sellerGstin}${sellerState ? ` · ${sellerState}` : ""}`
-                : "Not registered for GST",
+                : i.sellerTaxId
+                  ? `Tax ID ${i.sellerTaxId}`
+                  : // GST is only ever about rupees (DEC-204).
+                    i.currency === "INR"
+                    ? "Not registered for GST"
+                    : "",
         },
         billedTo: {
             name: who.name,

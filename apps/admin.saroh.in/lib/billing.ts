@@ -68,6 +68,29 @@ export function getSarohSubscription(
 }
 
 /**
+ * One subscription for the list's sheet, or why there is none: refused
+ * (401/403), not found (404: a wrong or removed id), or the read failed.
+ */
+export async function readSarohSubscription(subscriptionId: string): Promise<{
+    detail: SarohSubscriptionDetail | null;
+    failed?: "error" | "refused" | "not-found";
+}> {
+    try {
+        const res = await adminFetch(
+            `/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
+        );
+        if (res.status === 401 || res.status === 403) {
+            return { detail: null, failed: "refused" };
+        }
+        if (res.status === 404) return { detail: null, failed: "not-found" };
+        if (!res.ok) return { detail: null, failed: "error" };
+        return { detail: (await res.json()) as SarohSubscriptionDetail };
+    } catch {
+        return { detail: null, failed: "error" };
+    }
+}
+
+/**
  * One subscription's history (admin plan U15): provider events, invoices,
  * billing emails and staff actions, newest first, a page at a time.
  */

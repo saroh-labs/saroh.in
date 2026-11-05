@@ -19,6 +19,7 @@ const findUnique = prisma.platformAdmin.findUnique as jest.Mock;
 const mutableEnv = env as { ADMIN_ALLOWLIST?: string };
 
 interface TestRequest {
+    headers?: { host?: string };
     user?: { id: string; email: string };
     platformAdmin?: {
         userId: string;
@@ -26,6 +27,7 @@ interface TestRequest {
         roles: AdminRole[];
         permissions: AdminPermission[];
         viaBootstrap: boolean;
+        edition: string | null;
     };
 }
 
@@ -71,6 +73,7 @@ describe("PlatformAdminGuard", () => {
                 AdminPermission.OrganizationRead,
             ]),
             viaBootstrap: false,
+            edition: null,
         });
     });
 
@@ -127,6 +130,7 @@ describe("PlatformAdminGuard", () => {
                 AdminPermission.FlagsPublish,
             ]),
             viaBootstrap: true,
+            edition: null,
         });
     });
 
@@ -292,5 +296,53 @@ describe("PlatformAdminGuard", () => {
             .catch((err: Error) => err.message);
 
         expect(revoked).toBe(never);
+    });
+
+    describe("the console's edition (DEC-204)", () => {
+        const grant = (role: AdminRole, editions: string[]) => ({
+            id: "pa_1",
+            revokedAt: null,
+            editions,
+            roleAssignments: [{ role, expiresAt: null, revokedAt: null }],
+        });
+        const onGlobal = (): TestRequest => ({
+            headers: { host: "api.saroh.tech" },
+            user: { id: "user_1", email: "staff@saroh.in" },
+        });
+
+        it("refuses staff whose grant doesn't include the edition", async () => {
+            findUnique.mockResolvedValue(grant(AdminRole.Support, ["INDIA"]));
+            await expect(
+                guard.canActivate(contextFor(onGlobal())),
+            ).rejects.toThrow("Your access doesn't include this edition.");
+        });
+
+        it("admits staff granted the edition, and says which it is", async () => {
+            findUnique.mockResolvedValue(
+                grant(AdminRole.Support, ["INDIA", "GLOBAL"]),
+            );
+            const request = onGlobal();
+            await guard.canActivate(contextFor(request));
+            expect(request.platformAdmin?.edition).toBe("GLOBAL");
+        });
+
+        it("lets a Platform owner open every edition", async () => {
+            findUnique.mockResolvedValue(
+                grant(AdminRole.PlatformOwner, ["INDIA"]),
+            );
+            const request = onGlobal();
+            await guard.canActivate(contextFor(request));
+            expect(request.platformAdmin?.edition).toBe("GLOBAL");
+        });
+
+        it("reads India's address as India", async () => {
+            findUnique.mockResolvedValue(grant(AdminRole.Support, ["INDIA"]));
+            const request: TestRequest = {
+                ...onGlobal(),
+                headers: { host: "api.saroh.in" },
+            };
+            await guard.canActivate(contextFor(request));
+            expect(request.platformAdmin?.edition).toBe("INDIA");
+        });
     });
 });

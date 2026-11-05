@@ -1,3 +1,5 @@
+import { DOC_KINDS } from "@saroh/search-pages/kinds";
+
 import { ABOUT } from "@/content/about";
 import type { ChangelogEntry } from "@/content/changelog";
 import { changelogHref, liveEntries } from "@/content/changelog";
@@ -19,6 +21,7 @@ import type { GalleryTemplate } from "@/content/templates";
 import { galleryTemplates, templateHref } from "@/content/templates";
 import type { LaunchMode } from "@/lib/links";
 import { LAUNCH_MODE } from "@/lib/links";
+import { liveDocPages } from "@/lib/search-page-route";
 import type { PublishList } from "@/lib/search-pages";
 import {
     liveSearchPages,
@@ -141,6 +144,21 @@ export function llmsText(
         out.push("", "## Tools", "");
         for (const page of tools) {
             out.push(line(base, page.href, page.name, page.line));
+        }
+    }
+
+    // The GST pages, guides and downloads (plan 2026-10-31-002): each
+    // group's live pages, under its hub, once any is live and routed.
+    for (const kind of DOC_KINDS) {
+        const pages = liveDocPages(kind.id, published).filter((p) =>
+            routeExists(p.path, ctx.routes),
+        );
+        if (pages.length === 0) continue;
+        out.push("", `## ${kind.hubLabel}`, "");
+        if (routeExists(kind.hub, ctx.routes))
+            out.push(`- [${kind.hubLabel}](${base}${kind.hub})`);
+        for (const p of pages) {
+            out.push(line(base, p.path, p.name, p.description));
         }
     }
 

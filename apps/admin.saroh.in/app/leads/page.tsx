@@ -33,14 +33,14 @@ export default async function LeadsPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer>
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Leads"]}
                     title="Leads"
                     description={
                         board?.scope === "own"
                             ? "The leads you work, by stage. A lead that starts paying becomes one of your businesses."
-                            : "Saroh's own sales leads, by stage: questions from saroh.in, the waitlist, and the ones the team adds."
+                            : "Saroh's own sales leads, by stage: questions from the website, the waitlist, and the ones the team adds."
                     }
                 />
                 {board ? (

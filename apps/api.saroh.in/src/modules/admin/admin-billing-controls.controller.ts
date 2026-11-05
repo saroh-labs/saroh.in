@@ -1,4 +1,5 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -12,6 +13,7 @@ import {
     RecordRefundDto,
 } from "./admin-billing-controls.dto";
 import { AdminBillingControlsService } from "./admin-billing-controls.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { OperatorReasonDto } from "./dto";
@@ -38,8 +40,9 @@ export class AdminBillingControlsController {
     async listActions(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListBillingActionsDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const page = await this.actions.list(staff, query);
+        const page = await this.actions.list(staff, query, edition);
         await this.read(staff, "billing.actions.list", "billing_action", {
             state: query.state ?? "open",
             // Never the search text: it may be a name.
@@ -66,8 +69,9 @@ export class AdminBillingControlsController {
     async listEvents(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListProviderEventsDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const page = await this.actions.events(staff, query);
+        const page = await this.actions.events(staff, query, edition);
         await this.read(staff, "billing.events.list", "billing_webhook_event", {
             filter: query.filter ?? "all",
             ...(query.q ? { searched: true } : {}),

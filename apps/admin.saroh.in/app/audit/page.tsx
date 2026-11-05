@@ -41,7 +41,7 @@ export default async function AuditPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Audit trail"]}
                     title="What operators did"

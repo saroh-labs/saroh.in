@@ -12,7 +12,7 @@ import { CloseAccess } from "./close-access";
 import { GiveOffer } from "./give-offer";
 import { LegalHoldNotice } from "./legal-hold-notice";
 import {
-    ATTENTION_LABEL,
+    attentionLabel,
     LegalHoldBadge,
     LifecycleBadge,
 } from "./lifecycle-badge";
@@ -83,7 +83,7 @@ export function BusinessHeader({
                         {held && <LegalHoldBadge />}
                         {summary.attention.map((reason) => (
                             <Badge key={reason} variant="warning">
-                                {ATTENTION_LABEL[reason]}
+                                {attentionLabel(reason, summary.lastActiveAt)}
                             </Badge>
                         ))}
                     </div>

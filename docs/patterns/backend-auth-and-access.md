@@ -641,6 +641,12 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   Granting, changing and revoking happen in the console (`/team`), never in
   SQL; assignments are append-only; no change may leave the instance without
   a Platform Owner whose ownership does not expire.
+- **Current** (DEC-204) — **A staff grant names its editions.**
+  `PlatformAdmin.editions` says which consoles someone may open; a request
+  through another edition's address is 403 `edition_not_granted`. A Platform
+  owner opens all. Grant adds (default: the console's own edition), Change
+  (`PUT staff/:id`) sets exactly, both `staff:grant`, with a reason, on the
+  ledger; a staff invite carries its editions to the grant. No new permission.
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
   `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
@@ -652,6 +658,16 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   returns what decides whether to act — never a business's customers, orders
   or messages — and reads personal data only behind `organization:pii:read`.
   A tenant path never calls one.
+- **Current** (DEC-204) — **A new admin list stays in its edition.** Its
+  controller takes `@ServedEdition() edition` and passes it to the service,
+  which filters with the helpers in `modules/admin/admin-edition.ts`:
+  `editionWhere` (a business, or a row with its own edition), `viaBusiness`,
+  `viaBusinessOrNone`, `byBusinessIds`, `peopleWhere`; put them in an `AND`
+  where another `OR` could collide. A path naming one business is covered by
+  `AdminEditionGuard`; add a new id param there. Never read the edition inside
+  a helper a job shares: sweeps, retention and deletion cross editions, so a
+  shared helper takes an optional `edition` that defaults to no filter. Staff,
+  releases and audit stay shared (DEC-204 item 6).
 - **Current** (DEC-121) — **Customers' reports about a business** are read
   with `organization:read` (the reporter's email only with
   `organization:pii:read`) and marked done with `reports:resolve`, which

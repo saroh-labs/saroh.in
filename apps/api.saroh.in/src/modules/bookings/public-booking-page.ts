@@ -166,6 +166,8 @@ export interface PublicBookingPage {
      * connected. Whether the desk is on offer is `rules.bookingPayment`.
      */
     payOnline: boolean;
+    /** What a Global business chose at setup, for a zero; else null. */
+    currency: string | null;
     rules: BookingRulesValue;
     services: {
         id: string;
@@ -493,7 +495,9 @@ export async function publicBookingPage(
         },
         select: {
             organizationId: true,
-            organization: { select: { name: true, isDemo: true } },
+            organization: {
+                select: { name: true, isDemo: true, currency: true },
+            },
         },
     });
     if (!site) throw new NotFoundException("Site not found");
@@ -561,6 +565,7 @@ export async function publicBookingPage(
         ...(site.organization.isDemo ? { demo: true as const } : {}),
         timezone: zone,
         payOnline: online && allowsOnline(rules),
+        currency: site.organization.currency,
         rules,
         services: offered.map((svc) => ({
             id: svc.id,

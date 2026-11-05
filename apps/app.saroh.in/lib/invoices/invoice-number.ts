@@ -106,7 +106,10 @@ function localParts(
 export function financialYear(
     now: Date,
     zone: string | null = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
+    // January to December, a Global business's choice (DEC-204): "2026".
+    if (yearStartMonth === 1) return String(localParts(now, zone).year);
     const start = financialYearStart(now, zone);
     return `${twoDigits(start)}-${twoDigits(start + 1)}`;
 }
@@ -118,7 +121,9 @@ export function financialYear(
 export function financialYearShort(
     now: Date,
     zone: string | null = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
+    if (yearStartMonth === 1) return twoDigits(localParts(now, zone).year);
     return twoDigits(financialYearStart(now, zone));
 }
 
@@ -138,14 +143,15 @@ export function partValue(
     prefix: string | null,
     now: Date = new Date(),
     zone: string | null = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
     switch (part) {
         case "PREFIX":
             return printedPrefix(prefix);
         case "FY":
-            return financialYear(now, zone);
+            return financialYear(now, zone, yearStartMonth);
         case "FY_SHORT":
-            return financialYearShort(now, zone);
+            return financialYearShort(now, zone, yearStartMonth);
         case "YEAR":
             return String(localParts(now, zone).year);
         case "MONTH":
@@ -189,6 +195,7 @@ function stem(
     now: Date,
     mark: CreditMark,
     zone: string | null = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
     const values = format.parts.map((part) => {
         if (part === "PREFIX" && credit) {
@@ -196,7 +203,7 @@ function stem(
                 ? CREDIT_MARK
                 : `${printedPrefix(prefix)}${CREDIT_MARK}`;
         }
-        return partValue(part, prefix, now, zone);
+        return partValue(part, prefix, now, zone, yearStartMonth);
     });
     const parts =
         credit && mark === "first" ? [CREDIT_MARK, ...values] : values;
@@ -215,6 +222,7 @@ export function formatNumber(
         credit?: boolean;
         now?: Date;
         timezone?: string | null;
+        yearStartMonth?: number | null;
     },
 ): string {
     const mark = creditMark(format, input.prefix);
@@ -225,6 +233,7 @@ export function formatNumber(
         input.now ?? new Date(),
         mark,
         input.timezone ?? DEFAULT_TIMEZONE,
+        input.yearStartMonth,
     );
     return `${head}${String(input.counter).padStart(format.digits, "0")}`;
 }
@@ -335,6 +344,7 @@ export function nextInvoiceNumber(
         now?: Date;
         /** The business's zone, which dates the number; India's if none. */
         timezone?: string | null;
+        yearStartMonth?: number | null;
     },
 ): string {
     const last = input.samePrefix ? (input.last?.[format.restart] ?? 0) : 0;
@@ -343,6 +353,7 @@ export function nextInvoiceNumber(
         counter: last + 1,
         now: input.now,
         timezone: input.timezone,
+        yearStartMonth: input.yearStartMonth,
     });
 }
 

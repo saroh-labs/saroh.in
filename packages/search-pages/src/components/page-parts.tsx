@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Fragment } from "react";
 
 import type { Question } from "../schema";
 
@@ -30,18 +31,33 @@ export interface Crumb {
 export function Crumbs({
     crumbs,
     brand = false,
+    home,
+    collapse = false,
+    sep = "/",
 }: {
     crumbs: Crumb[];
     brand?: boolean;
+    /** Start the trail at Home (the content pages); its href, or none in the preview. */
+    home?: { href?: string };
+    /** On a phone, a trail of 4 or more shows the first, "…" and the last. */
+    collapse?: boolean;
+    /** "›" is the content pages' trail: 14.5px, the page itself in Ink 600. */
+    sep?: "/" | "›";
 }) {
+    const all = home ? [{ name: "Home", href: home.href }, ...crumbs] : crumbs;
+    const fold = collapse && all.length >= 4;
     return (
-        <nav aria-label="Breadcrumb" className="sp-crumb">
-            {crumbs.map((c, i) => {
-                const last = i === crumbs.length - 1;
-                const d = c.deskOnly ? "sp-d" : undefined;
-                return (
+        <nav
+            aria-label="Breadcrumb"
+            className={cls("sp-crumb", sep === "›" && "sp-crumb-c")}
+        >
+            {all.map((c, i) => {
+                const last = i === all.length - 1;
+                const d =
+                    c.deskOnly || (fold && i > 0 && !last) ? "sp-d" : undefined;
+                const item = (
                     <span key={i} className={cls("sp-crumb-i", d)}>
-                        {i > 0 ? <span aria-hidden="true">/</span> : null}
+                        {i > 0 ? <span aria-hidden="true">{sep}</span> : null}
                         {last ? (
                             <span
                                 aria-current="page"
@@ -54,6 +70,17 @@ export function Crumbs({
                         )}
                     </span>
                 );
+                return fold && last ? (
+                    <Fragment key={i}>
+                        <span className="sp-crumb-i sp-p">
+                            <span aria-hidden="true">{sep}</span>
+                            <span aria-hidden="true">…</span>
+                        </span>
+                        {item}
+                    </Fragment>
+                ) : (
+                    item
+                );
             })}
         </nav>
     );
@@ -65,16 +92,19 @@ export function Questions({
     openFirst = false,
     headingClass,
     className,
+    compact = false,
 }: {
     questions: readonly Question[];
     /** The first answer starts open (a /for/ page). */
     openFirst?: boolean;
+    /** The GST pages' smaller rows (15.5px questions, 15px answers). */
+    compact?: boolean;
     /** The page's own H2 class, so "Questions" matches its other headings. */
     headingClass: string;
     className?: string;
 }) {
     return (
-        <section className={cls("sp-faq", className)}>
+        <section className={cls("sp-faq", compact && "sp-faq-c", className)}>
             <h2 className={headingClass}>Questions</h2>
             <div className="sp-faq-list">
                 {questions.map((q, i) => (
@@ -109,16 +139,19 @@ export function StartButton({
     href,
     label,
     amber = false,
+    src,
 }: {
     href?: string;
     label?: string;
     amber?: boolean;
+    /** Names the page and spot (`gst-salon-band`), as the href's `src=` does. */
+    src?: string;
 }) {
     return (
         <a
             className={cls("sp-btn", amber && "sp-btn-amber")}
             href={href}
-            data-cta=""
+            data-cta={src ?? ""}
         >
             {label ?? "Start free"}
         </a>
@@ -134,6 +167,8 @@ export function ClosingBand({
     href,
     label,
     className,
+    src,
+    look,
 }: {
     title: ReactNode;
     line?: ReactNode;
@@ -144,9 +179,17 @@ export function ClosingBand({
     href?: string;
     label?: string;
     className?: string;
+    /** The start button's `data-cta`: the page and spot, e.g. `gst-salon-band`. */
+    src?: string;
+    /**
+     * The content pages' bands (BLOCKS.md): `wide` on hubs and downloads,
+     * `stack` (title, line, button in a column) on GST and guide pages.
+     * Unset is the /for/ and tools band.
+     */
+    look?: "wide" | "stack";
 }) {
     return (
-        <section className={cls("sp-cta", className)}>
+        <section className={cls("sp-cta", look && `sp-cta-${look}`, className)}>
             <div className="sp-cta-copy">
                 <h2 className="sp-cta-h">{title}</h2>
                 {line ? (
@@ -156,7 +199,7 @@ export function ClosingBand({
                 ) : null}
             </div>
             <div className="sp-cta-act">
-                <StartButton href={href} label={label} amber />
+                <StartButton href={href} label={label} amber src={src} />
                 {note ? <span className="sp-cta-note">{note}</span> : null}
             </div>
         </section>

@@ -1,9 +1,11 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { istDay } from "../admin/admin-billing";
+import { editionWhere } from "../admin/admin-edition";
 import { AdminPermission } from "../admin/admin-permissions";
 import { ownerWhere, scopeForStaff } from "../admin/staff-scope";
 import {
@@ -46,10 +48,12 @@ export class SarohLeadsService {
     async board(
         staff: PlatformAdminInfo,
         query: LeadsBoardQuery = {},
+        edition: Edition | null = null,
     ): Promise<LeadsBoard> {
         const scope = scopeForStaff(staff, AdminPermission.SarohLeadsRead);
         const today = istDay(new Date());
         const where: Prisma.SarohLeadWhereInput = {
+            ...editionWhere(edition),
             ...ownerWhere(scope, "ownerPlatformAdminId"),
             ...ownerFilter(scope, query.owner),
             ...searchFilter(query.q),
@@ -75,9 +79,13 @@ export class SarohLeadsService {
             }),
             scope.kind === "all"
                 ? prisma.sarohLead.count({
+                      // Follows the search, as every other count does,
+                      // so no tile is half-filtered (admin audit F14).
                       where: {
                           ownerPlatformAdminId: null,
                           stage: { in: [...OPEN_STAGES] },
+                          ...searchFilter(query.q),
+                          ...editionWhere(edition),
                       },
                   })
                 : Promise.resolve(null),
@@ -161,6 +169,7 @@ export class SarohLeadsService {
      */
     async managers(
         staff: PlatformAdminInfo,
+        edition: Edition | null = null,
     ): Promise<{ platformAdminId: string; name: string; openLeads: number }[]> {
         const scope = scopeForStaff(staff, AdminPermission.SarohLeadsWrite);
         if (scope.kind !== "all" || !maySeeAll(staff)) {
@@ -182,7 +191,10 @@ export class SarohLeadsService {
                 _count: {
                     select: {
                         sarohLeads: {
-                            where: { stage: { in: [...OPEN_STAGES] } },
+                            where: {
+                                stage: { in: [...OPEN_STAGES] },
+                                ...editionWhere(edition),
+                            },
                         },
                     },
                 },

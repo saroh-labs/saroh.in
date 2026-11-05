@@ -1,49 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { PricingCards as Cards } from "@saroh/marketing/pricing-cards";
+import type {
+    PricingPageModel,
+    PricingSwitches,
+} from "@saroh/marketing/pricing-model";
+import { usePricingSwitches } from "@saroh/marketing/use-pricing-switches";
 
 import { track } from "@/lib/analytics";
-import type { PricingPageModel, PricingView } from "@/lib/pricing-model";
-import { viewKey } from "@/lib/pricing-model";
 
-import { Arrow } from "../shared/links/arrow";
-import { textLinkClasses } from "../shared/links/text-link";
-import { BillingToggle } from "./billing-toggle";
+import { CtaLink } from "../shared/buttons/cta-link";
 import { GstToggle } from "./gst-toggle";
-import { PlanCards } from "./plan-cards";
-
-export interface PricingSwitches {
-    yearly: boolean;
-    setYearly: (v: boolean) => void;
-    withGst: boolean;
-    setWithGst: (v: boolean) => void;
-    view: PricingView;
-}
 
 /**
- * The two switches (yearly, with GST) and the view they pick from the
- * model the server worked out (`pricingPageModel`). `/pricing` holds them
- * itself so its tables follow the same switches as its cards.
- */
-export function usePricingSwitches(model: PricingPageModel): PricingSwitches {
-    const [yearly, setYearly] = useState(false);
-    const [withGst, setWithGst] = useState(model.gst.initial);
-    return {
-        yearly,
-        setYearly,
-        withGst,
-        setWithGst,
-        view: model.views[viewKey(yearly && !!model.yearly, withGst)],
-    };
-}
-
-/**
- * The plan cards as the Pricing page draws them, with its switches and
- * footnote: ONE component wherever plans show (the Pricing page, Home, a
- * /solutions/ page, a /for/ page), so they never drift. `compare` adds
- * "Compare every plan" for pages without the comparison tables; `src` says
- * where a sign-up came from. Sends `pricing_toggle` when a switch flips.
+ * The plan cards as this site draws them: its start button (`CtaLink`, the one
+ * CTA builder, KTD-16), its GST box and its `pricing_toggle` events. ONE
+ * component wherever plans show (the Pricing page, Home, a /solutions/ page, a
+ * /for/ page), so they never drift. `compare` adds "Compare every plan" for
+ * pages without the comparison tables; `src` says where a sign-up came from.
  */
 export function PricingCards({
     model,
@@ -58,60 +32,38 @@ export function PricingCards({
     compare?: boolean;
 }) {
     const own = usePricingSwitches(model);
-    const { yearly, setYearly, withGst, setWithGst, view } = switches ?? own;
-    const showControls = !!model.yearly || model.gst.toggle;
-
     return (
-        <div className="grid gap-3.5">
-            {showControls ? (
-                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
-                    {model.yearly ? (
-                        <BillingToggle
-                            yearly={yearly}
-                            freeMonths={model.yearly.freeMonths}
-                            onChange={(v) => {
-                                if (v === yearly) return;
-                                setYearly(v);
-                                track("pricing_toggle", {
-                                    control: "yearly",
-                                    value: v,
-                                });
-                            }}
-                        />
-                    ) : null}
-                    {model.gst.toggle ? (
-                        <GstToggle
-                            checked={withGst}
-                            onChange={(v) => {
-                                setWithGst(v);
-                                track("pricing_toggle", {
-                                    control: "gst",
-                                    value: v,
-                                });
-                            }}
-                        />
-                    ) : null}
-                </div>
-            ) : null}
-            <PlanCards plans={view.plans} src={src} />
-            {view.footnote || compare ? (
-                <div className="flex flex-wrap gap-x-5 gap-y-2 text-mk-note text-muted-foreground">
-                    {view.footnote ? (
-                        <span aria-live="polite">{view.footnote}</span>
-                    ) : null}
-                    {compare ? (
-                        <Link
-                            href="/pricing"
-                            className={textLinkClasses({
-                                className: "font-semibold",
-                            })}
-                        >
-                            Compare every plan
-                            <Arrow />
-                        </Link>
-                    ) : null}
-                </div>
-            ) : null}
-        </div>
+        <Cards
+            model={model}
+            switches={switches ?? own}
+            compare={
+                compare
+                    ? { href: "/pricing", label: "Compare every plan" }
+                    : undefined
+            }
+            cta={(p, look) => (
+                <CtaLink
+                    src={src}
+                    plan={p.cta.plan}
+                    planName={p.cta.planName}
+                    paid={p.cta.paid}
+                    trialDays={p.cta.trialDays}
+                    cycle={p.cta.cycle}
+                    {...look}
+                />
+            )}
+            onYearlyChange={(v) =>
+                track("pricing_toggle", { control: "yearly", value: v })
+            }
+            taxToggle={(checked, onChange) => (
+                <GstToggle
+                    checked={checked}
+                    onChange={(v) => {
+                        onChange(v);
+                        track("pricing_toggle", { control: "gst", value: v });
+                    }}
+                />
+            )}
+        />
     );
 }

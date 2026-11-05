@@ -11,16 +11,32 @@
     "types": "./src/index.ts",
     "files": [
         "src/**",
-        "content/**"
+        "content/**",
+        "scripts/embed-content.mjs",
+        "scripts/embed-docs.mjs",
+        "kinds.js",
+        "kinds.d.ts"
     ],
     "exports": {
         ".": "./src/index.ts",
         "./checks": "./src/checks.tsx",
+        "./tool-checks": "./src/tool-checks.ts",
+        "./docs": "./src/docs.ts",
+        "./docs-embedded": "./src/docs-embedded.ts",
+        "./embedded": "./src/embedded.ts",
+        "./embed-docs": "./scripts/embed-docs.mjs",
+        "./embed-content": "./scripts/embed-content.mjs",
         "./download": "./src/tools/download.ts",
+        "./tool-slot": "./src/tools/tool-slot.tsx",
+        "./tools": "./src/tools/every-tool-slot.tsx",
+        "./tools/*": "./src/tools/*/index.tsx",
+        "./pages": "./src/content-pages.ts",
+        "./kinds": "./kinds.js",
         "./styles.css": "./src/styles.css"
     },
     "scripts": {
         "content": "node scripts/embed-content.mjs",
+        "docs-content": "node scripts/embed-docs.mjs",
         "lint": "eslint src/",
         "test": "vitest run",
         "typecheck": "tsc --noEmit"

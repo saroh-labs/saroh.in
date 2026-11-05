@@ -75,6 +75,7 @@ const DIGIT_OPTIONS = Array.from(
  * GST's 16. Wrapped at the card's field widths by `at`.
  */
 export function InvoiceNumberFields({
+    yearStartMonth,
     format,
     prefix,
     registered,
@@ -83,6 +84,8 @@ export function InvoiceNumberFields({
     timezone,
     at,
 }: {
+    /** When the business's numbering year starts; absent, April. */
+    yearStartMonth?: number;
     /** The format the four fields describe now. */
     format: NumberFormat;
     prefix: string | null;
@@ -118,6 +121,7 @@ export function InvoiceNumberFields({
         counter: 1,
         credit: true,
         timezone,
+        yearStartMonth,
     });
 
     return (
@@ -190,6 +194,7 @@ export function InvoiceNumberFields({
                                                     prefix,
                                                     new Date(),
                                                     timezone,
+                                                    yearStartMonth,
                                                 )}
                                             </span>
                                         </Label>

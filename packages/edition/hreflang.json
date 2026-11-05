@@ -1,0 +1,106 @@
+{
+    "tech": "https://saroh.tech",
+    "in": "https://www.saroh.in",
+    "pairs": [
+        {
+            "tech": "/",
+            "in": "/"
+        },
+        {
+            "tech": "/pricing",
+            "in": "/pricing"
+        },
+        {
+            "tech": "/about",
+            "in": "/about"
+        },
+        {
+            "tech": "/contact",
+            "in": "/contact"
+        },
+        {
+            "tech": "/integrations",
+            "in": "/integrations"
+        },
+        {
+            "tech": "/customers",
+            "in": "/customers"
+        },
+        {
+            "tech": "/changelog",
+            "in": "/changelog"
+        },
+        {
+            "tech": "/tools",
+            "in": "/tools"
+        },
+        {
+            "tech": "/tools/invoice-generator",
+            "in": "/tools/gst-invoice-generator"
+        },
+        {
+            "tech": "/tools/quote-maker",
+            "in": "/tools/quotation-maker"
+        },
+        {
+            "tech": "/tools/receipt-maker",
+            "in": "/tools/receipt-maker"
+        },
+        {
+            "tech": "/tools/gst-calculator",
+            "in": "/tools/gst-calculator"
+        },
+        {
+            "tech": "/features/dashboard",
+            "in": "/features/dashboard"
+        },
+        {
+            "tech": "/features/products",
+            "in": "/features/products"
+        },
+        {
+            "tech": "/features/orders",
+            "in": "/features/orders"
+        },
+        {
+            "tech": "/features/customers",
+            "in": "/features/customers"
+        },
+        {
+            "tech": "/features/bookings",
+            "in": "/features/bookings"
+        },
+        {
+            "tech": "/features/subscriptions",
+            "in": "/features/subscriptions"
+        },
+        {
+            "tech": "/features/billing",
+            "in": "/features/billing"
+        },
+        {
+            "tech": "/features/website",
+            "in": "/features/website"
+        },
+        {
+            "tech": "/features/insights",
+            "in": "/features/insights"
+        },
+        {
+            "tech": "/solutions/shops",
+            "in": "/solutions/shops"
+        },
+        {
+            "tech": "/solutions/salons",
+            "in": "/solutions/salons"
+        },
+        {
+            "tech": "/solutions/gyms",
+            "in": "/solutions/gyms"
+        },
+        {
+            "tech": "/solutions/clinics",
+            "in": "/solutions/clinics"
+        }
+    ]
+}

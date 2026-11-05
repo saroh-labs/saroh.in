@@ -1,3 +1,5 @@
+import type { Edition } from "@saroh/edition";
+import { EDITIONS } from "@saroh/edition";
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
@@ -283,10 +285,20 @@ export class ListOrganizationsDto {
 }
 
 /** Storage used per business (#798): sorted by size, one page at a time. */
+/** A page of one flag's history (`?page=`, from 1). */
+export class FlagHistoryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(10_000)
+    page?: number;
+}
+
 export class ListStorageUsageDto {
     @IsOptional()
-    @IsIn(["most", "least"])
-    order?: "most" | "least";
+    @IsIn(["most", "least", "closest"])
+    order?: "most" | "least" | "closest";
 
     @IsOptional()
     @Type(() => Number)
@@ -335,6 +347,14 @@ export class GrantStaffDto {
     @IsBoolean()
     onCommission?: boolean;
 
+    /** Which consoles they may open. Left out: see the service. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(EDITIONS.length)
+    @IsIn(EDITIONS, { each: true })
+    editions?: Edition[];
+
     @Transform(trim)
     @IsString()
     @MinLength(8)
@@ -354,6 +374,14 @@ export class AmendStaffDto extends OperatorReasonDto {
     @IsOptional()
     @IsISO8601()
     expiresAt?: string;
+
+    /** Which consoles they may open, exactly. Left out: unchanged. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(EDITIONS.length)
+    @IsIn(EDITIONS, { each: true })
+    editions?: Edition[];
 }
 
 /**
@@ -458,6 +486,14 @@ export class SearchPeopleDto {
     @ArrayMaxSize(PEOPLE_FILTERS.length)
     @IsIn(PEOPLE_FILTERS, { each: true })
     filter?: PeopleFilter[];
+
+    /** Which page of the list, from 1 (`LIST_LIMIT` a page). Text: converted. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(1000)
+    page?: number;
 }
 
 /** Change a person's sign-in email (U9). */
@@ -544,9 +580,20 @@ export class ExplainFlagDto {
 }
 
 export class ListWaitlistDto {
+    /**
+     * Waiting (the default) leaves out free-tool email gates, which are not
+     * people waiting for Saroh; "tools" lists only those.
+     */
     @IsOptional()
-    @IsIn(["waiting", "invited"])
-    state?: "waiting" | "invited";
+    @IsIn(["waiting", "invited", "tools"])
+    state?: "waiting" | "invited" | "tools";
+
+    /** One person's entry, by their address (the Leads and Messages links). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(320)
+    email?: string;
 
     @IsOptional()
     @IsString()
@@ -602,10 +649,28 @@ export class ListContactMessagesDto {
     @IsIn(CONTACT_TOPICS)
     topic?: ContactTopic;
 
+    /** Open (not handled yet) or handled; both when unset. */
+    @IsOptional()
+    @IsIn(["open", "handled"])
+    state?: "open" | "handled";
+
+    /** One person's messages, by their address (the Leads link). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(320)
+    email?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(200)
     cursor?: string;
+}
+
+/** Mark a message handled, or open again (the team replied from its mailbox). */
+export class MarkContactMessageDto {
+    @IsBoolean()
+    handled!: boolean;
 }
 
 /**

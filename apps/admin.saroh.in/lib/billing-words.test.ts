@@ -216,7 +216,7 @@ describe("a subscription row in words (R26)", () => {
                 nextChargeAt: null,
                 cancelAtPeriodEnd: true,
             }),
-        ).toBe("None · ends 3 Nov 2026");
+        ).toBe("No next charge · ends 3 Nov 2026");
         expect(
             nextChargeLine({
                 ...base,
@@ -224,7 +224,7 @@ describe("a subscription row in words (R26)", () => {
                 nextChargeHow: "NONE",
                 nextChargeAt: null,
             }),
-        ).toBe("None · ended");
+        ).toBe("No next charge · ended");
     });
 
     it("marks an autopay running out soon, and one declined", () => {

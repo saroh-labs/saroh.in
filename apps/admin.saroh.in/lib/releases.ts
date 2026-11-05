@@ -80,6 +80,22 @@ export function haveItCount(
     return whoHasIt(flag, organizations).filter((row) => row.on).length;
 }
 
+/**
+ * The list's count. A module release only allows a business the module,
+ * which it still switches on itself, so it says "Allowed for", not "has".
+ */
+export function haveItLabel(
+    flag: AdminFlag,
+    have: number,
+    total: number,
+): string {
+    const all = total > 0 && have === total;
+    if (flag.metadata.group === "module") {
+        return all ? `Allowed for all ${have}` : `Allowed for ${have}`;
+    }
+    return all ? `All ${businesses(have)}` : businesses(have);
+}
+
 /** One line under the title: the default, then who differs from it. */
 export function effectiveSummary(flag: AdminFlag): string {
     if (flag.enabledByDefault === true) {
@@ -213,6 +229,8 @@ export function reviewOverdue(flag: AdminFlag, today: string): boolean {
 export interface WhoRow {
     organizationId: string;
     name: string;
+    /** Its web address, to tell apart businesses that share a name. */
+    slug: string | null;
     on: boolean;
     /** The business's own setting, when it has one. */
     override: boolean | null;
@@ -234,6 +252,7 @@ export function whoHasIt(
         return {
             organizationId: org.id,
             name: org.name,
+            slug: org.slug,
             on: override ?? fallback,
             override,
             sameAsDefault: override !== null && override === fallback,
@@ -245,6 +264,7 @@ export function whoHasIt(
             rows.push({
                 organizationId: o.organizationId,
                 name: o.organizationName,
+                slug: null,
                 on: o.enabled,
                 override: o.enabled,
                 sameAsDefault: o.enabled === fallback,
@@ -256,6 +276,36 @@ export function whoHasIt(
             Number(b.override !== null) - Number(a.override !== null) ||
             a.name.localeCompare(b.name),
     );
+}
+
+/** Whether a business matches a search, by its name or web address. */
+export function matchesBusiness(
+    row: { name: string; slug: string | null },
+    query: string,
+): boolean {
+    const q = query.trim().toLowerCase();
+    return (
+        !q ||
+        row.name.toLowerCase().includes(q) ||
+        (row.slug?.toLowerCase().includes(q) ?? false)
+    );
+}
+
+/** Who has it's chips: everyone, by what they get, or set for them alone. */
+export type WhoShow = "all" | "on" | "off" | "own";
+
+export const WHO_FILTERS: { value: WhoShow; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "on", label: "Has it" },
+    { value: "off", label: "Doesn't" },
+    { value: "own", label: "Set for them alone" },
+];
+
+export function passesWho(row: WhoRow, show: WhoShow): boolean {
+    if (show === "on") return row.on;
+    if (show === "off") return !row.on;
+    if (show === "own") return row.override !== null;
+    return true;
 }
 
 /** The global change that applies now: on when off or never set, else off. */

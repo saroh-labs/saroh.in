@@ -18,10 +18,13 @@ import {
 } from "@/components/organizations/business-details/registered-address-fields";
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
 import { GstRatePicker } from "@/components/shared/fields/gst-rate-picker";
+import { EDITION } from "@/lib/edition";
 import { rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
+
+import { GlobalTaxFields } from "./global-tax-fields";
 import { GstinGuide } from "./gstin-guide";
 import { InvoiceNumberFields } from "./invoice-number-fields";
 
@@ -132,6 +135,9 @@ export function BusinessTaxFields({
 
     switch (sheet) {
         case "gst":
+            if (EDITION === "GLOBAL") {
+                return <GlobalTaxFields control={control} taxId={taxId} />;
+            }
             return (
                 <>
                     <FormField
@@ -196,6 +202,7 @@ export function BusinessTaxFields({
                         )}
                     />
                     <InvoiceNumberFields
+                        yearStartMonth={Number(v.yearStartMonth)}
                         format={formatOf(v)}
                         prefix={prefixOf(v.invoicePrefix)}
                         registered={registered}

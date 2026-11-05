@@ -355,7 +355,7 @@ e2e_stack() {
     # picker in the app, which the templates specs open. Unset is off.
     export NEXT_PUBLIC_TEMPLATES=on
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""
     if specs_open_admin "$specs"; then admin_filter=--filter=admin; fi
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
@@ -699,7 +699,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     # The operator console, when an `admin:` spec is in the run.
     [ "$E2E_STATUS" = run ] && specs_open_admin "$specs" && ports="$ports 3006"
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
@@ -876,7 +876,10 @@ bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step domains pnpm run check:domains
+bg_step shared-data pnpm run check:shared-data
 bg_step date-inputs pnpm run check:date-inputs
+bg_step native-selects pnpm run check:native-selects
 bg_step history-state pnpm run check:history-state
 bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request
 bg_step client-calls pnpm run check:client-calls
@@ -1222,6 +1225,19 @@ fi
 
 bg_report
 [ "$E2E" = 1 ] && e2e_finish
+
+# A production-like build of saroh.in carries no word or file of a page that
+# isn't live, nor a draft tool's code (plans 2026-10-31-002 R3, 2026-11-01-001
+# U4). A whole site build, so not in the quick run; after the browser run,
+# never beside it.
+if [ "$QUICK" = 0 ] && affected web; then
+    step draft-words pnpm run check:draft-words
+fi
+
+# saroh.tech's postbuild fails on a claim the product can't back (DEC-203).
+if [ "$QUICK" = 0 ] && affected tech; then
+    step tech-claims pnpm --filter tech build
+fi
 
 [ -n "$W" ] && [ -z "$FAILED" ] && rm -rf "$W"
 echo "--- $(( $(date +%s) - T0 ))s"

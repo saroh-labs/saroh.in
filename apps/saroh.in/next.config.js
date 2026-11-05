@@ -6,6 +6,7 @@ const {
     searchRedirects,
 } = require("./redirects");
 const {
+    docExists,
     familyOf,
     loadPublishList,
     toolExists,
@@ -64,7 +65,9 @@ const SECURITY_HEADERS = [
 // off (@saroh/auth/security-headers). A rule of their own: a policy governs
 // a page, not the files and redirects SECURITY_HEADERS also reaches.
 const PAGE_POLICIES = pageSecurityHeaders({
-    uses: ["google", "meta"],
+    // The header asks the API who is signed in (lib/browser/session.ts).
+    origins: [process.env.API_URL],
+    uses: ["google", "meta", "turnstile"],
     posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     dev: process.env.NODE_ENV === "development",
 });
@@ -72,7 +75,12 @@ const PAGE_POLICIES = pageSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
-    transpilePackages: ["@saroh/ui", "@saroh/search-pages"],
+    transpilePackages: [
+        "@saroh/ui",
+        "@saroh/marketing",
+        "@saroh/search-pages",
+        "@saroh/site-blocks",
+    ],
 
     // No database here — saroh.in is the public marketing site (single backend
     // lives at api.saroh.in).
@@ -94,6 +102,9 @@ const nextConfig = {
         // The /for/ publish list (DEC-193, `lib/search-pages.ts`); empty
         // when none was read, which a production build refuses.
         SAROH_SEARCH_PAGES: searchPages ? JSON.stringify(searchPages) : "",
+        // The API's address, for the header's "who is signed in?" check
+        // (lib/browser/session.ts). Not a secret; empty skips the check.
+        SAROH_API_URL: process.env.API_URL ?? "",
     },
 
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
@@ -125,7 +136,7 @@ const nextConfig = {
     async redirects() {
         return [
             ...REDIRECTS,
-            ...searchRedirects(searchPages, familyOf, toolExists),
+            ...searchRedirects(searchPages, familyOf, toolExists, docExists),
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
             ...launched(
                 process.env.NEXT_PUBLIC_LAUNCH_MODE,

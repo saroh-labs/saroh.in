@@ -1,0 +1,211 @@
+/* DownloadPage's own layout (download-page.tsx); its blocks are styles.css's. Boards downloads/Sample*. */
+/* The board's left column: as wide when the gate beside it is empty. */
+.sp-dl-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 560px;
+}
+.sp .sp-dl-h1 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(38px, 4.6vw, 54px);
+    line-height: 1.04;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+.sp .sp-dl-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--sp-body);
+}
+.sp .sp-dl-ben {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: var(--sp-body);
+}
+@media (max-width: 899.98px) {
+    .sp .sp-dl-h1 {
+        font-size: 26px;
+    }
+}
+
+/* DownloadGate (download-gate.tsx): the card in the hero's aside. */
+.sp-dl-gate {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 28px;
+    border: 1px solid var(--sp-line);
+    border-radius: 18px;
+    background: var(--sp-white);
+    box-shadow: 0 10px 30px rgba(28, 28, 26, 0.06);
+}
+.sp-dl-gate-head,
+.sp-dl-gate-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.sp-dl-gate-title {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+}
+.sp-dl-gate-line {
+    font-size: 14.5px;
+    color: var(--sp-body);
+}
+.sp .sp-dl-gate-via {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 8px;
+}
+.sp-dl-gate-opt {
+    position: relative;
+    flex: 1;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--sp-line-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.sp-dl-gate-opt input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.sp-dl-gate-opt:has(input:checked) {
+    background: var(--sp-ink);
+    border-color: var(--sp-ink);
+    color: var(--sp-paper);
+}
+.sp-dl-gate-opt:has(input:focus-visible),
+.sp-dl-gate-box:focus-within,
+.sp-dl-gate-btn:focus-visible,
+.sp-dl-gate-again:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.sp-dl-gate-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+.sp-dl-gate-box {
+    display: flex;
+    height: 44px;
+    border: 1px solid var(--sp-line-strong);
+    border-radius: 9px;
+    overflow: hidden;
+    background: var(--sp-white);
+}
+.sp-dl-gate-box:has([aria-invalid="true"]) {
+    border-color: var(--sp-bad);
+}
+.sp-dl-gate-pre {
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    background: var(--sp-paper);
+    font-size: 15px;
+    color: var(--sp-body);
+    border-right: 1px solid var(--sp-line);
+}
+.sp .sp-dl-gate-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    padding: 0 12px;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--sp-ink);
+    background: transparent;
+}
+.sp-dl-gate-error {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--sp-bad);
+}
+.sp-dl-gate-check {
+    min-height: 65px;
+}
+.sp .sp-dl-gate-btn {
+    height: 52px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    font-size: 16px;
+    font-family: inherit;
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    cursor: pointer;
+}
+.sp .sp-dl-gate-btn:disabled {
+    opacity: 0.7;
+    cursor: progress;
+}
+.sp .sp-dl-gate-note {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--sp-muted-2);
+}
+.sp .sp-dl-gate-note a {
+    color: var(--sp-muted-2);
+}
+.sp .sp-dl-gate-done {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+.sp .sp-dl-gate-files {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.sp .sp-dl-gate-files a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sp-amber-text);
+}
+.sp .sp-dl-gate-again {
+    align-self: flex-start;
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 14.5px;
+    color: var(--sp-body);
+    text-decoration: underline;
+    cursor: pointer;
+}
+@media (max-width: 899.98px) {
+    .sp-dl-gate {
+        padding: 22px;
+    }
+    /* 16px or a phone zooms in on focus. */
+    .sp .sp-dl-gate-input {
+        font-size: 16px;
+    }
+}

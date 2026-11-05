@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { emailVerifiedBySelf } from "../../common/auth/email-verification";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
@@ -26,7 +27,9 @@ import {
     AdminRole as Roles,
 } from "./admin-permissions";
 import {
+    consoleEdition,
     guardedStaffChange,
+    requireEditions,
     requireReason,
     requireRoles,
 } from "./admin-staff.service";
@@ -94,6 +97,7 @@ const INVITE_SELECT = {
     roles: true,
     worksAs: true,
     onCommission: true,
+    editions: true,
     reason: true,
     expiresAt: true,
     invitedByUserId: true,
@@ -118,6 +122,7 @@ export interface StaffInviteView {
     roles: AdminRole[];
     worksAs: StaffJob;
     onCommission: boolean;
+    editions: Edition[];
     state: StaffInviteState;
     expiresAt: Date;
     sentAt: Date;
@@ -143,6 +148,8 @@ export interface StaffInviteInput {
     roles: string[];
     worksAs: StaffJob;
     onCommission?: boolean;
+    /** Left out: the console this was sent from. */
+    editions?: string[];
     reason: string;
 }
 
@@ -203,6 +210,9 @@ export class AdminStaffInvitesService {
     async invite(input: StaffInviteInput): Promise<StaffInviteSent> {
         const roles = requireRoles(input.roles);
         const reason = requireReason(input.reason);
+        const editions = input.editions
+            ? requireEditions(input.editions)
+            : [consoleEdition(input.staff)];
         const email = normaliseInviteEmail(input.email);
         const name = input.name.trim();
         if (!STAFF_JOBS.includes(input.worksAs)) {
@@ -249,6 +259,7 @@ export class AdminStaffInvitesService {
                     roles,
                     worksAs: input.worksAs,
                     onCommission: input.onCommission ?? false,
+                    editions,
                     reason,
                     tokenHash: hashStaffInviteToken(token),
                     expiresAt: staffInviteExpiry(now),
@@ -269,6 +280,7 @@ export class AdminStaffInvitesService {
                     roles,
                     worksAs: input.worksAs,
                     onCommission: input.onCommission ?? false,
+                    editions,
                     replacedExpired: open.length,
                     expiresAt: created.expiresAt.toISOString(),
                 },
@@ -539,8 +551,11 @@ export class AdminStaffInvitesService {
                 userId,
                 grantedByUserId: row.invitedByUserId,
                 note: row.reason,
+                editions: row.editions,
             },
-            update: {},
+            // Nobody here holds access yet (`onTheTeam` above), so nothing is
+            // taken from them.
+            update: { editions: row.editions },
             select: { id: true, revokedAt: true },
         });
         const reopened = Boolean(admin.revokedAt);
@@ -617,6 +632,7 @@ export class AdminStaffInvitesService {
                 roles,
                 worksAs: row.worksAs,
                 onCommission: row.onCommission,
+                editions: row.editions,
                 reopened,
                 profileCreated: !hadProfile,
             },
@@ -826,6 +842,7 @@ function inviteView(
         roles: inviteRoles(row),
         worksAs: row.worksAs as StaffJob,
         onCommission: row.onCommission,
+        editions: row.editions,
         state: staffInviteState(row, now),
         expiresAt: row.expiresAt,
         sentAt: row.sentAt,

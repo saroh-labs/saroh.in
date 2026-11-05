@@ -20,7 +20,7 @@ import {
     qrLink,
     typedLink,
 } from "@/lib/qr-code-maker";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 import { fieldClasses } from "../../shared/fields/field-classes";
 import { readAsDataUrl, saveFile, svgBlob, svgToPng } from "./qr-download";

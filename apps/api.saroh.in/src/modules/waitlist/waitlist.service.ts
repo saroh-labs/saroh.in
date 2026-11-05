@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { businessByReferralCode } from "../organizations/referral";
@@ -8,8 +9,7 @@ import type { WaitlistKind, WaitlistPlan } from "./waitlist-keys";
 import {
     businessKey,
     cleanSource,
-    isToolGateSource,
-    LINK_PREVIEW_SOURCE,
+    isFreeToolSource,
     maskEmail,
     newRefCode,
     normaliseEmail,
@@ -19,6 +19,8 @@ import {
 
 export interface JoinWaitlistInput {
     email: string;
+    /** The website's edition, from the address it wrote through. */
+    edition?: Edition;
     /** The V2 form's fields; absent from the V1 form, which asks for an email only. */
     business?: string;
     kind?: WaitlistKind;
@@ -46,10 +48,6 @@ export type JoinWaitlistResult =
     | { created: true; position: number; refCode: string | null }
     | { created: false };
 
-/** Sources of entries a tool's email gate made, not people waiting. */
-const isToolSource = (source: string): boolean =>
-    source === LINK_PREVIEW_SOURCE || isToolGateSource(source);
-
 /** How many times a clashing referral id is drawn again. */
 const REF_CODE_ATTEMPTS = 3;
 
@@ -70,7 +68,7 @@ export class WaitlistService {
     private readonly logger = new Logger(WaitlistService.name);
 
     /**
-     * Idempotent per normalised email and business (OQ-11: one owner may list
+     * Idempotent per edition, normalised email and business (OQ-11: one owner may list
      * a second business). A repeat must not 500 on the unique index, and must
      * not hand back the existing entry's place or link.
      */
@@ -82,7 +80,8 @@ export class WaitlistService {
         const businessName = textOrNull(input.business);
         const bKey = businessKey(businessName);
 
-        if (await this.exists(key, bKey)) {
+        const edition = input.edition ?? "INDIA";
+        if (await this.exists(key, bKey, edition)) {
             this.logger.log(`waitlist: repeat signup for ${maskEmail(email)}`);
             return { created: false };
         }
@@ -107,6 +106,7 @@ export class WaitlistService {
             referredById,
             referredByOrganizationId,
             ipHash: input.ipHash ?? null,
+            edition,
         };
 
         for (let attempt = 0; attempt < REF_CODE_ATTEMPTS; attempt += 1) {
@@ -127,13 +127,14 @@ export class WaitlistService {
                 // whatever happens to the lead. A tool's email gate (the
                 // link preview, the QR code maker) is not someone waiting
                 // for Saroh, so it makes none.
-                if (!isToolSource(data.source)) {
+                if (!isFreeToolSource(data.source)) {
                     await recordWebsiteLead({
                         source: "WAITLIST",
                         email,
                         name: businessName,
                         kind: data.kind,
                         city: data.city,
+                        edition,
                     }).catch(() => "failed" as const);
                 }
                 return {
@@ -147,7 +148,9 @@ export class WaitlistService {
                 // to insert; the loser hits the unique index. That is the
                 // outcome the caller wanted, so it is a repeat, not a 500.
                 // Otherwise the clash was the referral id: draw another.
-                if (await this.exists(key, bKey)) return { created: false };
+                if (await this.exists(key, bKey, edition)) {
+                    return { created: false };
+                }
             }
         }
         throw new Error(
@@ -155,9 +158,19 @@ export class WaitlistService {
         );
     }
 
-    private async exists(emailKey: string, bKey: string): Promise<boolean> {
+    private async exists(
+        emailKey: string,
+        bKey: string,
+        edition: Edition,
+    ): Promise<boolean> {
         const row = await prisma.waitlistSignup.findUnique({
-            where: { emailKey_businessKey: { emailKey, businessKey: bKey } },
+            where: {
+                edition_emailKey_businessKey: {
+                    edition,
+                    emailKey,
+                    businessKey: bKey,
+                },
+            },
             select: { id: true },
         });
         return row !== null;

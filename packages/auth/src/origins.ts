@@ -1,3 +1,5 @@
+import { EDITIONS, hostsFor, merchantSitesFor, urlOf } from "@saroh/edition";
+
 /**
  * The trusted first-party origins, shared by the betterAuth config, the
  * api CSRF guard, the Next.js middleware, and the accounts app's
@@ -20,11 +22,12 @@ export function getTrustedOrigins(): string[] {
             .filter(Boolean);
     }
     return [
-        "https://accounts.saroh.in",
-        "https://api.saroh.in",
-        "https://app.saroh.in",
-        "https://admin.saroh.in",
-        "https://saroh.app",
+        // Each edition's site (its header asks get-session and signs out),
+        // app, API, accounts and admin.
+        ...EDITIONS.flatMap((edition) =>
+            Object.values(hostsFor(edition, "production")).map(urlOf),
+        ),
+        urlOf(merchantSitesFor("production").root),
         "https://templates.saroh.in",
         "https://docs.saroh.in",
         "https://help.saroh.in",

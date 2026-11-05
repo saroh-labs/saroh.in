@@ -12,6 +12,7 @@ import {
     Home,
     LayoutGrid,
     Mail,
+    Radio,
     ReceiptText,
     Repeat,
     Rocket,
@@ -145,7 +146,8 @@ const GROUPS: ConsoleNavGroup[] = [
             {
                 href: "/billing/events",
                 label: "Provider events",
-                icon: Webhook,
+                // Not Webhook: that is Keep it running's Webhooks.
+                icon: Radio,
                 permission: "saroh-billing:read",
             },
         ],

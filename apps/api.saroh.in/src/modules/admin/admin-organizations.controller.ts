@@ -1,5 +1,6 @@
 import { Body, Delete, Get, Param, Post, Put, Query } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -9,6 +10,7 @@ import { NOT_CATALOGUE_PLAN } from "../billing/plans.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminBusinessModulesService } from "./admin-business-modules.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -64,8 +66,9 @@ export class AdminOrganizationsController {
     listOrganizations(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: ListOrganizationsDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        if (query.for === "picker") return this.organizations.picker();
+        if (query.for === "picker") return this.organizations.picker(edition);
         return this.organizations.directory(
             {
                 q: query.q,
@@ -82,6 +85,7 @@ export class AdminOrganizationsController {
                     AdminPermission.OrganizationPiiRead,
                 ),
             },
+            edition,
         );
     }
 

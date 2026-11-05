@@ -19,7 +19,8 @@ const ADMIN = urls.ADMIN_URL;
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 async function search(page: Page, term: string) {
-    await page.getByPlaceholder("Search users").fill(term);
+    // A role skips the hidden copy React keeps while it streams the page in.
+    await page.getByRole("searchbox", { name: "Search users" }).fill(term);
     await expect(page).toHaveURL(
         new RegExp(`[?&]q=${escape(encodeURIComponent(term))}`),
     );

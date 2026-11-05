@@ -107,7 +107,10 @@ export function InvoicesScreen({
     missingRates = null,
     summary,
     businessName = "This business",
+    paymentsOn = true,
 }: {
+    /** Invoices sit under Payments only while it is on (DEC-070). */
+    paymentsOn?: boolean;
     /** The business's name as it signs its messages, for a reminder's preview. */
     businessName?: string;
     /**
@@ -345,7 +348,8 @@ export function InvoicesScreen({
         <div>
             <PageHeader
                 compactOnPhone
-                breadcrumb={["Payments", "Invoices"]}
+                // Off, it is a top-level page, with nothing to sit under.
+                breadcrumb={paymentsOn ? ["Payments", "Invoices"] : undefined}
                 title="Invoices"
                 // How many are on hand, until a search or a figure asks
                 // the API: then the rows are the answer, not the business.

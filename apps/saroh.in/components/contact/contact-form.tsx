@@ -5,10 +5,10 @@ import { CONTACT_PAGE } from "@/content/contact-page";
 import type { ContactKindId } from "@/lib/contact-message";
 import { CONTACT_LIMITS, firstName } from "@/lib/contact-message";
 
-import { Button } from "../shared/buttons/button";
-import { ChoiceChip } from "../shared/fields/choice-chips";
+import { Button } from "@saroh/marketing/button";
+import { ChoiceChip } from "@saroh/marketing/choice-chip";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { fieldClasses } from "../shared/fields/field-classes";
-import { textLinkClasses } from "../shared/links/text-link";
 import { useContactForm } from "./use-contact-form";
 
 const copy = CONTACT_PAGE.form;

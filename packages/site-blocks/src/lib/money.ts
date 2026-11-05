@@ -1,4 +1,11 @@
 /**
+ * How a site groups an amount: lakh and crore for rupees, thousands otherwise.
+ * One renderer serves both editions, and a business sells in one currency.
+ */
+export const moneyLocaleOf = (currency: string | null | undefined) =>
+    currency === "INR" ? "en-IN" : "en-US";
+
+/**
  * Every price a merchant's site shows, one way (DEC-073 #11): a whole amount
  * without decimals ("₹500", "₹1,099"), anything else with two ("₹499.50"),
  * as the Customer Site design writes prices. Services, plans, packs,
@@ -7,9 +14,9 @@
  * `formatMoney`, `accountMoney`).
  *
  * `locale` is Intl's default when omitted (the visitor's); callers pin
- * "en-IN" where the page has always used it. Null for a currency Intl
- * doesn't know, or an amount that isn't a number: better no price than a
- * wrong one, and each caller says what it shows instead.
+ * {@link moneyLocaleOf} where the page has always pinned one. Null for a
+ * currency Intl doesn't know, or an amount that isn't a number: better no
+ * price than a wrong one, and each caller says what it shows instead.
  */
 export function siteMoney(
     amount: number,
@@ -32,8 +39,8 @@ export function siteMoney(
 }
 
 /**
- * A decimal string from the API as the site shows it, in "en-IN" unless
- * told otherwise; the string itself when it can't be formatted. Here, not
+ * A decimal string from the API as the site shows it, in its currency's
+ * locale unless told otherwise; the string itself when it can't be formatted. Here, not
  * in the "use client" product page, so a server component can call it: the
  * order confirmation page crashed for every buyer when it called the
  * client copy (UX-001).
@@ -41,7 +48,7 @@ export function siteMoney(
 export function formatAmount(
     amount: string,
     currency: string,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string {
     // "₹2,499", "₹24.50" (DEC-073 #11): never "₹24.5".
     return siteMoney(Number(amount), currency, locale) ?? amount;

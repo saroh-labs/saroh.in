@@ -1,5 +1,8 @@
 import { headers } from "next/headers";
 
+import { EDITION } from "./edition";
+import { DOCS_URL, HELP_URL } from "./saroh-apps";
+
 /**
  * The instance's other apps, for the console's apps menu. Server-only.
  *
@@ -7,7 +10,9 @@ import { headers } from "next/headers";
  * in: every app on an instance is its hostname's first label on one shared
  * domain (DEC-002), so `admin.saroh.in` has its workspace at `app.saroh.in`
  * and a self-hosted `admin.saroh.example.com` at `app.saroh.example.com`.
- * Nothing here assumes the instance is Saroh's own (plan R20).
+ * Nothing here assumes the instance is Saroh's own (plan R20), so a console
+ * follows its edition by its address; only help and docs, which Global doesn't
+ * serve yet, go elsewhere from there.
  */
 
 export interface SiblingApp {
@@ -59,13 +64,13 @@ export async function instanceApps(): Promise<InstanceApps | null> {
                 key: "help",
                 name: "Help centre",
                 description: "What merchants read when they are stuck.",
-                href: at("help"),
+                href: EDITION === "INDIA" ? at("help") : HELP_URL,
             },
             {
                 key: "docs",
                 name: "Docs",
                 description: "Guides and the API reference.",
-                href: at("docs"),
+                href: EDITION === "INDIA" ? at("docs") : DOCS_URL,
             },
             {
                 key: "website",

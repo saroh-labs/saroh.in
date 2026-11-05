@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Chip } from "@saroh/ui/chip";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
@@ -12,8 +13,15 @@ import type {
     AdminOrganization,
     FlagExplanation,
 } from "@/lib/control-plane";
-import type { ReleaseChange, WhoRow } from "@/lib/releases";
-import { QUICK_REASONS, releaseHref, whoHasIt } from "@/lib/releases";
+import type { ReleaseChange, WhoRow, WhoShow } from "@/lib/releases";
+import {
+    matchesBusiness,
+    passesWho,
+    QUICK_REASONS,
+    releaseHref,
+    WHO_FILTERS,
+    whoHasIt,
+} from "@/lib/releases";
 
 import { REASON_LABEL } from "./release-actions";
 import { applyChange, useReleaseFeedback } from "./use-release-change";
@@ -50,19 +58,22 @@ export function WhoHasIt({
     explained: { organizationId: string; explanation: FlagExplanation } | null;
 }) {
     const [query, setQuery] = useState("");
-    const q = query.trim().toLowerCase();
-    const rows = whoHasIt(flag, organizations).filter(
-        (row) => !q || row.name.toLowerCase().includes(q),
+    const [show, setShow] = useState<WhoShow>("all");
+    const all = whoHasIt(flag, organizations);
+    const rows = all.filter(
+        (row) => passesWho(row, show) && matchesBusiness(row, query),
     );
-    const own = flag.overrides.length;
+    const have = all.filter((row) => row.on).length;
+    const own = all.filter((row) => row.override !== null).length;
 
     return (
         <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
+                    {have} of {all.length} have it
                     {own === 0
-                        ? "Every business follows the default."
-                        : `${own} ${own === 1 ? "business is" : "businesses are"} turned on or off for them alone.`}
+                        ? " · every business follows the default"
+                        : ` · ${own} set for them alone`}
                 </p>
                 <div className="w-full sm:w-64">
                     <Label htmlFor="who-search" className="sr-only">
@@ -73,14 +84,38 @@ export function WhoHasIt({
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search businesses"
+                        placeholder="Search by name or web address"
                         autoComplete="off"
                     />
                 </div>
             </div>
+            <div
+                role="group"
+                aria-label="Show"
+                className="flex flex-wrap gap-2"
+            >
+                {WHO_FILTERS.map((chip) => (
+                    <Chip
+                        key={chip.value}
+                        as="toggle"
+                        on={show === chip.value}
+                        onClick={() => setShow(chip.value)}
+                    >
+                        {chip.label}
+                        <span className="tabular-nums opacity-70">
+                            {
+                                all.filter((row) => passesWho(row, chip.value))
+                                    .length
+                            }
+                        </span>
+                    </Chip>
+                ))}
+            </div>
             {rows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                    No business matches “{query.trim()}”.
+                    {query.trim()
+                        ? `No business matches “${query.trim()}”.`
+                        : "No business here."}
                 </p>
             ) : (
                 <ul className="divide-y rounded-md border">
@@ -101,8 +136,8 @@ export function WhoHasIt({
             )}
             {rows.length > SHOW_AT_MOST && (
                 <p className="text-xs text-muted-foreground">
-                    Showing {SHOW_AT_MOST} of {rows.length}. Search to find the
-                    rest.
+                    Showing the first {SHOW_AT_MOST} of {rows.length}. Search or
+                    pick a filter to find the rest.
                 </p>
             )}
         </div>
@@ -131,12 +166,19 @@ function WhoRowItem({
         <li className="grid gap-1.5 px-3 py-2.5 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Link
-                        href={`/businesses/${encodeURIComponent(row.organizationId)}`}
-                        className="truncate font-medium underline-offset-2 hover:underline"
-                    >
-                        {row.name}
-                    </Link>
+                    <div className="min-w-0">
+                        <Link
+                            href={`/businesses/${encodeURIComponent(row.organizationId)}`}
+                            className="block truncate font-medium underline-offset-2 hover:underline"
+                        >
+                            {row.name}
+                        </Link>
+                        {row.slug && (
+                            <p className="truncate font-mono text-[12px] text-muted-foreground">
+                                {row.slug}
+                            </p>
+                        )}
+                    </div>
                     <Badge variant={row.on ? "success" : "neutral"}>
                         {row.on ? "On" : "Off"}
                     </Badge>
@@ -197,6 +239,19 @@ function WhoRowItem({
                     {row.name} has {flag.metadata.shownAs}{" "}
                     {explanation.value ? "on" : "off"}{" "}
                     {SOURCE[explanation.source]}.
+                    {flag.metadata.group === "module" && (
+                        <>
+                            {" "}
+                            Whether they use it is on their{" "}
+                            <Link
+                                href={`/businesses/${encodeURIComponent(row.organizationId)}/modules`}
+                                className="underline underline-offset-2 hover:text-foreground"
+                            >
+                                Modules tab
+                            </Link>
+                            .
+                        </>
+                    )}
                 </p>
             )}
         </li>

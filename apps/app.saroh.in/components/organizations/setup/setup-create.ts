@@ -88,6 +88,7 @@ export async function createFromSetup(
         ...(values.managerCode?.trim()
             ? { managerCode: values.managerCode }
             : {}),
+        ...(values.currency ? { currency: values.currency } : {}),
         profile: {
             country: values.country,
             // The browser's zone (UX-008): the business's for a country

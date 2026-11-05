@@ -8,6 +8,7 @@ import type { BillingTab, Query } from "@/lib/billing-filters";
 import {
     clearHref,
     isNarrowed,
+    narrowCause,
     searchHref,
     tabOf,
     withFilter,
@@ -59,16 +60,12 @@ export function BillingToolbar({ counts }: { counts: BillingCounts | null }) {
             filters={<TabFilters tab={tab} query={query} set={set} />}
             onClear={narrowed ? () => go(clearHref(tab)) : undefined}
             clearLabel={
-                narrowed && !hasTabFilter(tab, query)
+                narrowCause(tab, query) === "search"
                     ? "Clear search"
                     : "Clear filters"
             }
         />
     );
-}
-
-function hasTabFilter(tab: BillingTab, query: Query): boolean {
-    return isNarrowed(tab, { ...query, q: undefined });
 }
 
 /** The open tab's own dropdowns. Subscriptions has its cards and chips. */

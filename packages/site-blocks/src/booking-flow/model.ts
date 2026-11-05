@@ -11,7 +11,7 @@ import {
     gstOnPriceOf,
     gstPriceWords,
 } from "../lib/gst-price";
-import { siteMoney } from "../lib/money";
+import { moneyLocaleOf, siteMoney } from "../lib/money";
 import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
 
@@ -114,6 +114,11 @@ export interface BookingPageData {
      * and a provider is connected.
      */
     payOnline: boolean;
+    /**
+     * What a Global business chose at setup, for a zero before a priced
+     * service is chosen. Null or absent otherwise, and it reads as rupees.
+     */
+    currency?: string | null;
     rules: BookingRules;
     services: BookingService[];
 }
@@ -691,7 +696,7 @@ export function servicePickPrice(service: BookingService): string | null {
 export function formatMoney(
     cents: number | null,
     currency: string | null,
-    locale = "en-IN",
+    locale = moneyLocaleOf(currency),
 ): string | null {
     if (cents === null || !currency) return null;
     return siteMoney(cents / 100, currency, locale);

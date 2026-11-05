@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import {
@@ -31,6 +32,7 @@ import {
     INVOICE_STATUSES,
     invoicesCsv,
     invoicesCsvFileName,
+    isPaying,
     istMonthRange,
     linkAt,
     mrrPaise,
@@ -53,6 +55,7 @@ import {
     SHOW_KINDS,
 } from "./admin-billing-history";
 import { subscriptionTerms } from "./admin-billing-terms";
+import { byBusinessIds, viaBusiness } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 
 export const BILLING_PAGE_SIZE = 50;
@@ -201,6 +204,8 @@ export interface SubscriptionSummary {
     mrrPaise: number;
     /** Ending, or moving to another plan, in the next 30 days. */
     endingSoon: number;
+    /** ACTIVE on a plan with a list price above nothing: Free is not counted. */
+    paying: number;
     currency: string;
 }
 
@@ -336,11 +341,16 @@ export class AdminBillingService {
     async listInvoices(
         staff: PlatformAdminInfo,
         query: InvoiceQuery,
+        edition: Edition | null = null,
     ): Promise<AdminInvoicePage> {
         assertSarohBillingReader(staff);
         const refunded = await refundedInvoiceIds();
-        const where = invoiceWhere(query, refunded);
-        const others = invoiceWhere({ ...query, status: undefined });
+        const where = invoiceWhere(query, refunded, edition);
+        const others = invoiceWhere(
+            { ...query, status: undefined },
+            [],
+            edition,
+        );
         const page = Math.max(1, query.page ?? 1);
         const [rows, sums, ...byStatus] = await Promise.all([
             prisma.sarohInvoice.findMany({
@@ -412,6 +422,7 @@ export class AdminBillingService {
     async exportInvoices(
         staff: PlatformAdminInfo,
         query: InvoiceQuery,
+        edition: Edition | null = null,
     ): Promise<{ csv: string; fileName: string; count: number }> {
         assertSarohBillingReader(staff);
         if (!query.month || !istMonthRange(query.month)) {
@@ -419,7 +430,7 @@ export class AdminBillingService {
         }
         const refunded = query.status ? await refundedInvoiceIds() : [];
         const rows = await prisma.sarohInvoice.findMany({
-            where: invoiceWhere(query, refunded),
+            where: invoiceWhere(query, refunded, edition),
             orderBy: [{ issuedAt: "asc" }, { number: "asc" }],
             take: CSV_MAX_ROWS,
             include: {
@@ -444,6 +455,7 @@ export class AdminBillingService {
     async exportAttribution(
         staff: PlatformAdminInfo,
         query: { month?: string },
+        edition: Edition | null = null,
     ): Promise<{ csv: string; fileName: string; count: number }> {
         assertSarohBillingReader(staff);
         if (!query.month || !istMonthRange(query.month)) {
@@ -454,7 +466,7 @@ export class AdminBillingService {
                 // A demo business (DEC-188) is no one's sale.
                 where: {
                     AND: [
-                        invoiceWhere({ month: query.month }),
+                        invoiceWhere({ month: query.month }, [], edition),
                         { organization: { isDemo: false } },
                     ],
                 },
@@ -567,14 +579,21 @@ export class AdminBillingService {
      * every invoice, the open Needs-action rows and every provider event.
      * Counts only, nothing about a business.
      */
-    async counts(staff: PlatformAdminInfo): Promise<BillingCounts> {
+    async counts(
+        staff: PlatformAdminInfo,
+        edition: Edition | null = null,
+    ): Promise<BillingCounts> {
         assertSarohBillingReader(staff);
+        const owned = viaBusiness(edition);
+        const scoped = await byBusinessIds(edition);
         const [subscriptions, invoices, openActions, events] =
             await Promise.all([
-                prisma.subscription.count(),
-                prisma.sarohInvoice.count(),
-                prisma.billingAction.count({ where: { resolvedAt: null } }),
-                prisma.billingWebhookEvent.count(),
+                prisma.subscription.count({ where: owned }),
+                prisma.sarohInvoice.count({ where: owned }),
+                prisma.billingAction.count({
+                    where: { resolvedAt: null, ...scoped },
+                }),
+                prisma.billingWebhookEvent.count({ where: scoped }),
             ]);
         return { subscriptions, invoices, openActions, events };
     }
@@ -584,6 +603,7 @@ export class AdminBillingService {
     async listSubscriptions(
         staff: PlatformAdminInfo,
         query: SubscriptionQuery,
+        edition: Edition | null = null,
         now: Date = new Date(),
     ): Promise<AdminSubscriptionPage> {
         assertSarohBillingReader(staff);
@@ -593,6 +613,7 @@ export class AdminBillingService {
                 query.status ? { status: query.status } : {},
                 query.plan ? { plan: { key: query.plan } } : {},
                 subscriptionSearch(query.q),
+                viaBusiness(edition),
             ],
         };
         const page = Math.max(1, query.page ?? 1);
@@ -605,9 +626,9 @@ export class AdminBillingService {
                 include: SUBSCRIPTION_INCLUDE,
             }),
             prisma.subscription.count({ where }),
-            this.summary(now),
+            this.summary(now, edition),
             prisma.plan.findMany({
-                where: { subscriptions: { some: {} } },
+                where: { subscriptions: { some: viaBusiness(edition) } },
                 distinct: ["key"],
                 orderBy: [{ key: "asc" }, { version: "desc" }],
                 select: { key: true, name: true },
@@ -933,14 +954,23 @@ export class AdminBillingService {
     }
 
     /** Counts by status and plan, and the list-price monthly figure. */
-    private async summary(now: Date): Promise<SubscriptionSummary> {
+    private async summary(
+        now: Date,
+        edition: Edition | null,
+    ): Promise<SubscriptionSummary> {
         const [groups, endingSoon] = await Promise.all([
             prisma.subscription.groupBy({
                 by: ["planId", "status"],
+                where: viaBusiness(edition),
                 _count: { _all: true },
             }),
             prisma.subscription.count({
-                where: subscriptionViewWhere("ending-soon", now),
+                where: {
+                    AND: [
+                        subscriptionViewWhere("ending-soon", now),
+                        viaBusiness(edition),
+                    ],
+                },
             }),
         ]);
         const plans = await prisma.plan.findMany({
@@ -961,12 +991,14 @@ export class AdminBillingService {
             { key: string; name: string; count: number }
         >();
         const priced: Parameters<typeof mrrPaise>[0] = [];
+        let paying = 0;
         for (const g of groups) {
             const count = g._count._all;
             byStatus.set(g.status, (byStatus.get(g.status) ?? 0) + count);
             const plan = planById.get(g.planId);
             if (!plan) continue;
             priced.push({ status: g.status, count, plan });
+            if (isPaying(g.status, plan)) paying += count;
             if (g.status === "CANCELLED") continue;
             const entry = byPlan.get(plan.key) ?? {
                 key: plan.key,
@@ -984,6 +1016,7 @@ export class AdminBillingService {
             byPlan: [...byPlan.values()].sort((a, b) => b.count - a.count),
             mrrPaise: mrrPaise(priced),
             endingSoon,
+            paying,
             currency: plans[0]?.currency ?? "INR",
         };
     }
@@ -1141,8 +1174,10 @@ export function assertSarohBillingReader(staff: PlatformAdminInfo | undefined) {
 export function invoiceWhere(
     query: InvoiceQuery,
     refunded: readonly string[] = [],
+    edition: Edition | null = null,
 ): Prisma.SarohInvoiceWhereInput {
     const and: Prisma.SarohInvoiceWhereInput[] = [];
+    if (edition) and.push(viaBusiness(edition));
     if (query.status) and.push(invoiceStatusWhere(query.status, refunded));
     const range = istMonthRange(query.month);
     if (range) and.push({ issuedAt: { gte: range.from, lt: range.to } });

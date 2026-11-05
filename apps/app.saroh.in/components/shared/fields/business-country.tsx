@@ -24,6 +24,19 @@ export function BusinessCountryProvider({
     );
 }
 
+/** What a Global business chose at setup, given by the shell; else null. */
+const BusinessCurrencyContext = createContext<string | null>(null);
+
+export const BusinessCurrencyProvider = BusinessCurrencyContext.Provider;
+
+/**
+ * The currency for money that records none of its own: a new price, a zero
+ * total, an icon. What a Global business chose, else India's rupee.
+ */
+export function useStartingCurrency(): string {
+    return useContext(BusinessCurrencyContext) ?? "INR";
+}
+
 /** The active business's ISO country code, or null. */
 export function useBusinessCountry(): string | null {
     return useContext(BusinessCountryContext);

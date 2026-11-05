@@ -98,6 +98,9 @@ const REFUSED = [
     // saroh.in's QR code maker: its email gate stores an address and
     // sends an email; only saroh.in's server calls it.
     "POST public/tools/qr-code-maker/unlock",
+    // saroh.in's free downloads: the gate stores a contact and may send an
+    // email; only saroh.in's server calls it.
+    "POST public/downloads/unlock",
     // saroh.in/customers' report about a business: stored for staff; only
     // saroh.in's server sends one, never a merchant's test release.
     "POST public/business-reports",

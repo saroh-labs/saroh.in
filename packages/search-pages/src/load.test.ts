@@ -2,13 +2,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { SOURCES, TOOL_SOURCES } from "./content.gen";
 import {
     allSearchPages,
     allToolPages,
     listSearchPages,
     loadSearchPage,
     loadToolPage,
+    SOURCES,
+    TOOL_SOURCES,
+} from "./embedded";
+import {
+    createSearchPagesLoader,
     parseQuestions,
     parseSearchPage,
     parseToolPage,
@@ -70,6 +74,22 @@ describe("content", () => {
         );
     });
 
+    it("a loader holds only the words it is given (plan 2026-11-01-001, U1)", () => {
+        const some = createSearchPagesLoader({
+            sources: { salons: SOURCES.salons ?? "" },
+            toolSources: {
+                "gst-calculator": TOOL_SOURCES["gst-calculator"] ?? "",
+            },
+        });
+        expect(some.listSearchPages().map((p) => p.path)).toEqual([
+            "/for/salons",
+            "/tools/gst-calculator",
+        ]);
+        expect(some.loadSearchPage("yoga-studios")).toBeNull();
+        expect(some.loadToolPage("receipt-maker")).toBeNull();
+        expect(some.loadSearchPage("salons")).toEqual(loadSearchPage("salons"));
+    });
+
     it("lists the tools the site and admin read, the two app tools marked", () => {
         const tools = listSearchPages({ kind: "tools" });
         expect(tools.find((p) => p.slug === "no-show-cost-calculator")).toEqual(
@@ -123,16 +143,20 @@ describe("content", () => {
             family: "Beauty",
             familySlug: "beauty",
             search: "salon software",
-            updated: "2026-10-26",
+            updated: "2026-11-04",
         });
         expect(Object.keys(salons ?? {}).sort()).toEqual([
             "description",
             "family",
             "familySlug",
+            "h1",
+            "hero",
             "kind",
             "name",
             "path",
             "search",
+            "searchWords",
+            "shape",
             "slug",
             "title",
             "updated",

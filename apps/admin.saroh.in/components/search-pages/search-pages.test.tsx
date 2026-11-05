@@ -21,17 +21,24 @@ vi.stubGlobal(
 );
 
 const searchPageAction = vi.fn();
+const deploySearchPages = vi.fn();
 vi.mock("@/lib/search-page-actions", () => ({
     searchPageAction: (...args: unknown[]) =>
         searchPageAction(...args) as unknown,
+    deploySearchPages: () => deploySearchPages() as unknown,
 }));
 const refresh = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh }),
+    useSearchParams: () => new URLSearchParams(),
+}));
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
 }));
 
+import { DeployBar } from "./deploy-bar";
+import { SearchPageActions } from "./search-page-actions";
 import { SearchPageDialog } from "./search-page-dialog";
 import { SearchPagesTable } from "./search-pages-table";
 
@@ -45,7 +52,12 @@ const row = (slug: string, state: PageRow["state"]): PageRow => ({
     search: `${slug} software`,
     updated: "2026-10-26",
     state,
+    onSite: state === "live",
+    pending: null,
     record: null,
+    blocked: [],
+    links: [],
+    deadLinks: [],
 });
 
 const table = (canPublish: boolean) =>
@@ -63,43 +75,85 @@ const table = (canPublish: boolean) =>
         />,
     );
 
+// Whole tables with their menus: over 5s beside a full gate and on CI.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("SearchPagesTable (DEC-193)", () => {
-    it("chooses between trade pages and free tools by address, with a count each (#1253)", () => {
+    it("groups the rows by section, A to Z by name, and folds a group", () => {
+        const tool = (slug: string, name: string, family: string): PageRow => ({
+            ...row(slug, "draft"),
+            kind: "tools",
+            path: `/tools/${slug}`,
+            name,
+            family,
+        });
         render(
             <SearchPagesTable
                 kind="tools"
-                kindCounts={{ for: 34, tools: 3 }}
-                rows={[{ ...row("no-show", "draft"), kind: "tools" }]}
+                rows={[
+                    tool("review-qr", "Google review QR", "QR codes"),
+                    tool("bill", "Bill of supply", "Billing and GST"),
+                    tool("menu-qr", "Menu QR", "QR codes"),
+                ]}
                 site="saroh.in"
                 reviewSite="saroh.io"
                 reviewUrl="https://saroh.io"
-                canPublish={false}
+                canPublish
             />,
         );
+        const list = screen.getByRole("list", { name: "Pages" });
+        const names = within(list)
+            .getAllByRole("link")
+            .filter((a) => a.getAttribute("href")?.startsWith("/search-pages/"))
+            .map((a) => a.textContent);
+        expect(names).toEqual([
+            "Bill of supply",
+            "Google review QR",
+            "Menu QR",
+        ]);
+        // The section is the group's header, not a column.
+        expect(screen.queryByText("Section")).toBeNull();
+        const qr = screen.getByRole("button", { name: /QR codes/ });
+        expect(qr.textContent).toContain("2 pages · none live");
+        fireEvent.click(qr);
+        expect(qr.getAttribute("aria-expanded")).toBe("false");
+        // Kept for the next visit, per kind.
         expect(
-            screen
-                .getByRole("link", { name: /Free tools · \/tools\/ · 3/ })
-                .getAttribute("href"),
-        ).toBe("/search-pages?kind=tools");
+            window.localStorage.getItem("saroh:search-pages:folded:tools"),
+        ).toBe('["QR codes"]');
+        expect(screen.queryByRole("link", { name: "Menu QR" })).toBeNull();
+        fireEvent.click(
+            screen.getByLabelText("Select every page in Billing and GST"),
+        );
         expect(
-            screen
-                .getByRole("link", { name: /Trade pages · \/for\/ · 34/ })
-                .getAttribute("href"),
-        ).toBe("/search-pages");
-        expect(screen.getByText("Section")).toBeTruthy();
+            screen.getByRole("region", { name: "Selected pages" }).textContent,
+        ).toContain("1 selected");
+    });
+
+    it("an empty kind draws without a crash (plan 2026-10-31-002)", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        expect(screen.getByText("No pages here")).toBeTruthy();
     });
 
     it("lists every page that isn't archived, with its status", () => {
         table(false);
-        expect(screen.getByRole("link", { name: /Salons/ })).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Salons" })).toBeTruthy();
         expect(
             within(screen.getByRole("list", { name: "Pages" })).getByText(
                 "Live",
             ),
         ).toBeTruthy();
-        expect(
-            screen.getByText("Never published", { exact: false }),
-        ).toBeTruthy();
+        // Said on nearly every draft, so not said at all.
+        expect(screen.queryByText("Never published")).toBeNull();
         expect(screen.queryByText("Old")).toBeNull();
     });
 
@@ -154,7 +208,7 @@ describe("SearchPageDialog", () => {
     it("keeps Publish off until the page is ticked as read, then publishes it and says so", async () => {
         searchPageAction.mockResolvedValue({
             ok: true,
-            data: { pages: [], rebuildQueued: true },
+            data: { pages: [] },
         });
         publish();
         expect(screen.getByText("Publish Spas on saroh.in?")).toBeTruthy();
@@ -174,8 +228,9 @@ describe("SearchPageDialog", () => {
         );
         await waitFor(() =>
             expect(showSuccess).toHaveBeenCalledWith(
-                "Publishing the page.",
-                "saroh.in is rebuilding.",
+                "Spas waits to deploy.",
+                "Deploy changes to put it on saroh.in.",
+                expect.objectContaining({ label: "Show waiting changes" }),
             ),
         );
         expect(refresh).toHaveBeenCalled();
@@ -199,5 +254,514 @@ describe("SearchPageDialog", () => {
             /^Spas can't be published from where it is now/,
         );
         expect(showSuccess).not.toHaveBeenCalled();
+    });
+});
+
+describe("DeployBar (R13)", () => {
+    beforeEach(() => {
+        deploySearchPages.mockReset();
+        refresh.mockReset();
+        showSuccess.mockReset();
+    });
+
+    const waiting = [
+        { ...row("spas", "live"), onSite: false, pending: "on" as const },
+        { ...row("gyms", "live"), onSite: false, pending: "on" as const },
+        {
+            ...row("salons", "unpublished"),
+            onSite: true,
+            pending: "off" as const,
+        },
+    ];
+
+    it("lists what waits and deploys it all in one confirm", async () => {
+        deploySearchPages.mockResolvedValue({
+            ok: true,
+            data: {
+                paths: ["/for/gyms", "/for/salons", "/for/spas"],
+                rebuildQueued: true,
+            },
+        });
+        render(
+            <DeployBar
+                rows={waiting}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish
+            />,
+        );
+        expect(screen.getByText("3 changes waiting to deploy")).toBeTruthy();
+        const list = screen.getByRole("list", { name: "Changes waiting" });
+        expect(within(list).getAllByText("Goes live")).toHaveLength(2);
+        expect(within(list).getByText("Comes off")).toBeTruthy();
+        // Each waiting change can be cancelled from the bar (DEC-201 amendment).
+        expect(
+            within(list).getAllByRole("button", {
+                name: /^Cancel this change to /,
+            }),
+        ).toHaveLength(3);
+
+        fireEvent.click(screen.getByRole("button", { name: "Deploy changes" }));
+        expect(
+            await screen.findByText("Deploy 3 changes to saroh.in?"),
+        ).toBeTruthy();
+        const dialog = screen.getByRole("dialog");
+        fireEvent.click(
+            within(dialog).getByRole("button", { name: "Deploy changes" }),
+        );
+        await waitFor(() => expect(deploySearchPages).toHaveBeenCalledTimes(1));
+        await waitFor(() =>
+            expect(showSuccess).toHaveBeenCalledWith(
+                "Deploying 3 changes.",
+                "saroh.in is rebuilding.",
+            ),
+        );
+        expect(refresh).toHaveBeenCalled();
+    });
+
+    it("keeps Deploy changes off while the site rebuilds, and says so", () => {
+        render(
+            <DeployBar rows={waiting} site="saroh.in" rebuilding canPublish />,
+        );
+        expect(
+            screen.getByText(/saroh.in is rebuilding\. You can deploy again/),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole<HTMLButtonElement>("button", {
+                name: "Deploy changes",
+            }).disabled,
+        ).toBe(true);
+    });
+
+    it("cancels one waiting change from the bar, with its own confirm", async () => {
+        searchPageAction.mockResolvedValue({ ok: true, data: { pages: [] } });
+        render(
+            <DeployBar
+                rows={waiting}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: "Cancel this change to Spas" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        expect(
+            within(dialog).getByText(/Nothing changes on saroh.in/),
+        ).toBeTruthy();
+        fireEvent.click(
+            within(dialog).getByRole("button", { name: "Cancel the change" }),
+        );
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("cancel", [
+                "/for/spas",
+            ]),
+        );
+        await waitFor(() =>
+            expect(showSuccess).toHaveBeenCalledWith(
+                "Cancelled the change to Spas.",
+                "Nothing changes on saroh.in.",
+                undefined,
+            ),
+        );
+    });
+
+    it("keeps Deploy changes off with nothing waiting", () => {
+        render(
+            <DeployBar
+                rows={[]}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish
+            />,
+        );
+        expect(screen.getByText("No changes waiting to deploy")).toBeTruthy();
+        expect(
+            screen.getByRole<HTMLButtonElement>("button", {
+                name: "Deploy changes",
+            }).disabled,
+        ).toBe(true);
+    });
+
+    it("never shows Deploy changes to read-only staff", () => {
+        render(
+            <DeployBar
+                rows={waiting}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish={false}
+            />,
+        );
+        expect(screen.getByText("3 changes waiting to deploy")).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Deploy changes" }),
+        ).toBeNull();
+        expect(
+            screen.getByText(/A Platform owner deploys these\./),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: /^Cancel this change/ }),
+        ).toBeNull();
+        const { container } = render(
+            <DeployBar
+                rows={[]}
+                site="saroh.in"
+                rebuilding={false}
+                canPublish={false}
+            />,
+        );
+        expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("a row waiting for Deploy changes", () => {
+    it("says so in its status", () => {
+        render(
+            <SearchPagesTable
+                rows={[
+                    { ...row("spas", "live"), onSite: false, pending: "on" },
+                    {
+                        ...row("salons", "unpublished"),
+                        onSite: true,
+                        pending: "off",
+                    },
+                ]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        const list = screen.getByRole("list", { name: "Pages" });
+        expect(within(list).getAllByText("Waiting to deploy")).toHaveLength(2);
+    });
+});
+
+describe("a GST page, guide or download whose checks fail (plan 2026-10-31-002, U6)", () => {
+    const blocked = (slug: string, state: PageRow["state"]): PageRow => ({
+        ...row(slug, state),
+        path: `/gst/${slug}`,
+        kind: "gst",
+        family: "By trade",
+        blocked: ["Every fact is confirmed"],
+        why: ["2 facts to confirm"],
+    });
+
+    it("can't be published from a bulk selection, and the bar names the check", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "draft"), row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        fireEvent.click(screen.getByLabelText("Select every page shown"));
+        const bar = screen.getByRole("region", { name: "Selected pages" });
+        expect(
+            within(bar).getByRole("button", { name: "Publish 1" }),
+        ).toBeTruthy();
+        expect(bar.textContent).toContain(
+            "1 page can't be published yet: Salon (2 facts to confirm). Publish 1 publishes the rest.",
+        );
+        expect(
+            within(bar)
+                .getByRole("button", { name: "Publish 1" })
+                .getAttribute("aria-describedby"),
+        ).toBe("publish-held-bulk");
+    });
+
+    it("says Can't publish yet under Draft, and why in the row's menu (U14)", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "draft"), row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        const list = screen.getByRole("list", { name: "Pages" });
+        expect(
+            within(list).getAllByText("Can't publish yet: 2 facts to confirm"),
+        ).toHaveLength(1);
+        expect(within(list).queryByText("Never published")).toBeNull();
+        fireEvent.keyDown(screen.getByLabelText("Actions for Salon"), {
+            key: "Enter",
+        });
+        // The menu opens at once on Enter; role queries over it are slow in jsdom.
+        // The row says it too; the menu's copy is the one inside a menu item.
+        const item = screen
+            .getAllByText("Can't publish yet: 2 facts to confirm")
+            .map((el) => el.closest('[role="menuitem"]'))
+            .find(Boolean);
+        expect(item?.getAttribute("aria-disabled")).toBe("true");
+        // Part of the item's name, so a screen reader and a phone get it.
+        expect(item?.textContent).toBe(
+            "Publish on saroh.inCan't publish yet: 2 facts to confirm",
+        );
+        expect(item?.getAttribute("title")).toBeNull();
+    });
+
+    it("keeps a /for/ row's menu and status line as they were", () => {
+        render(
+            <SearchPagesTable
+                rows={[row("spas", "draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        expect(screen.queryByText(/Can't publish/)).toBeNull();
+        fireEvent.keyDown(screen.getByLabelText("Actions for Spas"), {
+            key: "Enter",
+        });
+        const item = screen
+            .getByText("Publish on saroh.in")
+            .closest('[role="menuitem"]');
+        expect(item?.getAttribute("aria-disabled")).toBeNull();
+        expect(item?.textContent).toBe("Publish on saroh.in");
+    });
+
+    it("shows Held by checks while live, and says why", () => {
+        render(
+            <SearchPagesTable
+                kind="gst"
+                rows={[blocked("salon", "live")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish={false}
+            />,
+        );
+        expect(screen.getByText("Held by checks")).toBeTruthy();
+        expect(
+            screen.getByText(
+                /Left out of the site until it passes: Every fact is confirmed/,
+            ),
+        ).toBeTruthy();
+    });
+
+    it("keeps the page's own Publish off, naming the failing check", () => {
+        render(
+            <SearchPageActions
+                row={blocked("salon", "draft")}
+                site="saroh.in"
+                siteUrl="https://saroh.in"
+                production
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+                page={{} as never}
+            />,
+        );
+        const publish = screen.getByRole("button", {
+            name: "Publish on saroh.in",
+        });
+        expect((publish as HTMLButtonElement).disabled).toBe(true);
+        // Why is the header's line (#publish-held), said to every role, not a row in the actions.
+        expect(publish.getAttribute("aria-describedby")).toBe("publish-held");
+    });
+});
+
+describe("links to pages that aren't live (U12)", () => {
+    beforeEach(() => {
+        searchPageAction.mockReset();
+        searchPageAction.mockResolvedValue({ ok: true, data: { pages: [] } });
+    });
+    const TOOL = "/tools/cancellation-policy-generator";
+    const tool = (
+        state: PageRow["state"],
+        blocked: string[] = [],
+    ): PageRow => ({
+        ...row("cancellation-policy-generator", state),
+        path: TOOL,
+        kind: "tools",
+        name: "Cancellation policy generator",
+        blocked,
+    });
+    const guide = (
+        state: PageRow["state"],
+        extra: Partial<PageRow> = {},
+    ): PageRow => ({
+        ...row("reduce-no-shows", state),
+        path: "/guides/reduce-no-shows",
+        kind: "guides",
+        name: "Reduce no-shows",
+        links: [TOOL],
+        ...extra,
+    });
+    const dialog = (
+        action: "publish" | "unpublish" | "archive",
+        pages: PageRow[],
+        rows: PageRow[],
+    ) =>
+        render(
+            <SearchPageDialog
+                action={action}
+                pages={pages}
+                rows={rows}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                onOpenChange={() => undefined}
+            />,
+        );
+    const tick = () =>
+        fireEvent.click(screen.getByRole("checkbox", { name: /^I've read/ }));
+    const confirm = (name: RegExp) =>
+        screen.getByRole<HTMLButtonElement>("button", { name });
+
+    it("publishes a guide whose tool is live, with no warning", async () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("live")]);
+        expect(
+            screen.queryByText("Links to pages that aren't live"),
+        ).toBeNull();
+        tick();
+        fireEvent.click(confirm(/^Publish page$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("publish", [
+                "/guides/reduce-no-shows",
+            ]),
+        );
+    });
+
+    it("holds Publish while the tool isn't live, then Publish these too adds it to the same publish", async () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("draft")]);
+        expect(
+            screen.getByText("Links to pages that aren't live"),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                `Cancellation policy generator (${TOOL}) is not published. Reduce no-shows links to it.`,
+            ),
+        ).toBeTruthy();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+        fireEvent.click(
+            screen.getByRole("button", { name: "Publish these too" }),
+        );
+        expect(
+            screen.queryByText("Links to pages that aren't live"),
+        ).toBeNull();
+        expect(
+            screen.getByRole("list", { name: "Pages" }).textContent,
+        ).toContain(TOOL);
+        // It says what it added, tags it, and words the lists for both kinds (F4).
+        expect(
+            screen.getByText(
+                /Added 1 linked page\. Read it before you publish\./,
+            ),
+        ).toBeTruthy();
+        expect(
+            within(screen.getByRole("list", { name: "Pages" })).getByText(
+                "Linked",
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(/the \/guides and \/tools lists, the menu/),
+        ).toBeTruthy();
+        // The added page is read too before it goes out.
+        expect(confirm(/^Publish 2 pages$/).disabled).toBe(true);
+        tick();
+        fireEvent.click(confirm(/^Publish 2 pages$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("publish", [
+                "/guides/reduce-no-shows",
+                TOOL,
+            ]),
+        );
+    });
+
+    it("says a taken-off tool is taken off", () => {
+        dialog(
+            "publish",
+            [guide("draft")],
+            [guide("draft"), tool("unpublished")],
+        );
+        expect(
+            screen.getByText(/is taken off\. Reduce no-shows links to it\./),
+        ).toBeTruthy();
+    });
+
+    it("an archived tool can't be added: it says to restore it first, and Publish stays off", () => {
+        dialog("publish", [guide("draft")], [guide("draft"), tool("archived")]);
+        expect(
+            screen.getByText(
+                `Cancellation policy generator (${TOOL}) is archived, and Reduce no-shows links to it. Restore it first, then publish it with this.`,
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Publish these too" }),
+        ).toBeNull();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+    });
+
+    it("a tool whose own checks fail can't be added, and says why", () => {
+        dialog(
+            "publish",
+            [guide("draft")],
+            [guide("draft"), tool("draft", ["Every fact is confirmed"])],
+        );
+        expect(
+            screen.getByText(
+                /It can't be published until its checks pass: Every fact is confirmed\. Fix them first\./,
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Publish these too" }),
+        ).toBeNull();
+    });
+
+    it("a link to a page that doesn't exist blocks, naming the page and the link", () => {
+        const typo = guide("draft", {
+            links: ["/tools/cancelation-policy"],
+            deadLinks: ["/tools/cancelation-policy"],
+        });
+        dialog("publish", [typo], [typo]);
+        expect(
+            screen.getByText(
+                "Reduce no-shows links to /tools/cancelation-policy. This link goes to a page that doesn't exist. Fix the link in the code, then publish.",
+            ),
+        ).toBeTruthy();
+        tick();
+        expect(confirm(/^Publish page$/).disabled).toBe(true);
+    });
+
+    it("unpublishing a tool live pages link to warns, and doesn't block", async () => {
+        dialog("unpublish", [tool("live")], [guide("live"), tool("live")]);
+        expect(
+            screen.getByText(
+                "1 live page links here (Reduce no-shows); their links will go to the /tools list until you publish it again.",
+            ),
+        ).toBeTruthy();
+        fireEvent.click(confirm(/^Unpublish page$/));
+        await waitFor(() =>
+            expect(searchPageAction).toHaveBeenCalledWith("unpublish", [TOOL]),
+        );
+    });
+
+    it("the list's bulk Publish checks links across kinds", () => {
+        render(
+            <SearchPagesTable
+                kind="guides"
+                rows={[guide("draft")]}
+                allRows={[guide("draft"), tool("draft")]}
+                site="saroh.in"
+                reviewSite="saroh.io"
+                reviewUrl="https://saroh.io"
+                canPublish
+            />,
+        );
+        fireEvent.click(screen.getByLabelText("Select every page shown"));
+        fireEvent.click(screen.getByRole("button", { name: "Publish 1" }));
+        expect(
+            screen.getByRole("button", { name: "Publish these too" }),
+        ).toBeTruthy();
     });
 });

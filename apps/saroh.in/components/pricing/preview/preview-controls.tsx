@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { cn } from "@/lib/cn";
 import type { PreviewView } from "@/lib/pricing-preview";
 import { previewHref } from "@/lib/pricing-preview";
-import { ring } from "@/lib/ring";
+import { cn } from "@saroh/marketing/cn";
+import { ring } from "@saroh/marketing/ring";
 
 /**
  * The staff draft preview's controls (admin redesign U13, R24), in the amber

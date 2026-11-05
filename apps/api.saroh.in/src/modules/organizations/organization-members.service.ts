@@ -9,12 +9,12 @@ import {
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
+import { appBase } from "../../common/app-url";
 import { sendOrganizationInvitationEmail } from "../../common/email";
 import type {
     OrganizationContext,
     OrgRole,
 } from "../../common/types/organization-context";
-import { env } from "../../env";
 import {
     AuditAction,
     AuditOutcome,
@@ -418,12 +418,12 @@ export class OrganizationMembersService {
 
         const organization = await prisma.organization.findUnique({
             where: { id: ctx.organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         });
 
         await sendOrganizationInvitationEmail(
             dto.email,
-            `${env.APP_URL ?? "https://app.saroh.localhost"}/join/${token}`,
+            `${appBase(organization?.edition)}/join/${token}`,
             organization?.name ?? "a business on Saroh",
         );
 

@@ -1,6 +1,8 @@
 import type { ExecutionContext } from "@nestjs/common";
 import { createParamDecorator } from "@nestjs/common";
 
+import type { Edition } from "@saroh/edition";
+
 import type {
     AdminPermission,
     AdminRole,
@@ -14,6 +16,8 @@ export interface PlatformAdminInfo {
     permissions: AdminPermission[];
     /** True when access came from ADMIN_ALLOWLIST rather than a PlatformAdmin grant. */
     viaBootstrap: boolean;
+    /** The edition this console serves, from its address; null on an address of none (local). */
+    edition: Edition | null;
 }
 
 /** Injects the staff context attached by `PlatformAdminGuard`. */

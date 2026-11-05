@@ -4,7 +4,7 @@ import type {
     PricingPageModel,
     PricingView,
     ViewKey,
-} from "./pricing-model";
+} from "@saroh/marketing/pricing-model";
 
 /**
  * "Show what changed" on the staff draft preview (admin redesign U13, R24):

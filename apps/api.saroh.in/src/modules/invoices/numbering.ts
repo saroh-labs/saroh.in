@@ -63,16 +63,19 @@ export function prefixProblem(prefix: string): string | null {
 }
 
 /**
- * The Indian financial year a moment falls in, April to March, as the short
- * form a number carries: 23 September 2026 → "26-27". Fixed by GST law for
- * every business. Read in the business's own zone, so an invoice at ten past
- * midnight on 1 April is next year's.
+ * The financial year a moment falls in, as the short form a number carries:
+ * 23 September 2026 → "26-27", April to March. Fixed by GST law for an Indian
+ * business. A Global business may run January to December instead (DEC-204):
+ * "2026". Read in the business's own zone, so an invoice at ten past midnight on
+ * 1 April is next year's.
  */
 export function financialYear(
     at: Date,
     timezone: string = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
     const local = DateTime.fromJSDate(at, { zone: timezone });
+    if (yearStartMonth === 1) return String(local.year);
     const start = local.month >= 4 ? local.year : local.year - 1;
     return `${twoDigits(start)}-${twoDigits(start + 1)}`;
 }
@@ -85,8 +88,10 @@ export function financialYear(
 export function financialYearShort(
     at: Date,
     timezone: string = DEFAULT_TIMEZONE,
+    yearStartMonth?: number | null,
 ): string {
     const local = DateTime.fromJSDate(at, { zone: timezone });
+    if (yearStartMonth === 1) return twoDigits(local.year);
     return twoDigits(local.month >= 4 ? local.year : local.year - 1);
 }
 
@@ -252,6 +257,7 @@ function build(
         at: Date;
         timezone?: string | null;
         mark: CreditMark;
+        yearStartMonth?: number | null;
     },
 ): string {
     const credit = input.kind === "CREDIT_NOTE";
@@ -265,9 +271,9 @@ function build(
                     ? CREDIT_MARK
                     : `${printedPrefix(input.prefix)}${CREDIT_MARK}`;
             case "FY":
-                return financialYear(input.at, zone);
+                return financialYear(input.at, zone, input.yearStartMonth);
             case "FY_SHORT":
-                return financialYearShort(input.at, zone);
+                return financialYearShort(input.at, zone, input.yearStartMonth);
             case "YEAR":
                 return String(local.year);
             case "MONTH":
@@ -409,12 +415,20 @@ export function seriesFor(input: {
     kind: InvoiceKind;
     at: Date;
     timezone?: string | null;
+    /** The month its numbering year starts; absent, April. */
+    yearStartMonth?: number | null;
     /** The stored format; absent, the default for the business's standing. */
     format?: unknown;
 }): InvoiceSeries {
     const format = numberFormatFor(input.format, input.registered);
     const head = `${printedPrefix(input.prefix)}${input.kind === "CREDIT_NOTE" ? CREDIT_MARK : ""}`;
-    const key = seriesKey(head, format.restart, input.at, input.timezone);
+    const key = seriesKey(
+        head,
+        format.restart,
+        input.at,
+        input.timezone,
+        input.yearStartMonth,
+    );
     const stem = build(format, {
         ...input,
         mark: creditMark(format, input.prefix),
@@ -442,9 +456,12 @@ function seriesKey(
     restart: NumberRestart,
     at: Date,
     timezone?: string | null,
+    yearStartMonth?: number | null,
 ): string {
     const zone = zoneOrDefault(timezone);
-    if (restart === "FY") return `${head}/${financialYear(at, zone)}`;
+    if (restart === "FY") {
+        return `${head}/${financialYear(at, zone, yearStartMonth)}`;
+    }
     if (restart === "MONTH") {
         return `${head}/${DateTime.fromJSDate(at, { zone }).toFormat("yyyy-MM")}`;
     }
@@ -459,10 +476,11 @@ export function invoiceSeriesKeys(
     prefix: string | null,
     at: Date,
     timezone?: string | null,
+    yearStartMonth?: number | null,
 ): Record<NumberRestart, string> {
     const head = printedPrefix(prefix);
     return {
-        FY: seriesKey(head, "FY", at, timezone),
+        FY: seriesKey(head, "FY", at, timezone, yearStartMonth),
         MONTH: seriesKey(head, "MONTH", at, timezone),
         NEVER: seriesKey(head, "NEVER", at, timezone),
     };

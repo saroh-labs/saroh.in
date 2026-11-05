@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 
 import { PublishedPage } from "@/components/published-page";
 import { businessJsonLdScript } from "@/lib/business-json-ld";
-import { findHomePage, getSiteForHost, siteOriginFor } from "@/lib/publication";
+import {
+    findHomePage,
+    getSiteForHost,
+    getSiteForPage,
+    siteOriginFor,
+} from "@/lib/publication";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical } from "@/lib/site-meta";
 
@@ -39,7 +44,7 @@ export default async function SiteHomePage({
     const { domain } = await params;
     // The site's id as well as its snapshot: Visit us reads its place by it
     // (G8), as the post routes read posts by it (#232).
-    const resolved = await getSiteForHost(domain);
+    const resolved = await getSiteForPage(domain);
 
     if (!resolved) {
         notFound();

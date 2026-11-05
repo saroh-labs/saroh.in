@@ -16,7 +16,10 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
+import type { Edition } from "@saroh/edition";
+
 import type { AdminRole } from "@/lib/control-plane";
+import { EDITION } from "@/lib/edition";
 import { formatDate } from "@/lib/format";
 import { addTeammateAction } from "@/lib/team-actions";
 import type { StaffJob } from "@/lib/team-words";
@@ -27,12 +30,17 @@ import {
     suggestedRole,
 } from "@/lib/team-words";
 
-import { endOfDay, RolePicker, todayIsoLocal } from "./team-actions";
+import {
+    EditionPicker,
+    endOfDay,
+    RolePicker,
+    todayIsoLocal,
+} from "./team-actions";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Errors = Partial<
-    Record<"name" | "email" | "roles" | "reason" | "form", string>
+    Record<"name" | "email" | "roles" | "editions" | "reason" | "form", string>
 >;
 
 /**
@@ -61,6 +69,7 @@ export function AddTeammateSheet({
         suggestedRole("ACCOUNT_MANAGER_JOB"),
     ]);
     const [rolesTouched, setRolesTouched] = useState(false);
+    const [editions, setEditions] = useState<Edition[]>([EDITION]);
     const [onCommission, setOnCommission] = useState(true);
     const [endsOn, setEndsOn] = useState("");
     const [reason, setReason] = useState("");
@@ -83,6 +92,10 @@ export function AddTeammateSheet({
             found.email = "Give the email they'll sign in with.";
         }
         if (roles.length === 0) found.roles = "Tick at least one role.";
+        const owner = roles.includes("PLATFORM_OWNER");
+        if (!owner && editions.length === 0) {
+            found.editions = "Tick at least one edition.";
+        }
         if (reason.trim().length < 4) {
             found.reason = "Say why, in a few words.";
         }
@@ -95,6 +108,7 @@ export function AddTeammateSheet({
                 worksAs: job,
                 roles,
                 onCommission,
+                ...(owner ? {} : { editions }),
                 expiresAt: endOfDay(endsOn),
                 reason: reason.trim(),
                 idempotencyKey: key,
@@ -204,6 +218,21 @@ export function AddTeammateSheet({
                                 className="text-sm text-destructive"
                             >
                                 {errors.roles}
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="grid gap-1.5">
+                        <EditionPicker
+                            roles={roles}
+                            value={editions}
+                            onChange={setEditions}
+                        />
+                        {errors.editions ? (
+                            <p
+                                role="alert"
+                                className="text-sm text-destructive"
+                            >
+                                {errors.editions}
                             </p>
                         ) : null}
                     </div>

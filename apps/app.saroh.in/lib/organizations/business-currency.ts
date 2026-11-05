@@ -1,11 +1,9 @@
 import { cache } from "react";
 
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { businessCurrencyOf } from "@/lib/services/editor-data";
 import { listServices } from "@/lib/services/service";
 import { getStorefront, listStorefronts } from "@/lib/stores/storefronts";
-
-/** What a business with nothing priced yet is taken to sell in. */
-export const DEFAULT_CURRENCY = "INR";
 
 /**
  * The business's currency, for an amount that records none of its own: a
@@ -20,6 +18,8 @@ export const DEFAULT_CURRENCY = "INR";
  *
  * Server-only (it reads through the API client). One read per request.
  */
+export { DEFAULT_CURRENCY } from "@/lib/organizations/starting-currency";
+
 export const readBusinessCurrency = cache(async (): Promise<string> => {
     const locations = await listStorefronts().catch(() => []);
     const first = locations.at(0);
@@ -30,5 +30,5 @@ export const readBusinessCurrency = cache(async (): Promise<string> => {
     const services = await listServices().catch(() => []);
     return services.some((s) => s.currency)
         ? businessCurrencyOf(services)
-        : DEFAULT_CURRENCY;
+        : startingCurrency();
 });

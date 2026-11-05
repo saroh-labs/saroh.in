@@ -19,16 +19,24 @@ vi.mock("@/lib/page-cache/site-rules", () => ({
 import { SERVER_READ_TIMEOUT_MS } from "./api-url";
 import { getBookingPage, getBookingVisit } from "./booking-page";
 import { getCatalogue } from "./catalogue";
+import { getInvoiceAutopay, getPayInvoice } from "./invoice-pay";
+import { getPayOrder } from "./order-pay";
 import {
+    getPreviewByToken,
+    getPreviewPost,
+    getPreviewPosts,
     getPublishedPost,
     getSiteForHost,
     readPublishedPosts,
     siteReadFailed,
 } from "./publication";
+import { getReviewInvitation } from "./reviews";
 import { getCheckoutOptions } from "./shop-checkout";
 import { getSiteContact } from "./site-contact";
 import { getFooterFacts } from "./site-footer";
 import { getPublicPlans } from "./site-plans";
+import { getStockWatch } from "./stock-watch";
+import { getWaitlistClaim } from "./waitlist-claim";
 
 /**
  * A read that hangs: the API takes longer than a page may wait. The timer
@@ -87,6 +95,43 @@ describe("a server read the API doesn't answer in time", () => {
         await expect(siteReadFailed("rye.saroh.app")).resolves.toBe(true);
         await expect(readPublishedPosts("site_1")).resolves.toBeNull();
         await expect(getPublishedPost("site_1", "a")).rejects.toThrow();
+    });
+
+    // Asserted on the signal: a read with no timeout rejects here too.
+    it.each<[string, () => Promise<unknown>]>([
+        ["an order's pay link", () => getPayOrder("tok")],
+        ["an invoice's pay link", () => getPayInvoice("tok")],
+        ["a review link", () => getReviewInvitation("tok")],
+        ["a back-in-stock link", () => getStockWatch("site_1", "tok")],
+        ["a waitlist offer", () => getWaitlistClaim("site_1", "tok")],
+    ])(
+        "is %s saying it couldn't open, never that it's gone",
+        async (_n, read) => {
+            await expect(read()).resolves.toEqual({
+                ok: false,
+                reason: "unavailable",
+            });
+            expect(timeout).toHaveBeenCalledWith(SERVER_READ_TIMEOUT_MS);
+        },
+    );
+
+    it("is autopay's error state after a pay link", async () => {
+        await expect(getInvoiceAutopay("tok")).resolves.toEqual({
+            state: { kind: "error" },
+            payUrl: null,
+        });
+        expect(timeout).toHaveBeenCalledWith(SERVER_READ_TIMEOUT_MS);
+    });
+
+    it("is a preview's failure: never a dead link or no posts", async () => {
+        await expect(getPreviewByToken("tok")).rejects.toThrow("Preview read");
+        expect(timeout).toHaveBeenCalledTimes(1);
+        await expect(getPreviewPosts("tok")).resolves.toBeNull();
+        expect(timeout).toHaveBeenCalledTimes(2);
+        await expect(getPreviewPost("tok", "a")).rejects.toThrow(
+            "Preview read",
+        );
+        expect(timeout).toHaveBeenCalledTimes(3);
     });
 
     it("waits about 8 seconds, from one constant", () => {

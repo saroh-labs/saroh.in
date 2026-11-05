@@ -1,7 +1,9 @@
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { PROVIDER_ID } from "./admin-billing.service";
+import { editionWhere } from "./admin-edition";
 
 /**
  * Billing's one search on its queue and its provider events (R25): the
@@ -67,11 +69,12 @@ export function organizationSearch(q: string): Prisma.OrganizationWhereInput {
  */
 export async function searchedOrganizationIds(
     raw: string | undefined,
+    edition: Edition | null = null,
 ): Promise<string[] | null> {
     const q = raw?.trim();
     if (!q) return null;
     const rows = await prisma.organization.findMany({
-        where: organizationSearch(q),
+        where: { AND: [organizationSearch(q), editionWhere(edition)] },
         orderBy: { id: "asc" },
         take: SEARCHED_BUSINESSES_CAP,
         select: { id: true },

@@ -3,10 +3,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
-import { Arrow } from "@/components/shared/links/arrow";
-import { Pill } from "@/components/shared/links/pill";
-import { textLinkClasses } from "@/components/shared/links/text-link";
-import { Eyebrow } from "@/components/shared/sections/eyebrow";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
@@ -22,10 +18,14 @@ import {
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
-import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Pill } from "@saroh/marketing/pill";
+import { ring } from "@saroh/marketing/ring";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /*
  * The footer's one Devanagari word, सारोह, in Noto Sans Devanagari 500 (the

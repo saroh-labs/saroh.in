@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { allToolPages } from "./load";
+import { allToolPages } from "./embedded";
 
 /**
  * The email gate's email names the tool from the API's own list

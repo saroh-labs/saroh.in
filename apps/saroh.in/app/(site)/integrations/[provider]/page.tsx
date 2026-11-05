@@ -4,14 +4,7 @@ import { notFound } from "next/navigation";
 
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
-import { Article, Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { Arrow } from "@/components/shared/links/arrow";
-import { textLinkClasses } from "@/components/shared/links/text-link";
-import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
-import { Faq } from "@/components/shared/sections/faq";
-import { PageTitle } from "@/components/shared/sections/page-title";
-import { SectionHeading } from "@/components/shared/sections/section-heading";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -22,6 +15,13 @@ import { numberWord } from "@/lib/format/number-words";
 import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
+import { Article, Container } from "@saroh/marketing/container";
+import { Faq } from "@saroh/marketing/faq";
+import { PageTitle } from "@saroh/marketing/page-title";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * One integration's page (Resources plan U3, design "Saroh Resources -

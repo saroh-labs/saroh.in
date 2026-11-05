@@ -1,3 +1,5 @@
+import { env } from "@/env";
+
 import { apiFetch } from "./api";
 import { getAppUrl } from "./app-urls";
 
@@ -10,6 +12,8 @@ import { getAppUrl } from "./app-urls";
 export type BuiltInRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
 
 export interface Business {
+    /** Which edition it runs under. Absent from an older API: India. */
+    edition?: "INDIA" | "GLOBAL";
     id: string;
     name: string;
     slug: string;
@@ -44,7 +48,11 @@ export function businessBadge(
 export async function listBusinesses(): Promise<Business[]> {
     const res = await apiFetch("/organizations");
     if (!res.ok) throw new Error(`GET /organizations failed: ${res.status}`);
-    return (await res.json()) as Business[];
+    const businesses = (await res.json()) as Business[];
+    // This edition's: each opens on its own edition's app (DEC-204).
+    return businesses.filter(
+        (b) => (b.edition ?? "INDIA") === (env.NEXT_PUBLIC_EDITION ?? "INDIA"),
+    );
 }
 
 /**

@@ -1,0 +1,10 @@
+{
+    "userMenu": {
+        "yourAccount": "Your account",
+        "yourAccountOf": "Your account, {who}",
+        "profile": "Your profile",
+        "appearance": "Appearance",
+        "helpCentre": "Help centre",
+        "signOut": "Sign out"
+    }
+}

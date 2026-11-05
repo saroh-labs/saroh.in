@@ -1,14 +1,12 @@
 /**
- * When planned work is expected, as the changelog's Coming next and the
- * Integrations page's Planned list both say it (owner, 10 Oct 2026): the
- * nearest group keeps its months, the one after is "Early 2027", and
- * everything further out is "Later", with no date to miss.
+ * How near planned work is, as the changelog's and the Integrations page's
+ * Planned lists both say it: "Coming next", then "Later", with no date to
+ * miss (owner, 4 Nov 2026; dated groups until then).
  *
  * A group's label is drawn once, over its rows, never on every row.
  */
 export const COMING_GROUPS = [
-    { key: "next", label: "Nov–Dec 2026" },
-    { key: "early-2027", label: "Early 2027" },
+    { key: "next", label: "Coming next" },
     { key: "later", label: "Later" },
 ] as const;
 
@@ -80,19 +78,53 @@ export const COMING: readonly ComingItem[] = [
         line: "Online appointments get a meeting link made for them automatically.",
     },
     {
-        group: "early-2027",
+        group: "next",
+        name: "Saroh for Android",
+        line: "Run your day from your phone: bookings, walk-ins, orders and payments, in English, Hindi or Hinglish. Works without internet.",
+    },
+    {
+        group: "next",
+        // Invoices already carry the business's logo and GSTIN (ledger
+        // BI7), so the design's "add your logo, colours, GSTIN…" names only
+        // what is new (ledger CN11).
+        name: "Invoice layouts",
+        line: "Pick an invoice layout, set its colours, terms and a signature, and see it before it goes out.",
+    },
+    {
+        group: "next",
+        name: "Sign in with Google",
+        line: "Your customers sign in to your booking or shop page with Google. GitHub too.",
+    },
+    {
+        group: "next",
+        name: "Bring your own login",
+        line: "Already have an app with Firebase, Clerk or Auth0? Your customers keep one account.",
+    },
+    {
+        group: "next",
+        name: "API keys and webhooks",
+        line: "Connect Saroh to your own tools, n8n and AI assistants, with keys you control.",
+    },
+    {
+        group: "next",
+        name: "Saroh Social",
+        integration: true,
+        line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
+    },
+    {
+        group: "later",
         name: "Shopify import",
         integration: true,
         line: "Move products, customers and past orders over from Shopify in one go.",
     },
     {
-        group: "early-2027",
+        group: "later",
         name: "PhonePe",
         integration: true,
         line: "Take payments through PhonePe, alongside Razorpay and Cashfree.",
     },
     {
-        group: "early-2027",
+        group: "later",
         // An order that ships already takes a courier's name and a tracking
         // number typed by hand, so tracking alone isn't what's coming
         // (ledger CN7).
@@ -101,50 +133,16 @@ export const COMING: readonly ComingItem[] = [
         line: "Shipping labels and courier pick-up for orders that ship, with tracking filled in for you.",
     },
     {
-        group: "early-2027",
+        group: "later",
         name: "Google Business Profile",
         integration: true,
         line: "Your booking or shop link on your Google listing.",
     },
     {
-        group: "early-2027",
+        group: "later",
         name: "Tally and Zoho Books export",
         integration: true,
         line: "Send orders and invoices to your accountant in their format.",
-    },
-    {
-        group: "early-2027",
-        name: "Saroh for Android",
-        line: "Run your day from your phone: bookings, walk-ins, orders and payments, in English, Hindi or Hinglish. Works without internet.",
-    },
-    {
-        group: "early-2027",
-        // Invoices already carry the business's logo and GSTIN (ledger
-        // BI7), so the design's "add your logo, colours, GSTIN…" names only
-        // what is new (ledger CN11).
-        name: "Invoice layouts",
-        line: "Pick an invoice layout, set its colours, terms and a signature, and see it before it goes out.",
-    },
-    {
-        group: "early-2027",
-        name: "Sign in with Google",
-        line: "Your customers sign in to your booking or shop page with Google. GitHub too.",
-    },
-    {
-        group: "later",
-        name: "Bring your own login",
-        line: "Already have an app with Firebase, Clerk or Auth0? Your customers keep one account.",
-    },
-    {
-        group: "later",
-        name: "API keys and webhooks",
-        line: "Connect Saroh to your own tools, n8n and AI assistants, with keys you control.",
-    },
-    {
-        group: "later",
-        name: "Social publishing",
-        integration: true,
-        line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
     },
     {
         group: "later",

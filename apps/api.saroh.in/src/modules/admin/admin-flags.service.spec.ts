@@ -123,6 +123,7 @@ describe("AdminFlagsService", () => {
             expect.objectContaining({
                 where: { flagKey: "MODULE_PAYMENTS" },
                 take: 20,
+                skip: 0,
             }),
         );
         expect(history.map((row) => row.actorName)).toEqual([
@@ -131,6 +132,14 @@ describe("AdminFlagsService", () => {
         ]);
         expect(history[0]?.organizationName).toBe("Rye & Co.");
         expect(history[1]?.organizationName).toBeNull();
+    });
+
+    it("pages past the newest 20", async () => {
+        audit.mockResolvedValue([]);
+        await service.history("MODULE_PAYMENTS", 3);
+        expect(audit).toHaveBeenCalledWith(
+            expect.objectContaining({ take: 20, skip: 40 }),
+        );
     });
 
     it("reads no names when the flag has never changed", async () => {

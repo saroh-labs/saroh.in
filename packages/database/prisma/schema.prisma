@@ -144,6 +144,12 @@ model SignInEmailChange {
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
 // carries Membership. Renamed from the former optional Workspace grouping.
 
+/// The two editions, one running on saroh.in and one on saroh.tech (DEC-204).
+enum Edition {
+  INDIA
+  GLOBAL
+}
+
 model Organization {
   id   String @id @default(cuid())
   name String
@@ -158,6 +164,16 @@ model Organization {
   // every public and site-customer write refuses with ORGANIZATION_DEMO.
   // Its owner can't sign in. Set only by the demo-businesses script.
   isDemo Boolean @default(false)
+
+  // Which edition this business runs under: the rules it follows, its currency
+  // and tax system, its addresses (DEC-204). Set once, when the business is
+  // made, from its country (@saroh/edition, editionForCountry). Nothing changes
+  // it after that. Code reads it from here, never from the address a request
+  // came through.
+  edition Edition @default(INDIA)
+  // ISO 4217, chosen at setup by a Global business: its one currency. Null for
+  // a business from before, whose currency comes from what it sells (DEC-030).
+  currency String?
 
   // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
   // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for
@@ -543,6 +559,11 @@ model BusinessProfile {
   // `gstState` is also the state of the registered address below, registered
   // or not — one field, so the address and the GSTIN can never disagree.
   gstRegistered Boolean @default(false)
+  // A Global business's tax line (DEC-204): what it's called, its rate in
+  // percent, and the month its numbering year starts (1 or 4; null is 4).
+  taxName        String?
+  taxRate        Decimal? @db.Decimal(5, 2)
+  yearStartMonth Int?
   gstState      String?
 
   // The registered address (CGST rule 46: a tax invoice names the supplier's
@@ -2324,7 +2345,7 @@ model Post {
   currentPublication   Publication?  @relation("PostCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
   publications         Publication[] @relation("PostPublications")
 
-  comments Comment[]
+  comments    Comment[]
   // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
   reviewNotes SiteComment[]
 
@@ -2769,6 +2790,10 @@ model PlatformAdmin {
   /// Why this person has staff access (e.g. "on-call platform engineer").
   note String?
 
+  /// The editions' consoles this person may open (DEC-204). A Platform owner
+  /// opens every edition's, whatever this says.
+  editions Edition[] @default([INDIA])
+
   @@index([revokedAt])
 }
 
@@ -2899,7 +2924,9 @@ model StaffInvite {
   name         String
   roles        String[]
   worksAs      String
-  onCommission Boolean  @default(false)
+  onCommission Boolean   @default(false)
+  /// The consoles the grant opens once accepted (DEC-204).
+  editions     Edition[] @default([INDIA])
   reason       String
 
   tokenHash String   @unique
@@ -2946,18 +2973,20 @@ model StaffInvite {
 // its email is left (`saroh-leads/lead-retention.ts`, the enquiry purge).
 // Not a tenant row: it belongs to Saroh.
 model SarohLead {
-  id String @id @default(cuid())
+  id      String  @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   /// Who: the business's or the person's name, as known.
   name     String
   email    String?
-  emailKey String?   @unique
+  emailKey String?
   /// When this email was first put on the lead.
   emailAt  DateTime?
 
   /// The email the business signed up with, when it isn't `email`.
   signUpEmail    String?
-  signUpEmailKey String?   @unique
+  signUpEmailKey String?
   signUpEmailAt  DateTime?
 
   phone String?
@@ -2993,6 +3022,12 @@ model SarohLead {
   @@index([ownerPlatformAdminId, stage])
   @@index([stage, followUpOn])
   @@index([websiteSeenAt])
+
+  // One lead per email on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey])
+  @@unique([edition, signUpEmailKey])
+  @@index([emailKey])
+  @@index([signUpEmailKey])
 }
 
 // A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
@@ -6425,7 +6460,9 @@ model BillingWebhookEvent {
 // matching the public enquiry surface — and exists so abuse can be
 // investigated and a self-referral recognised.
 model WaitlistSignup {
-  id String @id @default(cuid())
+  id      String  @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition Edition @default(INDIA)
 
   email       String
   emailKey    String
@@ -6513,11 +6550,46 @@ model WaitlistSignup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([emailKey, businessKey])
+  // One entry per person and business on each edition (owner, 4 Nov).
+  @@unique([edition, emailKey, businessKey])
+  @@index([emailKey])
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])
   @@index([reportEmailDay])
+}
+
+// A free download's lead on saroh.in (/downloads/<slug>, plan 2026-10-31-002
+// U9): the email or WhatsApp number given for the file, exactly one (a CHECK
+// in the migration), one row per contact and download. Used only to send
+// that file: no marketing consent, and an unverified number is never
+// messaged. Deleted 12 months after its last request (the waitlist
+// retention sweep). Platform-level, not a business.
+model DownloadLead {
+  id             String    @id @default(cuid())
+  email          String?
+  // E.164, an Indian mobile (DEC-198).
+  phone          String?
+  // The email's key (`normaliseEmail`) or the phone: what "the same person" is.
+  contactKey     String
+  slug           String
+  // `download:<slug>`.
+  source         String
+  purpose        String    @default("download")
+  // The version of the consent line the gate showed.
+  consentVersion String
+  ipHash         String?
+  // The download emails sent to this lead on one UTC day, for the tools'
+  // email caps (`waitlist/tool-email-cap.ts`).
+  emailDay       DateTime? @db.Date
+  emailCount     Int       @default(0)
+
+  createdAt       DateTime @default(now())
+  lastRequestedAt DateTime @default(now())
+
+  @@unique([contactKey, slug])
+  @@index([lastRequestedAt])
+  @@index([emailDay])
 }
 
 /// A record of a completed or in-flight idempotent operation.
@@ -7057,10 +7129,14 @@ model Invoice {
   sgst            Decimal @default(0) @db.Decimal(12, 2)
   igst            Decimal @default(0) @db.Decimal(12, 2)
 
-  currency String
-  subtotal Decimal @db.Decimal(12, 2)
-  tax      Decimal @default(0) @db.Decimal(12, 2)
-  total    Decimal @db.Decimal(12, 2)
+  currency    String
+  subtotal    Decimal @db.Decimal(12, 2)
+  // What the tax line prints as ("VAT 20%"), frozen on the paper; null is "Tax".
+  taxLabel    String?
+  // The tax number printed beside it. A GST seller's is `sellerGstin`.
+  sellerTaxId String?
+  tax         Decimal @default(0) @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
 
   issuedAt   DateTime?
   dueAt      DateTime?
@@ -8836,6 +8912,9 @@ model SarohInvoiceSequence {
 // (reports:resolve). Kept when the business is deleted.
 model BusinessReport {
   id             String               @id @default(cuid())
+  // The edition whose address it came through (DEC-204). Staff see a report
+  // under its business's edition, and this one when it names no business.
+  edition        Edition              @default(INDIA)
   organizationId String?
   organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   // The host as typed and normalised ("shop.example.com"), not a full URL.
@@ -8865,17 +8944,23 @@ enum BusinessReportStatus {
 // them in the admin console (organization:pii:read). Deleted 12 months
 // after it arrived (`contact-messages/contact-retention.ts`).
 model ContactMessage {
-  id        String   @id @default(cuid())
+  id              String    @id @default(cuid())
+  // The edition whose address it came through (DEC-204); no business to read it from.
+  edition         Edition   @default(INDIA)
   // One of the form's topics (`CONTACT_TOPICS` in the API), never free text.
-  topic     String
-  name      String
-  email     String
+  topic           String
+  name            String
+  email           String
   // One of the waitlist's kinds of business (`WAITLIST_KINDS`), if they chose one.
-  kind      String?
-  message   String
+  kind            String?
+  message         String
   // A digest of the writer's address, as the waitlist keeps one; never the address.
-  ipHash    String?
-  createdAt DateTime @default(now())
+  ipHash          String?
+  createdAt       DateTime  @default(now())
+  // When staff marked it handled (they replied from the team's mailbox), and
+  // who; null while it is open. Set from the console's Messages screen.
+  handledAt       DateTime?
+  handledByUserId String?
 
   @@index([createdAt])
 }
@@ -9225,18 +9310,26 @@ model OtpWidgetTokenUse {
 // organization, so no row-level security policy (named in
 // `packages/database/src/rls-coverage.test.ts`).
 model SearchPage {
-  id              String           @id @default(cuid())
+  id               String           @id @default(cuid())
   // `/for/<slug>`.
-  path            String           @unique
-  status          SearchPageStatus
+  path             String           @unique
+  status           SearchPageStatus
   // When it last went live; null while it isn't.
-  liveSince       DateTime?
+  liveSince        DateTime?
   // When it last stopped being live; null if it never was. A page taken
   // off redirects on the site, so a restored page keeps this.
-  takenOffAt      DateTime?
-  changedAt       DateTime         @default(now())
+  takenOffAt       DateTime?
+  changedAt        DateTime         @default(now())
   // The staff user (`User.id`) who made the last change.
-  changedByUserId String?
+  changedByUserId  String?
+  // What the last Deploy changes sent to the site (R13, owner 31 Oct):
+  // `status` is staged by publish, unpublish, archive and restore, and the
+  // site's build reads this. They differ only while a page waits to go on
+  // or come off; liveSince and takenOffAt follow this one.
+  releasedStatus   SearchPageStatus @default(DRAFT)
+  // When and by whom (`User.id`) this page was last deployed.
+  deployedAt       DateTime?
+  deployedByUserId String?
 }
 
 enum SearchPageStatus {

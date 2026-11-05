@@ -6,7 +6,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import {
     ListTable,
     ListTableHead,
@@ -133,7 +133,10 @@ function Row({
                     // says it in columns from `sm`.
                     <span className="truncate text-[12px] text-muted-foreground sm:hidden">
                         {orders?.lastAt ? (
-                            <ViewerDate iso={orders.lastAt} variant="recent" />
+                            <BusinessDate
+                                iso={orders.lastAt}
+                                variant="recent"
+                            />
                         ) : row.addedByHand ? (
                             "Added by hand · no orders yet"
                         ) : (
@@ -156,7 +159,7 @@ function Row({
                     <span className="hidden min-w-0 gap-0.5 sm:grid">
                         <span>
                             {orders?.lastAt ? (
-                                <ViewerDate
+                                <BusinessDate
                                     iso={orders.lastAt}
                                     variant="recent"
                                 />

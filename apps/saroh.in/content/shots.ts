@@ -11,16 +11,12 @@
  * names its business as a demo (DEC-075, D14). No amounts in captions: the
  * shot shows the figures, the caption says what it is.
  */
+import type { ShotKey } from "@saroh/marketing/content-types";
+import type { Shot } from "@saroh/marketing/shot";
+
 import { CAPTURED } from "./shots.captured";
 
-export interface Shot {
-    /** Under /public, e.g. `/shots/v2/s-home.webp`; null until captured. */
-    src: string | null;
-    alt: string;
-    /** Intrinsic size of the captured image; the placeholder uses 16:10. */
-    width: number;
-    height: number;
-}
+export type { Shot, ShotKey };
 
 const pending = (alt: string): Shot => ({
     src: null,
@@ -139,8 +135,6 @@ const designed = {
  * captured alt describes what the image really shows. */
 export const shots = Object.fromEntries(
     Object.entries(designed).map(([key, shot]) => [key, CAPTURED[key] ?? shot]),
-) as Record<keyof typeof designed, Shot>;
-
-export type ShotKey = keyof typeof designed;
+) as Record<ShotKey, Shot>;
 
 export const SHOT_KEYS = Object.keys(shots) as ShotKey[];

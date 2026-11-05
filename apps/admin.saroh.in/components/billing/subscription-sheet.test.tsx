@@ -91,6 +91,17 @@ describe("SubscriptionSheet › header and the problem banner", () => {
         });
     });
 
+    it("a wrong id says there is no such subscription, not try again", () => {
+        sheet({ detail: null, failed: "not-found" });
+        expect(
+            screen.getByText(
+                "No subscription with this id. It may have been removed.",
+            ),
+        ).toBeTruthy();
+        expect(screen.queryByText(/try again/)).toBeNull();
+        expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    });
+
     it("past due: the payment-failed banner, its tries and last try, and no fix (no pay link this round)", () => {
         sheet({
             detail: subscriptionDetail({

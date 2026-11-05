@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     AlertDialog,
@@ -7,12 +7,15 @@ import {
     AlertDialogDescription,
     AlertDialogTitle,
 } from "./alert-dialog";
+import { CommandDialog, CommandInput, CommandList } from "./command";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogTitle,
+    FULL_ON_PHONE,
+    SHEET_ON_PHONE,
 } from "./dialog";
 
 /**
@@ -152,5 +155,165 @@ describe("the dialog's sizes, title, close target and footer", () => {
             </Dialog>,
         );
         expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    });
+});
+
+/**
+ * DEC-202: below `sm` every dialog is a bottom sheet, in the bottom
+ * FormSheet's look; at a desk it is the centred dialog it always was. The
+ * phone look is `max-sm:` classes only, so a caller's own classes (a
+ * width, `p-0`, `sm:rounded-xl`) can't fight it.
+ */
+describe("a dialog on a phone is a bottom sheet (DEC-202)", () => {
+    const PHONE = [
+        "max-sm:inset-x-0",
+        "max-sm:bottom-0",
+        "max-sm:top-auto",
+        "max-sm:max-w-none",
+        "max-sm:max-h-[92dvh]",
+        "max-sm:translate-x-0",
+        "max-sm:translate-y-0",
+        "max-sm:rounded-t-[18px]",
+        "max-sm:border-b-[length:env(safe-area-inset-bottom)]",
+        "max-sm:data-[state=open]:slide-in-from-bottom",
+        "max-sm:data-[state=closed]:slide-out-to-bottom",
+    ];
+    const DESK = [
+        "fixed",
+        "left-[50%]",
+        "top-[50%]",
+        "translate-x-[-50%]",
+        "translate-y-[-50%]",
+        "max-h-[calc(100dvh-2rem)]",
+        "p-6",
+        "sm:rounded-2xl",
+        "data-[state=open]:slide-in-from-left-1/2",
+        "data-[state=open]:slide-in-from-top-[48%]",
+    ];
+
+    it.each([
+        [
+            "DialogContent",
+            "dialog",
+            <Dialog key="d" open>
+                <DialogContent size="sm" className="p-0 sm:rounded-xl">
+                    <DialogTitle>Rename</DialogTitle>
+                    <DialogDescription>One field.</DialogDescription>
+                </DialogContent>
+            </Dialog>,
+        ],
+        [
+            "AlertDialogContent",
+            "alertdialog",
+            <AlertDialog key="a" open>
+                <AlertDialogContent className="max-w-[420px] p-0">
+                    <AlertDialogTitle>Delete page?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Gone for good.
+                    </AlertDialogDescription>
+                </AlertDialogContent>
+            </AlertDialog>,
+        ],
+    ] as const)(
+        "%s keeps the desk classes and adds only phone ones",
+        (_, role, tree) => {
+            render(tree);
+            const dialog = screen.getByRole(role);
+            for (const rule of PHONE) expect(dialog).toHaveClass(rule);
+            for (const rule of DESK.filter(
+                (r) => r !== "p-6" && r !== "sm:rounded-2xl",
+            )) {
+                expect(dialog).toHaveClass(rule);
+            }
+            // Every class it adds is phone-only, and none is lost to a
+            // caller's class.
+            const phone = SHEET_ON_PHONE.split(" ");
+            expect(phone.every((c) => c.startsWith("max-sm:"))).toBe(true);
+            for (const rule of phone) expect(dialog).toHaveClass(rule);
+            // The caller's own classes still win where they were set.
+            expect(dialog).toHaveClass("p-0");
+            expect(dialog).not.toHaveClass("p-6");
+        },
+    );
+
+    it("keeps every desk class with no caller classes", () => {
+        render(
+            <Dialog open>
+                <DialogContent>
+                    <DialogTitle>Rename</DialogTitle>
+                    <DialogDescription>One field.</DialogDescription>
+                </DialogContent>
+            </Dialog>,
+        );
+        const dialog = screen.getByRole("dialog");
+        for (const rule of DESK) expect(dialog).toHaveClass(rule);
+    });
+
+    it("draws the sheet's grab handle on a phone only, unheard", () => {
+        render(
+            <AlertDialog open>
+                <AlertDialogContent>
+                    <AlertDialogTitle>Leave?</AlertDialogTitle>
+                    <AlertDialogDescription>Unsaved.</AlertDialogDescription>
+                </AlertDialogContent>
+            </AlertDialog>,
+        );
+        const handle = screen.getByRole("alertdialog").firstElementChild;
+        expect(handle).toHaveAttribute("aria-hidden");
+        expect(handle).toHaveClass("sm:hidden");
+        expect(handle).toHaveClass("absolute");
+        expect(handle).toHaveClass("h-[5px]");
+    });
+});
+
+describe("the search palette is the full screen on a phone (owner, 31 Oct)", () => {
+    // cmdk measures its list; jsdom has no ResizeObserver or scrollIntoView.
+    beforeEach(() => {
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                observe() {
+                    return undefined;
+                }
+                unobserve() {
+                    return undefined;
+                }
+                disconnect() {
+                    return undefined;
+                }
+            },
+        );
+        Element.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("opens full screen, with no sheet classes and no grab handle", () => {
+        render(
+            <CommandDialog open label="Search" description="Find anything">
+                <CommandInput placeholder="Search" />
+                <CommandList />
+            </CommandDialog>,
+        );
+        const panel = screen.getByRole("dialog");
+        for (const c of FULL_ON_PHONE.split(" ")) expect(panel).toHaveClass(c);
+        expect(panel).not.toHaveClass("max-sm:rounded-t-[18px]");
+        expect(panel).not.toHaveClass("max-sm:bottom-0");
+        expect(
+            panel.querySelector('[aria-hidden="true"].sm\\:hidden'),
+        ).toBeNull();
+    });
+
+    it("leaves every other dialog a bottom sheet", () => {
+        render(
+            <Dialog open>
+                <DialogContent>
+                    <DialogTitle>Rename</DialogTitle>
+                    <DialogDescription>One field.</DialogDescription>
+                </DialogContent>
+            </Dialog>,
+        );
+        expect(screen.getByRole("dialog")).toHaveClass("max-sm:bottom-0");
     });
 });

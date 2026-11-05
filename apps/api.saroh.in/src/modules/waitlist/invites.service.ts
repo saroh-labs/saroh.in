@@ -13,7 +13,7 @@ import {
     newInviteToken,
     STALE_CLAIM_MS,
 } from "./invite-token";
-import { maskEmail } from "./waitlist-keys";
+import { isFreeToolSource, maskEmail } from "./waitlist-keys";
 
 /** What a dry run says about one entry (the admin operations' shape). */
 export interface InvitePlanItem {
@@ -54,14 +54,14 @@ export class WaitlistInvitesService {
         if (!signupBase) {
             return {
                 ready: false,
-                reason: "This instance does not know where people sign up. Set ACCOUNTS_URL on the API.",
+                reason: "Invites are off until Saroh knows where people sign up. Whoever runs the API sets it (ACCOUNTS_URL).",
             };
         }
         const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
         if (!offer) {
             return {
                 ready: false,
-                reason: "The launch offer isn't set up yet, and the invite promises it. Set LAUNCH_OFFER_DAYS on the API.",
+                reason: "Invites are off until the launch offer has a length. Whoever runs the API sets it (LAUNCH_OFFER_DAYS).",
             };
         }
         return { ready: true, signupBase, offer };
@@ -76,6 +76,7 @@ export class WaitlistInvitesService {
                 id: true,
                 email: true,
                 businessName: true,
+                source: true,
                 invitedAt: true,
                 inviteSentAt: true,
                 joinedAt: true,
@@ -106,6 +107,13 @@ export class WaitlistInvitesService {
                     targetId: id,
                     verdict: "skip",
                     detail: `${who}: already joined`,
+                };
+            }
+            if (isFreeToolSource(row.source)) {
+                return {
+                    targetId: id,
+                    verdict: "skip",
+                    detail: `${who}: came from a free tool, not waiting for Saroh`,
                 };
             }
             if (row.inviteSentAt) {

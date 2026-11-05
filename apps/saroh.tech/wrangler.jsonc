@@ -1,0 +1,32 @@
+// saroh.tech: static files from `next build` (out/), behind worker/index.ts.
+// No production routes until the owner says so. A Global development deploy
+// adds its routes and settings in its own checkout (scripts/cf-global-dev.mjs).
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-tech-dev",
+    "main": "worker/index.ts",
+    "compatibility_date": "2026-10-01",
+    "assets": {
+        "directory": "out",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "html_handling": "auto-trailing-slash",
+        "not_found_handling": "404-page"
+    },
+    "observability": { "enabled": true },
+    "env": {
+        "production": {
+            "name": "saroh-tech",
+            // Without it a build uses the local API (site.config.ts). Give it to
+            // the build with scripts/cf-env.mjs, as deploy-frontends.yml does.
+            "vars": { "GLOBAL_PRODUCTION_HOSTS": "on" },
+            "assets": {
+                "directory": "out",
+                "binding": "ASSETS",
+                "run_worker_first": true,
+                "html_handling": "auto-trailing-slash",
+                "not_found_handling": "404-page"
+            }
+        }
+    }
+}

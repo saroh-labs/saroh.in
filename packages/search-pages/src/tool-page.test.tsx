@@ -14,11 +14,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ToolPage } from "./components/tool-page";
 import { ToolsHub } from "./components/tools-hub";
-import { allToolPages, listSearchPages, loadToolPage } from "./load";
+import { allToolPages, listSearchPages, loadToolPage } from "./embedded";
 import { unknownClasses } from "./test-classes";
 import { toolChecks } from "./tool-checks";
 import { TOOL_GROUPS } from "./tool-schema";
 import { EmailGate, emailProblem, ToolGateProvider } from "./tools/email-gate";
+import { EveryToolSlot } from "./tools/every-tool-slot";
 import { TOOLS } from "./tools/registry";
 
 afterEach(cleanup);
@@ -70,6 +71,7 @@ describe("<ToolPage>", () => {
                 <ToolPage
                     page={p}
                     links={{ home: "/", hub: "/tools", startFree: "/start" }}
+                    tool={<EveryToolSlot slug={p.slug} />}
                 />,
             );
             // The tool is lazy: wait for its form.
@@ -108,7 +110,9 @@ describe("<ToolPage>", () => {
     it("draws nothing navigable without links (the admin preview), and says when it's a draft", async () => {
         const p = loadToolPage("no-show-cost-calculator");
         if (!p) throw new Error("no-show-cost-calculator is missing");
-        const { container } = render(<ToolPage page={p} draft />);
+        const { container } = render(
+            <ToolPage page={p} draft tool={<EveryToolSlot slug={p.slug} />} />,
+        );
         await screen.findByRole("form");
         expect(container.querySelectorAll("a[href]")).toHaveLength(0);
         expect(screen.getByText("Draft — not published yet")).toBeTruthy();

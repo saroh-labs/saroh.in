@@ -5,14 +5,17 @@ import {
     Delete,
     Get,
     Header,
+    Headers,
     HttpCode,
     HttpStatus,
     Ip,
+    NotFoundException,
     Post,
     Req,
     Res,
     UseGuards,
 } from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 import { fromNodeHeaders } from "better-auth/node";
 import type { Request, Response } from "express";
 
@@ -26,6 +29,13 @@ import type {
 } from "./account-phone.service";
 import { AccountPhoneService, placeOf } from "./account-phone.service";
 import { StartPhoneDto, VerifyPhoneDto } from "./dto";
+
+/** Phone sign-in is India's, and each code costs money to send (DEC-204). */
+function refusePhoneOnGlobal(host: string | undefined): void {
+    if (editionOfHost(host ?? "") === "GLOBAL") {
+        throw new NotFoundException("Phone sign-in isn't available here.");
+    }
+}
 
 /**
  * Signing in to Saroh with a verified phone (DEC-196), before anyone is
@@ -48,7 +58,12 @@ export class PhoneSignInController {
     @Post("start")
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
-    start(@Body() dto: StartPhoneDto, @Ip() ip: string): Promise<PhoneStart> {
+    start(
+        @Body() dto: StartPhoneDto,
+        @Ip() ip: string,
+        @Headers("host") host?: string,
+    ): Promise<PhoneStart> {
+        refusePhoneOnGlobal(host);
         return this.phones.start({
             phoneE164: dto.phone,
             channel: dto.channel ?? "whatsapp",
@@ -95,7 +110,9 @@ export class AccountPhoneController {
         @CurrentUser() user: AuthUser,
         @Body() dto: StartPhoneDto,
         @Ip() ip: string,
+        @Headers("host") host?: string,
     ): Promise<PhoneStart> {
+        refusePhoneOnGlobal(host);
         return this.phones.start({
             phoneE164: dto.phone,
             channel: dto.channel ?? "whatsapp",

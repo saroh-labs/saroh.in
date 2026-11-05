@@ -17,6 +17,7 @@ jest.mock("@saroh/database", () => ({
             create: jest.fn(),
         },
         order: { findFirst: jest.fn().mockResolvedValue(null) },
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
         product: { findFirst: jest.fn().mockResolvedValue(null) },
         subscription: { findUnique: jest.fn() },
         entitlementOverride: { findMany: jest.fn() },

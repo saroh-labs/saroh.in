@@ -9,6 +9,7 @@ import {
     Post,
 } from "@nestjs/common";
 
+import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { ContactMessagesService } from "./contact-messages.service";
@@ -42,6 +43,7 @@ export class PublicContactMessagesController {
         @Body() dto: SendContactMessageDto,
         @Ip() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+        @Headers("host") host?: string,
     ): Promise<{ ok: true }> {
         const ipHash = visitorKey(ip, relay);
         if (
@@ -60,6 +62,7 @@ export class PublicContactMessagesController {
             kind: dto.kind,
             message: dto.message,
             ipHash,
+            edition: editionOfFormHost(host),
         });
     }
 }

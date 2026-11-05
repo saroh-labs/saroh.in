@@ -58,6 +58,38 @@ describe("SubscriptionSummary › Billing profile", () => {
         expect(screen.queryByRole("button", { name: "Sync again" })).toBeNull();
     });
 
+    it("a long list of other businesses is a count with Show, the names kept behind it", () => {
+        const others = Array.from({ length: 57 }, (_, i) => ({
+            id: `org_${i}`,
+            name: `Shop ${i}`,
+        }));
+        const { container } = render(
+            <SubscriptionSummary
+                canAct={false}
+                detail={subscriptionDetail({
+                    billingProfile: {
+                        id: "bp_1",
+                        legalName: "Asha Rao Enterprises",
+                        billingEmail: "accounts@example.com",
+                        gstin: null,
+                        provider: "RAZORPAY",
+                        providerCustomerId: "cust_Abc123",
+                        syncedAt: null,
+                        lastError: null,
+                        contactWithheld: false,
+                        otherBusinesses: others,
+                    },
+                })}
+            />,
+        );
+        const details = container.querySelector("details");
+        expect(details?.querySelector("summary")?.textContent).toContain(
+            "Also bills 57 other businesses",
+        );
+        expect(details?.open).toBe(false);
+        expect(details?.textContent).toContain("Shop 56");
+    });
+
     it("says when the profile bills only this business", () => {
         const { container } = render(
             <SubscriptionSummary canAct detail={subscriptionDetail()} />,

@@ -33,6 +33,10 @@ describe("saroh.in page policies", () => {
         expect(sources("connect-src")).toContain(
             "https://*.google-analytics.com",
         );
+        // The downloads' bot check (Turnstile).
+        expect(sources("script-src")).toContain(
+            "https://challenges.cloudflare.com",
+        );
         expect(sources("script-src").join(" ")).not.toMatch(/razorpay|msg91/);
     });
 

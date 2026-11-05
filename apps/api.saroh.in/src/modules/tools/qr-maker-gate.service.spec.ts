@@ -195,6 +195,7 @@ describe("unlocking the downloads", () => {
             source: "qr-maker",
             checkedAt: now,
             newsConsent: false,
+            edition: "INDIA",
             ipHash: "h1",
         });
     });
@@ -269,6 +270,14 @@ describe("unlocking the downloads", () => {
 
     it("has no email for a slug off the list", () => {
         expect(() => toolEmail("not-a-tool")).toThrow();
+    });
+
+    it("sends a Global visitor to saroh.tech's tools, naming no saroh.in", () => {
+        for (const slug of [undefined, "gst-calculator"]) {
+            const { text } = toolEmail(slug, "GLOBAL");
+            expect(text).toContain("https://saroh.tech/tools");
+            expect(text).not.toContain("saroh.in");
+        }
     });
 
     it("touches another tool's gate entry too, keeping its source", async () => {

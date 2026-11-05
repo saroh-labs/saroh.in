@@ -1,7 +1,6 @@
-import { cn } from "@/lib/cn";
-import type { PricingPageModel } from "@/lib/pricing-model";
+import type { PricingPageModel } from "@saroh/marketing/pricing-model";
+import { PricingSection as Section } from "@saroh/marketing/pricing-section";
 
-import { Section } from "../shared/sections/section";
 import { PricingCards } from "./pricing-cards";
 
 /**
@@ -27,12 +26,7 @@ export function PricingSection({
     src: string;
 }) {
     return (
-        <Section
-            id={id}
-            titleId="pricing-title"
-            title={title}
-            className={cn("grid gap-[18px]", className)}
-        >
+        <Section id={id} className={className} title={title}>
             <PricingCards model={model} src={src} compare />
         </Section>
     );

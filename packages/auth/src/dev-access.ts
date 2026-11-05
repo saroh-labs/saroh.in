@@ -104,7 +104,12 @@ export function withDevAccess(
 ): Middleware {
     return async function devAccess(request) {
         const key = process.env.DEV_ACCESS_KEY?.trim();
-        if (!key) return next(request);
+        if (!key) {
+            // A domain that refuses visitors never opens for a missing key.
+            return process.env.DEV_REDIRECT_ORIGIN?.trim() === "refuse"
+                ? noIndex(new NextResponse("Not found", { status: 404 }))
+                : next(request);
+        }
 
         const opensAt = launchInstant(process.env.LAUNCH_AT);
         if (opensAt !== null && now() >= opensAt) return next(request);
@@ -135,7 +140,8 @@ export function withDevAccess(
 
         const production = process.env.DEV_REDIRECT_ORIGIN?.trim();
         const isRead = request.method === "GET" || request.method === "HEAD";
-        if (!isRead || !production) {
+        // "refuse": a domain whose address shouldn't lead anywhere (DEC-204).
+        if (!isRead || !production || production === "refuse") {
             return noIndex(new NextResponse("Not found", { status: 404 }));
         }
         // An empty DEV_REDIRECT_PATH keeps the page, as an unset one does.

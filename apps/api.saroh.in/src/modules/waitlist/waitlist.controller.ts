@@ -8,6 +8,7 @@ import {
     Ip,
     Post,
 } from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
@@ -51,6 +52,7 @@ export class WaitlistController {
         @Body() dto: JoinWaitlistDto,
         @Ip() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+        @Headers("host") host?: string,
     ): Promise<JoinWaitlistResponse> {
         // The raw IP is hashed immediately and never leaves this handler — it
         // is used as the rate-limit key and stored only as a digest.
@@ -74,6 +76,7 @@ export class WaitlistController {
             ref: dto.ref,
             template: dto.template,
             ipHash,
+            edition: editionOfHost(host ?? "") ?? "INDIA",
         });
 
         return result.created

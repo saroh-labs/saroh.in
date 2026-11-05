@@ -37,40 +37,65 @@ export default async function UserOverview({
             )}
             <Panel title="Account">
                 {() => (
-                    <Facts
-                        rows={[
-                            ["Email", person.email],
-                            ["Email check", verifiedWords(person.verifiedBy)],
-                            [
-                                "Businesses",
-                                person.businesses === 0
-                                    ? "No business yet"
-                                    : plural(
-                                          person.businesses,
-                                          "business",
-                                          "businesses",
-                                      ),
-                            ],
-                            ["Account since", formatDate(person.createdAt)],
-                            ["Last seen", formatRelative(person.lastSeenAt)],
-                            [
-                                "Signed in on",
-                                person.sessions.length === 0
-                                    ? "Nowhere right now"
-                                    : plural(person.sessions.length, "device"),
-                            ],
-                            ["Staff", person.isStaff ? "Yes — see Team" : "No"],
-                            [
-                                "Account id",
-                                <span
-                                    key="id"
-                                    className="break-all font-mono text-[12.5px]"
-                                >
-                                    {person.id}
-                                </span>,
-                            ],
-                        ]}
-                    />
+                    <>
+                        <Facts
+                            rows={[
+                                ["Email", person.email],
+                                [
+                                    "Email check",
+                                    verifiedWords(person.verifiedBy),
+                                ],
+                                [
+                                    "Businesses",
+                                    person.businesses === 0
+                                        ? "No business yet"
+                                        : plural(
+                                              person.businesses,
+                                              "business",
+                                              "businesses",
+                                          ),
+                                ],
+                                ["Account since", formatDate(person.createdAt)],
+                                [
+                                    "Last seen",
+                                    formatRelative(person.lastSeenAt),
+                                ],
+                                [
+                                    "Signed in on",
+                                    person.sessions.length === 0
+                                        ? "Nowhere right now"
+                                        : plural(
+                                              person.sessions.length,
+                                              "device",
+                                          ),
+                                ],
+                                [
+                                    "Staff",
+                                    person.isStaff ? "Yes — see Team" : "No",
+                                ],
+                                [
+                                    "Account id",
+                                    <span
+                                        key="id"
+                                        className="break-all font-mono text-[12.5px]"
+                                    >
+                                        {person.id}
+                                    </span>,
+                                ],
+                            ]}
+                        />
+                        {(person.otherEditionBusinesses ?? 0) > 0 && (
+                            <p className="mt-3 text-[13px] text-muted-foreground">
+                                Has{" "}
+                                {plural(
+                                    person.otherEditionBusinesses ?? 0,
+                                    "business",
+                                    "businesses",
+                                )}{" "}
+                                on the other edition.
+                            </p>
+                        )}
+                    </>
                 )}
             </Panel>
         </>

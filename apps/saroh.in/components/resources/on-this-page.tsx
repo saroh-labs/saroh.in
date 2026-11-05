@@ -1,5 +1,5 @@
-import { textLinkClasses } from "../shared/links/text-link";
-import { Eyebrow } from "../shared/sections/eyebrow";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 export interface PageHeading {
     /** The heading's `id`, which its link jumps to. */
@@ -17,7 +17,7 @@ export function OnThisPage({ headings }: { headings: PageHeading[] }) {
     return (
         <nav
             aria-label="On this page"
-            className="hidden min-w-0 min-[1100px]:sticky min-[1100px]:top-6 min-[1100px]:block min-[1100px]:max-h-[calc(100dvh-3rem)] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain"
+            className="hidden min-w-0 min-[1100px]:sticky min-[1100px]:top-[calc(var(--mk-nav-h)+1.5rem)] min-[1100px]:block min-[1100px]:max-h-[calc(100dvh-var(--mk-nav-h)-3rem)] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain"
         >
             <div className="grid gap-2">
                 <Eyebrow as="span" tone="muted" size="sm">

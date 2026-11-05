@@ -9,6 +9,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { stamp } from "../fixtures/own-data";
+import { sitemapPages } from "../fixtures/sitemap";
 import { urls } from "../playwright.config";
 
 /**
@@ -311,7 +312,7 @@ test.describe("nav menus by keyboard", () => {
             )
             .toBe(true);
 
-        // Each section opens and closes from the keyboard.
+        // Each section is a level, in and out from the keyboard.
         for (const [label, count] of [
             ["Features", FEATURES.length],
             ["Solutions", SOLUTIONS.length],
@@ -319,10 +320,13 @@ test.describe("nav menus by keyboard", () => {
             const row = sheet.getByRole("button", { name: label });
             await row.focus();
             await page.keyboard.press("Enter");
-            await expect(row).toHaveAttribute("aria-expanded", "true");
+            const back = sheet.getByRole("button", { name: "Back" });
+            await expect(back).toBeFocused();
             await expect(
                 sheet.locator(`#nav-sheet-${label.toLowerCase()} a`),
             ).toHaveCount(count);
+            await page.keyboard.press("Enter");
+            await expect(row).toBeFocused();
         }
 
         const axe = await new AxeBuilder({ page })
@@ -623,13 +627,8 @@ test.describe("links, redirects and the sitemap", () => {
         request,
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
-        const sitemap = await request.get(`${WEB}/sitemap.xml`);
-        expect(sitemap.status()).toBe(200);
-        const listed = [
-            ...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g),
-        ]
-            .map((m) => new URL(m[1]).pathname)
-            .sort();
+        // The index and every group sitemap, none with changefreq or priority.
+        const listed = (await sitemapPages(request, WEB)).sort();
         expect(listed).toEqual(
             expect.arrayContaining([...INDEXED, ...TEXT_FILES]),
         );
@@ -658,9 +657,6 @@ test.describe("links, redirects and the sitemap", () => {
         // own noindex is seen (a blocked page can still be listed bare).
         expect(robots).not.toMatch(/^Host:/m);
         expect(robots).not.toContain("Disallow: /welcome");
-        // No guessed changefreq or priority in the sitemap.
-        const xml = await (await request.get(`${WEB}/sitemap.xml`)).text();
-        expect(xml).not.toMatch(/<changefreq>|<priority>/);
 
         // The draft and its link say noindex themselves too.
         const draft = await head(request, `${WEB}/pricing/draft`);

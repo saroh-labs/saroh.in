@@ -272,3 +272,49 @@ export function howToLd(input: {
         })),
     };
 }
+
+/**
+ * A guide or a GST page as an `Article` (plan 2026-10-31-002, R7): its
+ * headline, its author as the page names them, and its dates. Only facts
+ * the page sets: no published date, no `datePublished`; no picture, no
+ * `image`. Saroh publishes it.
+ */
+export function contentArticleLd(input: {
+    headline: string;
+    description: string;
+    path: string;
+    author: { name: string; role: string };
+    /** YYYY-MM-DD, when the page holds one. */
+    published?: string;
+    updated: string;
+    image?: string;
+}): JsonLdObject {
+    const day = (d: string) => `${d}T00:00:00+05:30`;
+    return {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: input.headline,
+        description: input.description,
+        url: `${SITE_URL}${input.path}`,
+        mainEntityOfPage: `${SITE_URL}${input.path}`,
+        inLanguage: "en-IN",
+        author: {
+            "@type": "Person",
+            name: input.author.name,
+            jobTitle: input.author.role,
+        },
+        publisher: {
+            "@type": "Organization",
+            name: SITE_NAME,
+            url: SITE_URL,
+            logo: { "@type": "ImageObject", url: `${SITE_URL}/icon1.png` },
+        },
+        ...(input.published && { datePublished: day(input.published) }),
+        dateModified: day(input.updated),
+        ...(input.image && {
+            image: input.image.startsWith("/")
+                ? `${SITE_URL}${input.image}`
+                : input.image,
+        }),
+    };
+}

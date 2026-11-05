@@ -6,13 +6,47 @@
  * where a page is drawn; the app must set --font-sans (Geist) and
  * --font-display (Space Grotesk) from packages/ui/fonts.
  */
-// `searchPageChecks` is `@saroh/search-pages/checks`: it draws the page with
-// react-dom/server, which Next refuses in a Server Component's imports, so
-// the index stays importable from one.
+// `searchPageChecks` is `@saroh/search-pages/checks`: it draws the page
+// with react-dom/server, which Next refuses in a Server Component's
+// imports, so the index stays importable from one. `toolChecks` is
+// `./tool-checks` and the tool registry `./tools`, so the index reaches no
+// tool's code: a site imports only its build's tools (`./tools/<slug>`).
 export type { SearchPageCheck } from "./checks";
+export {
+    AnswerBox,
+    Byline,
+    Callout,
+    FactsStrip,
+    Figure,
+    LinkCard,
+    NumberedList,
+    OnThisPage,
+    Related,
+    Section,
+    pickRelated,
+} from "./components/content-blocks";
+export type { Author, CardItem, Fact } from "./components/content-blocks";
+export { ContentLayout } from "./components/content-layout";
+export { DataTable } from "./components/data-table";
+export type {
+    Cell,
+    Column,
+    DataTableProps,
+    Row,
+} from "./components/data-table";
 export { ForHub } from "./components/for-hub";
 export type { ForHubProps } from "./components/for-hub";
+export { HubCards, HubChips, HubPage } from "./components/hub-page";
+export type { HubChip, HubGroup } from "./components/hub-page";
+export {
+    ClosingBand,
+    Crumbs,
+    Questions,
+    StartButton,
+} from "./components/page-parts";
+export type { Crumb } from "./components/page-parts";
 export { PRESETS, smallKeys } from "./components/parts";
+export { Prose } from "./components/prose";
 export { SearchPage, starterWords } from "./components/search-page";
 export type {
     SearchPageLinks,
@@ -22,16 +56,15 @@ export { ToolPage } from "./components/tool-page";
 export type { ToolPageLinks, ToolPageProps } from "./components/tool-page";
 export { ToolsHub } from "./components/tools-hub";
 export type { ToolsHubProps } from "./components/tools-hub";
+// The loader takes the words: `./embedded` has every page (admin, checks,
+// tests); saroh.in builds its own live-only copy. The index holds none.
 export {
-    allSearchPages,
-    allToolPages,
+    createSearchPagesLoader,
     familySlug,
-    listSearchPages,
-    loadSearchPage,
-    loadToolPage,
     parseSearchPage,
     parseToolPage,
 } from "./load";
+export type { SearchPageSources, SearchPagesLoader } from "./load";
 export { FAMILIES, SHAPES } from "./schema";
 export type {
     Family,
@@ -43,7 +76,6 @@ export type {
     Shape,
     ToolPageEntry,
 } from "./schema";
-export { toolChecks } from "./tool-checks";
 export { TOOL_GROUPS } from "./tool-schema";
 export type { ToolGroup, ToolPageData } from "./tool-schema";
 export {
@@ -57,4 +89,3 @@ export type {
     GateResult,
     GateSubmit,
 } from "./tools/email-gate";
-export { TOOLS, hasTool } from "./tools/registry";

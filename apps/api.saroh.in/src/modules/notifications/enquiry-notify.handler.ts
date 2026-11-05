@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Contact, Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { appBase } from "../../common/app-url";
+import { appBaseOf } from "../../common/app-url";
 import { sendEnquiryNotificationEmail } from "../../common/email";
 import {
     emailFieldNames,
@@ -108,7 +108,7 @@ export class EnquiryNotifyHandler {
         // the worker retry the whole job; the unique above keeps that retry from
         // duplicating the Notification.
         const recipients = await this.ownerAdminEmails(lead.organizationId);
-        const leadUrl = `${this.appBaseUrl()}/leads/${lead.id}`;
+        const leadUrl = `${await appBaseOf(lead.organizationId)}/leads/${lead.id}`;
         for (const to of recipients) {
             await sendEnquiryNotificationEmail(to, {
                 contactName,
@@ -161,7 +161,4 @@ export class EnquiryNotifyHandler {
     }
 
     /** The app dashboard origin the lead link points at. */
-    private appBaseUrl(): string {
-        return appBase();
-    }
 }

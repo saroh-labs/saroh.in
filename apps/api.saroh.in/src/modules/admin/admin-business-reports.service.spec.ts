@@ -193,6 +193,52 @@ describe("AdminBusinessReportsService.markDone", () => {
         expect(audit.write).not.toHaveBeenCalled();
     });
 
+    it("is a 404 for a report about another edition's business", async () => {
+        const { service, audit } = build();
+        db.businessReport.findUnique.mockResolvedValue({
+            status: "OPEN",
+            organizationId: "org_1",
+            organization: { edition: "INDIA" },
+        });
+        await expect(
+            service.markDone(staffWith(), "r1", "reason", "GLOBAL"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.businessReport.update).not.toHaveBeenCalled();
+        expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    it("closes a report about no business on the edition it came through only", async () => {
+        const { service } = build();
+        db.businessReport.findUnique.mockResolvedValue({
+            status: "OPEN",
+            edition: "GLOBAL",
+            organizationId: null,
+            organization: null,
+        });
+        await expect(
+            service.markDone(staffWith(), "r1", "reason", "INDIA"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.markDone(staffWith(), "r1", "reason", "GLOBAL"),
+        ).resolves.toEqual({ id: "r1", status: "DONE" });
+    });
+
+    it("goes by the business's edition when the two differ", async () => {
+        const { service } = build();
+        db.businessReport.findUnique.mockResolvedValue({
+            status: "OPEN",
+            edition: "GLOBAL",
+            organizationId: "org_1",
+            organization: { edition: "INDIA" },
+        });
+        await expect(
+            service.markDone(staffWith(), "r1", "reason", "GLOBAL"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.markDone(staffWith(), "r1", "reason", "INDIA"),
+        ).resolves.toEqual({ id: "r1", status: "DONE" });
+    });
+
     it("is a 404 for a report that doesn't exist", async () => {
         const { service } = build();
         db.businessReport.findUnique.mockResolvedValue(null);

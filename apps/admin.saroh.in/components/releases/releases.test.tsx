@@ -163,6 +163,14 @@ describe("ReleaseTable", () => {
         />
     );
 
+    it("narrows by kind", () => {
+        render(table());
+        const kind = within(screen.getByRole("group", { name: "Kind" }));
+        fireEvent.click(kind.getByRole("button", { name: /^Modules/ }));
+        expect(screen.getByRole("link", { name: "Payments" })).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "Reviews" })).toBeNull();
+    });
+
     it("shows the name first, the code small below, the state, the count and the last change", () => {
         render(table());
         const row = screen
@@ -183,7 +191,8 @@ describe("ReleaseTable", () => {
             .getByRole("link", { name: "Payments" })
             .closest("li") as HTMLElement;
         expect(within(paymentsRow).getByText("On for some")).toBeTruthy();
-        expect(within(paymentsRow).getByText(/1 business/)).toBeTruthy();
+        // A module release allows the module; the business still switches it on.
+        expect(within(paymentsRow).getByText("Allowed for 1")).toBeTruthy();
         expect(within(paymentsRow).getByText("No changes yet")).toBeTruthy();
         // Modules come first.
         const names = screen
@@ -589,5 +598,34 @@ describe("WhoHasIt", () => {
         });
         expect(screen.queryByText("Org 1")).toBeNull();
         expect(screen.getByText("Org 2")).toBeTruthy();
+    });
+
+    it("shows each business's web address and narrows by state", () => {
+        render(
+            <WhoHasIt
+                flag={payments}
+                organizations={orgs(3)}
+                canPublish={false}
+                explained={null}
+            />,
+        );
+        const own = payments.overrides.length;
+        expect(
+            screen.getByText(
+                new RegExp(`of 3 have it · ${own} set for them alone`),
+            ),
+        ).toBeTruthy();
+        fireEvent.change(screen.getByLabelText("Search businesses"), {
+            target: { value: "org-3" },
+        });
+        expect(screen.getByText("Org 3")).toBeTruthy();
+        expect(screen.queryByText("Org 1")).toBeNull();
+        fireEvent.change(screen.getByLabelText("Search businesses"), {
+            target: { value: "" },
+        });
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Set for them alone/ }),
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(own);
     });
 });

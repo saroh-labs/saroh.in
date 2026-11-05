@@ -1,4 +1,5 @@
 import { browserEnv as env } from "@/lib/browser/env";
+import type { PlanId } from "@saroh/marketing/content-types";
 
 /** accounts.saroh.in, or this environment's own. */
 export const ACCOUNTS_URL =
@@ -7,11 +8,21 @@ export const ACCOUNTS_URL =
 /** Sign in, for someone who already has a business on Saroh. */
 export const SIGN_IN_URL = `${ACCOUNTS_URL}/login`;
 
+/**
+ * "Open dashboard", for someone signed in: accounts' front door, which sends
+ * them where signing in does (Saroh's app, which picks setup, Home or which
+ * business; `apps/accounts.saroh.in/proxy.ts`).
+ */
+export const DASHBOARD_URL = `${ACCOUNTS_URL}/`;
+
+/** Their account (name, email, sign-in), on accounts.saroh.in. */
+export const ACCOUNT_URL = `${ACCOUNTS_URL}/account`;
+
 /** Sign-up, used only in open mode (`cta`). */
 export const SIGN_UP_URL = `${ACCOUNTS_URL}/signup`;
 
 export type LaunchMode = "waitlist" | "open";
-export type PlanId = "free" | "grow" | "pro";
+export type { PlanId };
 
 /** The site's launch mode. Anything but an explicit `open` is waitlist. */
 export const LAUNCH_MODE: LaunchMode =

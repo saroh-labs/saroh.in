@@ -197,7 +197,14 @@ test("at desk the topics stay in view while the article scrolls, and scroll insi
     await expect
         .poll(async () => (await nav.boundingBox())?.y ?? -1)
         .toBeGreaterThanOrEqual(0);
-    expect((await nav.boundingBox())?.y).toBeLessThanOrEqual(30);
+    // It sticks just under the fixed site header, not behind it.
+    const header = await page
+        .getByRole("navigation", { name: "Main" })
+        .boundingBox();
+    const headerBottom = (header?.y ?? 0) + (header?.height ?? 0);
+    const navTop = (await nav.boundingBox())?.y ?? -1;
+    expect(navTop).toBeGreaterThanOrEqual(headerBottom);
+    expect(navTop).toBeLessThanOrEqual(headerBottom + 30);
 
     // A window shorter than the list: the nav scrolls on its own.
     await page.setViewportSize({ width: 1280, height: 320 });

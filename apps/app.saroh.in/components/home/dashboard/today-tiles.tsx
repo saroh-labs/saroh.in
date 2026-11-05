@@ -1,14 +1,9 @@
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Banknote,
-    CalendarClock,
-    CircleCheck,
-    IndianRupee,
-    Package,
-} from "lucide-react";
+import { CalendarClock, CircleCheck, Package } from "lucide-react";
 import Link from "next/link";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import type { TileView } from "@/lib/home/tiles";
 
 /**
@@ -51,10 +46,12 @@ function TileIcon({ tile }: { tile: TileView }) {
         case "came":
             return <CircleCheck aria-hidden className={cls} />;
         case "moneyIn":
-            return tile.currency && tile.currency !== "INR" ? (
-                <Banknote aria-hidden className={cls} />
-            ) : (
-                <IndianRupee aria-hidden className={cls} />
+            return (
+                <MoneyIcon
+                    aria-hidden
+                    className={cls}
+                    currency={tile.currency}
+                />
             );
     }
 }

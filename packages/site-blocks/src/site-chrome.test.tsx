@@ -230,7 +230,9 @@ describe("the site header (G17)", () => {
 
 describe("the site footer (G17, DEC-102)", () => {
     /** A Free site's credit, with a made-up referral code. */
-    const FREE = { href: madeWithSarohHref("k7m2p9qa") };
+    const FREE = {
+        href: madeWithSarohHref("k7m2p9qa", "https://www.saroh.in"),
+    };
     const madeWith = () =>
         screen.getByRole("link", { name: "Made with Saroh" });
 
@@ -244,7 +246,7 @@ describe("the site footer (G17, DEC-102)", () => {
         );
         expect(madeWith()).toHaveAttribute(
             "href",
-            "https://saroh.in/?ref=k7m2p9qa",
+            "https://www.saroh.in/?ref=k7m2p9qa",
         );
         expect(madeWith()).toHaveAttribute("target", "_blank");
         expect(madeWith()).toHaveAttribute("rel", "noopener");

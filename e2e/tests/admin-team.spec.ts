@@ -122,7 +122,9 @@ test.describe("Team on the operator console", () => {
                 .first(),
         ).toBeVisible();
         await expect(page.getByText("staff:grant")).toHaveCount(0);
-        await page.getByLabel("Show permission codes").click();
+        await page
+            .getByRole("switch", { name: "Show permission codes" })
+            .click();
         await expect(
             page
                 .getByText(/staff:read · staff:grant/)

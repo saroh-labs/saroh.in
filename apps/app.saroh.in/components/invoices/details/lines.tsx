@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Copy } from "lucide-react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
+import { EDITION } from "@/lib/edition";
 import {
     addedLineOf,
     isExemptPaper,
@@ -126,8 +127,10 @@ export function TaxRows({
                       ] as [string, string][])),
             ]
           : Number(i.tax) > 0
-            ? [["Tax", money(i.tax)]]
-            : [[`No GST. ${seller} isn't registered`, ""]];
+            ? [[i.taxLabel ?? "Tax", money(i.tax)]]
+            : EDITION === "GLOBAL"
+              ? []
+              : [[`No GST. ${seller} isn't registered`, ""]];
     return (
         <div className="py-1">
             {rows.map(([k, v]) => (

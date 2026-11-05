@@ -123,9 +123,7 @@ describe("/templates/[slug]", () => {
             (d) => d.textContent,
         );
         expect(terms).toEqual(["Pages", "Uses", "Type", "Colours"]);
-        expect(
-            screen.getByText("Bookings, Payments and Class packs"),
-        ).toBeTruthy();
+        expect(screen.getByText("Bookings and Payments")).toBeTruthy();
         expect(screen.getByText("Archivo Narrow and Archivo")).toBeTruthy();
         expect(
             screen.getByRole("heading", {

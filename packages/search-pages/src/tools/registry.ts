@@ -1,6 +1,11 @@
 import type { ComponentType, LazyExoticComponent } from "react";
 import { lazy } from "react";
 
+/** Free tools' components by slug, as `<ToolSlot>` draws them. */
+export type ToolRegistry = Readonly<
+    Record<string, LazyExoticComponent<ComponentType>>
+>;
+
 /**
  * Every free tool's component, by slug (#1253): one line per tool, loaded
  * only on its own page. A tool is a client component, default-exported from
@@ -9,10 +14,11 @@ import { lazy } from "react";
  *
  * Plain module (no "use client"), so the server can list the slugs for the
  * checks; `lazy` only records the import until `<ToolSlot>` draws it.
+ * Admin draws from it (`EveryToolSlot`); saroh.in never imports it: its
+ * build writes its own registry of the tools it carries (U3, plan
+ * 2026-11-01-001), each through `@saroh/search-pages/tools/<slug>`.
  */
-export const TOOLS: Readonly<
-    Record<string, LazyExoticComponent<ComponentType>>
-> = {
+export const TOOLS: ToolRegistry = {
     "bill-of-supply-generator": lazy(
         () => import("./bill-of-supply-generator"),
     ),

@@ -1,0 +1,22 @@
+/* GstPage's own layout (gst-page.tsx); its blocks are styles.css's. Boards gst/*. */
+.sp-gst-top {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sp .sp-gst-h1 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 46px;
+    line-height: 1.06;
+    letter-spacing: -0.04em;
+}
+.sp-gst-checked {
+    font-size: 13px;
+    color: var(--sp-muted-2);
+}
+@media (max-width: 899.98px) {
+    .sp .sp-gst-h1 {
+        font-size: 32px;
+    }
+}

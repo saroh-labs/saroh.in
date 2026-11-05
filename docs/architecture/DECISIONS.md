@@ -1168,6 +1168,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
     - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
 - Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+- 4 Nov 2026 (owner): marketing no longer claims packs while they aren't offered. The screenshots and the module's code stay.
 
 ## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
 
@@ -1358,7 +1359,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 **Status: Accepted — 2026-10-10** · owner
 
 - Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
-- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
+- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: "Coming next" or "Later". Never a date (owner, 4 Nov 2026: it was months, then "Early 2027", until then, and those dates went stale). The same day the owner moved Saroh for Android, Invoice layouts, Sign in with Google, Bring your own login, API keys and webhooks, and social publishing, now named Saroh Social, up to Coming next.
 - Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
 
 ## DEC-120 A business scheduled for deletion winds down, and an owner can download its data
@@ -1625,6 +1626,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **How long it is kept.** 12 months from the day it arrived, then deleted, the rule waitlist entries, link-preview reports and QR code maker emails already follow. The waitlist's daily retention job does it (`contact-messages/contact-retention.ts`), so there is no new job chain.
 - The Privacy Policy lists "Messages: what you write to contact@saroh.in" under what we collect. The owner's reading (11 Oct 2026) is that a message from the form is one of those: it reaches the same inbox. The legal text was not changed. Open: its "How long we keep it" table has no row for messages, so the 12 months above are the code's rule and not a published one.
 - A session recording masks what is typed (every input, by the recorder's own rule) and the thanks that says the name and email back (`data-ph-mask`, DEC-125).
+- Amended 2026-11-01 (admin audit fixes, owner: "lets do the fixes based on the suggestions"): Messages is no longer read-only. Staff mark a message handled after replying from the mailbox, or open it again (`POST /admin/contact-messages/:id/handled`, `ContactMessage.handledAt` and `handledByUserId`, migration `20270118100000_contact_message_handled`), and filter Open / Handled. The write needs `organization:pii:read` and `reports:resolve`, Support's existing "close what people send in" permission, so no new permission; each change is on the admin ledger (`contact-message.handled` / `.reopened`). Each message links read-only to the same address's lead, waitlist entry and account. The reply still goes from the team's mailbox.
 
 ## DEC-138 Whoever reports a business gives their email and their mobile number
 
@@ -2041,6 +2043,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Decision 5, **amounts only from the database**: invoices' stored paise, and the monthly figure from each plan row's `priceCents` (a year's price spread over twelve), ACTIVE and PAST_DUE only, before GST; coupons, custom prices and add-ons are not counted, and the screen says so. No price is written in code.
 - The CSV: one row per invoice in number order — document, number, date (India), buyer name, buyer GSTIN, place of supply (state name and code), B2B or B2C, SAC (from the lines), taxable value, CGST, SGST, IGST, total, in rupees with paise. No totals row. A cell a spreadsheet would run as a formula is prefixed with an apostrophe.
 - Open: Saroh issues no credit notes and holds no refund of its own charges (nothing in the schema stores one), so every invoice is a paid charge and the CSV's "Document" column always says "Invoice". When credit notes exist they join the same export.
+- Follow-up (1 Nov 2026, money screens audit M1): **"Paying" no longer counts Free.** The status card that read "Paying" was every ACTIVE subscription, so 75 businesses on Free made it read 93 beside the monthly figure. The summary now carries `paying`: ACTIVE on a plan whose `priceCents` is above 0 (`PAYING_WHERE`, `isPaying` in `admin-billing.ts`), and the list takes `view=paying` with the same rule, so the count is the list it filters to. The console shows it as "On a paid plan" rather than "Paying", since an ACTIVE row on a priced plan may never have been charged (a business moved there by hand). "Active" (every ACTIVE, Free included) stays as its own chip, and the status cards became chips with counts, as on Invoices.
 - Rules: `apps/api.saroh.in/src/modules/admin/admin-permissions.ts` (`SarohBillingRead`), `admin-billing.controller.ts`, `admin-billing.service.ts` (`assertSarohBillingReader`), `admin-billing.ts` (month, CSV, MRR, views), `admin-billing-terms.ts`; `apps/admin.saroh.in/app/billing/`, `lib/billing.ts`, `lib/billing-words.ts`; `docs/patterns/backend-auth-and-access.md` → Cross-tenant reads.
 
 ## DEC-166 Admin billing controls: Needs action, refunds on record, a daily reconcile and `saroh-billing:act`
@@ -2520,6 +2523,9 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
     - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
     - **Who:** a new staff permission, `search-pages:publish`.
+    - Amended 2026-10-31 by [DEC-201](#dec-201-gst-pages-guides-and-downloads-share-one-page-kit-publish-stages-and-deploy-changes-ships-them-together) (owner): **Publishing no longer rebuilds the site.** Publish, Unpublish and Archive stage a change; admin's Deploy changes sends every staged change in one rebuild.
+    - Amended 2026-11-01 (owner, plan 2026-11-01-001): **production builds carry only live search pages' words and code, every kind.** A /for/ page's or free tool's words reach saroh.in only through the build's own copy (`apps/saroh.in/lib/search-content.gen.ts`, written by `docs-content.config.ts` from the publish list), and a tool's code only through the build's registry (`lib/tool-registry.gen.ts`, one `@saroh/search-pages/tools/<slug>` import per tool), as DEC-201 item 2 does for GST pages, guides and downloads. The package's root carries no words; admin reads every page from `@saroh/search-pages/embedded` and previews every tool with `EveryToolSlot`; saroh.io (a preview) still builds every page. `pnpm check:draft-words` scans a production build for a draft /for/ page's or tool's words and a draft tool's code. The tools' shared unlock route is unchanged.
+    - Amended 2026-11-01 (owner, the /for hub audit): the `/for` hub leads with a bento and a search with two filters, filters in the address and every trade's link in the HTML. Each row shows the page's promise, not its search phrase, which stays as data.
 - Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(site)/for/`; `apps/admin.saroh.in/app/search-pages/`.
 
 ## DEC-195 Reuse the shared component; never redraw it
@@ -2657,3 +2663,115 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The owner-only reads (flags, the web address) are not made for a Reviewer, and owner-only props are sent empty; trimming them from the API's `getSite` response is a follow-up.
     - `site-review-view.tsx` is retired once the editor covers everything it did (00-universal §15); `section-review.tsx` and `review-panel.tsx` stay for the test-release review page.
 - Rules: `docs/patterns/backend-auth-and-access.md` → "A reviewer reads in the editor, read-only"; plan `docs/plans/2026-10-29-001-feat-reviewer-sees-editor-plan.md` (local); `apps/app.saroh.in/components/sites/editor/read-only.test.tsx`.
+
+## DEC-201 GST pages, guides and downloads share one page kit; Publish stages and Deploy changes ships them together
+
+**Status: Accepted — 2026-10-31** · owner · plan 2026-10-31-002 · #1201 #1204 #1205 #1206 · amends DEC-193, departs from DEC-194's email-only gate
+
+- Context:
+    - Three new groups of search pages (GST pages, guides, free downloads) were drawn on the canvas. DEC-193 rebuilt the site on every Publish, so publishing 30 pages meant 30 builds. The owner: "In the admin panel, the admin will select the pages -> then click on publish -> then deploy changes … all gets deployed in one go".
+- Decision:
+    1. **One kind list names the new groups**: `gst`, `guides`, `downloads` in `@saroh/search-pages/kinds` (`packages/search-pages/kinds.js`, plain JS so Node config files can require it). Adding a group is one entry there. **/for/ and /tools/ are left off on purpose**: they keep their own code paths, and `apps/saroh.in/live-pages.snapshot.test.ts` pins their live HTML, metadata and JSON-LD.
+    2. **A production build carries only live new pages' words and files.** A prebuild step (`apps/saroh.in/docs-content.config.ts`) reads the publish list (or the live snapshot) and writes only live pages' words, and copies only live downloads' files; previews get every page. Share cards read that generated, live-only module. `pnpm check:draft-words` scans a real Workers build for any draft page's words.
+    3. **The build is the publish guard.** A live page whose checks fail (facts still `toConfirm`, a stale GST check date) is held out of the build with a `::warning title=Page held by checks::`, and listed under `held` in `/_build/state.json`; the build never fails for it, so an unrelated urgent deploy still goes out. Admin runs the same checks: for GST pages, guides and downloads it disables Publish (single and in a selection) while an error-level check fails, naming the check, and shows a live page that fails them as "Held by checks". /for/ and tools keep their confirm-only behaviour.
+    4. **Publish stages; Deploy changes ships.** Publish, Unpublish and Archive stage a change. Admin's bar ("N changes waiting to deploy") sends every staged change in one rebuild, 1 page or 30. Each page keeps its staged status and its deployed status; the public list and every build read the deployed one, so a code release never puts a staged page live. A deploy job still waiting to start takes the new paths instead of a second build. This replaces DEC-193's "Publishing rebuilds the site".
+    5. **A download is unlocked with an email or a WhatsApp number** (departs from DEC-194's email only). `POST /public/downloads/unlock` checks IP and contact limits, the download allow-list, the contact and Turnstile before anything is written. A lead is one `DownloadLead` row per contact and download (source `download:<slug>`, consent text version, purpose "download"). An email lead gets one email with the page's link; **a WhatsApp number is never messaged**. **An unverified contact gives no marketing consent.** Leads are deleted after 12 months.
+    6. **Download files are committed**, made once by a standard-library script (`packages/search-pages/scripts/make-download-files.py`) with sample data and a "Made with Saroh" line. No new dependency.
+    7. **GST pages are held by `toConfirm`** until a CA has checked them, so none can go live before that. `src/gst-rates.test.ts` holds each page's codes and rates to the HSN/SAC finder's list (`codes.ts`; a difference must be declared on the page) and works every invoice table out again in paise.
+    8. **`/sitemap.xml` is an index of group sitemaps**, one static sitemap per group (`/sitemap/<group>`), each URL with its real lastmod; a group with no live page has none.
+    9. **A page's links must be live before it is** (owner, 31 Oct: "if we try to publish something which has unpublished tools, then those should show warning and should be completed before publishing"). `docLinks` (`@saroh/search-pages/docs`) lists the search pages a GST page, guide or download links to in its words (required) and what its template draws only while live (the GST rail's tools, the trade's /for/ page, related pins: optional, never blocking). Admin's Publish is held while a required link isn't live (staged) or in the same publish; "Publish these too" adds those pages when each can be published, an archived or failing one says how to fix it, and a link to no page in the code is an error. Unpublish and Archive only warn which live pages link there (taken-off pages redirect). The production build holds a live page whose required link is neither live nor taken off ("Page held by checks").
+- Consequences:
+    - Admin works out "Held by checks" from its own run of the same checks, not from `/_build/state.json`; both read the same check list, so they agree.
+- Amended 2026-11-01 (owner, "do the fixes based on the suggestions", admin audit F1): **a staged change can be cancelled before it ships.** `POST /admin/search-pages/actions` takes `cancel`, behind `search-pages:publish`: a page's staged status goes back to its released one (`cancelStatus`), so nothing is left waiting and the site never sees it; a page with nothing staged is a 409, all or none like the other actions. It writes a `cancel` history row and a `search-page.cancel` audit entry per page. Admin offers **Cancel this change** in a waiting row's ⋯, on the page's ⋯ and on each row of the deploy bar. Item 4 otherwise stands: Unpublish of a page that never went live now says so ("It isn't on … yet, so nothing changes there") instead of describing a page coming off.
+- Rules: `packages/search-pages/kinds.js`; `packages/search-pages/src/components/BLOCKS.md`; `apps/saroh.in/docs-content.config.ts`, `lib/search-page-route.ts`, `lib/sitemaps.ts`; `apps/api.saroh.in/src/modules/tools/download-gate.service.ts`; `apps/admin.saroh.in/components/search-pages/deploy-bar.tsx`; `docs/patterns/frontend-app-structure.md` → saroh.in and search.
+
+## DEC-202 Dialogs are bottom sheets on phones in every product app
+
+**Status: Accepted — 2026-10-31** · owner ("the dialogs shown on desktop should be changed to bottom sheet on mobiles, to make UI consistent"); all product apps, done once in the shared component
+
+- Context: on a phone the side sheets already rose from the bottom (`FormSheet bottomOnPhone`, the More sheet, Publish), while every dialog and confirm still floated in the middle of the screen, so a phone showed two overlay looks.
+- Decision:
+    1. **Below `sm` (640px) every `DialogContent` and `AlertDialogContent` is a bottom sheet**, and so every `FormDialog`, `ConfirmDialog` and leave guard: the screen's width, pinned to the foot, top corners rounded (18px), at most 92dvh tall, a grab handle, rising from the bottom at a sheet's pace (still under reduced motion), clearing the home indicator (`env(safe-area-inset-bottom)`). It wears the bottom `FormSheet`'s look and shares its handle (`SheetHandle`). **The one exception is the search palette** (owner, 31 Oct): on a phone it is a full-screen panel with no handle (`DialogContent phone="full"`, `FULL_ON_PHONE`), its results list filling the screen.
+    2. **A `FormDialog` keeps its title and its buttons in view** on a phone: only the fields scroll, and the foot is pinned with the sheet's rule above it. Footers stack full width with the main button on top, as they already did.
+    3. **At a desk nothing changes**: the centred dialog, its widths, its focus trap, Escape, outside press and the alert dialog's no-outside-close.
+    4. One component, no per-app copies (DEC-195): the phone look is `max-sm:` classes in `@saroh/ui/dialog` (`SHEET_ON_PHONE`), which never meet a caller's own `sm:` classes, so no call site is patched.
+- Not affected: merchant sites (`saroh.app`, `site-blocks`) draw their own overlays in `--site-*` tokens and use none of these components.
+- Why `sm` and not `desk` (760px): Tailwind emits `max-desk:` before `sm:`, so a caller's `sm:max-w-lg` or `sm:rounded-xl` would win between 640 and 759px and pin a half-width sheet to the left; the dialog's own phone rules (stacked footer, rounded corners) already switch at `sm`.
+- Rules: `docs/patterns/frontend-design-system.md` → "Overlays come in fixed sizes"; `packages/ui/src/components/ui/dialog.test.tsx`.
+
+## DEC-203 The global edition is its own marketing app, static, on its own catalogue
+
+**Status: Accepted — 2026-11-02** · owner ("everything will follow the same structure as we have", "we can create a new similar object/api for that, in order to make things clean")
+
+- Context: Saroh gets a global edition on saroh.tech beside the India edition on saroh.in. Its plan is private (saroh-internal); only what the code needs is here.
+- Decision:
+    1. **`apps/saroh.tech` is a separate app**, static HTML from Next's export, behind a small Worker. saroh.in stays India only. The other apps are refactored for two editions after this site is done.
+    2. **Its prices come from a USD catalogue**, a new object and API beside the existing one, read the way saroh.in reads its catalogue. Prices and the design boards are never committed.
+    3. **India is offered, never forced**: the Worker shows a bar to visitors Cloudflare places in India, and no one is redirected.
+    4. **A page out of its phase stays noindex and out of the sitemap** until it is really built.
+    5. **`packages/edition/hreflang.json`** holds the pages that do the same job on both sites. A pair must point both ways, so saroh.in's side goes in once saroh.tech is live.
+    6. **Search (owner, 2 Nov):** merchant sites on `*.saroh.app` are indexed, the bare `saroh.app` is not, and `app.saroh.tech` is noindex as `app.saroh.in` is.
+    7. **Performance comes after the build (owner, 2 Nov):** the plan's 100 KB JavaScript limit on tool pages is set aside for now: standard Next, optimised later.
+    8. **Until the USD catalogue exists, the plans shown are the ones the catalogue already has**, as placeholders.
+    9. **It presents the whole product, in saroh.in's style (owner, 2 Nov):** the same features and solutions, the same tokens and components, its own header and its own wording. It claims only what works outside India at the date of a private ledger, re-checked before launch; every feature keeps its page, marked Full, Limited or Coming soon. Words the product doesn't back, such as client quote acceptance and approvals, stay off the site (`apps/saroh.tech/scripts/check-claims.mjs`). This replaces the first build's quote and invoice positioning.
+    10. **Its own PostHog project.** Without a key nothing is sent. No SDK, no cookies or browser storage, no autocapture.
+- Rules: `apps/saroh.tech/lib/site-map.ts`; `apps/saroh.tech/worker/index.ts`; `packages/edition/hreflang.json`.
+
+**Free's limits on /pricing (4 Nov, owner).** Paid plans come later, and Free keeps the limits it already has. So until the USD catalogue exists, Free's card on saroh.tech reads Free's own rows from the published catalogue at build (`apps/saroh.tech/lib/plans.ts`), and nothing else in it: no price, no paid plan. With no catalogue at build, the card keeps its general lines and footnote.
+
+**The free tools and the claims check (4 Nov, owner).** saroh.tech says only what's verified, and `apps/saroh.tech/scripts/check-claims.mjs` runs as `postbuild`, so a phrase the product can't back fails the build, in CI's Build job too. A tool's sign-up goes to the real sign-up with the tool's `src`: the app has no import page, so a draft stays in the browser and no line says otherwise. This departs from the plan's "destinations stay". Comparison pages state Saroh's side only, until a fact about another tool has its own public page and a date.
+
+**One person, and no compare or referral pages, for now (owner, 4 Nov).** While plans can't be bought abroad, saroh.tech's pages speak to one person running their business. Anything that needs a second person is out, a diary person with no login included, since they take a team seat (DEC-155): `ONE_PERSON` in `apps/saroh.tech/scripts/check-claims.mjs` fails the build on those words. Teams aren't listed as coming. `/compare`, its six alternatives and `/referral` are removed from saroh.tech, and come back through git, with no feature flag.
+
+**Referral links stay, compare pages stay out (owner, 4 Nov).** `/referral` is back, noindex and in no menu (saroh.in has no referral page or link), and it says what a link does today: the "Made with Saroh" credit records who referred a new business (DEC-156), with no reward while plans can't be bought abroad. saroh.tech's Worker keeps `?ref=` and shares `saroh_ref` with the app's domain, as saroh.in's page does. The app still has no referral screen.
+
+**Saroh.tech's facts (owner, 4 Nov).** The address is support@saroh.tech. Its legal pages take saroh.in's company facts and limits, in saroh.in's words where they hold abroad, and stay marked "Draft: not yet in force" until the owner's legal read. Guides are signed as saroh.in's are. /pricing says what happens at each of Free's limits, in the words the API refuses in, read from the catalogue at build.
+
+## DEC-204 Two editions from one codebase: one database, the business decides
+
+**Status: Accepted — 2026-11-02** · owner
+
+- Context: India runs on saroh.in. A global edition runs on saroh.tech. Both must share one codebase, and adding a domain later should mean config rather than code.
+- Decision:
+    1. **One codebase, deployed per edition.** The marketing site, `app`, `accounts` and `admin` each deploy once per edition. `saroh.app` is shared, because every business's site lives on `*.saroh.app`.
+    2. **One database and one running API for now.** The API answers on `api.saroh.in`, `api.saroh.tech` and `api.saroh.app`. A second database or instance comes only if a law, a large customer, load or migration risk calls for it.
+    3. **The edition belongs to the business.** It's set once, from the business's country, and everything under the business inherits it. A person's location only suggests the country.
+    4. **Code reads the edition from the business, never from the address** a request came through. An address must match the business's edition, apart from `api.saroh.app`, which serves merchant sites only and refuses routes it hasn't listed.
+    5. **One account per person,** signed in separately on each edition's accounts site. Each lists all that person's businesses.
+    6. **Admin shows one edition per deployment,** with staff, releases and audit shared.
+    7. **Settings over branches.** Code asks a profile in `@saroh/edition` what it needs ("which tax system?"), never "is this India?". A third edition should mean a new profile.
+    8. **Languages are separate from editions.** Formatting and text foundations come first; existing text moves over time.
+- Consequences: a bad migration or outage reaches both editions, so migrations stay backward-compatible and new Global behaviour sits behind per-edition flags.
+- Rules: `packages/edition/src/index.ts`; `Organization.edition`.
+
+**Finding a site from its address stays three lookups (2 Nov).** The plan was one function. The code has three, and their rules differ on purpose: `getPublicationBySubdomain` with `getPublicationByHostname` shows a site and refuses test addresses and paused domains; `resolveSiteHost` serves customer sign-in and messages and needs a live, published site; `businessForHost` serves reports and still counts a deleted site. One function would only pay off in a database split, which isn't planned, and merging risks live merchant sites. Merge them if a split is decided.
+
+**Global's development domain isn't in the repo (3 Nov, owner).** It's the `GLOBAL_DEV_DOMAIN` setting on the development API and a secret for the Global development apps' deployments. Those apps sit behind the access key, as saroh.io's do.
+
+**Each edition shows its own businesses (3 Nov, owner).** The app and accounts on one edition list only that edition's businesses, though a person has one account. A person who has businesses on both sees them on each edition's own addresses.
+
+**Global setup (3 Nov).** It offers USD, EUR, GBP, CAD, AUD, NZD, SGD, AED and ZAR, suggested by the country. A Global business has no billing profile until Saroh's own billing abroad exists. MRP reads as Original price, since MRP is an Indian legal term.
+
+**Global invoices (3 Nov).** A Global business uses the non-GST paper path, and it can't register for GST. A named tax line ("VAT 20%") comes from its settings, is added on top of a manual invoice's lines and is frozen on the paper with its tax number, as `taxLabel` and `sellerTaxId`. The business works out what to charge; Saroh doesn't calculate tax by country yet. Only a manual invoice takes the tax line. One made from an order, a booking, a plan, a pack, a course or a payment records money already agreed or paid, so adding to it would leave the paper disagreeing with the charge. The numbering year runs January to December or April to March by its choice, starting on January. India's stays April to March by GST law.
+
+**Language and formats (3 Nov).** Text moves into each app's `lib/language/en.json`, read through `use-intl`, as it's touched. `next-intl` was rejected for now: it upgrades `@swc/core` across the repo and brings a message extractor, for routing and server helpers a one-language app doesn't use, and `use-intl` is its core with the same message format. A person's language isn't stored until a second language is decided. Numbers group by the deployment's edition where it serves one, by the currency where it serves both. Dates are day first everywhere.
+
+**Admin per edition (4 Nov).** A console's edition is its address, the one exception to item 4, since a console serves many businesses. The address is the caller's to set, so a staff member's grant decides whether they may have it: `PlatformAdmin.editions`, India for everyone who already had access, with Platform owners opening both. Lists filter by edition, and a path naming another edition's business is a 404. A person with no business, a job or webhook with no business, and health, audit, staff and releases show on both. Leads, messages and the waitlist take the edition of the address they came through, and one email holds one lead and one waitlist entry per business on each edition, so each team sees its own enquiries (owner). A person who asks to come off the waitlist comes off both editions, with their unconverted leads. Sweeps and retention keep crossing editions. Plans and Saroh's own money stay India's until Global has them.
+
+**Shared data is listed (2 Nov).** `scripts/shared-data.json` names the 35 models that belong to no one business, each with why, and `check:shared-data` fails on a new one that isn't listed.
+
+**Sign-in on two domains (2 Nov).** A browser takes a session cookie only for the address's own domain, so the one running API keeps one Better Auth instance per edition address, chosen from a fixed list by the request's address. The configured `BETTER_AUTH_URL` stays the default, and a second instance is only built when someone reaches that address. Reading a session needs only the shared secret and database, so the guard uses one instance. Signed-in state stays separate per domain, as agreed.
+
+## DEC-205 A Book page lists everything offered
+
+- Decision (owner, 4 Nov 2026): whoever opens `/book` can pick anything the business offers. A published Book page lists every service offered: its stored ids first, in their order, then the rest. Its layout, prices, button label and heading stay the merchant's. Home, Prices and other pages keep their stored selection.
+- Why: "if we open all bookings page, it should list down all so that we can select one, but it was showing empty, so ideally we should be seeing all". A snapshot can't tell a merchant's choice from a list written when one service existed.
+- Rules: `apps/saroh.app/lib/book-page-offer.ts`, `frontend-data-and-state.md`.
+
+## DEC-206 Classic's booking page folds each step, and the header's Sign in stays on the booking
+
+- Decision (owner, 4 Nov 2026): on Classic, a service, a day and a time each fold to one row with Edit once answered, and a day's times show only after the day is pressed. The summary card stays in view below the site's header. Pressing Sign in in the header while a booking is open signs in on the page and keeps everything chosen and typed; with no booking open it goes to the account as before.
+- Why: "This makes the space little and easy for the user to navigate in the booking page", and "the progress is lost" at sign-in.
+- Unchanged: no control is removed (owner, "do not remove anything"): other services, the person choice, later dates and other times sit behind Edit. The looks already ask one thing a screen and draw as before, and so does the account's Move sheet.
+- Consequences: one more press than before, since times used to show for the first free day. A look's phone menu and footer links still go to the account.
+- Rules: `packages/site-blocks/src/booking-flow/choose-steps.tsx`, `steps/chosen-row.tsx`, `header-sign-in.ts`; `frontend-data-and-state.md`.

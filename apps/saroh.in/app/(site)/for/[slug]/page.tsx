@@ -1,7 +1,7 @@
 import "@saroh/search-pages/styles.css";
 
 import type { SearchPageData } from "@saroh/search-pages";
-import { loadSearchPage, SearchPage } from "@saroh/search-pages";
+import { SearchPage } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -19,6 +19,7 @@ import {
     FOR_HUB,
     isPublished,
     questionsLd,
+    searchPages,
 } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
@@ -42,7 +43,7 @@ interface Props {
 /** The page, when this build has it. */
 function builtPage(slug: string): SearchPageData | null {
     return builtSearchPages().some((p) => p.slug === slug)
-        ? loadSearchPage(slug)
+        ? searchPages.loadSearchPage(slug)
         : null;
 }
 

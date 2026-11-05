@@ -57,6 +57,10 @@ describe("catalogueUsage", () => {
 });
 
 describe("usageNote", () => {
+    it("says team members are seats, so the count can pass its people", () => {
+        expect(usageNote("members", 7, 0)).toBe("seats");
+    });
+
     it("says a business with only online storefronts sells online only", () => {
         expect(usageNote("locations", 0, 2)).toBe("online-only");
     });

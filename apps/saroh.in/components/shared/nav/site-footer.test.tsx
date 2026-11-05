@@ -123,3 +123,25 @@ describe("SiteFooter", () => {
         }
     });
 });
+
+describe("SiteFooter: See all trades", () => {
+    it("links /for in Solutions only when given", () => {
+        const { unmount } = render(<SiteFooter />);
+        expect(
+            screen.queryByRole("link", { name: "See all trades" }),
+        ).toBeNull();
+        unmount();
+        render(
+            <SiteFooter
+                solutions={[
+                    { name: "See all trades", line: "Find.", href: "/for" },
+                ]}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: "See all trades" })
+                .getAttribute("href"),
+        ).toBe("/for");
+    });
+});

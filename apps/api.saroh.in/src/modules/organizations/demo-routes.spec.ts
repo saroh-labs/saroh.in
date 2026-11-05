@@ -112,6 +112,7 @@ const ASKS: Record<string, How> = {
     "POST public/tools/qr-code-maker/unlock": {
         exempt: "saroh.in's free tool",
     },
+    "POST public/downloads/unlock": { exempt: "saroh.in's free download" },
     "POST public/waitlist": { exempt: "Saroh's own launch waitlist" },
     // Provider callbacks: a demo connects no provider.
     "POST public/billing/webhooks/:provider": { exempt: "Saroh's billing" },

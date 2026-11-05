@@ -47,7 +47,7 @@ export default async function TeamMemberLayout({
         }
         return (
             <AdminShell staff={staff}>
-                <PageContainer width="wide">
+                <PageContainer width="full">
                     <FailedPanel things="this teammate" />
                 </PageContainer>
             </AdminShell>
@@ -66,7 +66,7 @@ export default async function TeamMemberLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 {member && name ? (
                     <PageHeader
                         breadcrumb={["Keep it running", "Team", name]}

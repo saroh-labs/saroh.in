@@ -7,6 +7,7 @@ import {
     UnauthorizedException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { editionOfHost } from "@saroh/edition";
 
 import { env } from "../../env";
 import {
@@ -18,6 +19,7 @@ import type { PlatformAdminInfo } from "../decorators/platform-admin-context.dec
 import type { AuthUser } from "../types/store-context";
 
 interface PlatformAdminRequest {
+    headers?: { host?: string };
     user?: AuthUser;
     platformAdmin?: PlatformAdminInfo;
 }
@@ -57,12 +59,19 @@ export class PlatformAdminGuard implements CanActivate {
             throw new UnauthorizedException("Authentication required");
         }
 
+        // Unlike a business's, the console's edition is its address (DEC-204
+        // item 6). The Host is the caller's to set, so the grant below decides
+        // whether they may have it.
+        const host = request.headers?.host;
+        const edition = host ? (editionOfHost(host) ?? null) : null;
+
         const now = new Date();
         const grant = await prisma.platformAdmin.findUnique({
             where: { userId: user.id },
             select: {
                 id: true,
                 revokedAt: true,
+                editions: true,
                 roleAssignments: {
                     where: {
                         revokedAt: null,
@@ -80,12 +89,23 @@ export class PlatformAdminGuard implements CanActivate {
         if (grant?.revokedAt === null) {
             const roles = resolveActiveRoles(grant.roleAssignments, now);
             if (roles.length > 0) {
+                if (
+                    edition &&
+                    !roles.includes(AdminRole.PlatformOwner) &&
+                    !grant.editions.includes(edition)
+                ) {
+                    throw new ForbiddenException({
+                        message: "Your access doesn't include this edition.",
+                        details: { reason: "edition_not_granted" },
+                    });
+                }
                 request.platformAdmin = {
                     userId: user.id,
                     platformAdminId: grant.id,
                     roles,
                     permissions: permissionsFor(roles),
                     viaBootstrap: false,
+                    edition,
                 };
                 return true;
             }
@@ -102,6 +122,7 @@ export class PlatformAdminGuard implements CanActivate {
                 roles,
                 permissions: permissionsFor(roles),
                 viaBootstrap: true,
+                edition,
             };
             return true;
         }

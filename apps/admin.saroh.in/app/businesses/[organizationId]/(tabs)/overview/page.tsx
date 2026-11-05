@@ -23,6 +23,7 @@ import {
 import type { BusinessView } from "@/lib/businesses";
 import { can } from "@/lib/console";
 import { dataKeptLine, legalHoldLine } from "@/lib/deletion-words";
+import { EDITION_LABEL } from "@/lib/edition";
 import { formatDate, formatDateTime, plural } from "@/lib/format";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
@@ -83,8 +84,22 @@ export default async function OverviewTab({ params }: BusinessTabProps) {
         : null;
     const view = session?.status === "ok" ? session.view : null;
 
+    const { edition, currency } = overview;
+
     return (
         <div className="grid gap-6">
+            {edition && (
+                <Panel title="Where it runs">
+                    {() => (
+                        <Facts
+                            rows={[
+                                ["Edition", EDITION_LABEL[edition]],
+                                ["Currency", currency ?? "From what it sells"],
+                            ]}
+                        />
+                    )}
+                </Panel>
+            )}
             <div className="grid gap-6 lg:grid-cols-2">
                 <PlanCard
                     organizationId={organizationId}

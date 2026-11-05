@@ -191,6 +191,20 @@ add or change there may be served to the next visitor without rendering.
   read a page is drawn from, never on a write, and an abort lands in that reader's
   failure path. `fetchDays` and `fetchHold` (`booking-flow/api.ts`) retry on no
   answer or a 5xx, and the page says "Still finding times…" after 4 seconds.
+- **A reader shared in one render goes in React's `cache()`.** A `signal` turns
+  off Next's `fetch` dedupe, so every read in `lib` is a separate request unless
+  `cache()` shares it: without it a layout, a page, a menu or `generateMetadata`
+  each spend the visitor's rate limit and can get different answers. Give it
+  primitive arguments only (an object is a new key each time). Outside a render
+  it calls straight through, so a test proves it only with a `cache` stand-in
+  (`lib/site-read-failed.test.ts`).
+- **A page reads its site with `getSiteForPage`, not `getSiteForHost`.** Null then
+  only means the API said nothing is here, so `notFound()` is never a 404 for a
+  live site on a blip; a failed read throws to the error page. The layout's own
+  check isn't enough: moving between pages renders a page without its layout.
+- **A custom domain is only ever looked up by hostname.** Under a set
+  `NEXT_PUBLIC_ROOT_DOMAIN`, `shop.client.com` has no subdomain, so whatever its
+  read answers can't draw the merchant whose address is `shop`.
 - **A read that failed doesn't take a page out of search.** `routeHasNothing` is
   told `empty` only for a read that answered with nothing; a blip keeps the page
   indexed and unkept.

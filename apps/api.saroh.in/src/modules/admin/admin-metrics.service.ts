@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+
+import { editionWhere, peopleWhere, viaBusiness } from "./admin-edition";
 
 /** Platform-wide counts for the admin dashboard. Aggregates only. */
 export interface PlatformMetrics {
@@ -32,8 +35,13 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  */
 @Injectable()
 export class AdminMetricsService {
-    async summary(): Promise<PlatformMetrics> {
+    async summary(edition: Edition | null = null): Promise<PlatformMetrics> {
         const since = new Date(Date.now() - THIRTY_DAYS_MS);
+        const businesses = editionWhere(edition);
+        const people = peopleWhere(edition);
+        const owned = viaBusiness(edition);
+        // An order's own business link is nullable; its store's never is.
+        const orderOwned = edition ? { store: viaBusiness(edition) } : {};
 
         const [
             organizations,
@@ -48,26 +56,33 @@ export class AdminMetricsService {
             publishedSites,
             activityRows,
         ] = await Promise.all([
-            prisma.organization.count(),
-            prisma.organization.count({ where: { createdAt: { gte: since } } }),
-            prisma.user.count(),
-            prisma.user.count({ where: { emailVerified: true } }),
-            prisma.user.count({ where: { createdAt: { gte: since } } }),
+            prisma.organization.count({ where: businesses }),
+            prisma.organization.count({
+                where: { createdAt: { gte: since }, ...businesses },
+            }),
+            prisma.user.count({ where: people }),
+            prisma.user.count({ where: { emailVerified: true, ...people } }),
+            prisma.user.count({
+                where: { createdAt: { gte: since }, ...people },
+            }),
             prisma.organizationModule.groupBy({
                 by: ["moduleKey"],
-                where: { status: "ENABLED" },
+                where: { status: "ENABLED", ...owned },
                 _count: { _all: true },
             }),
-            prisma.order.count(),
+            prisma.order.count({ where: orderOwned }),
             prisma.order.count({
-                where: { status: { in: ["PENDING", "PROCESSING"] } },
+                where: {
+                    status: { in: ["PENDING", "PROCESSING"] },
+                    ...orderOwned,
+                },
             }),
-            prisma.site.count(),
+            prisma.site.count({ where: owned }),
             // Publishes, not test releases' snapshots (DEC-071).
-            prisma.publication.count({ where: { kind: "LIVE" } }),
+            prisma.publication.count({ where: { kind: "LIVE", ...owned } }),
             prisma.analyticsEvent.groupBy({
                 by: ["type"],
-                where: { createdAt: { gte: since } },
+                where: { createdAt: { gte: since }, ...owned },
                 _count: { _all: true },
             }),
         ]);

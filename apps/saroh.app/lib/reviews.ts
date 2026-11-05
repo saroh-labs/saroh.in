@@ -1,4 +1,4 @@
-import { serverApiUrl } from "./api-url";
+import { serverApiUrl, serverReadSignal } from "./api-url";
 import type { ReviewGoneReason, ReviewInvitation } from "./reviews-shape";
 import { goneReason, isReviewInvitation } from "./reviews-shape";
 
@@ -22,7 +22,11 @@ export async function getReviewInvitation(
     try {
         res = await fetch(
             `${API_URL}/public/product-reviews/${encodeURIComponent(token)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: { accept: "application/json" },
+                signal: serverReadSignal(),
+            },
         );
     } catch {
         return { ok: false, reason: "unavailable" };

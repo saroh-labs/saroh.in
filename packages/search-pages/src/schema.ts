@@ -26,7 +26,6 @@ export const FAMILIES = [
 ] as const;
 export const CHIP_ICONS = ["cal", "ok", "bill", "person"] as const;
 export const ALSO_ICONS = [
-    "pack",
     "clock",
     "link",
     "shield",
@@ -140,14 +139,6 @@ export const sceneSchema = z.object({
             dayTab: text,
         })
         .optional(),
-    pack: z
-        .object({
-            name: text,
-            size: z.number().int().positive(),
-            left: z.number().int(),
-            price: z.number().positive(),
-        })
-        .optional(),
     orders: z
         .object({ count: text, foot: text, list: z.array(order).length(5) })
         .optional(),
@@ -220,6 +211,8 @@ export const frontmatterSchema = z
         family: z.enum(FAMILIES),
         /** The one search this page answers; no two pages share one. */
         search: text,
+        /** The owner's other words for this trade, for the /for search: "dentist teeth". */
+        searchWords: text,
         /** The <title> before " · Saroh". */
         title: text,
         description: text,
@@ -260,7 +253,7 @@ export const frontmatterSchema = z
         const need: Record<(typeof SHAPES)[number], (keyof typeof fm.scene)[]> =
             {
                 appointments: ["staff", "place", "booking", "today"],
-                classes: ["timetable", "pack", "today"],
+                classes: ["timetable", "today"],
                 orders: ["orders", "stock"],
             };
         for (const k of need[fm.shape]) {
@@ -309,6 +302,12 @@ export interface ForPageEntry extends EntryBase {
     kind: "for";
     family: Family;
     familySlug: string;
+    /** The promise the /for hub shows under its name. */
+    h1: string;
+    shape: Shape;
+    searchWords: string;
+    /** Its example day, for the hub's lead tile. */
+    hero: Scene["hero"];
 }
 
 /** A /tools/ row of `listSearchPages()` (#1253). */

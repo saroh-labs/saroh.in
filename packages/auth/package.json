@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@saroh/database": "workspace:*",
+    "@saroh/edition": "workspace:*",
     "better-auth": "^1.7.10",
     "react": "catalog:react19"
   },

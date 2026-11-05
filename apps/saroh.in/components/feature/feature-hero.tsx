@@ -1,6 +1,9 @@
+import { ProductHero } from "@saroh/marketing/product-hero";
+
 import type { Feature } from "@/content/types";
 
-import { ProductHero } from "../shared/sections/product-hero";
+import { HeroActions } from "../shared/buttons/hero-actions";
+import { shotView } from "../shared/media/shot-view";
 
 /**
  * A feature page's opening (Features template), drawn by `ProductHero`: the
@@ -23,9 +26,9 @@ export function FeatureHero({
             headline={feature.headline}
             sub={feature.sub}
             narrow
-            actions={{ src: `feature-${feature.slug}` }}
+            actions={<HeroActions src={`feature-${feature.slug}`} />}
             freeLine={freeLine}
-            shot={feature.hero}
+            shot={shotView(feature.hero.shot, feature.hero.alt)}
         />
     );
 }

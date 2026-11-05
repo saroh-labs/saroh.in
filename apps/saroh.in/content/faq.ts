@@ -44,8 +44,8 @@ export const faqs = {
         a: "Yes. Each location keeps its own stock, and an order holds stock where it was placed, so the counter and your site never sell the same last loaf.",
     },
     "gyms-pack-and-membership": {
-        q: "Can members use a class pack and a membership?",
-        a: "Yes. Credits from a pack are used as they book, and a membership renews on its day: on its own by UPI Autopay where you've set it up, or with an invoice and a pay link. Each member's page shows what they have left.",
+        q: "Can members book with a membership?",
+        a: "Yes. A membership pays for classes as they book, and renews on its day: on its own by UPI Autopay where you've set it up, or with an invoice and a pay link. Each member's page shows what they have left.",
     },
     "clinics-medical-notes": {
         q: "Who can read a patient's medical notes?",

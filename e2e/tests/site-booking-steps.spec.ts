@@ -187,6 +187,12 @@ test.describe("the booking step in the address", () => {
         let session: { serviceId: string; date: string; time: string } | null =
             null;
         for (let i = 0; i < count && !session; i += 1) {
+            // The one tried last has folded: Edit shows the list again.
+            if (i > 0) {
+                await page
+                    .getByRole("button", { name: /^Edit what you're booking/ })
+                    .click();
+            }
             const read = page.waitForResponse((r) =>
                 /\/public\/services\/[^/]+\/days/.test(r.url()),
             );

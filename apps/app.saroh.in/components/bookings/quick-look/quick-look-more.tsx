@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import {
@@ -9,7 +10,6 @@ import {
     ChevronDown,
     CircleCheck,
     CircleX,
-    IndianRupee,
     MoreHorizontal,
     Pencil,
     Rows3,
@@ -50,7 +50,7 @@ export type MoreIcon =
     | "who";
 
 const ICONS: Record<MoreIcon, ReactNode> = {
-    take: <IndianRupee aria-hidden className="size-[18px]" />,
+    take: <MoneyIcon aria-hidden className="size-[18px]" />,
     noshow: <CircleX aria-hidden className="size-[18px]" />,
     came: <CircleCheck aria-hidden className="size-[18px]" />,
     undo: <Undo2 aria-hidden className="size-[18px]" />,

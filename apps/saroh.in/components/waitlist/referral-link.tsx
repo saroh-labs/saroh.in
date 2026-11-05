@@ -4,7 +4,7 @@ import { copyText } from "@saroh/ui/copy-button";
 import { useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
 /** How long "Copied" stays before the button reads "Copy" again. */
 const COPIED_MS = 2000;

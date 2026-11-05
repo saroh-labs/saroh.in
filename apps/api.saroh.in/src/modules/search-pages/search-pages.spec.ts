@@ -17,7 +17,7 @@ import { validationPipeOptions } from "../../common/validation";
 import { AdminPermission } from "../admin/admin-permissions";
 import { SearchPageActionDto, SearchPageHistoryQueryDto } from "./dto";
 import type { SearchPageAction, SearchPageStatus } from "./search-page-rules";
-import { changesLive, nextStatus } from "./search-page-rules";
+import { cancelStatus, changesLive, nextStatus } from "./search-page-rules";
 import {
     enqueueWebDeploy,
     SEARCH_PAGES_DEPLOY_TYPE,
@@ -32,10 +32,13 @@ describe("who may use the console's search pages", () => {
             SearchPagesController.prototype[name],
         ) as unknown;
 
-    it("reads with the console read, acts with search-pages:publish", () => {
+    it("reads with the console read, acts and deploys with search-pages:publish", () => {
         expect(required("list")).toEqual([AdminPermission.PlatformRead]);
         expect(required("history")).toEqual([AdminPermission.PlatformRead]);
         expect(required("act")).toEqual([AdminPermission.SearchPagesPublish]);
+        expect(required("deploy")).toEqual([
+            AdminPermission.SearchPagesPublish,
+        ]);
     });
 });
 
@@ -52,12 +55,24 @@ describe("search page transitions (DEC-193)", () => {
         unpublish: [null, null, null, "UNPUBLISHED", null],
         archive: ["ARCHIVED", "ARCHIVED", "ARCHIVED", "ARCHIVED", null],
         restore: [null, null, null, null, "DRAFT"],
+        // Cancel reads the released status too: `cancelStatus`.
+        cancel: [null, null, null, null, null],
     };
 
     it.each(Object.entries(table))("%s from each status", (action, to) => {
         expect(
             from.map((f) => nextStatus(action as SearchPageAction, f)),
         ).toEqual(to);
+    });
+
+    it("cancels a staged change back to the released status, and nothing else", () => {
+        expect(cancelStatus("LIVE", "DRAFT")).toBe("DRAFT");
+        expect(cancelStatus("LIVE", null)).toBe("DRAFT");
+        expect(cancelStatus("LIVE", "UNPUBLISHED")).toBe("UNPUBLISHED");
+        expect(cancelStatus("ARCHIVED", "LIVE")).toBe("LIVE");
+        expect(cancelStatus("UNPUBLISHED", "LIVE")).toBe("LIVE");
+        expect(cancelStatus("LIVE", "LIVE")).toBeNull();
+        expect(cancelStatus(null, null)).toBeNull();
     });
 
     it("counts only a move onto or off the site as a live change", () => {
@@ -90,6 +105,18 @@ describe("search page DTOs", () => {
         ).resolves.toBeDefined();
     });
 
+    it("takes the new page groups' paths too (plan 2026-10-31-002)", async () => {
+        await expect(
+            body({
+                action: "publish",
+                paths: ["/gst/x", "/guides/x", "/downloads/x"],
+            }),
+        ).resolves.toBeInstanceOf(SearchPageActionDto);
+        await expect(
+            body({ action: "publish", paths: ["/gst/"] }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it.each([
         ["no paths", { action: "publish", paths: [] }],
         [
@@ -99,7 +126,7 @@ describe("search page DTOs", () => {
                 paths: Array.from({ length: 101 }, (_, i) => `/for/p-${i}`),
             },
         ],
-        ["another kind", { action: "publish", paths: ["/guides/qr"] }],
+        ["another kind", { action: "publish", paths: ["/blog/qr"] }],
         ["a bare kind", { action: "publish", paths: ["/tools/"] }],
         ["capitals", { action: "publish", paths: ["/for/Salons"] }],
         ["a nested path", { action: "publish", paths: ["/for/a/b"] }],
@@ -135,8 +162,16 @@ describe("the web deploy a search page change queues", () => {
     }
     afterEach(() => configure(false));
 
+    const fakeTx = (waiting: unknown, updated = 1) => ({
+        job: {
+            create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn().mockResolvedValue(waiting),
+            updateMany: jest.fn().mockResolvedValue({ count: updated }),
+        },
+    });
+
     it("queues only when a web deploy can run", async () => {
-        const tx = { job: { create: jest.fn().mockResolvedValue({}) } };
+        const tx = fakeTx(null);
         expect(await enqueueWebDeploy(tx as never, ["/for/a"])).toBe(false);
         expect(tx.job.create).not.toHaveBeenCalled();
 
@@ -148,6 +183,26 @@ describe("the web deploy a search page change queues", () => {
                 payload: { paths: ["/for/a"] },
             },
         });
+    });
+
+    it("adds the paths to a deploy still waiting to start", async () => {
+        configure(true);
+        const tx = fakeTx({ id: "job_w", payload: { paths: ["/for/b"] } });
+        expect(await enqueueWebDeploy(tx as never, ["/for/a", "/for/b"])).toBe(
+            true,
+        );
+        expect(tx.job.updateMany).toHaveBeenCalledWith({
+            where: { id: "job_w", status: "PENDING" },
+            data: { payload: { paths: ["/for/a", "/for/b"] } },
+        });
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("queues its own when a worker claimed the waiting one first", async () => {
+        configure(true);
+        const tx = fakeTx({ id: "job_w", payload: { paths: [] } }, 0);
+        expect(await enqueueWebDeploy(tx as never, ["/for/a"])).toBe(true);
+        expect(tx.job.create).toHaveBeenCalledTimes(1);
     });
 
     it("dispatches deploy-frontends.yml for web in this environment", async () => {

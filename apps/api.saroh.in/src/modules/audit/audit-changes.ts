@@ -29,6 +29,9 @@ export interface FieldChange {
  * invoice or a receipt, or says how the business keeps time or numbers.
  */
 export const VALUE_FIELDS = [
+    "taxName",
+    "taxRate",
+    "yearStartMonth",
     "name",
     // What is being set up (DEC-070): BUSINESS, SOLO or WORK.
     "kind",

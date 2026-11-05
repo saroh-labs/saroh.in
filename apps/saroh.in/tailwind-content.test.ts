@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { UI_FILES } from "./tailwind.config";
+import { marketingContent } from "../../packages/marketing/src/tailwind";
+import config, { UI_FILES } from "./tailwind.config";
 
 /**
  * Tailwind reads only the @saroh/ui files `UI_FILES` names
@@ -11,6 +12,12 @@ import { UI_FILES } from "./tailwind.config";
  */
 const ROOT = __dirname;
 const UI = resolve(ROOT, "../../packages/ui/src");
+const MARKETING = resolve(ROOT, "../../packages/marketing/src");
+
+/** Every glob of `@saroh/marketing`'s is in `content`, its exclusions too. */
+const namesMarketing = (content: unknown) =>
+    Array.isArray(content) &&
+    marketingContent.every((glob) => content.includes(glob));
 
 function sources(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -47,6 +54,7 @@ describe("saroh.in's Tailwind content", () => {
         const reached = new Set<string>();
         const todo = ["app", "components", "lib", "content"]
             .flatMap((dir) => sources(join(ROOT, dir)))
+            .concat(sources(MARKETING))
             .flatMap((file) => imports(readFileSync(file, "utf8")))
             .filter((spec) => spec.startsWith("@saroh/ui/"))
             .map(uiEntry)
@@ -70,5 +78,22 @@ describe("saroh.in's Tailwind content", () => {
             .sort();
         expect(reached.size).toBeGreaterThan(5);
         expect(missing).toEqual([]);
+    });
+
+    // Left out, every class only @saroh/marketing draws (the buttons, the
+    // links, the focus ring) is missing from the site's CSS.
+    it("reads @saroh/marketing", () => {
+        expect(namesMarketing(config.content)).toBe(true);
+        expect(marketingContent[0]).toBe(
+            "../../packages/marketing/src/**/*.{ts,tsx}",
+        );
+        expect(existsSync(join(MARKETING, "ring.ts"))).toBe(true);
+        expect(
+            namesMarketing(
+                (config.content as string[]).filter(
+                    (glob) => !glob.includes("packages/marketing"),
+                ),
+            ),
+        ).toBe(false);
     });
 });

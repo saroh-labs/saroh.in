@@ -1,5 +1,7 @@
 import { getJson } from "./control-plane";
 
+export { kindLabel, WAITLIST_KIND_LABELS } from "./waitlist-words";
+
 /** The waitlist, as the console reads it (plan U11). Server-only. */
 
 export interface WaitlistSummary {
@@ -22,6 +24,8 @@ export interface WaitlistSummary {
     }[];
     /** U31: invited people who made their business with the invite. */
     joined: number;
+    /** Free-tool email gates not invited: kept out of Waiting and its counts. */
+    fromTools: number;
     /** False when invites can't go: no sign-up address or no launch offer. */
     canInvite: boolean;
     /** Why not, in the API's words; null when they can. */
@@ -47,6 +51,8 @@ export interface WaitlistRow {
     inviteSentAt: string | null;
     /** U31: when they made their business with the invite. */
     joinedAt: string | null;
+    /** One of Saroh's leads has this address (the Lead link). */
+    isLead: boolean;
 }
 
 export function getWaitlistSummary(): Promise<WaitlistSummary | null> {
@@ -55,6 +61,7 @@ export function getWaitlistSummary(): Promise<WaitlistSummary | null> {
 
 export function listWaitlist(params: {
     state?: string;
+    email?: string;
     source?: string;
     kind?: string;
     city?: string;
@@ -70,21 +77,4 @@ export function listWaitlist(params: {
     }
     const suffix = search.size > 0 ? `?${search.toString()}` : "";
     return getJson(`/waitlist${suffix}`);
-}
-
-/** The form's kinds of business (U30), as the console names them. */
-export const WAITLIST_KIND_LABELS: Record<string, string> = {
-    salon: "Salon or beauty",
-    gym: "Gym or studio",
-    clinic: "Clinic",
-    coach: "Dietician or coach",
-    food: "Bakery or food",
-    shop: "Shop",
-    creator: "Creator",
-    other: "Something else",
-};
-
-export function kindLabel(kind: string | null): string {
-    if (!kind) return "Not recorded";
-    return WAITLIST_KIND_LABELS[kind] ?? kind;
 }

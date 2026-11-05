@@ -53,7 +53,7 @@ export default async function HealthPage() {
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Health"]}
                     title="Health"

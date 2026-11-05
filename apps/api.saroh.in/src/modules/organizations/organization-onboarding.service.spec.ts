@@ -169,7 +169,11 @@ describe("OrganizationOnboardingService.onboard", () => {
                     kind: "BUSINESS",
                     billingProfileId: "bprof_1",
                 },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                },
             });
             expect(mockFirstBillingProfile).not.toHaveBeenCalled();
         });
@@ -284,7 +288,11 @@ describe("OrganizationOnboardingService.onboard", () => {
 
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                },
             });
         });
 
@@ -305,7 +313,11 @@ describe("OrganizationOnboardingService.onboard", () => {
             ).resolves.toEqual({ id: "org_1", slug: "acme" });
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true, createdAt: true },
+                select: {
+                    id: true,
+                    slug: true,
+                    createdAt: true,
+                },
             });
         });
 
@@ -344,6 +356,7 @@ describe("OrganizationOnboardingService.onboard", () => {
                 organizationId: "org_1",
                 ownerUserId: "user_1",
                 madeAt: MADE_AT,
+                edition: "INDIA",
                 claim: {
                     link: {
                         code: "ABCD2345",
@@ -361,6 +374,7 @@ describe("OrganizationOnboardingService.onboard", () => {
                 organizationId: "org_1",
                 ownerUserId: "user_1",
                 madeAt: MADE_AT,
+                edition: "INDIA",
                 claim: { link: null, code: undefined },
             });
         });
@@ -389,6 +403,48 @@ describe("OrganizationOnboardingService.onboard", () => {
                 }),
             );
             expect(JSON.stringify(record.mock.calls)).not.toContain("pa_asha");
+        });
+    });
+
+    describe("on a Global address (DEC-204)", () => {
+        const global = (dto: OnboardOrganizationDto) =>
+            service.onboard("user_1", dto, {
+                email: "owner@example.com",
+                host: "api.saroh.tech",
+            });
+
+        it("makes a Global business in its currency, with no billing profile", async () => {
+            await global({
+                name: "Acme",
+                currency: "CAD",
+                profile: { country: "GB" },
+            });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        edition: "GLOBAL",
+                        currency: "CAD",
+                    }),
+                }),
+            );
+            expect(mockFirstBillingProfile).not.toHaveBeenCalled();
+        });
+
+        it("suggests the country's currency when none was chosen", async () => {
+            await global({ name: "Acme", profile: { country: "DE" } });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ currency: "EUR" }),
+                }),
+            );
+        });
+
+        it("refuses India, and no country at all", async () => {
+            await expect(
+                global({ name: "Acme", profile: { country: "IN" } }),
+            ).rejects.toThrow(/India/);
+            await expect(global({ name: "Acme" })).rejects.toThrow(/country/);
+            expect(orgCreate).not.toHaveBeenCalled();
         });
     });
 
@@ -611,7 +667,11 @@ describe("OrganizationOnboardingService.onboard", () => {
 
                 expect(orgCreate).toHaveBeenCalledWith({
                     data: { name: "Asha Rao", slug: "asha-rao", kind },
-                    select: { id: true, slug: true, createdAt: true },
+                    select: {
+                        id: true,
+                        slug: true,
+                        createdAt: true,
+                    },
                 });
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({

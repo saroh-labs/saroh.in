@@ -7,11 +7,12 @@ import { canPickProducts } from "@/lib/invoices/can-pick-products";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
 import { mayUpdateBusiness } from "@/lib/invoices/paper-access";
-import { payLinkPossible } from "@/lib/invoices/payments-on";
+import { payLinkPossible, paymentsModuleOn } from "@/lib/invoices/payments-on";
 import { listInvoices } from "@/lib/invoices/service";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readOrganizationSettings } from "@/lib/organizations/settings-service";
+import { startingCurrency } from "@/lib/organizations/starting-currency";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "New invoice" };
@@ -66,7 +67,7 @@ export default async function NewInvoicePage({
             <InvoiceForm
                 header={{
                     breadcrumb: [
-                        "Payments",
+                        ...((await paymentsModuleOn()) ? ["Payments"] : []),
                         <Link key="list" href="/billing/invoices">
                             Invoices
                         </Link>,
@@ -76,7 +77,9 @@ export default async function NewInvoicePage({
                 }}
                 contacts={contacts}
                 // The currency the business last invoiced in.
-                defaultCurrency={invoices.rows.at(0)?.currency ?? "INR"}
+                defaultCurrency={
+                    invoices.rows.at(0)?.currency ?? (await startingCurrency())
+                }
                 initialContactId={forContact?.id}
                 registered={
                     settings.ok && (settings.data.tax?.registered ?? false)

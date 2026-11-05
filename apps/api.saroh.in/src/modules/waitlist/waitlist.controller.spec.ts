@@ -43,6 +43,26 @@ describe("WaitlistController", () => {
         });
     });
 
+    it("takes the edition from the address it was called on", async () => {
+        const { controller, join } = build();
+        const call = (host?: string) =>
+            controller.join(DTO, "203.0.113.5", undefined, host);
+
+        await call("api.saroh.tech");
+        expect(join).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "GLOBAL" }),
+        );
+        await call("api.saroh.in");
+        expect(join).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "INDIA" }),
+        );
+        // Local, or an address of no edition.
+        await call("localhost:3333");
+        expect(join).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "INDIA" }),
+        );
+    });
+
     it("answers a repeat with neither", async () => {
         const { controller, join } = build();
         join.mockResolvedValue({ created: false });

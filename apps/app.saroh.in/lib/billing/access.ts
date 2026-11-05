@@ -4,6 +4,7 @@ import {
     limitNotice,
     limitWordsFor,
     MODULE_MAP,
+    quietAtLimit,
 } from "@saroh/pricing-catalog";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
@@ -123,9 +124,32 @@ const OFF: LimitNotice = { on: false, full: false };
  * `LIMIT_WORDS`) — or none: under 80%, a row with no cap, a business the
  * catalogue doesn't reach, or while limits aren't enforced (nothing would
  * stop them, so "you'll be stopped" would be untrue). A soft cap's notice
- * informs and never says anything stops.
+ * informs and never says anything stops. Quiet at a total limit of one
+ * (UX-041, as the API's `quietAtOne`) until it's passed.
  */
 export function rowNotice(
+    view: BillingAccessView | null,
+    moduleId: string,
+): LimitNotice {
+    const row = accessRow(view, moduleId);
+    const words = limitWordsFor(moduleId);
+    if (
+        row?.limit != null &&
+        row.usage !== null &&
+        row.usage <= row.limit &&
+        words &&
+        quietAtLimit(words, row.limit)
+    ) {
+        return OFF;
+    }
+    return rowLimit(view, moduleId);
+}
+
+/**
+ * Where a row stands against its limit, shown or not: what turns a create
+ * button off (Invite at Free's one seat), where {@link rowNotice} says nothing.
+ */
+export function rowLimit(
     view: BillingAccessView | null,
     moduleId: string,
 ): LimitNotice {
@@ -169,7 +193,7 @@ export function createBlock(
 ): string | null {
     if (view?.source !== "catalogue" || !view.enforced) return null;
     if (roomForOneMore(view, moduleId) !== false) return null;
-    const n = rowNotice(view, moduleId);
+    const n = rowLimit(view, moduleId);
     return n.on ? n.why || n.title : null;
 }
 

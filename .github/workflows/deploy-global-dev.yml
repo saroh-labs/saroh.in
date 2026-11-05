@@ -1,0 +1,76 @@
+# Global's development apps (DEC-204): the same code as the development Workers,
+# on a domain that's a secret of this deploy and never in the repo. Run logs are
+# public, and GitHub masks the secret in them. Each app sits behind the access
+# key, so a deploy without the key stops.
+name: Deploy Global development
+
+on:
+    push:
+        branches: [development]
+
+permissions:
+    contents: read
+
+jobs:
+    deploy:
+        name: Deploy ${{ matrix.dir }}
+        runs-on: ubuntu-latest
+        environment: cloudflare-development
+        concurrency:
+            group: deploy-global-dev-${{ matrix.dir }}
+            cancel-in-progress: false
+        strategy:
+            fail-fast: false
+            matrix:
+                dir:
+                    - apps/app.saroh.in
+                    - apps/accounts.saroh.in
+                    - apps/admin.saroh.in
+                    - apps/saroh.tech
+        env:
+            CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+            CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+            GLOBAL_DEV_DOMAIN: ${{ secrets.GLOBAL_DEV_DOMAIN }}
+            NEXT_TELEMETRY_DISABLED: "1"
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: ./.github/actions/setup
+              with:
+                  prisma: "false"
+                  # No caches: a pull request can restore them, and the build
+                  # holds the domain.
+                  next-cache: "false"
+
+            - name: Global's settings and the access key
+              env:
+                  DEV_ACCESS_KEY: ${{ secrets.DEV_ACCESS_KEY }}
+              run: |
+                  set -euo pipefail
+                  [ -n "$GLOBAL_DEV_DOMAIN" ] || { echo "::error::GLOBAL_DEV_DOMAIN is missing"; exit 1; }
+                  [ -n "$(echo "$DEV_ACCESS_KEY" | tr -d '[:space:]')" ] || { echo "::error::DEV_ACCESS_KEY is missing: the app would be open to anyone"; exit 1; }
+                  node scripts/cf-global-dev.mjs "${{ matrix.dir }}"
+                  node scripts/cf-env.mjs "${{ matrix.dir }}" development >> "$GITHUB_ENV"
+                  echo "DEV_ACCESS_KEY=$DEV_ACCESS_KEY" >> "$GITHUB_ENV"
+                  umask 077
+                  jq -n --arg v "$DEV_ACCESS_KEY" '{DEV_ACCESS_KEY: $v}' > "$RUNNER_TEMP/worker-secrets.json"
+
+            - name: Build the packages the app uses
+              run: pnpm turbo run build --filter="$(jq -r .name "${{ matrix.dir }}/package.json")^..."
+
+            - name: Build for Cloudflare
+              working-directory: ${{ matrix.dir }}
+              run: pnpm cf:build
+
+            # The key goes on before the code, so no deploy is ever without it.
+            - name: Key onto the Worker
+              working-directory: ${{ matrix.dir }}
+              run: |
+                  set -euo pipefail
+                  pnpm exec wrangler secret bulk "$RUNNER_TEMP/worker-secrets.json" > /dev/null
+                  rm -f "$RUNNER_TEMP/worker-secrets.json"
+
+            - name: Deploy
+              working-directory: ${{ matrix.dir }}
+              # Its output cuts values short, past what GitHub's mask can match.
+              run: pnpm cf:deploy > /dev/null

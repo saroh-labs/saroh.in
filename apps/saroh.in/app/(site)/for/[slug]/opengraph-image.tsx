@@ -1,6 +1,5 @@
-import { loadSearchPage } from "@saroh/search-pages";
-
 import { OG_CONTENT_TYPE, OG_SIZE, ogCard } from "@/lib/og-card";
+import { searchPages } from "@/lib/search-pages";
 
 /** Each /for/ page's share card: "For salons" and its headline, as a solution page's. */
 export const size = OG_SIZE;
@@ -12,7 +11,7 @@ export async function generateImageMetadata({
     params: { slug: string } | Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const p = loadSearchPage(slug);
+    const p = searchPages.loadSearchPage(slug);
     return [
         {
             id: "card",
@@ -29,7 +28,7 @@ export default async function Image({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const p = loadSearchPage(slug);
+    const p = searchPages.loadSearchPage(slug);
     if (!p) return ogCard({ title: "Saroh" });
     return ogCard({ eyebrow: `For ${p.plural}`, title: p.h1 });
 }

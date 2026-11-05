@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { EDITION } from "@/lib/edition";
 import type { MrpPricing } from "@/lib/gst/mrp";
 import { overMrpProblem, toPayLine } from "@/lib/gst/mrp";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
@@ -30,6 +31,7 @@ import {
     slugify,
     suggestedPath,
 } from "@/lib/products/editor-sections";
+import { MRP_LABEL } from "@/lib/products/mrp-label";
 import type { ProductDetail } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -390,7 +392,7 @@ export function BasicsSection({
                 <Field
                     // Its line names what this product costs to pay.
                     holdsData={payLine !== null}
-                    label="MRP"
+                    label={MRP_LABEL}
                     className="flex-[1_1_150px]"
                     error={
                         seen("mrp")
@@ -405,7 +407,9 @@ export function BasicsSection({
                             ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
                             : sameAsPrice
                               ? "Same as the price, so nothing is struck through."
-                              : "The printed price, shown struck through. Leave it empty if it sells at MRP."
+                              : EDITION === "GLOBAL"
+                                ? "A higher price, shown struck through. Leave it empty if there isn't one."
+                                : "The printed price, shown struck through. Leave it empty if it sells at MRP."
                     }
                 >
                     <MoneyInput

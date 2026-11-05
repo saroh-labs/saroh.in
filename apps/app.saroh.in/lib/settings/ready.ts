@@ -1,6 +1,7 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
+import { EDITION } from "@/lib/edition";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
@@ -351,8 +352,8 @@ function howToPay(
     return {
         key: "howToPay",
         label: "Tell customers how to pay you",
-        why: "Add your UPI ID or bank details. Customers see them on every unpaid invoice, order and booking.",
-        cta: "Add UPI or bank",
+        why: `Add your ${EDITION === "GLOBAL" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
+        cta: EDITION === "GLOBAL" ? "Add bank details" : "Add UPI or bank",
         // The tab, with its sheet open: the step is done there.
         href: businessEditHref("pay"),
         broken: false,

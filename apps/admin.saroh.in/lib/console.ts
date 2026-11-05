@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { NotAuthorized } from "@/components/not-authorized";
 
 import type { AdminPermission, StaffIdentity } from "./control-plane";
-import { getStaffIdentity } from "./control-plane";
+import { editionNotGranted, getStaffIdentity } from "./control-plane";
 import { requireSession } from "./session";
 
 /**
@@ -14,7 +14,8 @@ import { requireSession } from "./session";
  * Returns the staff identity or the screen to render instead: staff who lack
  * the permission get the refusal inside the console shell, with the menu of
  * screens they can open; someone who is not staff at all gets the bare page
- * (owner decision, 6 Oct, #840). The API refuses
+ * (owner decision, 6 Oct, #840), or, when the API says their grant leaves out
+ * this console's edition, a page that says that instead. The API refuses
  * the underlying reads either way; this only keeps a screen from being drawn
  * around data it was never going to get.
  */
@@ -28,7 +29,10 @@ export async function requireStaff(
     if (!staff) {
         return {
             ok: false,
-            screen: createElement(NotAuthorized, { email: session.user.email }),
+            screen: createElement(NotAuthorized, {
+                email: session.user.email,
+                ...((await editionNotGranted()) && { wrongConsole: true }),
+            }),
         };
     }
     if (permission && !staff.permissions.includes(permission)) {

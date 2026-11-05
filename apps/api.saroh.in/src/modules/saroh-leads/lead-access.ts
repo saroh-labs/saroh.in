@@ -5,6 +5,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { AdminRole } from "../admin/admin-permissions";
@@ -136,16 +137,19 @@ export function ownerName(
 }
 
 /**
- * Refuse an email that is already on another lead, as its email or its
- * sign-up email, saying whose it is: the first to record it owns it.
+ * Refuse an email that is already on another lead of this edition, as its
+ * email or its sign-up email, saying whose it is: the first to record it owns
+ * it. The other edition's leads are its own team's and never count.
  */
 export async function assertEmailFree(
     tx: Tx,
     key: string,
     selfId: string | null,
+    edition: Edition,
 ): Promise<void> {
     const taken = await tx.sarohLead.findFirst({
         where: {
+            edition,
             OR: [{ emailKey: key }, { signUpEmailKey: key }],
             ...(selfId ? { id: { not: selfId } } : {}),
         },
@@ -170,7 +174,7 @@ export async function assertEmailFree(
 
 export async function candidatesFor(
     db: Pick<Tx, "organization">,
-    lead: Pick<LeadRow, "email" | "signUpEmail">,
+    lead: Pick<LeadRow, "email" | "signUpEmail" | "edition">,
 ): Promise<{ id: string; name: string }[]> {
     const emails = [lead.email, lead.signUpEmail].filter(
         (email): email is string => Boolean(email),
@@ -178,6 +182,7 @@ export async function candidatesFor(
     if (emails.length === 0) return [];
     return db.organization.findMany({
         where: {
+            edition: lead.edition,
             memberships: {
                 some: {
                     role: "OWNER",
@@ -220,9 +225,12 @@ export async function assertWonBusiness(
     }
     const exists = await tx.organization.findUnique({
         where: { id: organizationId },
-        select: { id: true },
+        select: { edition: true },
     });
-    if (!exists) throw new BadRequestException("That business doesn't exist.");
+    // Another edition's business is one this lead's console can't see.
+    if (exists?.edition !== lead.edition) {
+        throw new BadRequestException("That business doesn't exist.");
+    }
 }
 
 export function activeAccountManager(

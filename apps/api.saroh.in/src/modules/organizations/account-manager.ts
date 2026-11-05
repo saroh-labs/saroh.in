@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { emailVerifiedBySelf } from "../../common/auth/email-verification";
 import { AdminRole } from "../admin/admin-permissions";
@@ -167,6 +168,7 @@ async function managerByLeadEmail(
     ownerUserId: string,
     madeAt: Date,
     now: Date,
+    edition: Edition,
 ): Promise<Attribution | null> {
     const user = await tx.user.findUnique({
         where: { id: ownerUserId },
@@ -178,10 +180,12 @@ async function managerByLeadEmail(
     });
     if (!user || !emailVerifiedBySelf(user)) return null;
     const key = normaliseEmail(user.email).key;
-    // An email is on one lead at most, as its email or its sign-up email
-    // (`assertEmailFree`); both are read, and the earlier recording wins.
+    // An email is on one lead at most on each edition, as its email or its
+    // sign-up email (`assertEmailFree`); both are read, and the earlier
+    // recording wins. A business counts only its own edition's lead.
     const leads = await tx.sarohLead.findMany({
         where: {
+            edition,
             ownerPlatformAdminId: { not: null },
             OR: [
                 { emailKey: key, emailAt: { lt: madeAt } },
@@ -261,6 +265,8 @@ export async function managerFor(
         ownerUserId: string;
         /** When the business was made: a lead email must be older. */
         madeAt: Date;
+        /** The business's edition, whose leads count. India when left out. */
+        edition?: Edition;
         claim: ManagerClaim;
         now?: Date;
     },
@@ -298,7 +304,13 @@ export async function managerFor(
             };
         }
     }
-    return managerByLeadEmail(tx, input.ownerUserId, input.madeAt, now);
+    return managerByLeadEmail(
+        tx,
+        input.ownerUserId,
+        input.madeAt,
+        now,
+        input.edition ?? "INDIA",
+    );
 }
 
 const SAVEPOINT = "account_manager_link";
@@ -328,6 +340,7 @@ export async function recordManagerInTx(
         organizationId: string;
         ownerUserId: string;
         madeAt: Date;
+        edition?: Edition;
         claim: ManagerClaim;
     },
 ): Promise<Attribution | null> {

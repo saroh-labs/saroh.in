@@ -6,9 +6,9 @@ import { useId, useState } from "react";
 
 import type { HelpSummary } from "@/content/help";
 import { HELP_EMAIL, helpHome, helpHref, searchArticles } from "@/content/help";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { fieldClasses } from "../shared/fields/field-classes";
-import { textLinkClasses } from "../shared/links/text-link";
 
 /**
  * The Help home's search (design 1a): in the browser, over the published

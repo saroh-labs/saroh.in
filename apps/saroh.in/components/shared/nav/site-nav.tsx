@@ -1,27 +1,39 @@
 "use client";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@saroh/marketing/cn";
 import { Wordmark } from "@saroh/ui/wordmark";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { KeyboardEvent, RefObject } from "react";
+import type { ComponentProps, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
-import { ring } from "@/lib/ring";
-import { nextIndex } from "@/lib/roving";
+import type { Visitor } from "@/lib/browser/session";
+import { useVisitor } from "@/lib/browser/session";
+import {
+    ACCOUNT_URL,
+    DASHBOARD_URL,
+    LAUNCH_MODE,
+    SIGN_IN_URL,
+} from "@/lib/links";
+import { ring } from "@saroh/marketing/ring";
 
+import { ButtonLink } from "@saroh/marketing/button";
+import { IntentLink } from "@saroh/marketing/intent-link";
+import { MenuPanel, moveWithArrows } from "@saroh/marketing/menu-panel";
 import { CtaLink } from "../buttons/cta-link";
-import { IntentLink } from "../links/intent-link";
 import { MobileMenu } from "./mobile-menu";
-import type { NavItem, NavSection } from "./nav-section";
-import { sectionOf } from "./nav-section";
+import type { NavMenus, NavSection } from "./nav-section";
+import { ABOUT_LINKS, sectionOf } from "./nav-section";
 
-type MenuId = "features" | "solutions" | "resources" | "tools";
+type MenuId = "features" | "solutions" | "resources" | "tools" | "account";
 
 /** A top-level control: 36px, 9px corners, Paper-dark on hover. */
 const TOP = `flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
+
+/** A menu's panel, under its button (the nav's menus and the account menu). */
+const PANEL =
+    "absolute top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu";
 
 /** The current section: underlined in Saffron, 8px below the word. */
 const CURRENT =
@@ -41,24 +53,32 @@ const CURRENT =
  * published and built (`content/resources.ts`) and passes them in, so the
  * browser never judges a date.
  *
+ * It stays at the top of the window as the page scrolls (owner, 1 Nov), and
+ * `--mk-nav-h` is its height, for whatever else sticks below it.
+ *
+ * A desk menu opens across the nav (owner, 1 Nov): columns ruled apart, under
+ * family or group headings where the items have them, and a strip below with
+ * the "see all" and the quieter links.
+ *
  * The section the page is in is underlined in Saffron, and the page itself
  * carries `aria-current="page"` in its menu. A menu closes on Escape (focus
  * returns to its button), on a click outside, and when focus leaves the nav;
  * arrow keys move within it.
+ *
+ * Signed in (owner, 1 Nov; `useVisitor`, asked once the page is idle), Sign
+ * in and the start button become the visitor's initial, which opens their
+ * name, email, Account and Sign out, and "Open dashboard". The page's HTML is
+ * always the signed-out nav; the swap happens in the browser.
  */
 export function SiteNav({
     features,
     solutions,
+    solutionMenu,
+    allTrades,
+    allTools,
     resources = [],
     tools = [],
-}: {
-    /** The Features menu (`FEATURE_ITEMS`), from the server. */
-    features: NavItem[];
-    /** The Solutions menu, as the server links it (`solutionLink`). */
-    solutions: NavItem[];
-    resources?: NavItem[];
-    tools?: NavItem[];
-}) {
+}: NavMenus) {
     const pathname = usePathname();
     const section = sectionOf(pathname, features, solutions, resources, tools);
     const [open, setOpen] = useState<MenuId | null>(null);
@@ -67,6 +87,8 @@ export function SiteNav({
     const solutionsButton = useRef<HTMLButtonElement>(null);
     const resourcesButton = useRef<HTMLButtonElement>(null);
     const toolsButton = useRef<HTMLButtonElement>(null);
+    const accountButton = useRef<HTMLButtonElement>(null);
+    const { visitor, signOut } = useVisitor();
 
     // A new page closes whatever menu was open (state adjusted while
     // rendering, not in an effect: https://react.dev/learn/you-might-not-need-an-effect).
@@ -90,6 +112,7 @@ export function SiteNav({
                 solutions: solutionsButton,
                 resources: resourcesButton,
                 tools: toolsButton,
+                account: accountButton,
             }[open];
             setOpen(null);
             button.current?.focus();
@@ -111,7 +134,7 @@ export function SiteNav({
                     setOpen(null);
                 }
             }}
-            className="relative z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
+            className="sticky top-0 z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
         >
             <IntentLink
                 href="/"
@@ -127,7 +150,7 @@ export function SiteNav({
                     id="features"
                     label="Features"
                     items={features}
-                    columns={2}
+                    columns={3}
                     current={section === "features"}
                     pathname={pathname}
                     open={open === "features"}
@@ -139,8 +162,12 @@ export function SiteNav({
                 <Menu
                     id="solutions"
                     label="Solutions"
-                    items={solutions}
-                    columns={1}
+                    items={
+                        solutionMenu ??
+                        solutions.filter((i) => i.href !== allTrades?.href)
+                    }
+                    columns={2}
+                    seeAll={allTrades}
                     current={section === "solutions"}
                     pathname={pathname}
                     open={open === "solutions"}
@@ -165,7 +192,8 @@ export function SiteNav({
                         id="resources"
                         label="Resources"
                         items={resources}
-                        columns={1}
+                        columns={3}
+                        links={ABOUT_LINKS}
                         current={section === "resources"}
                         pathname={pathname}
                         open={open === "resources"}
@@ -180,7 +208,8 @@ export function SiteNav({
                         id="tools"
                         label="Tools"
                         items={tools}
-                        columns={1}
+                        columns={2}
+                        seeAll={allTools}
                         current={section === "tools"}
                         pathname={pathname}
                         open={open === "tools"}
@@ -191,9 +220,32 @@ export function SiteNav({
                     />
                 ) : null}
             </div>
+            {visitor ? (
+                <>
+                    <AccountMenu
+                        visitor={visitor}
+                        open={open === "account"}
+                        onToggle={() =>
+                            setOpen(open === "account" ? null : "account")
+                        }
+                        onSignOut={() => {
+                            setOpen(null);
+                            void signOut();
+                        }}
+                        buttonRef={accountButton}
+                    />
+                    <ButtonLink
+                        href={DASHBOARD_URL}
+                        size="sm"
+                        className="hidden min-[760px]:inline-flex"
+                    >
+                        Open dashboard
+                    </ButtonLink>
+                </>
+            ) : null}
             {/* Sign in waits for early access, as Pricing does: until then
                 accounts.saroh.in is closed to anyone without the key. */}
-            {LAUNCH_MODE === "open" ? (
+            {!visitor && LAUNCH_MODE === "open" ? (
                 <a
                     href={SIGN_IN_URL}
                     className={cn(
@@ -204,14 +256,16 @@ export function SiteNav({
                     Sign in
                 </a>
             ) : null}
-            <CtaLink
-                src="nav"
-                size="sm"
-                className={cn(
-                    "hidden min-[760px]:inline-flex",
-                    LAUNCH_MODE !== "open" && "ml-auto",
-                )}
-            />
+            {visitor ? null : (
+                <CtaLink
+                    src="nav"
+                    size="sm"
+                    className={cn(
+                        "hidden min-[760px]:inline-flex",
+                        LAUNCH_MODE !== "open" && "ml-auto",
+                    )}
+                />
+            )}
 
             {/* Below 760px wide. */}
             <MobileMenu
@@ -220,7 +274,12 @@ export function SiteNav({
                 resources={resources}
                 features={features}
                 solutions={solutions}
+                solutionMenu={solutionMenu}
+                allTrades={allTrades}
+                allTools={allTools}
                 tools={tools}
+                visitor={visitor}
+                onSignOut={signOut}
                 className="ml-auto min-[760px]:hidden"
             />
         </nav>
@@ -230,34 +289,20 @@ export function SiteNav({
 function Menu({
     id,
     label,
-    items,
-    columns,
     current,
-    pathname,
     open,
     onToggle,
     buttonRef,
-}: {
+    ...panel
+}: Omit<ComponentProps<typeof MenuPanel>, "id"> & {
     id: MenuId;
-    label: string;
-    items: NavItem[];
-    columns: 1 | 2;
     current: boolean;
-    pathname: string;
     open: boolean;
     onToggle: () => void;
     buttonRef: RefObject<HTMLButtonElement | null>;
 }) {
-    const menu = useRef<HTMLDivElement>(null);
-
-    // Opening a menu puts focus on its first item, as the design's script
-    // does, so the arrow keys work straight away.
-    useEffect(() => {
-        if (open) menu.current?.querySelector<HTMLElement>("a")?.focus();
-    }, [open]);
-
     return (
-        <div className="relative">
+        <div>
             <button
                 ref={buttonRef}
                 type="button"
@@ -269,6 +314,7 @@ function Menu({
                 className={cn(
                     TOP,
                     "gap-1.5 border-none bg-transparent",
+                    open && "bg-mk-hover",
                     current && CURRENT,
                 )}
             >
@@ -283,52 +329,86 @@ function Menu({
                     )}
                 />
             </button>
-            {open ? (
-                <div
-                    ref={menu}
-                    id={`nav-menu-${id}`}
-                    role="menu"
-                    aria-label={label}
-                    onKeyDown={(e) => moveWithArrows(e)}
-                    className={cn(
-                        "absolute left-0 top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu",
-                        columns === 2
-                            ? "w-[662px] grid-cols-2"
-                            : "w-[362px] grid-cols-1",
-                    )}
-                >
-                    {items.map((item) => (
-                        <Link
-                            key={item.href}
-                            role="menuitem"
-                            href={item.href}
-                            aria-current={
-                                item.href === pathname ? "page" : undefined
-                            }
-                            className={`grid cursor-pointer gap-[3px] rounded-[10px] px-3.5 py-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`}
-                        >
-                            <span className="text-[15px] font-semibold">
-                                {item.name}
-                            </span>
-                            <span className="text-mk-note leading-[1.45] text-muted-foreground">
-                                {item.line}
-                            </span>
-                        </Link>
-                    ))}
-                </div>
-            ) : null}
+            {open ? <MenuPanel id={id} label={label} {...panel} /> : null}
         </div>
     );
 }
 
-/** Arrow keys move through a menu's items, wrapping at either end. */
-function moveWithArrows(e: KeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(e.currentTarget.querySelectorAll("a"));
-    const at = items.indexOf(document.activeElement as HTMLAnchorElement);
-    const next = nextIndex(e.key, at, items.length);
-    if (next === null) return;
-    e.preventDefault();
-    items[next]?.focus();
+/**
+ * The signed-in visitor's initial and its menu: who they are, then Account
+ * and Sign out. Their name and email are masked in a session recording.
+ */
+function AccountMenu({
+    visitor,
+    open,
+    onToggle,
+    onSignOut,
+    buttonRef,
+}: {
+    visitor: Visitor;
+    open: boolean;
+    onToggle: () => void;
+    onSignOut: () => void;
+    buttonRef: RefObject<HTMLButtonElement | null>;
+}) {
+    const menu = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (open)
+            menu.current
+                ?.querySelector<HTMLElement>('[role="menuitem"]')
+                ?.focus();
+    }, [open]);
+    const item = `flex h-11 w-full cursor-pointer items-center rounded-[10px] border-none bg-transparent px-3.5 text-left text-[15px] font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`;
+
+    return (
+        <div
+            data-ph-mask=""
+            className="relative ml-auto hidden min-[760px]:block"
+        >
+            <button
+                ref={buttonRef}
+                type="button"
+                aria-label="Your account"
+                aria-haspopup="true"
+                aria-expanded={open}
+                aria-controls={open ? "nav-menu-account" : undefined}
+                onClick={onToggle}
+                className={`grid size-9 cursor-pointer place-items-center rounded-full border border-border-strong bg-card text-[15px] font-semibold uppercase text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring({ offset: 2 })}`}
+            >
+                <span aria-hidden>{visitor.name.trim().charAt(0)}</span>
+            </button>
+            {open ? (
+                <div
+                    ref={menu}
+                    id="nav-menu-account"
+                    role="menu"
+                    aria-label="Your account"
+                    onKeyDown={(e) => moveWithArrows(e)}
+                    className={cn(PANEL, "right-0 w-[280px]")}
+                >
+                    <div className="mb-1 grid gap-[3px] border-b border-border px-3.5 pb-3 pt-2">
+                        <span className="truncate text-[15px] font-semibold">
+                            {visitor.name}
+                        </span>
+                        <span className="truncate text-mk-note text-muted-foreground">
+                            {visitor.email}
+                        </span>
+                    </div>
+                    <a role="menuitem" href={ACCOUNT_URL} className={item}>
+                        Account
+                    </a>
+                    <button
+                        role="menuitem"
+                        type="button"
+                        onClick={onSignOut}
+                        className={item}
+                    >
+                        Sign out
+                    </button>
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 export type { NavSection };

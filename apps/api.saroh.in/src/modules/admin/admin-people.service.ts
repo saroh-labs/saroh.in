@@ -4,6 +4,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -11,6 +12,7 @@ import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { peopleWhere as inEditionWhere, viaBusiness } from "./admin-edition";
 import type {
     PersonHistoryItem,
     PersonRow,
@@ -20,7 +22,7 @@ import {
     peopleWhere,
     personHistory,
     personRow,
-    personSelect,
+    personSelectIn,
     signInState,
 } from "./admin-people-reads";
 import { AdminPermission } from "./admin-permissions";
@@ -42,6 +44,13 @@ export interface RecentSignup {
     businesses: { id: string; name: string }[];
 }
 
+/** One page of the Users list, and whether another follows it. */
+export interface PeoplePage {
+    items: PersonRow[];
+    /** The next page's number, when there is one. */
+    nextPage?: number;
+}
+
 export interface PersonDetail extends PersonRow {
     memberships: {
         organizationId: string;
@@ -60,6 +69,8 @@ export interface PersonDetail extends PersonRow {
     }[];
     /** The Sign-in tab, and why they can't sign in if anything stops them. */
     signIn: SignInState;
+    /** Their businesses on the other edition: a count, never which. */
+    otherEditionBusinesses: number;
 }
 
 /**
@@ -82,27 +93,44 @@ export class AdminPeopleService {
 
     /**
      * The Users list (U9): a search, the chips, or both. With neither, the
-     * newest accounts first; with a search, by email. At most
-     * {@link LIST_LIMIT} rows.
+     * newest accounts first; with a search, by email. {@link LIST_LIMIT}
+     * rows a page, numbered from 1, so nobody past the 50th is out of reach.
      */
     async search(
-        input: { q?: string; filters?: readonly PeopleFilter[] } = {},
-    ): Promise<PersonRow[]> {
+        input: {
+            q?: string;
+            filters?: readonly PeopleFilter[];
+            page?: number;
+        } = {},
+        edition: Edition | null = null,
+    ): Promise<PeoplePage> {
         const term = input.q?.trim() ?? "";
         if (term.length === 1) {
             throw new BadRequestException(
                 "Search with at least two characters.",
             );
         }
+        const page = input.page ?? 1;
         const users = await prisma.user.findMany({
-            where: peopleWhere(term, input.filters ?? []),
-            select: personSelect,
+            where: {
+                AND: [
+                    peopleWhere(term, input.filters ?? [], undefined, edition),
+                    inEditionWhere(edition),
+                ],
+            },
+            select: personSelectIn(edition),
             orderBy: term
                 ? [{ email: "asc" }]
                 : [{ createdAt: "desc" }, { id: "desc" }],
-            take: LIST_LIMIT,
+            skip: (page - 1) * LIST_LIMIT,
+            // One more than a page: whether a next page exists.
+            take: LIST_LIMIT + 1,
         });
-        return Promise.all(users.map((user) => personRow(user)));
+        const rows = users.slice(0, LIST_LIMIT);
+        return {
+            items: await Promise.all(rows.map((user) => personRow(user))),
+            nextPage: users.length > LIST_LIMIT ? page + 1 : undefined,
+        };
     }
 
     /** What staff did to this person (the History tab). */
@@ -115,14 +143,16 @@ export class AdminPeopleService {
      * which businesses they belong to. Same personal data as a search, so the
      * route in front of it needs the same permission and records each read.
      */
-    async recent(): Promise<RecentSignup[]> {
+    async recent(edition: Edition | null = null): Promise<RecentSignup[]> {
         const users = await prisma.user.findMany({
+            where: inEditionWhere(edition),
             select: {
                 id: true,
                 name: true,
                 email: true,
                 createdAt: true,
                 memberships: {
+                    where: viaBusiness(edition),
                     select: {
                         organization: { select: { id: true, name: true } },
                     },
@@ -144,12 +174,17 @@ export class AdminPeopleService {
         }));
     }
 
-    async detail(userId: string): Promise<PersonDetail> {
+    /** Reachable on either console; the businesses shown are its edition's. */
+    async detail(
+        userId: string,
+        edition: Edition | null = null,
+    ): Promise<PersonDetail> {
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
-                ...personSelect,
+                ...personSelectIn(edition),
                 memberships: {
+                    where: viaBusiness(edition),
                     select: {
                         role: true,
                         organization: {
@@ -183,6 +218,14 @@ export class AdminPeopleService {
         return {
             ...(await personRow({ ...base, memberships })),
             signIn: await signInState(base),
+            otherEditionBusinesses: edition
+                ? await prisma.membership.count({
+                      where: {
+                          userId,
+                          organization: { edition: { not: edition } },
+                      },
+                  })
+                : 0,
             memberships: memberships.map((row) => ({
                 organizationId: row.organization.id,
                 organizationName: row.organization.name,

@@ -103,7 +103,7 @@ test("opens on the Overview for the last 4 weeks, three answers each leading to 
     // How it was counted, folded at the foot; it says how often.
     await main.getByText("How these are counted").click();
     await expect(main).toContainText(
-        "Your website's visits, enquiries and online orders are updated every hour.",
+        "Your website's visits, enquiries and paid orders are updated every hour.",
     );
     // Never a "0%" place or "100% below".
     await expect(main).not.toContainText(/100% below|\b0%/);
@@ -123,8 +123,9 @@ test("the period is the page's: it changes every figure, keeps the tab, and surv
         });
         const sheet = page.getByRole("dialog", { name: "Show figures for" });
         await pressUntil(button, sheet);
+        // "19 to 25 Oct" in one month, "26 Oct to 1 Nov" across two.
         await expect(sheet).toContainText(
-            /\d+(?: \w{3})? to \d+ \w{3}, against \d+(?: \w{3})? to \d+ \w{3}/,
+            /\d+ (\w{3} )?to \d+ \w{3}, against \d+ (\w{3} )?to \d+ \w{3}/,
         );
         await expect(sheet).toContainText(
             "Every figure on Insights follows this choice.",

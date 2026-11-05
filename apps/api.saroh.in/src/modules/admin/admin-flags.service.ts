@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { FlagKey, FlagMetadata } from "../feature-flags/flags";
 import { FLAG_KEYS, FLAG_METADATA } from "../feature-flags/flags";
+import { editionWhere, viaBusiness } from "./admin-edition";
 
 /** One flag as the control plane sees it: the global default + who overrides it. */
 export interface AdminFlagView {
@@ -46,7 +48,8 @@ export interface AdminFlagChange {
     createdAt: Date;
 }
 
-const HISTORY_LIMIT = 20;
+/** One page of a flag's history; the console pages past it (`?page=`). */
+export const HISTORY_LIMIT = 20;
 
 /**
  * The flag control surface for admin.saroh.in (S1-012, DEC feature-flags).
@@ -59,12 +62,14 @@ const HISTORY_LIMIT = 20;
  */
 @Injectable()
 export class AdminFlagsService {
-    async list(): Promise<AdminFlagView[]> {
+    async list(edition: Edition | null = null): Promise<AdminFlagView[]> {
         const [defaults, overrides] = await Promise.all([
             prisma.featureFlag.findMany({
                 select: { key: true, enabledByDefault: true },
             }),
+            // The flags are shared; another edition's business never is.
             prisma.featureFlagOverride.findMany({
+                where: viaBusiness(edition),
                 select: {
                     flagKey: true,
                     enabled: true,
@@ -149,17 +154,22 @@ export class AdminFlagsService {
     }
 
     /**
-     * The last changes to one flag, newest first, for the Releases screen's
-     * History tab (R9). Read from the flag's own ledger, which `flags:read`
+     * The changes to one flag, newest first, {@link HISTORY_LIMIT} a page,
+     * for the Releases screen's History tab (R9). Read from the flag's own ledger, which `flags:read`
      * already opens: the platform audit list needs `audit:read`, which a
      * release manager does not hold. Names are joined here so the console
      * says who changed what, not two ids.
      */
-    async history(key: FlagKey): Promise<AdminFlagChange[]> {
+    async history(
+        key: FlagKey,
+        page = 1,
+        edition: Edition | null = null,
+    ): Promise<AdminFlagChange[]> {
         const rows = await prisma.featureFlagAudit.findMany({
             where: { flagKey: key },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: HISTORY_LIMIT,
+            skip: (Math.max(1, Math.trunc(page)) - 1) * HISTORY_LIMIT,
             select: {
                 id: true,
                 organizationId: true,
@@ -187,7 +197,7 @@ export class AdminFlagsService {
                 : [],
             orgIds.length > 0
                 ? prisma.organization.findMany({
-                      where: { id: { in: orgIds } },
+                      where: { id: { in: orgIds }, ...editionWhere(edition) },
                       select: { id: true, name: true },
                   })
                 : [],

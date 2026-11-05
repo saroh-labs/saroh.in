@@ -21,6 +21,14 @@
  * (`apps/saroh.in/scripts/shot-sizes.mjs`), and a test there fails on a
  * missing one.
  *
+ * With `--edition=global` it takes saroh.tech's shots instead: the Global
+ * demo businesses (`db:seed:global`), the entries in `shots.global.ts`,
+ * written to `apps/saroh.tech/public/shots/v2/` and
+ * `apps/saroh.tech/content/shots.captured.ts`, each in its business's own
+ * locale and time zone. Run the app and accounts with
+ * `NEXT_PUBLIC_EDITION=GLOBAL`; saroh.in's images and manifest aren't touched.
+ * Then `pnpm --filter tech shots:sizes --force`.
+ *
  * Read-only: it only navigates, sets page-local UI state and types into
  * forms it never submits. It never saves.
  * The seed moves with the calendar, so re-seed before a run for "today" to
@@ -37,9 +45,15 @@ import { CAPTURED } from "../../apps/saroh.in/content/shots.captured";
 import { urls } from "../playwright.config";
 import type { Business, Role, Shot } from "./shots.config";
 import { BUSINESSES, ROLES, SHOTS } from "./shots.config";
+import { GLOBAL_SHOTS, morningZone } from "./shots.global";
+
+/** Which site's shots this run takes (`--edition=global`, else saroh.in's). */
+const GLOBAL = process.argv.includes("--edition=global");
+const EDITION_SHOTS = GLOBAL ? GLOBAL_SHOTS : SHOTS;
+const EDITION_APP = GLOBAL ? "apps/saroh.tech" : "apps/saroh.in";
 
 const ROOT = path.resolve(__dirname, "..", "..");
-const PUBLIC_DIR = path.join(ROOT, "apps/saroh.in/public");
+const PUBLIC_DIR = path.join(ROOT, EDITION_APP, "public");
 
 /** Where a shot's image is served from: Help's own folder, or V2's. */
 function srcOf(key: string): string {
@@ -57,7 +71,7 @@ interface Mark {
     h: number;
 }
 
-const MANIFEST = path.join(ROOT, "apps/saroh.in/content/shots.captured.ts");
+const MANIFEST = path.join(ROOT, EDITION_APP, "content/shots.captured.ts");
 const AUTH_DIR = path.join(ROOT, "e2e/.auth");
 const PASSWORD = "demo-password-123";
 
@@ -82,19 +96,36 @@ function loadSharp(): Sharp {
     return fromNext("sharp") as Sharp;
 }
 
-/** The coming Monday (today if it is Monday), as YYYY-MM-DD in India. */
-function nextMonday(): string {
-    const today = new Date(
-        new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
-    );
+/** The coming Monday (today if it is Monday), as YYYY-MM-DD where the business is. */
+function nextMonday(timeZone: string): string {
+    const today = new Date(new Date().toLocaleString("en-US", { timeZone }));
     const add = (8 - today.getDay()) % 7;
     today.setDate(today.getDate() + add);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 }
 
+/**
+ * The zone the seed gave the Global businesses, which the page is read in: its
+ * log says it (`SHOTS_ZONE`). Else today's, which moves on the hour, so a run
+ * crossing one writes screens an hour apart from those in the business's zone.
+ */
+// eslint-disable-next-line turbo/no-undeclared-env-vars -- set by hand for one capture; not a build input
+const zoneOfTheSeed = () => process.env.SHOTS_ZONE ?? morningZone(new Date());
+
+/** The locale and zone a shot's page is read in. */
+function clockOf(shot: Shot): { locale: string; timezoneId: string } {
+    const business = shot.business && BUSINESSES[shot.business];
+    return business && "locale" in business
+        ? { locale: business.locale, timezoneId: zoneOfTheSeed() }
+        : { locale: "en-IN", timezoneId: "Asia/Kolkata" };
+}
+
 function urlOf(shot: Shot): string {
-    const route = shot.route.replace("{nextMonday}", nextMonday());
+    const route = shot.route.replace(
+        "{nextMonday}",
+        nextMonday(clockOf(shot).timezoneId),
+    );
     if (route.startsWith("accounts:")) {
         return `${urls.ACCOUNTS_URL}${route.slice("accounts:".length)}`;
     }
@@ -117,7 +148,11 @@ async function sessionFor(
     role: Role,
 ): Promise<string | undefined> {
     if (role === "visitor") return undefined;
-    const file = path.join(AUTH_DIR, `marketing-shots-${role}.json`);
+    // Per edition: each signs in on its own database.
+    const file = path.join(
+        AUTH_DIR,
+        `marketing-shots${GLOBAL ? "-global" : ""}-${role}.json`,
+    );
     if (fs.existsSync(file)) return file;
     fs.mkdirSync(AUTH_DIR, { recursive: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -246,6 +281,7 @@ async function capture(
 /** The marks the manifest has now, kept for shots this run doesn't retake. */
 function readMarks(): Record<string, Mark> {
     const marks: Record<string, Mark> = {};
+    if (GLOBAL) return marks;
     for (const [key, shot] of Object.entries(CAPTURED)) {
         if (shot.mark) marks[key] = shot.mark;
     }
@@ -255,7 +291,7 @@ function readMarks(): Record<string, Mark> {
 /** Rewrite the manifest from every shot in the config that has a file. */
 async function writeManifest(sharp: Sharp, marks: Record<string, Mark>) {
     const lines: string[] = [];
-    for (const shot of SHOTS) {
+    for (const shot of EDITION_SHOTS) {
         const file = fileOf(shot.key);
         if (!fs.existsSync(file)) continue;
         const mark = shot.mark ? marks[shot.key] : undefined;
@@ -301,9 +337,15 @@ ${lines.join("\n")}
 }
 
 async function main() {
-    const only = new Set(process.argv.slice(2));
-    const shots = only.size ? SHOTS.filter((s) => only.has(s.key)) : SHOTS;
-    const unknown = [...only].filter((k) => !SHOTS.some((s) => s.key === k));
+    const only = new Set(
+        process.argv.slice(2).filter((a) => !a.startsWith("--")),
+    );
+    const shots = only.size
+        ? EDITION_SHOTS.filter((s) => only.has(s.key))
+        : EDITION_SHOTS;
+    const unknown = [...only].filter(
+        (k) => !EDITION_SHOTS.some((s) => s.key === k),
+    );
     if (unknown.length)
         throw new Error(`Unknown shot keys: ${unknown.join(", ")}`);
 
@@ -326,8 +368,7 @@ async function main() {
                 deviceScaleFactor: DPR,
                 colorScheme: "light",
                 reducedMotion: "reduce",
-                locale: "en-IN",
-                timezoneId: "Asia/Kolkata",
+                ...clockOf(shot),
             });
             const page = await context.newPage();
             try {
@@ -354,7 +395,7 @@ async function main() {
         await browser.close();
     }
     await writeManifest(sharp, marks);
-    const total = SHOTS.map((s) => fileOf(s.key))
+    const total = EDITION_SHOTS.map((s) => fileOf(s.key))
         .filter((f) => fs.existsSync(f))
         .reduce((sum, f) => sum + fs.statSync(f).size, 0);
     console.log(`\n${(total / 1024 / 1024).toFixed(2)} MB of shots`);

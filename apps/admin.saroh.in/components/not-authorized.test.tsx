@@ -57,6 +57,16 @@ describe("NotAuthorized", () => {
     });
 });
 
+describe("NotAuthorized on the wrong console", () => {
+    it("says the access doesn't include this console", () => {
+        render(<NotAuthorized email="support@example.com" wrongConsole />);
+        expect(
+            screen.getByText("Your access doesn't include this console"),
+        ).toBeTruthy();
+        expect(screen.queryByText("Not authorized")).toBeNull();
+    });
+});
+
 describe("NoAccessPanel", () => {
     it("says nothing about why and points to Home", () => {
         render(<NoAccessPanel email="support@example.com" />);

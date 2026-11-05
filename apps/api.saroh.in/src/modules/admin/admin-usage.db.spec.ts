@@ -94,4 +94,22 @@ describe("AdminUsageService.storage (DB)", () => {
         }
         expect(found).toMatchObject({ files: 0, bytes: 0, gb: 0 });
     });
+
+    it("ranks closest to the limit first, a business with no plan limit last", async () => {
+        const page = await usage.storage({ order: "closest", limit: 100 });
+
+        // No subscription or plan override: the resolver gives no limit.
+        let heavyRow = page.items.find((row) => row.id === heavy);
+        for (let p = 2; !heavyRow && p <= Math.ceil(page.total / 100); p++) {
+            const next = await usage.storage({
+                order: "closest",
+                page: p,
+                limit: 100,
+            });
+            heavyRow = next.items.find((row) => row.id === heavy);
+        }
+        expect(heavyRow).toMatchObject({ limitGb: null, usedPercent: null });
+        const shares = page.items.map((row) => row.usedPercent ?? -1);
+        expect(shares).toEqual([...shares].sort((a, b) => b - a));
+    });
 });

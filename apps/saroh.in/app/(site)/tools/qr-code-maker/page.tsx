@@ -5,13 +5,13 @@ import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { PageTitle } from "@/components/shared/sections/page-title";
 import { QrCodeMaker } from "@/components/tools/qr-code-maker/qr-code-maker";
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { toolLd } from "@/lib/structured-data";
+import { PageTitle } from "@saroh/marketing/page-title";
 
 export const metadata: Metadata = pageMetadata({
     title: copy.metaTitle,

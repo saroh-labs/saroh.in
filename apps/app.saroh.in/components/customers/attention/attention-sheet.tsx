@@ -49,7 +49,7 @@ const CHOICE =
 
 /**
  * Add or edit a Needs attention entry (C5), with the controls of the design's
- * booking-page card: the kind, a short label for the team, and the sensitive
+ * booking-page card: the kind, a short label, and the sensitive
  * tick — on for Medical until someone changes it. An allergy is picked from
  * the business's allergen list when it has one, so an order can be checked
  * against it.
@@ -231,7 +231,7 @@ export function AttentionSheet({
                         htmlFor={`${id}-label`}
                         className="text-[12.5px] font-medium"
                     >
-                        Short label for the team
+                        Short label
                     </Label>
                     <Input
                         id={`${id}-label`}

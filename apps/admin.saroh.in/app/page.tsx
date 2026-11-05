@@ -31,7 +31,7 @@ export default async function HomePage() {
 
     return (
         <AdminShell staff={gate.staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader title={greeting()} />
                 <Suspense
                     fallback={<PanelSkeleton label="Loading what needs you" />}

@@ -35,7 +35,12 @@ export async function deleteStaleWebsiteLeads(now: Date): Promise<number> {
                 websiteSeenAt: { lt: cutoff },
                 ...(after ? { id: { gt: after } } : {}),
             },
-            select: { id: true, emailKey: true, signUpEmailKey: true },
+            select: {
+                id: true,
+                edition: true,
+                emailKey: true,
+                signUpEmailKey: true,
+            },
             orderBy: { id: "asc" },
             take: BATCH,
         });
@@ -51,15 +56,17 @@ export async function deleteStaleWebsiteLeads(now: Date): Promise<number> {
             (
                 await prisma.waitlistSignup.findMany({
                     where: { emailKey: { in: keys } },
-                    select: { emailKey: true },
+                    select: { edition: true, emailKey: true },
                 })
-            ).map((row) => row.emailKey),
+            ).map((row) => `${row.edition}:${row.emailKey}`),
         );
+        const isWaiting = (edition: string, key: string | null) =>
+            key !== null && waiting.has(`${edition}:${key}`);
         const ids = due
             .filter(
                 (lead) =>
-                    !(lead.emailKey && waiting.has(lead.emailKey)) &&
-                    !(lead.signUpEmailKey && waiting.has(lead.signUpEmailKey)),
+                    !isWaiting(lead.edition, lead.emailKey) &&
+                    !isWaiting(lead.edition, lead.signUpEmailKey),
             )
             .map((lead) => lead.id);
         if (ids.length > 0) {
@@ -79,7 +86,8 @@ export async function deleteStaleWebsiteLeads(now: Date): Promise<number> {
 /**
  * Someone asked to be taken off the waitlist ("at once if you ask"): their
  * unconverted website lead goes too, unless another waitlist entry with the
- * same email is still there. Run in the removal's transaction, after the
+ * same email is still there, on either edition: a person has one set of
+ * leads to take away. Run in the removal's transaction, after the
  * entry is deleted. True when a lead went.
  */
 export async function deleteWebsiteLeadOnRequest(

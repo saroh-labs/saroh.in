@@ -197,7 +197,7 @@ describe("Profile", () => {
             (row) => row.getAttribute("data-row"),
         );
         expect(missing).toEqual(["phone", "emergencyContact"]);
-        expect(screen.getAllByText("Missing")).toHaveLength(2);
+        expect(screen.getAllByText("Not added")).toHaveLength(2);
         // No team:pay: no tax id row, and no Edit details without team:write.
         expect(screen.queryByText("Tax id (PAN)")).toBeNull();
         expect(

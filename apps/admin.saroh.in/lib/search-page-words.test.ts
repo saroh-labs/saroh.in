@@ -1,21 +1,43 @@
 import type { ForPageEntry, ToolPageEntry } from "@saroh/search-pages";
 import { describe, expect, it } from "vitest";
 
-import type { PageRow, SearchPageRecord } from "./search-page-words";
+import type { DocEntry, PageRow, SearchPageRecord } from "./search-page-words";
 import {
+    badgeOf,
+    cantPublishWords,
+    changedByWords,
+    checkWhy,
     countBy,
+    deployedWords,
+    deployWords,
     dialogWords,
     eligible,
+    groupRows,
+    heldWords,
     historyWords,
     inFilter,
+    KIND_NOUN,
     kindOf,
+    KINDS,
+    linkedFromWords,
+    listHref,
+    listWordsFor,
     matchesQuery,
     mergePages,
+    nextAction,
+    publishLinks,
+    readListQuery,
+    rebuildWords,
     refusalWords,
     rowActions,
+    rowNote,
+    searchRepeatsName,
+    siteOf,
+    sortRows,
     stateNote,
     stateOf,
     successWords,
+    takenOffGoesTo,
     whereItShows,
 } from "./search-page-words";
 
@@ -26,6 +48,10 @@ const entry = (slug: string, family = "Beauty"): ForPageEntry => ({
     name: slug.charAt(0).toUpperCase() + slug.slice(1),
     family: family as ForPageEntry["family"],
     familySlug: "x",
+    h1: "h",
+    shape: "appointments",
+    searchWords: "w",
+    hero: { title: "t", count: "c", highlight: 0, rows: [] },
     search: `${slug} software`,
     title: "t",
     description: "d",
@@ -36,9 +62,11 @@ const record = (
     slug: string,
     status: SearchPageRecord["status"],
     changedAt = "2026-10-25T10:00:00.000Z",
+    releasedStatus: SearchPageRecord["status"] = status,
 ): SearchPageRecord => ({
     path: `/for/${slug}`,
     status,
+    releasedStatus,
     liveSince: status === "LIVE" ? changedAt : null,
     changedAt,
     changedBy: { name: "Mohit" },
@@ -68,33 +96,99 @@ describe("mergePages (DEC-193)", () => {
     });
 });
 
-describe("stateOf", () => {
-    const rebuild = { running: true, startedAt: "2026-10-26T09:00:00.000Z" };
-    it("says Publishing… and Coming off… for a change in the rebuild under way", () => {
-        expect(
-            stateOf(record("a", "LIVE", "2026-10-26T08:59:30.000Z"), rebuild),
-        ).toBe("publishing");
-        expect(
-            stateOf(
-                record("a", "UNPUBLISHED", "2026-10-26T09:01:00.000Z"),
-                rebuild,
-            ),
-        ).toBe("unpublishing");
+describe("staged and released (R13)", () => {
+    it("is the staged status, and waits for Deploy changes where the site differs", () => {
+        expect(stateOf(record("a", "LIVE"))).toBe("live");
+        expect(stateOf(record("a", "ARCHIVED"))).toBe("archived");
+        expect(stateOf(null)).toBe("draft");
+        expect(siteOf(record("a", "LIVE", undefined, "DRAFT"))).toEqual({
+            onSite: false,
+            pending: "on",
+        });
+        expect(siteOf(record("a", "ARCHIVED", undefined, "LIVE"))).toEqual({
+            onSite: true,
+            pending: "off",
+        });
+        expect(siteOf(record("a", "LIVE"))).toEqual({
+            onSite: true,
+            pending: null,
+        });
+        expect(siteOf(null)).toEqual({ onSite: false, pending: null });
     });
-    it("keeps the saved status for an older change, or when nothing rebuilds", () => {
+
+    it("labels a row that waits, and says when it changes", () => {
+        const [on, off, settled] = mergePages(
+            [entry("a"), entry("b"), entry("c")],
+            {
+                pages: [
+                    record("a", "LIVE", undefined, "DRAFT"),
+                    record("b", "UNPUBLISHED", undefined, "LIVE"),
+                    record("c", "LIVE"),
+                ],
+                rebuild: idle,
+            },
+        );
+        expect(badgeOf(on)).toEqual({
+            label: "Waiting to deploy",
+            variant: "warning",
+        });
+        expect(badgeOf(off).label).toBe("Waiting to deploy");
+        expect(badgeOf(settled)).toEqual({ label: "Live", variant: "success" });
+        expect(stateNote(on)).toBe("Goes live when changes are deployed");
+        expect(stateNote(off)).toBe("Comes off when changes are deployed");
+        // The chips go by the site: waiting to go on is not live yet, nor a draft.
+        expect(inFilter(on, "draft")).toBe(false);
+        expect(inFilter(on, "waiting")).toBe(true);
+        expect(inFilter(off, "waiting")).toBe(true);
+        expect(inFilter(settled, "waiting")).toBe(false);
+        expect(inFilter(on, "live")).toBe(false);
+        expect(inFilter(off, "live")).toBe(true);
+        // Waiting pages can be changed again before the deploy.
+        expect(eligible("unpublish", [on])).toEqual([on]);
+        expect(eligible("publish", [off])).toEqual([off]);
+        // Only a waiting page's change can be cancelled (DEC-201 amendment).
+        expect(eligible("cancel", [on, off, settled])).toEqual([on, off]);
+        expect(rowActions(on.state, "saroh.io", on.pending)[0]).toEqual({
+            action: "cancel",
+            label: "Cancel this change",
+        });
         expect(
-            stateOf(record("a", "LIVE", "2026-10-20T09:00:00.000Z"), rebuild),
-        ).toBe("live");
+            rowActions(settled.state, "saroh.io").map((a) => a.action),
+        ).toEqual(["unpublish", "archive"]);
+    });
+
+    it("counts the deploy bar's changes and words its confirm", () => {
+        const w = deployWords(
+            [{ pending: "on" }, { pending: "on" }, { pending: "off" }],
+            "saroh.in",
+        );
+        expect(w.title).toBe("3 changes waiting to deploy");
+        expect(w.dialogTitle).toBe("Deploy 3 changes to saroh.in?");
+        expect(w.points).toEqual([
+            "saroh.in rebuilds once with every change below. It takes a few minutes.",
+            "2 pages go live, into the sitemap and the lists.",
+            "1 page comes off. Old links send people to the page above them, not an error.",
+        ]);
+        expect(deployWords([{ pending: "on" }], "saroh.in").title).toBe(
+            "1 change waiting to deploy",
+        );
+        expect(deployWords([], "saroh.in").title).toBe(
+            "No changes waiting to deploy",
+        );
+        expect(deployedWords(30, true, "saroh.in")).toEqual({
+            title: "Deploying 30 changes.",
+            description: "saroh.in is rebuilding.",
+        });
+        expect(deployedWords(1, false, "saroh.in").description).toMatch(
+            /can't rebuild from here/,
+        );
+    });
+
+    it("says how many pages the rebuild carries, when the API knows", () => {
         expect(
-            stateOf(record("a", "LIVE", "2026-10-26T09:01:00.000Z"), idle),
-        ).toBe("live");
-        expect(
-            stateOf(
-                record("a", "ARCHIVED", "2026-10-26T09:01:00.000Z"),
-                rebuild,
-            ),
-        ).toBe("archived");
-        expect(stateOf(record("a", "DRAFT"), idle)).toBe("draft");
+            rebuildWords({ running: true, paths: ["/for/a", "/for/b"] }),
+        ).toBe("2 pages change in it.");
+        expect(rebuildWords({ running: true })).toBe("");
     });
 });
 
@@ -115,12 +209,11 @@ describe("filters and counts", () => {
         expect(countBy(rows)).toEqual({
             all: 4,
             live: 1,
+            waiting: 0,
             draft: 2,
             unpublished: 1,
             archived: 1,
         });
-        expect(inFilter("publishing", "draft")).toBe(true);
-        expect(inFilter("unpublishing", "live")).toBe(true);
     });
     it("searches the name and the search phrase", () => {
         expect(
@@ -149,8 +242,8 @@ describe("filters and counts", () => {
         expect(rowActions("draft", "saroh.in")[0]?.label).toBe(
             "Publish on saroh.in",
         );
-        expect(rowActions("publishing", "saroh.in")).toEqual([
-            { action: null, label: "Wait for the rebuild" },
+        expect(rowActions("archived", "saroh.in")).toEqual([
+            { action: "restore", label: "Restore" },
         ]);
     });
 });
@@ -165,6 +258,7 @@ describe("dialog words", () => {
         slug,
         family,
         state,
+        onSite: state === "live",
     });
     it("asks one page's publish with the tick", () => {
         const w = dialogWords(
@@ -177,7 +271,7 @@ describe("dialog words", () => {
         expect(w.confirm).toBe("Publish page");
         expect(w.tick).toBe("I've read this page on saroh.io");
         expect(w.points[0]).toBe(
-            "saroh.in rebuilds with this page. It takes a few minutes.",
+            "Nothing changes on saroh.in yet. It goes live when changes are deployed, with every other change waiting.",
         );
     });
     it("says when checks need the operator", () => {
@@ -231,7 +325,7 @@ describe("dialog words", () => {
             "saroh.io",
         );
         expect(live.points[0]).toBe(
-            "1 is live now. saroh.in rebuilds and takes it off first.",
+            "1 is live now. It comes off saroh.in when changes are deployed.",
         );
         expect(live.destructive).toBe(true);
         expect(live.tick).toBeNull();
@@ -254,16 +348,26 @@ describe("after the API answers", () => {
             "Spas can't be published from where it is now. Someone may have just changed it. Nothing was changed: close this to see the list as it is.",
         );
     });
-    it("says the site rebuilds, or that it can't from here", () => {
-        expect(successWords("publish", 1, true, "saroh.io")).toEqual({
-            title: "Publishing the page.",
-            description: "saroh.io is rebuilding.",
-        });
+    it("says a change waits for Deploy changes, by name, and offers the bar", () => {
         expect(
-            successWords("unpublish", 3, false, "saroh.io").description,
-        ).toMatch(/can't rebuild from here/);
-        expect(successWords("restore", 1, false, "saroh.io")).toEqual({
+            successWords("publish", [{ name: "Tattoo studios" }], "saroh.io"),
+        ).toEqual({
+            title: "Tattoo studios waits to deploy.",
+            description: "Deploy changes to put it on saroh.io.",
+            staged: true,
+        });
+        const three = [{ name: "A" }, { name: "B" }, { name: "C" }];
+        expect(successWords("unpublish", three, "saroh.io").description).toBe(
+            "Deploy changes to take them off saroh.io.",
+        );
+        expect(successWords("restore", [{ name: "A" }], "saroh.io")).toEqual({
             title: "Restored the page as a draft.",
+            staged: false,
+        });
+        expect(successWords("cancel", [{ name: "A" }], "saroh.io")).toEqual({
+            title: "Cancelled the change to A.",
+            description: "Nothing changes on saroh.io.",
+            staged: false,
         });
     });
     it("says a history row in words", () => {
@@ -278,7 +382,37 @@ describe("after the API answers", () => {
             "saroh.in",
         );
         expect(w.what).toBe("Published by Mohit");
-        expect(w.detail).toBe("Was a draft, now live. Put on saroh.in.");
+        // Publishing only stages it: never "now live" (F2).
+        expect(w.detail).toBe(
+            "Was a draft, set to go live at the next deploy.",
+        );
+        const deployed = historyWords(
+            {
+                action: "deploy",
+                fromStatus: "DRAFT",
+                toStatus: "LIVE",
+                by: { name: "Mohit" },
+                at: "2026-10-26T09:00:00.000Z",
+            },
+            "saroh.in",
+        );
+        expect(deployed.what).toBe("Went live on saroh.in · deployed by Mohit");
+        expect(deployed.detail).toBe("Was a draft, now live.");
+        expect(
+            historyWords(
+                {
+                    action: "cancel",
+                    fromStatus: "LIVE",
+                    toStatus: "DRAFT",
+                    by: { name: "Mohit" },
+                    at: "2026-10-26T09:00:00.000Z",
+                },
+                "saroh.in",
+            ),
+        ).toMatchObject({
+            what: "Change cancelled by Mohit",
+            detail: "Back to a draft, as the site has it. Nothing changed on saroh.in.",
+        });
         expect(
             historyWords(
                 {
@@ -317,6 +451,7 @@ describe("free tools (#1253)", () => {
                     {
                         path: "/tools/qr-code-maker",
                         status: "LIVE",
+                        releasedStatus: "LIVE",
                         liveSince: "2026-10-16T18:30:00Z",
                         changedAt: "2026-10-26T10:00:00Z",
                         changedBy: null,
@@ -337,7 +472,57 @@ describe("free tools (#1253)", () => {
     it("reads the kind from the address, trade pages by default", () => {
         expect(kindOf("tools")).toBe("tools");
         expect(kindOf(undefined)).toBe("for");
-        expect(kindOf("guides")).toBe("for");
+        expect(kindOf("guides")).toBe("guides");
+        expect(kindOf("blog")).toBe("for");
+    });
+
+    it("chooses between every kind, the new groups with no pages yet (plan 2026-10-31-002)", () => {
+        expect(KINDS.map((k) => [k.kind, k.label, k.path])).toEqual([
+            ["for", "Trade pages", "/for/"],
+            ["tools", "Free tools", "/tools/"],
+            ["gst", "GST guides", "/gst/"],
+            ["guides", "Guides", "/guides/"],
+            ["downloads", "Free downloads", "/downloads/"],
+        ]);
+        expect(kindOf("gst")).toBe("gst");
+        expect(kindOf("downloads")).toBe("downloads");
+        // The API may hold a record for a new group's page the code lacks.
+        const rows = mergePages([entry("salons")], {
+            pages: [
+                {
+                    ...record("salons", "LIVE"),
+                    path: "/gst/composition-scheme",
+                },
+            ],
+            rebuild: idle,
+        });
+        expect(rows.filter((r) => r.kind === "gst")).toEqual([]);
+        expect(rows).toHaveLength(1);
+    });
+
+    it("says where a live page of a new group shows", () => {
+        expect(
+            whereItShows(
+                { onSite: true, pending: null },
+                "saroh.in",
+                "gst",
+            ).map((w) => w.label),
+        ).toContain("The /gst list, the menu and the footer");
+        const on = dialogWords(
+            "publish",
+            [
+                {
+                    name: "Composition scheme",
+                    slug: "composition-scheme",
+                    family: "",
+                    state: "draft",
+                    kind: "gst",
+                },
+            ],
+            "saroh.in",
+            "saroh.io",
+        );
+        expect(on.points.join(" ")).toContain("the /gst list");
     });
 
     it("says a tool taken off goes to /tools, and where a live one shows", () => {
@@ -359,8 +544,45 @@ describe("free tools (#1253)", () => {
         );
         expect(on.points.join(" ")).toContain("the /tools list");
         expect(
-            whereItShows("live", "saroh.in", "tools").map((w) => w.label),
+            whereItShows(
+                { onSite: true, pending: null },
+                "saroh.in",
+                "tools",
+            ).map((w) => w.label),
         ).toContain("The /tools list, the menu and the footer");
+    });
+
+    it("names every kind's list for a mixed set, never one kind's (F4)", () => {
+        expect(listWordsFor([{ kind: "tools" }])).toBe(
+            "the /tools list, the Tools menu and the footer",
+        );
+        expect(
+            listWordsFor([
+                { kind: "guides" },
+                { kind: "tools" },
+                { kind: "tools" },
+            ]),
+        ).toBe("the /guides and /tools lists, the menu and the footer");
+    });
+
+    it("words Unpublish truthfully for a page that never went live, and Cancel", () => {
+        const page = {
+            name: "Tattoo studios",
+            slug: "tattoo-studios",
+            family: "Beauty",
+            state: "live" as const,
+            onSite: false,
+            pending: "on" as const,
+        };
+        const off = dialogWords("unpublish", [page], "saroh.in", "saroh.io");
+        expect(off.points[0]).toBe(
+            "It isn't on saroh.in yet, so nothing changes there.",
+        );
+        expect(off.points.join(" ")).not.toContain("Google");
+        const cancel = dialogWords("cancel", [page], "saroh.in", "saroh.io");
+        expect(cancel.title).toBe("Cancel the change to Tattoo studios?");
+        expect(cancel.confirm).toBe("Cancel the change");
+        expect(cancel.points[0]).toContain("doesn't go live");
     });
 
     it("words the seeded record of the app's two tools", () => {
@@ -376,5 +598,341 @@ describe("free tools (#1253)", () => {
                 "saroh.in",
             ).what,
         ).toBe("Live before publish control");
+    });
+});
+
+describe("links (U12)", () => {
+    const doc = (
+        slug: string,
+        required: string[],
+        optional: string[] = [],
+    ): DocEntry => ({
+        kind: "downloads",
+        path: `/downloads/${slug}`,
+        slug,
+        name: slug,
+        search: `${slug} search`,
+        updated: "2026-10-26",
+        group: "Bills",
+        blocked: [],
+        why: [],
+        links: { required, optional },
+    });
+    const rows = mergePages(
+        [
+            doc("receipt", ["/downloads/invoice"]),
+            doc(
+                "invoice",
+                ["/for/salons", "/for/typo"],
+                ["/for/not-written-yet"],
+            ),
+            entry("salons"),
+            entry("spas"),
+        ],
+        { pages: [], rebuild: idle },
+    );
+    const at = (path: string): PageRow => {
+        const r = rows.find((x) => x.path === path);
+        if (!r) throw new Error(`no ${path}`);
+        return r;
+    };
+
+    it("keeps a page's required links, and names a required link to no page in the code as dead", () => {
+        expect(at("/downloads/receipt").links).toEqual(["/downloads/invoice"]);
+        expect(at("/downloads/invoice").deadLinks).toEqual(["/for/typo"]);
+        expect(at("/for/spas").links).toEqual([]);
+    });
+
+    it("adds what the added pages link to, as well", () => {
+        const { add, blocking } = publishLinks(
+            [at("/downloads/receipt")],
+            rows,
+        );
+        expect(add.map((r) => r.path)).toEqual([
+            "/downloads/invoice",
+            "/for/salons",
+        ]);
+        expect(blocking).toEqual([
+            { path: "/for/typo", row: null, from: ["invoice"] },
+        ]);
+    });
+
+    it("a page published with what it links to needs nothing more", () => {
+        const ok = mergePages(
+            [doc("receipt", ["/downloads/invoice"]), doc("invoice", [])],
+            { pages: [], rebuild: idle },
+        );
+        expect(publishLinks(ok, ok)).toEqual({ add: [], blocking: [] });
+    });
+
+    it("unpublishing a GST page names the live pages that link to it, and where their links go", () => {
+        const live = mergePages(
+            [
+                {
+                    ...doc("guide-a", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/a",
+                },
+                {
+                    ...doc("guide-b", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/b",
+                },
+                {
+                    ...doc("guide-c", ["/gst/x"]),
+                    kind: "guides",
+                    path: "/guides/c",
+                },
+                { ...doc("x", []), kind: "gst", path: "/gst/x" },
+            ],
+            {
+                pages: ["/guides/a", "/guides/b", "/guides/c", "/gst/x"].map(
+                    (path) => ({ ...record("x", "LIVE"), path }),
+                ),
+                rebuild: idle,
+            },
+        );
+        expect(
+            linkedFromWords(
+                live.filter((r) => r.kind === "gst"),
+                live,
+            ),
+        ).toBe(
+            "3 live pages link here (guide-a, guide-b, guide-c); their links will go to the GST guides list until you publish it again.",
+        );
+    });
+});
+
+describe("why a page can't be published (U14)", () => {
+    const check = (id: string, count: number) =>
+        checkWhy({ id, title: "Some check", count });
+
+    it("names each failing check in a few words, with its count", () => {
+        expect(check("to-confirm", 2)).toBe("2 facts to confirm");
+        expect(check("to-confirm", 1)).toBe("1 fact to confirm");
+        expect(check("checked-on", 1)).toBe("the GST check date is too old");
+        expect(check("placeholders", 3)).toBe("3 placeholders left");
+        expect(check("files", 1)).toBe("1 problem with its files");
+        expect(check("something-new", 1)).toBe('"Some check" fails');
+    });
+
+    const held = {
+        name: "Salon",
+        state: "draft" as const,
+        blocked: ["Every fact is confirmed", "No placeholders left"],
+        why: ["2 facts to confirm", "1 placeholder left"],
+    };
+
+    it("says the first reason and how many more, on one line", () => {
+        expect(cantPublishWords(held)).toBe(
+            "Can't publish yet: 2 facts to confirm, and 1 more check",
+        );
+        expect(
+            cantPublishWords({
+                blocked: ["A"],
+                why: ["the GST check date is too old"],
+            }),
+        ).toBe("Can't publish yet: the GST check date is too old");
+        expect(cantPublishWords({ blocked: ["A", "B"] })).toBe(
+            "Can't publish yet: 2 checks fail",
+        );
+        expect(cantPublishWords({ blocked: [], why: [] })).toBeNull();
+    });
+
+    it("the bulk bar counts the held pages and offers the rest", () => {
+        const ok = { name: "Spa", state: "draft" as const, blocked: [] };
+        expect(heldWords([held, ok])).toBe(
+            "1 page can't be published yet: Salon (2 facts to confirm, 1 placeholder left). Publish 1 publishes the rest.",
+        );
+        expect(heldWords([held, { ...held, name: "Gym" }])).toBe(
+            "2 pages can't be published yet: Salon (2 facts to confirm, 1 placeholder left); Gym (2 facts to confirm, 1 placeholder left).",
+        );
+        expect(heldWords([ok])).toBeNull();
+    });
+
+    it("shows Can't publish yet as a draft's second line; a /for/ draft is unchanged", () => {
+        const [doc, forPage] = mergePages(
+            [
+                {
+                    kind: "gst",
+                    path: "/gst/salon",
+                    slug: "salon",
+                    name: "Salon",
+                    search: "salon gst",
+                    updated: "2026-10-26",
+                    group: "By trade",
+                    blocked: held.blocked,
+                    why: held.why,
+                    links: { required: [], optional: [] },
+                },
+                entry("spas"),
+            ],
+            { pages: [], rebuild: { running: false } },
+        );
+        expect(stateNote(doc)).toBe("Can't publish yet");
+        expect(doc.why).toEqual(held.why);
+        expect(stateNote(forPage)).toBe("Never published");
+        expect(forPage.why).toEqual([]);
+    });
+});
+
+describe("the list's address, order and groups (Search pages list, 1 Nov)", () => {
+    const at = (
+        name: string,
+        family: string,
+        extra: Partial<PageRow> = {},
+    ): PageRow => ({
+        path: `/tools/${name}`,
+        slug: name,
+        kind: "tools",
+        name,
+        family,
+        inApp: false,
+        search: name,
+        updated: "2026-10-26",
+        state: "draft",
+        onSite: false,
+        pending: null,
+        record: null,
+        blocked: [],
+        links: [],
+        deadLinks: [],
+        ...extra,
+    });
+
+    it("reads the filters from the address and writes back only what isn't the default", () => {
+        const q = readListQuery((k) =>
+            new URLSearchParams(
+                "status=draft&q=qr&section=QR+codes&group=none&sort=bogus",
+            ).get(k),
+        );
+        expect(q).toEqual({
+            status: "draft",
+            q: "qr",
+            section: "QR codes",
+            group: "none",
+            sort: "name",
+        });
+        expect(listHref("tools", q)).toBe(
+            "/search-pages?kind=tools&status=draft&q=qr&section=QR+codes&group=none",
+        );
+        expect(
+            listHref(
+                "for",
+                readListQuery(() => null),
+            ),
+        ).toBe("/search-pages");
+    });
+
+    it("sorts by name, not by address, and newest change first on asking", () => {
+        const rows = [
+            at("Menu QR", "QR"),
+            at("Google review QR", "QR", { updated: "2026-10-30" }),
+        ];
+        expect(sortRows(rows, "name").map((r) => r.name)).toEqual([
+            "Google review QR",
+            "Menu QR",
+        ]);
+        expect(sortRows(rows, "changed")[0]?.name).toBe("Google review QR");
+    });
+
+    it("groups by section A to Z, or by status with waiting first", () => {
+        const rows = [
+            at("a", "QR codes", { state: "live", onSite: true }),
+            at("b", "Money", { pending: "on" }),
+            at("c", "QR codes"),
+        ];
+        expect(groupRows(rows, "section").map((g) => g.label)).toEqual([
+            "Money",
+            "QR codes",
+        ]);
+        expect(
+            groupRows(rows, "status").map((g) => [g.label, g.rows.length]),
+        ).toEqual([
+            ["Waiting to deploy", 1],
+            ["Live", 1],
+            ["Draft", 1],
+        ]);
+        expect(groupRows(rows, "none")).toHaveLength(1);
+    });
+
+    it("says only what's worth saying under a status, and offers one next step", () => {
+        expect(rowNote(at("a", "x"))).toBeNull();
+        const held = at("b", "x", {
+            blocked: ["Every fact is confirmed"],
+            why: ["6 facts to confirm"],
+        });
+        expect(rowNote(held)).toBe("Can't publish yet: 6 facts to confirm");
+        expect(nextAction(held)).toBeNull();
+        expect(nextAction(at("c", "x"))?.action).toBe("publish");
+        expect(nextAction(at("d", "x", { pending: "on" }))?.action).toBe(
+            "cancel",
+        );
+        expect(nextAction(at("e", "x", { state: "archived" }))?.action).toBe(
+            "restore",
+        );
+        expect(
+            nextAction(at("f", "x", { state: "live", onSite: true })),
+        ).toBeNull();
+    });
+
+    it("knows when the search phrase only repeats the name", () => {
+        expect(
+            searchRepeatsName({
+                name: "GST calculator",
+                search: "gst calculator",
+            }),
+        ).toBe(true);
+        expect(
+            searchRepeatsName({
+                name: "Gyms & studios",
+                search: "gym software",
+            }),
+        ).toBe(false);
+    });
+});
+
+describe("one page's facts (detail audit, 1 Nov)", () => {
+    const at = (
+        path: string,
+        kind: PageRow["kind"],
+        onSite: boolean,
+        family = "",
+    ) => ({ path, kind, onSite, family, slug: path.split("/").pop() ?? "" });
+
+    it("sends a taken-off page where the site's redirects do", () => {
+        const guide = at("/guides/cut-no-shows", "guides", false);
+        expect(takenOffGoesTo(guide, [guide])).toBe("Home");
+        expect(
+            takenOffGoesTo(guide, [guide, at("/guides/other", "guides", true)]),
+        ).toBe("/guides");
+        const tool = at("/tools/qr", "tools", true);
+        expect(takenOffGoesTo(tool, [tool])).toBe("Home");
+        expect(
+            takenOffGoesTo(tool, [tool, at("/tools/upi", "tools", true)]),
+        ).toBe("/tools");
+        const spa = at("/for/spas", "for", false, "Beauty");
+        expect(takenOffGoesTo(spa, [spa])).toBe("Home");
+        expect(
+            takenOffGoesTo(spa, [
+                spa,
+                at("/for/salons", "for", true, "Beauty"),
+            ]),
+        ).toBe("/for/salons");
+    });
+
+    it("says a draft is readable on a development site, and not on production", () => {
+        const draft = { onSite: false, pending: null };
+        expect(whereItShows(draft, "saroh.io", "guides", false)[0]?.value).toBe(
+            "Readable, marked Draft",
+        );
+        expect(whereItShows(draft, "saroh.in", "guides", true)[0]?.value).toBe(
+            "Not on saroh.in",
+        );
+    });
+
+    it("names each kind as one page, and never guesses who changed it", () => {
+        expect(KIND_NOUN.downloads).toBe("Free download");
+        expect(changedByWords(null)).toBe("not recorded");
     });
 });

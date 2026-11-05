@@ -1,15 +1,19 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
-    cardLines,
-    cellOf,
+    formatCount,
     formatInr,
     GST_PERCENT,
-    monthlyEquivalentPaise,
-    offeredPlans,
-    trialFirstPaise,
     withGstPaise,
-    yearlyPaise,
 } from "@saroh/pricing-catalog";
+
+import type {
+    PricingPageModel,
+    PricingSite,
+} from "@saroh/marketing/pricing-model";
+import {
+    pricingPageModel as pageModel,
+    placeholderPricingModel as placeholderModel,
+} from "@saroh/marketing/pricing-view";
 
 import { PLAN_TEASERS } from "@/content/home";
 import {
@@ -18,25 +22,7 @@ import {
     PRICE_PLACEHOLDER,
 } from "@/content/types";
 
-import type {
-    CompareRow,
-    PlanCardView,
-    PricingPageModel,
-    PricingView,
-    ViewKey,
-} from "./pricing-model";
-import { viewKey } from "./pricing-model";
-import { usageView } from "./pricing-usage";
-
-/**
- * The pricing page as words, worked out on the server from the catalogue
- * (plans catalogue U24, the Pricing design's `renderVals`). Every figure is
- * computed here with the catalogue package's paise helpers, for each of the
- * four ways a visitor can look (monthly or yearly, with or without GST), so
- * the page's client part only picks one and never carries the catalogue.
- */
-
-export { viewKey } from "./pricing-model";
+export { viewKey } from "@saroh/marketing/pricing-model";
 export type {
     CompareRow,
     Cycle,
@@ -44,163 +30,40 @@ export type {
     PricingPageModel,
     PricingView,
     ViewKey,
-} from "./pricing-model";
+} from "@saroh/marketing/pricing-model";
 
-function planViews(
-    catalog: Catalog,
-    yearly: boolean,
-    withGst: boolean,
-): PlanCardView[] {
-    const gst = (p: number) => (withGst ? withGstPaise(p) : p);
-    return offeredPlans(catalog).map((p) => {
-        const paid = p.pricePaise > 0;
-        const year = yearly && paid;
-        const charge = gst(
-            year
-                ? yearlyPaise(p.pricePaise, catalog.yearly.paid)
-                : p.pricePaise,
-        );
-        let sub: string;
-        if (!paid) sub = "Free for good";
-        else if (year) {
-            sub = `About ${formatInr(monthlyEquivalentPaise(charge))} a month${withGst ? " incl. GST" : " + GST"}`;
-        } else sub = withGst ? "Incl. GST" : "+ GST";
-        // DEC-093: the offer is monthly only (yearly is one payment), and
-        // a first month that costs something is said with its amount.
-        const trialOn = paid && !year && p.trial?.on === true;
-        const first = trialOn ? trialFirstPaise(p) : 0;
-        const cl = cardLines(catalog, p.id);
-        return {
-            id: p.id,
-            name: p.name,
-            tagline: p.tagline,
-            featured: p.featured,
-            price: formatInr(charge),
-            per: year ? "a year" : "a month",
-            sub,
-            cta: {
-                plan: p.id,
-                planName: p.name,
-                paid,
-                trialDays: trialOn && first === 0 ? p.trial?.days : undefined,
-                cycle: year ? "year" : "month",
-            },
-            lead: cl.lead,
-            trial: !trialOn
-                ? ""
-                : first > 0
-                  ? `First month ${formatInr(gst(first))}${withGst ? " incl. GST" : " + GST"}`
-                  : `Try it free for ${p.trial?.days} days`,
-            lines: cl.lines,
-        };
-    });
-}
+/** This site's money and tax: rupees, and GST said in every place it shows. */
+export const PRICING_SITE: PricingSite = {
+    money: formatInr,
+    count: formatCount,
+    tax: {
+        add: withGstPaise,
+        subExcl: "+ GST",
+        subIncl: "Incl. GST",
+        afterExcl: " + GST",
+        afterIncl: " incl. GST",
+        footnoteExcl: `Prices before GST (${GST_PERCENT}%).`,
+        footnoteIncl: `Prices include ${GST_PERCENT}% GST.`,
+        noteExcl: `Prices are before GST. ${GST_PERCENT}% GST is added to your bill.`,
+        noteIncl: `Prices include ${GST_PERCENT}% GST.`,
+    },
+};
 
-function compareRows(catalog: Catalog): CompareRow[] {
-    const plans = offeredPlans(catalog);
-    const rows: CompareRow[] = [];
-    for (const g of catalog.groups) {
-        const mods = catalog.modules.filter(
-            (m) => m.group === g.id && m.pricing !== "hidden",
-        );
-        if (!mods.length) continue;
-        rows.push({ kind: "group", label: g.name });
-        for (const m of mods) {
-            rows.push({
-                kind: "line",
-                label: m.name,
-                soon: m.pricing === "soon",
-                cells: plans.map((p) => {
-                    const c = cellOf(m, p.id);
-                    return c.inc
-                        ? { yes: true, t: c.text || "Included" }
-                        : { yes: false };
-                }),
-            });
-        }
-    }
-    return rows;
-}
-
-function footnote(catalog: Catalog, yearly: boolean, withGst: boolean) {
-    const billed = yearly
-        ? `Billed yearly, pay for ${catalog.yearly.paid} months and get 12.`
-        : "Billed monthly.";
-    const gst = withGst
-        ? ` Prices include ${GST_PERCENT}% GST.`
-        : ` Prices before GST (${GST_PERCENT}%).`;
-    return billed + gst;
-}
-
-/** The pricing page for a catalogue: the design's every state, worked out. */
+/** The pricing page for a catalogue, in this site's money and words. */
 export function pricingPageModel(catalog: Catalog): PricingPageModel {
-    const yearlyOn = catalog.yearly.on;
-    const views = {} as Record<ViewKey, PricingView>;
-    for (const yearly of [false, true]) {
-        for (const withGst of [false, true]) {
-            const y = yearly && yearlyOn;
-            views[viewKey(yearly, withGst)] = {
-                plans: planViews(catalog, y, withGst),
-                usage: usageView(catalog, withGst),
-                footnote: footnote(catalog, y, withGst),
-            };
-        }
-    }
-    return {
-        placeholder: false,
-        yearly: yearlyOn ? { freeMonths: 12 - catalog.yearly.paid } : null,
-        gst: { toggle: true, initial: catalog.gst.show === "incl" },
-        views,
-        rows: compareRows(catalog),
-    };
+    return pageModel(catalog, PRICING_SITE);
 }
 
 /**
  * The page with no catalogue to show (the API unreachable on a first build,
  * or no version published yet): the plan names, every price the
- * placeholder, every detail `PLAN_DETAILS_PLACEHOLDER`. No toggles:
- * there is nothing for them to change.
+ * placeholder, every detail `PLAN_DETAILS_PLACEHOLDER`.
  */
 export function placeholderPricingModel(): PricingPageModel {
-    const view: PricingView = {
-        plans: PLAN_TEASERS.map((t) => ({
-            id: t.plan,
-            name: t.name,
-            tagline: "",
-            featured: t.featured,
-            price: PRICE_PLACEHOLDER,
-            per: "",
-            sub: PRICE_NOTE,
-            cta: {
-                plan: t.plan,
-                planName: t.name,
-                paid: t.plan !== "free",
-                cycle: "month",
-            },
-            lead: "",
-            trial: "",
-            lines: [{ t: PLAN_DETAILS_PLACEHOLDER, soon: false }],
-        })),
-        usage: null,
-        footnote: "",
-    };
-    return {
-        placeholder: true,
-        yearly: null,
-        gst: { toggle: false, initial: false },
-        views: {
-            "month-excl": view,
-            "month-incl": view,
-            "year-excl": view,
-            "year-incl": view,
-        },
-        rows: [
-            {
-                kind: "line",
-                label: PLAN_DETAILS_PLACEHOLDER,
-                soon: false,
-                cells: PLAN_TEASERS.map(() => ({ yes: false })),
-            },
-        ],
-    };
+    return placeholderModel({
+        plans: PLAN_TEASERS,
+        price: PRICE_PLACEHOLDER,
+        note: PRICE_NOTE,
+        details: PLAN_DETAILS_PLACEHOLDER,
+    });
 }

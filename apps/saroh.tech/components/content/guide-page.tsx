@@ -1,0 +1,327 @@
+import { PageTitle } from "@saroh/marketing/page-title";
+import Link from "next/link";
+
+import { Breadcrumb } from "@/components/shared/breadcrumb";
+import { ButtonLink } from "@/components/shared/button";
+import { CtaBand } from "@/components/shared/cta-band";
+import { FaqList } from "@/components/shared/faq-list";
+import { JsonLd } from "@/components/shared/json-ld";
+import type { Guide, GuideBlock } from "@/content/guides";
+import {
+    GUIDE_AUTHOR,
+    guideOf,
+    guideSteps,
+    readMinutes,
+} from "@/content/guides";
+import {
+    articleSchema,
+    faqSchema,
+    howToSchema,
+    pageSchema,
+} from "@/lib/schema";
+import type { SitePage } from "@/lib/site-map";
+import { formatDate } from "@/lib/tools/dates";
+
+const LABEL =
+    "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const COPY = "m-0 text-[17px] leading-[1.7] text-mk-prose md:text-lg";
+const H2 =
+    "m-0 mb-3 mt-9 scroll-mt-[calc(var(--mk-nav-h)+16px)] font-display text-mk-h2-article font-bold md:mt-11 [text-wrap:balance]";
+
+function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
+    switch (block.kind) {
+        case "text":
+            return <p className={`${COPY} mb-4`}>{block.text}</p>;
+        case "list":
+            return (
+                <ul className={`${COPY} mb-4 list-disc pl-[22px]`}>
+                    {block.items.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
+                </ul>
+            );
+        case "checklist":
+            return (
+                <ul className={`${COPY} mb-4 list-none p-0`}>
+                    {block.items.map((item) => (
+                        <li key={item} className="flex gap-3">
+                            <span aria-hidden="true">✓</span>
+                            <span>{item}</span>
+                        </li>
+                    ))}
+                </ul>
+            );
+        case "steps":
+            return (
+                <ol className="m-0 list-none border-b border-border p-0">
+                    {block.items.map((step, i) => (
+                        <li
+                            key={step.title}
+                            className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 border-t border-border py-[18px]"
+                        >
+                            <span
+                                aria-hidden="true"
+                                className="flex size-9 items-center justify-center rounded-full border-[1.9px] border-foreground font-mono text-sm"
+                            >
+                                {i + 1}
+                            </span>
+                            <div>
+                                <b className="text-lg">{step.title}</b>
+                                <p className={`${COPY} mt-1.5`}>{step.text}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ol>
+            );
+        case "lines":
+            return (
+                <div
+                    role="img"
+                    aria-label={block.label}
+                    className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5 rounded-mk-card border border-border bg-card px-[22px] py-5 text-[15.5px] leading-normal"
+                >
+                    {block.rows.map(([name, amount]) => (
+                        <div key={name} className="contents">
+                            <span>{name}</span>
+                            <span className="pl-6 text-right font-mono">
+                                {amount}
+                            </span>
+                        </div>
+                    ))}
+                    <b className="border-t border-foreground pt-1.5">
+                        {block.total[0]}
+                    </b>
+                    <b className="border-t border-foreground pl-6 pt-1.5 text-right font-mono">
+                        {block.total[1]}
+                    </b>
+                </div>
+            );
+        case "message":
+            return (
+                <figure className="m-0 mb-3 rounded-mk-card border border-border bg-card px-[22px] py-5">
+                    <figcaption className={`${LABEL} mb-2`}>
+                        {block.title}
+                    </figcaption>
+                    <p className="m-0 text-base leading-relaxed">
+                        {block.text}
+                    </p>
+                </figure>
+            );
+        case "table":
+            return (
+                <div className="mb-4 overflow-hidden rounded-mk-card border border-border bg-card">
+                    <table className="w-full border-collapse text-[14.5px] leading-[1.45] md:text-base">
+                        <thead>
+                            <tr>
+                                {block.head.map((h) => (
+                                    <th
+                                        key={h}
+                                        scope="col"
+                                        className="border-b border-border-strong p-3 text-left text-[13px] font-semibold text-muted-foreground md:px-5 md:py-4"
+                                    >
+                                        {h || (
+                                            <span className="sr-only">
+                                                Compare
+                                            </span>
+                                        )}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {block.rows.map(([first, ...rest]) => (
+                                <tr
+                                    key={first}
+                                    className="border-b border-border last:border-b-0"
+                                >
+                                    <th
+                                        scope="row"
+                                        className="p-3 text-left align-top font-semibold md:px-5 md:py-4"
+                                    >
+                                        {first}
+                                    </th>
+                                    {rest.map((cell) => (
+                                        <td
+                                            key={cell}
+                                            className="p-3 align-top md:px-5 md:py-4"
+                                        >
+                                            {cell}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        case "sources":
+            return (
+                <ul className="mb-4 flex list-none flex-col p-0 text-base">
+                    {block.items.map((s) => (
+                        <li key={s.href}>
+                            <a
+                                href={s.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex min-h-11 items-center md:min-h-8"
+                            >
+                                {s.name}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            );
+        case "tool":
+            return (
+                <div className="my-8 flex flex-col gap-5 rounded-[18px] bg-foreground px-7 py-[26px] text-background md:flex-row md:items-center md:justify-between md:gap-6">
+                    <div>
+                        <b className="font-display text-xl tracking-[-0.02em]">
+                            {block.title}
+                        </b>
+                        <p className="m-0 mt-1.5 text-base text-mk-on-ink">
+                            {block.line}
+                        </p>
+                    </div>
+                    <ButtonLink
+                        href={guide.tool.href}
+                        data-cta="guide-tool"
+                        className="shrink-0 whitespace-normal !bg-background text-center !text-foreground hover:!bg-white md:whitespace-nowrap"
+                    >
+                        Try the {guide.tool.name}
+                    </ButtonLink>
+                </div>
+            );
+    }
+}
+
+/** Every guide, in the spec's order: the answer first, then the tool. */
+export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
+    const steps = guideSteps(guide);
+    const toc = [
+        { id: "short-answer", title: "The short answer" },
+        ...guide.sections,
+        { id: "questions", title: "Questions" },
+    ];
+    return (
+        <div
+            data-page-type={page.type}
+            className="mx-auto max-w-mk-page px-mk-gutter pt-4 md:pt-10"
+        >
+            <JsonLd
+                data={[
+                    ...(steps.length
+                        ? [howToSchema(page.h1, steps)]
+                        : [articleSchema(page, GUIDE_AUTHOR)]),
+                    faqSchema(guide.faqs),
+                    ...pageSchema(page),
+                ]}
+            />
+            <div className="grid gap-10 xl:grid-cols-[200px_minmax(0,1fr)_200px] xl:gap-10">
+                <div className="hidden pt-[210px] xl:block">
+                    <nav
+                        aria-label="On this page"
+                        className="sticky top-[calc(var(--mk-nav-h)+16px)]"
+                    >
+                        <span className={LABEL}>On this page</span>
+                        <ul className="m-0 mt-2 list-none p-0">
+                            {toc.map((t) => (
+                                <li key={t.id}>
+                                    <a
+                                        href={`#${t.id}`}
+                                        className="block py-[7px] text-[15px] text-mk-copy no-underline hover:underline"
+                                    >
+                                        {t.title}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                </div>
+
+                <article className="min-w-0">
+                    {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
+                    <PageTitle size="article" className="mb-4 mt-3.5">
+                        {page.h1}
+                    </PageTitle>
+                    <div className="mb-7 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <span
+                            aria-hidden="true"
+                            className="inline-grid size-8 place-items-center rounded-full bg-mk-hover font-semibold text-foreground"
+                        >
+                            {GUIDE_AUTHOR.name.charAt(0)}
+                        </span>
+                        <span>
+                            Written by {GUIDE_AUTHOR.name}, {GUIDE_AUTHOR.role}
+                        </span>
+                        {page.updated ? (
+                            <span>Last updated {formatDate(page.updated)}</span>
+                        ) : null}
+                        <span>{readMinutes(guide)} min read</span>
+                    </div>
+
+                    <div
+                        id="short-answer"
+                        className="mb-2 scroll-mt-[calc(var(--mk-nav-h)+16px)] rounded-mk-card border border-foreground bg-card px-6 py-[22px]"
+                    >
+                        <span className={LABEL}>The short answer</span>
+                        <p className="m-0 mt-2 text-lg leading-relaxed">
+                            {guide.short}
+                        </p>
+                    </div>
+
+                    {guide.sections.map((section) => (
+                        <section key={section.id}>
+                            <h2 id={section.id} className={H2}>
+                                {section.title}
+                            </h2>
+                            {section.blocks.map((block, i) => (
+                                <Block key={i} block={block} guide={guide} />
+                            ))}
+                        </section>
+                    ))}
+
+                    <section>
+                        <h2 id="questions" className={H2}>
+                            Questions
+                        </h2>
+                        <FaqList items={guide.faqs} />
+                    </section>
+                    <p className="m-0 mt-6 text-sm text-muted-foreground">
+                        This guide is general information, not tax or legal
+                        advice.
+                    </p>
+                </article>
+
+                <aside className="flex flex-col gap-3.5 xl:pt-[210px]">
+                    <span className={LABEL}>Read next</span>
+                    {guide.next.map((slug) => {
+                        const { title, line } = guideOf(slug).card;
+                        return (
+                            <Link
+                                key={slug}
+                                prefetch={false}
+                                href={`/guides/${slug}`}
+                                className="flex flex-col rounded-mk-card border border-border bg-card p-4 no-underline transition-colors duration-150 hover:border-border-strong"
+                            >
+                                <b>{title}</b>
+                                <span className="text-sm text-muted-foreground">
+                                    {line}
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </aside>
+            </div>
+
+            <div className="pt-10 md:pt-[72px]">
+                <CtaBand
+                    title={guide.band.title}
+                    line={guide.band.line}
+                    action={`Try the ${guide.tool.name}`}
+                    href={guide.tool.href}
+                    from="guide-tool-band"
+                />
+            </div>
+        </div>
+    );
+}

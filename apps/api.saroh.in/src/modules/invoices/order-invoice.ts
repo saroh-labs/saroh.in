@@ -31,6 +31,13 @@ export interface TaxProfile {
     state: string | null;
     prefix: string | null;
     timezone: string | null;
+    /** The month its numbering year starts; null, April. */
+    yearStartMonth?: number | null;
+    /**
+     * A Global business's tax on a manual invoice, added to its lines
+     * (DEC-204). Null where none is set, and always on a GST business.
+     */
+    taxLine?: { label: string; rateBps: number } | null;
     /**
      * How its numbers are built, as stored (`numbering.ts`, NumberFormat);
      * absent or null, the default for its GST standing.
@@ -125,6 +132,10 @@ export interface BuiltDocument {
     cgstCents: number;
     sgstCents: number;
     igstCents: number;
+    /** What the tax line prints as; absent, "Tax". */
+    taxLabel?: string | null;
+    /** Printed beside it, when there's a named tax. */
+    sellerTaxId?: string | null;
     /** Null on a receipt. */
     placeOfSupply: string | null;
     taxType: TaxType | null;
@@ -311,7 +322,8 @@ export function finish(
         | "sellerState"
         | "sellerAddress"
         | keyof SellerParticulars
-    >,
+    > &
+        Pick<Partial<BuiltDocument>, "taxLabel" | "sellerTaxId">,
 ): BuiltDocument {
     const sum = (pick: (l: GstLine) => number) =>
         lines.reduce((s, l) => s + pick(l), 0);
@@ -344,6 +356,8 @@ export interface IssuedLine {
 
 /** What a correction is against: the original's GST standing and lines. */
 export interface Original extends SellerParticulars {
+    taxLabel?: string | null;
+    sellerTaxId?: string | null;
     sellerGstin: string | null;
     sellerState: string | null;
     sellerAddress: string | null;
@@ -360,6 +374,8 @@ export interface Original extends SellerParticulars {
 
 function gstOf(original: Original) {
     return {
+        taxLabel: original.taxLabel ?? null,
+        sellerTaxId: original.sellerTaxId ?? null,
         placeOfSupply: original.placeOfSupply,
         taxType: (original.taxType as TaxType | null) ?? null,
         sellerGstin: original.sellerGstin,
@@ -601,10 +617,26 @@ export function buildManualInvoice(
     >,
     billToState: string | null,
     typedTaxCents: number,
+    /**
+     * A Global business's named tax (DEC-204). Only a manual invoice passes it:
+     * every other caller records money already agreed or paid, and adding to
+     * it would leave the paper disagreeing with what was charged.
+     */
+    taxLine: TaxProfile["taxLine"] = null,
 ): BuiltDocument {
     if (!profile.registered) {
         const taxed = taxLines(lines, { registered: false, taxType: "INTRA" });
-        return finish(taxed.lines, typedTaxCents, {
+        // A named rate decides the tax; a typed one stands only without it.
+        const taxCents = taxLine
+            ? Math.round(
+                  (taxed.lines.reduce((n, l) => n + l.amountCents, 0) *
+                      taxLine.rateBps) /
+                      10_000,
+              )
+            : typedTaxCents;
+        return finish(taxed.lines, taxCents, {
+            taxLabel: taxLine?.label ?? null,
+            sellerTaxId: taxLine ? profile.gstin : null,
             placeOfSupply: null,
             taxType: null,
             sellerGstin: null,

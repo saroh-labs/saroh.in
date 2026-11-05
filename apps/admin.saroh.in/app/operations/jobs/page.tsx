@@ -46,7 +46,7 @@ export default async function JobsPage({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Jobs"]}
                     title="Jobs"

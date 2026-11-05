@@ -8,15 +8,15 @@ import { drawnIn } from "@/content/launch-words";
 import type { PublishContext } from "@/content/resources";
 import { linkShown } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
-import { cn } from "@/lib/cn";
 import type { LaunchMode } from "@/lib/links";
+import { cn } from "@saroh/marketing/cn";
 
-import { Container } from "../shared/layout/container";
-import { Arrow } from "../shared/links/arrow";
-import { cardLinkClasses } from "../shared/links/card-link";
-import { textLinkClasses } from "../shared/links/text-link";
-import { Eyebrow } from "../shared/sections/eyebrow";
-import { Section } from "../shared/sections/section";
+import { Arrow } from "@saroh/marketing/arrow";
+import { cardLinkClasses } from "@saroh/marketing/card-link";
+import { Container } from "@saroh/marketing/container";
+import { Eyebrow } from "@saroh/marketing/eyebrow";
+import { Section } from "@saroh/marketing/section";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import { ContactForm } from "./contact-form";
 
 /** The side column's white card. */

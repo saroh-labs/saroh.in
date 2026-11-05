@@ -6,6 +6,9 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(async () => null),
         },
         organizationInvitation: { findFirst: jest.fn() },
+        membership: { count: jest.fn() },
+        signInEmailChange: { findFirst: jest.fn(async () => null) },
+        adminAuditEvent: { findMany: jest.fn(async () => []) },
         $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
             callback(prisma),
         ),
@@ -27,6 +30,7 @@ const staff: PlatformAdminInfo = {
     roles: ["SUPPORT"],
     permissions: [],
     viaBootstrap: false,
+    edition: null,
 };
 
 function build() {
@@ -145,6 +149,54 @@ describe("AdminPeopleService", () => {
             expect.objectContaining({ userId: "staff_1" }),
             { email: "new@example.test", role: "MEMBER", siteIds: [] },
         );
+    });
+
+    describe("a person's other edition", () => {
+        const person = {
+            id: "u1",
+            name: "Asha",
+            email: "asha@example.test",
+            emailVerified: true,
+            emailVerifiedByStaffAt: null,
+            createdAt: new Date("2026-10-01T00:00:00Z"),
+            _count: { memberships: 1 },
+            memberships: [],
+            sessions: [],
+            platformAdmin: null,
+        };
+
+        it("counts their businesses elsewhere, and lists only this edition's", async () => {
+            (prisma.user.findUnique as jest.Mock).mockResolvedValue(person);
+            (prisma.membership.count as jest.Mock).mockResolvedValue(2);
+            const { service } = build();
+
+            const detail = await service.detail("u1", "GLOBAL");
+
+            expect(detail.otherEditionBusinesses).toBe(2);
+            expect(prisma.membership.count).toHaveBeenCalledWith({
+                where: {
+                    userId: "u1",
+                    organization: { edition: { not: "GLOBAL" } },
+                },
+            });
+            const read = (prisma.user.findUnique as jest.Mock).mock
+                .calls[0][0] as {
+                select: { memberships: { where: unknown } };
+            };
+            expect(read.select.memberships.where).toEqual({
+                organization: { edition: "GLOBAL" },
+            });
+        });
+
+        it("is 0, with nothing read, on an address of no edition", async () => {
+            (prisma.user.findUnique as jest.Mock).mockResolvedValue(person);
+            const { service } = build();
+
+            const detail = await service.detail("u1", null);
+
+            expect(detail.otherEditionBusinesses).toBe(0);
+            expect(prisma.membership.count).not.toHaveBeenCalled();
+        });
     });
 
     it("needs two characters to search", async () => {

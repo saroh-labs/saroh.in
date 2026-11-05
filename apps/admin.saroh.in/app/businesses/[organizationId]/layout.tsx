@@ -50,7 +50,7 @@ export default async function BusinessLayout({
 
     return (
         <AdminShell staff={staff}>
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <BusinessHeader
                     summary={summary}
                     hold={open ? (view.view.facts.legalHold ?? null) : null}

@@ -347,6 +347,9 @@ const NEVER: Record<string, string> = {
     // QR codes plan U9: the free QR code maker's email gate, the same way.
     "tools/qr-maker.controller.ts":
         "saroh.in's public QR code maker's email gate, not a tenant surface",
+    // Plan 2026-10-31-002 U9: the free downloads' email-or-WhatsApp gate.
+    "tools/download-gate.controller.ts":
+        "saroh.in's public free downloads' gate, not a tenant surface",
     // Terms rev 46 (9 Oct): a customer reports a business at
     // saroh.in/customers, with no account and whatever it has switched on.
     "business-reports/public-business-reports.controller.ts":

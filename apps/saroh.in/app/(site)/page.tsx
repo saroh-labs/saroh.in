@@ -3,15 +3,8 @@ import type { Metadata } from "next";
 import { HomeHero } from "@/components/home/home-hero";
 import { TourVideo } from "@/components/home/tour-video";
 import { PricingSection } from "@/components/pricing/pricing-section";
-import { Container } from "@/components/shared/layout/container";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { CardLink } from "@/components/shared/links/card-link";
-import { PillLink } from "@/components/shared/links/pill";
 import { CtaBand } from "@/components/shared/sections/cta-band";
-import { Eyebrow } from "@/components/shared/sections/eyebrow";
-import { Faq } from "@/components/shared/sections/faq";
-import { Section } from "@/components/shared/sections/section";
-import { SectionHeading } from "@/components/shared/sections/section-heading";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
@@ -29,6 +22,10 @@ import {
     softwareApplicationLd,
     webSiteLd,
 } from "@/lib/structured-data";
+import { Faq } from "@saroh/marketing/faq";
+import { FeatureCards } from "@saroh/marketing/feature-cards";
+import { SolutionCards } from "@saroh/marketing/solution-cards";
+import { WorksFor } from "@saroh/marketing/works-for";
 
 /**
  * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,
@@ -70,64 +67,36 @@ export default async function HomePage() {
             />
             <HomeHero freeLine={freePlanLine(catalog)} />
 
-            <Container
-                as="nav"
-                aria-label={home.worksFor}
-                className="flex flex-wrap items-center gap-3.5 pt-24"
-            >
-                <Eyebrow>{home.worksFor}</Eyebrow>
-                {solutionList.map((s) => (
-                    <PillLink key={s.slug} href={solutionLink(s.slug)}>
-                        {s.card.name}
-                    </PillLink>
-                ))}
-            </Container>
+            <WorksFor
+                label={home.worksFor}
+                items={solutionList.map((s) => ({
+                    href: solutionLink(s.slug),
+                    name: s.card.name,
+                }))}
+            />
 
-            <Container
-                as="section"
-                id="features"
-                aria-labelledby="features-title"
-                className="scroll-mt-6 pt-24"
-            >
-                <SectionHeading
-                    id="features-title"
-                    eyebrow={home.featuresEyebrow}
-                    title={home.featuresTitle}
-                />
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,max(200px,calc((100%-48px)/4))),1fr))] gap-4 pb-14 pt-10">
-                    {featureList.map((f) => (
-                        <CardLink
-                            key={f.slug}
-                            href={featureHref(f.slug)}
-                            title={f.name}
-                            body={f.homeBody}
-                        />
-                    ))}
-                </div>
-            </Container>
+            <FeatureCards
+                eyebrow={home.featuresEyebrow}
+                title={home.featuresTitle}
+                items={featureList.map((f) => ({
+                    href: featureHref(f.slug),
+                    title: f.name,
+                    body: f.homeBody,
+                }))}
+            />
 
             <TourVideo />
 
-            <Section
-                id="solutions"
-                titleId="solutions-title"
+            <SolutionCards
                 title={home.solutionsTitle}
-                className="grid scroll-mt-6 gap-[18px] pt-[110px]"
-            >
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
-                    {solutionList.map((s) => (
-                        <CardLink
-                            key={s.slug}
-                            href={solutionLink(s.slug)}
-                            title={s.card.name}
-                            body={s.card.body}
-                            meta={s.card.uses}
-                            action={s.card.link}
-                            size="lg"
-                        />
-                    ))}
-                </div>
-            </Section>
+                items={solutionList.map((s) => ({
+                    href: solutionLink(s.slug),
+                    title: s.card.name,
+                    body: s.card.body,
+                    meta: s.card.uses,
+                    action: s.card.link,
+                }))}
+            />
 
             {/* Plans show once the site's launch switch opens: before
                 that Pricing waits at the waitlist (Gate W), so no page draws

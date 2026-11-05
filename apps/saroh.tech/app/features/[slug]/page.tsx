@@ -1,0 +1,160 @@
+import { ComingList } from "@saroh/marketing/coming-list";
+import type { FeatureSlug } from "@saroh/marketing/content-types";
+import { FEATURE_SLUGS } from "@saroh/marketing/content-types";
+import { CtaBand } from "@saroh/marketing/cta-band";
+import { FeaturePoints } from "@saroh/marketing/feature-points";
+import { FeatureSteps } from "@saroh/marketing/feature-steps";
+import { FeatureUsedBy } from "@saroh/marketing/feature-used-by";
+import { FeatureWorksWith } from "@saroh/marketing/feature-works-with";
+import { ProductHero } from "@saroh/marketing/product-hero";
+import { Section } from "@saroh/marketing/section";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { HeroActions } from "@/components/shared/hero-actions";
+import { JsonLd } from "@/components/shared/json-ld";
+import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
+import { CTA_BAND } from "@/content/home";
+import { shotView } from "@/content/shots";
+import { solutionHref, solutions } from "@/content/solutions";
+import { freePlanLine, readCatalog } from "@/lib/plans";
+import { pageSchema } from "@/lib/schema";
+import { pageMetadata } from "@/lib/seo";
+import { pageAt } from "@/lib/site-map";
+
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+    return FEATURE_SLUGS.map((slug) => ({ slug }));
+}
+
+interface Props {
+    params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { slug } = await params;
+    const page = pageAt(`/features/${slug}`);
+    return page ? pageMetadata(page) : {};
+}
+
+/** A part that can't be used yet: saroh.in's planned row, never a promise. */
+function NotYet({
+    idPrefix,
+    rows,
+}: {
+    idPrefix: string;
+    rows: readonly { name: string; line: string }[];
+}) {
+    return (
+        <ComingList
+            idPrefix={idPrefix}
+            mark={NOT_AVAILABLE_YET}
+            groups={[{ key: "later", label: "Later", rows }]}
+        />
+    );
+}
+
+/**
+ * saroh.in's feature template, section for section. A Limited page says what
+ * works today, in place of the free-plan line, so a page carries one message. A Coming soon page says it in its headline and sub, and
+ * its parts are planned rows, with no steps to follow.
+ */
+export default async function FeaturePage({ params }: Props) {
+    const { slug } = await params;
+    const page = pageAt(`/features/${slug}`);
+    if (!page) notFound();
+    const feature = features[slug as FeatureSlug];
+    const coming = feature.state === "coming-soon";
+    const limited = feature.state === "limited";
+    const catalog = limited ? null : await readCatalog();
+
+    return (
+        <div data-page-type={page.type}>
+            <JsonLd data={pageSchema(page)} />
+            <ProductHero
+                section={{ name: "Features", href: "/#features" }}
+                name={feature.name}
+                headline={feature.headline}
+                sub={feature.sub}
+                narrow
+                actions={<HeroActions src={`feature-${slug}`} />}
+                today={limited ? feature.worksToday : undefined}
+                freeLine={limited ? undefined : freePlanLine(catalog)}
+                shot={shotView(feature.hero.shot, feature.hero.alt)}
+            />
+            {coming ? (
+                <>
+                    <Section
+                        titleId="how-it-works"
+                        eyebrow="How it works"
+                        title={feature.howTitle}
+                        size="lg"
+                        className="grid gap-14 pt-[120px]"
+                    >
+                        <NotYet
+                            idPrefix="how"
+                            rows={feature.steps.map((s) => ({
+                                name: s.title,
+                                line: s.body,
+                            }))}
+                        />
+                    </Section>
+                    <Section
+                        titleId="what-it-does"
+                        title="What else it will do"
+                        className="grid gap-9 pt-[130px]"
+                    >
+                        <NotYet
+                            idPrefix="what"
+                            rows={feature.points.map((p) => ({
+                                name: p.title,
+                                line: p.body,
+                            }))}
+                        />
+                    </Section>
+                </>
+            ) : (
+                <>
+                    <FeatureSteps
+                        title={feature.howTitle}
+                        steps={feature.steps.map((step) => {
+                            const shot = shotView(step.shot, step.alt);
+                            // `who` names the demo business in the picture.
+                            return {
+                                title: step.title,
+                                body: step.body,
+                                who: shot ? step.who : undefined,
+                                shot,
+                            };
+                        })}
+                    />
+                    <FeaturePoints points={feature.points} />
+                </>
+            )}
+            <FeatureWorksWith
+                lead={feature.worksLead}
+                items={feature.worksWith.map((f) => ({
+                    href: featureHref(f),
+                    title: features[f].name,
+                    body: features[f].cardLine,
+                }))}
+            />
+            {feature.usedBy.length > 0 ? (
+                <FeatureUsedBy
+                    items={feature.usedBy.map((s) => ({
+                        href: solutionHref(s),
+                        name: solutions[s].longName,
+                    }))}
+                />
+            ) : null}
+            <CtaBand
+                title={feature.closer}
+                body={CTA_BAND.body}
+                note={CTA_BAND.note}
+                actions={<HeroActions src={`feature-${slug}-band`} onInk />}
+                className="pt-[120px]"
+            />
+        </div>
+    );
+}

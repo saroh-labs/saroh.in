@@ -1,3 +1,4 @@
+import { GLOBAL_CURRENCIES } from "@saroh/edition";
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
@@ -165,6 +166,13 @@ export class OnboardOrganizationDto {
     @ValidateNested()
     @Type(() => OnboardingProfileDto)
     profile?: OnboardingProfileDto;
+
+    /** A Global business's one currency (DEC-204). India's ignores it. */
+    @IsOptional()
+    @IsIn(GLOBAL_CURRENCIES, {
+        message: "Choose one of the currencies listed.",
+    })
+    currency?: string;
 
     /**
      * The business's address on Saroh — the `<address>.saroh.app` its website
@@ -345,6 +353,24 @@ export class TaxSettingsDto {
     @IsString()
     @MaxLength(10)
     invoicePrefix?: string;
+
+    /** What a Global business calls its tax, like VAT; "" clears it. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(30)
+    taxName?: string;
+
+    /** A Global business's tax rate in percent; "" clears it. */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(/^(\d{1,2}(\.\d{1,2})?)?$/, { message: "A rate like 20 or 7.5" })
+    taxRate?: string;
+
+    /** When a Global business's numbering year starts: January or April. */
+    @IsOptional()
+    @IsIn([1, 4], { message: "A year starts in January or April" })
+    yearStartMonth?: number;
 
     /** The GST rate on delivery, in percent. */
     @IsOptional()

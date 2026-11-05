@@ -20,7 +20,9 @@ export const browserEnv = {
         process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     NEXT_PUBLIC_POSTHOG_ANALYTICS: process.env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
-} as Pick<
+    /** `API_URL`, written in by next.config.js `env` (the header's session check). */
+    SAROH_API_URL: process.env.SAROH_API_URL,
+} as { SAROH_API_URL?: string } & Pick<
     typeof env,
     | "NEXT_PUBLIC_ACCOUNTS_URL"
     | "NEXT_PUBLIC_LAUNCH_MODE"

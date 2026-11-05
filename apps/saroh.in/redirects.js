@@ -35,6 +35,10 @@
  * (`docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`).
  */
 
+// `next.config.js` requires this file in Node, before any build.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { docKindOf, takenOffDestination } = require("@saroh/search-pages/kinds");
+
 /** @typedef {{ source: string; destination: string; statusCode: 301 | 302 }} Redirect */
 
 /** V1 job slug → its V2 page. */
@@ -142,6 +146,9 @@ const FAMILY_PAGE = {
  *   when that is live, else Home.
  * - A free tool taken off (#1253) → 302 to the /tools hub while any tool
  *   is live, else Home.
+ * - A page of a group on the shared kit taken off (GST, guides,
+ *   downloads: `@saroh/search-pages/kinds`) → 302 to its group's hub while
+ *   any page of the group is live, else Home.
  *
  * Taken-off rules are not made in a preview build, which still builds
  * those pages as drafts. Only pages in this commit's code count as live
@@ -152,9 +159,17 @@ const FAMILY_PAGE = {
  * @param {{ preview: boolean; live: string[]; takenOff: { path: string }[] } | null} list
  * @param {(slug: string) => string | null} familyOf
  * @param {(slug: string) => boolean} [toolExists]
+ * @param {(path: string) => boolean} [docExists] whether this build has
+ *   the page at a group's path (`search-pages.config.js`); without it every
+ *   taken-off page of theirs goes Home
  * @returns {Redirect[]}
  */
-const searchRedirects = (list, familyOf, toolExists = () => false) => {
+const searchRedirects = (
+    list,
+    familyOf,
+    toolExists = () => false,
+    docExists = () => false,
+) => {
     if (!list) return [];
     const FOR = "/for/";
     const TOOLS = "/tools/";
@@ -189,7 +204,20 @@ const searchRedirects = (list, familyOf, toolExists = () => false) => {
             destination: liveTools.length > 0 ? "/tools" : "/",
             statusCode: /** @type {const} */ (302),
         }));
-    return [...solutions, ...takenOff, ...toolsOff];
+    const liveDocs = list.live.filter((p) => docKindOf(p) && docExists(p));
+    const docsOff = list.takenOff.flatMap((t) => {
+        const kind = docKindOf(t.path);
+        return kind && !list.live.includes(t.path)
+            ? [
+                  {
+                      source: t.path,
+                      destination: takenOffDestination(kind, liveDocs),
+                      statusCode: /** @type {const} */ (302),
+                  },
+              ]
+            : [];
+    });
+    return [...solutions, ...takenOff, ...toolsOff, ...docsOff];
 };
 
 module.exports = {

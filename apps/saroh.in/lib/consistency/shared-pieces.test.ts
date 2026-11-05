@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 
 const APP = path.resolve(__dirname, "../..");
 const PKG = path.resolve(APP, "../../packages/search-pages");
+const MARKETING = path.resolve(APP, "../../packages/marketing");
 const SKIP = new Set(["node_modules", ".next", ".turbo", ".open-next"]);
 
 interface Source {
@@ -60,7 +61,15 @@ function load(root: string, dirs: string[]): Source[] {
         }));
 }
 
-const SITE = load(APP, ["app", "components", "lib", "content"]);
+/** Where the site's primitives live (`@saroh/marketing`), as `home` names it. */
+const MK = "packages/marketing/src";
+const SITE = [
+    ...load(APP, ["app", "components", "lib", "content"]),
+    ...load(MARKETING, ["src"]).map((f) => ({
+        ...f,
+        rel: `packages/marketing/${f.rel}`,
+    })),
+];
 const PACKAGE = load(PKG, ["src"]);
 
 interface Rule {
@@ -104,30 +113,30 @@ const both = (a: string, b: string) =>
 
 const RULES: Rule[] = [
     {
-        name: "the focus ring is ring() from lib/ring.ts (C1)",
+        name: "the focus ring is ring() from @saroh/marketing/ring (C1)",
         pattern: /focus-visible:\[outline-style:solid\]/,
-        home: ["lib/ring.ts"],
+        home: [`${MK}/ring.ts`],
         allow: {},
         files: SITE,
     },
     {
         name: "a question list is Faq (V3)",
         pattern: /<details\b/,
-        home: ["components/shared/sections/faq.tsx"],
+        home: [`${MK}/sections/faq.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a breadcrumb is Breadcrumbs (V2, A4)",
         pattern: /aria-label="Breadcrumbs?"/,
-        home: ["components/shared/nav/breadcrumbs.tsx"],
+        home: [`${MK}/nav/breadcrumbs.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "the Ink closing band is CtaBand (V4, A10)",
         pattern: both("\\brounded-mk-band\\b", "\\bbg-foreground\\b"),
-        home: ["components/shared/sections/cta-band.tsx"],
+        home: [`${MK}/sections/cta-band.tsx`],
         allow: {
             "components/about/about-page.tsx":
                 "step 6 (V4): About's closing band (its 56px title, no body) becomes CtaBand; its सह name band is its own Ink block and stays",
@@ -137,14 +146,14 @@ const RULES: Rule[] = [
     {
         name: "a section's H2 is SectionHeading / Section (A8)",
         pattern: /<h2\b[^>]*?font-display[^>]*?text-mk-h2/,
-        home: ["components/shared/sections/section-heading.tsx"],
+        home: [`${MK}/sections/section-heading.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a Saffron text link is TextLink (V1, A2)",
         pattern: both("\\btext-brand-700\\b", "\\bno-underline\\b"),
-        home: ["components/shared/links/text-link.tsx"],
+        home: [`${MK}/links/text-link.tsx`],
         allow: {},
         files: SITE,
     },
@@ -153,7 +162,7 @@ const RULES: Rule[] = [
         pattern: new RegExp(
             `\\btext-muted-foreground\\b${RUN}\\bno-underline\\b${RUN}hover:text-foreground`,
         ),
-        home: ["components/shared/links/text-link.tsx"],
+        home: [`${MK}/links/text-link.tsx`],
         allow: {},
         files: SITE,
     },
@@ -177,17 +186,14 @@ const RULES: Rule[] = [
             `\\bcursor-pointer\\b${RUN}\\bbg-foreground\\b${RUN}\\btext-background\\b|\\bbg-foreground\\b${RUN}\\bcursor-pointer\\b${RUN}\\btext-background\\b|<button\\b[^>]*?className=[^>]*?\\bbg-foreground\\b`,
         ),
         // ChoiceChip's chosen state is Ink too.
-        home: [
-            "components/shared/buttons/button.tsx",
-            "components/shared/fields/choice-chips.tsx",
-        ],
+        home: [`${MK}/buttons/button.tsx`, `${MK}/fields/choice-chip.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a plan's price is drawn by PlanCards only (A1, the teaser)",
         pattern: /\btext-mk-price\b/,
-        home: ["components/pricing/plan-cards.tsx"],
+        home: [`${MK}/pricing/plan-cards.tsx`],
         allow: {},
         files: SITE,
     },
@@ -197,21 +203,21 @@ const RULES: Rule[] = [
         // The pricing feature (cards, the two tables, the staff preview)
         // and the lib that builds the views; a page elsewhere takes
         // PricingCards.
-        home: ["components/pricing/", "lib/"],
+        home: [`${MK}/pricing/`, "components/pricing/", "lib/"],
         allow: {},
         files: SITE,
     },
     {
         name: "a small caps label is Eyebrow (V12)",
         pattern: both("\\buppercase\\b", "tracking-\\[0\\.1em\\]"),
-        home: ["components/shared/sections/eyebrow.tsx"],
+        home: [`${MK}/sections/eyebrow.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a page title is PageTitle, its size a token (V6, A7)",
         pattern: /text-\[clamp\(/,
-        home: ["components/shared/sections/page-title.tsx"],
+        home: [`${MK}/sections/page-title.tsx`],
         allow: {
             "app/(standalone)/waitlist/page.tsx":
                 "keep: the waitlist's 68px opening line is a paragraph of its own design, not a page title",
@@ -225,23 +231,23 @@ const RULES: Rule[] = [
     {
         name: "a reading column is Container width (V7, A23)",
         pattern: /max-w-\[(?:720|760|768|860|900)px\]/,
-        home: ["components/shared/layout/container.tsx"],
+        home: [`${MK}/layout/container.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a link card's hover is CardLink's (V5)",
         pattern: /hover:shadow-mk-(?:lift|card)\b/,
-        home: ["components/shared/links/card-link.tsx"],
+        home: [`${MK}/links/card-link.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: 'a "Coming soon" badge is Pill tone="soon" (A19)',
         pattern: /\bbg-mk-soon\b/,
-        home: ["components/shared/links/pill.tsx"],
+        home: [`${MK}/links/pill.tsx`],
         allow: {
-            "components/pricing/plan-cards.tsx":
+            [`${MK}/pricing/plan-cards.tsx`]:
                 "keep: the staff preview's changed-part highlight, not a badge",
         },
         files: SITE,
@@ -249,7 +255,7 @@ const RULES: Rule[] = [
     {
         name: "a choice chip is ChoiceChip (V9, A13)",
         pattern: both("\\bh-9\\b", "\\brounded-full\\b"),
-        home: ["components/shared/fields/choice-chips.tsx"],
+        home: [`${MK}/fields/choice-chip.tsx`],
         allow: {},
         files: SITE,
     },
@@ -292,14 +298,14 @@ const RULES: Rule[] = [
     {
         name: '"a, b and c" is sentenceList() (B5)',
         pattern: /\.slice\(0,\s*-1\)\.join\(", "\)/,
-        home: ["lib/format/"],
+        home: [`${MK}/sentence-list.ts`],
         allow: {},
         files: SITE,
     },
     {
-        name: "arrow keys in a row are nextIndex() from lib/roving.ts (B6)",
+        name: "arrow keys in a row are nextIndex() from @saroh/marketing/roving (B6)",
         pattern: /"Arrow(?:Right|Left)"/,
-        home: ["lib/roving.ts"],
+        home: [`${MK}/roving.ts`],
         allow: {},
         files: SITE,
     },
@@ -328,6 +334,57 @@ const RULES: Rule[] = [
         pattern: /\b(?:sp|tp)-(?:crumb|faq|cta)\b/,
         home: ["src/components/page-parts.tsx"],
         allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: a question list or a breadcrumb is page-parts.tsx's (A11, #1201)",
+        pattern: /<details\b|aria-label="Breadcrumbs?"/,
+        home: ["src/components/page-parts.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    // The content pages' blocks (plan 2026-10-31-002 U4, components/BLOCKS.md):
+    // each class family is drawn in its home file only, so a template that
+    // redraws a block, under any prefix, uses the block instead.
+    {
+        name: "package: the content blocks are content-blocks.tsx's (#1201)",
+        pattern:
+            /\bsp-(?:sc|ans|facts|nl|by|lc|rel|otp|call|fig)(?:-[\w-]+)?\b/,
+        home: ["src/components/content-blocks.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: a content table is DataTable (#1201)",
+        pattern: /\bsp-dt(?:-[\w-]+)?\b|<table\b/,
+        // A tool's own working table is the tool's.
+        home: ["src/components/data-table.tsx", "src/tools/"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: the content page shell is ContentLayout (#1201)",
+        pattern: /\bsp-cl(?:-[\w-]+)?\b/,
+        home: ["src/components/content-layout.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: parsed text is Prose (#1201)",
+        pattern: /\bsp-prose(?:-[\w-]+)?\b/,
+        home: ["src/components/prose.tsx"],
+        allow: {},
+        files: PACKAGE,
+    },
+    {
+        name: "package: a hub's cards and chips are hub-page.tsx's (#1201)",
+        pattern:
+            /\bsp-(?:hp|hc|fchips?)(?:-[\w-]+)?\b|\b(?:sp|tp)-hub-(?:list|grid)\b/,
+        home: ["src/components/hub-page.tsx"],
+        allow: {
+            "src/components/tools-hub.tsx":
+                "follow-up (plan 2026-10-31-002, Deferred): /tools moves onto HubCards once the owner has seen the look change",
+        },
         files: PACKAGE,
     },
     {
@@ -360,6 +417,19 @@ describe("one of each piece on saroh.in (DEC-195)", () => {
             expect(stale(rule)).toEqual([]);
         });
     }
+
+    // A file that moves and leaves its rule's `home` behind would pass every
+    // scan above: nothing draws the piece at the old path, and no copy trips it.
+    it("every rule's home is a file that exists", () => {
+        for (const rule of RULES) {
+            for (const home of rule.home) {
+                const there = home.endsWith("/")
+                    ? rule.files.some((f) => f.rel.startsWith(home))
+                    : rule.files.some((f) => f.rel === home);
+                expect(there, `${rule.name}: ${home}`).toBe(true);
+            }
+        }
+    });
 
     it("every allow-list entry gives its reason", () => {
         for (const rule of RULES) {
@@ -409,9 +479,34 @@ describe("the scan catches a redraw", () => {
         ]);
     });
 
+    it("a content template that redraws a block fails (#1201)", () => {
+        const gst: Source = {
+            rel: "src/components/gst-page.tsx",
+            code: `<details><summary>Q</summary></details><table className="gp-table" /><div className="sp-ans" />`,
+        };
+        expect(offenders(rule("package: a question list"), [gst])).toEqual([
+            gst.rel,
+        ]);
+        expect(offenders(rule("package: a content table"), [gst])).toEqual([
+            gst.rel,
+        ]);
+        expect(offenders(rule("package: the content blocks"), [gst])).toEqual([
+            gst.rel,
+        ]);
+    });
+
+    it("a redraw inside @saroh/marketing fails too", () => {
+        const copy: Source = {
+            rel: `${MK}/sections/my-faq.tsx`,
+            code: `<details><summary>Q</summary></details>`,
+        };
+        expect(offenders(rule("a question list"), [copy])).toEqual([copy.rel]);
+        expect(SITE.some((f) => f.rel === `${MK}/sections/faq.tsx`)).toBe(true);
+    });
+
     it("the piece's own home passes", () => {
         const home: Source = {
-            rel: "components/pricing/plan-cards.tsx",
+            rel: `${MK}/pricing/plan-cards.tsx`,
             code: `<span className="font-display text-mk-price-lg" />`,
         };
         expect(offenders(rule("a plan's price"), [home])).toEqual([]);

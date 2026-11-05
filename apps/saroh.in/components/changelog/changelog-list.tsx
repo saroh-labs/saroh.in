@@ -8,10 +8,10 @@ import {
     entryDayLong,
 } from "@/content/changelog";
 import { COMING } from "@/content/coming";
-import { ring } from "@/lib/ring";
+import { ring } from "@saroh/marketing/ring";
 
-import { Container } from "../shared/layout/container";
-import { Arrow } from "../shared/links/arrow";
+import { Arrow } from "@saroh/marketing/arrow";
+import { Container } from "@saroh/marketing/container";
 import { ComingList } from "../shared/sections/coming-list";
 
 /** The design's row: a 140px date column and the text, wrapping on a phone. */

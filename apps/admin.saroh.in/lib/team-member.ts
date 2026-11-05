@@ -1,9 +1,11 @@
+import { siteUrlOf } from "@saroh/edition";
 import { cache } from "react";
 
 import { env } from "@/env";
 
 import { readEarnings } from "./commission";
 import { getJson } from "./control-plane";
+import { EDITION } from "./edition";
 import { instanceApps } from "./sibling-apps";
 import type { TeamMember } from "./team-member-words";
 
@@ -30,7 +32,7 @@ export const getMemberEarnings = cache((platformAdminId: string) =>
 
 /**
  * Where the public site lives, for a manager's `?am=` link: the env's
- * `MARKETING_SITE_URL`, else the instance's website app, else saroh.in.
+ * `MARKETING_SITE_URL`, else the instance's website app, else the edition's.
  */
 export async function marketingSiteUrl(): Promise<string> {
     const instance = env.MARKETING_SITE_URL
@@ -39,6 +41,6 @@ export async function marketingSiteUrl(): Promise<string> {
     return (
         env.MARKETING_SITE_URL ??
         instance?.apps.find((app) => app.key === "website")?.href ??
-        "https://www.saroh.in"
+        siteUrlOf(EDITION)
     ).replace(/\/+$/, "");
 }

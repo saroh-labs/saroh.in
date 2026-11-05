@@ -1,16 +1,22 @@
-import { Get, Query } from "@nestjs/common";
+import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
+
+import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { AdminContactMessagesService } from "./admin-contact-messages.service";
+import { ServedEdition } from "./admin-edition";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
-import { ListContactMessagesDto } from "./dto";
+import { ListContactMessagesDto, MarkContactMessageDto } from "./dto";
 
 /**
  * Messages from saroh.in/contact (DEC-137; the public side is
  * `POST /public/contact-messages`). A message is a person's name, email and
- * words, so reading the list needs `organization:pii:read`. There is no
- * write: the team replies from its own mailbox.
+ * words, so reading the list needs `organization:pii:read`. The team
+ * replies from its own mailbox; marking a message handled (or open again)
+ * also needs `reports:resolve`, Support's "close what people send in".
  */
 @AdminRoutes()
 export class AdminContactMessagesController {
@@ -18,7 +24,24 @@ export class AdminContactMessagesController {
 
     @Get("contact-messages")
     @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
-    listContactMessages(@Query() query: ListContactMessagesDto) {
-        return this.messages.list(query);
+    listContactMessages(
+        @Query() query: ListContactMessagesDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.messages.list(query, edition);
+    }
+
+    @Post("contact-messages/:id/handled")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.ReportsResolve,
+    )
+    markContactMessage(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("id") id: string,
+        @Body() dto: MarkContactMessageDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.messages.mark(staff, id, dto.handled, edition);
     }
 }

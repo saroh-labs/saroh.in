@@ -109,6 +109,7 @@ export class AdminStaffController {
                         : undefined,
                     worksAs: dto.worksAs,
                     onCommission: dto.onCommission,
+                    editions: dto.editions,
                 }),
         );
     }
@@ -176,6 +177,7 @@ export class AdminStaffController {
                     roles: dto.roles,
                     worksAs: dto.worksAs,
                     onCommission: dto.onCommission,
+                    editions: dto.editions,
                     reason: dto.reason,
                 }),
         );
@@ -242,6 +244,7 @@ export class AdminStaffController {
                     roles: dto.roles,
                     reason: dto.reason,
                     expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+                    editions: dto.editions,
                 }),
         );
     }

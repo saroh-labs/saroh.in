@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Organization } from "@/lib/organizations/service";
 
 const resolveActiveOrganization = vi.fn();
+vi.mock("@/lib/organizations/starting-currency", () => ({
+    DEFAULT_CURRENCY: "INR",
+    startingCurrency: () => Promise.resolve("INR"),
+}));
 vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: () => resolveActiveOrganization() as unknown,
 }));
@@ -43,6 +47,7 @@ vi.mock("@/lib/invoices/service", () => ({
 }));
 vi.mock("@/lib/invoices/payments-on", () => ({
     payLinkPossible: () => Promise.resolve(true),
+    paymentsModuleOn: () => Promise.resolve(true),
 }));
 const canPick = vi.fn(() => Promise.resolve(true));
 vi.mock("@/lib/invoices/can-pick-products", () => ({

@@ -15,7 +15,13 @@ import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 import { SiteNav } from "./site-nav";
 
 /** The nav as the server hands it its Features and Solutions menus. */
-const Nav = (props: { resources?: NavItem[]; tools?: NavItem[] }) => (
+const Nav = (props: {
+    resources?: NavItem[];
+    tools?: NavItem[];
+    solutions?: NavItem[];
+    solutionMenu?: NavItem[];
+    allTrades?: { name: string; href: string };
+}) => (
     <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} {...props} />
 );
 
@@ -209,13 +215,16 @@ describe("SiteNav: Resources (plan U1)", () => {
             "/help",
             "/integrations",
             "/changelog",
+            "/about",
+            "/#faq",
+            "/contact",
         ]);
         expect(document.activeElement).toBe(items[0]);
         fireEvent.keyDown(items[0], { key: "ArrowDown" });
         expect(document.activeElement).toBe(items[1]);
         fireEvent.keyDown(items[1], { key: "ArrowUp" });
         fireEvent.keyDown(items[0], { key: "ArrowUp" });
-        expect(document.activeElement).toBe(items[2]);
+        expect(document.activeElement).toBe(items[5]);
         expect(menu).toBeTruthy();
 
         fireEvent.keyDown(document, { key: "Escape" });
@@ -244,19 +253,25 @@ describe("SiteNav: Resources (plan U1)", () => {
         ).toBe("page");
     });
 
-    it("the phone sheet has Resources, open on a Resources page", async () => {
+    it("the phone sheet has Resources as a level, marked on a Resources page", async () => {
         pathname = "/changelog";
         render(<Nav resources={RESOURCES} />);
         fireEvent.click(screen.getByRole("button", { name: "Menu" }));
         const sheet = await screen.findByRole("dialog", { name: "Menu" });
-        const row = screen
-            .getAllByRole("button", { name: /^Resources/ })
-            .find((b) => sheet.contains(b));
-        expect(row?.getAttribute("aria-expanded")).toBe("true");
+        const row = within(sheet).getByRole("button", { name: "Resources" });
+        expect(row.getAttribute("aria-current")).toBe("true");
+        fireEvent.click(row);
         const links = Array.from(
             sheet.querySelectorAll("#nav-sheet-resources a"),
         ).map((a) => a.getAttribute("href"));
-        expect(links).toEqual(["/help", "/integrations", "/changelog"]);
+        expect(links).toEqual([
+            "/help",
+            "/integrations",
+            "/changelog",
+            "/about",
+            "/#faq",
+            "/contact",
+        ]);
     });
 });
 
@@ -283,7 +298,52 @@ describe("SiteNav: Tools, a menu of its own", () => {
         fireEvent.click(button("Resources"));
         expect(
             screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
-        ).toEqual(["/help", "/integrations", "/changelog"]);
+        ).toEqual([
+            "/help",
+            "/integrations",
+            "/changelog",
+            "/about",
+            "/#faq",
+            "/contact",
+        ]);
+    });
+
+    it("draws a grouped menu in named columns, then its see-all", () => {
+        render(
+            <Nav
+                solutionMenu={[
+                    {
+                        name: "Shops",
+                        line: "",
+                        href: "/for/shops",
+                        group: "Shops and food",
+                    },
+                    {
+                        name: "Salons",
+                        line: "",
+                        href: "/for/salons",
+                        group: "Beauty",
+                    },
+                    {
+                        name: "Barbers",
+                        line: "",
+                        href: "/for/barbers",
+                        group: "Beauty",
+                    },
+                ]}
+                allTrades={{ name: "See all trades", href: "/for" }}
+            />,
+        );
+        fireEvent.click(button("Solutions"));
+        const beauty = screen.getByRole("group", { name: "Beauty" });
+        expect(
+            within(beauty)
+                .getAllByRole("menuitem")
+                .map((i) => i.getAttribute("href")),
+        ).toEqual(["/for/salons", "/for/barbers"]);
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).toEqual(["/for/shops", "/for/salons", "/for/barbers", "/for"]);
     });
 
     it("on a tool, underlines Tools and not Resources", () => {
@@ -295,15 +355,14 @@ describe("SiteNav: Tools, a menu of its own", () => {
         );
     });
 
-    it("the phone sheet has Tools, open on a tool", async () => {
+    it("the phone sheet has Tools as a level, marked on a tool", async () => {
         pathname = "/tools/link-preview";
         render(<Nav resources={RESOURCES} tools={TOOLS} />);
         fireEvent.click(screen.getByRole("button", { name: "Menu" }));
         const sheet = await screen.findByRole("dialog", { name: "Menu" });
-        const row = screen
-            .getAllByRole("button", { name: /^Tools/ })
-            .find((b) => sheet.contains(b));
-        expect(row?.getAttribute("aria-expanded")).toBe("true");
+        const row = within(sheet).getByRole("button", { name: "Tools" });
+        expect(row.getAttribute("aria-current")).toBe("true");
+        fireEvent.click(row);
         expect(
             Array.from(sheet.querySelectorAll("#nav-sheet-tools a")).map((a) =>
                 a.getAttribute("href"),
@@ -313,34 +372,63 @@ describe("SiteNav: Tools, a menu of its own", () => {
 });
 
 describe("MobileMenu (below 760px)", () => {
-    it("opens on a Solutions page with Solutions expanded and Features closed", async () => {
+    it("opens on its first level, the page's section marked; Back returns to its row", async () => {
         pathname = "/solutions/gyms";
         render(<Nav />);
-        const menu = screen.getByRole("button", { name: "Menu" });
-        fireEvent.click(menu);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
         const sheet = await screen.findByRole("dialog", { name: "Menu" });
-        expect(sheet).toBeTruthy();
-        const inSheet = (name: RegExp) =>
-            screen
-                .getAllByRole("button", { name })
-                .find((b) => sheet.contains(b));
-        expect(inSheet(/^Solutions/)?.getAttribute("aria-expanded")).toBe(
-            "true",
-        );
-        expect(inSheet(/^Features/)?.getAttribute("aria-expanded")).toBe(
-            "false",
-        );
-        // D-9: the open row's chevron points up, the closed one's down.
-        const flipped = (name: RegExp) =>
-            inSheet(name)
-                ?.querySelector("[data-chevron]")
-                ?.classList.contains("rotate-180");
-        expect(flipped(/^Solutions/)).toBe(true);
-        expect(flipped(/^Features/)).toBe(false);
+        const row = (name: string) =>
+            within(sheet).getByRole("button", { name });
+        expect(row("Solutions").getAttribute("aria-current")).toBe("true");
+        expect(row("Features").getAttribute("aria-current")).toBeNull();
+        expect(sheet.querySelector("#nav-sheet-solutions")).toBeNull();
+
+        fireEvent.click(row("Solutions"));
         const gyms = Array.from(sheet.querySelectorAll("a")).find(
             (a) => a.getAttribute("href") === "/solutions/gyms",
         );
         expect(gyms?.getAttribute("aria-current")).toBe("page");
+        expect(document.activeElement).toBe(row("Back"));
+
+        fireEvent.click(row("Back"));
+        expect(document.activeElement).toBe(row("Solutions"));
+    });
+
+    it("shows every trade under its family, and the see-all beside Back", async () => {
+        render(
+            <Nav
+                solutionMenu={[
+                    {
+                        name: "Salons",
+                        line: "",
+                        href: "/for/salons",
+                        group: "Beauty",
+                    },
+                    {
+                        name: "Barbers",
+                        line: "",
+                        href: "/for/barbers",
+                        group: "Beauty",
+                    },
+                ]}
+                allTrades={{ name: "See all trades", href: "/for" }}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Solutions" }),
+        );
+        expect(
+            within(within(sheet).getByRole("group", { name: "Beauty" }))
+                .getAllByRole("link")
+                .map((a) => a.getAttribute("href")),
+        ).toEqual(["/for/salons", "/for/barbers"]);
+        expect(
+            within(sheet)
+                .getByRole("link", { name: "See all trades" })
+                .getAttribute("href"),
+        ).toBe("/for");
     });
 
     it("Esc closes the sheet and returns focus to Menu", async () => {
@@ -370,5 +458,39 @@ describe("MobileMenu (below 760px)", () => {
         expect(document.activeElement).toBe(focusable[0]);
         fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
         expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+    });
+});
+
+describe("SiteNav: See all trades", () => {
+    const TRADES = [
+        ...SOLUTION_ITEMS,
+        { name: "See all trades", line: "Find.", href: "/for" },
+    ];
+
+    it("ends the desk Solutions menu with it when given, and not otherwise", () => {
+        const { unmount } = render(<Nav />);
+        fireEvent.click(button("Solutions"));
+        expect(
+            screen.queryByRole("menuitem", { name: /See all trades/ }),
+        ).toBeNull();
+        unmount();
+        render(<Nav solutions={TRADES} />);
+        fireEvent.click(button("Solutions"));
+        const items = screen.getAllByRole("menuitem");
+        expect(items.at(-1)?.getAttribute("href")).toBe("/for");
+    });
+
+    it("is in the phone sheet's Solutions", async () => {
+        pathname = "/solutions/gyms";
+        render(<Nav solutions={TRADES} />);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = await screen.findByRole("dialog", { name: "Menu" });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Solutions" }),
+        );
+        const links = Array.from(
+            sheet.querySelectorAll("#nav-sheet-solutions a"),
+        ).map((a) => a.getAttribute("href"));
+        expect(links.at(-1)).toBe("/for");
     });
 });

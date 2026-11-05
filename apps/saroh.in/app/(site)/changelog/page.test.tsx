@@ -162,8 +162,7 @@ describe("/changelog", () => {
         if (!section) throw new Error("no Coming next section");
         const labels = within(section).getAllByRole("heading", { level: 3 });
         expect(labels.map((h) => h.textContent)).toEqual([
-            "Nov–Dec 2026",
-            "Early 2027",
+            "Coming next",
             "Later",
         ]);
         const groups = byComingGroup(COMING);

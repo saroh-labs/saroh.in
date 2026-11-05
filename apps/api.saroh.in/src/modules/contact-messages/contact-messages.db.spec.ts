@@ -8,13 +8,17 @@
  */
 import { prisma } from "@saroh/database";
 
+import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import type { AdminAuditService } from "../admin/admin-audit.service";
 import { AdminContactMessagesService } from "../admin/admin-contact-messages.service";
 import { ContactMessagesService } from "./contact-messages.service";
 import { deleteOldContactMessages } from "./contact-retention";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const service = new ContactMessagesService();
-const admin = new AdminContactMessagesService();
+const admin = new AdminContactMessagesService({
+    write: jest.fn(),
+} as unknown as AdminAuditService);
 
 describe("contact messages", () => {
     it("stores a message as it was sent", async () => {
@@ -88,6 +92,24 @@ describe("contact messages", () => {
 
         const bugs = await admin.list({ topic: "bug" });
         expect(bugs.items.map((m) => m.name)).toEqual(["Ravi Menon"]);
+    });
+
+    it("marks one handled and back, and filters by it", async () => {
+        const bug = await prisma.contactMessage.findFirstOrThrow({
+            where: { topic: "bug" },
+            select: { id: true },
+        });
+        const staff = { userId: "support_1" } as PlatformAdminInfo;
+        const marked = await admin.mark(staff, bug.id, true);
+        expect(marked.handledAt).toBeInstanceOf(Date);
+        const handled = await admin.list({ state: "handled" });
+        expect(handled.items.map((m) => m.id)).toEqual([bug.id]);
+        const open = await admin.list({ state: "open" });
+        expect(open.items.map((m) => m.topic)).toEqual(["question"]);
+        await admin.mark(staff, bug.id, false);
+        expect((await admin.list({ state: "handled" })).items).toEqual([]);
+        const one = await admin.list({ email: "RAVI.MENON@example.com" });
+        expect(one.items.map((m) => m.name)).toEqual(["Ravi Menon"]);
     });
 
     it("deletes a message 12 months after it arrived, and no sooner", async () => {

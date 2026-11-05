@@ -2,6 +2,7 @@
 jest.mock("@saroh/database", () => ({
     prisma: {
         customerThreadMessage: { findUnique: jest.fn() },
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
         notification: { create: jest.fn() },
         membership: { findMany: jest.fn() },
     },

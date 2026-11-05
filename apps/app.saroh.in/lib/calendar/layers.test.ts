@@ -9,6 +9,7 @@ import {
     leadingBlanks,
     linkHref,
     monthSummary,
+    readFromWords,
     shiftMonth,
 } from "./layers";
 import { shortMoney, wholeMoney } from "./money";
@@ -459,5 +460,27 @@ describe("money and dates", () => {
         expect(
             formatDay("2027-01-02", { today: "2026-09-23", weekday: "short" }),
         ).toBe("Sat 2 Jan 2027");
+    });
+});
+
+describe("readFromWords: the footnote names only this calendar's layers", () => {
+    it("reads as it always did with every module", () => {
+        expect(
+            readFromWords(["orders", "subscriptions", "invoices", "bookings"]),
+        ).toBe(
+            "Everything here is read from orders, subscriptions, invoices and bookings.",
+        );
+    });
+
+    it("names no subscriptions or orders a business doesn't have", () => {
+        expect(readFromWords(["orders", "invoices", "collections"])).toBe(
+            "Everything here is read from orders and invoices.",
+        );
+        expect(readFromWords(["bookings", "classes", "invoices"])).toBe(
+            "Everything here is read from invoices and bookings.",
+        );
+        expect(readFromWords(["classes"])).toBe(
+            "Everything here is read from your records.",
+        );
     });
 });

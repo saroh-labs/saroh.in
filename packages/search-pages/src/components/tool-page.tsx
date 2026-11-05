@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
+
 import type { ToolPageData } from "../tool-schema";
-import { ToolSlot } from "../tools/tool-slot";
 import { ClosingBand, Crumbs, Questions } from "./page-parts";
 
 /**
@@ -22,6 +23,12 @@ export interface ToolPageProps {
     /** A page that isn't live: a small label says so at the top. */
     draft?: boolean;
     links?: ToolPageLinks;
+    /**
+     * The tool itself: a `<ToolSlot>` over the app's registry (saroh.in:
+     * only its build's tools; admin: `EveryToolSlot`). A prop, so this
+     * page imports no tool's code.
+     */
+    tool: ReactNode;
 }
 
 /** Desk and phone words: one element when they're the same, two (one shown) when not. */
@@ -61,6 +68,7 @@ export function ToolPage({
     page: p,
     draft = false,
     links = {},
+    tool,
 }: ToolPageProps) {
     const how = p.how ?? [];
     return (
@@ -85,7 +93,7 @@ export function ToolPage({
                     </p>
                 </section>
 
-                <ToolSlot slug={p.slug} />
+                {tool}
 
                 {how.length ? (
                     <section className="tp-how">

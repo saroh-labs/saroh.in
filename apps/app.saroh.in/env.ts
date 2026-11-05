@@ -26,6 +26,7 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
         NEXT_PUBLIC_API_URL: z.url().optional(),
         NEXT_PUBLIC_BETTER_AUTH_URL: z.url().optional(),
+        NEXT_PUBLIC_EDITION: z.enum(["INDIA", "GLOBAL"]).optional(),
         /**
          * The host a merchant's subdomain hangs off — `saroh.app`, not the
          * marketing site. The sites index used to build that address from a
@@ -92,6 +93,7 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+        NEXT_PUBLIC_EDITION: process.env.NEXT_PUBLIC_EDITION,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET:
             process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET,

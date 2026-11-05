@@ -9,7 +9,7 @@ import {
     RAZORPAY_LINK_HINT,
     readEventFilter,
 } from "@/lib/billing-action-words";
-import { clearHref } from "@/lib/billing-filters";
+import { clearHref, narrowCause } from "@/lib/billing-filters";
 import { billingHref, readPage } from "@/lib/billing-words";
 import { requireStaff } from "@/lib/console";
 import { param } from "@/lib/params";
@@ -58,7 +58,7 @@ export default async function BillingEventsPage({
             <EmptyPanel
                 kind="no-results"
                 things="events"
-                cause={q ? "search" : "filters"}
+                cause={narrowCause("events", raw)}
                 query={q}
                 clearHref={clearHref("events")}
             />

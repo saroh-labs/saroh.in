@@ -10,8 +10,10 @@ import { Button } from "@saroh/ui/button";
 
 export function GridHint({ id, canEdit }: { id: string; canEdit: boolean }) {
     return (
-        <p id={id} className="text-[12px] text-muted-foreground coarse:hidden">
-            <span aria-hidden>
+        <p id={id} className="text-[12px] text-muted-foreground">
+            {/* Keys a phone hasn't got: drawn at desk widths only; the
+                spoken version below stays everywhere. */}
+            <span aria-hidden className="coarse:hidden max-sm:hidden">
                 ←↑↓→ move
                 {canEdit ? " · Enter change · Esc cancel" : ""} · a
                 feature&apos;s name opens it on every plan
