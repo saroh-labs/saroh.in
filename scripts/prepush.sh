@@ -380,6 +380,10 @@ e2e_stack() {
     # own-domain spec's hosting states run. Test only, as above; the spec
     # runs them when E2E_DOMAIN_HOSTING says the API has them.
     export DOMAIN_HOSTING_FAKE=1 E2E_DOMAIN_HOSTING=fake
+    # Stripe on a fake (U8): made-up keys connect and intents are made without
+    # calling Stripe; only the signed webhook settles. Test only, as above;
+    # the stripe-checkout spec runs when the runner sees it too.
+    export STRIPE_FAKE=1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
