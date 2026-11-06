@@ -16,6 +16,7 @@ import { planMeter } from "./metering.service";
 import {
     assertPlanStartsSubscriptions,
     assertPlanTakesOnlinePayment,
+    businessEdition,
     isRenewalInvoice,
     noProviderReason,
     planStartsSubscriptions,
@@ -51,6 +52,14 @@ async function refusal(p: Promise<unknown>) {
     };
 }
 
+/** The business's edition takes money online on every plan (Global) or not (India). */
+function everyPlan(yes: boolean): jest.SpyInstance {
+    return jest
+        .spyOn(businessEdition, "takesOnlineOnEveryPlan")
+        .mockResolvedValue(yes);
+}
+
+beforeEach(() => everyPlan(false));
 afterEach(() => jest.restoreAllMocks());
 
 describe("online payments on the plan", () => {
@@ -164,5 +173,40 @@ describe("no provider connected: whose fix it is (UX-017)", () => {
         await expect(noProviderReason("org_1")).resolves.toBe("NO_PROVIDER");
         room.mockRejectedValue(new Error("down"));
         await expect(noProviderReason("org_1")).resolves.toBe("NO_PROVIDER");
+    });
+});
+
+describe("an edition that takes money online on every plan (Global, DEC-208)", () => {
+    it("takes a new online payment on a plan without it, and connects with no room for own accounts", async () => {
+        onPlan("free");
+        everyPlan(true);
+
+        await expect(planTakesOnlinePayment("org_1")).resolves.toBe(true);
+        await expect(
+            assertPlanTakesOnlinePayment("org_1"),
+        ).resolves.toBeUndefined();
+        await expect(
+            planTakesInvoiceOnline("org_1", { subscriptionId: null }),
+        ).resolves.toBe(true);
+        jest.spyOn(planMeter, "hasRoom").mockResolvedValue(false);
+        await expect(noProviderReason("org_1")).resolves.toBe("NO_PROVIDER");
+    });
+
+    it("still leaves memberships to the plan", async () => {
+        onPlan("free");
+        everyPlan(true);
+
+        await expect(planStartsSubscriptions("org_1")).resolves.toBe(false);
+        const body = await refusal(assertPlanStartsSubscriptions("org_1"));
+        expect(body.details).toMatchObject({ moduleId: "subscriptions" });
+    });
+
+    it("never reads the edition where the plan already says yes", async () => {
+        onPlan("grow");
+        const spy = everyPlan(true);
+
+        await expect(planTakesOnlinePayment("org_1")).resolves.toBe(true);
+        await assertPlanTakesOnlinePayment("org_1");
+        expect(spy).not.toHaveBeenCalled();
     });
 });

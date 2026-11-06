@@ -1,7 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import type { MerchantPaymentProvider, Prisma } from "@saroh/database";
 
-import { needsPublicKey, OPENS_CHECKOUT } from "./public-key";
+import { IN_EDITION, needsPublicKey, OPENS_CHECKOUT } from "./public-key";
 
 /**
  * Which provider takes the payment behind an order's pay link (plan B, B11),
@@ -9,7 +9,8 @@ import { needsPublicKey, OPENS_CHECKOUT } from "./public-key";
  *
  * The order's storefront's choice (Sell → Storefronts), when it made one;
  * otherwise the business's first connection that can open a checkout
- * window. A Razorpay connection still missing its public key id can't
+ * window. Only the business's edition's providers count (DEC-208): a
+ * connection outside it reads as not connected. A Razorpay connection still missing its public key id can't
  * (DEC-054): offering a link it would take would only fail on the
  * customer's phone, so it counts as no provider here.
  *
@@ -42,6 +43,7 @@ function label(provider: string): string {
     const p = provider.toUpperCase();
     if (p === "RAZORPAY") return "Razorpay";
     if (p === "CASHFREE") return "Cashfree";
+    if (p === "STRIPE") return "Stripe";
     return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
@@ -63,6 +65,7 @@ export async function payLinkProvider(
         const row = await db.merchantPaymentProvider.findUnique({
             where: {
                 organizationId_provider: { organizationId, provider: pinned },
+                ...IN_EDITION,
             },
         });
         if (row?.status === "CONNECTED" && opensCheckout(row)) return row;
@@ -90,7 +93,7 @@ export async function businessPayLinkProvider(
     if (ready) return ready;
     // Connected, but none can open the window: say which needs what.
     const stuck = await db.merchantPaymentProvider.findFirst({
-        where: { organizationId, status: "CONNECTED" },
+        where: { organizationId, status: "CONNECTED", ...IN_EDITION },
         orderBy: { createdAt: "asc" },
     });
     throw new ConflictException(

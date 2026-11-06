@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 import type { ProviderAttention } from "../../common/providers/provider-attention";
 import {
@@ -24,6 +25,7 @@ import {
     assertPlanTakesOnlinePayment,
     planTakesOnlinePayment,
 } from "../billing/online-payments-plan";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
@@ -53,6 +55,7 @@ import { assertOrganizationWindingDown } from "../organizations/organization-lif
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
+import { OPEN_INTENT_STATUSES } from "./intent-state";
 import {
     MISMATCH_ATTEMPT_WHERE,
     MISMATCH_REFUND_REASON,
@@ -65,6 +68,8 @@ import {
     assertKeysAccepted,
     credentialsUnreadable,
     paymentProviderWorks,
+    PROVIDER_FAILED_MESSAGE,
+    providerLabel,
     providerOrderFailed,
 } from "./provider-keys";
 import { activeMandatesByProvider } from "./provider-memberships";
@@ -80,8 +85,9 @@ import {
     PROVIDER_FACTORY,
     RefundCallError,
 } from "./providers/provider.port";
-import { needsPublicKey, publicKeyFor } from "./public-key";
+import { IN_EDITION, needsPublicKey, publicKeyFor } from "./public-key";
 import { enqueueRefundAlert, enqueueRefundSentNotice } from "./refund-notices";
+import { belowStripeMinimum } from "./stripe-minimum";
 import type { SealedCredentials } from "./webhook-secret";
 import { webhookSecretFrom } from "./webhook-secret";
 import type { WebhookSetup } from "./webhook-setup";
@@ -437,6 +443,26 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
     };
 }
 
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : "unknown error";
+}
+
+// Stateless: it reads the flag rows on every call.
+const rolloutFlags = new FeatureFlagService();
+
+/**
+ * A provider the business's edition doesn't take payment through, in the
+ * merchant's words (DEC-208). Keyed by the provider refused, never by
+ * edition: each provider belongs to one edition's profile.
+ */
+const OUTSIDE_EDITION: Record<string, string> = {
+    RAZORPAY:
+        "Razorpay and Cashfree take payments in India. Connect Stripe instead.",
+    CASHFREE:
+        "Razorpay and Cashfree take payments in India. Connect Stripe instead.",
+    STRIPE: "Stripe isn't available for businesses in India. Connect Razorpay or Cashfree.",
+};
+
 /**
  * Org merchant-payments service (S5-002).
  *
@@ -496,9 +522,34 @@ export class PaymentsService {
             );
         }
 
+        // The edition's profile names the providers a business connects
+        // (DEC-208): a Global business can't connect Razorpay, nor an India
+        // one Stripe.
+        if (
+            !(
+                editionProfile(ctx.edition)
+                    .paymentProviders as readonly string[]
+            ).includes(provider)
+        ) {
+            throw new BadRequestException({
+                message: OUTSIDE_EDITION[provider],
+                field: "provider",
+            });
+        }
+        // A provider still behind its rollout flag (Stripe) can't be
+        // connected while the flag is off for this business.
+        const flag = this.factory.get(provider).rolloutFlag;
+        if (flag && !(await rolloutFlags.isEnabled(flag, ctx.organizationId))) {
+            throw new BadRequestException({
+                message: `${providerLabel(provider)} isn't available yet.`,
+                field: "provider",
+            });
+        }
+
         // Razorpay's checkout opens with the key id, so it is the public key;
         // both it and the secret are checked before anything is stored
-        // (DEC-054). Throws 400 before any write.
+        // (DEC-054); Stripe's three values are checked the same way.
+        // Throws 400 before any write.
         const publicKey = publicKeyFor({ ...input, provider });
 
         // A first connection starts taking money online, which the plan
@@ -507,11 +558,13 @@ export class PaymentsService {
         // keys of one already made is never refused: renewals the business
         // already has are charged through it (ADR-003). Asked before the
         // business details, so a plan without it hears about the plan, not
-        // an address it would add for nothing (UX-006).
+        // an address it would add for nothing (UX-006). An edition that
+        // takes money online on every plan asks neither (DEC-208).
+        const everyPlan = editionProfile(ctx.edition).onlinePaymentsOnEveryPlan;
         const known = await prisma.merchantPaymentProvider.count({
             where: { organizationId: ctx.organizationId, provider },
         });
-        if (known === 0) {
+        if (known === 0 && !everyPlan) {
             if (!(await planTakesOnlinePayment(ctx.organizationId))) {
                 await assertPlanTakesOnlinePayment(ctx.organizationId);
             }
@@ -597,6 +650,7 @@ export class PaymentsService {
             },
             {
                 addingIn: async (tx) =>
+                    everyPlan ||
                     (await tx.merchantPaymentProvider.count({
                         where: {
                             organizationId: ctx.organizationId,
@@ -717,7 +771,7 @@ export class PaymentsService {
      */
     async webhookSetup(ctx: OrganizationContext): Promise<WebhookSetup[]> {
         authorize(ctx, "payment:read");
-        return readWebhookSetup(ctx.organizationId);
+        return readWebhookSetup(ctx.organizationId, ctx.edition);
     }
 
     /**
@@ -2054,6 +2108,35 @@ export class PaymentsService {
         }
 
         const providerRow = await resolveProvider();
+        const provider = this.factory.get(providerRow.provider);
+        // A provider behind its rollout flag (Stripe) takes no payment while
+        // it is off: the customer reads that online payment is down, as for
+        // any provider that's off.
+        if (
+            provider.rolloutFlag &&
+            !(await rolloutFlags.isEnabled(
+                provider.rolloutFlag,
+                organizationId,
+            ))
+        ) {
+            throw new ServiceUnavailableException({
+                message: PROVIDER_FAILED_MESSAGE,
+                details: { reason: "provider-off" },
+            });
+        }
+        // The last guard on Stripe's minimum: set-up refuses a price or
+        // deposit under it, but a basket, a balance or a price set before
+        // Stripe was connected can still come to less.
+        const below =
+            providerRow.provider === "STRIPE"
+                ? belowStripeMinimum(amountCents, currency)
+                : null;
+        if (below) {
+            throw new ConflictException({
+                message: below,
+                details: { reason: "below-provider-minimum" },
+            });
+        }
         // A Razorpay connection without its public key id can't open the
         // checkout window, so no provider order is made for it (DEC-054).
         // Settings › Providers says it needs attention; the backfill fills
@@ -2079,7 +2162,6 @@ export class PaymentsService {
         } catch (err) {
             throw credentialsUnreadable(providerRow, err);
         }
-        const provider = this.factory.get(providerRow.provider);
         let intent: CreateOrderIntentResult;
         try {
             intent = await provider.createOrderIntent({
@@ -2379,18 +2461,82 @@ export class PaymentsService {
      * Otherwise there must be exactly one CONNECTED provider (400 if none, 409
      * if the choice is ambiguous).
      */
+    /**
+     * Close at the provider each open intent of a booking hold that was let
+     * go or lapsed (DEC-208), so a customer's page still holding one can't
+     * pay for a place that's gone. Only an adapter with `cancelIntent`
+     * (Stripe) is asked; Razorpay and Cashfree orders have nothing to close.
+     * Called after the release commits, outside its transaction. Never
+     * throws: a failure is logged by provider and intent, never a value,
+     * and a payment that lands anyway is recorded as owed back.
+     */
+    async cancelHoldIntents(bookingId: string): Promise<void> {
+        let intents: {
+            id: string;
+            organizationId: string;
+            provider: string;
+            providerIntentId: string | null;
+        }[];
+        try {
+            intents = await prisma.paymentIntent.findMany({
+                where: {
+                    status: { in: [...OPEN_INTENT_STATUSES] },
+                    providerIntentId: { not: null },
+                    invoice: { bookingId, source: "BOOKING" },
+                },
+                select: {
+                    id: true,
+                    organizationId: true,
+                    provider: true,
+                    providerIntentId: true,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Could not read the open payments of booking ${bookingId} to cancel them: ${errorMessage(error)}`,
+            );
+            return;
+        }
+        for (const intent of intents) {
+            try {
+                const adapter = this.factory.get(intent.provider);
+                if (!adapter.cancelIntent || !intent.providerIntentId) continue;
+                const row = await prisma.merchantPaymentProvider.findUnique({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: intent.organizationId,
+                            provider: intent.provider,
+                        },
+                    },
+                });
+                if (!row) continue;
+                await adapter.cancelIntent({
+                    providerIntentId: intent.providerIntentId,
+                    credentials: this.openCredentials(row),
+                });
+            } catch (error) {
+                // The adapter's message keeps only the HTTP status.
+                this.logger.warn(
+                    `Could not cancel ${providerLabel(intent.provider)} payment ${intent.id} of booking ${bookingId}: ${errorMessage(error)}`,
+                );
+            }
+        }
+    }
+
     private async resolveConnectedProvider(
         organizationId: string,
         pinned?: string,
     ): Promise<MerchantPaymentProvider> {
         if (pinned) {
             const name = pinned.toUpperCase();
+            // One outside the business's edition reads as not connected.
             const row = await prisma.merchantPaymentProvider.findUnique({
                 where: {
                     organizationId_provider: {
                         organizationId,
                         provider: name,
                     },
+                    ...IN_EDITION,
                 },
             });
             if (!row) {
@@ -2407,7 +2553,7 @@ export class PaymentsService {
         }
 
         const connected = await prisma.merchantPaymentProvider.findMany({
-            where: { organizationId, status: "CONNECTED" },
+            where: { organizationId, status: "CONNECTED", ...IN_EDITION },
             orderBy: { createdAt: "asc" },
         });
         if (connected.length === 0) {

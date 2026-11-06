@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {
@@ -197,7 +197,7 @@ export function InvoicePaper({
                     ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
                     : i.sellerTaxId
                       ? `Tax ID ${i.sellerTaxId}`
-                      : EDITION === "GLOBAL"
+                      : PROFILE.taxSystem === "named-line"
                         ? null
                         : "Not registered for GST"}
             </p>

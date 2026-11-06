@@ -54,6 +54,7 @@ import {
     payOptionsFor,
 } from "./checkout-readiness";
 import type { CheckoutQuoteDto, CheckoutStartDto } from "./checkout.dto";
+import { settleDeliveryAddress } from "./delivery-address";
 import {
     assertItemsAllow,
     FULFILMENT_RULES,
@@ -437,6 +438,13 @@ export class PublicCheckoutService {
                     message: "Add a phone number for the delivery.",
                     details: { reason: "phone", field: "address.phone" },
                 });
+            }
+
+            if (dto.address) {
+                dto.address = await settleDeliveryAddress(
+                    scope.organizationId,
+                    dto.address,
+                );
             }
 
             // The QR code whose scan opened the page, if its address

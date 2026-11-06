@@ -9,6 +9,7 @@ import {
     EMPTY_ADDRESS,
     trimmed,
 } from "./bag-address";
+import { parseBagDraft } from "./bag-draft-store";
 import { holdReason } from "./bag-sheet";
 import { INDIA_STATES, stateIn } from "./india-states";
 
@@ -134,5 +135,62 @@ describe("phoneOk", () => {
         for (const phone of ["", "call me", "12345", "------", "98450x12345"]) {
             expect(phoneOk(phone)).toBe(false);
         }
+    });
+});
+
+describe("a Global business's delivery", () => {
+    const ABROAD = {
+        phone: "+14155550100",
+        line1: "1 Main St",
+        city: "Austin",
+        state: "",
+        postalCode: "",
+    };
+
+    it("needs no region or postcode; India's rule still does", () => {
+        expect(addressLeft(ABROAD, "country-and-region")).toBeNull();
+        expect(addressLeft(ABROAD)).toBe("Add the address to deliver to.");
+        expect(
+            addressLeft({ ...ABROAD, city: " " }, "country-and-region"),
+        ).toBe("Add the address to deliver to.");
+    });
+
+    it("sends a free-text region and its country as typed", () => {
+        expect(
+            trimmed(
+                { ...ABROAD, state: " Texas ", country: "US" },
+                "country-and-region",
+            ),
+        ).toMatchObject({ state: "Texas", country: "US" });
+        expect(trimmed({ ...ABROAD, state: "Texas" }).state).toBe("");
+    });
+
+    it("names the country when read out", () => {
+        expect(addressLines({ ...ABROAD, country: "US" })).toContain(
+            "United States",
+        );
+    });
+
+    it("keeps a region through a reload", () => {
+        const raw = JSON.stringify({ address: { state: "Texas" } });
+        expect(parseBagDraft(raw, "country-and-region").address.state).toBe(
+            "Texas",
+        );
+        expect(parseBagDraft(raw).address.state).toBe("");
+    });
+
+    it("keeps the country apart through a reload, as its column holds it (DEC-207)", () => {
+        const raw = JSON.stringify({
+            address: { ...ABROAD, state: "Texas", country: "US" },
+        });
+        const { address } = parseBagDraft(raw, "country-and-region");
+        expect(trimmed(address, "country-and-region")).toMatchObject({
+            state: "Texas",
+            country: "US",
+        });
+        // India's never sends one.
+        expect(trimmed(parseBagDraft(raw).address)).not.toHaveProperty(
+            "country",
+        );
     });
 });

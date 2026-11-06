@@ -1,3 +1,5 @@
+import { joinDeliveryPlace } from "@saroh/block-contract";
+
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { orderPartyName } from "../orders/walk-in";
@@ -93,6 +95,8 @@ export interface OrderForInvoice {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    /** A Global delivery's ISO country (DEC-207); India's is null. */
+    deliveryCountry: string | null;
     /** Null for a walk-in (B13), billed by `walkInName`. */
     customer: {
         firstName: string | null;
@@ -175,7 +179,7 @@ export function orderBillTo(order: OrderForInvoice): BillTo {
               [order.deliveryCity, order.deliveryPostalCode]
                   .filter(Boolean)
                   .join(" "),
-              order.deliveryState,
+              joinDeliveryPlace(order.deliveryState, order.deliveryCountry),
           ]
               .filter((x) => x && x.trim() !== "")
               .join(", ")

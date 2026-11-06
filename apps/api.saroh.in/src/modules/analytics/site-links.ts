@@ -47,11 +47,11 @@ export function linkLabelOf(name: string): string {
         .replace(/[̀-ͯ]/g, "")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+        .replace(/^-|-$/g, "");
     if (slug.length <= VISIT_REF_MAX) return slug;
     const cut = slug.slice(0, VISIT_REF_MAX);
     const lastHyphen = cut.lastIndexOf("-");
-    return (lastHyphen > 0 ? cut.slice(0, lastHyphen) : cut).replace(/-+$/, "");
+    return (lastHyphen > 0 ? cut.slice(0, lastHyphen) : cut).replace(/-$/, "");
 }
 
 /**

@@ -6,6 +6,7 @@
         "dev": "portless accounts.saroh next dev",
         "dev:app": "next dev",
         "build": "next build",
+        "build:global": "NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL next build",
         "start": "next start",
         "lint": "eslint .",
         "test": "vitest run",
@@ -17,6 +18,7 @@
     "portless": "accounts.saroh",
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/edition": "workspace:*",
         "@saroh/error-tracking": "workspace:*",
         "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",

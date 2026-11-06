@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-import { EDITION } from "./edition";
+import { PROFILE } from "./edition";
 import { DOCS_URL, HELP_URL } from "./saroh-apps";
 
 /**
@@ -43,6 +43,8 @@ export async function instanceApps(): Promise<InstanceApps | null> {
     const domain = rest.join(".");
     const at = (label: string, path = "") =>
         `https://${label}.${domain}${path}`;
+    // Help and docs each edition serves itself, or the shared ones.
+    const ownHelp = PROFILE.helpAndDocs === "own-addresses";
 
     return {
         domain,
@@ -64,13 +66,13 @@ export async function instanceApps(): Promise<InstanceApps | null> {
                 key: "help",
                 name: "Help centre",
                 description: "What merchants read when they are stuck.",
-                href: EDITION === "INDIA" ? at("help") : HELP_URL,
+                href: ownHelp ? at("help") : HELP_URL,
             },
             {
                 key: "docs",
                 name: "Docs",
                 description: "Guides and the API reference.",
-                href: EDITION === "INDIA" ? at("docs") : DOCS_URL,
+                href: ownHelp ? at("docs") : DOCS_URL,
             },
             {
                 key: "website",

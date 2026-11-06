@@ -129,3 +129,11 @@ describe("stripTrailingSlashes", () => {
         expect(performance.now() - started).toBeLessThan(250);
     });
 });
+
+describe("a run of unsafe characters at the ends", () => {
+    it("leaves no dashes at the ends, however long the run", () => {
+        const run = "-".repeat(50_000);
+        expect(sanitizeSegment(`${run}a b${run}`)).toBe("a-b");
+        expect(sanitizeFilename(`${run}a.png${run}`)).toBe("a.png");
+    });
+});

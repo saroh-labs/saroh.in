@@ -143,6 +143,7 @@ interface IntentRow {
 const PROVIDER_LABEL: Record<string, string> = {
     RAZORPAY: "Razorpay",
     CASHFREE: "Cashfree",
+    STRIPE: "Stripe",
 };
 
 /**

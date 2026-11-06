@@ -21,6 +21,11 @@ export type CredentialCheck =
     | "ACCEPTED"
     /** It refused them (401/403): wrong, revoked or from another account. */
     | "REJECTED"
+    /**
+     * Stripe only: the key is real but can't read payments or refunds (a
+     * restricted key without those permissions answers 403).
+     */
+    | "PERMISSION_MISSING"
     /** It didn't say (network, timeout, 429, 5xx or an answer we can't read). */
     | "UNSURE"
     /** Email only: the keys work, but the sending domain isn't verified. */

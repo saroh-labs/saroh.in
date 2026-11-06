@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { appVars } from "../../../scripts/cf-env.mjs";
-import { prefilledSite, reportProblem, sendReport } from "./business-report";
+import { prefilledSite, reportProblems, sendReport } from "./business-report";
 
 const good = {
     site: "shop.example.com",
@@ -15,19 +15,21 @@ const good = {
 
 describe("a report", () => {
     it("names the first field at fault, in the form's order", () => {
-        expect(reportProblem(good)).toBeNull();
-        expect(reportProblem({ ...good, site: "not an address" })).toBe("site");
-        expect(reportProblem({ ...good, message: "short", email: "x" })).toBe(
-            "message",
-        );
-        expect(reportProblem({ ...good, email: "x" })).toBe("email");
+        expect(reportProblems(good)).toEqual([]);
+        expect(reportProblems({ ...good, site: "not an address" })).toEqual([
+            "site",
+        ]);
+        expect(
+            reportProblems({ ...good, message: "short", email: "x" }),
+        ).toEqual(["message", "email"]);
+        expect(reportProblems({ ...good, email: "x" })).toEqual(["email"]);
     });
 
     it("wants a phone with its country code", () => {
-        expect(reportProblem({ ...good, phone: "020 7946 0958" })).toBe(
+        expect(reportProblems({ ...good, phone: "020 7946 0958" })).toEqual([
             "phone",
-        );
-        expect(reportProblem({ ...good, phone: "+12" })).toBe("phone");
+        ]);
+        expect(reportProblems({ ...good, phone: "+12" })).toEqual(["phone"]);
     });
 
     it("fills in the address a merchant site's link carries", () => {

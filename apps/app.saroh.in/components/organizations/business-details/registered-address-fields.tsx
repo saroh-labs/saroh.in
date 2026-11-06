@@ -12,7 +12,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
 
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type { RegisteredAddressValues } from "@/lib/organizations/registered-address";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -50,7 +50,7 @@ const LINES = [
     ["city", "City", "240px", true, "address-level2"],
     [
         "postalCode",
-        EDITION === "GLOBAL" ? "Postcode" : "PIN code",
+        PROFILE.address === "country-and-region" ? "Postcode" : "PIN code",
         "140px",
         false,
         "postal-code",
@@ -171,7 +171,7 @@ export function RegisteredAddressFields<T extends FieldValues>({
                                 />
                             </FormControl>
                             <FormDescription>
-                                {EDITION === "GLOBAL"
+                                {PROFILE.businessCountry === "asked-at-setup"
                                     ? "Contact us to change your business's country."
                                     : "Saroh is for businesses in India for now."}
                             </FormDescription>

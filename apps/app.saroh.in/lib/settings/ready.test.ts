@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { EDITION_PROFILES } from "@saroh/edition";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { ModuleView } from "@/lib/modules/schema";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
@@ -1024,6 +1025,78 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
             }),
         ).toBe(true);
         expect(done({ ...none, note: "Pay at the counter" })).toBe(false);
+    });
+
+    it("Global: never a step while How to pay us is off, whatever a row holds (DEC-208)", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                setup: facts(false),
+                payInstructions: {
+                    ...none,
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankAccountName: "Example Traders",
+                    edition: "GLOBAL",
+                },
+            },
+            modules: selling,
+        });
+        expect(r.steps.map((s) => s.key)).not.toContain("howToPay");
+        expect(r.left.map((s) => s.key)).not.toContain("howToPay");
+    });
+
+    // Global's per-country checks stay, off: judged as they'll be when back on.
+    const globalPayOn = () => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = true;
+    };
+    afterEach(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = false;
+    });
+
+    it("Free, Global: bank details with no code tick it, and a stale UPI ID doesn't", () => {
+        globalPayOn();
+        const done = (pay: Partial<typeof none>) =>
+            readyChecklist({
+                settings: {
+                    ...settled,
+                    setup: facts(false),
+                    payInstructions: {
+                        ...none,
+                        ...pay,
+                        edition: "GLOBAL",
+                    },
+                },
+                modules: selling,
+            }).steps.find((s) => s.key === "howToPay")?.done;
+        expect(done({ bankAccountNumber: "12345678" })).toBe(true);
+        expect(done({ upiId: "shop@okexample" })).toBe(false);
+        expect(done({ note: "Pay at the counter" })).toBe(false);
+    });
+
+    it("Free, Global: a US business needs its routing number, and the step asks for it", () => {
+        globalPayOn();
+        const step = (pay: Partial<typeof none>) =>
+            readyChecklist({
+                settings: {
+                    ...settled,
+                    setup: facts(false),
+                    payInstructions: {
+                        ...none,
+                        ...pay,
+                        edition: "GLOBAL",
+                        country: "US",
+                    },
+                },
+                modules: selling,
+            }).steps.find((s) => s.key === "howToPay");
+        expect(step({ bankAccountNumber: "000123456789" })?.done).toBe(false);
+        expect(
+            step({ bankAccountNumber: "000123456789", bankIfsc: "021000021" })
+                ?.done,
+        ).toBe(true);
+        expect(step({})?.why).toBe(
+            "Add your account and routing number. Customers see your bank details on every unpaid invoice, order and booking.",
+        );
     });
 
     it("Grow (online payments): not a step, connecting payments is", () => {

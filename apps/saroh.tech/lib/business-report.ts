@@ -26,20 +26,22 @@ export const phoneOk = (phone: string) =>
     /^\+[\d\s()-]{6,23}$/.test(phone) && phone.replace(/\D/g, "").length >= 6;
 
 /** The first field at fault, in the form's order, or null when it can go. */
-export function reportProblem(input: ReportBody): ReportField | null {
+export function reportProblems(input: ReportBody): ReportField[] {
+    const bad: ReportField[] = [];
     if (!ADDRESS.test(input.site) || input.site.length > REPORT_LIMITS.site) {
-        return "site";
+        bad.push("site");
     }
     if (
         input.message.length < MESSAGE_MIN ||
         input.message.length > REPORT_LIMITS.message
     ) {
-        return "message";
+        bad.push("message");
     }
     if (!EMAIL.test(input.email) || input.email.length > REPORT_LIMITS.email) {
-        return "email";
+        bad.push("email");
     }
-    return phoneOk(input.phone) ? null : "phone";
+    if (!phoneOk(input.phone)) bad.push("phone");
+    return bad;
 }
 
 /** The `?site=` a merchant site's "Report" link carries. */

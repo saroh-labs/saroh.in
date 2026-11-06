@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { formatMoney } from "@/lib/format/money";
 import type { Place, PreviewSeller } from "@/lib/invoices/new-invoice";
 import type { PreviewSums } from "@/lib/invoices/new-invoice-lines";
@@ -157,7 +157,7 @@ export function PaperPreview({
                 ) : null}
                 {registered
                     ? `GSTIN ${seller.gstin ?? ""}${seller.state ? ` · ${seller.state}` : ""}`
-                    : EDITION === "GLOBAL"
+                    : PROFILE.taxSystem === "named-line"
                       ? seller.taxId
                           ? `Tax ID ${seller.taxId}`
                           : null
@@ -377,7 +377,7 @@ export function PaperPreview({
                 </div>
             </div>
 
-            {howToPay?.length || editing
+            {howToPay?.length || (editing && PROFILE.payInstructionsOffered)
                 ? wrap(
                       { part: "notes" },
                       "How to pay you: printed on every unpaid invoice",
@@ -394,7 +394,7 @@ export function PaperPreview({
                           ) : (
                               <p className="text-muted-foreground">
                                   Add your{" "}
-                                  {EDITION === "GLOBAL"
+                                  {PROFILE.payInstructions === "bank-code"
                                       ? "bank details"
                                       : "UPI ID or bank details"}
                                   , and every unpaid invoice carries them.
@@ -413,7 +413,7 @@ export function PaperPreview({
                         ? exempt
                             ? "Bill of supply under section 31(3)(c), CGST Act. Supply exempt from GST."
                             : "Tax invoice under section 31, CGST Act. Reverse charge does not apply."
-                        : EDITION === "GLOBAL"
+                        : PROFILE.taxSystem === "named-line"
                           ? null
                           : `${seller.name} is not registered for GST, so no tax is charged.`}
                 </p>

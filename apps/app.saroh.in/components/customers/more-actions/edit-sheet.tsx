@@ -5,6 +5,10 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import {
+    useBusinessCountry,
+    useIndiaAddress,
+} from "@/components/shared/fields/business-country";
 import { personHref } from "@/lib/contacts/person-href";
 import { saveDetailsAction } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
@@ -56,7 +60,11 @@ export function EditSheet({
     onMerge?: (holder: EmailHolder) => void;
 }) {
     const router = useRouter();
-    const [initial] = useState(() => draftFrom(contact));
+    const india = useIndiaAddress();
+    const country = useBusinessCountry();
+    const [initial] = useState(() =>
+        draftFrom(contact, india ? "IN" : (country ?? "IN")),
+    );
     const [draft, setDraft] = useState(initial);
     const [refusal, setRefusal] = useState<Refusal | null>(null);
     // What is wrong is said once Save is pressed, then as each is fixed.

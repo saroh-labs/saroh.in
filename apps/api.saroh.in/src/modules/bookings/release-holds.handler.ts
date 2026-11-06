@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { discardStalePackDrafts } from "../class-packs/pack-checkout";
+import { PaymentsService } from "../payments/payments.service";
 import { discardStalePlanJoins } from "../subscriptions/plan-join";
 import { PaymentLookupService } from "../webhooks/payment-lookup.service";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
@@ -51,8 +52,13 @@ export class ReleaseHoldsHandler {
      *   hold is released (P1). Nest always gives it; only a test that builds
      *   the handler by hand leaves it out, and then a hold is released on
      *   its time alone, as before.
+     * @param intents closes a released hold's open intent at its provider
+     *   (Stripe, DEC-208). Optional for the same reason.
      */
-    constructor(private readonly payments?: PaymentLookupService) {}
+    constructor(
+        private readonly payments?: PaymentLookupService,
+        @Optional() private readonly intents?: PaymentsService,
+    ) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
         let full = false;
@@ -179,6 +185,10 @@ export class ReleaseHoldsHandler {
                     )
                 ) {
                     released += 1;
+                    // Asked above and not paid: close its intent, so the
+                    // customer's page can't pay a place that's gone. Never
+                    // throws; a failure is only logged.
+                    await this.intents?.cancelHoldIntents(id);
                 }
             } catch (error) {
                 this.logger.error(

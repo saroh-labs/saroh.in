@@ -14,7 +14,44 @@ export interface PayInstructions {
     bankIfsc: string | null;
     bankName: string | null;
     note: string | null;
+    /**
+     * The business's edition, sent only where its profile pays by bank code:
+     * no UPI, an optional bank code (`business-pay-instructions.ts`). Its
+     * presence is the fact; a block can't read the profile itself (G1).
+     */
+    edition?: string;
+    /** A Global business's SWIFT/BIC, apart from its country's own code in `bankIfsc`. */
+    bankSwift?: string | null;
+    /** What the business's bank calls each number, as the API names them. */
+    bankLabels?: BankLabels;
 }
+
+export interface BankLabels {
+    account: string;
+    /** Null where the country's banks have no code of their own. */
+    code: string | null;
+    swift: string;
+}
+
+/** India's words, and a Global answer's own where the API sent them. */
+export function bankLabelsOf(p: PayInstructions): {
+    account: string;
+    code: string;
+    swift: string;
+} {
+    const global = byBankCode(p);
+    return {
+        account: p.bankLabels?.account ?? "Account number",
+        code: p.bankLabels?.code ?? (global ? "Bank code" : "IFSC"),
+        swift: p.bankLabels?.swift ?? "SWIFT/BIC",
+    };
+}
+
+/** "routing number" to be read out; "IBAN" and "BSB" stay as they are. */
+export const spokenOf = (label: string) =>
+    /^[A-Z]{2}/.test(label)
+        ? label
+        : label.charAt(0).toLowerCase() + label.slice(1);
 
 const FIELDS = [
     "upiId",
@@ -28,23 +65,48 @@ const FIELDS = [
 const nonEmpty = (v: string | null | undefined): v is string =>
     typeof v === "string" && v.trim() !== "";
 
+/** No UPI, and the bank code is optional. */
+export const byBankCode = (p: PayInstructions) => p.edition !== undefined;
+
+const hasUpi = (p: PayInstructions) => !byBankCode(p) && nonEmpty(p.upiId);
+
+const hasBank = (p: PayInstructions) =>
+    nonEmpty(p.bankAccountNumber) && (byBankCode(p) || nonEmpty(p.bankIfsc));
+
 /** The API's answer, checked field by field; null when strange or empty. */
 export function payInstructionsOf(v: unknown): PayInstructions | null {
     if (typeof v !== "object" || v === null) return null;
     const o = v as Record<string, unknown>;
-    const out = {} as Record<(typeof FIELDS)[number], string | null>;
+    const out = {} as PayInstructions;
     for (const field of FIELDS) {
         const value = o[field];
         if (value !== undefined && value !== null && typeof value !== "string")
             return null;
         out[field] = nonEmpty(value) ? value.trim() : null;
     }
+    if (typeof o.edition === "string" && o.edition !== "") {
+        out.edition = o.edition;
+        out.upiId = null;
+        const text = (v: unknown) =>
+            typeof v === "string" && nonEmpty(v) ? v.trim() : null;
+        out.bankSwift = text(o.bankSwift);
+        const labels = (o.bankLabels ?? {}) as Record<string, unknown>;
+        const account = text(labels.account);
+        if (account) {
+            out.bankLabels = {
+                account,
+                code: text(labels.code),
+                swift: text(labels.swift) ?? "SWIFT/BIC",
+            };
+        }
+    }
     // Bank details are only any use whole.
-    if (!(out.bankAccountNumber && out.bankIfsc && out.bankAccountName)) {
+    if (!(hasBank(out) && out.bankAccountName)) {
         out.bankAccountName = null;
         out.bankAccountNumber = null;
         out.bankIfsc = null;
         out.bankName = null;
+        if ("bankSwift" in out) out.bankSwift = null;
     }
     return hasPayInstructions(out) ? out : null;
 }
@@ -53,12 +115,7 @@ export function payInstructionsOf(v: unknown): PayInstructions | null {
 export function hasPayInstructions(
     p: PayInstructions | null | undefined,
 ): p is PayInstructions {
-    return (
-        !!p &&
-        (nonEmpty(p.upiId) ||
-            (nonEmpty(p.bankAccountNumber) && nonEmpty(p.bankIfsc)) ||
-            nonEmpty(p.note))
-    );
+    return !!p && (hasUpi(p) || hasBank(p) || nonEmpty(p.note));
 }
 
 /**
@@ -67,8 +124,8 @@ export function hasPayInstructions(
  */
 export function payWaysText(p: PayInstructions | null): string | null {
     if (!p) return null;
-    const upi = nonEmpty(p.upiId);
-    const bank = nonEmpty(p.bankAccountNumber) && nonEmpty(p.bankIfsc);
+    const upi = hasUpi(p);
+    const bank = hasBank(p);
     if (upi && bank) return "UPI or bank transfer";
     if (upi) return "UPI";
     if (bank) return "bank transfer";
@@ -138,7 +195,7 @@ export function qrPath(
     return { size: qr.size, path: parts.join("") };
 }
 
-/** "1234 5678 9012": an account number in fours, easier to read out. */
+/** "1234 5678 9012": an account number or IBAN in fours, easier to read out. */
 export function groupedAccount(number: string): string {
-    return number.replace(/(\d{4})(?=\d)/g, "$1 ");
+    return number.replace(/([0-9A-Z]{4})(?=[0-9A-Z])/g, "$1 ");
 }

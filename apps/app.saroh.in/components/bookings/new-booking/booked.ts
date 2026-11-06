@@ -1,8 +1,8 @@
 import type { PayLinkResult } from "@/components/bookings/booking-page/pay-link-panel";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
+import { methodLabel } from "@/lib/payments/method-words";
 import type { PaidBy, PayChoice } from "@/lib/services/booking-pay";
-import { PAID_BY } from "@/lib/services/booking-pay";
 import { whenWords } from "@/lib/services/new-booking";
 import { zoneShortName } from "@/lib/services/time-picker";
 
@@ -53,10 +53,7 @@ export function bookedOf(input: {
     ).toISOString();
     const [day = "", time = ""] = whenWords(startAt, zone).split(", ");
     const link = pay.kind === "LINK" ? pay.link : null;
-    const paidWord =
-        pay.kind === "PAID"
-            ? (PAID_BY.find((p) => p.key === pay.paidBy)?.label ?? "")
-            : "";
+    const paidWord = pay.kind === "PAID" ? (methodLabel(pay.paidBy) ?? "") : "";
     return {
         bookingId: input.bookingId,
         customer: input.customer,

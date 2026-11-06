@@ -34,5 +34,8 @@
         "typescript": "catalog:",
         "vitest": "^4.1.12"
     },
-    "module": "./dist/index.mjs"
+    "module": "./dist/index.mjs",
+    "dependencies": {
+        "ibantools": "4.5.4"
+    }
 }

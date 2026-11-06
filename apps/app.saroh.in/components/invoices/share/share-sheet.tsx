@@ -9,7 +9,6 @@ import { Button } from "@saroh/ui/button";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
-import { PhoneInput } from "@saroh/ui/phone-input";
 import { Segmented } from "@saroh/ui/segmented";
 import { TabStrip } from "@saroh/ui/tabs";
 import { showError } from "@saroh/ui/toast";
@@ -22,6 +21,7 @@ import { EmailNoteText } from "@/components/communications/email-note";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
@@ -575,7 +575,7 @@ export function ShareSheet({
                                     hint={`No number for ${first} on this invoice. It's used for this message only.`}
                                     error={typedProblem}
                                 >
-                                    <PhoneInput
+                                    <BusinessPhoneInput
                                         id={ids.to}
                                         value={typed}
                                         onValueChange={setTyped}

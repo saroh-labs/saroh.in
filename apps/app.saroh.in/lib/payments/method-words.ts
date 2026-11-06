@@ -1,3 +1,5 @@
+import { PROFILE } from "@/lib/edition";
+
 /**
  * The one word for each way a person pays by hand (UX-078, owner 9 Oct):
  * Cash, UPI, Card, Bank transfer, Other — in every picker and every label.
@@ -18,6 +20,13 @@ export const METHOD_WORD = {
 } as const;
 
 export type WordedMethod = keyof typeof METHOD_WORD;
+
+/**
+ * Whether a picker offers this way (DEC-204): UPI only where customers pay by
+ * it. A payment already recorded as UPI still reads "UPI" through the words.
+ */
+export const offered = (method: string): boolean =>
+    method !== "UPI" || PROFILE.upi;
 
 /** "Cash", "UPI", "Card"…; null for a value that isn't a way paid by hand. */
 export function methodLabel(method: string | null | undefined): string | null {

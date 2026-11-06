@@ -17,7 +17,15 @@ import type { PaymentProviderName, PaymentWebhookSetup } from "./service";
 export const WEBHOOK_PLACE: Record<PaymentProviderName, string> = {
     RAZORPAY: "Accounts & Settings › Webhooks › Add New Webhook",
     CASHFREE: "Developers › Webhooks › Add Webhook Endpoint",
+    STRIPE: "Developers › Webhooks › Add endpoint",
 };
+
+/**
+ * The API version a Stripe webhook endpoint must be made on: Stripe sends
+ * each event in the endpoint's version, and the API reads them as this one.
+ * The API pins the same (`STRIPE_API_VERSION` in its `stripe-payments.ts`).
+ */
+export const STRIPE_API_VERSION = "2026-10-28.endive";
 
 /** The webhook setup for one provider, or `null` when it wasn't read. */
 export function webhookFor(
@@ -27,9 +35,12 @@ export function webhookFor(
     return webhooks?.find((w) => w.provider === provider) ?? null;
 }
 
-/** A Razorpay key id in test mode: its webhook lives in the test dashboard. */
+/**
+ * A key in test mode (a Razorpay key id, a Stripe publishable or restricted
+ * key): its webhook lives in the provider's test dashboard.
+ */
 export function isTestKey(keyId: string): boolean {
-    return keyId.trim().startsWith("rzp_test_");
+    return /^(rzp|pk|rk)_test_/.test(keyId.trim());
 }
 
 /**

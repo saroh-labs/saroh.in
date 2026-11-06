@@ -13,6 +13,7 @@ import {
     lookScope,
     ShopBag,
     SignInOpener,
+    SiteBusinessProvider,
     SiteChromeFrame,
     SiteTheme,
     StickyActions,
@@ -57,7 +58,7 @@ import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
-import { siteUrlOf } from "@saroh/edition";
+import { editionProfile, siteUrlOf } from "@saroh/edition";
 import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { lookDock } from "@/lib/header-action";
@@ -417,163 +418,179 @@ export default async function SiteLayout({
 
     return (
         <TestReleaseProvider release={testRelease}>
-            <div
-                className="min-h-screen bg-site-bg text-site-body"
-                data-test-release={resolved.release ? "" : undefined}
-                // The look's mark (DEC-172); nothing for Classic.
-                {...lookScope(snapshot.site.look)}
+            <SiteBusinessProvider
+                value={{
+                    country: footerFacts?.country ?? null,
+                    address: editionProfile(footerFacts?.edition).address,
+                    phoneNumbers: editionProfile(footerFacts?.edition)
+                        .phoneNumbers,
+                    upi: editionProfile(footerFacts?.edition).upi,
+                }}
             >
-                {resolved.release ? (
-                    <>
-                        <TestReleaseBar
-                            name={resolved.release.name}
-                            liveUrl={release?.ok ? release.liveUrl : null}
-                        />
-                        {/* The site's sticky header sits below the bar, not
-                        under it: the bar keeps this variable at its height. */}
-                        <style>{HEADER_BELOW_BAR}</style>
-                    </>
-                ) : null}
-                <SiteTheme
-                    variables={snapshot.site.styleVariables}
-                    faces={SITE_FACES}
-                    // Folio, Quiet or Live (DEC-172); absent is Classic,
-                    // drawn exactly as before.
-                    look={snapshot.site.look}
-                />
-                {/* Page views for Insights (UX-032): live hosts only, never a
-                test release, whose visits are not the business's. */}
-                {siteId && test.mode !== "test" && !resolved.release ? (
-                    <SiteViewBeacon siteId={siteId} apiUrl={publicApiUrl()} />
-                ) : null}
-                {/* The merchant's own trackers and the banner that asks first
-                (DEC-108): the same live hosts, never a release. */}
-                {siteId &&
-                test.mode !== "test" &&
-                !resolved.release &&
-                head.trackers.length > 0 ? (
-                    <SiteTrackers
-                        trackers={head.trackers}
-                        noticeHref={head.privacyUrl ?? "/cookie-notice"}
-                        // The banner in the look (DEC-172, U15); and it
-                        // says visits are counted without cookies, true
-                        // here: the beacon above runs on these same hosts.
-                        look={look}
-                        countsVisits
-                    />
-                ) : null}
-                {/* The account area draws its own compact header and no
-                footer (DEC-073 #10): the frame leaves these out there. */}
-                <SiteChromeFrame
-                    account={accountAreaOn()}
-                    // Under a look the account is a page of the site, in
-                    // its header and footer (DEC-172, U12).
-                    look={look}
-                    header={
-                        <SiteHeader
-                            name={snapshot.site.name}
-                            navigation={navigation}
-                            // A module page leaves the menu while its module is
-                            // off (G15).
-                            modules={resolved.modules}
-                            action={action}
-                            // The business's mark beside its name: the
-                            // site's own icon, else its logo (DEC-124),
-                            // as the site read resolved it. Neither: the
-                            // name alone.
-                            logo={resolved.icon}
-                            // A Shop entry in the menu while /shop serves (P4).
-                            shopServes={shopServes}
-                            account={account}
-                            bag={bag}
-                            // Folio, Quiet or Live draw their own header
-                            // and phone menu (DEC-172, U5); absent is
-                            // Classic, unchanged.
-                            look={look}
-                            contact={siteContact}
-                            session={session}
-                        />
-                    }
-                    footer={
+                <div
+                    className="min-h-screen bg-site-bg text-site-body"
+                    data-test-release={resolved.release ? "" : undefined}
+                    // The look's mark (DEC-172); nothing for Classic.
+                    {...lookScope(snapshot.site.look)}
+                >
+                    {resolved.release ? (
                         <>
-                            <SiteFooter
-                                look={look}
-                                // A look's footer offers the main action
-                                // again, as an outline.
-                                action={action}
-                                session={session}
-                                footer={snapshot.site.footer}
-                                name={snapshot.site.name}
-                                // The header's own menu, listed again at the
-                                // foot with every page in it.
-                                navigation={navigation}
-                                modules={resolved.modules}
-                                shopServes={shopServes}
-                                contact={siteContact}
-                                // "Made with Saroh" on Free only (DEC-102).
-                                // "Report" rides with it: no Saroh link on a
-                                // paid site (DEC-121).
-                                credit={
-                                    footerFacts?.credit
-                                        ? {
-                                              ...footerFacts.credit,
-                                              reportHref: reportBusinessHref(
-                                                  test.host,
-                                                  siteUrlOf(
-                                                      footerFacts.edition,
-                                                  ),
-                                              ),
-                                          }
-                                        : null
-                                }
-                                // "Cookie choices" while a tracker asks (DEC-108).
-                                cookieChoices={asksConsent}
-                                // "Sold by ‹legal name›" in the business's own
-                                // details, on every plan (DEC-121).
-                                seller={siteSeller(
-                                    footerFacts,
-                                    snapshot.site.name,
-                                    shopServes,
-                                )}
+                            <TestReleaseBar
+                                name={resolved.release.name}
+                                liveUrl={release?.ok ? release.liveUrl : null}
                             />
-                            {/* One fixed bar on a phone, and the header's Book
-                            filled only while the page's own is off screen
-                            (DEC-172, U5). Classic has none. */}
-                            {/* Under a look, "Sign in" in the menu or the
-                            footer comes back to the page it was pressed on
-                            (U12). */}
-                            {look && accountAreaOn() ? <SignInOpener /> : null}
-                            {look ? (
-                                <StickyActions
+                            {/* The site's sticky header sits below the bar, not
+                        under it: the bar keeps this variable at its height. */}
+                            <style>{HEADER_BELOW_BAR}</style>
+                        </>
+                    ) : null}
+                    <SiteTheme
+                        variables={snapshot.site.styleVariables}
+                        faces={SITE_FACES}
+                        // Folio, Quiet or Live (DEC-172); absent is Classic,
+                        // drawn exactly as before.
+                        look={snapshot.site.look}
+                    />
+                    {/* Page views for Insights (UX-032): live hosts only, never a
+                test release, whose visits are not the business's. */}
+                    {siteId && test.mode !== "test" && !resolved.release ? (
+                        <SiteViewBeacon
+                            siteId={siteId}
+                            apiUrl={publicApiUrl()}
+                        />
+                    ) : null}
+                    {/* The merchant's own trackers and the banner that asks first
+                (DEC-108): the same live hosts, never a release. */}
+                    {siteId &&
+                    test.mode !== "test" &&
+                    !resolved.release &&
+                    head.trackers.length > 0 ? (
+                        <SiteTrackers
+                            trackers={head.trackers}
+                            noticeHref={head.privacyUrl ?? "/cookie-notice"}
+                            // The banner in the look (DEC-172, U15); and it
+                            // says visits are counted without cookies, true
+                            // here: the beacon above runs on these same hosts.
+                            look={look}
+                            countsVisits
+                        />
+                    ) : null}
+                    {/* The account area draws its own compact header and no
+                footer (DEC-073 #10): the frame leaves these out there. */}
+                    <SiteChromeFrame
+                        account={accountAreaOn()}
+                        // Under a look the account is a page of the site, in
+                        // its header and footer (DEC-172, U12).
+                        look={look}
+                        header={
+                            <SiteHeader
+                                name={snapshot.site.name}
+                                navigation={navigation}
+                                // A module page leaves the menu while its module is
+                                // off (G15).
+                                modules={resolved.modules}
+                                action={action}
+                                // The business's mark beside its name: the
+                                // site's own icon, else its logo (DEC-124),
+                                // as the site read resolved it. Neither: the
+                                // name alone.
+                                logo={resolved.icon}
+                                // A Shop entry in the menu while /shop serves (P4).
+                                shopServes={shopServes}
+                                account={account}
+                                bag={bag}
+                                // Folio, Quiet or Live draw their own header
+                                // and phone menu (DEC-172, U5); absent is
+                                // Classic, unchanged.
+                                look={look}
+                                contact={siteContact}
+                                session={session}
+                            />
+                        }
+                        footer={
+                            <>
+                                <SiteFooter
                                     look={look}
+                                    // A look's footer offers the main action
+                                    // again, as an outline.
                                     action={action}
-                                    // Next free beside Book, read in the
-                                    // browser (U8, #1042): the cached
-                                    // page carries no time.
-                                    live={
-                                        siteId
+                                    session={session}
+                                    footer={snapshot.site.footer}
+                                    name={snapshot.site.name}
+                                    // The header's own menu, listed again at the
+                                    // foot with every page in it.
+                                    navigation={navigation}
+                                    modules={resolved.modules}
+                                    shopServes={shopServes}
+                                    contact={siteContact}
+                                    // "Made with Saroh" on Free only (DEC-102).
+                                    // "Report" rides with it: no Saroh link on a
+                                    // paid site (DEC-121).
+                                    credit={
+                                        footerFacts?.credit
                                             ? {
-                                                  siteId,
-                                                  apiUrl: publicApiUrl(),
+                                                  ...footerFacts.credit,
+                                                  reportHref:
+                                                      reportBusinessHref(
+                                                          test.host,
+                                                          siteUrlOf(
+                                                              footerFacts.edition,
+                                                          ),
+                                                      ),
                                               }
                                             : null
                                     }
-                                    dock={lookDock({
-                                        look,
-                                        navigation,
-                                        modules: resolved.modules,
+                                    // "Cookie choices" while a tracker asks (DEC-108).
+                                    cookieChoices={asksConsent}
+                                    // "Sold by ‹legal name›" in the business's own
+                                    // details, on every plan (DEC-121).
+                                    seller={siteSeller(
+                                        footerFacts,
+                                        snapshot.site.name,
                                         shopServes,
-                                        action,
-                                        accountArea: accountAreaOn(),
-                                    })}
+                                    )}
                                 />
-                            ) : null}
-                        </>
-                    }
-                >
-                    {children}
-                </SiteChromeFrame>
-            </div>
+                                {/* One fixed bar on a phone, and the header's Book
+                            filled only while the page's own is off screen
+                            (DEC-172, U5). Classic has none. */}
+                                {/* Under a look, "Sign in" in the menu or the
+                            footer comes back to the page it was pressed on
+                            (U12). */}
+                                {look && accountAreaOn() ? (
+                                    <SignInOpener />
+                                ) : null}
+                                {look ? (
+                                    <StickyActions
+                                        look={look}
+                                        action={action}
+                                        // Next free beside Book, read in the
+                                        // browser (U8, #1042): the cached
+                                        // page carries no time.
+                                        live={
+                                            siteId
+                                                ? {
+                                                      siteId,
+                                                      apiUrl: publicApiUrl(),
+                                                  }
+                                                : null
+                                        }
+                                        dock={lookDock({
+                                            look,
+                                            navigation,
+                                            modules: resolved.modules,
+                                            shopServes,
+                                            action,
+                                            accountArea: accountAreaOn(),
+                                        })}
+                                    />
+                                ) : null}
+                            </>
+                        }
+                    >
+                        {children}
+                    </SiteChromeFrame>
+                </div>
+            </SiteBusinessProvider>
         </TestReleaseProvider>
     );
 }

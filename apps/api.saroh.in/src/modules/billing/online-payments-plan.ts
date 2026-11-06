@@ -1,4 +1,8 @@
+import { prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
+
 import { planMeter } from "./metering.service";
+import { moduleLocked } from "./plan-limit-errors";
 
 /**
  * The plan's say over taking money online (catalogue rows `payments` and
@@ -23,12 +27,29 @@ import { planMeter } from "./metering.service";
  * `MODULE_LOCKED` (`assert…`), which the app turns into its upgrade panel;
  * a customer's side only asks yes or no, and words its own refusal without
  * naming a plan, as the booking page's cap does.
+ *
+ * An edition whose profile takes money online on every plan
+ * (`onlinePaymentsOnEveryPlan`, Global, DEC-208) is never refused online
+ * payments, nor a payment provider for want of room on `integrations`;
+ * its edition is read only where the plan would refuse. Memberships stay
+ * the plan's to say.
  */
 
 /** The row that sells taking money online. */
 export const PAYMENTS_ROW = "payments";
 /** The row that sells memberships that renew. */
 export const SUBSCRIPTIONS_ROW = "subscriptions";
+
+/** The business's edition as the plan checks read it; an object so a test can spy on it. */
+export const businessEdition = {
+    async takesOnlineOnEveryPlan(organizationId: string): Promise<boolean> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { edition: true },
+        });
+        return editionProfile(org?.edition).onlinePaymentsOnEveryPlan;
+    },
+};
 
 async function included(
     organizationId: string,
@@ -39,10 +60,13 @@ async function included(
 }
 
 /** Whether the plan lets this business take a new payment online. */
-export function planTakesOnlinePayment(
+export async function planTakesOnlinePayment(
     organizationId: string,
 ): Promise<boolean> {
-    return included(organizationId, PAYMENTS_ROW);
+    return (
+        (await included(organizationId, PAYMENTS_ROW)) ||
+        businessEdition.takesOnlineOnEveryPlan(organizationId)
+    );
 }
 
 /**
@@ -68,7 +92,8 @@ export function planConnectsOwnAccounts(
 export async function noProviderReason(
     organizationId: string,
 ): Promise<"PLAN" | "NO_PROVIDER"> {
-    return (await planConnectsOwnAccounts(organizationId))
+    return (await planConnectsOwnAccounts(organizationId)) ||
+        (await businessEdition.takesOnlineOnEveryPlan(organizationId))
         ? "NO_PROVIDER"
         : "PLAN";
 }
@@ -77,7 +102,14 @@ export async function noProviderReason(
 export async function assertPlanTakesOnlinePayment(
     organizationId: string,
 ): Promise<void> {
-    await planMeter.assertIncluded(organizationId, PAYMENTS_ROW);
+    const row = await planMeter.enforcedRow(organizationId, PAYMENTS_ROW);
+    if (
+        row &&
+        row.state !== "on" &&
+        !(await businessEdition.takesOnlineOnEveryPlan(organizationId))
+    ) {
+        throw moduleLocked(row);
+    }
 }
 
 /**
@@ -89,7 +121,7 @@ export async function planStartsSubscriptions(
 ): Promise<boolean> {
     return (
         (await included(organizationId, SUBSCRIPTIONS_ROW)) &&
-        (await included(organizationId, PAYMENTS_ROW))
+        (await planTakesOnlinePayment(organizationId))
     );
 }
 
@@ -98,7 +130,7 @@ export async function assertPlanStartsSubscriptions(
     organizationId: string,
 ): Promise<void> {
     await planMeter.assertIncluded(organizationId, SUBSCRIPTIONS_ROW);
-    await planMeter.assertIncluded(organizationId, PAYMENTS_ROW);
+    await assertPlanTakesOnlinePayment(organizationId);
 }
 
 /**

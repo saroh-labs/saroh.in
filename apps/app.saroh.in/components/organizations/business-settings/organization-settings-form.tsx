@@ -21,13 +21,14 @@ import {
     PayInstructionsSection,
 } from "@/components/organizations/pay-instructions/pay-instructions-section";
 import { SocialLinksSheet } from "@/components/organizations/social-links/social-links-sheet";
+import { PROFILE } from "@/lib/edition";
 import { businessModeOf } from "@/lib/gst/price-mode";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { BusinessTab } from "@/lib/organizations/business-rows";
 import {
     BUSINESS_TAB_PARAM,
-    BUSINESS_TABS,
     businessSheetToOpen,
+    businessTabsFor,
 } from "@/lib/organizations/business-rows";
 import { savedWords } from "@/lib/organizations/business-sheet-words";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -88,11 +89,8 @@ export function OrganizationSettingsForm({
     // waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
     // In the address, so Search settings can open the tab a setting is on.
-    const [tab, setTab] = useTabParam(
-        BUSINESS_TAB_PARAM,
-        BUSINESS_TABS,
-        "identity",
-    );
+    const tabs = businessTabsFor(PROFILE.payInstructionsOffered);
+    const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, tabs, "identity");
     // Undo on a save (F12); what it saved back shows at once.
     const undo = useSettingsUndo();
     const applySaved = (next: OrganizationSettings) => {
@@ -109,6 +107,7 @@ export function OrganizationSettingsForm({
                 canEdit,
                 canEditHours: mayEditHours,
                 registered: saved.gstRegistered,
+                payOffered: PROFILE.payInstructionsOffered,
             }),
         undo.settle,
     );
@@ -123,7 +122,7 @@ export function OrganizationSettingsForm({
                 value={tab}
                 onValueChange={setTab}
                 className="-mt-1.5 mb-[18px]"
-                tabs={BUSINESS_TABS.map((key) => ({
+                tabs={tabs.map((key) => ({
                     value: key,
                     label: titleOf(key),
                     controls: isDetailTab(key)
@@ -158,16 +157,19 @@ export function OrganizationSettingsForm({
                     sheets={sheets}
                     offerUndo={undo.offer}
                 />
-                {/* Its own preview: what customers see. */}
-                <PayInstructionsSection
-                    saved={settings.payInstructions}
-                    businessName={settings.name}
-                    hidden={tab !== "pay"}
-                    canEdit={canEdit}
-                    sheets={sheets}
-                    onSaved={setSettings}
-                    offerUndo={undo.offer}
-                />
+                {/* Its own preview: what customers see. Not offered where
+                    the edition has no How to pay us (DEC-208). */}
+                {PROFILE.payInstructionsOffered ? (
+                    <PayInstructionsSection
+                        saved={settings.payInstructions}
+                        businessName={settings.name}
+                        hidden={tab !== "pay"}
+                        canEdit={canEdit}
+                        sheets={sheets}
+                        onSaved={setSettings}
+                        offerUndo={undo.offer}
+                    />
+                ) : null}
 
                 {/* What is saved, as an invoice prints it. A sheet shows
                     its own draft the same way, under its fields. */}

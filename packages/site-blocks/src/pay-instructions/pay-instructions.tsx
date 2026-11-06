@@ -4,7 +4,15 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { cn } from "../lib/utils";
 import type { PayInstructions } from "./model";
-import { groupedAccount, hasPayInstructions, qrPath, upiPayUri } from "./model";
+import {
+    bankLabelsOf,
+    byBankCode,
+    groupedAccount,
+    hasPayInstructions,
+    qrPath,
+    spokenOf,
+    upiPayUri,
+} from "./model";
 
 const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-fg focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
@@ -34,7 +42,9 @@ export interface PayInstructionsCardProps {
  * (R32): the business's UPI ID as a scannable UPI QR with a copy button and,
  * on a phone, a link that opens their UPI app; bank details with a copy
  * button on each; the business's note. Only what is set is drawn, and a
- * business that set nothing gets nothing — the page keeps its own line.
+ * business that set nothing gets nothing — the page keeps its own line. A
+ * Global business has no UPI, and its numbers are named as its country's
+ * banks name them ("IBAN", "Routing number", "BSB"), words the API sends.
  *
  * Merchant chrome in the `--site-*` layer, never Saroh's. The QR itself is
  * black on white whatever the theme: a scanner reads dark modules on a light
@@ -52,9 +62,18 @@ export function PayInstructionsCard({
 }: PayInstructionsCardProps) {
     const headingId = useId();
     if (!hasPayInstructions(instructions)) return null;
-    const { upiId, bankAccountName, bankAccountNumber, bankIfsc, bankName } =
-        instructions;
-    const bank = bankAccountNumber && bankIfsc ? bankAccountNumber : null;
+    const {
+        bankAccountName,
+        bankAccountNumber,
+        bankIfsc,
+        bankSwift,
+        bankName,
+    } = instructions;
+    const global = byBankCode(instructions);
+    const labels = bankLabelsOf(instructions);
+    const upiId = global ? null : instructions.upiId;
+    const bank =
+        bankAccountNumber && (bankIfsc || global) ? bankAccountNumber : null;
     const uri = upiId
         ? upiPayUri({
               upiId,
@@ -114,7 +133,7 @@ export function PayInstructionsCard({
                 </div>
             ) : null}
 
-            {bank && bankIfsc ? (
+            {bank ? (
                 <div
                     className={cn(
                         "mt-4",
@@ -132,14 +151,31 @@ export function PayInstructionsCard({
                             />
                         ) : null}
                         <CopyRow
-                            label="Account number"
-                            spoken="account number"
+                            label={labels.account}
+                            spoken={spokenOf(labels.account)}
                             value={bank}
                             shown={groupedAccount(bank)}
                             mono
                             asFact
                         />
-                        <CopyRow label="IFSC" value={bankIfsc} mono asFact />
+                        {bankIfsc ? (
+                            <CopyRow
+                                label={labels.code}
+                                spoken={spokenOf(labels.code)}
+                                value={bankIfsc}
+                                mono
+                                asFact
+                            />
+                        ) : null}
+                        {global && bankSwift ? (
+                            <CopyRow
+                                label={labels.swift}
+                                spoken={labels.swift}
+                                value={bankSwift}
+                                mono
+                                asFact
+                            />
+                        ) : null}
                         {bankName ? (
                             <Fact label="Bank" value={bankName} />
                         ) : null}

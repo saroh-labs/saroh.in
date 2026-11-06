@@ -33,6 +33,7 @@ import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactNotice } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
+import { settleDeliveryAddress } from "./delivery-address";
 import type {
     EditOrderDto,
     MoveStageDto,
@@ -433,6 +434,12 @@ export class OrderKitchenService {
          */
         trackingNotice: boolean;
     }> {
+        if (dto.address) {
+            dto.address = await settleDeliveryAddress(
+                ctx.organizationId,
+                dto.address,
+            );
+        }
         const touchesItems =
             (dto.lines?.length ?? 0) > 0 || (dto.add?.length ?? 0) > 0;
         const touchesDelivery =
@@ -699,6 +706,7 @@ export class OrderKitchenService {
                             deliveryCity: dto.address.city,
                             deliveryState: dto.address.state,
                             deliveryPostalCode: dto.address.postalCode,
+                            deliveryCountry: dto.address.country ?? null,
                         }
                       : {};
             const hasAddress =
@@ -1196,6 +1204,7 @@ const CLEARED_ADDRESS = {
     deliveryCity: null,
     deliveryState: null,
     deliveryPostalCode: null,
+    deliveryCountry: null,
 } as const;
 
 /** What Order Detail reads — see order-read.ts. */

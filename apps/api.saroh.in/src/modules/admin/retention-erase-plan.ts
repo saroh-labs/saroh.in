@@ -53,7 +53,7 @@ export const RETENTION_ERASED: readonly ErasedThing[] = [
         how: "cleared",
     },
     {
-        what: "On every order: the delivery name, phone, street, city and postcode, the free-text note, and a walk-in's name and phone",
+        what: "On every order: the delivery name, phone, street, city and postcode, the free-text note, and a walk-in's name and phone; with no GST, its region and country too (DEC-207)",
         how: "cleared",
     },
     {
@@ -94,7 +94,7 @@ export const RETENTION_KEPT: readonly KeptThing[] = [
         why: "Tax records, kept eight years (ADR-008).",
     },
     {
-        what: "Orders and their lines: items, amounts, status, dates and the delivery state (the GST place of supply)",
+        what: "Orders and their lines: items, amounts, status, dates and, under GST, the delivery state (the place of supply)",
         why: "Tax records, kept eight years (ADR-008).",
     },
     {
@@ -136,7 +136,7 @@ export interface KeptDecision {
 export const KEPT_FIELD_DECISIONS: Readonly<Record<string, KeptDecision>> = {
     "Order.deliveryState": {
         at180Days: "kept",
-        why: "The GST place of supply; a state names no person.",
+        why: "The GST place of supply; a state names no person. With no GST the removal already cleared it (DEC-207).",
     },
     "Order.walkInName": {
         at180Days: "erased",

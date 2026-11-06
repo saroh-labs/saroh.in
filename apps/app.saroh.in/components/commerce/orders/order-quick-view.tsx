@@ -21,6 +21,7 @@ import { loadOrderQuickView } from "@/lib/orders/list-actions";
 import { rowCustomer } from "@/lib/orders/list-row";
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import {
     orderPageHref,
@@ -259,7 +260,7 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                   [order.deliveryAddress.city, order.deliveryAddress.postalCode]
                       .filter(Boolean)
                       .join(" "),
-                  order.deliveryAddress.state,
+                  deliveryPlace(order.deliveryAddress),
                   // The number it's delivered to: the order's own, which
                   // whoever works it sees (review #19).
                   order.deliveryAddress.phone,

@@ -146,3 +146,18 @@ describe("who the customer is buying from (DEC-121)", () => {
         });
     });
 });
+
+describe("the business the page's forms start on (DEC-204)", () => {
+    it("reads its edition and country, with or without the credit", () => {
+        expect(
+            footerFacts({ edition: "GLOBAL", country: "GB", credit: null }),
+        ).toMatchObject({ edition: "GLOBAL", country: "GB" });
+    });
+
+    it("is India's when an older API doesn't say", () => {
+        expect(footerFacts({ credit: null })).toMatchObject({
+            edition: "INDIA",
+            country: null,
+        });
+    });
+});

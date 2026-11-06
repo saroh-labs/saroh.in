@@ -4,6 +4,7 @@ import type { LookId } from "@saroh/block-contract";
 
 import { timeWords } from "../lib/clock";
 import { cn } from "../lib/utils";
+import { useSiteBusiness } from "../site-business";
 import type { CheckoutRequest } from "./checkout";
 import type { Phase } from "./flow-state";
 import {
@@ -40,11 +41,14 @@ export function payingWords({
     status,
     started,
     payError,
+    upi = true,
 }: {
     status: CheckoutStatus;
     /** The payment has been started with the provider (a handoff). */
     started: boolean;
     payError: string | null;
+    /** Its customers pay by UPI (the edition's profile). Absent: yes. */
+    upi?: boolean;
 }): PayingWords {
     if (payError) {
         return {
@@ -64,7 +68,9 @@ export function payingWords({
         case "paid":
             return {
                 title: "Waiting for your payment to come through",
-                body: "If you paid in your UPI app, there's no need to pay again. This page moves on by itself once it's through.",
+                body: upi
+                    ? "If you paid in your UPI app, there's no need to pay again. This page moves on by itself once it's through."
+                    : "If you've paid, there's no need to pay again. This page moves on by itself once it's through.",
                 problem: false,
             };
         case "failed":
@@ -135,10 +141,12 @@ export function LookPaying({
               }
             : null;
     const checkout = useCheckout(request, onPaid);
+    const { upi } = useSiteBusiness();
     const words = payingWords({
         status: checkout.status,
         started: phase.handoff !== null,
         payError: phase.payError,
+        upi,
     });
     const until = phase.booking.holdExpiresAt;
     const minutesLeft =

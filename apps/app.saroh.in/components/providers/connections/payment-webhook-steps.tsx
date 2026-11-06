@@ -11,7 +11,11 @@ import type {
     PaymentProviderName,
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
-import { generateWebhookSecret, WEBHOOK_PLACE } from "@/lib/providers/webhook";
+import {
+    generateWebhookSecret,
+    STRIPE_API_VERSION,
+    WEBHOOK_PLACE,
+} from "@/lib/providers/webhook";
 import { CopyButton } from "@saroh/ui/copy-button";
 import { FailedRead } from "@saroh/ui/failed-read";
 
@@ -78,7 +82,17 @@ export function WebhookAddressStep({
                 <span className="font-medium text-foreground">
                     {WEBHOOK_PLACE[provider]}
                 </span>
-                . Paste this address, tick the events below and save.
+                . Paste this address,{" "}
+                {provider === "STRIPE" ? (
+                    <>
+                        choose API version{" "}
+                        <code className="font-mono text-foreground">
+                            {STRIPE_API_VERSION}
+                        </code>
+                        ,{" "}
+                    </>
+                ) : null}
+                tick the events below and save.
             </p>
             {testMode ? (
                 <p className="rounded-[10px] bg-muted px-3 py-2 text-[12px] leading-[1.45] text-foreground">

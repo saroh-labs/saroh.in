@@ -1,5 +1,5 @@
 import { PreviewPanel } from "@/components/organizations/business-settings/preview-panel";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 
 /**
  * "How it prints" ("Saroh Settings" design): the top of an invoice as the
@@ -103,7 +103,7 @@ export function BusinessPrintPreview({
             <p className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
                 {registered
                     ? `A sale inside ${stateName || "your state"} splits into CGST + SGST. To anywhere else it's IGST.`
-                    : EDITION === "GLOBAL"
+                    : PROFILE.taxSystem === "named-line"
                       ? "Your tax line and tax ID print on each new invoice."
                       : "Not GST-registered, so invoices carry no GSTIN and no tax split."}
             </p>

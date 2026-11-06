@@ -189,4 +189,18 @@ describe("paying says only what is known", () => {
         }
         expect(words("open").body).not.toMatch(/UPI/);
     });
+
+    it("names no UPI app where customers don't pay by UPI", () => {
+        expect(
+            payingWords({
+                status: "paid",
+                started: true,
+                payError: null,
+                upi: false,
+            }).body,
+        ).toBe(
+            "If you've paid, there's no need to pay again. This page moves on by itself once it's through.",
+        );
+        expect(words("paid").body).toMatch(/your UPI app/);
+    });
 });

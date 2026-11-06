@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "build": "next build",
+        "build:global": "NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL next build",
         "dev": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} portless app.saroh next dev",
         "dev:app": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} next dev",
         "lint": "eslint .",

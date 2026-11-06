@@ -1,8 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Service } from "@saroh/database";
+import { prisma } from "@saroh/database";
 
 import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
 import { NO_GST_TERMS } from "../invoices/gst-price";
+import { assertStripeTakes } from "../payments/stripe-minimum";
 import type { DepositMode } from "./dto";
 import { DEPOSIT_MODES } from "./dto";
 import { serviceCharge } from "./service-price";
@@ -60,6 +62,27 @@ export function assertDepositPriced(
             "A deposit is part of the price. Set a price first, or take nothing at booking.",
         details: { field: "depositMode" },
     });
+}
+
+/**
+ * What a service takes online in one payment, its deposit or else its
+ * price, must be one Stripe can take when the business takes payment
+ * through Stripe (DEC-208): 400 under the field that sets it. Checked on
+ * the service as it will be after the write.
+ */
+export async function assertServiceChargeTakes(
+    organizationId: string,
+    priceCents: number | null,
+    depositMode: string,
+    currency: string | null,
+): Promise<void> {
+    const deposit = depositCents(priceCents, depositMode);
+    await assertStripeTakes(
+        prisma,
+        organizationId,
+        { amountCents: deposit ?? priceCents, currency },
+        deposit === null ? "priceCents" : "depositMode",
+    );
 }
 
 /**

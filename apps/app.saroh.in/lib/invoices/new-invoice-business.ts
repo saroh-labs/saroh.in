@@ -2,6 +2,7 @@ import { paperColourOf, paperStyleOf } from "@saroh/block-contract";
 
 import { businessZone } from "@/lib/format/business-zone";
 import { businessModeOf } from "@/lib/gst/price-mode";
+import { payOffered } from "@/lib/organizations/pay-instructions";
 import { printedAddress } from "@/lib/organizations/registered-address";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
@@ -57,6 +58,9 @@ export function newInvoiceBusiness(
             settings.payInstructions,
         ),
         logoFile: settings.logo ?? null,
-        pay: settings.payInstructions,
+        // Not offered where the edition has no How to pay us (DEC-208).
+        pay: payOffered(settings.payInstructions?.edition)
+            ? settings.payInstructions
+            : undefined,
     };
 }

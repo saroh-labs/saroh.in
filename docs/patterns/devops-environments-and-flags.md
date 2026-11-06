@@ -165,6 +165,30 @@ is harmless, and should say so: `packages/database/src/client.ts` caches the
 Prisma client on `globalThis` when `NODE_ENV !== "production"`, which is
 hot-reload hygiene and protects nothing.
 
+## Editions are asked, never compared — **Current** (DEC-204 item 7)
+
+Code that behaves differently for India and Global asks the edition's
+profile for the fact it needs: `editionProfile(edition).taxSystem`, never
+`edition === "GLOBAL"`. `EDITION_PROFILES` in `packages/edition/src/index.ts`
+holds one entry per edition, typed so a third edition doesn't compile until it
+fills every fact. Next apps read `PROFILE` from their `lib/edition.ts`; the API
+reads the business's edition (`editionProfile(org.edition)`; unset is India). A
+new difference is a new fact there, with its test, read by the code that
+needs it; a fact nobody reads is removed.
+
+`@saroh/site-blocks` can't import the package (G1, #252), so a merchant
+site's layout passes the facts a block needs (`address`, `phoneNumbers`, `upi`) in
+`SiteBusinessProvider`, and a pay card knows its business pays by bank code
+from the `edition` the API sends only then.
+
+What stays an edition is identity: routing by host (`editionOfHost`), which
+addresses an edition has (`hostsFor`), `editionForCountry`, admin's edition
+filter, the stored `edition` columns and the `?? "INDIA"` default for one not
+set. `pnpm run check:edition-branches` refuses a new `=== "GLOBAL"`,
+`!== "INDIA"` or `case "GLOBAL":` outside the package, tests and the identity
+files it lists (`scripts/check-edition-branches.mjs`); a stored country written
+in full (`country === "INDIA"`) is a country and passes.
+
 ## Feature flags
 
 - **Current** — Keys live in

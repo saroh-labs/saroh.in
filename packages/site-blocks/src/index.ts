@@ -673,6 +673,16 @@ export type {
 // A test release (DEC-071, T6): the layout's provider, the hook the flows
 // read, the stop they show instead of taking a real order, booking,
 // payment or enquiry, and the words the site's server actions refuse in.
+export {
+    INDIA_SITE_BUSINESS,
+    SiteBusinessProvider,
+    useSiteBusiness,
+} from "./site-business";
+export type {
+    SiteAddress,
+    SiteBusiness,
+    SitePhoneNumbers,
+} from "./site-business";
 export { TestReleaseProvider, useTestRelease } from "./test-release/context";
 export type { TestReleaseInfo } from "./test-release/context";
 export {

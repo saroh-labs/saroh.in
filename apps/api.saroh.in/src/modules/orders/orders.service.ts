@@ -29,6 +29,7 @@ import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import { assertLocationTakingOrders } from "./checkout-paused";
+import { settleDeliveryAddress } from "./delivery-address";
 import type {
     CreateOrderDto,
     OrderStatus,
@@ -207,6 +208,12 @@ export class OrdersService {
         // is priced, so a request that can't be served costs nothing.
         assertOneParty(dto);
         await this.assertNewOrderAllowed(storeId, userId, organizationId, dto);
+        if (dto.address) {
+            dto.address = await settleDeliveryAddress(
+                organizationId,
+                dto.address,
+            );
+        }
         // A location a move to a lower plan paused takes no new order (#800).
         if (organizationId) {
             await assertLocationTakingOrders(organizationId, storeId);
@@ -372,6 +379,7 @@ export class OrdersService {
                       deliveryCity: dto.address.city,
                       deliveryState: dto.address.state,
                       deliveryPostalCode: dto.address.postalCode,
+                      deliveryCountry: dto.address.country ?? null,
                   }
                 : {}),
             items: {

@@ -105,6 +105,43 @@ describe("OrderTickets", () => {
         expect(html).not.toContain("₹");
     });
 
+    it("names a Global delivery's region and country, and India's ticket as it was (DEC-207)", () => {
+        const delivered = (address: Partial<OrderRead["deliveryAddress"]>) =>
+            renderToStaticMarkup(
+                <OrderTickets
+                    orders={[
+                        order({
+                            fulfilmentType: "LOCAL_DELIVERY",
+                            fulfilmentLabel: "Local delivery",
+                            deliveryAddress: {
+                                name: null,
+                                phone: null,
+                                line1: "1 Main St",
+                                line2: null,
+                                city: "Austin",
+                                state: "Texas",
+                                postalCode: "78701",
+                                ...address,
+                            },
+                        }),
+                    ]}
+                    noTicket={0}
+                    failed={0}
+                />,
+            );
+        expect(delivered({ country: "US" })).toContain(
+            "1 Main St, Austin 78701, Texas, United States",
+        );
+        const india = delivered({
+            city: "Bengaluru",
+            state: "Karnataka",
+            postalCode: "560001",
+            country: null,
+        });
+        expect(india).toContain("1 Main St, Bengaluru 560001");
+        expect(india).not.toContain("Karnataka");
+    });
+
     it("says what it couldn't print, and nothing to print when that's all", () => {
         const html = renderToStaticMarkup(
             <OrderTickets orders={[]} noTicket={1} failed={1} />,

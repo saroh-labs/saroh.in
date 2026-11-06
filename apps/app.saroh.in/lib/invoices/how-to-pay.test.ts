@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { EDITION_PROFILES } from "@saroh/edition";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { howToPayLines } from "./how-to-pay";
 
@@ -51,5 +52,69 @@ describe("howToPayLines (#833)", () => {
                 { ...PAY, bankIfsc: null, note: null },
             ),
         ).toEqual(["UPI: rye@okhdfc"]);
+    });
+});
+
+describe("howToPayLines while Global takes Stripe only (DEC-208)", () => {
+    it("prints nothing for a Global business, whatever it saved, and India's as before", () => {
+        expect(
+            howToPayLines(
+                { standing: "ISSUED" },
+                {
+                    ...PAY,
+                    edition: "GLOBAL",
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankIfsc: null,
+                    country: "GB",
+                },
+            ),
+        ).toBeNull();
+        expect(howToPayLines({ standing: "ISSUED" }, PAY)).not.toBeNull();
+    });
+});
+
+describe("howToPayLines for a Global business (DEC-204)", () => {
+    // Its per-country lines stay, off: judged as they'll be when back on.
+    beforeAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = true;
+    });
+    afterAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = false;
+    });
+
+    it("names the numbers as its country does, and leaves out a UPI ID", () => {
+        const global = {
+            ...PAY,
+            edition: "GLOBAL" as const,
+            bankAccountNumber: "GB82WEST12345698765432",
+            bankIfsc: null,
+            bankSwift: "NWBKGB2L",
+            bankName: "Example Bank",
+            country: "GB",
+            bankLabels: { account: "IBAN", code: null, swift: "SWIFT/BIC" },
+        };
+        expect(howToPayLines({ standing: "ISSUED" }, global)).toEqual([
+            "Bank transfer: Rye and Company · IBAN GB82 WEST 1234 5698 7654 32 · SWIFT/BIC NWBKGB2L · Example Bank",
+            "Put the invoice number in the note.",
+        ]);
+        expect(
+            howToPayLines(
+                { standing: "ISSUED" },
+                {
+                    ...global,
+                    bankAccountNumber: "12345678",
+                    bankIfsc: "062-000",
+                    bankSwift: null,
+                    country: "AU",
+                    bankLabels: {
+                        account: "Account number",
+                        code: "BSB",
+                        swift: "SWIFT/BIC",
+                    },
+                },
+            )?.[0],
+        ).toBe(
+            "Bank transfer: Rye and Company · Account number 1234 5678 · BSB 062-000 · Example Bank",
+        );
     });
 });

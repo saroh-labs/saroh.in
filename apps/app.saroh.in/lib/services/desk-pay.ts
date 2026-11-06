@@ -9,7 +9,7 @@
 
 import type { CashChange } from "@/lib/orders/new-order";
 import { cashChange, centsOf } from "@/lib/orders/new-order";
-import { METHOD_WORD, methodLabel } from "@/lib/payments/method-words";
+import { METHOD_WORD, methodLabel, offered } from "@/lib/payments/method-words";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How the desk takes it, as the API records it. */
@@ -75,9 +75,9 @@ export function deskChoices(input: {
 }): { key: DeskChoice; label: string; off: string | null }[] {
     return [
         // One word each (UX-078); where it's taken is the note's to say.
-        { key: "CASH", label: METHOD_WORD.CASH, off: null },
-        { key: "UPI", label: METHOD_WORD.UPI, off: null },
-        { key: "CARD", label: METHOD_WORD.CARD, off: null },
+        ...(["CASH", "UPI", "CARD"] as const)
+            .filter(offered)
+            .map((key) => ({ key, label: METHOD_WORD[key], off: null })),
         ...(input.online === false
             ? []
             : [

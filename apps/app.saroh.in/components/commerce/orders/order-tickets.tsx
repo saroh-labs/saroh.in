@@ -10,6 +10,7 @@ import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 import {
     ticketAttention,
     ticketLine,
@@ -130,6 +131,10 @@ function Ticket({ order }: { order: OrderRead }) {
                   [order.deliveryAddress.city, order.deliveryAddress.postalCode]
                       .filter(Boolean)
                       .join(" "),
+                  // Abroad, the country (DEC-207); India's ticket as it was.
+                  order.deliveryAddress.country
+                      ? deliveryPlace(order.deliveryAddress)
+                      : null,
                   order.deliveryAddress.phone,
               ]
                   .filter(Boolean)

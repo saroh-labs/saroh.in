@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { splitDeliveryPlace } from "@saroh/block-contract";
 import { prisma, runInOrgContext } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 
@@ -31,6 +34,8 @@ export interface SavedAddress {
     city: string;
     state: string;
     postalCode: string;
+    /** ISO code, on a Global business's delivery that named one. */
+    country?: string;
 }
 
 /** What the read selects, and all {@link savedAddressOf} needs. */
@@ -42,6 +47,7 @@ export interface SavedAddressRow {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    deliveryCountry: string | null;
 }
 
 const clean = (value: string | null | undefined): string | null => {
@@ -52,25 +58,35 @@ const clean = (value: string | null | undefined): string | null => {
 
 /**
  * The address on an order, or null when any part a delivery needs is
- * missing: half an address is never offered. Pure.
+ * missing: half an address is never offered. A Global delivery needs no
+ * region or postcode, and its country comes from its own column (DEC-207),
+ * or from the line a delivery stored before that column. Pure.
  */
 export function savedAddressOf(
     row: SavedAddressRow | null | undefined,
+    edition: Edition = "INDIA",
 ): SavedAddress | null {
     if (!row) return null;
     const line1 = clean(row.deliveryLine1);
     const city = clean(row.deliveryCity);
     const state = clean(row.deliveryState);
     const postalCode = clean(row.deliveryPostalCode);
-    if (!line1 || !city || !state || !postalCode) return null;
+    const global = editionProfile(edition).address === "country-and-region";
+    if (!line1 || !city || (!global && (!state || !postalCode))) return null;
+    const place = !global
+        ? null
+        : row.deliveryCountry
+          ? { region: state ?? "", country: row.deliveryCountry }
+          : splitDeliveryPlace(state);
     return {
         name: clean(row.deliveryName),
         phone: clean(row.deliveryPhone),
         line1,
         line2: clean(row.deliveryLine2),
         city,
-        state,
-        postalCode,
+        state: place ? place.region : (state ?? ""),
+        postalCode: postalCode ?? "",
+        ...(place?.country ? { country: place.country } : {}),
     };
 }
 
@@ -107,9 +123,14 @@ export class CheckoutSavedAddressService {
                     deliveryCity: true,
                     deliveryState: true,
                     deliveryPostalCode: true,
+                    deliveryCountry: true,
                 },
             }),
         );
-        return { address: savedAddressOf(row) };
+        const business = await prisma.organization.findUnique({
+            where: { id: customer.organizationId },
+            select: { edition: true },
+        });
+        return { address: savedAddressOf(row, business?.edition) };
     }
 }

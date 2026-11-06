@@ -9,6 +9,7 @@ import {
     PHONE_EXAMPLE,
 } from "@saroh/block-contract";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 /**
  * The business's public phone (DEC-053, F20): the merchant's own number,
@@ -59,16 +60,16 @@ export function phoneWrite(
 } {
     if (raw === undefined) return {};
     // Without a +, the shared rule reads ten digits as Indian (DEC-204).
-    if (edition !== "INDIA" && raw.trim() && !raw.trim().startsWith("+")) {
+    const indian = editionProfile(edition).phoneNumbers === "indian";
+    if (!indian && raw.trim() && !raw.trim().startsWith("+")) {
         throw new BadRequestException({
             message: "Start with + and your country code.",
             details: { field: "phone" },
         });
     }
-    const result =
-        edition === "INDIA"
-            ? normaliseIndianPhone(raw)
-            : normalisePublicPhone(raw);
+    const result = indian
+        ? normaliseIndianPhone(raw)
+        : normalisePublicPhone(raw);
     if ("problem" in result) {
         throw new BadRequestException({
             message: result.problem,

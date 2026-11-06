@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SitePhoneInput } from "./phone-input";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "./site-business";
 
 /** The merchant site's phone field (#1036), as a form holds it. */
 function Harness({ initial = "" }: { initial?: string }) {
@@ -25,6 +26,36 @@ function Harness({ initial = "" }: { initial?: string }) {
 const box = () => screen.getByLabelText("Phone");
 const code = () => screen.getByRole("combobox");
 const value = () => screen.getByTestId("value").textContent;
+
+describe("where a phone field starts (DEC-204)", () => {
+    it("starts on a Global business's country, and sends its code", () => {
+        render(
+            <SiteBusinessProvider
+                value={{
+                    country: "GB",
+                    address: "country-and-region",
+                    phoneNumbers: "with-country-code",
+                }}
+            >
+                <Harness />
+            </SiteBusinessProvider>,
+        );
+        expect(code()).toHaveValue("GB");
+        fireEvent.change(box(), { target: { value: "7911 123456" } });
+        expect(value()).toBe("+447911123456");
+    });
+
+    it("starts on +91 for an India business, whatever country reads", () => {
+        render(
+            <SiteBusinessProvider
+                value={{ ...INDIA_SITE_BUSINESS, country: "India" }}
+            >
+                <Harness />
+            </SiteBusinessProvider>,
+        );
+        expect(code()).toHaveValue("IN");
+    });
+});
 
 describe("SitePhoneInput (#1036)", () => {
     it("starts on India, with the site's tokens only", () => {

@@ -67,8 +67,19 @@ const WEB_URL = process.env.E2E_WEB_URL ?? "https://saroh.localhost";
  */
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "https://admin.saroh.localhost";
 
+/**
+ * The Global edition's merchant app and accounts (`NEXT_PUBLIC_EDITION=GLOBAL`),
+ * a second build of each against the same API: the seeded stack serves them
+ * on 3007 and 3008 (`scripts/prepush.sh`, CI's browser shards). Unset — a
+ * portless dev stack runs India's only — the Global specs skip.
+ */
+const GLOBAL_APP_URL = process.env.E2E_GLOBAL_APP_URL ?? "";
+const GLOBAL_ACCOUNTS_URL = process.env.E2E_GLOBAL_ACCOUNTS_URL ?? "";
+
 export const urls = {
     APP_URL,
+    GLOBAL_APP_URL,
+    GLOBAL_ACCOUNTS_URL,
     ACCOUNTS_URL,
     API_URL,
     RENDERER_URL,

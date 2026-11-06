@@ -6,6 +6,7 @@ import { reservedRemovedEmail } from "../contacts/contact-email";
 import { anonymiseStoreCustomersInTx } from "../customers/anonymise-customer";
 import { enqueueDataRequestEmail } from "../site-accounts/data-request-email.handler";
 import { destinationHashFor } from "../site-accounts/sign-in-codes.service";
+import { deliveryPlaceErased } from "./personal-data";
 import type { RemovalGoes } from "./privacy-removal-plan";
 import {
     REMOVED_BODY,
@@ -122,8 +123,16 @@ export async function removeDetailsInTx(
     });
     const orderIds = orders.map((o) => o.id);
 
-    // Orders keep their lines, amounts, status and `deliveryState` (the GST
-    // place of supply); the recipient and the free-text note go.
+    // Orders keep their lines, amounts, status and, under GST, the state (the
+    // place of supply); the recipient and the free-text note go, and with no
+    // GST the region and country too (DEC-207).
+    const business = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: {
+            edition: true,
+            businessProfile: { select: { taxRate: true } },
+        },
+    });
     const scrubbed = await tx.order.updateMany({
         where: { id: { in: orderIds } },
         data: {
@@ -133,6 +142,10 @@ export async function removeDetailsInTx(
             deliveryLine2: null,
             deliveryCity: null,
             deliveryPostalCode: null,
+            ...deliveryPlaceErased({
+                edition: business?.edition,
+                taxRate: business?.businessProfile?.taxRate,
+            }),
             notes: null,
         },
     });

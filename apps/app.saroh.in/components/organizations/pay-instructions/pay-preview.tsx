@@ -2,6 +2,7 @@ import { PayInstructionsCard, SiteThemeScope } from "@saroh/site-blocks";
 
 import { PreviewPanel } from "@/components/organizations/business-settings/preview-panel";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
+import { payBankSet } from "@/lib/organizations/pay-instructions";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /**
@@ -22,10 +23,7 @@ export function PayPreview({
     businessName: string;
     preview: PayInstructionsSettings;
 }) {
-    const any =
-        !!preview.upiId ||
-        !!(preview.bankAccountNumber && preview.bankIfsc) ||
-        !!preview.note;
+    const any = !!preview.upiId || payBankSet(preview) || !!preview.note;
     return (
         <PreviewPanel
             label="What customers see"

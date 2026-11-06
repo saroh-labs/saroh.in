@@ -16,6 +16,7 @@ import {
     needsWebhookSecret,
     WEBHOOK_EVENTS,
     webhookSecretFrom,
+    webhookSecretRequired,
 } from "./webhook-secret";
 import {
     lacksWebhookSecret,
@@ -134,7 +135,7 @@ describe("the webhook address", () => {
                     where.provider === "RAZORPAY" ? { createdAt: at } : null,
                 ),
         );
-        const setup = await readWebhookSetup("org_1", {
+        const setup = await readWebhookSetup("org_1", "INDIA", {
             webhookEvent: { findFirst },
         } as never);
 
@@ -159,5 +160,32 @@ describe("the webhook address", () => {
                 expect.objectContaining({ organizationId: "org_1" }),
             );
         }
+    });
+
+    it("lists only the business's edition's providers (DEC-208)", async () => {
+        const findFirst = jest.fn(() => Promise.resolve(null));
+        const db = { webhookEvent: { findFirst } } as never;
+
+        await expect(readWebhookSetup("org_1", "GLOBAL", db)).resolves.toEqual([
+            {
+                provider: "STRIPE",
+                url: "https://api.example.test/public/webhooks/stripe/org_1",
+                events: [...WEBHOOK_EVENTS.STRIPE],
+                secretRequired: true,
+                lastReceivedAt: null,
+            },
+        ]);
+        // Unset is India.
+        const india = await readWebhookSetup("org_1", undefined, db);
+        expect(india.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);
+    });
+
+    it("asks for Stripe's signing secret in Stripe's own words", () => {
+        expect(webhookSecretRequired("STRIPE")).toMatch(
+            /Stripe › Developers › Webhooks/,
+        );
+        expect(webhookSecretRequired("RAZORPAY")).toMatch(
+            /Razorpay › Webhooks/,
+        );
     });
 });

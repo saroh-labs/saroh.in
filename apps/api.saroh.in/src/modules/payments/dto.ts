@@ -1,4 +1,5 @@
 import { Transform, Type } from "class-transformer";
+import type { ValidationArguments } from "class-validator";
 import {
     ArrayMinSize,
     IsArray,
@@ -15,13 +16,19 @@ import {
 } from "class-validator";
 
 import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
-import { needsWebhookSecret, WEBHOOK_SECRET_REQUIRED } from "./webhook-secret";
+import { needsWebhookSecret, webhookSecretRequired } from "./webhook-secret";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
 const upper = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toUpperCase() : value;
+
+/** The missing-secret message in the provider's own words. */
+const secretRequiredFor = (args: ValidationArguments): string =>
+    webhookSecretRequired(
+        String((args.object as { provider?: unknown }).provider),
+    );
 
 /**
  * Connect (or re-connect) a merchant payment provider for the org.
@@ -70,8 +77,8 @@ export class ConnectProviderDto {
             needsWebhookSecret(String(o.provider)) || (v != null && v !== ""),
     )
     @Transform(trim)
-    @IsString({ message: WEBHOOK_SECRET_REQUIRED })
-    @MinLength(1, { message: WEBHOOK_SECRET_REQUIRED })
+    @IsString({ message: secretRequiredFor })
+    @MinLength(1, { message: secretRequiredFor })
     @MaxLength(1024)
     webhookSecret?: string;
 }

@@ -3,6 +3,7 @@ import { NotFoundException } from "@nestjs/common";
 
 import { CashfreeWebhookProvider } from "./cashfree.webhook";
 import { RazorpayWebhookProvider } from "./razorpay.webhook";
+import { StripeWebhookProvider } from "./stripe.webhook";
 import type {
     WebhookProvider,
     WebhookProviderFactory,
@@ -32,7 +33,11 @@ export class DefaultWebhookProviderFactory implements WebhookProviderFactory {
 }
 
 function defaultProviders(): WebhookProvider[] {
-    return [new RazorpayWebhookProvider(), new CashfreeWebhookProvider()];
+    return [
+        new RazorpayWebhookProvider(),
+        new CashfreeWebhookProvider(),
+        new StripeWebhookProvider(),
+    ];
 }
 
 /**

@@ -36,6 +36,9 @@ import { newRefCode } from "../waitlist/waitlist-keys";
  * The place stays the Visit us read's (`/visit`, UX-038).
  */
 export interface PublicFooter {
+    /** The business's edition and country: the rules its forms start on. */
+    edition: Edition;
+    country: string | null;
     email: string | null;
     credit: { referralCode: string; edition: Edition } | null;
     seller: {
@@ -113,6 +116,7 @@ export class PublicFooterService {
                     where: { organizationId },
                     select: {
                         contactEmail: true,
+                        country: true,
                         legalName: true,
                         addressLine1: true,
                         addressLine2: true,
@@ -131,6 +135,8 @@ export class PublicFooterService {
               (await this.giveCode(organizationId)))
             : null;
         return {
+            edition: site.organization.edition,
+            country: said(profile?.country),
             email: said(profile?.contactEmail),
             credit: referralCode
                 ? { referralCode, edition: site.organization.edition }

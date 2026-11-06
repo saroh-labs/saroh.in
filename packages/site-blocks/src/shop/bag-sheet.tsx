@@ -11,6 +11,7 @@ import {
 } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
+import { useSiteBusiness } from "../site-business";
 import type {
     CheckoutQuote,
     DeliveryAddress,
@@ -270,6 +271,7 @@ export function BagSheet({
     onPlace: (request: StartCheckout, priced: BagPriced) => void;
     onClose: () => void;
 }) {
+    const { address: addressBy } = useSiteBusiness();
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
     const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
@@ -385,14 +387,17 @@ export function BagSheet({
                     return {
                         ...d,
                         address: last,
-                        saved: addressLeft(last) === null ? "shown" : "typing",
+                        saved:
+                            addressLeft(last, addressBy) === null
+                                ? "shown"
+                                : "typing",
                     };
                 });
             });
         return () => {
             live = false;
         };
-    }, [askSaved, onDraft]);
+    }, [askSaved, onDraft, addressBy]);
 
     if (items.length === 0) {
         return (
@@ -418,7 +423,9 @@ export function BagSheet({
     const applied =
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
-    const addressNote = needsAddress(way) ? addressLeft(address) : null;
+    const addressNote = needsAddress(way)
+        ? addressLeft(address, addressBy)
+        : null;
     const addressOk = addressNote === null;
     const pays = paysOf(quote);
     const pay = payChosen(pays, draft.pay);
@@ -451,7 +458,9 @@ export function BagSheet({
         const body: Omit<StartCheckout, "key"> = {
             lines: [...items],
             fulfilment: way,
-            ...(needsAddress(way) ? { address: trimmed(address) } : {}),
+            ...(needsAddress(way)
+                ? { address: trimmed(address, addressBy) }
+                : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
             ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),
             // Only a code the quote applied: a refused one is never sent.

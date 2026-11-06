@@ -294,6 +294,7 @@ export async function ensureOrderInvoice(
             deliveryCity: true,
             deliveryState: true,
             deliveryPostalCode: true,
+            deliveryCountry: true,
             customer: {
                 select: { firstName: true, lastName: true, email: true },
             },

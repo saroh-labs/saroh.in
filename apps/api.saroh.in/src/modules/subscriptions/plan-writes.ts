@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { fromCents, toCents } from "../invoices/totals";
+import { assertStripeTakes } from "../payments/stripe-minimum";
 import type { PlanInputDto } from "./dto";
 import type { PlanActor } from "./plan-events";
 import {
@@ -74,6 +75,13 @@ export async function createPlanRow(
     if (!price) fieldError("Set a price", "price");
     if (!currency) fieldError("Choose a currency", "currency");
     if (!interval) fieldError("Choose how often it renews", "interval");
+    // Each renewal is one online payment (DEC-208).
+    await assertStripeTakes(
+        prisma,
+        organizationId,
+        { amountCents: toCents(price), currency },
+        "price",
+    );
     const gst = gstColumns(dto);
     const created = await prisma.$transaction(async (tx) => {
         await lockPlanNames(tx, organizationId);
@@ -125,6 +133,17 @@ export async function updatePlanRow(
             select: PLAN_SNAPSHOT_SELECT,
         });
         if (!plan) planNotFound();
+        if (dto.price !== undefined) {
+            await assertStripeTakes(
+                tx,
+                organizationId,
+                {
+                    amountCents: toCents(dto.price),
+                    currency: dto.currency ?? plan.currency,
+                },
+                "price",
+            );
+        }
         // A draft is edited only through its revision-checked autosave (D5);
         // this whole-plan PATCH is the old form's, kept for one release
         // (follow-up Z6), and never saw a draft.

@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { MrpPricing } from "@/lib/gst/mrp";
 import { overMrpProblem, toPayLine } from "@/lib/gst/mrp";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
@@ -407,7 +407,7 @@ export function BasicsSection({
                             ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
                             : sameAsPrice
                               ? "Same as the price, so nothing is struck through."
-                              : EDITION === "GLOBAL"
+                              : PROFILE.struckPrice === "original-price"
                                 ? "A higher price, shown struck through. Leave it empty if there isn't one."
                                 : "The printed price, shown struck through. Leave it empty if it sells at MRP."
                     }

@@ -1,4 +1,5 @@
 import type { CustomerPick } from "@/lib/customers/picker";
+import { offered } from "@/lib/payments/method-words";
 
 /**
  * How a booking made by hand is paid (E4, DEC-170), pure so the booking
@@ -51,11 +52,13 @@ export type PayChoice = "LINK" | "DESK" | "PAID";
 /** How "Paid now" was paid (DEC-170), saved with the booking. */
 export type PaidBy = "CASH" | "UPI" | "CARD";
 
-export const PAID_BY: readonly { key: PaidBy; label: string }[] = [
-    { key: "CASH", label: "Cash" },
-    { key: "UPI", label: "UPI" },
-    { key: "CARD", label: "Card" },
-];
+export const PAID_BY: readonly { key: PaidBy; label: string }[] = (
+    [
+        { key: "CASH", label: "Cash" },
+        { key: "UPI", label: "UPI" },
+        { key: "CARD", label: "Card" },
+    ] as const
+).filter((p) => offered(p.key));
 
 /**
  * The choices in the boards' order (BKMNewBookingStep5): "Pays at the
@@ -99,7 +102,9 @@ export function payNote(choice: PayChoice, amount?: string | null): string {
         case "LINK":
             return "You share it on WhatsApp or SMS. Shows Awaiting payment until paid.";
         case "PAID":
-            return "Cash, UPI or card, taken already";
+            return offered("UPI")
+                ? "Cash, UPI or card, taken already"
+                : "Cash or card, taken already";
     }
 }
 
@@ -116,7 +121,9 @@ export function paidByNote(how: PaidBy, amount?: string | null): string {
 }
 
 /** "Paid now" with no way picked: what the Book button says is missing. */
-export const PAID_BY_MISSING = "Say how they paid: Cash, UPI or Card.";
+export const PAID_BY_MISSING = offered("UPI")
+    ? "Say how they paid: Cash, UPI or Card."
+    : "Say how they paid: Cash or Card.";
 
 /**
  * What stops a booking's payment being sent as chosen, or null: "Paid

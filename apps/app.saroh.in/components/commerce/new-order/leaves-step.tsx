@@ -3,6 +3,7 @@
 import { FailedRead } from "@saroh/ui/failed-read";
 import { Input } from "@saroh/ui/input";
 
+import { useIndiaAddress } from "@/components/shared/fields/business-country";
 import { Chip } from "@/components/shared/lists/chip";
 import type { AddressDraft, NewOrderWay } from "@/lib/orders/new-order";
 import { goesToAddress } from "@/lib/orders/new-order";
@@ -37,6 +38,7 @@ export function LeavesStep({
     failed: boolean;
     loading: boolean;
 }) {
+    const india = useIndiaAddress();
     const set = (field: keyof AddressDraft) => (value: string) =>
         onAddress({ ...address, [field]: value });
     return (
@@ -98,17 +100,17 @@ export function LeavesStep({
                         <Input
                             value={address.state}
                             onChange={(e) => set("state")(e.target.value)}
-                            aria-label="State"
-                            placeholder="State"
+                            aria-label={india ? "State" : "Region and country"}
+                            placeholder={india ? "State" : "Region, country"}
                             autoComplete="address-level1"
                             className={FIELD}
                         />
                         <Input
                             value={address.postalCode}
                             onChange={(e) => set("postalCode")(e.target.value)}
-                            aria-label="PIN code"
-                            placeholder="PIN"
-                            inputMode="numeric"
+                            aria-label={india ? "PIN code" : "Postcode"}
+                            placeholder={india ? "PIN" : "Postcode"}
+                            inputMode={india ? "numeric" : undefined}
                             autoComplete="postal-code"
                             className={FIELD}
                         />

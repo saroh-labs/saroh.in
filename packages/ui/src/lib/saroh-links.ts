@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import { parseEdition, siteUrlOf } from "@saroh/edition";
 
 /**
@@ -17,10 +18,21 @@ import { parseEdition, siteUrlOf } from "@saroh/edition";
  * `apps/app.saroh.in/lib/help/links.ts`).
  */
 
+const EDITION = parseEdition(process.env.NEXT_PUBLIC_EDITION);
+
 /** This deployment's marketing site. */
-export const SAROH_SITE_URL = siteUrlOf(
-    parseEdition(process.env.NEXT_PUBLIC_EDITION),
-);
+export const SAROH_SITE_URL = siteUrlOf(EDITION);
+
+/**
+ * Where each site keeps its legal pages: saroh.in at its root, saroh.tech
+ * under /legal. Help is /help on both. `saroh-links.test.ts` checks each
+ * against the site's own routes.
+ */
+export const LEGAL_PATHS: Record<Edition, { privacy: string; terms: string }> =
+    {
+        INDIA: { privacy: "/privacy", terms: "/terms" },
+        GLOBAL: { privacy: "/legal/privacy", terms: "/legal/terms" },
+    };
 
 /** Where Help lives until it publishes on the marketing site. */
 export const SAROH_OLD_HELP_URL = "https://help.saroh.in";
@@ -43,18 +55,23 @@ export interface SarohLink {
 }
 
 /** Privacy · Terms · Help, each only where it has a page to open at `now`. */
-export function sarohFooterLinks(now: Date = new Date()): SarohLink[] {
+export function sarohFooterLinks(
+    now: Date = new Date(),
+    edition: Edition = EDITION,
+): SarohLink[] {
+    const site = siteUrlOf(edition);
+    const legal = LEGAL_PATHS[edition];
     const links: SarohLink[] = [];
     if (hasBegun(PUBLISHED_ON.privacy, now)) {
-        links.push({ label: "Privacy", href: `${SAROH_SITE_URL}/privacy` });
+        links.push({ label: "Privacy", href: `${site}${legal.privacy}` });
     }
     if (hasBegun(PUBLISHED_ON.terms, now)) {
-        links.push({ label: "Terms", href: `${SAROH_SITE_URL}/terms` });
+        links.push({ label: "Terms", href: `${site}${legal.terms}` });
     }
     links.push({
         label: "Help",
         href: hasBegun(PUBLISHED_ON.help, now)
-            ? `${SAROH_SITE_URL}/help`
+            ? `${site}/help`
             : SAROH_OLD_HELP_URL,
     });
     return links;

@@ -4,7 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Copy } from "lucide-react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import {
     addedLineOf,
     isExemptPaper,
@@ -128,7 +128,7 @@ export function TaxRows({
             ]
           : Number(i.tax) > 0
             ? [[i.taxLabel ?? "Tax", money(i.tax)]]
-            : EDITION === "GLOBAL"
+            : PROFILE.taxSystem === "named-line"
               ? []
               : [[`No GST. ${seller} isn't registered`, ""]];
     return (

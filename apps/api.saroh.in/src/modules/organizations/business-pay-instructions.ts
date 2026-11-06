@@ -1,6 +1,18 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import {
+    bankCodesOf,
+    bankDetailsWhole,
+    bankFormatFor,
+    checkBankAccount,
+    checkBankCode,
+    checkSwift,
+    editionProfile,
+    joinBankCodes,
+    SWIFT_LABEL,
+} from "@saroh/edition";
 
 import { publicPhone } from "./business-phone";
 
@@ -18,7 +30,22 @@ import { publicPhone } from "./business-phone";
  * These are a business's own payment details, but an account number is
  * still not something to scatter: never logged, and the audit stream names
  * a change without its value (`audit/audit-changes.ts`, NAME_ONLY_FIELDS).
+ *
+ * A Global business (DEC-204) has no UPI, and its bank details follow its
+ * country (`@saroh/edition` bank-details): an IBAN, or a country's own account
+ * number and code (a US routing number, an Australian BSB), and an optional
+ * SWIFT/BIC kept after the code in the same column. The rules go by the
+ * business's edition and country, never the caller.
+ *
+ * Off where the edition doesn't offer it (`payInstructionsOffered`): Global
+ * takes payment through Stripe only for now (owner, 6 Nov 2026, DEC-208). A
+ * write is refused and a customer is shown nothing, even from a row saved
+ * before; the per-country rules below stay for when it returns.
  */
+
+/** The refusal of a pay write where the edition doesn't offer How to pay us. */
+export const PAY_INSTRUCTIONS_OFF =
+    "Bank transfer details aren't available for businesses outside India yet. Customers pay online with Stripe.";
 
 /** "asha.kapoor@okhdfc": a handle, an @, and the bank's PSP handle. */
 export const UPI_ID = /^[a-z0-9][a-z0-9._-]{1,255}@[a-z][a-z0-9.-]{1,63}$/;
@@ -44,25 +71,64 @@ export const PAY_FIELDS = {
 export type PayField = keyof typeof PAY_FIELDS;
 type PayColumn = (typeof PAY_FIELDS)[PayField];
 
-/** What the settings save takes: absent leaves a field, "" clears it. */
-export type PayInstructionsInput = Partial<Record<PayField, string>>;
+/** A Global business's SWIFT/BIC: no column, it follows the code in `payBankIfsc`. */
+type InputField = PayField | "bankSwift";
 
-/** The business's pay instructions as stored, every field or null. */
-export type PayInstructionsView = Record<PayField, string | null>;
+/** What the settings save takes: absent leaves a field, "" clears it. */
+export type PayInstructionsInput = Partial<Record<InputField, string>>;
+
+/** What a Global business's bank calls each number, for the customer's card. */
+export interface BankLabels {
+    account: string;
+    code: string | null;
+    swift: string;
+}
+
+/**
+ * The business's pay instructions as stored, every field or null. `edition` is
+ * sent only for a Global business; absent reads as India. A Global business's
+ * `bankIfsc` is its country's own code, and it also has its `bankSwift`, its
+ * `country` and the `bankLabels` its customers read.
+ */
+export type PayInstructionsView = Record<PayField, string | null> & {
+    edition?: Edition;
+    bankSwift?: string | null;
+    country?: string | null;
+    bankLabels?: BankLabels;
+};
 
 /** The columns a read selects. */
 export const PAY_SELECT = {
     payUpiId: true,
     payBankAccountName: true,
     payBankAccountNumber: true,
+    // A Global business's bank code lives here too: the same place on the same
+    // card, so one column serves both and no migration is needed.
     payBankIfsc: true,
     payBankName: true,
     payNote: true,
 } as const;
 
-export type PayRow = Partial<Record<PayColumn, string | null>>;
+/**
+ * A customer's read: the columns, and the edition and country that say how to
+ * read them. The save reads the same, to judge a Global business's bank.
+ */
+export const PAY_PUBLIC_SELECT = {
+    ...PAY_SELECT,
+    country: true,
+    organization: { select: { edition: true } },
+} as const;
+
+export type PayRow = Partial<Record<PayColumn, string | null>> & {
+    country?: string | null;
+    organization?: { edition: Edition } | null;
+};
 
 const UPI_EXAMPLE = "yourname@okhdfc";
+
+/** No UPI and an optional bank code; the view says so with its `edition`. */
+const bankCode = (edition: Edition | null | undefined) =>
+    editionProfile(edition).payInstructions === "bank-code";
 
 /**
  * One typed value as stored, or why it can't be. Pure: the save names the
@@ -71,9 +137,15 @@ const UPI_EXAMPLE = "yourname@okhdfc";
 export function normalisePayField(
     field: PayField,
     raw: string,
+    edition: Edition = "INDIA",
+    country?: string | null,
 ): { value: string | null } | { problem: string } {
     const trimmed = raw.trim();
     if (trimmed === "") return { value: null };
+    if (bankCode(edition)) {
+        const global = normaliseGlobalBankField(field, trimmed, country);
+        if (global) return global;
+    }
     switch (field) {
         case "upiId": {
             const id = trimmed.toLowerCase();
@@ -121,7 +193,26 @@ export function normalisePayField(
     }
 }
 
-function refuse(field: PayField, message: string): never {
+/** A Global business's own rules, or null for a field India's rules also fit. */
+function normaliseGlobalBankField(
+    field: PayField,
+    trimmed: string,
+    country: string | null | undefined,
+): { value: string } | { problem: string } | null {
+    switch (field) {
+        case "upiId":
+            return { problem: "UPI only works for a business in India." };
+        case "bankAccountNumber":
+            return checkBankAccount(country, trimmed);
+        // The country's own code alone; the save adds the SWIFT/BIC after it.
+        case "bankIfsc":
+            return checkBankCode(country, trimmed);
+        default:
+            return null;
+    }
+}
+
+function refuse(field: InputField, message: string): never {
     throw new BadRequestException({ message, details: { field } });
 }
 
@@ -129,21 +220,41 @@ function refuse(field: PayField, message: string): never {
  * The settings save's write: only the fields sent, each checked and made
  * plain, as columns. Bank details go together — a number without the IFSC
  * or the name on the account can't be paid into — so they are judged as
- * they will stand once saved (`current`, the row before this save).
+ * they will stand once saved (`current`, the row before this save). A Global
+ * business's bank code is optional: not every country's transfer needs one.
  */
 export function payInstructionsWrite(
     input: PayInstructionsInput | undefined,
     current: PayRow | null,
+    edition: Edition = "INDIA",
 ): Partial<Record<PayColumn, string | null>> {
     if (!input) return {};
+    if (
+        !editionProfile(edition).payInstructionsOffered &&
+        Object.values<string | undefined>(input).some((v) => v !== undefined)
+    ) {
+        throw new BadRequestException({
+            message: PAY_INSTRUCTIONS_OFF,
+            details: { field: "payInstructions" },
+        });
+    }
+    const global = bankCode(edition);
+    const country = current?.country;
     const written: Partial<Record<PayColumn, string | null>> = {};
     for (const field of Object.keys(PAY_FIELDS) as PayField[]) {
         const raw = input[field];
         if (raw === undefined) continue;
         if (typeof raw !== "string") refuse(field, "That isn't text.");
-        const result = normalisePayField(field, raw);
+        if (global && field === "bankIfsc") continue;
+        const result = normalisePayField(field, raw, edition, country);
         if ("problem" in result) refuse(field, result.problem);
         written[PAY_FIELDS[field]] = result.value;
+    }
+    if (
+        global &&
+        (input.bankIfsc !== undefined || input.bankSwift !== undefined)
+    ) {
+        written.payBankIfsc = globalCodesWrite(input, current);
     }
     if (Object.keys(written).length === 0) return {};
 
@@ -164,10 +275,16 @@ export function payInstructionsWrite(
         if (!has("payBankAccountNumber")) {
             refuse(
                 "bankAccountNumber",
-                "Add the account number, or clear the bank details.",
+                global
+                    ? bankFormatFor(country).accountMissing
+                    : "Add the account number, or clear the bank details.",
             );
         }
-        if (!has("payBankIfsc")) {
+        if (global) {
+            const { codeMissing } = bankFormatFor(country);
+            if (codeMissing && !bankCodesOf(country, after.payBankIfsc).code)
+                refuse("bankIfsc", codeMissing);
+        } else if (!has("payBankIfsc")) {
             refuse(
                 "bankIfsc",
                 "Add the IFSC: a transfer needs it with the account number.",
@@ -177,8 +294,60 @@ export function payInstructionsWrite(
     return written;
 }
 
+/**
+ * A Global business's codes column: its country's own code, then its
+ * SWIFT/BIC, each the one sent or else the one already kept.
+ */
+function globalCodesWrite(
+    input: PayInstructionsInput,
+    current: PayRow | null,
+): string | null {
+    const country = current?.country;
+    const before = bankCodesOf(country, current?.payBankIfsc);
+    const part = (
+        field: "bankIfsc" | "bankSwift",
+        check: (typed: string) => { value: string } | { problem: string },
+        kept: string | null,
+    ) => {
+        const raw = input[field];
+        if (raw === undefined) return kept;
+        if (typeof raw !== "string") refuse(field, "That isn't text.");
+        const trimmed = raw.trim();
+        if (trimmed === "") return null;
+        const result = check(trimmed);
+        if ("problem" in result) refuse(field, result.problem);
+        return result.value;
+    };
+    return joinBankCodes(
+        part("bankIfsc", (t) => checkBankCode(country, t), before.code),
+        part("bankSwift", checkSwift, before.swift),
+    );
+}
+
+/** A Global business's codes split, its country, and its customers' words. */
+function globalBankView(
+    country: string | null | undefined,
+    codes: string | null | undefined,
+) {
+    const format = bankFormatFor(country);
+    const { code, swift } = bankCodesOf(country, codes);
+    return {
+        bankIfsc: code,
+        bankSwift: swift,
+        country: country ?? null,
+        bankLabels: {
+            account: format.account,
+            code: format.code,
+            swift: SWIFT_LABEL,
+        },
+    };
+}
+
 /** Every field as stored, for the business's own settings read. */
-export function payInstructionsView(row: PayRow | null): PayInstructionsView {
+export function payInstructionsView(
+    row: PayRow | null,
+    edition: Edition = "INDIA",
+): PayInstructionsView {
     return {
         upiId: row?.payUpiId ?? null,
         bankAccountName: row?.payBankAccountName ?? null,
@@ -186,6 +355,12 @@ export function payInstructionsView(row: PayRow | null): PayInstructionsView {
         bankIfsc: row?.payBankIfsc ?? null,
         bankName: row?.payBankName ?? null,
         note: row?.payNote ?? null,
+        ...(bankCode(edition)
+            ? {
+                  edition,
+                  ...globalBankView(row?.country, row?.payBankIfsc),
+              }
+            : {}),
     };
 }
 
@@ -193,19 +368,32 @@ export function payInstructionsView(row: PayRow | null): PayInstructionsView {
  * What a customer may be shown, or null when there is nothing to show. A
  * stored value is re-checked on the way out rather than trusted (the public
  * phone's rule): a UPI ID that isn't one would draw a QR that pays nobody,
- * and bank details missing a part are left out whole.
+ * and bank details missing a part are left out whole. A Global business
+ * shows no UPI ID, even one saved before it was refused.
  */
 export function publicPayInstructions(
     row: PayRow | null | undefined,
 ): PayInstructionsView | null {
     if (!row) return null;
-    const upi = row.payUpiId && UPI_ID.test(row.payUpiId) ? row.payUpiId : null;
+    const edition = row.organization?.edition;
+    if (!editionProfile(edition).payInstructionsOffered) return null;
+    const global = bankCode(edition);
+    const upi =
+        !global && row.payUpiId && UPI_ID.test(row.payUpiId)
+            ? row.payUpiId
+            : null;
     const bankWhole =
         !!row.payBankAccountName &&
         !!row.payBankAccountNumber &&
-        ACCOUNT_NUMBER.test(row.payBankAccountNumber) &&
-        !!row.payBankIfsc &&
-        IFSC.test(row.payBankIfsc);
+        (global
+            ? bankDetailsWhole(
+                  row.country,
+                  row.payBankAccountNumber,
+                  row.payBankIfsc,
+              )
+            : ACCOUNT_NUMBER.test(row.payBankAccountNumber) &&
+              !!row.payBankIfsc &&
+              IFSC.test(row.payBankIfsc));
     const note = row.payNote?.trim() ? row.payNote.trim() : null;
     if (!upi && !bankWhole && !note) return null;
     return {
@@ -217,6 +405,15 @@ export function publicPayInstructions(
         bankIfsc: bankWhole ? (row.payBankIfsc ?? null) : null,
         bankName: bankWhole ? (row.payBankName ?? null) : null,
         note,
+        ...(global && edition
+            ? {
+                  edition,
+                  ...globalBankView(
+                      row.country,
+                      bankWhole ? row.payBankIfsc : null,
+                  ),
+              }
+            : {}),
     };
 }
 
@@ -232,7 +429,7 @@ export async function businessPayInstructionsOf(
 ): Promise<PayInstructionsView | null> {
     const profile = await db.businessProfile.findUnique({
         where: { organizationId },
-        select: PAY_SELECT,
+        select: PAY_PUBLIC_SELECT,
     });
     return publicPayInstructions(profile);
 }
