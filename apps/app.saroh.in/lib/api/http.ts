@@ -14,6 +14,7 @@ import {
     WRITE_TIMEOUT_MS,
 } from "@/lib/api/unreached";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { EDITION } from "@/lib/edition";
 import type { RateItem } from "@/lib/gst-rates/missing";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { pickActive } from "@/lib/organizations/choose";
@@ -86,9 +87,14 @@ const memberOrgIds = cache(
         });
         if (!res.ok) return null;
         const orgs = (await res.json().catch(() => null)) as
-            { id: string; paused?: boolean }[] | null;
+            { id: string; paused?: boolean; edition?: string }[] | null;
+        // This deployment's businesses only, as the chrome's list is
+        // (`listOrganizations`): otherwise a person in both editions, with no
+        // business chosen, saw one business's name over another's data.
         return Array.isArray(orgs)
-            ? orgs.map((o) => ({ id: o.id, paused: o.paused === true }))
+            ? orgs
+                  .filter((o) => (o.edition ?? "INDIA") === EDITION)
+                  .map((o) => ({ id: o.id, paused: o.paused === true }))
             : null;
     },
 );
