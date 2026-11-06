@@ -10,7 +10,7 @@ import { SAROH_NAME } from "./name";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-06";
 
 /**
  * /about, from the design "Saroh Marketing Site V2 - About" (DEC-137): who
