@@ -162,11 +162,12 @@ describe("the Terms' 9 Oct additions (rev 46)", () => {
         }
     });
 
-    it("moved the page's Last updated to 10 Oct, and DEC-161 to 14 Oct", () => {
+    it("moved the page's Last updated to 10 Oct, DEC-161 to 14 Oct, and early access to 6 Nov", () => {
         // 10 Oct for these additions (and the DPDP alignment); 14 Oct for
-        // the autopay and price-change sentences (DEC-161).
+        // the autopay and price-change sentences (DEC-161); 6 Nov for
+        // "Saroh is in early access." (owner).
         expect(LEGAL_PAGES.find((p) => p.id === "terms")?.publishOn).toBe(
-            "2026-10-14",
+            "2026-11-06",
         );
     });
 });

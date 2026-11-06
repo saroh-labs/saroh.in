@@ -7,8 +7,8 @@ import { UsageTable } from "./usage-table";
 
 /**
  * Everything on a pricing page the two switches change: the site's plan cards
- * (`cards`, `PricingCards` with its button and toggle), then the usage table
- * and the comparison table's prices, following the same switches.
+ * (`cards`, `PricingCards` with its button and toggle), then the comparison
+ * table and the usage table, following the same switches.
  */
 export function PricingPlans({
     model,
@@ -39,17 +39,18 @@ export function PricingPlans({
                 </h2>
                 {cards}
             </Container>
-            <UsageTable
-                plans={switches.view.plans}
-                usage={switches.view.usage}
-                title={usageTitle}
-                lead={usageLead}
-            />
+            {/* Compare first, then usage (owner, 6 Nov 2026). */}
             <CompareTable
                 plans={switches.view.plans}
                 rows={model.rows}
                 placeholder={model.placeholder}
                 placeholderNote={placeholderNote}
+            />
+            <UsageTable
+                plans={switches.view.plans}
+                usage={switches.view.usage}
+                title={usageTitle}
+                lead={usageLead}
             />
         </>
     );

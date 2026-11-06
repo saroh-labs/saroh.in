@@ -10,7 +10,7 @@ import { SAROH_NAME } from "./name";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-06";
 
 /**
  * /about, from the design "Saroh Marketing Site V2 - About" (DEC-137): who
@@ -150,7 +150,11 @@ export const ABOUT = {
 
     where: {
         eyebrow: "Where we are",
-        title: `Early access, from ${EARLY_ACCESS_LONG}.`,
+        /** A date only while it is still to come: once open, early access just is. */
+        title: {
+            waitlist: `Early access, from ${EARLY_ACCESS_LONG}.`,
+            open: "In early access.",
+        } satisfies ModeWords,
         /** The paragraph's first sentence: only open mode can say "live". */
         opens: {
             waitlist: `Saroh opens in early access on ${EARLY_ACCESS_LONG}.`,
