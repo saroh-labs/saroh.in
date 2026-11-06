@@ -34,11 +34,21 @@ export interface PersonalField {
 /**
  * What a removal and the retention eraser write of an order's place past the
  * city (DEC-207). Under GST the state is the place of supply and stays
- * (DEC-122), and such an order has no country; with no GST, nothing reads the
- * region, so it goes with the country.
+ * (DEC-122). A business that charges a tax of its own (VAT, sales tax) keeps
+ * the region and country too: they show where the sale was taxed. Only a
+ * business charging no tax loses them.
  */
-export const deliveryPlaceErased = (edition: Edition | null | undefined) =>
-    editionProfile(edition).taxSystem === "gst"
+export const deliveryPlaceErased = (
+    business:
+        | {
+              edition?: Edition | null;
+              taxRate?: { toString(): string } | number | null;
+          }
+        | null
+        | undefined,
+) =>
+    editionProfile(business?.edition).taxSystem === "gst" ||
+    Number(business?.taxRate?.toString() ?? 0) > 0
         ? {}
         : { deliveryState: null, deliveryCountry: null };
 

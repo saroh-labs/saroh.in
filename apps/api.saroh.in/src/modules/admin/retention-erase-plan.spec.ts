@@ -91,7 +91,7 @@ describe("the retention erase plan (DEC-122)", () => {
         // And the fields kept for tax are never written. The delivery state
         // is written only through `deliveryPlaceErased`, which keeps it
         // under GST (below).
-        expect(writes).toContain("...deliveryPlaceErased(business?.edition)");
+        expect(writes).toContain("...deliveryPlaceErased(business)");
         for (const kept of [
             "deliveryState",
             "deliveryCountry",
@@ -109,13 +109,31 @@ describe("the retention erase plan (DEC-122)", () => {
             expect(`${kept}: ${writes.includes(kept)}`).toBe(`${kept}: false`);
         }
         // A GST business's orders keep their state, as before (DEC-122)...
-        expect(deliveryPlaceErased("INDIA")).toEqual({});
+        expect(deliveryPlaceErased({ edition: "INDIA" })).toEqual({});
+        expect(deliveryPlaceErased({ edition: "INDIA", taxRate: 0 })).toEqual(
+            {},
+        );
         expect(deliveryPlaceErased(null)).toEqual({});
-        // ...and one with no GST loses its region and country (DEC-207).
-        expect(deliveryPlaceErased("GLOBAL")).toEqual({
-            deliveryState: null,
-            deliveryCountry: null,
-        });
+        // ...a Global business charging its own tax keeps them, where the
+        // sale was taxed (DEC-207)...
+        expect(deliveryPlaceErased({ edition: "GLOBAL", taxRate: 20 })).toEqual(
+            {},
+        );
+        expect(
+            deliveryPlaceErased({
+                edition: "GLOBAL",
+                taxRate: { toString: () => "8.25" },
+            }),
+        ).toEqual({});
+        // ...and one charging no tax loses its region and country.
+        for (const taxRate of [null, 0, undefined]) {
+            expect(deliveryPlaceErased({ edition: "GLOBAL", taxRate })).toEqual(
+                {
+                    deliveryState: null,
+                    deliveryCountry: null,
+                },
+            );
+        }
         // An order is only ever updated, never deleted.
         expect(writes).not.toMatch(/tx\.order\.delete/);
         expect(writes).not.toMatch(/tx\.booking\.delete/);
