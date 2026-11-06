@@ -41,6 +41,11 @@ export function providerLabel(provider: string): string {
  * when it can't say, so a typo is never saved as connected. An adapter
  * without a check (none today) is let through.
  */
+/** What each provider calls the two keys a merchant copies. */
+const KEY_WORDS: Readonly<Record<string, string>> = {
+    STRIPE: "the publishable key and the restricted key",
+};
+
 export async function assertKeysAccepted(
     adapter: MerchantProvider,
     provider: string,
@@ -52,7 +57,7 @@ export async function assertKeysAccepted(
     if (check === "ACCEPTED") return;
     if (check === "REJECTED") {
         throw new BadRequestException({
-            message: `${label} didn't accept these keys. Copy the key id and secret from your ${label} dashboard again, in the same mode (test or live).`,
+            message: `${label} didn't accept these keys. Copy ${KEY_WORDS[provider] ?? "the key id and secret"} from your ${label} dashboard again, in the same mode (test or live).`,
             field: "keySecret",
         });
     }
