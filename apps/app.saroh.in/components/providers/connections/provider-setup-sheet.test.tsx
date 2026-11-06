@@ -35,6 +35,20 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
 }));
 
+// Which edition this is (DEC-204): its profile lists the payment providers.
+const edition = vi.hoisted((): { name: "INDIA" | "GLOBAL" } => ({
+    name: "INDIA",
+}));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
@@ -63,6 +77,7 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    edition.name = "INDIA";
     for (const fn of [
         connectPaymentProvider,
         refresh,
@@ -105,7 +120,7 @@ const HOOKS: PaymentWebhookSetup[] = [
 ];
 
 function open(
-    provider: "RAZORPAY" | "CASHFREE",
+    provider: "RAZORPAY" | "CASHFREE" | "STRIPE" | undefined,
     over: {
         connected?: ConnectedPaymentProvider[];
         webhooks?: PaymentWebhookSetup[] | null;
@@ -115,7 +130,7 @@ function open(
         root.render(
             <ProviderSetupSheet
                 kind="payments"
-                label={provider === "RAZORPAY" ? "Razorpay" : "Cashfree"}
+                label={provider ?? "Payments"}
                 trigger="Connect"
                 urgent={false}
                 provider={provider}
@@ -164,7 +179,8 @@ function typeInto(el: HTMLInputElement, value: string) {
     });
 }
 
-const save = () => button(/^ ?Connect Razorpay|Save keys|Connect Cashfree/);
+const save = () =>
+    button(/^ ?Connect Razorpay|Save keys|Connect Cashfree|Connect Stripe/);
 
 describe("Razorpay setup, as guided steps", () => {
     it("shows the three steps, the webhook URL and the events to tick", () => {
@@ -309,5 +325,217 @@ describe("Cashfree setup", () => {
         typeInto(byLabel("Key ID"), "TEST1234app");
         typeInto(byLabel("Key secret"), "cfsk_secret");
         expect(save().disabled).toBe(false);
+    });
+});
+
+describe("which providers each edition offers", () => {
+    it("India: Razorpay first, then Cashfree, never Stripe", () => {
+        open(undefined);
+        expect(text()).toContain("Tell Razorpay where to send payment updates");
+        expect(text()).not.toContain("Stripe");
+        // A choice of two, opening on Razorpay.
+        expect(byLabel("Provider").textContent).toContain("Razorpay");
+    });
+
+    it("Global: Stripe only, with no picker", () => {
+        edition.name = "GLOBAL";
+        open(undefined);
+        const t = text();
+        expect(t).toContain("Tell Stripe where to send payment updates");
+        expect(t).not.toMatch(/Razorpay|Cashfree/);
+        expect(() => byLabel("Provider")).toThrow();
+    });
+});
+
+const URL_STRIPE = "https://api.saroh.in/public/webhooks/stripe/org_1";
+const STRIPE_EVENTS = [
+    "payment_intent.succeeded",
+    "payment_intent.payment_failed",
+    "refund.created",
+    "refund.updated",
+    "refund.failed",
+];
+const STRIPE_HOOKS: PaymentWebhookSetup[] = [
+    {
+        provider: "STRIPE",
+        url: URL_STRIPE,
+        events: STRIPE_EVENTS,
+        secretRequired: true,
+        lastReceivedAt: null,
+    },
+];
+
+function openStripe(over: { connected?: ConnectedPaymentProvider[] } = {}) {
+    edition.name = "GLOBAL";
+    open("STRIPE", { webhooks: STRIPE_HOOKS, ...over });
+}
+
+/** Each field's message under it, by its label. */
+function said(label: string): string | null {
+    const field = byLabel(label);
+    const id = field.getAttribute("aria-describedby");
+    return id ? (document.getElementById(id)?.textContent ?? null) : null;
+}
+
+function fillStripe(
+    keys: Partial<Record<"pk" | "rk" | "wh", string>> = {},
+): void {
+    typeInto(byLabel("Publishable key"), keys.pk ?? "pk_test_example");
+    typeInto(byLabel("Restricted key"), keys.rk ?? "rk_test_example");
+    typeInto(byLabel("Webhook signing secret"), keys.wh ?? "whsec_example");
+}
+
+async function press() {
+    await act(async () => {
+        save().click();
+        await Promise.resolve();
+    });
+}
+
+describe("Stripe setup (Global)", () => {
+    it("asks for three things, as the steps taken in Stripe", () => {
+        openStripe();
+        const t = text();
+        expect(t).toContain("Developers › API keys");
+        expect(t).toContain("Payment Intents: Write and Refunds: Write");
+        expect(t).toContain("Developers › Webhooks › Add endpoint");
+        expect(t).toContain("choose API version 2026-10-28.endive");
+        expect(byLabel("Webhook URL").value).toBe(URL_STRIPE);
+        for (const event of STRIPE_EVENTS) expect(t).toContain(event);
+        expect(t).toContain("Customers pay by card for now.");
+        expect(t).toContain("Stripe also emails its own receipt");
+        expect(byLabel("Publishable key").type).toBe("text");
+        expect(byLabel("Restricted key").type).toBe("password");
+        expect(byLabel("Webhook signing secret").type).toBe("password");
+        // Stripe makes the secret: nothing to generate, no autopay events.
+        expect(() => button(/Generate/)).toThrow();
+        expect(t).not.toContain("Autopay");
+        expect(t).not.toContain("Key ID");
+    });
+
+    it("says what each key should start with, as it is typed", () => {
+        openStripe();
+        typeInto(byLabel("Publishable key"), "rk_test_example");
+        expect(said("Publishable key")).toBe(
+            "That isn't a publishable key. It starts pk_live_ or pk_test_.",
+        );
+        typeInto(byLabel("Restricted key"), "pk_test_example");
+        expect(said("Restricted key")).toBe(
+            "That isn't a restricted key. It starts rk_live_ or rk_test_.",
+        );
+        typeInto(byLabel("Webhook signing secret"), "example");
+        expect(said("Webhook signing secret")).toBe(
+            "That isn't a webhook signing secret. It starts whsec_.",
+        );
+        expect(
+            byLabel("Webhook signing secret").getAttribute("aria-invalid"),
+        ).toBe("true");
+    });
+
+    it("turns away a full secret key", async () => {
+        openStripe();
+        fillStripe({ rk: "sk_test_example" });
+        expect(said("Restricted key")).toBe(
+            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.",
+        );
+        await press();
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+    });
+
+    it("wants both keys in the same mode", async () => {
+        openStripe();
+        fillStripe({ pk: "pk_live_example", rk: "rk_test_example" });
+        expect(said("Restricted key")).toBe(
+            "The publishable key is a live key and the restricted key is a test key. Use two test keys or two live keys.",
+        );
+        await press();
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+    });
+
+    it("says what is missing once the button is pressed", async () => {
+        openStripe();
+        expect(said("Publishable key")).toBe(
+            "Opens your checkout, so customers see it.",
+        );
+        await press();
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+        expect(said("Publishable key")).toBe(
+            "Enter the publishable key. It starts pk_live_ or pk_test_.",
+        );
+        expect(said("Restricted key")).toBe(
+            "Enter the restricted key. It starts rk_live_ or rk_test_.",
+        );
+        expect(said("Webhook signing secret")).toBe(
+            "Enter the webhook signing secret. It starts whsec_.",
+        );
+        expect(text()).toContain("Check the keys marked above to connect.");
+    });
+
+    it("reads test keys as test mode", () => {
+        openStripe();
+        expect(text()).not.toContain("Test mode");
+        typeInto(byLabel("Publishable key"), "pk_test_example");
+        expect(text()).toContain(
+            "Test mode: use Stripe's test dashboard for the webhook too.",
+        );
+    });
+
+    it("sends the three keys, the publishable key as the public one", async () => {
+        connectPaymentProvider.mockResolvedValue({ ok: true, data: {} });
+        openStripe();
+        fillStripe({ pk: " pk_live_example ", rk: "rk_live_example" });
+        await press();
+        expect(connectPaymentProvider).toHaveBeenCalledWith({
+            provider: "STRIPE",
+            keyId: "pk_live_example",
+            keySecret: "rk_live_example",
+            publicKey: "pk_live_example",
+            webhookSecret: "whsec_example",
+        });
+        expect(showSuccess).toHaveBeenCalledWith("Stripe connected.");
+    });
+
+    it.each([
+        ["keySecret", "Restricted key"],
+        ["publicKey", "Publishable key"],
+        ["keyId", "Publishable key"],
+        ["webhookSecret", "Webhook signing secret"],
+    ])(
+        "puts the API's refusal about %s under %s, and clears it when that key changes",
+        async (field, label) => {
+            const error =
+                "This key can't see payments or refunds. Give it PaymentIntents: Write and Refunds: Write.";
+            connectPaymentProvider.mockResolvedValue({
+                ok: false,
+                error,
+                field,
+            });
+            openStripe();
+            fillStripe();
+            await press();
+            expect(said(label)).toBe(error);
+            expect(showError).not.toHaveBeenCalled();
+            const typed =
+                label === "Restricted key"
+                    ? "rk_test_other"
+                    : label === "Publishable key"
+                      ? "pk_test_other"
+                      : "whsec_other";
+            typeInto(byLabel(label), typed);
+            expect(said(label)).not.toBe(error);
+        },
+    );
+
+    it("says a refusal with no field as a toast", async () => {
+        connectPaymentProvider.mockResolvedValue({
+            ok: false,
+            error: "We couldn't reach Stripe to check these keys. Try again in a minute.",
+        });
+        openStripe();
+        fillStripe();
+        await press();
+        expect(showError).toHaveBeenCalledWith(
+            "We couldn't reach Stripe to check these keys. Try again in a minute.",
+        );
     });
 });

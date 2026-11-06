@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
@@ -6,9 +6,28 @@ import type { ProviderRowsInput } from "./rows";
 import {
     buildProvidersView,
     dashboardFor,
+    needsPublicKey,
     paymentsConsequence,
     RAZORPAY_KEY_ID,
+    stripeKeyProblems,
 } from "./rows";
+
+// Which edition this is (DEC-204): its profile lists the payment providers.
+const edition = vi.hoisted((): { name: "INDIA" | "GLOBAL" } => ({
+    name: "INDIA",
+}));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+afterEach(() => {
+    edition.name = "INDIA";
+});
 
 describe("disconnecting a payment provider (#921)", () => {
     it("warns that its customers' autopay memberships there aren't cancelled", () => {
@@ -77,7 +96,7 @@ function input(over: Partial<ProviderRowsInput> = {}): ProviderRowsInput {
 }
 
 const pay = (
-    provider: "RAZORPAY" | "CASHFREE",
+    provider: "RAZORPAY" | "CASHFREE" | "STRIPE",
     status = "CONNECTED",
     publicKey: string | null = null,
 ) => ({ id: provider, provider, status, publicKey, updatedAt: "" });
@@ -458,5 +477,110 @@ describe("no Saroh-sent booking emails (DEC-086 removed, #1134)", () => {
         expect(view.any).toBe(false);
         expect(view.connectEmailKey).toBeNull();
         expect(view).not.toHaveProperty("bookingEmails");
+    });
+});
+
+describe("Stripe, on Global only", () => {
+    it("Global offers Stripe and no Indian provider", () => {
+        edition.name = "GLOBAL";
+        const view = buildProvidersView(input());
+        const all = names(view.available);
+        expect(all).toContain("Stripe");
+        expect(all).not.toContain("Razorpay");
+        expect(all).not.toContain("Cashfree");
+    });
+
+    it("India never offers Stripe", () => {
+        expect(names(buildProvidersView(input()).available)).not.toContain(
+            "Stripe",
+        );
+    });
+
+    it("a Stripe connection without its publishable key needs attention", () => {
+        edition.name = "GLOBAL";
+        const row = pay("STRIPE", "CONNECTED", null);
+        expect(needsPublicKey(row)).toBe(true);
+        expect(needsPublicKey({ ...row, publicKey: "pk_live_example" })).toBe(
+            false,
+        );
+        const [entry] = buildProvidersView(
+            input({ payments: [row] }),
+        ).connected;
+        expect(entry.state).toBe("ATTENTION");
+        expect(entry.fix).toBe("Add publishable key");
+        expect(entry.note).toMatch(/^Needs its publishable key\. /);
+    });
+});
+
+describe("stripeKeyProblems", () => {
+    const ok = {
+        publishable: "pk_test_example",
+        restricted: "rk_test_example",
+        webhookSecret: "whsec_example",
+    };
+
+    it("takes a matching pair and a signing secret", () => {
+        expect(stripeKeyProblems(ok, true)).toEqual({});
+        expect(
+            stripeKeyProblems(
+                {
+                    ...ok,
+                    publishable: "pk_live_example",
+                    restricted: " rk_live_example ",
+                },
+                true,
+            ),
+        ).toEqual({});
+    });
+
+    it("says nothing of an empty key until the button is pressed", () => {
+        const empty = { publishable: "", restricted: "", webhookSecret: "" };
+        expect(stripeKeyProblems(empty, false)).toEqual({});
+        expect(stripeKeyProblems(empty, true)).toEqual({
+            publishable:
+                "Enter the publishable key. It starts pk_live_ or pk_test_.",
+            restricted:
+                "Enter the restricted key. It starts rk_live_ or rk_test_.",
+            webhookSecret:
+                "Enter the webhook signing secret. It starts whsec_.",
+        });
+    });
+
+    it("says what each key should start with", () => {
+        expect(
+            stripeKeyProblems(
+                {
+                    publishable: "rk_test_example",
+                    restricted: "pk_test_example",
+                    webhookSecret: "example",
+                },
+                false,
+            ),
+        ).toEqual({
+            publishable:
+                "That isn't a publishable key. It starts pk_live_ or pk_test_.",
+            restricted:
+                "That isn't a restricted key. It starts rk_live_ or rk_test_.",
+            webhookSecret:
+                "That isn't a webhook signing secret. It starts whsec_.",
+        });
+    });
+
+    it("turns away a full secret key", () => {
+        expect(
+            stripeKeyProblems({ ...ok, restricted: "sk_live_example" }, false)
+                .restricted,
+        ).toBe(
+            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.",
+        );
+    });
+
+    it("wants both keys in the same mode", () => {
+        expect(
+            stripeKeyProblems({ ...ok, restricted: "rk_live_example" }, false)
+                .restricted,
+        ).toBe(
+            "The publishable key is a test key and the restricted key is a live key. Use two test keys or two live keys.",
+        );
     });
 });

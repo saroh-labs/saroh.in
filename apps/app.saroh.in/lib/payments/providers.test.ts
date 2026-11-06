@@ -37,6 +37,23 @@ describe("opensCheckout (DEC-054)", () => {
         ).toBe(false);
     });
 
+    it("leaves out a Stripe connection without its publishable key", () => {
+        expect(
+            opensCheckout({
+                provider: "STRIPE",
+                status: "CONNECTED",
+                publicKey: null,
+            }),
+        ).toBe(false);
+        expect(
+            opensCheckout({
+                provider: "STRIPE",
+                status: "CONNECTED",
+                publicKey: "pk_test_example",
+            }),
+        ).toBe(true);
+    });
+
     it("leaves out a connection that isn't connected", () => {
         expect(
             opensCheckout({

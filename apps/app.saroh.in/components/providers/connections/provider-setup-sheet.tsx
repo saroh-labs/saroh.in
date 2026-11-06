@@ -21,11 +21,14 @@ import {
     disconnectCommsProvider,
     disconnectPaymentProvider,
 } from "@/lib/providers/actions";
+import type { StripeKeys } from "@/lib/providers/rows";
 import {
+    connectablePayments,
     needsPublicKey,
     needsWebhookSecret,
     paymentsConsequence,
     RAZORPAY_KEY_ID,
+    stripeKeyProblems,
 } from "@/lib/providers/rows";
 import type {
     CommsChannel,
@@ -52,7 +55,16 @@ import {
 const PAYMENT_PROVIDERS: { value: PaymentProviderName; label: string }[] = [
     { value: "RAZORPAY", label: "Razorpay" },
     { value: "CASHFREE", label: "Cashfree" },
+    { value: "STRIPE", label: "Stripe" },
 ];
+
+/** The Stripe field an API refusal names (`field`), by the name it sends. */
+const STRIPE_FIELD: Record<string, keyof StripeKeys> = {
+    keyId: "publishable",
+    publicKey: "publishable",
+    keySecret: "restricted",
+    webhookSecret: "webhookSecret",
+};
 
 /** What each channel's adapter supports, and the secrets it reads. */
 const CHANNELS: Record<
@@ -211,10 +223,14 @@ function PaymentsForm({
     onDone: () => void;
 }) {
     const router = useRouter();
+    // The edition's providers only: India never offers Stripe, Global only it.
+    const options = PAYMENT_PROVIDERS.filter((p) =>
+        connectablePayments().includes(p.value),
+    );
     const [provider, setProvider] = useState<PaymentProviderName>(
         initialProvider ??
             connected.find((c) => c.status === "CONNECTED")?.provider ??
-            "RAZORPAY",
+            options[0].value,
     );
     // Several payment providers can be connected at once, so "already
     // connected" is about the one picked — its keys are what Save replaces.
@@ -239,6 +255,26 @@ function PaymentsForm({
     const [webhookSecret, setWebhookSecret] = useState("");
     // What is missing is said once the button is pressed.
     const [tried, setTried] = useState(false);
+    // Stripe: a publishable key, a restricted key and the endpoint's signing
+    // secret, each checked as typed; the API's refusal goes under its field.
+    const stripe = provider === "STRIPE";
+    const [publishable, setPublishable] = useState("");
+    const [restricted, setRestricted] = useState("");
+    const [refused, setRefused] = useState<{
+        field: keyof StripeKeys;
+        error: string;
+    } | null>(null);
+    const stripeKeys = { publishable, restricted, webhookSecret };
+    const stripeErrors = stripe ? stripeKeyProblems(stripeKeys, tried) : {};
+    const stripeError = (field: keyof StripeKeys) =>
+        stripeErrors[field] ??
+        (refused?.field === field ? refused.error : undefined);
+    const typed =
+        (field: keyof StripeKeys, set: (value: string) => void) =>
+        (value: string) => {
+            set(value);
+            if (refused?.field === field) setRefused(null);
+        };
     const details = useBusinessDetailsStep({
         then: `connect ${labelOfPayment(provider)}`,
         continueLabel: "Save and connect",
@@ -255,11 +291,12 @@ function PaymentsForm({
         keyHint: useId(),
     };
 
-    const incomplete =
-        !keyId.trim() ||
-        !keySecret.trim() ||
-        keyIdWrong ||
-        (secretRequired && !webhookSecret.trim());
+    const incomplete = stripe
+        ? Object.keys(stripeKeyProblems(stripeKeys, true)).length > 0
+        : !keyId.trim() ||
+          !keySecret.trim() ||
+          keyIdWrong ||
+          (secretRequired && !webhookSecret.trim());
 
     async function submit() {
         setTried(true);
@@ -269,23 +306,43 @@ function PaymentsForm({
         const res = await runAction(
             () =>
                 details.run(() =>
-                    connectPaymentProvider({
-                        provider,
-                        keyId: keyId.trim(),
-                        keySecret: keySecret.trim(),
-                        ...(!razorpay && publicKey.trim()
-                            ? { publicKey: publicKey.trim() }
-                            : {}),
-                        ...(secretRequired && webhookSecret.trim()
-                            ? { webhookSecret: webhookSecret.trim() }
-                            : {}),
-                    }),
+                    connectPaymentProvider(
+                        stripe
+                            ? {
+                                  provider,
+                                  // The publishable key is the key's id and
+                                  // what the checkout opens with.
+                                  keyId: publishable.trim(),
+                                  keySecret: restricted.trim(),
+                                  publicKey: publishable.trim(),
+                                  webhookSecret: webhookSecret.trim(),
+                              }
+                            : {
+                                  provider,
+                                  keyId: keyId.trim(),
+                                  keySecret: keySecret.trim(),
+                                  ...(!razorpay && publicKey.trim()
+                                      ? { publicKey: publicKey.trim() }
+                                      : {}),
+                                  ...(secretRequired && webhookSecret.trim()
+                                      ? { webhookSecret: webhookSecret.trim() }
+                                      : {}),
+                              },
+                    ),
                 ),
             { setBusy: setSaving },
         );
         if (!res) return;
-        // At the plan's connections limit (U13): its notice, not a toast.
-        if (!res.ok) return reportFailure(res);
+        if (!res.ok) {
+            // Stripe's keys refused: said under the key the API names.
+            const field = stripe && res.field ? STRIPE_FIELD[res.field] : null;
+            if (field && !res.plan) {
+                setRefused({ field, error: res.error });
+                return;
+            }
+            // At the plan's connections limit (U13): its notice, not a toast.
+            return reportFailure(res);
+        }
         showSuccess(`${labelOfPayment(provider)} connected.`);
         onDone();
         router.refresh();
@@ -307,7 +364,9 @@ function PaymentsForm({
                         key: c.provider,
                         name: labelOfPayment(c.provider),
                         detail: needsPublicKey(c)
-                            ? "No key id yet. Enter the keys again below."
+                            ? c.provider === "STRIPE"
+                                ? "No publishable key yet. Enter the keys again below."
+                                : "No key id yet. Enter the keys again below."
                             : needsWebhookSecret(c)
                               ? "No webhook signing secret. Enter the keys again below."
                               : c.publicKey,
@@ -318,15 +377,17 @@ function PaymentsForm({
                     }
                 />
 
-                <div className="grid gap-1.5">
-                    <Label htmlFor={ids.provider}>Provider</Label>
-                    <OptionSelect
-                        id={ids.provider}
-                        value={provider}
-                        onValueChange={setProvider}
-                        options={PAYMENT_PROVIDERS}
-                    />
-                </div>
+                {options.length > 1 ? (
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.provider}>Provider</Label>
+                        <OptionSelect
+                            id={ids.provider}
+                            value={provider}
+                            onValueChange={setProvider}
+                            options={options}
+                        />
+                    </div>
+                ) : null}
                 {razorpay && missingKey ? (
                     <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
                         Razorpay needs its key id to open your checkout window,
@@ -342,74 +403,104 @@ function PaymentsForm({
                     </p>
                 ) : null}
 
-                <section aria-labelledby={ids.keys} className="grid gap-2.5">
-                    <StepHeading n={1} id={ids.keys}>
-                        Your API keys
-                    </StepHeading>
-                    <div className="grid gap-3 min-[420px]:grid-cols-2">
-                        <SecretField
-                            id={ids.keyId}
-                            label={razorpay ? "Key ID (public)" : "Key ID"}
-                            value={keyId}
-                            onChange={setKeyId}
-                            invalid={keyIdWrong || (tried && !keyId.trim())}
-                            describedBy={razorpay ? ids.keyHint : undefined}
-                        />
-                        <SecretField
-                            id={ids.secret}
-                            label="Key secret"
-                            value={keySecret}
-                            onChange={setKeySecret}
-                            invalid={tried && !keySecret.trim()}
-                            secret
-                        />
-                    </div>
-                    {razorpay ? (
-                        <p
-                            id={ids.keyHint}
-                            className={cn(
-                                "text-[11.5px] leading-[1.45]",
-                                keyIdWrong
-                                    ? "text-destructive"
-                                    : "text-muted-foreground",
-                            )}
-                        >
-                            {keyIdWrong
-                                ? "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_."
-                                : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it. The secret never leaves Saroh."}
-                        </p>
-                    ) : (
-                        <SecretField
-                            id={ids.public}
-                            label="Public key"
-                            value={publicKey}
-                            onChange={setPublicKey}
-                            optional
-                            hint="Shown to the checkout. Not a secret."
-                        />
-                    )}
-                </section>
-
-                <WebhookAddressStep
-                    n={2}
-                    provider={provider}
-                    setup={hook}
-                    testMode={razorpay && isTestKey(keyId)}
-                />
-
-                {secretRequired ? (
-                    <WebhookSecretStep
-                        n={3}
-                        provider={provider}
-                        value={webhookSecret}
-                        onChange={setWebhookSecret}
+                {stripe ? (
+                    <StripeSteps
+                        ids={ids}
+                        keys={stripeKeys}
+                        errors={{
+                            publishable: stripeError("publishable"),
+                            restricted: stripeError("restricted"),
+                            webhookSecret: stripeError("webhookSecret"),
+                        }}
+                        onPublishable={typed("publishable", setPublishable)}
+                        onRestricted={typed("restricted", setRestricted)}
+                        onWebhookSecret={typed(
+                            "webhookSecret",
+                            setWebhookSecret,
+                        )}
+                        hook={hook}
                     />
                 ) : (
-                    <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                        {labelOfPayment(provider)} signs its payment updates
-                        with your key secret, so there&apos;s no separate secret
-                        to add.
-                    </p>
+                    <>
+                        <section
+                            aria-labelledby={ids.keys}
+                            className="grid gap-2.5"
+                        >
+                            <StepHeading n={1} id={ids.keys}>
+                                Your API keys
+                            </StepHeading>
+                            <div className="grid gap-3 min-[420px]:grid-cols-2">
+                                <SecretField
+                                    id={ids.keyId}
+                                    label={
+                                        razorpay ? "Key ID (public)" : "Key ID"
+                                    }
+                                    value={keyId}
+                                    onChange={setKeyId}
+                                    invalid={
+                                        keyIdWrong || (tried && !keyId.trim())
+                                    }
+                                    describedBy={
+                                        razorpay ? ids.keyHint : undefined
+                                    }
+                                />
+                                <SecretField
+                                    id={ids.secret}
+                                    label="Key secret"
+                                    value={keySecret}
+                                    onChange={setKeySecret}
+                                    invalid={tried && !keySecret.trim()}
+                                    secret
+                                />
+                            </div>
+                            {razorpay ? (
+                                <p
+                                    id={ids.keyHint}
+                                    className={cn(
+                                        "text-[11.5px] leading-[1.45]",
+                                        keyIdWrong
+                                            ? "text-destructive"
+                                            : "text-muted-foreground",
+                                    )}
+                                >
+                                    {keyIdWrong
+                                        ? "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_."
+                                        : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it. The secret never leaves Saroh."}
+                                </p>
+                            ) : (
+                                <SecretField
+                                    id={ids.public}
+                                    label="Public key"
+                                    value={publicKey}
+                                    onChange={setPublicKey}
+                                    optional
+                                    hint="Shown to the checkout. Not a secret."
+                                />
+                            )}
+                        </section>
+
+                        <WebhookAddressStep
+                            n={2}
+                            provider={provider}
+                            setup={hook}
+                            testMode={razorpay && isTestKey(keyId)}
+                        />
+
+                        {secretRequired ? (
+                            <WebhookSecretStep
+                                n={3}
+                                provider={provider}
+                                value={webhookSecret}
+                                onChange={setWebhookSecret}
+                            />
+                        ) : (
+                            <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                                {labelOfPayment(provider)} signs its payment
+                                updates with your key secret, so there&apos;s no
+                                separate secret to add.
+                            </p>
+                        )}
+                    </>
                 )}
             </FormSheetBody>
             <FormSheetFoot
@@ -425,11 +516,13 @@ function PaymentsForm({
                             role="alert"
                             className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                         >
-                            {keyIdWrong
-                                ? "Fix the key ID to connect."
-                                : secretRequired
-                                  ? "Enter the key ID, the key secret and the webhook signing secret to connect."
-                                  : "Enter the key ID and the key secret to connect."}
+                            {stripe
+                                ? "Check the keys marked above to connect."
+                                : keyIdWrong
+                                  ? "Fix the key ID to connect."
+                                  : secretRequired
+                                    ? "Enter the key ID, the key secret and the webhook signing secret to connect."
+                                    : "Enter the key ID and the key secret to connect."}
                         </p>
                     ) : null
                 }
@@ -712,6 +805,7 @@ function SecretField({
     hint,
     invalid,
     describedBy,
+    error,
 }: {
     id: string;
     label: string;
@@ -724,6 +818,8 @@ function SecretField({
     invalid?: boolean;
     /** A hint rendered outside the field, e.g. below a row of two. */
     describedBy?: string;
+    /** What is wrong with it, said under it in place of the hint. */
+    error?: string;
 }) {
     const hintId = `${id}-hint`;
     return (
@@ -743,11 +839,20 @@ function SecretField({
                 spellCheck={false}
                 value={value}
                 className="font-mono"
-                aria-invalid={invalid ? true : undefined}
-                aria-describedby={describedBy ?? (hint ? hintId : undefined)}
+                aria-invalid={invalid || error ? true : undefined}
+                aria-describedby={
+                    describedBy ?? (hint || error ? hintId : undefined)
+                }
                 onChange={(e) => onChange(e.target.value)}
             />
-            {hint ? (
+            {error ? (
+                <p
+                    id={hintId}
+                    className="text-[11.5px] leading-[1.45] text-destructive"
+                >
+                    {error}
+                </p>
+            ) : hint ? (
                 <p
                     id={hintId}
                     className="text-[11.5px] leading-[1.45] text-muted-foreground"
@@ -756,5 +861,95 @@ function SecretField({
                 </p>
             ) : null}
         </div>
+    );
+}
+
+/**
+ * Stripe's setup, as the steps the merchant takes in Stripe: the two keys
+ * from Developers › API keys, the webhook endpoint, then its signing secret.
+ * Stripe makes the secret, so there is nothing to generate here.
+ */
+function StripeSteps({
+    ids,
+    keys,
+    errors,
+    onPublishable,
+    onRestricted,
+    onWebhookSecret,
+    hook,
+}: {
+    ids: { keys: string; keyId: string; secret: string; public: string };
+    keys: StripeKeys;
+    errors: Partial<Record<keyof StripeKeys, string>>;
+    onPublishable: (value: string) => void;
+    onRestricted: (value: string) => void;
+    onWebhookSecret: (value: string) => void;
+    hook: PaymentWebhookSetup | null;
+}) {
+    return (
+        <>
+            <section aria-labelledby={ids.keys} className="grid gap-2.5">
+                <StepHeading n={1} id={ids.keys}>
+                    Your API keys
+                </StepHeading>
+                <p className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
+                    In Stripe, open{" "}
+                    <span className="font-medium text-foreground">
+                        Developers › API keys
+                    </span>
+                    . Copy the publishable key, then create a restricted key
+                    with Payment Intents: Write and Refunds: Write.
+                </p>
+                <div className="grid gap-3 min-[420px]:grid-cols-2">
+                    <SecretField
+                        id={ids.keyId}
+                        label="Publishable key"
+                        value={keys.publishable}
+                        onChange={onPublishable}
+                        error={errors.publishable}
+                        hint="Opens your checkout, so customers see it."
+                    />
+                    <SecretField
+                        id={ids.secret}
+                        label="Restricted key"
+                        value={keys.restricted}
+                        onChange={onRestricted}
+                        error={errors.restricted}
+                        hint="Never leaves Saroh."
+                        secret
+                    />
+                </div>
+            </section>
+
+            <WebhookAddressStep
+                n={2}
+                provider="STRIPE"
+                setup={hook}
+                testMode={
+                    isTestKey(keys.publishable) || isTestKey(keys.restricted)
+                }
+            />
+
+            <section aria-labelledby={ids.public} className="grid gap-2.5">
+                <StepHeading n={3} id={ids.public}>
+                    Copy the signing secret
+                </StepHeading>
+                <SecretField
+                    id={`${ids.public}-secret`}
+                    label="Webhook signing secret"
+                    value={keys.webhookSecret}
+                    onChange={onWebhookSecret}
+                    error={errors.webhookSecret}
+                    hint="Once the endpoint is added, Stripe shows its signing secret. Reveal it and paste it here. It lets Saroh check that each payment update really came from Stripe."
+                    secret
+                />
+            </section>
+
+            <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                Customers pay by card for now. If receipts are turned on in your
+                Stripe settings, Stripe also emails its own receipt, alongside
+                Saroh&apos;s confirmation.
+            </p>
+        </>
     );
 }
