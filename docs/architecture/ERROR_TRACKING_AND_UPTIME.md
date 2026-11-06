@@ -10,7 +10,9 @@
 > Uptime monitoring and log-based alerts are still open (the end of this
 > page).
 
-One PostHog project (EU cloud, free plan) holds development and production.
+One PostHog project (EU cloud, free plan) holds development and production. In production the India apps (saroh.in, app, accounts, admin) send to
+`https://p.saroh.in`, a reverse proxy to PostHog's EU host, so ad blockers don't
+drop errors and visits (owner, 6 Nov 2026); the CSP follows `NEXT_PUBLIC_POSTHOG_HOST`.
 Every event says which with `environment` (`development` | `production`) and
 which app with `app` (`api` | `application` | `auth` | `admin` | `web` |
 `sites`).
