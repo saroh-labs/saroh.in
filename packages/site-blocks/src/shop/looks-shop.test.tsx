@@ -709,6 +709,15 @@ describe("the place button follows the choice", () => {
         }
     });
 
+    it("says nothing of UPI to a customer of a business that doesn't take it", () => {
+        const body = payingWords("confirming", {
+            handover: null,
+            upi: false,
+        }).body;
+        expect(body).not.toMatch(/UPI/);
+        expect(body).toMatch(/no need to pay again/);
+    });
+
     it("titles the page per look", () => {
         expect(checkoutTitle("folio", "PICKUP")).toBe("Pick-up and pay");
         expect(checkoutTitle("folio", "LOCAL_DELIVERY")).toBe(

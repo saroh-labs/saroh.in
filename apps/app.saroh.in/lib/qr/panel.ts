@@ -1,3 +1,5 @@
+import { PROFILE } from "@/lib/edition";
+
 import { findReusable, targetKey } from "./targets";
 import type { QrCodeInput, QrCodeView, QrTargetKind } from "./types";
 import { QR_PLACE_NOTE_MAX } from "./types";
@@ -111,7 +113,9 @@ export function panelCodeInput(
 /** What a scan of an instant QR opens, in one line. */
 export function instantOpens(opens: QrInstantLink["opens"]): string {
     if (opens === "pay") {
-        return "Opens the pay page for this link. It isn't the UPI QR on the invoice.";
+        return PROFILE.upi
+            ? "Opens the pay page for this link. It isn't the UPI QR on the invoice."
+            : "Opens the pay page for this link.";
     }
     if (opens === "invoice") {
         return "Opens this invoice for your customer to view.";

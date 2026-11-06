@@ -424,6 +424,7 @@ export default async function SiteLayout({
                     address: editionProfile(footerFacts?.edition).address,
                     phoneNumbers: editionProfile(footerFacts?.edition)
                         .phoneNumbers,
+                    upi: editionProfile(footerFacts?.edition).upi,
                 }}
             >
                 <div

@@ -1,5 +1,5 @@
 import { formatMoneyMajor, minorOf } from "@/lib/format/money";
-import { METHOD_WORD } from "@/lib/payments/method-words";
+import { METHOD_WORD, offered } from "@/lib/payments/method-words";
 
 import type { Invoice, InvoicePaymentMethod } from "./service";
 import { PARTLY_PAID } from "./words";
@@ -35,17 +35,21 @@ export interface PaymentTarget {
 export const RECORD_METHODS: readonly {
     value: InvoicePaymentMethod;
     label: string;
-}[] = [
-    { value: "CASH", label: METHOD_WORD.CASH },
-    { value: "UPI", label: METHOD_WORD.UPI },
-    { value: "CARD", label: METHOD_WORD.CARD },
-    { value: "BANK_TRANSFER", label: METHOD_WORD.BANK_TRANSFER },
-    { value: "CHEQUE", label: "Cheque" },
-    { value: "OTHER", label: METHOD_WORD.OTHER },
-];
+}[] = (
+    [
+        { value: "CASH", label: METHOD_WORD.CASH },
+        { value: "UPI", label: METHOD_WORD.UPI },
+        { value: "CARD", label: METHOD_WORD.CARD },
+        { value: "BANK_TRANSFER", label: METHOD_WORD.BANK_TRANSFER },
+        { value: "CHEQUE", label: "Cheque" },
+        { value: "OTHER", label: METHOD_WORD.OTHER },
+    ] as const
+).filter((m) => offered(m.value));
 
-/** UPI is chosen first, as it always was. */
-export const FIRST_METHOD: InvoicePaymentMethod = "UPI";
+/** UPI is chosen first, as it always was; cash where there's no UPI. */
+export const FIRST_METHOD: InvoicePaymentMethod = offered("UPI")
+    ? "UPI"
+    : "CASH";
 
 /** A money string as paise: "4000.50" → 400050; anything else → null. */
 export function toPaise(amount: string): number | null {

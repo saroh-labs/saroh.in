@@ -170,7 +170,7 @@ export function chargeWords(
 /** What paying says, from what is known only. Pure. */
 export function payingWords(
     status: "open" | Exclude<CheckoutOutcome, "paid"> | "confirming",
-    { handover }: { handover: string | null },
+    { handover, upi = true }: { handover: string | null; upi?: boolean },
 ): { title: string; body: string; problem: boolean } {
     switch (status) {
         case "open":
@@ -182,7 +182,9 @@ export function payingWords(
         case "confirming":
             return {
                 title: "Waiting for your payment to come through",
-                body: "If you paid in your UPI app, there's no need to pay again. This page moves on by itself once it's through.",
+                body: upi
+                    ? "If you paid in your UPI app, there's no need to pay again. This page moves on by itself once it's through."
+                    : "If you've paid, there's no need to pay again. This page moves on by itself once it's through.",
                 problem: false,
             };
         case "failed":
@@ -238,7 +240,7 @@ export function LookCheckout({
     const router = useRouter();
     const items = useBag(site);
     const testRelease = useTestRelease() !== null;
-    const { address: addressBy } = useSiteBusiness();
+    const { address: addressBy, upi } = useSiteBusiness();
     const code = useRef<InlineCodeHandle>(null);
     const [customer, setCustomer] = useState(account.customer);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
@@ -596,7 +598,9 @@ export function LookCheckout({
             : paying.kind === "confirming"
               ? "confirming"
               : null;
-    const words = windowState ? payingWords(windowState, { handover }) : null;
+    const words = windowState
+        ? payingWords(windowState, { handover, upi })
+        : null;
 
     return (
         <section

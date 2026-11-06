@@ -177,7 +177,7 @@ new difference is a new fact there, with its test, read by the code that
 needs it; a fact nobody reads is removed.
 
 `@saroh/site-blocks` can't import the package (G1, #252), so a merchant
-site's layout passes the facts a block needs (`address`, `phoneNumbers`) in
+site's layout passes the facts a block needs (`address`, `phoneNumbers`, `upi`) in
 `SiteBusinessProvider`, and a pay card knows its business pays by bank code
 from the `edition` the API sends only then.
 

@@ -20,6 +20,8 @@ export interface SiteBusiness {
     country: string | null;
     address: SiteAddress;
     phoneNumbers: SitePhoneNumbers;
+    /** Its customers pay by UPI, so a page may name a UPI app. Absent: yes. */
+    upi?: boolean;
 }
 
 export const INDIA_SITE_BUSINESS: SiteBusiness = {

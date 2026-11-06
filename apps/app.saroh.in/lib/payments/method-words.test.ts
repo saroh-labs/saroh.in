@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { DESK_PAID_BY, paidByLabel } from "@/lib/class-packs/sell-words";
 import { payOptions } from "@/lib/orders/new-order";
 import { PAID_HOW } from "@/lib/orders/paid-how";
+import { instantOpens } from "@/lib/qr/panel";
+import { PAID_BY_MISSING } from "@/lib/services/booking-pay";
 import { deskChoices, methodWord } from "@/lib/services/desk-pay";
 
 import { methodLabel } from "./method-words";
@@ -40,5 +42,15 @@ describe("one word for each way paid (UX-078)", () => {
         expect(PAID_HOW.map((w) => w.label)).toEqual(WORDS);
         expect(methodWord("CARD")).toBe("Card");
         expect(paidByLabel("BANK")).toBe("Bank transfer");
+    });
+});
+
+describe("India's ways paid by hand", () => {
+    it("offer and name UPI, as they always did", () => {
+        expect(PAID_BY_MISSING).toBe("Say how they paid: Cash, UPI or Card.");
+        expect(instantOpens("pay")).toBe(
+            "Opens the pay page for this link. It isn't the UPI QR on the invoice.",
+        );
+        expect(DESK_PAID_BY.map((m) => m.value)).toContain("UPI");
     });
 });

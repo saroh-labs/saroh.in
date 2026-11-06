@@ -4,12 +4,15 @@ import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
 import type { CounterPayment } from "@/lib/orders/kitchen-service";
+import { offered } from "@/lib/payments/method-words";
 
-const WAYS: { kind: CounterPayment; label: string }[] = [
-    { kind: "CASH", label: "Cash" },
-    { kind: "UPI", label: "UPI" },
-    { kind: "CARD", label: "Card" },
-];
+const WAYS: { kind: CounterPayment; label: string }[] = (
+    [
+        { kind: "CASH", label: "Cash" },
+        { kind: "UPI", label: "UPI" },
+        { kind: "CARD", label: "Card" },
+    ] as const
+).filter((w) => offered(w.kind));
 
 /**
  * "Record payment" for what a paid order still owes — an edit's

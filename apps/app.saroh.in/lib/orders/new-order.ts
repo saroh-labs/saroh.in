@@ -9,7 +9,7 @@
 import type { CustomerPick } from "@/lib/customers/picker";
 import { count } from "@/lib/format/plural";
 import { phoneLabel } from "@/lib/organizations/business-phone";
-import { METHOD_WORD } from "@/lib/payments/method-words";
+import { METHOD_WORD, offered } from "@/lib/payments/method-words";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How it is paid, as the API takes it. */
@@ -124,9 +124,9 @@ export function payOptions(input: {
     if (input.money === false) return [later];
     return [
         // One word each (UX-078); where it's taken is the note's to say.
-        { key: "CASH", label: METHOD_WORD.CASH, off: null },
-        { key: "UPI", label: METHOD_WORD.UPI, off: null },
-        { key: "CARD", label: METHOD_WORD.CARD, off: null },
+        ...(["CASH", "UPI", "CARD"] as const)
+            .filter(offered)
+            .map((key) => ({ key, label: METHOD_WORD[key], off: null })),
         ...(input.online === false
             ? []
             : [

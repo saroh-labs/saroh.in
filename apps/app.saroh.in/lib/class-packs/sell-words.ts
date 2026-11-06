@@ -2,7 +2,7 @@ import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { addedGst, addedGstWords } from "@/lib/gst/item-words";
-import { METHOD_WORD } from "@/lib/payments/method-words";
+import { METHOD_WORD, offered } from "@/lib/payments/method-words";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
@@ -23,13 +23,15 @@ import { packKind, unitWord } from "./pack-cards";
 export type DeskPaidBy = "CASH" | "UPI" | "CARD" | "BANK" | "NONE";
 export type PaidBy = DeskPaidBy | "ONLINE";
 
-export const DESK_PAID_BY: readonly { value: DeskPaidBy; label: string }[] = [
-    { value: "CASH", label: METHOD_WORD.CASH },
-    { value: "UPI", label: METHOD_WORD.UPI },
-    { value: "CARD", label: METHOD_WORD.CARD },
-    { value: "BANK", label: METHOD_WORD.BANK },
-    { value: "NONE", label: "No payment" },
-];
+export const DESK_PAID_BY: readonly { value: DeskPaidBy; label: string }[] = (
+    [
+        { value: "CASH", label: METHOD_WORD.CASH },
+        { value: "UPI", label: METHOD_WORD.UPI },
+        { value: "CARD", label: METHOD_WORD.CARD },
+        { value: "BANK", label: METHOD_WORD.BANK },
+        { value: "NONE", label: "No payment" },
+    ] as const
+).filter((m) => offered(m.value));
 
 const PAID_BY_LABEL: Record<PaidBy, string> = {
     CASH: METHOD_WORD.CASH,

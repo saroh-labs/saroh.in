@@ -175,6 +175,7 @@ describe("the edition profiles (DEC-204 item 7)", () => {
         toolPages: { INDIA: "own", GLOBAL: "hub" },
         helpAndDocs: { INDIA: "own-addresses", GLOBAL: "shared" },
         numberLocale: { INDIA: "en-IN", GLOBAL: "en-US" },
+        upi: { INDIA: true, GLOBAL: false },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {
