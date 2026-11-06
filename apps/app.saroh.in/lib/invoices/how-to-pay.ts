@@ -1,5 +1,8 @@
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
-import { accountLabel } from "@/lib/organizations/pay-instructions";
+import {
+    accountLabel,
+    payByBankCode,
+} from "@/lib/organizations/pay-instructions";
 
 import type { InvoiceStanding } from "./service";
 
@@ -18,7 +21,7 @@ export function howToPayLines(
     const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
     if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
     const lines: string[] = [];
-    const global = pay.edition === "GLOBAL";
+    const global = payByBankCode(pay.edition);
     if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);
     if (
         pay.bankAccountNumber &&

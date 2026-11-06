@@ -13,7 +13,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { cleanAddressInput } from "@/lib/organizations/address";
 import { kindDefaults, kindWords } from "@/lib/organizations/kind";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
@@ -110,7 +110,9 @@ export function SetupNameStep({
                 )}
             />
 
-            {EDITION === "GLOBAL" ? <SetupCountryFields /> : null}
+            {PROFILE.businessCountry === "asked-at-setup" ? (
+                <SetupCountryFields />
+            ) : null}
 
             <FormField
                 control={form.control}

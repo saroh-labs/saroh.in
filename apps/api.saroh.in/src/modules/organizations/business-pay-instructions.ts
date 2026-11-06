@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import { publicPhone } from "./business-phone";
 
@@ -61,7 +62,7 @@ export type PayInstructionsInput = Partial<Record<PayField, string>>;
  * sent only for a Global business; absent reads as India.
  */
 export type PayInstructionsView = Record<PayField, string | null> & {
-    edition?: "GLOBAL";
+    edition?: Edition;
 };
 
 /** The columns a read selects. */
@@ -88,6 +89,10 @@ export type PayRow = Partial<Record<PayColumn, string | null>> & {
 
 const UPI_EXAMPLE = "yourname@okhdfc";
 
+/** No UPI and an optional bank code; the view says so with its `edition`. */
+const bankCode = (edition: Edition | null | undefined) =>
+    editionProfile(edition).payInstructions === "bank-code";
+
 /**
  * One typed value as stored, or why it can't be. Pure: the save names the
  * field. "" (after trimming) is null — cleared.
@@ -99,7 +104,7 @@ export function normalisePayField(
 ): { value: string | null } | { problem: string } {
     const trimmed = raw.trim();
     if (trimmed === "") return { value: null };
-    if (edition === "GLOBAL") {
+    if (bankCode(edition)) {
         const global = normaliseGlobalBankField(field, trimmed);
         if (global) return global;
     }
@@ -226,12 +231,12 @@ export function payInstructionsWrite(
         if (!has("payBankAccountNumber")) {
             refuse(
                 "bankAccountNumber",
-                edition === "GLOBAL"
+                bankCode(edition)
                     ? "Add the account number or IBAN, or clear the bank details."
                     : "Add the account number, or clear the bank details.",
             );
         }
-        if (edition !== "GLOBAL" && !has("payBankIfsc")) {
+        if (!bankCode(edition) && !has("payBankIfsc")) {
             refuse(
                 "bankIfsc",
                 "Add the IFSC: a transfer needs it with the account number.",
@@ -253,7 +258,7 @@ export function payInstructionsView(
         bankIfsc: row?.payBankIfsc ?? null,
         bankName: row?.payBankName ?? null,
         note: row?.payNote ?? null,
-        ...(edition === "GLOBAL" ? { edition } : {}),
+        ...(bankCode(edition) ? { edition } : {}),
     };
 }
 
@@ -268,7 +273,8 @@ export function publicPayInstructions(
     row: PayRow | null | undefined,
 ): PayInstructionsView | null {
     if (!row) return null;
-    const global = row.organization?.edition === "GLOBAL";
+    const edition = row.organization?.edition;
+    const global = bankCode(edition);
     const upi =
         !global && row.payUpiId && UPI_ID.test(row.payUpiId)
             ? row.payUpiId
@@ -293,7 +299,7 @@ export function publicPayInstructions(
         bankIfsc: bankWhole ? (row.payBankIfsc ?? null) : null,
         bankName: bankWhole ? (row.payBankName ?? null) : null,
         note,
-        ...(global ? { edition: "GLOBAL" as const } : {}),
+        ...(global && edition ? { edition } : {}),
     };
 }
 

@@ -10,7 +10,7 @@ import {
     rowActions,
     Saved,
 } from "@/components/organizations/business-settings/business-row-parts";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
@@ -64,7 +64,7 @@ export function BusinessTaxRows({
                 </>
             }
         >
-            {EDITION === "GLOBAL" ? (
+            {PROFILE.taxSystem === "named-line" ? (
                 <Row
                     id={BUSINESS_ROW_ID.gst}
                     label="Tax"
@@ -129,15 +129,17 @@ export function BusinessTaxRows({
             ) : null}
             <Row
                 label={
-                    EDITION === "GLOBAL" ? "Numbering year" : "Financial year"
+                    PROFILE.taxSystem === "named-line"
+                        ? "Numbering year"
+                        : "Financial year"
                 }
                 action={
-                    EDITION === "GLOBAL"
+                    PROFILE.taxSystem === "named-line"
                         ? edit("gst", "Change", "Change numbering year")
                         : undefined
                 }
             >
-                {EDITION === "GLOBAL" ? (
+                {PROFILE.taxSystem === "named-line" ? (
                     <span>
                         {saved.yearStartMonth === "1"
                             ? "January to December"

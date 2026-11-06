@@ -878,6 +878,7 @@ bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step domains pnpm run check:domains
 bg_step shared-data pnpm run check:shared-data
+bg_step edition-branches pnpm run check:edition-branches
 bg_step date-inputs pnpm run check:date-inputs
 bg_step native-selects pnpm run check:native-selects
 bg_step history-state pnpm run check:history-state

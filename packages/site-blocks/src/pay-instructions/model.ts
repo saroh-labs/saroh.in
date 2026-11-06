@@ -14,8 +14,12 @@ export interface PayInstructions {
     bankIfsc: string | null;
     bankName: string | null;
     note: string | null;
-    /** Sent only for a Global business: no UPI, an optional bank code. */
-    edition?: "GLOBAL";
+    /**
+     * The business's edition, sent only where its profile pays by bank code:
+     * no UPI, an optional bank code (`business-pay-instructions.ts`). Its
+     * presence is the fact; a block can't read the profile itself (G1).
+     */
+    edition?: string;
 }
 
 const FIELDS = [
@@ -30,12 +34,13 @@ const FIELDS = [
 const nonEmpty = (v: string | null | undefined): v is string =>
     typeof v === "string" && v.trim() !== "";
 
-const hasUpi = (p: PayInstructions) =>
-    p.edition !== "GLOBAL" && nonEmpty(p.upiId);
+/** No UPI, and the bank code is optional. */
+export const byBankCode = (p: PayInstructions) => p.edition !== undefined;
+
+const hasUpi = (p: PayInstructions) => !byBankCode(p) && nonEmpty(p.upiId);
 
 const hasBank = (p: PayInstructions) =>
-    nonEmpty(p.bankAccountNumber) &&
-    (p.edition === "GLOBAL" || nonEmpty(p.bankIfsc));
+    nonEmpty(p.bankAccountNumber) && (byBankCode(p) || nonEmpty(p.bankIfsc));
 
 /** The API's answer, checked field by field; null when strange or empty. */
 export function payInstructionsOf(v: unknown): PayInstructions | null {
@@ -48,8 +53,8 @@ export function payInstructionsOf(v: unknown): PayInstructions | null {
             return null;
         out[field] = nonEmpty(value) ? value.trim() : null;
     }
-    if (o.edition === "GLOBAL") {
-        out.edition = "GLOBAL";
+    if (typeof o.edition === "string" && o.edition !== "") {
+        out.edition = o.edition;
         out.upiId = null;
     }
     // Bank details are only any use whole.

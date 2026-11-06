@@ -1,4 +1,4 @@
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { Invoice, InvoiceLine, InvoiceTitle } from "./service";
 
 /**
@@ -102,7 +102,7 @@ export function paperFooter(
                 ? "Cancelled by credit note. "
                 : "";
     // GST is India's (DEC-204).
-    if (EDITION === "GLOBAL") return paid.trim();
+    if (PROFILE.taxSystem === "named-line") return paid.trim();
     return Number(i.tax) > 0
         ? `${paid}${businessName} is not registered for GST.`
         : `${paid}${businessName} is not registered for GST, so no tax is charged.`;

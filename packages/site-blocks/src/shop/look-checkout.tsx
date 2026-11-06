@@ -238,7 +238,7 @@ export function LookCheckout({
     const router = useRouter();
     const items = useBag(site);
     const testRelease = useTestRelease() !== null;
-    const { edition } = useSiteBusiness();
+    const { address: addressBy } = useSiteBusiness();
     const code = useRef<InlineCodeHandle>(null);
     const [customer, setCustomer] = useState(account.customer);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
@@ -259,17 +259,17 @@ export function LookCheckout({
     // The visit's draft, read after the first paint (the server has none).
     useEffect(() => {
         /* eslint-disable-next-line react-hooks/set-state-in-effect -- restored once after hydration */
-        setDraft(readBagDraft(site, edition));
+        setDraft(readBagDraft(site, addressBy));
         setDrafted(true);
         // The header's bag changes the code: take it, keep the rest.
         return onBagDraft((changed) => {
             if (changed !== site) return;
-            const kept = readBagDraft(site, edition);
+            const kept = readBagDraft(site, addressBy);
             setDraft((d) =>
                 d.code === kept.code ? d : { ...d, code: kept.code },
             );
         });
-    }, [site, edition]);
+    }, [site, addressBy]);
     useEffect(() => {
         if (drafted) writeBagDraft(site, draft);
     }, [site, draft, drafted]);
@@ -337,7 +337,7 @@ export function LookCheckout({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, edition) === null
+                            addressLeft(last, addressBy) === null
                                 ? "shown"
                                 : "typing",
                     };
@@ -346,7 +346,7 @@ export function LookCheckout({
         return () => {
             live = false;
         };
-    }, [askSaved, edition]);
+    }, [askSaved, addressBy]);
 
     // Paid in the window: ask the server until it has placed the order.
     const confirmTries = paying.kind === "confirming" ? paying.tries : null;
@@ -413,7 +413,7 @@ export function LookCheckout({
     const quote = load.kind === "ready" ? load.quote : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(draft.address, edition)
+        ? addressLeft(draft.address, addressBy)
         : null;
     const pays =
         quote?.payments ??
@@ -503,7 +503,7 @@ export function LookCheckout({
             lines: [...items],
             fulfilment: way,
             ...(needsAddress(way)
-                ? { address: trimmed(draft.address, edition) }
+                ? { address: trimmed(draft.address, addressBy) }
                 : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
             ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),

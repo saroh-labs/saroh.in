@@ -12,7 +12,7 @@
  */
 
 import type { Edition } from "@saroh/edition";
-import { siteUrlOf } from "@saroh/edition";
+import { editionProfile, hostsFor, siteUrlOf } from "@saroh/edition";
 
 import { TOOL_NAMES } from "./tool-names";
 
@@ -27,9 +27,13 @@ export const QR_MAKER_URL = `${TOOLS_URL}/qr-code-maker`;
  * email links to its hub (`tools`), never to a page that may not be there.
  */
 const siteOf = (edition: Edition): { name: string; tools?: string } =>
-    edition === "GLOBAL"
-        ? { name: "saroh.tech", tools: `${siteUrlOf("GLOBAL")}/tools` }
-        : { name: "saroh.in" };
+    editionProfile(edition).toolPages === "hub"
+        ? { name: siteName(edition), tools: `${siteUrlOf(edition)}/tools` }
+        : { name: siteName(edition) };
+
+/** "saroh.in", "saroh.tech": the site as people type it, no `www.`. */
+const siteName = (edition: Edition) =>
+    hostsFor(edition, "production").site.replace(/^www\./, "");
 
 /** Every email has the same subject. */
 export const QR_MAKER_SUBJECT = "Your link back to the QR code maker";

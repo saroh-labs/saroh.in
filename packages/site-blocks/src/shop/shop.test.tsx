@@ -14,7 +14,7 @@ import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import type { ProductPageData } from "../product/product-page";
 import ProductPage from "../product/product-page";
 import type { SiteBusiness } from "../site-business";
-import { SiteBusinessProvider } from "../site-business";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "../site-business";
 import { TestReleaseProvider } from "../test-release/context";
 import { AddToBag } from "./add-to-bag";
 import type {
@@ -434,9 +434,7 @@ function setup(
         />
     );
     render(
-        <SiteBusinessProvider
-            value={over.business ?? { edition: "INDIA", country: null }}
-        >
+        <SiteBusinessProvider value={over.business ?? INDIA_SITE_BUSINESS}>
             {over.testRelease ? (
                 <TestReleaseProvider release={{ name: "Diwali menu" }}>
                     {bag}
@@ -458,7 +456,11 @@ describe("the bag's delivery for a Global business", () => {
     it("asks a country on the business's own, and no state list or PIN", async () => {
         const { start } = setup({
             signedIn: true,
-            business: { edition: "GLOBAL", country: "GB" },
+            business: {
+                country: "GB",
+                address: "country-and-region",
+                phoneNumbers: "with-country-code",
+            },
             quote: {
                 ok: true,
                 data: quoteOf({

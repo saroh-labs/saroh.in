@@ -4,7 +4,13 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { cn } from "../lib/utils";
 import type { PayInstructions } from "./model";
-import { groupedAccount, hasPayInstructions, qrPath, upiPayUri } from "./model";
+import {
+    byBankCode,
+    groupedAccount,
+    hasPayInstructions,
+    qrPath,
+    upiPayUri,
+} from "./model";
 
 const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-fg focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
@@ -55,7 +61,7 @@ export function PayInstructionsCard({
     if (!hasPayInstructions(instructions)) return null;
     const { bankAccountName, bankAccountNumber, bankIfsc, bankName } =
         instructions;
-    const global = instructions.edition === "GLOBAL";
+    const global = byBankCode(instructions);
     const upiId = global ? null : instructions.upiId;
     const bank =
         bankAccountNumber && (bankIfsc || global) ? bankAccountNumber : null;

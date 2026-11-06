@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Edition, EditionProfile } from "./index";
 import {
     currencyForCountry,
+    EDITION_PROFILES,
     editionForCountry,
     editionOfHost,
+    editionProfile,
     EDITIONS,
     hostsFor,
     merchantSitesFor,
@@ -130,4 +133,56 @@ describe("currencyForCountry", () => {
         expect(currencyForCountry("IN")).toBe("INR");
         expect(currencyForCountry("BR")).toBe("USD");
     });
+});
+
+describe("the edition profiles (DEC-204 item 7)", () => {
+    it("has one per edition and nothing else", () => {
+        expect(Object.keys(EDITION_PROFILES).sort()).toEqual(
+            [...EDITIONS].sort(),
+        );
+    });
+
+    it("makes a third edition a compile error until it fills a profile", () => {
+        type Third = Edition | "THIRD";
+        // @ts-expect-error: "THIRD" has no profile, so this mustn't compile.
+        const withThird: Record<Third, EditionProfile> = {
+            ...EDITION_PROFILES,
+        };
+        // @ts-expect-error: a profile missing a fact mustn't compile either.
+        const half: EditionProfile = { taxSystem: "gst" };
+        expect([withThird, half]).toHaveLength(2);
+    });
+
+    it("reads unset as India, as every business was", () => {
+        expect(editionProfile(undefined)).toBe(EDITION_PROFILES.INDIA);
+        expect(editionProfile(null)).toBe(EDITION_PROFILES.INDIA);
+    });
+
+    const facts: {
+        [K in keyof EditionProfile]: Record<Edition, EditionProfile[K]>;
+    } = {
+        taxSystem: { INDIA: "gst", GLOBAL: "named-line" },
+        payInstructions: { INDIA: "upi-and-ifsc", GLOBAL: "bank-code" },
+        address: {
+            INDIA: "indian-state-and-pin",
+            GLOBAL: "country-and-region",
+        },
+        phoneNumbers: { INDIA: "indian", GLOBAL: "with-country-code" },
+        businessCountry: { INDIA: "india-only", GLOBAL: "asked-at-setup" },
+        sarohBilling: { INDIA: true, GLOBAL: false },
+        phoneSignIn: { INDIA: true, GLOBAL: false },
+        struckPrice: { INDIA: "mrp", GLOBAL: "original-price" },
+        toolPages: { INDIA: "own", GLOBAL: "hub" },
+        helpAndDocs: { INDIA: "own-addresses", GLOBAL: "shared" },
+        numberLocale: { INDIA: "en-IN", GLOBAL: "en-US" },
+    };
+    for (const [fact, byEdition] of Object.entries(facts)) {
+        it(`answers ${fact} as each edition did before the profile`, () => {
+            for (const edition of EDITIONS) {
+                expect(
+                    editionProfile(edition)[fact as keyof EditionProfile],
+                ).toBe(byEdition[edition]);
+            }
+        });
+    }
 });

@@ -167,6 +167,9 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/edition':
+        specifier: workspace:*
+        version: link:../../packages/edition
       '@saroh/error-tracking':
         specifier: workspace:*
         version: link:../../packages/error-tracking

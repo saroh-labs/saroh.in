@@ -120,7 +120,7 @@ export function ShopBag({
     const items = useBag(site);
     const count = bagCount(items);
     const testRelease = useTestRelease() !== null;
-    const { edition } = useSiteBusiness();
+    const { address: addressBy } = useSiteBusiness();
     const [step, setStep] = useState<Step>({ kind: "closed" });
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
@@ -132,7 +132,7 @@ export function ShopBag({
     const [draft, setDraft] = useState<BagDraft>(() =>
         typeof window === "undefined"
             ? EMPTY_DRAFT
-            : readBagDraft(site, edition),
+            : readBagDraft(site, addressBy),
     );
     useEffect(() => writeBagDraft(site, draft), [site, draft]);
     // The QR code whose scan opened this page load, when the address it
@@ -158,10 +158,10 @@ export function ShopBag({
             onOpenBag(() => {
                 // A look's checkout page keeps the way and the address in
                 // the visit's draft: the bag opens on what it holds now.
-                if (look) setDraft(readBagDraft(site, edition));
+                if (look) setDraft(readBagDraft(site, addressBy));
                 setStep({ kind: "bag" });
             }),
-        [look, site, edition],
+        [look, site, addressBy],
     );
     // Whoever said "added to your bag" takes it down once the bag is open.
     const open = step.kind !== "closed";
@@ -298,7 +298,7 @@ export function ShopBag({
                 <button
                     type="button"
                     onClick={() => {
-                        if (look) setDraft(readBagDraft(site, edition));
+                        if (look) setDraft(readBagDraft(site, addressBy));
                         setStep({ kind: "bag" });
                     }}
                     aria-label={`Your bag, ${count} ${count === 1 ? "item" : "items"}`}

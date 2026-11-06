@@ -12,6 +12,7 @@ import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructio
 import {
     accountLabel,
     payBankSet,
+    payByBankCode,
     payPreviewOf,
     payValuesOf,
 } from "@/lib/organizations/pay-instructions";
@@ -70,7 +71,7 @@ export function PayInstructionsSection({
     onSaved: (next: OrganizationSettings) => void;
     offerUndo: OfferUndo;
 }) {
-    const global = saved?.edition === "GLOBAL";
+    const global = payByBankCode(saved?.edition);
     const bank =
         saved?.bankAccountNumber && payBankSet(saved)
             ? [

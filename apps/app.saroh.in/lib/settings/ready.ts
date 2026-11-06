@@ -1,12 +1,13 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
 import { businessEditHref } from "@/lib/organizations/business-rows";
 import { businessTypeOf } from "@/lib/organizations/business-types";
+import { payByBankCode } from "@/lib/organizations/pay-instructions";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -347,15 +348,18 @@ function howToPay(
     const pay = settings.payInstructions;
     if (!pay) return null;
     // A Global business has no UPI, and its bank code is optional.
-    const global = pay.edition === "GLOBAL";
+    const global = payByBankCode(pay.edition);
     const set =
         (!global && filled(pay.upiId)) ||
         (filled(pay.bankAccountNumber) && (global || filled(pay.bankIfsc)));
     return {
         key: "howToPay",
         label: "Tell customers how to pay you",
-        why: `Add your ${EDITION === "GLOBAL" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
-        cta: EDITION === "GLOBAL" ? "Add bank details" : "Add UPI or bank",
+        why: `Add your ${PROFILE.payInstructions === "bank-code" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
+        cta:
+            PROFILE.payInstructions === "bank-code"
+                ? "Add bank details"
+                : "Add UPI or bank",
         // The tab, with its sheet open: the step is done there.
         href: businessEditHref("pay"),
         broken: false,

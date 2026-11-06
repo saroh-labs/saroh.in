@@ -18,7 +18,7 @@ import {
 } from "@/components/organizations/business-details/registered-address-fields";
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
 import { GstRatePicker } from "@/components/shared/fields/gst-rate-picker";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";
@@ -135,7 +135,7 @@ export function BusinessTaxFields({
 
     switch (sheet) {
         case "gst":
-            if (EDITION === "GLOBAL") {
+            if (PROFILE.taxSystem === "named-line") {
                 return <GlobalTaxFields control={control} taxId={taxId} />;
             }
             return (

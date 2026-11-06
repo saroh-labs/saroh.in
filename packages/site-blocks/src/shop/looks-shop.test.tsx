@@ -729,7 +729,13 @@ describe("a look's checkout for a Global business", () => {
         fillBag();
         const { api, start } = makeApi();
         render(
-            <SiteBusinessProvider value={{ edition: "GLOBAL", country: "US" }}>
+            <SiteBusinessProvider
+                value={{
+                    country: "US",
+                    address: "country-and-region",
+                    phoneNumbers: "with-country-code",
+                }}
+            >
                 <LookCheckout
                     look="quiet"
                     site={SITE}

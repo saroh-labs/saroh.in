@@ -1,6 +1,6 @@
 "use client";
 
-import type { SiteEdition as Edition } from "../site-business";
+import type { SiteAddress } from "../site-business";
 import type { DeliveryAddress, ShopPayment, ShopWay } from "./api";
 import type { BagDraft } from "./bag-sheet";
 import { EMPTY_DRAFT } from "./bag-sheet";
@@ -54,7 +54,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** What is stored, narrowed field by field: anything else reads as unset. */
 export function parseBagDraft(
     raw: string | null,
-    edition: Edition = "INDIA",
+    by: SiteAddress = "indian-state-and-pin",
 ): BagDraft {
     if (!raw) return EMPTY_DRAFT;
     let stored: unknown;
@@ -74,7 +74,7 @@ export function parseBagDraft(
         }
     }
     // State is a choice now: one typed before reads as the list names it.
-    if (edition === "INDIA") address.state = stateIn(address.state);
+    if (by === "indian-state-and-pin") address.state = stateIn(address.state);
 
     const checkout = isRecord(stored.checkout) ? stored.checkout : null;
     return {
@@ -109,13 +109,10 @@ function isEmpty(draft: BagDraft): boolean {
 
 export function readBagDraft(
     site: string,
-    edition: Edition = "INDIA",
+    by: SiteAddress = "indian-state-and-pin",
 ): BagDraft {
     try {
-        return parseBagDraft(
-            window.sessionStorage.getItem(keyOf(site)),
-            edition,
-        );
+        return parseBagDraft(window.sessionStorage.getItem(keyOf(site)), by);
     } catch {
         return EMPTY_DRAFT;
     }

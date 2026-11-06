@@ -1,4 +1,5 @@
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import { z } from "zod";
 
 /**
@@ -18,8 +19,12 @@ export interface PayInstructionsSettings {
     bankIfsc: string | null;
     bankName: string | null;
     note: string | null;
-    edition?: "GLOBAL";
+    edition?: Edition;
 }
+
+/** No UPI, and the bank code is optional (DEC-204). Absent reads as India. */
+export const payByBankCode = (edition: Edition | null | undefined) =>
+    editionProfile(edition).payInstructions === "bank-code";
 
 export type PayField = Exclude<keyof PayInstructionsSettings, "edition">;
 
@@ -55,7 +60,7 @@ export function payStored(
     edition: Edition = "INDIA",
 ): string {
     const trimmed = typed.trim();
-    if (edition === "GLOBAL") {
+    if (payByBankCode(edition)) {
         if (field === "bankAccountNumber")
             return trimmed.replace(/\s/g, "").toUpperCase();
         if (field === "bankIfsc")
@@ -81,7 +86,7 @@ export function payFieldProblem(
 ): string | null {
     const value = payStored(field, typed, edition);
     if (value === "") return null;
-    if (edition === "GLOBAL") {
+    if (payByBankCode(edition)) {
         if (field === "upiId") return "UPI only works for a business in India.";
         if (field === "bankAccountNumber") {
             return GLOBAL_ACCOUNT.test(value)
@@ -148,13 +153,12 @@ export function bankProblem(
     if (!has("bankAccountNumber")) {
         return {
             field: "bankAccountNumber",
-            message:
-                edition === "GLOBAL"
-                    ? "Add the account number or IBAN, or clear the bank details."
-                    : "Add the account number, or clear the bank details.",
+            message: payByBankCode(edition)
+                ? "Add the account number or IBAN, or clear the bank details."
+                : "Add the account number, or clear the bank details.",
         };
     }
-    if (edition !== "GLOBAL" && !has("bankIfsc")) {
+    if (!payByBankCode(edition) && !has("bankIfsc")) {
         return {
             field: "bankIfsc",
             message:
@@ -200,7 +204,7 @@ export function payBankSet(
 ): boolean {
     return !!(
         pay?.bankAccountNumber &&
-        (!!pay.bankIfsc || pay.edition === "GLOBAL")
+        (!!pay.bankIfsc || payByBankCode(pay.edition))
     );
 }
 
@@ -210,7 +214,7 @@ export function payValuesOf(
 ): PayValues {
     return {
         // A Global business has no such field, whatever an older save left.
-        upiId: saved?.edition === "GLOBAL" ? "" : (saved?.upiId ?? ""),
+        upiId: payByBankCode(saved?.edition) ? "" : (saved?.upiId ?? ""),
         bankAccountName: saved?.bankAccountName ?? "",
         bankAccountNumber: saved?.bankAccountNumber ?? "",
         bankIfsc: saved?.bankIfsc ?? "",
@@ -227,7 +231,7 @@ export function payInputOf(
     values: PayValues,
     saved: PayInstructionsSettings | null | undefined,
 ): Partial<PayValues> {
-    const edition = saved?.edition ?? "INDIA";
+    const edition = saved?.edition;
     const before = payValuesOf(saved);
     const input: Partial<PayValues> = {};
     for (const f of PAY_FIELDS) {
@@ -260,7 +264,7 @@ export function payPreviewOf(
         bankIfsc: clean("bankIfsc"),
         bankName: clean("bankName"),
         note: clean("note"),
-        ...(edition === "GLOBAL" ? { edition } : {}),
+        ...(payByBankCode(edition) ? { edition } : {}),
     };
 }
 
@@ -273,7 +277,7 @@ export function accountLabel(stored: string | null | undefined): string {
 export function payWaysSummary(
     saved: PayInstructionsSettings | null | undefined,
 ): string {
-    const upi = !!saved?.upiId && saved.edition !== "GLOBAL";
+    const upi = !!saved?.upiId && !payByBankCode(saved.edition);
     const bank = payBankSet(saved);
     if (upi && bank) return "UPI and bank transfer";
     if (upi) return "UPI";

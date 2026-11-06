@@ -148,16 +148,19 @@ describe("a Global business's delivery", () => {
     };
 
     it("needs no region or postcode; India's rule still does", () => {
-        expect(addressLeft(ABROAD, "GLOBAL")).toBeNull();
+        expect(addressLeft(ABROAD, "country-and-region")).toBeNull();
         expect(addressLeft(ABROAD)).toBe("Add the address to deliver to.");
-        expect(addressLeft({ ...ABROAD, city: " " }, "GLOBAL")).toBe(
-            "Add the address to deliver to.",
-        );
+        expect(
+            addressLeft({ ...ABROAD, city: " " }, "country-and-region"),
+        ).toBe("Add the address to deliver to.");
     });
 
     it("sends a free-text region and its country as typed", () => {
         expect(
-            trimmed({ ...ABROAD, state: " Texas ", country: "US" }, "GLOBAL"),
+            trimmed(
+                { ...ABROAD, state: " Texas ", country: "US" },
+                "country-and-region",
+            ),
         ).toMatchObject({ state: "Texas", country: "US" });
         expect(trimmed({ ...ABROAD, state: "Texas" }).state).toBe("");
     });
@@ -170,7 +173,9 @@ describe("a Global business's delivery", () => {
 
     it("keeps a region through a reload", () => {
         const raw = JSON.stringify({ address: { state: "Texas" } });
-        expect(parseBagDraft(raw, "GLOBAL").address.state).toBe("Texas");
+        expect(parseBagDraft(raw, "country-and-region").address.state).toBe(
+            "Texas",
+        );
         expect(parseBagDraft(raw).address.state).toBe("");
     });
 });

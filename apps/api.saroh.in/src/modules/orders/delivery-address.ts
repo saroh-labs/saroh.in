@@ -8,6 +8,7 @@ import {
 } from "@saroh/block-contract";
 import { prisma, runInOrgContext } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import type { DeliveryAddressInput } from "./dto";
 
@@ -28,7 +29,7 @@ export function deliveryAddressFor<A extends DeliveryAddressInput>(
     business: { edition: Edition; country: string | null },
 ): A {
     const { country: sent, ...rest } = address;
-    if (business.edition !== "GLOBAL") {
+    if (editionProfile(business.edition).address === "indian-state-and-pin") {
         const missing = [
             !address.state && "address.Add the state",
             !address.postalCode && "address.Add the PIN code",

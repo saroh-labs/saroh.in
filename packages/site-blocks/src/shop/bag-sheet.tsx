@@ -271,7 +271,7 @@ export function BagSheet({
     onPlace: (request: StartCheckout, priced: BagPriced) => void;
     onClose: () => void;
 }) {
-    const { edition } = useSiteBusiness();
+    const { address: addressBy } = useSiteBusiness();
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
     const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
@@ -388,7 +388,7 @@ export function BagSheet({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, edition) === null
+                            addressLeft(last, addressBy) === null
                                 ? "shown"
                                 : "typing",
                     };
@@ -397,7 +397,7 @@ export function BagSheet({
         return () => {
             live = false;
         };
-    }, [askSaved, onDraft, edition]);
+    }, [askSaved, onDraft, addressBy]);
 
     if (items.length === 0) {
         return (
@@ -424,7 +424,7 @@ export function BagSheet({
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(address, edition)
+        ? addressLeft(address, addressBy)
         : null;
     const addressOk = addressNote === null;
     const pays = paysOf(quote);
@@ -459,7 +459,7 @@ export function BagSheet({
             lines: [...items],
             fulfilment: way,
             ...(needsAddress(way)
-                ? { address: trimmed(address, edition) }
+                ? { address: trimmed(address, addressBy) }
                 : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
             ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),

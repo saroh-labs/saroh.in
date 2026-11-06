@@ -136,9 +136,9 @@ export function SignInSheet({
     const field = useRef<HTMLInputElement>(null);
     // The whole number, country code and all, so only the hint can start
     // on the business's country.
-    const { edition, country } = useSiteBusiness();
+    const { phoneNumbers, country } = useSiteBusiness();
     const phoneHint =
-        edition === "INDIA"
+        phoneNumbers === "indian"
             ? "+91 98450 12345"
             : `+${phoneCountry(country).dial}`;
     const opener = useRef<Element | null>(null);

@@ -2739,10 +2739,10 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     4. **Code reads the edition from the business, never from the address** a request came through. An address must match the business's edition, apart from `api.saroh.app`, which serves merchant sites only and refuses routes it hasn't listed.
     5. **One account per person,** signed in separately on each edition's accounts site. Each lists all that person's businesses.
     6. **Admin shows one edition per deployment,** with staff, releases and audit shared.
-    7. **Settings over branches.** Code asks a profile in `@saroh/edition` what it needs ("which tax system?"), never "is this India?". A third edition should mean a new profile.
+    7. **Settings over branches.** Code asks a profile in `@saroh/edition` what it needs ("which tax system?"), never "is this India?". A third edition should mean a new profile. Built 6 Nov: `EDITION_PROFILES` / `editionProfile()`, with `check:edition-branches` refusing a new comparison (`devops-environments-and-flags.md`).
     8. **Languages are separate from editions.** Formatting and text foundations come first; existing text moves over time.
 - Consequences: a bad migration or outage reaches both editions, so migrations stay backward-compatible and new Global behaviour sits behind per-edition flags.
-- Rules: `packages/edition/src/index.ts`; `Organization.edition`.
+- Rules: `packages/edition/src/index.ts`; `Organization.edition`; `scripts/check-edition-branches.mjs`; `devops-environments-and-flags.md` → Editions are asked.
 
 **Finding a site from its address stays three lookups (2 Nov).** The plan was one function. The code has three, and their rules differ on purpose: `getPublicationBySubdomain` with `getPublicationByHostname` shows a site and refuses test addresses and paused domains; `resolveSiteHost` serves customer sign-in and messages and needs a live, published site; `businessForHost` serves reports and still counts a deleted site. One function would only pay off in a database split, which isn't planned, and merging risks live merchant sites. Merge them if a split is decided.
 

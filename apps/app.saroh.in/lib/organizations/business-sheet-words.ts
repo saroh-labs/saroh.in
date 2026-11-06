@@ -1,4 +1,4 @@
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { PRICE_MODE_ROW, PRICE_MODE_SAVED } from "@/lib/gst/price-mode";
 
@@ -83,7 +83,7 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
                 description: `Where ${words.people} can find you. Your website shows the ones you add.`,
             };
         case "gst":
-            if (EDITION === "GLOBAL") {
+            if (PROFILE.taxSystem === "named-line") {
                 return {
                     title: "Tax",
                     description:
@@ -130,7 +130,7 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
             return {
                 title: "How to pay us",
                 description:
-                    EDITION === "GLOBAL"
+                    PROFILE.payInstructions === "bank-code"
                         ? "Bank details for customers who pay you directly."
                         : "UPI and bank details for customers who pay you directly.",
             };

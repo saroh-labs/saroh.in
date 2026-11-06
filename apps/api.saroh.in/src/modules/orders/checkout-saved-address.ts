@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { splitDeliveryPlace } from "@saroh/block-contract";
 import { prisma, runInOrgContext } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 
@@ -68,7 +69,7 @@ export function savedAddressOf(
     const city = clean(row.deliveryCity);
     const state = clean(row.deliveryState);
     const postalCode = clean(row.deliveryPostalCode);
-    const global = edition === "GLOBAL";
+    const global = editionProfile(edition).address === "country-and-region";
     if (!line1 || !city || (!global && (!state || !postalCode))) return null;
     const place = global ? splitDeliveryPlace(state) : null;
     return {

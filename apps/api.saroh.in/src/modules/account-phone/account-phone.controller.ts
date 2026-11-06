@@ -15,7 +15,7 @@ import {
     Res,
     UseGuards,
 } from "@nestjs/common";
-import { editionOfHost } from "@saroh/edition";
+import { editionOfHost, editionProfile } from "@saroh/edition";
 import { fromNodeHeaders } from "better-auth/node";
 import type { Request, Response } from "express";
 
@@ -32,7 +32,8 @@ import { StartPhoneDto, VerifyPhoneDto } from "./dto";
 
 /** Phone sign-in is India's, and each code costs money to send (DEC-204). */
 function refusePhoneOnGlobal(host: string | undefined): void {
-    if (editionOfHost(host ?? "") === "GLOBAL") {
+    const edition = editionOfHost(host ?? "");
+    if (edition && !editionProfile(edition).phoneSignIn) {
         throw new NotFoundException("Phone sign-in isn't available here.");
     }
 }

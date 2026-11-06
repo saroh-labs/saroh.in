@@ -4,7 +4,7 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SitePhoneInput } from "./phone-input";
-import { SiteBusinessProvider } from "./site-business";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "./site-business";
 
 /** The merchant site's phone field (#1036), as a form holds it. */
 function Harness({ initial = "" }: { initial?: string }) {
@@ -30,7 +30,13 @@ const value = () => screen.getByTestId("value").textContent;
 describe("where a phone field starts (DEC-204)", () => {
     it("starts on a Global business's country, and sends its code", () => {
         render(
-            <SiteBusinessProvider value={{ edition: "GLOBAL", country: "GB" }}>
+            <SiteBusinessProvider
+                value={{
+                    country: "GB",
+                    address: "country-and-region",
+                    phoneNumbers: "with-country-code",
+                }}
+            >
                 <Harness />
             </SiteBusinessProvider>,
         );
@@ -42,7 +48,7 @@ describe("where a phone field starts (DEC-204)", () => {
     it("starts on +91 for an India business, whatever country reads", () => {
         render(
             <SiteBusinessProvider
-                value={{ edition: "INDIA", country: "India" }}
+                value={{ ...INDIA_SITE_BUSINESS, country: "India" }}
             >
                 <Harness />
             </SiteBusinessProvider>,

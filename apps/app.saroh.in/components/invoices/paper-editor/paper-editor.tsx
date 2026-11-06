@@ -14,7 +14,7 @@ import { usePhone } from "@/components/bookings/calendar/header/use-phone";
 import { BusinessLogoSheet } from "@/components/organizations/logo/business-logo-sheet";
 import { PayInstructionsSheet } from "@/components/organizations/pay-instructions/pay-instructions-sheet";
 import { runAction } from "@/lib/api/run-action";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {
     InvoiceFormBusiness,
@@ -264,7 +264,7 @@ export function PaperEditor({
                         <FromElsewhere>
                             <p>
                                 Printed on every unpaid invoice:{" "}
-                                {EDITION === "GLOBAL"
+                                {PROFILE.payInstructions === "bank-code"
                                     ? "your bank details"
                                     : "your UPI ID, bank details"}{" "}
                                 and a note, set once for the business.

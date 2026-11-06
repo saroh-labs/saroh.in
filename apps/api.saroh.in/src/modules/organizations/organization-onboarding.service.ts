@@ -6,7 +6,11 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma, startOnFreePlan } from "@saroh/database";
-import { currencyForCountry, editionOfHost } from "@saroh/edition";
+import {
+    currencyForCountry,
+    editionOfHost,
+    editionProfile,
+} from "@saroh/edition";
 
 import { appBase } from "../../common/app-url";
 import { sendWelcomeEmail } from "../../common/email";
@@ -103,8 +107,9 @@ export class OrganizationOnboardingService {
         // country must belong there (DEC-204). An address of neither is India.
         const edition = editionOfHost(owner?.host ?? "") ?? "INDIA";
         refuseCountryOutsideEdition(edition, dto.profile?.country);
+        const profile = editionProfile(edition);
         const currency =
-            edition === "GLOBAL"
+            profile.businessCountry === "asked-at-setup"
                 ? (dto.currency ??
                   currencyForCountry(dto.profile?.country ?? ""))
                 : undefined;
@@ -158,13 +163,12 @@ export class OrganizationOnboardingService {
             // profiles who chose none is refused, naming the choice.
             // Saroh's own billing abroad is later (DEC-204): nothing to choose
             // on Global yet, and its profile's fields are India's.
-            const billingProfileId =
-                edition === "INDIA"
-                    ? await chosenBillingProfileInTx(tx, userId, {
-                          billingProfileId: dto.billingProfileId,
-                          newBillingProfile: dto.newBillingProfile,
-                      })
-                    : null;
+            const billingProfileId = profile.sarohBilling
+                ? await chosenBillingProfileInTx(tx, userId, {
+                      billingProfileId: dto.billingProfileId,
+                      newBillingProfile: dto.newBillingProfile,
+                  })
+                : null;
 
             // Who referred it (DEC-156) and where it came from (#1190),
             // written here and nowhere else: no later write names these
@@ -174,7 +178,7 @@ export class OrganizationOnboardingService {
                     name: dto.name,
                     slug,
                     kind,
-                    ...(edition === "GLOBAL" ? { edition, currency } : {}),
+                    ...(currency !== undefined ? { edition, currency } : {}),
                     ...(billingProfileId ? { billingProfileId } : {}),
                     ...(referredBy
                         ? {
@@ -199,7 +203,9 @@ export class OrganizationOnboardingService {
                 data: {
                     organizationId: organization.id,
                     ...this.buildProfileData(dto),
-                    ...(edition === "GLOBAL" ? { yearStartMonth: 1 } : {}),
+                    ...(profile.taxSystem === "named-line"
+                        ? { yearStartMonth: 1 }
+                        : {}),
                     timezone: startingZone(
                         dto.profile?.timezone,
                         dto.profile?.country,
@@ -247,7 +253,7 @@ export class OrganizationOnboardingService {
             // from its details (DEC-167, R6), whose customer at Saroh's
             // billing provider is made by a job after the commit: never in
             // the way of signing up. A later business chose one above.
-            if (!billingProfileId && edition === "INDIA") {
+            if (!billingProfileId && profile.sarohBilling) {
                 await firstBillingProfileInTx(tx, {
                     ownerUserId: userId,
                     organizationId: organization.id,

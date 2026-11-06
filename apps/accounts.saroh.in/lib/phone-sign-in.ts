@@ -1,3 +1,5 @@
+import { editionProfile } from "@saroh/edition";
+
 import { env } from "@/env";
 import type { AuthFailure } from "./auth-error-copy";
 import { NETWORK_ERROR, TOO_MANY_REQUESTS } from "./auth-error-copy";
@@ -58,8 +60,8 @@ export type PhoneAnswer<T> =
 
 /** Whether the sign-in page offers a phone, read on this app's server. */
 export async function phoneOptions(): Promise<PhoneOptions> {
-    // Phone sign-in is India's (DEC-204).
-    if (env.NEXT_PUBLIC_EDITION === "GLOBAL") return NO_PHONE;
+    // Each code costs money to send, so an edition says (DEC-204).
+    if (!editionProfile(env.NEXT_PUBLIC_EDITION).phoneSignIn) return NO_PHONE;
     try {
         const response = await fetch(`${apiBase()}/account-phone/options`, {
             cache: "no-store",

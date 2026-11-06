@@ -235,6 +235,10 @@ jobs:
       - name: Shared data
         run: pnpm run check:shared-data
 
+      # Code asks its edition's profile, never "is this India?" (DEC-204)
+      - name: Edition branches
+        run: pnpm run check:edition-branches
+
       # Every date field is the shadcn date picker, never a native one.
       - name: Date inputs
         run: pnpm run check:date-inputs

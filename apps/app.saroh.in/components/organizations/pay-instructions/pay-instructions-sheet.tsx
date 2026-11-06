@@ -27,6 +27,7 @@ import {
     IFSC_EXAMPLE,
     MAX_PAY_NOTE,
     PAY_FIELDS,
+    payByBankCode,
     payInputOf,
     payInstructionsSchemaOf,
     payPreviewOf,
@@ -203,7 +204,7 @@ export function PayInstructionsSheet({
                         "[&_[data-slot=form-description]]:text-[11.5px] [&_[data-slot=form-description]]:leading-[1.5]",
                     )}
                 >
-                    {(edition === "GLOBAL" ? GLOBAL_FIELDS : FIELDS).map(
+                    {(payByBankCode(edition) ? GLOBAL_FIELDS : FIELDS).map(
                         (f) => (
                             <FormField
                                 key={f.name}

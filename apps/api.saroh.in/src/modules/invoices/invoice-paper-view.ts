@@ -1,4 +1,5 @@
 import type { PaperColours } from "@saroh/block-contract";
+import { editionProfile } from "@saroh/edition";
 
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { paperPrices, pricesSentence } from "./added-line";
@@ -382,7 +383,7 @@ export function payInstructionLines(
 ): string[] | null {
     if (!pay) return null;
     const lines: string[] = [];
-    const global = pay.edition === "GLOBAL";
+    const global = editionProfile(pay.edition).payInstructions === "bank-code";
     if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);
     if (
         pay.bankAccountNumber &&

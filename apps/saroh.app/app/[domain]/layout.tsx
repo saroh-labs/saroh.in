@@ -58,7 +58,7 @@ import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
-import { siteUrlOf } from "@saroh/edition";
+import { editionProfile, siteUrlOf } from "@saroh/edition";
 import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { lookDock } from "@/lib/header-action";
@@ -420,8 +420,10 @@ export default async function SiteLayout({
         <TestReleaseProvider release={testRelease}>
             <SiteBusinessProvider
                 value={{
-                    edition: footerFacts?.edition ?? "INDIA",
                     country: footerFacts?.country ?? null,
+                    address: editionProfile(footerFacts?.edition).address,
+                    phoneNumbers: editionProfile(footerFacts?.edition)
+                        .phoneNumbers,
                 }}
             >
                 <div

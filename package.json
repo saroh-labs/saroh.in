@@ -14,6 +14,7 @@
         "check:db-teardown": "node scripts/check-db-teardown.mjs",
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
         "check:icon-button-tips": "node scripts/check-icon-button-tips.mjs",
+        "check:edition-branches": "node --test scripts/check-edition-branches.test.mjs && node scripts/check-edition-branches.mjs",
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
         "check:security-headers": "node scripts/check-security-headers.mjs",
         "check:site-motion": "node --test scripts/check-site-motion.test.mjs && node scripts/check-site-motion.mjs",

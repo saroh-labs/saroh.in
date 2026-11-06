@@ -4,7 +4,7 @@ import {
     settingsPagesFor,
 } from "@/components/shared/navigation/nav-items";
 import { mayChangePlan } from "@/lib/billing/plan-access";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
@@ -142,7 +142,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         // What customers pay with when the business doesn't take payment
         // online (R32).
         words:
-            EDITION === "GLOBAL"
+            PROFILE.payInstructions === "bank-code"
                 ? [
                       "Bank details",
                       "Bank transfer",

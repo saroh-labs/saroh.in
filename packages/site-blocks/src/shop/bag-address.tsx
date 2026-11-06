@@ -12,7 +12,7 @@ import { focusRing, inputFill } from "../booking-flow/styles";
 import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
-import type { SiteEdition as Edition } from "../site-business";
+import type { SiteAddress } from "../site-business";
 import { useSiteBusiness } from "../site-business";
 import type { DeliveryAddress, ShopWay } from "./api";
 import { INDIA_STATES, stateIn } from "./india-states";
@@ -28,7 +28,8 @@ import { INDIA_STATES, stateIn } from "./india-states";
  *
  * A Global business's delivery asks for a country instead (starting on the
  * business's own), and its region and postcode are optional free text: no
- * tax reads them. The API decides by the business's edition, not by this.
+ * tax reads them. The API decides by the business's edition, not by this; `address` is
+ * its profile's fact.
  */
 
 export const needsAddress = (way: ShopWay | null) =>
@@ -58,12 +59,12 @@ export function addressBlank(a: DeliveryAddress): boolean {
  */
 export function addressLeft(
     a: DeliveryAddress,
-    edition: Edition = "INDIA",
+    address: SiteAddress = "indian-state-and-pin",
 ): string | null {
     if (
         a.line1.trim() === "" ||
         a.city.trim() === "" ||
-        (edition === "INDIA" &&
+        (address === "indian-state-and-pin" &&
             (stateIn(a.state) === "" || a.postalCode.trim() === ""))
     ) {
         return "Add the address to deliver to.";
@@ -86,22 +87,25 @@ export function deliveryPhoneOk(phone: string): boolean {
 
 export function addressReady(
     a: DeliveryAddress,
-    edition: Edition = "INDIA",
+    address: SiteAddress = "indian-state-and-pin",
 ): boolean {
-    return addressLeft(a, edition) === null;
+    return addressLeft(a, address) === null;
 }
 
 export function trimmed(
     a: DeliveryAddress,
-    edition: Edition = "INDIA",
+    address: SiteAddress = "indian-state-and-pin",
 ): DeliveryAddress {
     const out: DeliveryAddress = {
         line1: a.line1.trim(),
         city: a.city.trim(),
-        state: edition === "INDIA" ? stateIn(a.state) : a.state.trim(),
+        state:
+            address === "indian-state-and-pin"
+                ? stateIn(a.state)
+                : a.state.trim(),
         postalCode: a.postalCode.trim(),
     };
-    if (edition !== "INDIA" && a.country) out.country = a.country;
+    if (address === "country-and-region" && a.country) out.country = a.country;
     if (a.name?.trim()) out.name = a.name.trim();
     if (a.phone?.trim()) out.phone = a.phone.trim();
     if (a.line2?.trim()) out.line2 = a.line2.trim();
@@ -181,7 +185,7 @@ export function AddressFields({
     onChange: (name: keyof DeliveryAddress) => (value: string) => void;
 }) {
     const business = useSiteBusiness();
-    const global = business.edition !== "INDIA";
+    const global = business.address === "country-and-region";
     const phone = address.phone?.trim() ?? "";
     // Only once something is typed: an empty required field is said beside
     // the button, never as an error before the customer has started.
