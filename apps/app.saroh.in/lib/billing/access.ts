@@ -69,6 +69,11 @@ export interface BillingAccessView {
         endsAt: string;
         nextPlanName: string;
     } | null;
+    /**
+     * A renewal that wasn't paid (DEC-210): the plan stays until `dueBy`,
+     * then Free. Absent from an API that predates it: nothing is due.
+     */
+    paymentDue?: { planName: string; dueBy: string } | null;
     pendingMove: {
         /** The plan it moves to, on `version`. */
         planId: string;
