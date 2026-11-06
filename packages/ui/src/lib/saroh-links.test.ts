@@ -40,7 +40,7 @@ describe("the days the footer's pages publish", () => {
 
 describe("sarohFooterLinks", () => {
     it("is Privacy, Terms and Help once all three are published", () => {
-        expect(sarohFooterLinks(new Date("2026-10-26T00:00:00+05:30"))).toEqual(
+        expect(sarohFooterLinks(new Date("2026-11-06T00:00:00+05:30"))).toEqual(
             [
                 { label: "Privacy", href: `${SAROH_SITE_URL}/privacy` },
                 { label: "Terms", href: `${SAROH_SITE_URL}/terms` },
@@ -51,8 +51,8 @@ describe("sarohFooterLinks", () => {
 
     it("sends Help to the old help site until Help publishes", () => {
         const links = sarohFooterLinks(new Date("2026-10-16T23:59:59+05:30"));
-        // Privacy republishes on 17 Oct too (DEC-165).
-        expect(links.map((l) => l.label)).toEqual(["Terms", "Help"]);
+        // Privacy republishes on 17 Oct too (DEC-165), and Terms on 6 Nov.
+        expect(links.map((l) => l.label)).toEqual(["Help"]);
         expect(links.at(-1)?.href).toBe(SAROH_OLD_HELP_URL);
     });
 

@@ -14,7 +14,8 @@
  * price lock — each autopay covers 12 monthly charges and the next is
  * approved before it runs out, and a price that goes up is told at least
  * 30 days ahead by email and approved, the old price kept until then; the
- * yearly payment left out while yearly is switched off). Published
+ * yearly payment left out while yearly is switched off; and the 6 Nov
+ * owner's change, "Saroh is in early access.", with no launch date). Published
  * VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
@@ -58,7 +59,7 @@ You can cancel at any time by writing to contact@saroh.in. Payments aren't refun
 
 ## Early access
 
-Saroh opens in early access on 17 October 2026. It works, and it may still have rough edges. We fix what you report, and we'll tell you about changes that affect you.
+Saroh is in early access. It works, and it may still have rough edges. We fix what you report, and we'll tell you about changes that affect you.
 
 ## Money you take
 
