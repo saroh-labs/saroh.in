@@ -32,7 +32,8 @@ import {
  *    recorder, with every input masked and no network or console, and
  *    page visits (DEC-160): `$pageview` when the app says a page was
  *    opened ({@link BrowserTracking.pageview}) and `$pageleave` when the
- *    tab goes, so the time on a page is known. One instance for both, so a
+ *    tab goes, so the time on a page is known, and `$web_vitals` for the
+ *    page the tab loaded ({@link WEB_VITALS_CAPTURE}). One instance for both, so a
  *    page's visits and its recordings share a session. Each has its own
  *    switch (`POSTHOG_REPLAY`, `POSTHOG_ANALYTICS`); `before_send` drops
  *    every event that is not a recording or a page visit, and each of
@@ -87,6 +88,12 @@ export interface BrowserTrackingOptions {
      * the app's own bundle. Only the workspace and saroh.in pass it.
      */
     loadRecorder?: () => Promise<unknown>;
+    /**
+     * `() => import("posthog-js/dist/web-vitals")`: Google's web-vitals
+     * observers, from the app's own bundle. Loaded only while page visits
+     * are sent; without it no web vitals are measured.
+     */
+    loadWebVitals?: () => Promise<unknown>;
     /** `POSTHOG_REPLAY`: replay is possible only when this is "on". */
     replay?: string | undefined;
     /** `POSTHOG_REPLAY_SAMPLE`: a share from 0 to 1, or unset for the default. */
@@ -553,6 +560,38 @@ export interface PageRoutes {
     now?: string | undefined;
     /** The page before it. */
     previous?: string | undefined;
+    /**
+     * The first page the app named, beside the address it was at: the page
+     * the tab loaded, which is what web vitals measure.
+     */
+    landing?: { path: string; route: string } | undefined;
+}
+
+/**
+ * Web vitals, as posthog-js 1.435 reads `capture_performance`
+ * (`PerformanceCaptureConfig` in `@posthog/types`, and
+ * `extensions/web-vitals` in the SDK): LCP, INP, CLS and FCP, no
+ * attribution (it names the element and the address behind a slow number),
+ * and no network timing (it would record every request's address). Set
+ * explicitly, so the project's settings can't turn either on.
+ */
+export const WEB_VITALS_CAPTURE = {
+    web_vitals: true,
+    web_vitals_allowed_metrics: ["LCP", "INP", "CLS", "FCP"],
+    web_vitals_attribution: false,
+    network_timing: false,
+} satisfies PostHogConfig["capture_performance"];
+
+/** The properties of a `$web_vitals` event that may stay, and what each metric may say. */
+const WEB_VITAL_PROPERTY =
+    /^\$web_vitals_(?:LCP|INP|CLS|FCP)_(?:event|value)$/u;
+const WEB_VITAL_FIELDS = ["name", "value", "rating", "delta", "navigationType"];
+
+/** The path of an address: no origin, no query, no fragment. */
+function pathOfUrl(url: unknown): string | undefined {
+    if (typeof url !== "string") return undefined;
+    const rest = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu, "");
+    return rest.split(/[?#]/u)[0] || "/";
 }
 
 /** What the SDK adds about where a session began, and how far a page was scrolled. */
@@ -560,9 +599,9 @@ const ENTRY_PROPERTY =
     /^\$(?:initial_|session_entry_|prev_pageview_.*(?:scroll|content))/u;
 
 /**
- * A page visit's last gate (DEC-160): `$pageview` and `$pageleave` only,
- * and the address in each is the one the **app** named, never the
- * browser's. The workspace names a route's shape
+ * A page visit's last gate (DEC-160): `$pageview`, `$pageleave` and
+ * `$web_vitals` only, and the address in each is the one the **app**
+ * named, never the browser's. The workspace names a route's shape
  * (`/commerce/orders/[orderId]`), so no record's id, token or business name
  * leaves; saroh.in names its public path and the query its allow-list
  * keeps. The tab's title (it names the business), referrers and where the
@@ -570,14 +609,30 @@ const ENTRY_PROPERTY =
  *
  * Null when the app has named no page: nothing is guessed from the address
  * bar.
+ *
+ * `$web_vitals` measure the page the tab loaded (soft navigations are not
+ * measured), so they go out under the route the app named for that
+ * address ({@link PageRoutes.landing}), or not at all. Each metric keeps
+ * its name, value, rating, delta and navigation type; its id, addresses,
+ * session ids and any attribution are dropped.
  */
 export function pageBeforeSend(
     event: SdkEvent | null,
     routes: PageRoutes,
 ): SdkEvent | null {
-    if (event?.event !== "$pageview" && event?.event !== "$pageleave")
+    const vitals = event?.event === "$web_vitals";
+    if (
+        !vitals &&
+        event?.event !== "$pageview" &&
+        event?.event !== "$pageleave"
+    )
         return null;
-    if (!routes.now) return null;
+    const route = vitals
+        ? pathOfUrl(event.properties?.$current_url) === routes.landing?.path
+            ? routes.landing?.route
+            : undefined
+        : routes.now;
+    if (!route) return null;
     const clean = withoutPersonalProperties(event);
     const properties = { ...(clean.properties ?? {}) };
     for (const key of Object.keys(properties))
@@ -589,8 +644,27 @@ export function pageBeforeSend(
               )?.[0] ?? "")
             : "";
     const pathOf = (route: string) => route.split(/[?#]/u)[0] ?? "";
-    properties.$current_url = `${origin}${routes.now.split("#")[0] ?? ""}`;
-    properties.$pathname = pathOf(routes.now);
+    properties.$current_url = `${origin}${route.split("#")[0] ?? ""}`;
+    properties.$pathname = pathOf(route);
+    if (vitals) {
+        for (const [key, value] of Object.entries(properties)) {
+            if (!key.startsWith("$web_vitals_")) continue;
+            if (!WEB_VITAL_PROPERTY.test(key)) delete properties[key];
+            else if (key.endsWith("_event"))
+                properties[key] = Object.fromEntries(
+                    WEB_VITAL_FIELDS.filter(
+                        (field) =>
+                            typeof value === "object" &&
+                            value !== null &&
+                            field in value,
+                    ).map((field) => [
+                        field,
+                        (value as Record<string, unknown>)[field],
+                    ]),
+                );
+        }
+        return { ...clean, properties };
+    }
     // A leave is from the page on screen; a view comes after the one before.
     const from = event.event === "$pageleave" ? routes.now : routes.previous;
     if (from) properties.$prev_pageview_pathname = pathOf(from);
@@ -852,9 +926,13 @@ export function createBrowserTracking(
         }
         const turn = ++replayTurn;
         try {
+            // Web vitals only with page visits, and only when the app hands
+            // the observers in: the SDK never fetches them itself.
+            const vitals = count && Boolean(options.loadWebVitals);
             const [loaded] = await Promise.all([
                 loadSdk(),
                 record ? options.loadRecorder?.() : undefined,
+                vitals ? options.loadWebVitals?.() : undefined,
             ]);
             if (turn !== replayTurn) return false;
             // One instance per page: who it is about is fixed when it is made.
@@ -869,6 +947,9 @@ export function createBrowserTracking(
                         // `$pageleave` when the tab goes; `$pageview` is
                         // sent by hand, when the app names the page.
                         capture_pageleave: count,
+                        capture_performance: vitals
+                            ? WEB_VITALS_CAPTURE
+                            : false,
                         before_send: gate,
                     },
                     `saroh_replay_${turn}`,
@@ -1037,6 +1118,8 @@ export function createBrowserTracking(
 
         pageview(route) {
             wanted = route.startsWith("/") ? route.slice(0, 300) : undefined;
+            if (wanted && !routes.landing && typeof location !== "undefined")
+                routes.landing = { path: location.pathname, route: wanted };
             sendPage();
         },
 

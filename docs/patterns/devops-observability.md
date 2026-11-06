@@ -118,7 +118,8 @@ must keep:
   admin console or a merchant site (`check:merchant-site-tracking`). What a
   screen marks, and how: `frontend-design-system.md` → Session recordings.
 - **Page visits are the same two apps, under the same rules** (DEC-160):
-  `$pageview` and `$pageleave` only, switched by
+  `$pageview` and `$pageleave` only (and `$web_vitals` with them, no
+  attribution, no network timing, owner 6 Nov 2026), switched by
   `NEXT_PUBLIC_POSTHOG_ANALYTICS`, sent by the instance that records. A
   page is named by the app (`browserTracking.pageview(route)`), never read
   from the address bar: the workspace gives the route's shape

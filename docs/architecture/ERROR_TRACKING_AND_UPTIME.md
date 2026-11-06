@@ -37,7 +37,8 @@ which app with `app` (`api` | `application` | `auth` | `admin` | `web` |
    capture, no cookies or browser storage, no `identify()` with personal
    data. Besides errors there are two things, in two apps, under the rules
    below: session replay, and page visits (`$pageview` and `$pageleave`,
-   DEC-160, which replaced "no pageviews" on 14 Oct 2026 and nothing else).
+   DEC-160, which replaced "no pageviews" on 14 Oct 2026 and nothing else,
+   and with them `$web_vitals`, 6 Nov 2026).
 
 ## What is sent, from where
 
@@ -383,6 +384,24 @@ console or a merchant site.
   the page before it was open (`$prev_pageview_duration`), which is how
   PostHog knows the time on a page. Nothing else: no click, no scroll
   depth, no heatmap.
+- **Web vitals** (owner, 6 Nov 2026): with page visits, and only where
+  and when they are sent, one `$web_vitals` event for the page the tab
+  loaded: LCP, INP, CLS and FCP (`WEB_VITALS_CAPTURE`). The observers come
+  from the app's own bundle (`loadWebVitals`:
+  `posthog-js/dist/web-vitals`), fetched only once page visits may start;
+  where they are off nothing is loaded and nothing is measured. **No
+  attribution** (posthog-js would name the element behind a slow LCP or
+  INP and the image's address) and **no network timing** (it would record
+  every request's address), both set off in the config so the project's
+  settings can't turn them on. posthog-js puts the full address on the
+  event and on each metric (`$current_url`, `navigationURL`); the last
+  gate replaces the event's with the route the app named for that page
+  (`PageRoutes.landing`, the first page it named, matched by path), drops
+  the event if the app never named that page, and keeps of each metric
+  only its name, value, rating, delta and navigation type: no id,
+  address, session or window id. Soft navigations are not measured, so a
+  page opened inside the app after the first has no web vitals of its
+  own; INP and CLS cover the whole stay from that first page.
 - **The app names the page, never the address bar**
   (`BrowserTracking.pageview(route)`; posthog-js's own
   `capture_pageview: "history_change"` is off, because it reads the address
@@ -425,10 +444,10 @@ console or a merchant site.
 apps): one `GET …/array/<key>/config` when the instance is made (the
 project's settings: a recording starts only if the project records at
 all), `POST …/s/` with the recording (`$snapshot` events), and `POST
-…/e/` or `…/i/v0/e/` with each `$pageview` and `$pageleave`.
-`before_send` drops every other event, and autocapture, heatmaps, web
-vitals, exceptions, surveys and flags are switched off in the config as
-well. An error is one `POST …/e/` from the browser (`$exception`), and
+…/e/` or `…/i/v0/e/` with each `$pageview`, `$pageleave` and
+`$web_vitals`. `before_send` drops every other event, and autocapture,
+heatmaps, network timing, web vitals attribution, exceptions, surveys and
+flags are switched off in the config as well. An error is one `POST …/e/` from the browser (`$exception`), and
 one `POST …/i/v0/e/` from the server when the server threw it.
 
 ### Checking it by hand
@@ -437,7 +456,9 @@ Use a real browser, not one driven by a test tool, and click something:
 the SDK sends nothing from an automated browser, and nothing of a
 recording before the first click or key. Then, within a few seconds: a
 `POST` to `…/s/` (the recording) and one to `…/e/` or `…/i/v0/e/` per
-page opened. In a recording, look for the page itself, not a black frame.
+page opened, and a few seconds after the first page one more to `…/e/`
+with `$web_vitals`. In a recording, look for the page itself, not a black
+frame.
 
 ## Settings
 
@@ -483,9 +504,10 @@ list it.
 3. Production the same, with `POSTHOG_ENVIRONMENT=production`.
 4. Page visits (DEC-160): nothing to turn on in PostHog; Web analytics
    reads `$pageview` and `$pageleave` as they arrive. In the project's
-   settings leave **autocapture, heatmaps, dead clicks, web vitals and
-   exception autocapture off** (the SDK has them off whatever is set
-   there), leave "Cookieless server hash mode" off (not used), and keep
+   settings leave **autocapture, heatmaps, dead clicks and exception
+   autocapture off** (the SDK has them off whatever is set there), and
+   **web vitals autocapture on** (owner, 6 Nov 2026; the SDK sends them
+   only with page visits, and its own config wins either way), leave "Cookieless server hash mode" off (not used), and keep
    **discard client IP data** on. The production `vars` of the workspace
    and saroh.in say `NEXT_PUBLIC_POSTHOG_ANALYTICS: "on"`; development's
    say `off`.

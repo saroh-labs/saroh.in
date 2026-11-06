@@ -31,7 +31,8 @@
  * behind its cookie notice). So it also fails when:
  *
  *   7. any other app, or `packages/site-blocks`, names Saroh's recorder
- *      (`posthog-recorder`, `loadRecorder`, `startReplay`,
+ *      (`posthog-recorder`, `loadRecorder`, the web vitals observers
+ *      `posthog-js/dist/web-vitals` and `loadWebVitals`, `startReplay`,
  *      `startSiteReplay`, `startSessionRecording`, `…POSTHOG_REPLAY…`) or
  *      its page visits (`…POSTHOG_ANALYTICS…`, `tracking.pageview(`, DEC-160):
  *      never a merchant site, never accounts (sign-in, sign-up,
@@ -87,10 +88,11 @@ const RECORDER_HANDOVER = "lib/error-tracking-browser.ts";
  * its page visits (DEC-160), which the same two apps send and no other.
  */
 const RECORDER =
-    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/u;
+    /posthog-recorder|loadRecorder|posthog-js\/dist\/web-vitals|loadWebVitals|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/u;
 
 /** Handing the recorder to the tracker: the bundle, or the option that takes it. */
-const HANDOVER = /posthog-recorder|loadRecorder\s*:/u;
+const HANDOVER =
+    /posthog-recorder|loadRecorder\s*:|posthog-js\/dist\/web-vitals|loadWebVitals\s*:/u;
 
 /** Source a browser or a server could run; prose and settings are not it. */
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/u;

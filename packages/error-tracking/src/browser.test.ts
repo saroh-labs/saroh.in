@@ -20,6 +20,7 @@ import {
     SITE_REPLAY_BLOCK_SELECTOR,
     siteReplayConfig,
     siteReplayDecision,
+    WEB_VITALS_CAPTURE,
 } from "./browser";
 import { MAX_BROWSER_EXCEPTIONS_PER_SESSION } from "./names";
 
@@ -1078,6 +1079,216 @@ describe("page visits (DEC-160)", () => {
             capture_pageleave: true,
         });
         expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+    });
+
+    /** What posthog-js 1.435 sends (`extensions/web-vitals`), attribution forced on. */
+    function sdkWebVitals(url: string) {
+        const metric = (name: string, value: number) => ({
+            name,
+            value,
+            rating: "good",
+            delta: value,
+            id: "v6-1762400000000-1234567890123",
+            navigationType: "navigate",
+            navigationId: 1,
+            navigationInteractionId: undefined,
+            navigationURL: url,
+            navigationStartTime: 0,
+            $current_url: url,
+            timestamp: 1762400000000,
+            $session_id: "s1",
+            $window_id: "w1",
+            attribution: {
+                interactionTarget: "button#pay-asha-rao",
+                target: "img.product[alt='Northwind tea']",
+                url: `${url}&img=1`,
+            },
+        });
+        return {
+            event: "$web_vitals",
+            properties: {
+                $current_url: url,
+                $pathname: "/commerce/orders/seed_order_7",
+                title: "Order ORD-007 \u00b7 Northwind Supply \u00b7 Saroh",
+                $referrer: "https://mail.example.com/",
+                $session_id: "s1",
+                $web_vitals_LCP_event: metric("LCP", 1200.5),
+                $web_vitals_LCP_value: 1200.5,
+                $web_vitals_INP_event: metric("INP", 96),
+                $web_vitals_INP_value: 96,
+                $web_vitals_TTFB_event: metric("TTFB", 80),
+            },
+            $set: { name: "Asha" },
+        };
+    }
+    const CLEAN_LCP = {
+        name: "LCP",
+        value: 1200.5,
+        rating: "good",
+        delta: 1200.5,
+        navigationType: "navigate",
+    };
+
+    it("web vitals in the workspace: the route's shape, the numbers, nothing else", () => {
+        const sent = must(
+            pageBeforeSend(
+                sdkWebVitals(
+                    "https://app.saroh.in/commerce/orders/seed_order_7?tab=notes",
+                ),
+                {
+                    now: "/settings/profile",
+                    landing: {
+                        path: "/commerce/orders/seed_order_7",
+                        route: "/commerce/orders/[orderId]",
+                    },
+                },
+            ),
+        );
+        expect(sent.properties).toEqual({
+            $current_url: "https://app.saroh.in/commerce/orders/[orderId]",
+            $pathname: "/commerce/orders/[orderId]",
+            $session_id: "s1",
+            $web_vitals_LCP_event: CLEAN_LCP,
+            $web_vitals_LCP_value: 1200.5,
+            $web_vitals_INP_event: {
+                name: "INP",
+                value: 96,
+                rating: "good",
+                delta: 96,
+                navigationType: "navigate",
+            },
+            $web_vitals_INP_value: 96,
+        });
+        expect(sent).not.toHaveProperty("$set");
+        expect(JSON.stringify(sent)).not.toMatch(
+            /seed_order_7|asha|Northwind|mail\.example|tab=notes|button|img|w1/iu,
+        );
+    });
+
+    it("web vitals on saroh.in: the allow-listed path the app named", () => {
+        const sent = must(
+            pageBeforeSend(
+                sdkWebVitals(
+                    "https://saroh.in/pricing?utm_source=x&email=a@example.com",
+                ),
+                {
+                    now: "/pricing?utm_source=x",
+                    landing: {
+                        path: "/pricing",
+                        route: "/pricing?utm_source=x",
+                    },
+                },
+            ),
+        );
+        expect(sent.properties).toMatchObject({
+            $current_url: "https://saroh.in/pricing?utm_source=x",
+            $pathname: "/pricing",
+            $web_vitals_LCP_event: CLEAN_LCP,
+        });
+        expect(JSON.stringify(sent)).not.toMatch(/email|example\.com|img/u);
+    });
+
+    it("web vitals for a page the app never named are not sent", () => {
+        const event = sdkWebVitals("https://saroh.in/blog/x");
+        expect(pageBeforeSend(event, { now: "/pricing" })).toBeNull();
+        expect(
+            pageBeforeSend(event, {
+                now: "/blog/x",
+                landing: { path: "/pricing", route: "/pricing" },
+            }),
+        ).toBeNull();
+    });
+
+    it("web vitals are measured only where page visits are sent", async () => {
+        const loadWebVitals = vi.fn(() => Promise.resolve({}));
+        const on = tracker({ loadWebVitals });
+        expect(await on.tracking.startReplay(WORKSPACE)).toBe(true);
+        expect(loadWebVitals).toHaveBeenCalledTimes(1);
+        expect(on.instances[0].config.capture_performance).toEqual(
+            WEB_VITALS_CAPTURE,
+        );
+        expect(WEB_VITALS_CAPTURE).toMatchObject({
+            web_vitals: true,
+            web_vitals_attribution: false,
+            network_timing: false,
+        });
+
+        const site = tracker({ app: "web", loadWebVitals });
+        expect(
+            await site.tracking.startSiteReplay({
+                consent: "granted",
+                teamBrowser: false,
+                doNotTrack: null,
+                globalPrivacyControl: false,
+            }),
+        ).toBe(true);
+        expect(site.instances[0].config.capture_performance).toEqual(
+            WEB_VITALS_CAPTURE,
+        );
+
+        // Recording only: no observers loaded, nothing measured.
+        loadWebVitals.mockClear();
+        const recordOnly = tracker({ analytics: "off", loadWebVitals });
+        expect(await recordOnly.tracking.startReplay(WORKSPACE)).toBe(true);
+        expect(recordOnly.instances[0].config.capture_performance).toBe(false);
+        expect(loadWebVitals).not.toHaveBeenCalled();
+
+        for (const change of [
+            { sharesUsage: false },
+            { doNotTrack: "1" },
+            { globalPrivacyControl: true },
+        ]) {
+            const off = tracker({ loadWebVitals });
+            expect(
+                await off.tracking.startReplay({ ...WORKSPACE, ...change }),
+            ).toBe(false);
+        }
+        const refused = tracker({ app: "web", loadWebVitals });
+        await refused.tracking.startSiteReplay({
+            consent: "refused",
+            teamBrowser: false,
+        });
+        const team = tracker({ app: "web", loadWebVitals });
+        await team.tracking.startSiteReplay({
+            consent: "granted",
+            teamBrowser: true,
+        });
+        expect(loadWebVitals).not.toHaveBeenCalled();
+    });
+
+    it("the page the tab loaded is the first one the app names", async () => {
+        vi.stubGlobal("location", {
+            pathname: "/commerce/orders/seed_order_7",
+        });
+        try {
+            const { tracking, instances } = tracker({
+                loadWebVitals: () => Promise.resolve({}),
+            });
+            tracking.pageview("/commerce/orders/[orderId]");
+            await tracking.startReplay(WORKSPACE);
+            vi.stubGlobal("location", { pathname: "/settings/profile" });
+            tracking.pageview("/settings/profile");
+            const gate = instances[0].config.before_send as Gate;
+            expect(
+                must(
+                    gate(
+                        sdkWebVitals(
+                            "https://app.saroh.in/commerce/orders/seed_order_7",
+                        ),
+                    ),
+                ).properties?.$pathname,
+            ).toBe("/commerce/orders/[orderId]");
+            tracking.stopReplay();
+            expect(
+                gate(
+                    sdkWebVitals(
+                        "https://app.saroh.in/commerce/orders/seed_order_7",
+                    ),
+                ),
+            ).toBeNull();
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it("accounts and the admin console never count a visit", async () => {
