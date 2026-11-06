@@ -56,7 +56,11 @@ export default async function EditInvoicePage({
                 header={{
                     breadcrumb: [
                         ...((await paymentsModuleOn()) ? ["Payments"] : []),
-                        <Link key="list" href="/billing/invoices">
+                        <Link
+                            data-ph-unmask=""
+                            key="list"
+                            href="/billing/invoices"
+                        >
                             Invoices
                         </Link>,
                         "Draft",

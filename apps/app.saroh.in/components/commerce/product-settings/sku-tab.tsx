@@ -216,12 +216,16 @@ export function SkuTab({
                 </CheckRow>
             </div>
 
-            <p className="mb-2 mt-[18px] text-[12.5px] font-semibold">
+            <p
+                data-ph-unmask=""
+                className="mb-2 mt-[18px] text-[12.5px] font-semibold"
+            >
                 What your variants would be called
             </p>
             <div data-list-table="" className={listTable.card}>
                 <div
                     data-list-head=""
+                    data-ph-unmask=""
                     className={cn(
                         listTable.head,
                         "grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5",

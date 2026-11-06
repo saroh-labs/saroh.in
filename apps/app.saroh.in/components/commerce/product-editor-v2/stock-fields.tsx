@@ -85,7 +85,10 @@ export function WholeStock({
                     />
                 </Field>
                 <div className="min-w-0 flex-[1_1_96px]">
-                    <p className="mb-1.5 text-[0.78125rem] font-medium leading-none">
+                    <p
+                        data-ph-unmask=""
+                        className="mb-1.5 text-[0.78125rem] font-medium leading-none"
+                    >
                         Promised to orders
                     </p>
                     <p className="flex h-8 items-center font-display text-[15px] font-semibold tabular-nums">
@@ -158,9 +161,11 @@ export function VariantStockTable({
                 className={cn(GRID, "label pb-[5px] text-muted-foreground/80")}
             >
                 <span className="capitalize">{opt}</span>
-                <span>On hand</span>
-                <span>Low stock at</span>
-                <span className="text-right">Promised</span>
+                <span data-ph-unmask="">On hand</span>
+                <span data-ph-unmask="">Low stock at</span>
+                <span data-ph-unmask="" className="text-right">
+                    Promised
+                </span>
             </div>
             <div className="flex flex-col gap-1.5">
                 {shown.map((l) => (
@@ -218,7 +223,10 @@ export function VariantStockTable({
                         "mt-0.5 items-center border-t border-border/70 pt-2",
                     )}
                 >
-                    <span className="text-[12px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[12px] text-muted-foreground"
+                    >
                         Whole product
                     </span>
                     <span className="pl-2.5 font-display text-[14px] font-semibold tabular-nums">

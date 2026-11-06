@@ -192,7 +192,7 @@ export function PriceSection({
                     )}
                 </Notice>
             ) : null}
-            <p id={ids.every} className={cn(LABEL, "mt-3.5")}>
+            <p data-ph-unmask="" id={ids.every} className={cn(LABEL, "mt-3.5")}>
                 Charged
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -218,6 +218,7 @@ export function PriceSection({
                     was off. */}
                 {moreOpen ? null : (
                     <TextLink
+                        data-ph-unmask=""
                         aria-expanded={false}
                         onClick={() => setMore(true)}
                         className="text-[13px] coarse:inline-flex coarse:min-h-11 coarse:items-center"

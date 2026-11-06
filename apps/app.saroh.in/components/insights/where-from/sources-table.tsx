@@ -78,7 +78,7 @@ export function SourcesTable({
             {read.sources.length > 0 ? (
                 <ListTable className="w-full min-w-0">
                     <table className="w-full text-[13.5px]">
-                        <caption className="sr-only">
+                        <caption data-ph-unmask="" className="sr-only">
                             Where visits came from, and how many paid
                         </caption>
                         <thead data-ph-unmask="">

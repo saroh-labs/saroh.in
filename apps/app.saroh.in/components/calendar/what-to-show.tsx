@@ -96,7 +96,9 @@ export function WhatToShow({
         >
             {people.length > 0 ? (
                 <>
-                    <div className="label mb-1.5">Whose</div>
+                    <div data-ph-unmask="" className="label mb-1.5">
+                        Whose
+                    </div>
                     <div
                         role="radiogroup"
                         aria-label="Whose"
@@ -142,6 +144,7 @@ export function WhatToShow({
             ) : null}
 
             <div
+                data-ph-unmask=""
                 className={cn(
                     "label mb-1.5",
                     people.length > 0 && "mt-3.5 max-[759px]:mt-4",

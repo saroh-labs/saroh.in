@@ -94,7 +94,9 @@ export function DoneStep({
 
     const send = (
         <div className="grid min-w-0 gap-2">
-            <span className="label">What next?</span>
+            <span data-ph-unmask="" className="label">
+                What next?
+            </span>
             <div className="grid min-w-0 overflow-hidden rounded-[12px] border border-border bg-card">
                 <NextRow
                     href={whatsAppHref(booked.phone, text)}
@@ -137,7 +139,10 @@ export function DoneStep({
                     className="min-[760px]:hidden"
                 />
             </div>
-            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+            >
                 Saroh sends nothing itself: these open WhatsApp or SMS with the
                 message filled in, or copy it.
             </p>

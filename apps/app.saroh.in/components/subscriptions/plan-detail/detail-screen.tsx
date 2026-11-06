@@ -179,7 +179,7 @@ export function PlanDetail({
                     className="mb-0"
                     breadcrumb={[
                         "Payments",
-                        <Link key="plans" href={PLANS_HREF}>
+                        <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
                             Plans
                         </Link>,
                         plan.name,

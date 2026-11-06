@@ -33,7 +33,7 @@ export function PreviewAside({
                     : "min-w-0 max-sm:hidden lg:sticky lg:top-3"
             }
         >
-            <h2 id={`${id}-title`} className="label mb-2">
+            <h2 data-ph-unmask="" id={`${id}-title`} className="label mb-2">
                 How it will look
             </h2>
             <PaperPreview {...paper} />

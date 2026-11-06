@@ -195,13 +195,17 @@ function FieldsList({
                                 </div>
                                 {cats.length ? (
                                     <p className="mt-2 text-[12.5px] text-foreground/75">
-                                        <span className="font-medium text-foreground">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="font-medium text-foreground"
+                                        >
                                             Asked for products in
                                         </span>{" "}
                                         {cats.map((c) => c.name).join(", ")}
                                     </p>
                                 ) : (
                                     <p
+                                        data-ph-unmask=""
                                         role="status"
                                         className="mt-2 text-[12px] text-foreground"
                                     >

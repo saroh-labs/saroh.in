@@ -263,6 +263,7 @@ export function BulkBar({
                             </Tip>
                         ) : null}
                         <button
+                            data-ph-unmask=""
                             type="button"
                             onClick={onClear}
                             className={cn(
@@ -308,6 +309,7 @@ function HeldCard({
                     {holdTitle(held.count, secondsLeft(left))}
                 </span>
                 <button
+                    data-ph-unmask=""
                     type="button"
                     onClick={onUndo}
                     className={cn(
@@ -318,6 +320,7 @@ function HeldCard({
                     Undo all
                 </button>
                 <button
+                    data-ph-unmask=""
                     type="button"
                     onClick={onNow}
                     className={cn(

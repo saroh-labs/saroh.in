@@ -370,7 +370,9 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                 ) : null}
                 {money ? (
                     <div className="flex gap-2.5 border-t border-border/70 px-[13px] py-2.5 text-[14px] font-semibold">
-                        <span className="flex-1">Total</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            Total
+                        </span>
                         <span className="font-display tabular-nums">
                             {format(money.total)}
                         </span>
@@ -381,11 +383,15 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
             <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[13px] leading-[1.45]">
                 {payment ? (
                     <>
-                        <dt className="text-muted-foreground">Payment</dt>
+                        <dt data-ph-unmask="" className="text-muted-foreground">
+                            Payment
+                        </dt>
                         <dd>{payment}</dd>
                     </>
                 ) : null}
-                <dt className="text-muted-foreground">Customer</dt>
+                <dt data-ph-unmask="" className="text-muted-foreground">
+                    Customer
+                </dt>
                 <dd className="min-w-0">
                     {c && customerLink ? (
                         <Link href={customerLink} className={CUSTOMER_LINK}>
@@ -394,7 +400,7 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                     ) : walkIn ? (
                         <span>Walk-in · {walkIn.name}</span>
                     ) : (
-                        <span>Their record is gone</span>
+                        <span data-ph-unmask="">Their record is gone</span>
                     )}
                     {c ? (
                         <span className="text-muted-foreground">
@@ -409,13 +415,17 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                 </dd>
                 {address ? (
                     <>
-                        <dt className="text-muted-foreground">Address</dt>
+                        <dt data-ph-unmask="" className="text-muted-foreground">
+                            Address
+                        </dt>
                         <dd className="whitespace-pre-line">{address}</dd>
                     </>
                 ) : null}
                 {order.notes ? (
                     <>
-                        <dt className="text-muted-foreground">Note</dt>
+                        <dt data-ph-unmask="" className="text-muted-foreground">
+                            Note
+                        </dt>
                         <dd className="whitespace-pre-line break-words">
                             {order.notes}
                         </dd>
@@ -423,7 +433,9 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                 ) : null}
                 {appointment ? (
                     <>
-                        <dt className="text-muted-foreground">Visits</dt>
+                        <dt data-ph-unmask="" className="text-muted-foreground">
+                            Visits
+                        </dt>
                         <dd>
                             {order.visits
                                 ? `${quickVisitsText(order.visits, order.visits.service.timezone, new Date())}. `

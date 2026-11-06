@@ -69,6 +69,7 @@ export function StartTrackingButton({
 
     return (
         <button
+            data-ph-unmask=""
             type="button"
             onClick={turnOn}
             disabled={pending}

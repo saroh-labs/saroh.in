@@ -182,6 +182,7 @@ export function LocationDetailsSheet({
                     >
                         <div className="grid gap-0.5">
                             <p
+                                data-ph-unmask=""
                                 id="location-logo-label"
                                 className="text-sm font-medium leading-none"
                             >

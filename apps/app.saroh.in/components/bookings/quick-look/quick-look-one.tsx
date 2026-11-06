@@ -337,7 +337,10 @@ export function OneLook({
                             }
                         >
                             {b.staff?.name ?? (
-                                <span className="text-muted-foreground">
+                                <span
+                                    data-ph-unmask=""
+                                    className="text-muted-foreground"
+                                >
                                     Nobody yet
                                 </span>
                             )}
@@ -348,7 +351,10 @@ export function OneLook({
                         label="Email"
                     >
                         {b.contact?.email ?? b.bookerEmail ?? (
-                            <span className="text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
                                 Not set
                             </span>
                         )}

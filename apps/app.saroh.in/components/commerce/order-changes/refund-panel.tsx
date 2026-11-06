@@ -256,6 +256,7 @@ function RefundDraft({
                             </p>
                         ) : needsWhy ? (
                             <p
+                                data-ph-unmask=""
                                 id={`${ids}-why-help`}
                                 className="mb-2 text-[12px] text-destructive-subtle-foreground"
                             >

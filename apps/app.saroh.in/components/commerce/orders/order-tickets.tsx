@@ -65,7 +65,11 @@ export function OrderTickets({
                 className="mb-5 print:hidden"
                 breadcrumb={[
                     "Sell",
-                    <Link key="orders" href="/commerce/orders">
+                    <Link
+                        data-ph-unmask=""
+                        key="orders"
+                        href="/commerce/orders"
+                    >
                         Orders
                     </Link>,
                     "Tickets",
@@ -154,7 +158,10 @@ function Ticket({ order }: { order: OrderRead }) {
                 </div>
             ) : null}
             {attention.unchecked ? (
-                <div className="mb-2 border-2 border-foreground px-1.5 py-1.5 font-bold">
+                <div
+                    data-ph-unmask=""
+                    className="mb-2 border-2 border-foreground px-1.5 py-1.5 font-bold"
+                >
                     Needs attention couldn&apos;t be checked. Ask the customer
                     before it goes out.
                 </div>
@@ -189,12 +196,12 @@ function Ticket({ order }: { order: OrderRead }) {
             </table>
             {address ? (
                 <p className="mt-2 break-words">
-                    <strong>To:</strong> {address}
+                    <strong data-ph-unmask="">To:</strong> {address}
                 </p>
             ) : null}
             {order.notes ? (
                 <p className="mt-2 whitespace-pre-line break-words">
-                    <strong>Note:</strong> {order.notes}
+                    <strong data-ph-unmask="">Note:</strong> {order.notes}
                 </p>
             ) : null}
             {money ? (

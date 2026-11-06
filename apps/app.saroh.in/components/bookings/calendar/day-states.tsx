@@ -86,16 +86,20 @@ export function FirstDayHelp({
                     <ol className="mb-0 mt-2 grid list-decimal gap-1 pl-[18px] text-[13.5px] leading-normal text-foreground/85">
                         <li>
                             Click a{" "}
-                            <strong className="text-success-subtle-foreground">
+                            <strong
+                                data-ph-unmask=""
+                                className="text-success-subtle-foreground"
+                            >
                                 green free time
                             </strong>{" "}
                             to book someone into it, or block it.
                         </li>
                         <li>
-                            Or use <strong>New booking</strong> to pick any day
-                            and time.
+                            Or use{" "}
+                            <strong data-ph-unmask="">New booking</strong> to
+                            pick any day and time.
                         </li>
-                        <li>
+                        <li data-ph-unmask="">
                             Click a booking to mark them arrived, take payment,
                             move or cancel it.
                         </li>
@@ -122,14 +126,18 @@ export function FirstDayHelp({
                     {[
                         <>
                             Tap a{" "}
-                            <strong className="text-success-subtle">
+                            <strong
+                                data-ph-unmask=""
+                                className="text-success-subtle"
+                            >
                                 green free time
                             </strong>{" "}
                             to book someone into it.
                         </>,
                         <>
-                            Or tap <strong>New booking</strong> to pick any day
-                            and time.
+                            Or tap{" "}
+                            <strong data-ph-unmask="">New booking</strong> to
+                            pick any day and time.
                         </>,
                         <>
                             Tap a booking to mark them arrived, take payment,
@@ -188,16 +196,19 @@ export function NobodyTakesBookings({ onAdd }: { onAdd?: () => void }) {
             className="flex flex-col items-center gap-2 rounded-[12px] border border-dashed border-border-strong bg-card px-6 py-14 text-center max-[759px]:border-solid max-[759px]:border-border max-[759px]:px-5 max-[759px]:py-7"
         >
             <Users aria-hidden className="size-7 text-muted-foreground" />
-            <h2 className="m-0 font-display text-[19px] font-semibold tracking-[-0.02em]">
+            <h2
+                data-ph-unmask=""
+                className="m-0 font-display text-[19px] font-semibold tracking-[-0.02em]"
+            >
                 Who takes bookings?
             </h2>
             <p className="m-0 max-w-[56ch] text-[13.5px] leading-normal text-muted-foreground">
                 {onAdd ? "Add yourself or your team with your hours. " : null}
-                <span className="max-[759px]:hidden">
+                <span data-ph-unmask="" className="max-[759px]:hidden">
                     Each person gets their own column here, and customers can
                     book their free time.
                 </span>
-                <span className="min-[760px]:hidden">
+                <span data-ph-unmask="" className="min-[760px]:hidden">
                     Each person gets their own day here, and customers can book
                     their free time.
                 </span>
@@ -212,6 +223,7 @@ export function NobodyTakesBookings({ onAdd }: { onAdd?: () => void }) {
                 </Button>
             ) : null}
             <TextLink
+                data-ph-unmask=""
                 href="/services"
                 className="inline-flex min-h-11 items-center text-[13.5px] min-[760px]:hidden"
             >
@@ -239,13 +251,13 @@ export function ServiceHoursNote({ onAdd }: { onAdd?: () => void }) {
                 className="size-5 shrink-0 text-muted-foreground max-[759px]:size-[18px]"
             />
             <p className="m-0 min-w-0 flex-1 text-[13.5px] leading-normal max-[759px]:text-[13px] max-[759px]:text-foreground/85">
-                <strong className="max-[759px]:font-normal">
+                <strong data-ph-unmask="" className="max-[759px]:font-normal">
                     Nobody takes bookings yet,
                 </strong>{" "}
                 so customers book each service in its own hours.
                 {onAdd ? (
                     <>
-                        <span className="max-[759px]:hidden">
+                        <span data-ph-unmask="" className="max-[759px]:hidden">
                             {" "}
                             Add who takes bookings to give each person a column
                             of their own.
@@ -253,6 +265,7 @@ export function ServiceHoursNote({ onAdd }: { onAdd?: () => void }) {
                         <span className="min-[760px]:hidden">
                             {" "}
                             <TextLink
+                                data-ph-unmask=""
                                 onClick={onAdd}
                                 // A finger's 44px on a touch screen, as
                                 // every control on the calendar.
@@ -283,7 +296,10 @@ export function ServiceHoursNote({ onAdd }: { onAdd?: () => void }) {
 /** The one line under the day on a phone: how to move about, or the key. */
 export function DayFoot({ first }: { first: boolean }) {
     return (
-        <p className="mb-0 mt-2.5 text-[12.5px] leading-normal text-muted-foreground min-[760px]:hidden">
+        <p
+            data-ph-unmask=""
+            className="mb-0 mt-2.5 text-[12.5px] leading-normal text-muted-foreground min-[760px]:hidden"
+        >
             {first
                 ? "Free times show in green, so you can see at a glance where a booking fits."
                 : "Swipe the calendar left or right to change day. Tap the date at the top for any day, Week or List."}

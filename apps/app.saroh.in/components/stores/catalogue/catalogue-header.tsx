@@ -68,6 +68,7 @@ export function CatalogueHeader({
                     <DropdownMenuContent align="end" className="w-[220px]">
                         <DropdownMenuItem asChild>
                             <Link
+                                data-ph-unmask=""
                                 href={importProductsHref(
                                     here?.id ?? (many ? undefined : first.id),
                                 )}
@@ -76,7 +77,10 @@ export function CatalogueHeader({
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                            <Link href={productSettingsHref()}>
+                            <Link
+                                data-ph-unmask=""
+                                href={productSettingsHref()}
+                            >
                                 Product settings
                             </Link>
                         </DropdownMenuItem>

@@ -213,7 +213,10 @@ export function NeedGroups({
 
             {!lines && partial ? (
                 <p className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm text-neutral-700 dark:text-muted-foreground">
-                    <strong className="font-semibold text-foreground">
+                    <strong
+                        data-ph-unmask=""
+                        className="font-semibold text-foreground"
+                    >
                         Nothing else we could check needs you.
                     </strong>{" "}
                     {formatList(unavailable.map((u) => u.label))} couldn't be

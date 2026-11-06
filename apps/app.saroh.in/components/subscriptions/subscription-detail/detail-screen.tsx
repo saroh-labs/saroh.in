@@ -274,7 +274,11 @@ export function SubscriptionDetail({
                     className="mb-0"
                     breadcrumb={[
                         "Payments",
-                        <Link key="list" href="/billing/subscriptions">
+                        <Link
+                            data-ph-unmask=""
+                            key="list"
+                            href="/billing/subscriptions"
+                        >
                             Subscriptions
                         </Link>,
                         name,
@@ -304,7 +308,9 @@ export function SubscriptionDetail({
                     className="flex flex-wrap items-end gap-5 rounded-xl border border-border-strong bg-card px-5 py-[18px]"
                 >
                     <div className="min-w-0 flex-[1_1_300px]">
-                        <div className="label">Next charge</div>
+                        <div data-ph-unmask="" className="label">
+                            Next charge
+                        </div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
                             <AbsentOr says="None">{head.big}</AbsentOr>
                         </div>

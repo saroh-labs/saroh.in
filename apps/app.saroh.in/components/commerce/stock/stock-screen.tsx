@@ -257,8 +257,11 @@ export function StockScreen({
                         {counting ? (
                             <Notice tone="info" role="note">
                                 <div className="flex flex-wrap items-baseline gap-2.5">
-                                    <strong>Counting.</strong>
-                                    <span className="flex-[1_1_280px] text-pretty">
+                                    <strong data-ph-unmask="">Counting.</strong>
+                                    <span
+                                        data-ph-unmask=""
+                                        className="flex-[1_1_280px] text-pretty"
+                                    >
                                         Type what&apos;s on the shelf. Leave a
                                         box empty to skip it. Saroh records the
                                         gap between what the log expected and

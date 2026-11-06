@@ -232,6 +232,7 @@ function SendLinkDialog({
             />
             {tried && !method ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
                 >
@@ -275,7 +276,10 @@ function LinkBox({ url }: { url: string }) {
                 {url}
             </span>
             <ShareLink value={url} text="Your link to pay" />
-            <span className="basis-full text-[12px] text-muted-foreground">
+            <span
+                data-ph-unmask=""
+                className="basis-full text-[12px] text-muted-foreground"
+            >
                 Shown once. Saroh doesn&apos;t keep it. Make another if
                 it&apos;s lost.
             </span>

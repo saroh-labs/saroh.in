@@ -216,7 +216,12 @@ function WebsiteCard({
     if (placement?.status !== "ok") {
         return (
             <Card className="flex min-w-0 flex-col gap-[7px] rounded-[12px] px-[15px] py-[13px]">
-                <p className="text-[11.5px] text-muted-foreground">Website</p>
+                <p
+                    data-ph-unmask=""
+                    className="text-[11.5px] text-muted-foreground"
+                >
+                    Website
+                </p>
                 <PanelLine
                     status={placement?.status ?? "failed"}
                     what="the website's pages"
@@ -227,11 +232,20 @@ function WebsiteCard({
     const web = websiteSummary(placement.data, onShop, shopLive);
     return (
         <Card className="flex min-w-0 flex-col gap-[7px] rounded-[12px] px-[15px] py-[13px]">
-            <p className="text-[11.5px] text-muted-foreground">Website</p>
+            <p
+                data-ph-unmask=""
+                className="text-[11.5px] text-muted-foreground"
+            >
+                Website
+            </p>
             <LinkedHeadline>{web.headline}</LinkedHeadline>
             <LinkedLines lines={web.lines} />
             {shopLive === false && overview.canWrite ? (
-                <TextLink href="/sites" className="text-[12px]">
+                <TextLink
+                    data-ph-unmask=""
+                    href="/sites"
+                    className="text-[12px]"
+                >
                     Set up your shop
                 </TextLink>
             ) : null}

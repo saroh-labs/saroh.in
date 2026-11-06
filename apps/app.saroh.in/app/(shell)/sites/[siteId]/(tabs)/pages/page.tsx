@@ -88,6 +88,7 @@ export default async function SitePagesPage({
                                 : "Nothing is public until the site is published."}
                         </span>
                         <Link
+                            data-ph-unmask=""
                             href={editorHref}
                             className="font-medium underline-offset-4 hover:underline"
                         >

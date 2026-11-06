@@ -385,7 +385,7 @@ export function CsvImport({
             <Card className="wk-surface">
                 <CardContent className="space-y-6 p-6">
                     <div>
-                        <h2 className="text-lg font-semibold">
+                        <h2 data-ph-unmask="" className="text-lg font-semibold">
                             Import finished
                         </h2>
                         <p className="text-sm text-muted-foreground">
@@ -556,10 +556,13 @@ export function CsvImport({
                     <Card className="wk-surface">
                         <CardContent className="space-y-5 p-6">
                             <div>
-                                <h2 className="font-semibold">
+                                <h2 data-ph-unmask="" className="font-semibold">
                                     Match your columns
                                 </h2>
-                                <p className="text-sm text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-sm text-muted-foreground"
+                                >
                                     Matched from your headings. Columns set to
                                     “Don’t import” are left out.
                                 </p>
@@ -668,7 +671,7 @@ export function CsvImport({
                     <Card className="wk-surface">
                         <CardContent className="space-y-5 p-6">
                             <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <h2 className="font-semibold">
+                                <h2 data-ph-unmask="" className="font-semibold">
                                     What will happen
                                 </h2>
                                 {pending ? (
@@ -758,20 +761,29 @@ export function CsvImport({
                             </div>
 
                             {statusUnmatched ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-sm text-muted-foreground"
+                                >
                                     New products start as Draft.
                                 </p>
                             ) : null}
 
                             {plan?.totalRows === 0 ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-sm text-muted-foreground"
+                                >
                                     This file has headings but no rows.
                                 </p>
                             ) : null}
 
                             {groups.length > 0 ? (
                                 <div className="space-y-2 border-t pt-5">
-                                    <p className="text-sm font-medium">
+                                    <p
+                                        data-ph-unmask=""
+                                        className="text-sm font-medium"
+                                    >
                                         Rows that can’t be imported
                                     </p>
                                     <p className="text-sm text-muted-foreground">

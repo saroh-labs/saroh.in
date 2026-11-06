@@ -74,6 +74,7 @@ export function OrderGridHead({
     return (
         <div
             data-list-head=""
+            data-ph-unmask=""
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "label h-10 rounded-t-[11px] border-b border-border bg-muted",

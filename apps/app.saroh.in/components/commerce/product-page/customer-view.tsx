@@ -163,7 +163,10 @@ export function CustomerView({
     return (
         <div>
             <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-3">
-                <p className="min-w-0 flex-[1_1_280px] text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="min-w-0 flex-[1_1_280px] text-[12.5px] text-muted-foreground"
+                >
                     {live
                         ? "The shop page as a customer opens it. Try the variants. Nothing is added to a basket."
                         : product.status === "ARCHIVED"

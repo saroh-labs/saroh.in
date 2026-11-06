@@ -13,7 +13,11 @@ export default function NotFoundPage() {
             <PageHeader
                 breadcrumb={[
                     "Payments",
-                    <Link key="list" href="/billing/subscriptions">
+                    <Link
+                        data-ph-unmask=""
+                        key="list"
+                        href="/billing/subscriptions"
+                    >
                         Subscriptions
                     </Link>,
                     "Not found",

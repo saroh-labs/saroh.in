@@ -316,14 +316,20 @@ export function OrderDetail({
                 />
             ) : null}
             {!open && !hold ? (
-                <span className="text-[13px] font-semibold text-success-subtle-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[13px] font-semibold text-success-subtle-foreground"
+                >
                     Nothing left to do
                 </span>
             ) : null}
             {handover && can.stage && !next && open && !hold ? (
                 // Ready, and paid at the handover: Collected waits for the
                 // payment (the API refuses it before then, UX-010).
-                <span className="text-[13px] font-semibold text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[13px] font-semibold text-muted-foreground"
+                >
                     {handover === "collection"
                         ? "Mark collected once it's paid"
                         : "Mark delivered once it's paid"}

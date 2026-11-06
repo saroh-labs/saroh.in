@@ -57,7 +57,10 @@ export function ShownLink({
                     }}
                 />
             </div>
-            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12px] leading-[1.45] text-muted-foreground"
+            >
                 Kept here until you close this tab. Copying it again
                 doesn&apos;t make a new link.
             </p>

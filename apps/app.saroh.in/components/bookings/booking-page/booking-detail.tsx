@@ -279,7 +279,7 @@ export function BookingDetailView({
                 role="note"
                 className="flex flex-wrap items-center gap-x-3 gap-y-2"
             >
-                <span className="min-w-0 flex-1">
+                <span data-ph-unmask="" className="min-w-0 flex-1">
                     Nobody is on this booking yet.
                 </span>
                 <Button

@@ -9,7 +9,7 @@ export default function Loading() {
             width="wide"
             breadcrumb={[
                 "Sell",
-                <Link key="1" href="/commerce/products">
+                <Link data-ph-unmask="" key="1" href="/commerce/products">
                     Products
                 </Link>,
                 "Settings",

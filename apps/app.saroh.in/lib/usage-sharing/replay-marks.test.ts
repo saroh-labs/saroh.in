@@ -182,6 +182,115 @@ interface Finding {
     what: string;
 }
 
+/**
+ * Hand-drawn text that is only words written in the file ("Delivery
+ * address", "Overview", `canWrite ? "Edit" : "View"`): Saroh's own, so it
+ * says `data-ph-unmask` or a recording stars it (owner, 6 Nov: the customer
+ * page's tabs, crumbs, labels and badge came out as stars). Elements that
+ * draw computed text are not read here: they stay masked by default.
+ */
+const TEXT_TAGS = new Set(
+    "h1 h2 h3 h4 h5 h6 p span div label dt dd th td li strong em small legend caption figcaption button a Link TextLink".split(
+        " ",
+    ),
+);
+/** Already readable, or kept masked on purpose (a dialog's or sheet's title). */
+const COVERS = new Set([
+    ...Array.from(READABLE),
+    "FormMessage",
+    "FieldError",
+    "EmptyState",
+    "FailedState",
+    "DialogTitle",
+    "DialogDescription",
+    "SheetTitle",
+    "SheetDescription",
+    "AlertDialogTitle",
+    "AlertDialogDescription",
+    "DrawerTitle",
+    "DrawerDescription",
+]);
+/** Not recorded (the site editor), or marked at a layout in another file (setup). */
+const UNRECORDED = ["components/sites/", "app/(editor)/", "app/onboarding/"];
+
+function literal(e: ts.Expression | undefined): boolean {
+    if (!e) return false;
+    if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e))
+        return true;
+    if (ts.isParenthesizedExpression(e)) return literal(e.expression);
+    if (ts.isConditionalExpression(e))
+        return literal(e.whenTrue) && literal(e.whenFalse);
+    return false;
+}
+
+/** Fixed words drawn by hand with no mark on them or around them in the file. */
+function unmarkedWords(sf: ts.SourceFile): ts.JsxElement[] {
+    const found: ts.JsxElement[] = [];
+    const covered = (node: ts.Node): boolean => {
+        // `parent` is undefined at the source file, whatever ts's type says.
+        for (
+            let p = node as ts.Node | undefined;
+            p !== undefined;
+            p = p.parent as ts.Node | undefined
+        ) {
+            const opening = ts.isJsxElement(p)
+                ? p.openingElement
+                : ts.isJsxSelfClosingElement(p)
+                  ? p
+                  : undefined;
+            if (
+                opening &&
+                (decided(opening) || COVERS.has(opening.tagName.getText(sf)))
+            )
+                return true;
+        }
+        return false;
+    };
+    const visit = (node: ts.Node): void => {
+        if (
+            ts.isJsxElement(node) &&
+            TEXT_TAGS.has(node.openingElement.tagName.getText(sf))
+        ) {
+            const kids = node.children;
+            const words = kids.every(
+                (c) =>
+                    ts.isJsxText(c) ||
+                    (ts.isJsxExpression(c) && literal(c.expression)),
+            );
+            if (
+                words &&
+                /[A-Za-z]/.test(kids.map((c) => c.getText(sf)).join("")) &&
+                !covered(node)
+            )
+                found.push(node);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return found;
+}
+
+function unmarkedFixedWords(): Finding[] {
+    const out: Finding[] = [];
+    for (const file of sources(appDir)) {
+        const rel = path.relative(appDir, file);
+        if (UNRECORDED.some((dir) => rel.startsWith(dir))) continue;
+        const sf = ts.createSourceFile(
+            file,
+            readFileSync(file, "utf8"),
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TSX,
+        );
+        for (const node of unmarkedWords(sf))
+            out.push({
+                where: `${rel}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`,
+                what: node.getText(sf).replace(/\s+/g, " ").slice(0, 80),
+            });
+    }
+    return out;
+}
+
 function findings(): { unmarked: Finding[]; headers: Finding[] } {
     const unmarked: Finding[] = [];
     const headers: Finding[] = [];
@@ -250,6 +359,35 @@ function findings(): { unmarked: Finding[]; headers: Finding[] } {
                             });
                     }
                 }
+                // The crumbs before the last are read (Saroh's sections):
+                // one that is a record's says data-ph-mask on itself.
+                const crumbs = attribute(opening, "breadcrumb")?.initializer;
+                if (
+                    tag === "PageHeader" &&
+                    crumbs &&
+                    ts.isJsxExpression(crumbs) &&
+                    crumbs.expression &&
+                    ts.isArrayLiteralExpression(crumbs.expression)
+                ) {
+                    const list = crumbs.expression.elements;
+                    for (const crumb of list.slice(0, -1)) {
+                        const drawn =
+                            ts.isJsxElement(crumb) &&
+                            !decided(crumb.openingElement)
+                                ? computedIn(crumb)
+                                : ts.isJsxElement(crumb) ||
+                                    ts.isSpreadElement(crumb) ||
+                                    fixedWords(crumb)
+                                  ? []
+                                  : [crumb];
+                        for (const e of drawn)
+                            if (DATA.test(e.getText(sf)))
+                                unmarked.push({
+                                    where: at(crumb),
+                                    what: `breadcrumb crumb {${words(e)}}`,
+                                });
+                    }
+                }
                 if (HEADERS.has(tag) && !attribute(opening, "holdsData")) {
                     for (const prop of ["title", "description"]) {
                         const e = computedProp(opening, prop);
@@ -283,6 +421,33 @@ describe("what a workspace recording may read (DEC-125)", () => {
             found.headers.map((f) => `${f.where}  ${f.what}`),
             "Add holdsData (masks the title and description) or holdsData={false} (fixed words).",
         ).toEqual([]);
+    });
+
+    it("Saroh's own words drawn by hand say data-ph-unmask", () => {
+        expect(
+            unmarkedFixedWords().map((f) => `${f.where}  ${f.what}`),
+            'Fixed words are read in a recording only when marked: add data-ph-unmask="" (frontend-design-system.md → Session recordings).',
+        ).toEqual([]);
+    });
+
+    it("finds fixed words left unmarked, and leaves a record's data alone", () => {
+        const sf = ts.createSourceFile(
+            "x.tsx",
+            `const a = <div>
+                <h2>Delivery address</h2>
+                <span>{open ? "Open" : "Closed"}</span>
+                <p data-ph-unmask="">Team only.</p>
+                <p>{customer.name}</p>
+                <Button><span>Save</span></Button>
+                <SheetTitle><span>Edit details</span></SheetTitle>
+            </div>;`,
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TSX,
+        );
+        expect(
+            unmarkedWords(sf).map((n) => n.openingElement.tagName.getText(sf)),
+        ).toEqual(["h2", "span"]);
     });
 
     it("knows a record's name from fixed words", () => {

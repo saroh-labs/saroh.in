@@ -97,7 +97,7 @@ export default async function NewSitePage({
             <PageContainer width="form">
                 <PageHeader
                     breadcrumb={[
-                        <Link key="site" href="/sites">
+                        <Link data-ph-unmask="" key="site" href="/sites">
                             Website
                         </Link>,
                         "New site",
@@ -136,7 +136,7 @@ export default async function NewSitePage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={[
-                    <Link key="site" href="/sites">
+                    <Link data-ph-unmask="" key="site" href="/sites">
                         Website
                     </Link>,
                     "New site",

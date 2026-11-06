@@ -215,10 +215,14 @@ export function ServicesScreen({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                        <Link href={NEW_SERVICE_HREF}>New service</Link>
+                        <Link data-ph-unmask="" href={NEW_SERVICE_HREF}>
+                            New service
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                        <Link href={NEW_COURSE_HREF}>New course</Link>
+                        <Link data-ph-unmask="" href={NEW_COURSE_HREF}>
+                            New course
+                        </Link>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -116,7 +116,10 @@ export function VisitsCard({
             ) : null}
             {attention === null ? (
                 <Notice role="status">
-                    <span className="font-semibold text-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="font-semibold text-foreground"
+                    >
                         Needs attention: not available.
                     </span>{" "}
                     Check with {first} before the visit.

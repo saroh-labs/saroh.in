@@ -31,7 +31,11 @@ export function PlanOverview({
         <div className="flex flex-wrap items-start gap-4">
             <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
                 <section aria-labelledby="plan-included" className={CARD}>
-                    <h2 id="plan-included" className={cn(TITLE, "mb-1.5")}>
+                    <h2
+                        data-ph-unmask=""
+                        id="plan-included"
+                        className={cn(TITLE, "mb-1.5")}
+                    >
                         What&apos;s included
                     </h2>
                     <p className="text-[14px] leading-[1.55]">{what}</p>
@@ -42,10 +46,17 @@ export function PlanOverview({
                     ) : null}
                 </section>
                 <section aria-labelledby="plan-pays" className={CARD}>
-                    <h2 id="plan-pays" className={cn(TITLE, "mb-1")}>
+                    <h2
+                        data-ph-unmask=""
+                        id="plan-pays"
+                        className={cn(TITLE, "mb-1")}
+                    >
                         Who pays what
                     </h2>
-                    <p className="mb-1.5 text-pretty text-[12.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mb-1.5 text-pretty text-[12.5px] text-muted-foreground"
+                    >
                         A price change only applies to people who join after it.
                         Everyone else keeps what they agreed to.
                     </p>
@@ -71,7 +82,11 @@ export function PlanOverview({
             </div>
             <aside className="grid min-w-0 max-w-full flex-[0_0_300px] gap-3.5">
                 <section aria-labelledby="plan-glance" className={CARD}>
-                    <h2 id="plan-glance" className={cn(TITLE, "mb-1")}>
+                    <h2
+                        data-ph-unmask=""
+                        id="plan-glance"
+                        className={cn(TITLE, "mb-1")}
+                    >
                         At a glance
                     </h2>
                     <dl>
@@ -96,7 +111,10 @@ export function PlanOverview({
                     </dl>
                 </section>
                 {autopay}
-                <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-pretty text-[12px] leading-[1.5] text-muted-foreground"
+                >
                     Changing the price only affects people who join after the
                     change. Archiving stops new sign-ups, and everyone already
                     on it carries on.

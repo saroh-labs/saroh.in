@@ -209,7 +209,7 @@ export function ExtraHoursBody({
                     ))}
                 </ul>
             ) : (
-                <p className="text-[14px] font-semibold">
+                <p data-ph-unmask="" className="text-[14px] font-semibold">
                     No extra hours coming up
                 </p>
             )}
@@ -313,7 +313,10 @@ export function ExtraHoursBody({
 
             <p className="mt-2.5 text-[12.5px] leading-normal text-muted-foreground">
                 You can also open closed time on the{" "}
-                <TextLink href="/bookings">calendar</TextLink>.
+                <TextLink data-ph-unmask="" href="/bookings">
+                    calendar
+                </TextLink>
+                .
             </p>
         </div>
     );

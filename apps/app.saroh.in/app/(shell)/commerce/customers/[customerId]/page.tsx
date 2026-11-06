@@ -92,6 +92,7 @@ export default async function CustomerPage({
                     breadcrumb={[
                         "Sell",
                         <Link
+                            data-ph-unmask=""
                             key="customers"
                             href="/commerce/customers"
                             className="hover:text-foreground"
@@ -232,7 +233,10 @@ export default async function CustomerPage({
                                         </li>
                                     ))}
                                 </ul>
-                                <p className="text-pretty border-t border-foreground/10 px-4 py-2.5 text-[11.5px] leading-[1.45] text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-pretty border-t border-foreground/10 px-4 py-2.5 text-[11.5px] leading-[1.45] text-muted-foreground"
+                                >
                                     The same email at another location. Each
                                     location keeps its own details for them.
                                 </p>

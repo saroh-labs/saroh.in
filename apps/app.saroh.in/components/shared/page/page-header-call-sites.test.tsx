@@ -101,7 +101,9 @@ describe("a record: a class pack", () => {
         );
         isPageHeader(html);
         // "Class packs", as the menu says it, never "Packs".
-        expect(html).toMatch(/<a href="\/class-packs">Class packs<\/a>/);
+        expect(html).toMatch(
+            /<a [^>]*href="\/class-packs"[^>]*>Class packs<\/a>/,
+        );
         expect(html).toMatch(/<h1[^>]*>Ten classes<\/h1>/);
         expect(html).toMatch(/data-slot="page-badge"[^>]*>[\s\S]*On sale/);
         // The primary is the last button, at the default size and corner.
@@ -191,6 +193,8 @@ describe("a whole-page state: the product page", () => {
     it("keeps the page header over the state", () => {
         const html = renderToStaticMarkup(<ProductPageBar />);
         isPageHeader(html);
-        expect(html).toMatch(/<a href="\/commerce\/products">Products<\/a>/);
+        expect(html).toMatch(
+            /<a [^>]*href="\/commerce\/products"[^>]*>Products<\/a>/,
+        );
     });
 });

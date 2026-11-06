@@ -75,10 +75,18 @@ export default async function PastVersionPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link key="site" href={`/sites/${siteId}/pages`}>
+                    <Link
+                        data-ph-unmask=""
+                        key="site"
+                        href={`/sites/${siteId}/pages`}
+                    >
                         Website
                     </Link>,
-                    <Link key="versions" href={`/sites/${siteId}/versions`}>
+                    <Link
+                        data-ph-unmask=""
+                        key="versions"
+                        href={`/sites/${siteId}/versions`}
+                    >
                         Version history
                     </Link>,
                     formatDateTime(publication.publishedAt, zone, {
@@ -172,7 +180,7 @@ export default async function PastVersionPage({
                     look={publication.snapshot.site?.look}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p data-ph-unmask="" className="text-sm text-muted-foreground">
                     This version holds no pages.
                 </p>
             )}

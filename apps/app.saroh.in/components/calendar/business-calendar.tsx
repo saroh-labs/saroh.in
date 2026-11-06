@@ -313,7 +313,7 @@ export function BusinessCalendar({
                             {l.label}
                         </span>
                     ))}
-                    <span>Tap a day to see it</span>
+                    <span data-ph-unmask="">Tap a day to see it</span>
                 </div>
             )}
 

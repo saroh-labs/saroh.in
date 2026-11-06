@@ -134,7 +134,10 @@ export function PayLinkPanel({
     );
 
     const problem = link.ok ? null : link.plan ? (
-        <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p
+            data-ph-unmask=""
+            className="text-[12.5px] leading-[1.5] text-muted-foreground"
+        >
             No payment link. Your plan doesn&apos;t take payment online. The
             booking is made, and they can pay at the visit.
         </p>
@@ -151,7 +154,7 @@ export function PayLinkPanel({
                 data-pay-link=""
                 className="grid min-w-0 gap-2 rounded-[12px] border border-border bg-card px-4 py-3.5"
             >
-                <span id={id} className="label">
+                <span data-ph-unmask="" id={id} className="label">
                     Payment link
                 </span>
                 {link.ok ? (
@@ -209,7 +212,10 @@ export function PayLinkPanel({
                             onFocus={(e) => e.currentTarget.select()}
                         />
                     </Field>
-                    <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         Send it to them however you talk. The booking shows
                         unpaid until they pay. Cancelling it stops the link. A
                         payment they&apos;d already started shows on Home as one

@@ -232,6 +232,7 @@ export function MergeDialog({
                 </Notice>
             ) : !loaded || !preview || !names || !account ? (
                 <p
+                    data-ph-unmask=""
                     role="status"
                     className="mt-3.5 text-[12.5px] text-muted-foreground"
                 >
@@ -267,7 +268,10 @@ export function MergeDialog({
                             itemClassName={(on) => pickClass(on)}
                             layout={(item) => (
                                 <>
-                                    <span className="text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-muted-foreground"
+                                    >
                                         Stays
                                     </span>
                                     {COLUMNS.map(item)}

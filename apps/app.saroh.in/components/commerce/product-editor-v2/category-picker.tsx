@@ -146,6 +146,7 @@ export function CategoryPicker({
                     </CommandList>
                 </Command>
                 <Link
+                    data-ph-unmask=""
                     href={manageHref}
                     className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                 >

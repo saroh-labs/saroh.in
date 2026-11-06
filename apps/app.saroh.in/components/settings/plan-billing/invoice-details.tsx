@@ -205,7 +205,10 @@ export function InvoiceDetailsFields({
     return (
         <div className="grid gap-3">
             {required ? (
-                <p className="text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12px] text-muted-foreground"
+                >
                     Saroh&apos;s invoice needs these before the payment opens.
                     They&apos;re saved to the billing profile Saroh bills.
                 </p>
@@ -304,7 +307,11 @@ function AddressFields({
             aria-labelledby="bill-address-label"
             className="grid gap-3"
         >
-            <p id="bill-address-label" className="text-[13px] font-semibold">
+            <p
+                data-ph-unmask=""
+                id="bill-address-label"
+                className="text-[13px] font-semibold"
+            >
                 Registered address
             </p>
             <Field label="Address line 1" error={errors.addressLine1}>

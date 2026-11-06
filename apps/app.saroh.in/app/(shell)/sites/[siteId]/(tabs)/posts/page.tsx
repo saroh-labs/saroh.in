@@ -150,7 +150,10 @@ export default async function SitePostsPage({
                                                 iso={postUpdatedIso(post)}
                                             />
                                             {site.can.edit ? null : (
-                                                <span className="font-medium text-foreground">
+                                                <span
+                                                    data-ph-unmask=""
+                                                    className="font-medium text-foreground"
+                                                >
                                                     View
                                                 </span>
                                             )}

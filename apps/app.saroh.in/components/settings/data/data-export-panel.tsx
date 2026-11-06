@@ -72,7 +72,11 @@ export function DataExportPanel({
                 aria-labelledby="data-export-what"
                 className="grid gap-3 rounded-lg border border-border bg-card p-4"
             >
-                <h3 id="data-export-what" className="text-[14px] font-semibold">
+                <h3
+                    data-ph-unmask=""
+                    id="data-export-what"
+                    className="text-[14px] font-semibold"
+                >
                     Download your data
                 </h3>
                 <p className="text-pretty text-[13px] leading-normal text-muted-foreground">
@@ -97,6 +101,7 @@ export function DataExportPanel({
                     {inProgress ? (
                         <>
                             <p
+                                data-ph-unmask=""
                                 role="status"
                                 className="text-[13px] text-foreground/80"
                             >
@@ -121,7 +126,11 @@ export function DataExportPanel({
             </section>
 
             <section aria-labelledby="data-export-list" className="grid gap-2">
-                <h3 id="data-export-list" className="text-[14px] font-semibold">
+                <h3
+                    data-ph-unmask=""
+                    id="data-export-list"
+                    className="text-[14px] font-semibold"
+                >
                     Your downloads
                 </h3>
                 {lines.length === 0 ? (

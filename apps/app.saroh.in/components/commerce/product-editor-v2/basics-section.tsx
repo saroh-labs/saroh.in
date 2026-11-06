@@ -280,7 +280,10 @@ export function BasicsSection({
             {creating ? (
                 <>
                     <div className="flex flex-wrap items-center gap-2 rounded-[9px] bg-muted/50 px-[13px] py-[11px]">
-                        <span className="font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-mono text-[12px] text-muted-foreground"
+                        >
                             /products/
                         </span>
                         <span
@@ -302,7 +305,10 @@ export function BasicsSection({
             ) : (
                 <>
                     <div className="flex flex-wrap items-center gap-2 rounded-[9px] bg-muted/50 px-[11px] py-[9px]">
-                        <span className="font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-mono text-[12px] text-muted-foreground"
+                        >
                             /products/
                         </span>
                         <Input

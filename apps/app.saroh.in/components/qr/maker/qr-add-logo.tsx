@@ -30,6 +30,7 @@ export function QrAddLogo({
     return (
         <>
             <button
+                data-ph-unmask=""
                 id={ADD_LOGO_ID}
                 type="button"
                 aria-haspopup="dialog"

@@ -131,7 +131,9 @@ function Item({
                     )}
                 >
                     {struck ? (
-                        <span className="sr-only">No longer counts: </span>
+                        <span data-ph-unmask="" className="sr-only">
+                            No longer counts:{" "}
+                        </span>
                     ) : null}
                     {what}
                 </p>

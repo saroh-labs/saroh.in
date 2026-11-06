@@ -98,10 +98,16 @@ export default async function ChoosePage({
                 />
             }
         >
-            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+            <h1
+                data-ph-unmask=""
+                className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]"
+            >
                 Which business?
             </h1>
-            <p className="sa-rise mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="sa-rise mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600 dark:text-muted-foreground"
+            >
                 You can change this whenever you like.
             </p>
             {notice ? (
@@ -141,6 +147,7 @@ export default async function ChoosePage({
             <p className="sa-rise mt-5 text-[12.5px] text-muted-foreground">
                 Starting something new?{" "}
                 <Link
+                    data-ph-unmask=""
                     href="/onboarding"
                     className="text-foreground underline-offset-4 transition-colors duration-fast hover:underline"
                 >

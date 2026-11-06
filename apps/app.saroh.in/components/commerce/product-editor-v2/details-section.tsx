@@ -278,6 +278,7 @@ function FulfilmentChips({
     return (
         <>
             <p
+                data-ph-unmask=""
                 id="pe-fulfilment"
                 className="mb-[7px] mt-3.5 text-[12.5px] font-medium"
             >
@@ -365,15 +366,24 @@ function Allergens({
     return (
         <>
             <div className="mb-[7px] mt-3.5 flex items-center gap-2.5">
-                <span className="flex-1 text-[12.5px] font-medium">
+                <span
+                    data-ph-unmask=""
+                    className="flex-1 text-[12.5px] font-medium"
+                >
                     Contains
                 </span>
-                <span className="text-[11.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[11.5px] text-muted-foreground"
+                >
                     Always on the shop
                 </span>
             </div>
             {group("Contains", contains, onContains)}
-            <p className="mb-[7px] mt-3.5 text-[12.5px] font-medium">
+            <p
+                data-ph-unmask=""
+                className="mb-[7px] mt-3.5 text-[12.5px] font-medium"
+            >
                 May contain (same kitchen)
             </p>
             {group("May contain", may, onMay)}

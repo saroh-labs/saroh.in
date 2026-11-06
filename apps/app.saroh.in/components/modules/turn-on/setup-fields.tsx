@@ -104,7 +104,10 @@ export function SellFields({
                 className="grid min-w-0 gap-2"
                 aria-describedby={howError ? `${id}-how-note` : undefined}
             >
-                <legend className="mb-1.5 text-[12.5px] font-medium">
+                <legend
+                    data-ph-unmask=""
+                    className="mb-1.5 text-[12.5px] font-medium"
+                >
                     How orders leave
                 </legend>
                 {HOW_ORDERS_LEAVE.map((o) => (
@@ -204,11 +207,16 @@ export function WebsiteFields({
             {addressFixed ? (
                 // Chosen when the business was set up: said, not asked again.
                 <dl className="grid gap-1">
-                    <dt className="text-[12.5px] font-medium">Web address</dt>
+                    <dt data-ph-unmask="" className="text-[12.5px] font-medium">
+                        Web address
+                    </dt>
                     <dd className="break-all font-mono text-[13px]">
                         {w.address}.saroh.app
                     </dd>
-                    <dd className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
+                    <dd
+                        data-ph-unmask=""
+                        className="text-pretty text-[11.5px] leading-normal text-muted-foreground"
+                    >
                         You chose it when you set up. It can be changed in
                         Settings › Business.
                     </dd>
@@ -252,6 +260,7 @@ export function WebsiteFields({
                             className="min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
                         <span
+                            data-ph-unmask=""
                             id={`${id}-suffix`}
                             className="shrink-0 pr-3 text-[14px] text-muted-foreground"
                         >
@@ -312,7 +321,11 @@ function TemplateChoice({
     const id = useId();
     return (
         <div className="grid min-w-0 gap-2">
-            <span id={`${id}-label`} className="text-[13px] font-medium">
+            <span
+                data-ph-unmask=""
+                id={`${id}-label`}
+                className="text-[13px] font-medium"
+            >
                 Starts from
             </span>
             <RadioCards
@@ -325,7 +338,10 @@ function TemplateChoice({
                     aside: usesLine(c),
                 }))}
             />
-            <p className="text-[12.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12.5px] leading-normal text-muted-foreground"
+            >
                 Change its pages any time.
             </p>
         </div>

@@ -249,7 +249,7 @@ export function ModuleGoalPicker({
             />
             {choosable.length > 0 ? (
                 <fieldset className="space-y-3" disabled={pending}>
-                    <legend className="sr-only">
+                    <legend data-ph-unmask="" className="sr-only">
                         Choose what to set up first
                     </legend>
 
@@ -329,7 +329,9 @@ export function ModuleGoalPicker({
 
             {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
-                    <h2 className="label">Already on</h2>
+                    <h2 data-ph-unmask="" className="label">
+                        Already on
+                    </h2>
                     <ul className="flex flex-wrap gap-2">
                         {available
                             .filter((g) => alreadyOn.has(g.moduleKey))
@@ -348,7 +350,7 @@ export function ModuleGoalPicker({
                     </ul>
                     <p className="text-sm text-muted-foreground">
                         Turn these off any time in{" "}
-                        <TextLink href="/settings/modules">
+                        <TextLink data-ph-unmask="" href="/settings/modules">
                             Settings → Modules
                         </TextLink>
                         .

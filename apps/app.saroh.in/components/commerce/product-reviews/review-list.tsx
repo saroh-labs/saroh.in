@@ -95,13 +95,19 @@ export function ReviewList({
                                     {r.body}
                                 </p>
                             ) : (
-                                <p className="mt-1.5 text-[13px] text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="mt-1.5 text-[13px] text-muted-foreground"
+                                >
                                     No comment left, only a rating.
                                 </p>
                             )}
                             {r.reply && replyingTo !== r.id ? (
                                 <p className="mt-2 rounded-[8px] bg-muted/60 px-[11px] py-2 text-[13px] leading-[1.5] text-foreground/75">
-                                    <strong className="font-semibold text-foreground">
+                                    <strong
+                                        data-ph-unmask=""
+                                        className="font-semibold text-foreground"
+                                    >
                                         Your reply:
                                     </strong>{" "}
                                     {r.reply}

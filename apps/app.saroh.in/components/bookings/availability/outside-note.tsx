@@ -59,6 +59,7 @@ export function outsideLine({
                     <>
                         {" "}
                         <TextLink
+                            data-ph-unmask=""
                             href={first.href}
                             className="font-semibold text-inherit"
                         >
@@ -74,6 +75,7 @@ export function outsideLine({
             {count(list.length, "booking is", "bookings are")} outside these
             hours. They stay booked.{" "}
             <TextLink
+                data-ph-unmask=""
                 href={calendarHref("agenda", first.date ?? today, {
                     person: staffId,
                 })}

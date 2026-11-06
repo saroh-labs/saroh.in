@@ -425,7 +425,10 @@ export function MediaPicker({
                     <ImagePlus className="mr-1.5 size-3.5" />
                     {label}
                 </Button>
-                <span className="text-xs text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-xs text-muted-foreground"
+                >
                     or drop one here
                 </span>
             </div>

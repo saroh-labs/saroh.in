@@ -64,7 +64,10 @@ export function ProductDiscountsTab({
 
     return (
         <div>
-            <p className="mb-3 text-pretty text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mb-3 text-pretty text-[12.5px] text-muted-foreground"
+            >
                 Discounts that reach this product: set on it, its category, the
                 location or everything. Set up in Discounts.
             </p>
@@ -103,6 +106,7 @@ export function ProductDiscountsTab({
                                         {state.label}
                                     </Badge>
                                     <TextLink
+                                        data-ph-unmask=""
                                         href="/commerce/discounts"
                                         className="ml-auto text-[12px]"
                                     >

@@ -238,7 +238,10 @@ function Optional({ label, optional }: { label: string; optional?: boolean }) {
         <>
             {label}
             {optional ? (
-                <span className="font-normal text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="font-normal text-muted-foreground"
+                >
                     {" "}
                     (optional)
                 </span>

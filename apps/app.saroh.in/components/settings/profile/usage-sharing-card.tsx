@@ -81,7 +81,10 @@ export function UsageSharingCard({ on }: { on: boolean }) {
                     className="wk-press"
                 />
             </div>
-            <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80">
+            <p
+                data-ph-unmask=""
+                className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80"
+            >
                 Saroh records how it is used, to find what is confusing or
                 broken. A recording shows Saroh&rsquo;s own buttons, menus and
                 labels. Your customers&rsquo; details, your figures and anything

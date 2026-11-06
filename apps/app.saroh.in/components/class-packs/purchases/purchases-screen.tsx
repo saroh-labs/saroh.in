@@ -152,13 +152,17 @@ export function PurchasesScreen({
             cell: (p) =>
                 p.invoiceId ? (
                     <TextLink
+                        data-ph-unmask=""
                         href={`/billing/invoices/${p.invoiceId}`}
                         className="text-[12.5px]"
                     >
                         Open
                     </TextLink>
                 ) : (
-                    <span className="text-[12.5px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[12.5px] text-muted-foreground"
+                    >
                         None
                     </span>
                 ),
@@ -169,7 +173,7 @@ export function PurchasesScreen({
         <>
             <PageHeader
                 breadcrumb={[
-                    <Link key="bookings" href="/bookings">
+                    <Link data-ph-unmask="" key="bookings" href="/bookings">
                         Bookings
                     </Link>,
                     "Class packs",

@@ -171,7 +171,9 @@ export function CategoryDefaultsSheet({
             </div>
 
             <div className="grid gap-1.5">
-                <p className="text-sm font-medium">Returns</p>
+                <p data-ph-unmask="" className="text-sm font-medium">
+                    Returns
+                </p>
                 <ChipGroup
                     label={`${name}: returns`}
                     value={draft.returns}

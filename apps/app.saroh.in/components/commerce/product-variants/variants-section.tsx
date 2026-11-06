@@ -414,8 +414,8 @@ export function VariantsSection({
                                 )}
                             >
                                 <span>{optName}</span>
-                                <span>SKU</span>
-                                <span>Price</span>
+                                <span data-ph-unmask="">SKU</span>
+                                <span data-ph-unmask="">Price</span>
                                 <span />
                             </div>
                             {rows.length > FIND_FROM ? (

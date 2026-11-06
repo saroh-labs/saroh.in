@@ -71,7 +71,10 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
                                     {words.label}
                                 </Badge>
                                 {isPending(status) && (
-                                    <span className="text-xs text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-xs text-muted-foreground"
+                                    >
                                         queued…
                                     </span>
                                 )}

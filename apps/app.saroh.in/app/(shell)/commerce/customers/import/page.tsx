@@ -80,6 +80,7 @@ export default async function ImportCustomersPage({
                 breadcrumb={[
                     "Sell",
                     <Link
+                        data-ph-unmask=""
                         key="customers"
                         href="/commerce/customers"
                         className="hover:text-foreground"

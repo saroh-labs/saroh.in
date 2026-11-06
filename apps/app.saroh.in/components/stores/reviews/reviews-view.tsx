@@ -88,7 +88,10 @@ export function ReviewsView({
                     </span>
                     <span className="mt-0.5 block truncate text-[13px]">
                         {r.body ?? (
-                            <span className="text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
                                 No comment
                             </span>
                         )}
@@ -179,7 +182,10 @@ export function ReviewsView({
                         ) : undefined,
                 }}
             />
-            <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
+            >
                 Every review comes from a customer the business invited, for an
                 order that was paid and shipped. Hiding a review keeps it here.
                 Nothing a customer wrote is deleted.
@@ -329,7 +335,10 @@ function ReviewSheet({
                             </p>
                             <p className="mt-2 whitespace-pre-line text-[14px] leading-[1.55]">
                                 {review.body ?? (
-                                    <span className="text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-muted-foreground"
+                                    >
                                         No comment left.
                                     </span>
                                 )}
@@ -364,6 +373,7 @@ function ReviewSheet({
                                     />
                                 </Field>
                                 <p
+                                    data-ph-unmask=""
                                     id="review-reply-note"
                                     className="text-[11.5px] text-muted-foreground"
                                 >
@@ -376,7 +386,10 @@ function ReviewSheet({
                             </div>
                         ) : review.reply ? (
                             <div className="rounded-lg bg-muted p-3">
-                                <p className="text-[11.5px] font-medium text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-[11.5px] font-medium text-muted-foreground"
+                                >
                                     The business replied
                                 </p>
                                 <p className="mt-1 whitespace-pre-line text-[13.5px]">

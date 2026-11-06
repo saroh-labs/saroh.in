@@ -172,7 +172,10 @@ export function GapBooked({
                             </span>
                         </Button>
                     </div>
-                    <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         These open WhatsApp or SMS with the message filled in,
                         or copy it. Saroh sends nothing itself.
                     </p>

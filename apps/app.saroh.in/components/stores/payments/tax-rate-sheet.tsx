@@ -88,6 +88,7 @@ export function TaxRateSheet({
                 </span>
             </div>
             <p
+                data-ph-unmask=""
                 id="storefront-tax-rate-note"
                 role={valid ? undefined : "alert"}
                 className={

@@ -135,7 +135,11 @@ export function OpeningHoursFields({
                                         }}
                                         aria-label={`Open on ${label}`}
                                     />
-                                    <span aria-hidden className="w-11">
+                                    <span
+                                        data-ph-unmask=""
+                                        aria-hidden
+                                        className="w-11"
+                                    >
                                         {d.closed ? "Closed" : "Open"}
                                     </span>
                                 </span>
@@ -150,6 +154,7 @@ export function OpeningHoursFields({
                                             }}
                                         />
                                         <span
+                                            data-ph-unmask=""
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
@@ -172,6 +177,7 @@ export function OpeningHoursFields({
             ) : (
                 <div className="grid grid-cols-[3.5rem_1fr] items-start gap-x-4 gap-y-3">
                     <span
+                        data-ph-unmask=""
                         id="storefront-open-days"
                         className="pt-1.5 text-[12.5px] text-muted-foreground"
                     >
@@ -228,7 +234,10 @@ export function OpeningHoursFields({
                         ) : null}
                     </div>
 
-                    <span className="pt-2.5 text-[12.5px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="pt-2.5 text-[12.5px] text-muted-foreground"
+                    >
                         Hours
                     </span>
                     {openDays.length > 0 ? (
@@ -241,7 +250,11 @@ export function OpeningHoursFields({
                                     setSharedHours({ open });
                                 }}
                             />
-                            <span aria-hidden className="text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                aria-hidden
+                                className="text-muted-foreground"
+                            >
                                 to
                             </span>
                             <TimeSelect
@@ -254,7 +267,10 @@ export function OpeningHoursFields({
                             />
                         </div>
                     ) : (
-                        <p className="pt-2.5 text-[12.5px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="pt-2.5 text-[12.5px] text-muted-foreground"
+                        >
                             Closed every day. Pick the days it opens.
                         </p>
                     )}
@@ -284,6 +300,7 @@ export function OpeningHoursFields({
 
             {backwards ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="text-pretty text-[12.5px] leading-[1.5] text-destructive"
                 >

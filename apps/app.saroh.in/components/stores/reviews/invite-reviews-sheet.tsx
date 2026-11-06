@@ -119,6 +119,7 @@ export function InviteReviewsSheet({
             footNote={
                 tried && picked.size === 0 && !results && !emailNote ? (
                     <p
+                        data-ph-unmask=""
                         role="alert"
                         className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                     >
@@ -141,7 +142,9 @@ export function InviteReviewsSheet({
                 </div>
             ) : results ? (
                 <div className="space-y-3">
-                    <p className="text-[13px] font-medium">Not sent</p>
+                    <p data-ph-unmask="" className="text-[13px] font-medium">
+                        Not sent
+                    </p>
                     <ul className="space-y-2">
                         {results
                             .filter(

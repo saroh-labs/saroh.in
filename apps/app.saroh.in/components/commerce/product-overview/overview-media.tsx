@@ -76,7 +76,10 @@ export function OverviewPhotos({
                                 >
                                     <MediaThumb item={m} alt="" small />
                                     {i === 0 && m.kind !== "video" ? (
-                                        <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-1.5 py-px text-[10.5px] font-semibold text-background">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-1.5 py-px text-[10.5px] font-semibold text-background"
+                                        >
                                             Cover
                                         </span>
                                     ) : null}
@@ -177,7 +180,10 @@ export function OverviewDescription({
                     </DetailRow>
                     {contains.length > 0 || mayContain.length > 0 ? (
                         <div className="flex items-baseline gap-3 border-t border-border py-[11px]">
-                            <dt className="w-[104px] shrink-0 text-[12.5px] text-muted-foreground">
+                            <dt
+                                data-ph-unmask=""
+                                className="w-[104px] shrink-0 text-[12.5px] text-muted-foreground"
+                            >
                                 Contains
                             </dt>
                             <dd className="flex min-w-0 flex-1 flex-col gap-1.5">

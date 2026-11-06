@@ -79,7 +79,11 @@ export function SalesTab({
         <div className="grid gap-3.5">
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))]">
                 <section aria-labelledby="pack-sales-months" className={CARD}>
-                    <h2 id="pack-sales-months" className={`${H2} mb-1`}>
+                    <h2
+                        data-ph-unmask=""
+                        id="pack-sales-months"
+                        className={`${H2} mb-1`}
+                    >
                         Sales and takings
                     </h2>
                     <div className="mb-2 text-[12.5px] text-muted-foreground">
@@ -108,7 +112,11 @@ export function SalesTab({
                     ))}
                 </section>
                 <section aria-labelledby="pack-price-history" className={CARD}>
-                    <h2 id="pack-price-history" className={`${H2} mb-2`}>
+                    <h2
+                        data-ph-unmask=""
+                        id="pack-price-history"
+                        className={`${H2} mb-2`}
+                    >
                         Price history
                     </h2>
                     {history ? (
@@ -133,7 +141,10 @@ export function SalesTab({
                             {history.note}
                         </div>
                     ) : null}
-                    <div className="mt-1.5 text-[12px] text-muted-foreground">
+                    <div
+                        data-ph-unmask=""
+                        className="mt-1.5 text-[12px] text-muted-foreground"
+                    >
                         A price change only affects new sales.
                     </div>
                 </section>
@@ -141,11 +152,16 @@ export function SalesTab({
 
             <section aria-labelledby="pack-each-sale" className={CARD}>
                 <div className="mb-1 flex flex-wrap items-baseline gap-2.5">
-                    <h2 id="pack-each-sale" className={`${H2} flex-1`}>
+                    <h2
+                        data-ph-unmask=""
+                        id="pack-each-sale"
+                        className={`${H2} flex-1`}
+                    >
                         Each sale
                     </h2>
                     {allReceiptsHref ? (
                         <Link
+                            data-ph-unmask=""
                             href={allReceiptsHref}
                             className={`${LINK} text-[12.5px]`}
                         >
@@ -153,7 +169,10 @@ export function SalesTab({
                         </Link>
                     ) : null}
                 </div>
-                <div className="mb-2 text-[12.5px] text-muted-foreground">
+                <div
+                    data-ph-unmask=""
+                    className="mb-2 text-[12.5px] text-muted-foreground"
+                >
                     How it was paid is what the desk recorded.
                 </div>
                 {sales.length === 0 ? (
@@ -184,7 +203,10 @@ export function SalesTab({
                                 <span className="font-semibold tabular-nums">
                                     {s.amount}
                                     {s.older ? (
-                                        <span className="font-normal text-muted-foreground">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="font-normal text-muted-foreground"
+                                        >
                                             {" "}
                                             (older price)
                                         </span>
@@ -200,6 +222,7 @@ export function SalesTab({
                                 ) : null}
                                 {s.receiptHref ? (
                                     <Link
+                                        data-ph-unmask=""
                                         href={s.receiptHref}
                                         aria-label={`Receipt for ${s.name}, ${s.when}`}
                                         className={`${LINK} text-[12.5px]`}

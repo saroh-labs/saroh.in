@@ -166,7 +166,11 @@ export function ExtraPermissions({
 }) {
     return (
         <section aria-labelledby="extra-permissions-title" className="mt-5">
-            <h3 id="extra-permissions-title" className="label mb-1">
+            <h3
+                data-ph-unmask=""
+                id="extra-permissions-title"
+                className="label mb-1"
+            >
                 Extra permissions
             </h3>
             <p className="mb-[11px] text-pretty text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">

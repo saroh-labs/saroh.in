@@ -83,6 +83,7 @@ export function CustomerBlock({
             }
         >
             <h2
+                data-ph-unmask=""
                 id={`${ids.contact}-label`}
                 className={bare ? "sr-only" : "label mb-2"}
             >
@@ -255,7 +256,7 @@ export function NoContactsYet({
 }) {
     return (
         <div className="max-w-xl rounded-[12px] border border-border bg-card p-5 text-[13.5px]">
-            <p className="text-muted-foreground">
+            <p data-ph-unmask="" className="text-muted-foreground">
                 An invoice is for someone in your contacts, and there is no one
                 there yet. Add who it&apos;s for here, then write the invoice.
             </p>

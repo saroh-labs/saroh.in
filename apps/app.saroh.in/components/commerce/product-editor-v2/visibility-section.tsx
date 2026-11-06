@@ -125,7 +125,10 @@ export function VisibilitySection({
 
     return (
         <SectionCard k="visibility" title="Visibility">
-            <p className="mb-2.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mb-2.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground"
+            >
                 {creating
                     ? "Choose who can see it once it is created."
                     : saved === "PUBLISHED"

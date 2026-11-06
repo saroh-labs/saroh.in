@@ -496,8 +496,10 @@ export function ChangePlanDialog({
 
                 {noProfile ? (
                     <div className="grid gap-2 rounded-lg border border-border px-3.5 py-3 text-[13px]">
-                        <p className="font-semibold">Choose who Saroh bills</p>
-                        <p className="text-foreground/80">
+                        <p data-ph-unmask="" className="font-semibold">
+                            Choose who Saroh bills
+                        </p>
+                        <p data-ph-unmask="" className="text-foreground/80">
                             Saroh&apos;s invoices for this business need a
                             billing profile before the payment opens.
                         </p>

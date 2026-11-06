@@ -178,7 +178,10 @@ export function InvitePersonSheet({
                         </FormItem>
                     )}
                 />
-                <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                >
                     They also join your team as Location team, unless they are
                     on it already.
                 </p>

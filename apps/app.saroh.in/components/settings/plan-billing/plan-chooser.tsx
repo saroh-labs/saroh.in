@@ -144,7 +144,10 @@ export function PlanChooser({
                 className="grid gap-3 [container-type:inline-size]"
             >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-[13.5px] text-foreground/80">
+                    <p
+                        data-ph-unmask=""
+                        className="min-w-0 flex-[1_1_260px] text-pretty text-[13.5px] text-foreground/80"
+                    >
                         {canChange
                             ? "Choose a plan to see what the change costs and when it starts. Nothing changes until you confirm."
                             : "These are Saroh's plans and what each is for."}
@@ -197,7 +200,11 @@ export function PlanChooser({
                     </ul>
                 )}
                 <p className="text-center text-[13px]">
-                    <TextLink href={`${MARKETING_URL}/pricing`} external>
+                    <TextLink
+                        data-ph-unmask=""
+                        href={`${MARKETING_URL}/pricing`}
+                        external
+                    >
                         Compare everything on the pricing page
                     </TextLink>
                 </p>
@@ -208,7 +215,10 @@ export function PlanChooser({
                     aria-label="Coupon"
                     className={cn(card, "grid gap-2 px-[18px] py-3.5")}
                 >
-                    <span className="font-display text-[15px] font-semibold">
+                    <span
+                        data-ph-unmask=""
+                        className="font-display text-[15px] font-semibold"
+                    >
                         Coupon
                     </span>
                     {coupon ? (

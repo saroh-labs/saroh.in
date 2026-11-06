@@ -52,6 +52,7 @@ export function ScopeNotice({
                 {line}
             </span>
             <TextLink
+                data-ph-unmask=""
                 href={clearHref}
                 className="text-[13px] transition-opacity duration-fast coarse:inline-flex coarse:min-h-11 coarse:items-center"
             >

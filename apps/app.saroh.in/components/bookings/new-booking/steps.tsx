@@ -52,12 +52,18 @@ export function ServiceStep({
         const none = hidden === 0;
         return (
             <div className="grid justify-items-center gap-2 rounded-[12px] border border-border bg-card px-5 py-6 text-center">
-                <h4 className="font-display text-[18px] font-semibold">
+                <h4
+                    data-ph-unmask=""
+                    className="font-display text-[18px] font-semibold"
+                >
                     {none
                         ? "Add a service first"
                         : "No service your team can book"}
                 </h4>
-                <p className="max-w-[44ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="max-w-[44ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                >
                     {none
                         ? "A booking is always for a service, like a 45-minute assessment. Add one and come back."
                         : "Your services are booked by customers, on your booking page. Tick Your team under Who can book it on a service to book it here."}
@@ -279,7 +285,7 @@ export function NextVisitDay({
     const id = useId();
     return (
         <div className="grid min-w-0 gap-3">
-            <span id={id} className="sr-only">
+            <span data-ph-unmask="" id={id} className="sr-only">
                 Which day
             </span>
             <ChipGroup
@@ -292,7 +298,10 @@ export function NextVisitDay({
                 ]}
             />
             {choice === null ? (
-                <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] leading-[1.5] text-muted-foreground"
+                >
                     Same service and person as today. Pick a day, as soon as
                     tomorrow. You can change the service or person above.
                 </p>

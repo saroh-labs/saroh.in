@@ -209,7 +209,10 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 <span className="text-[12.5px] font-medium">
                     {mediaCounter(draft)}
                 </span>
-                <span className="flex-[1_1_200px] text-[11.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="flex-[1_1_200px] text-[11.5px] text-muted-foreground"
+                >
                     The first is the cover, on the shop and in lists. Every
                     variant shares these photos, and each one can choose which
                     photo it opens on.
@@ -274,7 +277,10 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                     }
                                 />
                                 {cover ? (
-                                    <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background"
+                                    >
                                         Cover
                                     </span>
                                 ) : null}
@@ -325,6 +331,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                     </button>
                                     {!video && !cover && canWrite ? (
                                         <button
+                                            data-ph-unmask=""
                                             type="button"
                                             className={tileBtn}
                                             disabled={ro}
@@ -364,7 +371,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                     )}
                 >
                     <Plus aria-hidden className="size-[18px]" />
-                    <span>From your photos</span>
+                    <span data-ph-unmask="">From your photos</span>
                 </button>
                 <button
                     type="button"
@@ -404,6 +411,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
             ) : null}
             {canWrite && !full ? (
                 <TextLink
+                    data-ph-unmask=""
                     disabled={ro}
                     aria-expanded={byAddress}
                     onClick={() => setByAddress((o) => !o)}

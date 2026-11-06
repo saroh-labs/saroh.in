@@ -256,7 +256,7 @@ export function NextVisitStep({
                     </span>
                 </div>
 
-                <span id={ids.day} className="sr-only">
+                <span data-ph-unmask="" id={ids.day} className="sr-only">
                     Which day
                 </span>
                 <ChoiceGroup
@@ -275,7 +275,10 @@ export function NextVisitStep({
                     }}
                 />
                 {choice === null ? (
-                    <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         Same service and person as today. Pick a day, as soon as
                         tomorrow.
                     </p>
@@ -334,7 +337,7 @@ export function NextVisitStep({
                                 aria-busy="true"
                                 className="mt-2 grid grid-cols-3 gap-2"
                             >
-                                <span className="sr-only">
+                                <span data-ph-unmask="" className="sr-only">
                                     Finding free times…
                                 </span>
                                 {Array.from({ length: 6 }, (_, i) => (

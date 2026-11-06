@@ -337,7 +337,7 @@ function LibraryPanel({
     return (
         <div className="rounded-[10px] bg-muted p-3">
             <div className="mb-2 flex items-center justify-between">
-                <p className="text-[12.5px] font-medium">
+                <p data-ph-unmask="" className="text-[12.5px] font-medium">
                     Your photos · tap to add
                 </p>
                 <Button
@@ -351,7 +351,9 @@ function LibraryPanel({
             </div>
             {items === "loading" ? (
                 <div role="status" aria-busy="true" className="flex gap-2">
-                    <span className="sr-only">Loading your photos</span>
+                    <span data-ph-unmask="" className="sr-only">
+                        Loading your photos
+                    </span>
                     <Skeleton aria-hidden className="h-16 w-20" />
                     <Skeleton aria-hidden className="h-16 w-20" />
                     <Skeleton aria-hidden className="h-16 w-20" />

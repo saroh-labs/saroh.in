@@ -229,7 +229,10 @@ export function InvoiceNumberFields({
                                             {"1".padStart(format.digits, "0")}
                                         </span>
                                     </span>
-                                    <span className="text-[11.5px]">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-[11.5px]"
+                                    >
                                         Always last
                                     </span>
                                 </li>
@@ -333,7 +336,10 @@ export function InvoiceNumberFields({
                 aria-live="polite"
                 className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg bg-muted/50 px-3 py-2.5"
             >
-                <span className="text-[12.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Next invoice
                 </span>
                 <span className="font-mono text-[14px] font-medium">

@@ -51,7 +51,7 @@ export function PaperLookFields({
     return (
         <>
             <div className="grid gap-2">
-                <span id={`${id}-style`} className="label">
+                <span data-ph-unmask="" id={`${id}-style`} className="label">
                     Style
                 </span>
                 <RadioCards<PaperStyle>
@@ -67,7 +67,7 @@ export function PaperLookFields({
             </div>
 
             <div className="grid gap-2">
-                <span id={`${id}-colour`} className="label">
+                <span data-ph-unmask="" id={`${id}-colour`} className="label">
                     Your colour
                 </span>
                 <ChoiceGroup
@@ -137,6 +137,7 @@ export function PaperLookFields({
                         </Button>
                     </div>
                     <p
+                        data-ph-unmask=""
                         id={`${id}-hex-note`}
                         className={cn(
                             "text-[12px]",

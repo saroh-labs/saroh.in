@@ -101,7 +101,7 @@ export function PayChoice({
             ) : null}
             {usingPack ? null : (
                 <div className="grid min-w-0 gap-1.5">
-                    <span id={ids.heading} className="label">
+                    <span data-ph-unmask="" id={ids.heading} className="label">
                         How will they pay?
                     </span>
                     <RadioCards

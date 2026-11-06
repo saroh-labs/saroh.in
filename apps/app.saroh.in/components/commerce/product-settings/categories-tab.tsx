@@ -156,7 +156,10 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 What each product is, one per product. They drive the
                 shop&apos;s filters and your reports. To group products for the
                 website, use{" "}
-                <TextLink href="/commerce/products?tab=collections">
+                <TextLink
+                    data-ph-unmask=""
+                    href="/commerce/products?tab=collections"
+                >
                     collections
                 </TextLink>
                 .
@@ -272,7 +275,10 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 ))}
                 <li className="flex flex-wrap items-center gap-2.5 px-4 py-3">
                     <div className="min-w-0 flex-[1_1_200px]">
-                        <p className="text-[13.5px] font-semibold">
+                        <p
+                            data-ph-unmask=""
+                            className="text-[13.5px] font-semibold"
+                        >
                             Uncategorized
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
@@ -289,7 +295,10 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                             )}
                         </p>
                     </div>
-                    <span className="text-[12px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[12px] text-muted-foreground"
+                    >
                         Products with no category. Always here.
                     </span>
                 </li>

@@ -24,7 +24,9 @@ export function SarohInvoices({
 }) {
     return (
         <section aria-label="Invoices from Saroh" className={card}>
-            <h3 className={cardHead}>Invoices from Saroh</h3>
+            <h3 data-ph-unmask="" className={cardHead}>
+                Invoices from Saroh
+            </h3>
             {invoices === null ? (
                 <FailedState
                     size="panel"

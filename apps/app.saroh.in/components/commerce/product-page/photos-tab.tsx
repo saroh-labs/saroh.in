@@ -49,7 +49,10 @@ export function ProductPhotosTab({
                 <p className="text-[13px] font-semibold">
                     {mediaCounter(product.images)}
                 </p>
-                <p className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     In the order customers see them. The first photo is the
                     cover.
                 </p>
@@ -92,7 +95,10 @@ export function ProductPhotosTab({
                             </div>
                             <p className="mt-1.5 text-[12.5px]">
                                 {img.alt || (
-                                    <span className="text-destructive">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-destructive"
+                                    >
                                         No description for screen readers yet
                                     </span>
                                 )}

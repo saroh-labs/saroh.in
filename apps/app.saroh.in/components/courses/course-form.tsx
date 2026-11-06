@@ -455,6 +455,7 @@ export function CourseForm({
                 </div>
                 {!course && sessions.length === 0 ? (
                     <p
+                        data-ph-unmask=""
                         id="course-open-why"
                         className="-mt-3 text-[0.78125rem] text-muted-foreground"
                     >
@@ -505,7 +506,9 @@ function SessionPicker({
 
     return (
         <fieldset className="grid gap-3">
-            <legend className="mb-1 text-sm font-medium">Sessions</legend>
+            <legend data-ph-unmask="" className="mb-1 text-sm font-medium">
+                Sessions
+            </legend>
             {value.length === 0 ? (
                 <EmptyState
                     size="inline"

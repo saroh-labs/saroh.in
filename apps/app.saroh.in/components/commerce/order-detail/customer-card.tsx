@@ -124,7 +124,10 @@ export function CustomerCard({
                 ) : null}
                 {deliveryPhone && deliveryPhone !== customer.phone ? (
                     <span>
-                        <span className="text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="text-muted-foreground"
+                        >
                             Delivery phone{" "}
                         </span>
                         <a
@@ -141,8 +144,10 @@ export function CustomerCard({
             </div>
             {orderNote ? (
                 <p className="mt-2 text-pretty text-[12.5px] leading-[1.5]">
-                    <span className="text-muted-foreground">Note</span> “
-                    {orderNote}”
+                    <span data-ph-unmask="" className="text-muted-foreground">
+                        Note
+                    </span>{" "}
+                    “{orderNote}”
                 </p>
             ) : null}
             {shipment ? (
@@ -166,7 +171,10 @@ function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
     if (attention === null) {
         return (
             <Notice role="status" className="mt-2.5">
-                <span className="font-semibold text-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="font-semibold text-foreground"
+                >
                     Needs attention: not available.
                 </span>{" "}
                 Check with them before it goes out.
@@ -184,7 +192,9 @@ function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
         <div className="mt-2.5">
             {entries.length > 0 ? (
                 <div className="rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground">
-                    <span aria-hidden>Needs attention: </span>
+                    <span data-ph-unmask="" aria-hidden>
+                        Needs attention:{" "}
+                    </span>
                     <ul aria-label="Needs attention" className="inline">
                         {entries.map((e, i) => (
                             <li
@@ -244,7 +254,9 @@ export function TrackingRow({
     );
     return (
         <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12.5px]">
-            <span className="text-muted-foreground">Tracking</span>{" "}
+            <span data-ph-unmask="" className="text-muted-foreground">
+                Tracking
+            </span>{" "}
             {courier ? (
                 <span className="font-mono text-[12px]">
                     {courier}
@@ -269,7 +281,7 @@ export function TrackingRow({
                 </span>
             ) : null}
             {!number && !ownDriver ? (
-                <span className="text-muted-foreground">
+                <span data-ph-unmask="" className="text-muted-foreground">
                     {courier || url ? "· " : ""}No tracking number yet
                     {canChange ? " · " : ""}
                 </span>

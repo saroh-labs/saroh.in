@@ -126,7 +126,7 @@ export default async function AnalyticsPage({
                     description={
                         <>
                             {periodLine(address.period, window)}
-                            <span className="max-desk:hidden">
+                            <span data-ph-unmask="" className="max-desk:hidden">
                                 {" "}
                                 · updated every hour
                             </span>

@@ -237,7 +237,11 @@ export function WhyNotOffered({ who }: { who: string }) {
         </>,
         <>
             The business is open then, for in-person visits.{" "}
-            <TextLink href={OPENING_HOURS} className="font-semibold">
+            <TextLink
+                data-ph-unmask=""
+                href={OPENING_HOURS}
+                className="font-semibold"
+            >
                 Opening hours
             </TextLink>{" "}
             are in Settings.
@@ -250,7 +254,7 @@ export function WhyNotOffered({ who }: { who: string }) {
     ];
     return (
         <div>
-            <p className="text-[14px] leading-[1.55]">
+            <p data-ph-unmask="" className="text-[14px] leading-[1.55]">
                 A time shows on your booking page only when all of these are
                 true:
             </p>

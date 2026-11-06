@@ -294,7 +294,7 @@ export function ChangeWhoFields({
     return (
         <div className="grid min-w-0 gap-3.5">
             <div className="grid min-w-0 gap-1.5">
-                <span id={ids.list} className="label">
+                <span data-ph-unmask="" id={ids.list} className="label">
                     Who it&apos;s with
                 </span>
                 <span
@@ -390,7 +390,10 @@ export function ChangeWhoFields({
                     Change the time too
                 </Button>
             )}
-            <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12.5px] leading-[1.5] text-muted-foreground"
+            >
                 Only the person
                 {s.timeOpen ? " and the time" : ""} change. What was paid, a
                 deposit, a payment link and a class pack stay on the booking.

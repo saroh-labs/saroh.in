@@ -177,7 +177,9 @@ function TurnOnBody({
             <FormSheetBody className="gap-5">
                 {comes.length > 0 ? (
                     <section className="grid gap-1.5">
-                        <h3 className="label">What comes with it</h3>
+                        <h3 data-ph-unmask="" className="label">
+                            What comes with it
+                        </h3>
                         <ul className="grid gap-1 text-pretty text-[12.5px] leading-normal text-foreground">
                             {comes.map((line) => (
                                 <li key={line}>{line}</li>
@@ -268,13 +270,19 @@ function TurnOnBody({
                         {fielded.length === 0 &&
                         !connectButtons &&
                         !plan.order.some((k) => lockOf(k)) ? (
-                            <p className="text-[12.5px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-[12.5px] text-muted-foreground"
+                            >
                                 Nothing to fill in here. Anything it still needs
                                 is said once it&apos;s on.
                             </p>
                         ) : null}
                         {connectButtons ? (
-                            <p className="text-pretty text-[12.5px] leading-normal text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-pretty text-[12.5px] leading-normal text-muted-foreground"
+                            >
                                 It turns on with nothing connected. Turn on and
                                 connect goes on to Settings › Providers once
                                 it&apos;s on.

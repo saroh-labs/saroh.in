@@ -171,7 +171,10 @@ export function SetupNameStep({
                                     className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent pr-0 text-right font-mono shadow-none focus-visible:ring-0 coarse:h-full coarse:text-base"
                                 />
                             </FormControl>
-                            <span className="text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
                                 .saroh.app
                             </span>
                         </div>

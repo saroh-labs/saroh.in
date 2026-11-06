@@ -195,6 +195,7 @@ export function MessageComposer({
                         />
                         {empty ? (
                             <p
+                                data-ph-unmask=""
                                 id={`${id}-problem`}
                                 role="alert"
                                 className="text-[12.5px] font-medium text-destructive-subtle-foreground"

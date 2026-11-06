@@ -141,7 +141,9 @@ export function UserMenu({
                             data-billing-profiles-link=""
                         >
                             <ReceiptText />
-                            <span className="flex-1">Billing profiles ↗</span>
+                            <span data-ph-unmask="" className="flex-1">
+                                Billing profiles ↗
+                            </span>
                             <Badge size="sm" variant="neutral">
                                 New
                             </Badge>

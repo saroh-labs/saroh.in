@@ -172,10 +172,15 @@ function SoldCard({
                     <ListTableHead
                         className={cn("hidden gap-3 desk:grid", cols)}
                     >
-                        <span>What</span>
-                        <span className={listTable.numeric}>Sold</span>
+                        <span data-ph-unmask="">What</span>
+                        <span data-ph-unmask="" className={listTable.numeric}>
+                            Sold
+                        </span>
                         {view.showAmount ? (
-                            <span className={listTable.numeric}>
+                            <span
+                                data-ph-unmask=""
+                                className={listTable.numeric}
+                            >
                                 Brought in
                             </span>
                         ) : null}

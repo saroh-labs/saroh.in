@@ -363,7 +363,7 @@ export function ChangeBillingProfileSheet({
                 }}
             >
                 <div className="grid gap-4">
-                    <p id={titleId} className="sr-only">
+                    <p data-ph-unmask="" id={titleId} className="sr-only">
                         Billing profiles
                     </p>
                     <SetupBillingStep billing={billing} labelledBy={titleId} />

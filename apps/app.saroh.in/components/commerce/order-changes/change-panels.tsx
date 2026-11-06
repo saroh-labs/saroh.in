@@ -254,7 +254,10 @@ export function PaymentBanner({
             <Notice role="status" align="center">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-[1_1_260px]">
-                        <div className="text-[13.5px] font-bold">
+                        <div
+                            data-ph-unmask=""
+                            className="text-[13.5px] font-bold"
+                        >
                             {handover === "collection"
                                 ? "Pay on collection"
                                 : "Pay on delivery"}

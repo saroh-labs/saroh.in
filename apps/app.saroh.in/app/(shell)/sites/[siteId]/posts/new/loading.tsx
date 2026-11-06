@@ -8,7 +8,7 @@ export default function Loading() {
             shape="editor"
             width="full"
             breadcrumb={[
-                <Link key="0" href="/sites">
+                <Link data-ph-unmask="" key="0" href="/sites">
                     Website
                 </Link>,
             ]}

@@ -139,7 +139,7 @@ export function PhoneFoot({
             className="sticky bottom-[var(--tab-bar-inset)] z-10 -mx-4 mt-4 grid gap-2 border-t border-border bg-card px-4 py-3 dark:bg-background sm:hidden"
         >
             <p className="flex items-baseline justify-between text-[15px] font-semibold">
-                <span>Total</span>
+                <span data-ph-unmask="">Total</span>
                 <span className="tabular-nums">{total}</span>
             </p>
             <div className="flex gap-2">{children}</div>

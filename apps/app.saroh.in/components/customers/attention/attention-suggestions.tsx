@@ -145,7 +145,10 @@ export function AttentionSuggestions({
                 <span className="text-[13.5px] font-semibold text-foreground">
                     {suggestionsTitle(shown)}
                 </span>
-                <span className="text-pretty text-[12px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-pretty text-[12px] text-muted-foreground"
+                >
                     Check it with them, then add it to Needs attention so it
                     shows on every booking.
                 </span>
@@ -246,6 +249,7 @@ function SuggestionCard({
                 {fromList ? (
                     <div className="grid min-w-0 gap-[5px]">
                         <span
+                            data-ph-unmask=""
                             id={`${id}-allergen`}
                             className="text-[12px] font-medium"
                         >

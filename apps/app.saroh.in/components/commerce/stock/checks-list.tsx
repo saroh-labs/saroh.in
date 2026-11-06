@@ -46,7 +46,10 @@ export function ChecksList({
     const [busy, setBusy] = useState<string | null>(null);
 
     const intro = (
-        <p className="mb-3.5 max-w-[72ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+        <p
+            data-ph-unmask=""
+            className="mb-3.5 max-w-[72ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground"
+        >
             Saroh compares the log with orders and counts. Each check says what
             doesn&apos;t add up and what you can do about it.
         </p>

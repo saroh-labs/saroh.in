@@ -361,13 +361,17 @@ function MoreAboutIt({
     return (
         <div className="mt-[18px] border-t border-border/70 pt-3.5">
             <div className="mb-2.5 flex flex-wrap items-baseline gap-2">
-                <span className="text-[12.5px] font-semibold">
+                <span data-ph-unmask="" className="text-[12.5px] font-semibold">
                     More about it
                 </span>
                 <span className="text-[11.5px] text-muted-foreground">
                     Asked of everything in {categoryName}.
                 </span>
-                <TextLink href={manageHref} className="ml-auto text-[12px]">
+                <TextLink
+                    data-ph-unmask=""
+                    href={manageHref}
+                    className="ml-auto text-[12px]"
+                >
                     Manage fields
                 </TextLink>
             </div>

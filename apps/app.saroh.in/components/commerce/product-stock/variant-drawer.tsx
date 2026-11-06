@@ -144,7 +144,10 @@ export function VariantDrawer({
                                         </p>
                                     </div>
                                 </div>
-                                <p className="mt-2 text-[11.5px] text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="mt-2 text-[11.5px] text-muted-foreground"
+                                >
                                     {open.imageId
                                         ? "Shows its own photo when someone picks it."
                                         : "Shows the cover when someone picks it."}
@@ -275,7 +278,10 @@ export function VariantDrawer({
                                         reassurance="Stock figures above are still right."
                                     />
                                 ) : (
-                                    <p className="text-[12.5px] text-muted-foreground">
+                                    <p
+                                        data-ph-unmask=""
+                                        className="text-[12.5px] text-muted-foreground"
+                                    >
                                         Your role can&apos;t see orders.
                                     </p>
                                 )}
@@ -330,7 +336,10 @@ export function VariantDrawer({
                                 ) : overview.reviews.status === "failed" ? (
                                     <FailedRead things="reviews" />
                                 ) : (
-                                    <p className="text-[12.5px] text-muted-foreground">
+                                    <p
+                                        data-ph-unmask=""
+                                        className="text-[12.5px] text-muted-foreground"
+                                    >
                                         Your role can&apos;t see reviews.
                                     </p>
                                 )}

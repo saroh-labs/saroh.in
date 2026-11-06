@@ -396,7 +396,10 @@ export function HistoryCard({
                     </li>
                 ))}
                 {events.length === 0 ? (
-                    <li className="py-2.5 text-[13.5px] text-muted-foreground">
+                    <li
+                        data-ph-unmask=""
+                        className="py-2.5 text-[13.5px] text-muted-foreground"
+                    >
                         This booking predates the history log, so only its
                         current state is known.
                     </li>

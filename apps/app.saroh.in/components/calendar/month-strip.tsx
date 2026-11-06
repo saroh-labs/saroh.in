@@ -67,7 +67,9 @@ export function MonthStrip(props: Where) {
                     "max-[759px]:grid max-[759px]:grid-cols-2 max-[759px]:gap-0 max-[759px]:overflow-hidden max-[759px]:rounded-xl max-[759px]:border max-[759px]:border-border max-[759px]:bg-card",
                 )}
             >
-                <span className="label max-[759px]:hidden">This month</span>
+                <span data-ph-unmask="" className="label max-[759px]:hidden">
+                    This month
+                </span>
                 {parts.map((part, i) => {
                     const on = open === part.key;
                     const last = i === parts.length - 1;

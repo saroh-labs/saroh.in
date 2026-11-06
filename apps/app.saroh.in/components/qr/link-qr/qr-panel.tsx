@@ -143,7 +143,12 @@ function Saved({
 
     if (read === null) {
         return (
-            <p role="status" aria-busy="true" className={NOTE}>
+            <p
+                data-ph-unmask=""
+                role="status"
+                aria-busy="true"
+                className={NOTE}
+            >
                 Finding this code…
             </p>
         );
@@ -176,12 +181,12 @@ function Saved({
     }
 
     const notLive = !read.live ? (
-        <p data-qr-not-live="" className={NOTE}>
+        <p data-ph-unmask="" data-qr-not-live="" className={NOTE}>
             Your site isn&apos;t published yet. This link works once it is.
         </p>
     ) : null;
     const more = (
-        <Link href={QR_SHARE_HREF} className={linkClass}>
+        <Link data-ph-unmask="" href={QR_SHARE_HREF} className={linkClass}>
             More options
         </Link>
     );
@@ -190,7 +195,7 @@ function Saved({
     if (code) {
         if (!code.link) {
             return (
-                <p role="note" className={NOTE}>
+                <p data-ph-unmask="" role="note" className={NOTE}>
                     Your site has no web address yet, so this code has no link
                     to hold.
                 </p>
@@ -266,7 +271,7 @@ function Saved({
                 </p>
             }
         >
-            <p data-qr-not-counted="" className={NOTE}>
+            <p data-ph-unmask="" data-qr-not-counted="" className={NOTE}>
                 Not counted. This is a QR of the link itself. An owner or admin
                 can make a saved code that counts its scans.
             </p>
@@ -357,7 +362,7 @@ function Drawn({
                     />
                 </div>
             ) : (
-                <p role="note" className={NOTE}>
+                <p data-ph-unmask="" role="note" className={NOTE}>
                     This link is too long to draw as a QR code. Copy it instead.
                 </p>
             )}

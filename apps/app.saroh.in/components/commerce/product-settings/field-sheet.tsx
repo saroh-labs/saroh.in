@@ -201,7 +201,11 @@ export function FieldSheet({
             </div>
 
             <div className="grid gap-1.5">
-                <p id={`${id}-type`} className="text-sm font-medium">
+                <p
+                    data-ph-unmask=""
+                    id={`${id}-type`}
+                    className="text-sm font-medium"
+                >
                     Type
                 </p>
                 {saved ? (
@@ -226,7 +230,11 @@ export function FieldSheet({
             </div>
 
             <div className="grid gap-1.5">
-                <p id={`${id}-who`} className="text-sm font-medium">
+                <p
+                    data-ph-unmask=""
+                    id={`${id}-who`}
+                    className="text-sm font-medium"
+                >
                     Who sees it
                 </p>
                 <Segmented
@@ -240,7 +248,10 @@ export function FieldSheet({
                         label: o.label,
                     }))}
                 />
-                <p className="text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12px] text-muted-foreground"
+                >
                     {onShop
                         ? "Customers see it under the product's description."
                         : "It stays on the product page, for your team."}
@@ -248,11 +259,18 @@ export function FieldSheet({
             </div>
 
             <div className="grid gap-1.5">
-                <p id={`${id}-cats`} className="text-sm font-medium">
+                <p
+                    data-ph-unmask=""
+                    id={`${id}-cats`}
+                    className="text-sm font-medium"
+                >
                     Asked for products in
                 </p>
                 {categories.length === 0 ? (
-                    <p className="text-[12.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] text-muted-foreground"
+                    >
                         There are no categories yet. Add one on the Categories
                         tab, then pick it here.
                     </p>
@@ -287,7 +305,11 @@ export function FieldSheet({
                     </div>
                 )}
                 {categoryIds.length === 0 && categories.length > 0 ? (
-                    <p role="status" className="text-[11.5px] text-foreground">
+                    <p
+                        data-ph-unmask=""
+                        role="status"
+                        className="text-[11.5px] text-foreground"
+                    >
                         In no category, so no product will ask for it.
                     </p>
                 ) : null}

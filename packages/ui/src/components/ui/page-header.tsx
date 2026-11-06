@@ -40,9 +40,13 @@ export interface PageHeaderProps extends Omit<
      * (`false` for fixed words): `lib/usage-sharing/replay-marks.test.ts`
      * in the workspace fails on one that doesn't.
      *
-     * The count, the badge, the lead, the meta and the breadcrumb are never
-     * marked here, so they stay masked: each is the caller's own node and
-     * as often a record's as a fixed word.
+     * The breadcrumb's crumbs before the last are read (Saroh's sections);
+     * its last crumb is the page and follows the title. A middle crumb that
+     * is a record's says `data-ph-mask` on its own element.
+     *
+     * The count, the badge, the lead and the meta are never marked here,
+     * so they stay masked: each is the caller's own node and as often a
+     * record's as a fixed word.
      */
     holdsData?: boolean | "title" | "description";
     /**
@@ -133,6 +137,14 @@ export function PageHeader({
                         </svg>
                     ) : null}
                     <span
+                        // The crumbs before the page are Saroh's sections
+                        // ("Sell › Customers"): readable. The last is the
+                        // page itself and follows the title's mark. A crumb
+                        // that is a record's ("Courses › Yoga basics ›
+                        // Edit") says `data-ph-mask` on its own element.
+                        {...(i === breadcrumb.length - 1
+                            ? mark("title")
+                            : { "data-ph-unmask": "" })}
                         aria-current={
                             i === breadcrumb.length - 1 ? "page" : undefined
                         }

@@ -619,6 +619,20 @@ describe("ListFilter", () => {
             must(container.querySelector("[data-list-filter]")),
         ).toHaveAttribute("data-ph-mask");
     });
+
+    it("reads a filter whose choices are Saroh's own words", () => {
+        const { container } = render(
+            <ListFilter
+                label="Show"
+                value="all"
+                onValueChange={vi.fn()}
+                options={[{ value: "all", label: "All customers" }]}
+            />,
+        );
+        const box = must(container.querySelector("[data-list-filter]"));
+        expect(box).toHaveAttribute("data-ph-unmask");
+        expect(box).not.toHaveAttribute("data-ph-mask");
+    });
 });
 
 describe("AttentionToggle", () => {

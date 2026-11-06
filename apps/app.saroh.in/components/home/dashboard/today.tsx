@@ -109,7 +109,11 @@ export function Today({
                     <span className="text-[12.5px] text-muted-foreground">
                         {desk ? view.dayCount : view.count}
                     </span>
-                    <TextLink href={allHref} className="ml-auto text-[12.5px]">
+                    <TextLink
+                        data-ph-unmask=""
+                        href={allHref}
+                        className="ml-auto text-[12.5px]"
+                    >
                         {today.bookings ? "Open the calendar" : "All orders"}
                     </TextLink>
                 </div>

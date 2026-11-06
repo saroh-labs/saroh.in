@@ -101,10 +101,10 @@ function OnlinePayments({ store, canEdit, pending, save }: SectionProps) {
         <div className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium">
-                    <span>Online payments</span>
+                    <span data-ph-unmask="">Online payments</span>
                     {status.badge}
                 </div>
-                <Link href={PROVIDERS_HREF} className={LINK}>
+                <Link data-ph-unmask="" href={PROVIDERS_HREF} className={LINK}>
                     {connected.length === 0
                         ? "Connect a provider"
                         : "Manage providers"}
@@ -128,7 +128,10 @@ function OnlinePayments({ store, canEdit, pending, save }: SectionProps) {
                                     <span className="block text-[13.5px] font-medium">
                                         {providerName(p.provider)}
                                     </span>
-                                    <span className="block text-[12px] text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="block text-[12px] text-muted-foreground"
+                                    >
                                         {usable
                                             ? "Connected for the business"
                                             : "Turned off for the business"}

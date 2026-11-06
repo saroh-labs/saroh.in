@@ -47,7 +47,9 @@ export function VisitsStorefrontNote() {
             <span className="text-destructive-subtle-foreground">
                 {TREATMENT_NEEDS_STOREFRONT}
             </span>{" "}
-            <TextLink href={STOREFRONTS_HREF}>Add a location</TextLink>
+            <TextLink data-ph-unmask="" href={STOREFRONTS_HREF}>
+                Add a location
+            </TextLink>
         </p>
     );
 }

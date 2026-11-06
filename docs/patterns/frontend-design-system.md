@@ -672,7 +672,11 @@ text, a column's name, the navigation, an empty state, a banner.
 - **The shared components mark themselves**, so most screens do nothing:
     - readable: `Button`, `Label` (and `FormLabel`), `FormDescription`,
       `FormMessage`, `Field`'s label, hint and error (`FieldHint`,
-      `FieldError`), `TableHead`, `TabsTrigger`, `PageHeader`'s title and
+      `FieldError`), `TableHead`, `TabsTrigger`, `TabStrip`'s tabs (a
+      label that is a record's wraps it in `<span data-ph-mask="">`),
+      `ListFilter` (unless `holdsData`: its options are records' names),
+      a `StatusBadge` given a `thing` (its word is the vocabulary's),
+      `PageHeader`'s breadcrumb before its last crumb, `PageHeader`'s title and
       description, every state card's title, description and note
       (`EmptyState`, `FailedState`, `PermissionDeniedState`,
       `ModuleOffState`, `PlanLockedState`, `LimitReachedState`,
@@ -689,8 +693,14 @@ text, a column's name, the navigation, an empty state, a banner.
       `Moment`'s fact line;
     - masked unless the screen marks it: a `Notice` (its body is as often
       the API's sentence as Saroh's, so only one with fixed copy says
-      `data-ph-unmask`), and `PageHeader`'s breadcrumb, count, badge, lead
-      and meta.
+      `data-ph-unmask`), a `StatusBadge` given a `tone` and words (say
+      `data-ph-unmask=""` on it when the words come from a closed set:
+      an order's step, a booking's state, "Returning"), and `PageHeader`'s
+      count, badge, lead and meta. Its last crumb follows the title's
+      `holdsData`.
+- **A middle crumb that is a record's says so on itself:**
+  `<Link data-ph-mask="" href={…}>{course.name}</Link>`. The test fails on
+  a computed crumb that looks like a record's without it.
 - **A state card masks its own title where the title is data.** A
   no-results card that repeats a search, and `PausedState` naming the
   business, mask the title and leave the sentence under it readable
@@ -721,6 +731,18 @@ text, a column's name, the navigation, an empty state, a banner.
   dialog's or a sheet's title and description. That is on purpose: toasts
   and titles are computed far more often than not (`${name} added`). Mark
   one `data-ph-unmask` only where its words are fixed.
+- **Words written in the file, drawn by hand, say `data-ph-unmask`** (owner,
+  6 Nov: a card's "Delivery address", a column head's "Status", a role's
+  "Your role can see this customer…"). An element (`p`, `span`, `div`,
+  `h1`–`h6`, `label`, `li`, `th`, `td`, `a`, `Link`, `TextLink`, …) whose
+  children are only literal words, or a choice between literals, fails
+  `replay-marks.test.ts` until it or an element around it in the same
+  file carries a mark, or sits in a readable component (`Button`,
+  `EmptyState`, …). A dialog's or sheet's title stays exempt and masked.
+  Not checked: the site editor (not recorded) and setup (marked at its
+  layout). `components/customers/detail/replay.test.tsx` renders the
+  customer page through `maskWorkspaceText` as the guard for the whole
+  shape.
 - **Digits and emails are hidden even in readable words** (`hideFigures`):
   "Take ₹***", "Step * of *". It is a net under mistakes, not a licence to
   unmask amounts.

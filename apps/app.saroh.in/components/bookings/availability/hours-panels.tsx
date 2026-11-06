@@ -319,7 +319,10 @@ export function HoursPanels({
                               }
                           >
                               <OffDetails item={panel.item} today={today} />
-                              <p className="mt-2.5 text-[12.5px] leading-normal text-muted-foreground">
+                              <p
+                                  data-ph-unmask=""
+                                  className="mt-2.5 text-[12.5px] leading-normal text-muted-foreground"
+                              >
                                   To change it, remove it and add it again. Undo
                                   puts it back.
                               </p>

@@ -60,7 +60,7 @@ export function PhoneShopMenu({
                         <DropdownMenuItem disabled className="items-start">
                             <ExternalLink />
                             <span className="flex flex-col gap-0.5">
-                                <span>View on the shop</span>
+                                <span data-ph-unmask="">View on the shop</span>
                                 <span className="text-pretty text-[12px] leading-[1.4] text-muted-foreground">
                                     {note}
                                 </span>

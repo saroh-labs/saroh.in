@@ -225,7 +225,7 @@ export function LevelsPanel({
                             </Fragment>
                         );
                     })}
-                    <span>
+                    <span data-ph-unmask="">
                         Turn tracking on from the product&apos;s editor.
                     </span>
                 </p>

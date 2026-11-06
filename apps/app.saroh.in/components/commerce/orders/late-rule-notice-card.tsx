@@ -72,7 +72,10 @@ export function LateRuleNoticeCard({
                             </Link>
                         </Button>
                     ) : (
-                        <span className="text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="text-[12px] text-muted-foreground"
+                        >
                             An owner or admin can change it in Locations.
                         </span>
                     )}
@@ -91,7 +94,7 @@ export function LateRuleNoticeCard({
                     Pick-up orders at {notice.name} now count as late after{" "}
                     {lateAfterWords(notice.pickupLateAfterMinutes)}.
                 </strong>{" "}
-                <span className="max-sm:hidden">
+                <span data-ph-unmask="" className="max-sm:hidden">
                     Set it to what suits your counter.
                 </span>
             </p>

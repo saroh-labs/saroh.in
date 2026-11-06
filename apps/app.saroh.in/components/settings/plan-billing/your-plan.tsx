@@ -87,7 +87,9 @@ export function YourPlan(props: YourPlanProps) {
     return (
         <section aria-label="Your plan" className="grid gap-3">
             <div className="grid gap-1.5">
-                <h2 className="label">Your plan</h2>
+                <h2 data-ph-unmask="" className="label">
+                    Your plan
+                </h2>
                 {/* One line where there is room for it. Each fact is kept
                     whole: a line breaks after a dot, never inside "then
                     ‹amount› a month". On a phone the plan is one line and
@@ -98,7 +100,7 @@ export function YourPlan(props: YourPlanProps) {
                     </span>
                     {status.map((part) => (
                         <Fragment key={`${part.lead}${part.iso ?? ""}`}>
-                            <span className="max-desk:hidden">
+                            <span data-ph-unmask="" className="max-desk:hidden">
                                 {"\u00a0· "}
                             </span>
                             <span className="inline-block max-desk:block">

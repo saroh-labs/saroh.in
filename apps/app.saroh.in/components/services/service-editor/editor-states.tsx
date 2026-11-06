@@ -31,10 +31,10 @@ export function ServiceEditorState({
         <PageContainer width="full">
             <PageHeader
                 breadcrumb={[
-                    <Link key="bookings" href="/bookings">
+                    <Link data-ph-unmask="" key="bookings" href="/bookings">
                         Bookings
                     </Link>,
-                    <Link key="services" href="/services">
+                    <Link data-ph-unmask="" key="services" href="/services">
                         Services
                     </Link>,
                 ]}
@@ -43,10 +43,17 @@ export function ServiceEditorState({
             {state === "missing" ? (
                 <div>
                     <div className="max-w-[480px] rounded-[12px] border border-border bg-card px-[18px] py-4">
-                        <h2 className="mb-2.5 font-display text-[16px] font-semibold tracking-[-0.01em]">
+                        <h2
+                            data-ph-unmask=""
+                            className="mb-2.5 font-display text-[16px] font-semibold tracking-[-0.01em]"
+                        >
                             That service isn&apos;t here
                         </h2>
-                        <TextLink href="/services" className="text-[13px]">
+                        <TextLink
+                            data-ph-unmask=""
+                            href="/services"
+                            className="text-[13px]"
+                        >
                             Back to services
                         </TextLink>
                     </div>

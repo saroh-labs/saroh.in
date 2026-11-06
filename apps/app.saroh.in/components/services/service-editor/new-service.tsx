@@ -311,7 +311,9 @@ export function NewService(props: EditorProps) {
                     disabled={store.saving}
                     className="m-0 grid min-w-0 gap-5 border-0 p-0 pb-6 min-[760px]:grid-cols-[minmax(0,1fr)_400px] min-[760px]:items-start"
                 >
-                    <legend className="sr-only">New service</legend>
+                    <legend data-ph-unmask="" className="sr-only">
+                        New service
+                    </legend>
                     <FiveQuestions
                         edit={{ draft, set, problem, leave }}
                         hidden={moreOpen}

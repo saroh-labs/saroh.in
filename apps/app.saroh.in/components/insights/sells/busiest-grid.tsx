@@ -106,6 +106,7 @@ export function BusiestGrid({ read }: { read: SellsRead }) {
                             </span>
                         )}
                         <TextLink
+                            data-ph-unmask=""
                             onClick={() => setTable((on) => !on)}
                             aria-controls={id}
                             aria-expanded={table}
@@ -162,10 +163,10 @@ function BusyTable({ rows }: { rows: ReturnType<typeof busyView>["rows"] }) {
     return (
         <ListTable className="w-full">
             <table className="w-full text-[13px]" data-testid="busy-table">
-                <caption className="sr-only">
+                <caption data-ph-unmask="" className="sr-only">
                     Sales and bookings, each day and time
                 </caption>
-                <thead>
+                <thead data-ph-unmask="">
                     <tr className={listTable.headRow}>
                         <th scope="col" className={cn(listTable.th, cell)}>
                             Day

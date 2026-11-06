@@ -131,8 +131,13 @@ export function PayStep({
                     boxClassName="mt-0.5"
                 >
                     <span>
-                        <span className="font-semibold">Handed over now</span>
-                        <span className="block text-[12px] text-muted-foreground">
+                        <span data-ph-unmask="" className="font-semibold">
+                            Handed over now
+                        </span>
+                        <span
+                            data-ph-unmask=""
+                            className="block text-[12px] text-muted-foreground"
+                        >
                             {handedOver
                                 ? "It's made Collected. Nothing more to do."
                                 : "It starts as New, to prepare and hand over later."}

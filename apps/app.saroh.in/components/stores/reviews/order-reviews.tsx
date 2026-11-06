@@ -69,7 +69,9 @@ export function OrderReviews({
             className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
         >
             <div className="min-w-0">
-                <p className="text-[13px] font-medium">Reviews</p>
+                <p data-ph-unmask="" className="text-[13px] font-medium">
+                    Reviews
+                </p>
                 <p className="text-[12.5px] text-muted-foreground">
                     {note ? (
                         <EmailNoteText note={note} />

@@ -8,10 +8,10 @@ import type { ReactNode } from "react";
  */
 export function packCrumbs(here: string | null): ReactNode[] {
     return [
-        <Link key="bookings" href="/bookings">
+        <Link data-ph-unmask="" key="bookings" href="/bookings">
             Bookings
         </Link>,
-        <Link key="packs" href="/class-packs">
+        <Link data-ph-unmask="" key="packs" href="/class-packs">
             Class packs
         </Link>,
         ...(here ? [here] : []),

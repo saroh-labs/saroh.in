@@ -277,7 +277,10 @@ function PublishSheet({
                         {address}
                     </p>
                 ) : null}
-                <p className="text-[12.5px] leading-normal text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] leading-normal text-muted-foreground"
+                >
                     Your services, times and prices show as they are in
                     Bookings. How the page looks is changed in Website.
                 </p>

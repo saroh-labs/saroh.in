@@ -84,7 +84,10 @@ export function OrderItems({
                                             {l.name}
                                         </Link>
                                     ) : (
-                                        <span className="text-[13.5px] font-semibold text-muted-foreground">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="text-[13.5px] font-semibold text-muted-foreground"
+                                        >
                                             A product that no longer exists
                                         </span>
                                     )}

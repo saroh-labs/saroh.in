@@ -42,12 +42,16 @@ export function TimeOffCard({
         <section aria-labelledby="time-off" className="min-w-0">
             <div className="mb-2.5 mt-[26px] flex items-baseline gap-2 min-[760px]:mt-0">
                 <h2
+                    data-ph-unmask=""
                     id="time-off"
                     className="flex-1 font-display text-[16px] font-semibold tracking-[-0.01em] min-[760px]:text-[17px] min-[760px]:tracking-[-0.02em]"
                 >
                     Time off
                 </h2>
-                <span className="text-[12.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Coming up
                 </span>
             </div>
@@ -106,10 +110,16 @@ export function TimeOffCard({
                 })}
                 {!items.length ? (
                     <li className="border-b border-border px-3.5 py-3.5 last:border-b-0">
-                        <span className="block text-[14px] font-semibold">
+                        <span
+                            data-ph-unmask=""
+                            className="block text-[14px] font-semibold"
+                        >
                             No time off coming up
                         </span>
-                        <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="mt-0.5 block text-[12.5px] text-muted-foreground"
+                        >
                             Leave, holidays and closed days show here.
                         </span>
                     </li>

@@ -176,7 +176,7 @@ function SwitchBody({
                     }))}
                 />
             ) : (
-                <p className="text-[13px] text-foreground/75">
+                <p data-ph-unmask="" className="text-[13px] text-foreground/75">
                     There is no other plan on sale to move to. Add one in Plans
                     first.
                 </p>
@@ -184,6 +184,7 @@ function SwitchBody({
             <p className={NOTE}>{note}</p>
             {tried && !picked && offered.length ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
                 >

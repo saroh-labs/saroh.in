@@ -197,7 +197,9 @@ export function InvoiceDetailsSheet({
                         aria-busy="true"
                         data-invoice-sheet-loading
                     >
-                        <span className="sr-only">Loading the invoice</span>
+                        <span data-ph-unmask="" className="sr-only">
+                            Loading the invoice
+                        </span>
                         <Skeleton
                             aria-hidden
                             className="h-[120px] rounded-[12px]"
@@ -216,6 +218,7 @@ export function InvoiceDetailsSheet({
             )}
             {invoiceId ? (
                 <Link
+                    data-ph-unmask=""
                     href={invoiceHref(invoiceId)}
                     className="-order-1 justify-self-end text-[12.5px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground coarse:py-2 print:hidden"
                 >

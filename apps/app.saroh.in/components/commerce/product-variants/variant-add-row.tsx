@@ -146,7 +146,9 @@ export function OptionChoice({
 }) {
     return (
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
-            <span className="text-[12px] font-medium">Customers choose by</span>
+            <span data-ph-unmask="" className="text-[12px] font-medium">
+                Customers choose by
+            </span>
             <ChipGroup
                 label="Option name"
                 className="gap-[5px]"
@@ -159,6 +161,7 @@ export function OptionChoice({
                 choices={options.map((o) => ({ value: o.id, label: o.name }))}
             />
             <TextLink
+                data-ph-unmask=""
                 href={productSettingsHref("options")}
                 className="text-[12px]"
             >
