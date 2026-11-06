@@ -150,7 +150,11 @@ export const ABOUT = {
 
     where: {
         eyebrow: "Where we are",
-        title: `Early access, from ${EARLY_ACCESS_LONG}.`,
+        /** A date only while it is still to come: once open, early access just is. */
+        title: {
+            waitlist: `Early access, from ${EARLY_ACCESS_LONG}.`,
+            open: "In early access.",
+        } satisfies ModeWords,
         /** The paragraph's first sentence: only open mode can say "live". */
         opens: {
             waitlist: `Saroh opens in early access on ${EARLY_ACCESS_LONG}.`,

@@ -150,7 +150,7 @@ export function AboutPage({
                         id="about-where"
                         className="m-0 font-display text-[clamp(30px,3.4vw,40px)] font-bold leading-[1.05] tracking-[-0.035em]"
                     >
-                        {where.title}
+                        {where.title[mode]}
                     </h2>
                     <p className="m-0 max-w-[52ch] text-mk-body text-mk-copy [text-wrap:pretty]">
                         {where.opens[mode]} {where.rest}
