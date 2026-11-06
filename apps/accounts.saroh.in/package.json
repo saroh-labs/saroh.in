@@ -26,7 +26,7 @@
         "better-auth": "^1.7.10",
         "lucide-react": "catalog:",
         "next": "catalog:next16",
-        "posthog-js": "1.435.9",
+        "posthog-js": "1.447.2",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "react-icons": "catalog:",
