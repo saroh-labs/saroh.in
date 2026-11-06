@@ -62,6 +62,8 @@ jest.mock("@saroh/database", () => {
         order: { findUnique: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
         webhookEvent: { findFirst: jest.fn() },
+        // The business's edition, where a plan check reads it: unset, India.
+        organization: { findUnique: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -1928,6 +1930,31 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
         const persisted = JSON.stringify(providerUpsert.mock.calls[0][0]);
         expect(persisted).not.toContain("rk_test_Madeup1");
         expect(persisted).not.toContain("whsec_Madeup1");
+    });
+
+    it("connects Stripe on a plan without online payments or room for its own accounts (owner, 6 Nov 2026)", async () => {
+        const { service } = stripeService();
+        (prisma.merchantPaymentProvider.count as jest.Mock).mockResolvedValue(
+            0,
+        );
+        // Every row locked: payments and integrations alike.
+        const enforced = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockImplementation((_org: string, moduleId: string) =>
+                Promise.resolve({
+                    ...fakePaymentsRow("free", "payments"),
+                    moduleId,
+                }),
+            );
+
+        try {
+            await expect(
+                service.connectProvider(global(), STRIPE_KEYS),
+            ).resolves.toMatchObject({ provider: "STRIPE" });
+            expect(providerUpsert).toHaveBeenCalledTimes(1);
+        } finally {
+            enforced.mockRestore();
+        }
     });
 
     it.each(["razorpay", "cashfree"])(

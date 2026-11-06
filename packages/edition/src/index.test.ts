@@ -180,6 +180,7 @@ describe("the edition profiles (DEC-204 item 7)", () => {
             INDIA: ["RAZORPAY", "CASHFREE"],
             GLOBAL: ["STRIPE"],
         },
+        onlinePaymentsOnEveryPlan: { INDIA: false, GLOBAL: true },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {

@@ -558,11 +558,13 @@ export class PaymentsService {
         // keys of one already made is never refused: renewals the business
         // already has are charged through it (ADR-003). Asked before the
         // business details, so a plan without it hears about the plan, not
-        // an address it would add for nothing (UX-006).
+        // an address it would add for nothing (UX-006). An edition that
+        // takes money online on every plan asks neither (DEC-208).
+        const everyPlan = editionProfile(ctx.edition).onlinePaymentsOnEveryPlan;
         const known = await prisma.merchantPaymentProvider.count({
             where: { organizationId: ctx.organizationId, provider },
         });
-        if (known === 0) {
+        if (known === 0 && !everyPlan) {
             if (!(await planTakesOnlinePayment(ctx.organizationId))) {
                 await assertPlanTakesOnlinePayment(ctx.organizationId);
             }
@@ -648,6 +650,7 @@ export class PaymentsService {
             },
             {
                 addingIn: async (tx) =>
+                    everyPlan ||
                     (await tx.merchantPaymentProvider.count({
                         where: {
                             organizationId: ctx.organizationId,

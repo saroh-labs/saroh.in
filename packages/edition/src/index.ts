@@ -41,6 +41,14 @@ export interface EditionProfile {
     upi: boolean;
     /** The payment providers a business may connect to take its customers' money; no two editions share one. */
     paymentProviders: readonly ("RAZORPAY" | "CASHFREE" | "STRIPE")[];
+    /**
+     * Whether a business takes its customers' money online whatever Saroh
+     * plan it is on: its plan's online payments row, and its room for its
+     * own accounts when it connects a payment provider, are not asked
+     * (owner, 6 Nov 2026, DEC-208). Memberships and its own email stay the
+     * plan's to say.
+     */
+    onlinePaymentsOnEveryPlan: boolean;
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -58,6 +66,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         numberLocale: "en-IN",
         upi: true,
         paymentProviders: ["RAZORPAY", "CASHFREE"],
+        onlinePaymentsOnEveryPlan: false,
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -73,6 +82,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         numberLocale: "en-US",
         upi: false,
         paymentProviders: ["STRIPE"],
+        onlinePaymentsOnEveryPlan: true,
     },
 };
 
