@@ -444,6 +444,13 @@ export interface MerchantProvider {
     /** Autopay mandates, when this provider's adapter has them. */
     readonly mandates?: MandateCapability;
     /**
+     * The rollout flag a business needs on to connect this provider and to
+     * start a payment through it (Stripe: `STRIPE_PAYMENTS`, DEC-208). Off,
+     * connecting is refused and a payment answers "can't take payment
+     * online right now". Webhooks and refunds never ask it. None: no gate.
+     */
+    readonly rolloutFlag?: FlagKey;
+    /**
      * Check a business's keys with one cheap authenticated read before they
      * are stored (UX-012): Razorpay `GET /payments?count=1`, Cashfree an
      * order look-up. Never throws; never logs a credential. An adapter

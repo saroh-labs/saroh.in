@@ -364,13 +364,16 @@ describe("BookingsService — bookings management", () => {
             prisma as unknown as { invoice: { updateMany: jest.Mock } }
         ).invoice.updateMany;
         const now = new Date("2026-07-20T08:05:00.000Z");
+        // Its open intent is closed at the provider once, after the
+        // commit (DEC-208).
+        const cancelHoldIntents = jest.fn().mockResolvedValue(undefined);
 
-        const out = await new BookingsService().cancelBooking(
-            ctx(),
-            "bk_1",
-            now,
-        );
+        const out = await new BookingsService(undefined, {
+            cancelHoldIntents,
+        } as never).cancelBooking(ctx(), "bk_1", now);
 
+        expect(cancelHoldIntents).toHaveBeenCalledTimes(1);
+        expect(cancelHoldIntents).toHaveBeenCalledWith("bk_1");
         expect(out.status).toBe("CANCELLED");
         expect(bookingUpdate).toHaveBeenCalledTimes(1);
         expect(bookingUpdate.mock.calls[0][0].data).toEqual({
@@ -415,9 +418,14 @@ describe("BookingsService — bookings management", () => {
                 organizationId: "org_SVC",
                 status: "CANCELLED",
             });
-        const out = await new BookingsService().cancelBooking(ctx(), "bk_1");
+        const cancelHoldIntents = jest.fn();
+        const out = await new BookingsService(undefined, {
+            cancelHoldIntents,
+        } as never).cancelBooking(ctx(), "bk_1");
         expect(out.status).toBe("CANCELLED");
         expect(bookingUpdate).not.toHaveBeenCalled();
+        // A confirmed booking holds no open intent to close.
+        expect(cancelHoldIntents).not.toHaveBeenCalled();
         expect(eventCreate).not.toHaveBeenCalled();
     });
 });

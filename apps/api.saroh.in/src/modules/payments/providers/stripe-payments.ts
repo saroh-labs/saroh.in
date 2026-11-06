@@ -59,7 +59,7 @@ export function isStripeSecretKey(key: string): boolean {
 
 /** What a business is told when it pastes its full secret key. */
 export const STRIPE_SECRET_KEY_REFUSED =
-    "That's your Stripe secret key, which can do anything in your account. Make a restricted key instead (it starts rk_live_ or rk_test_) with PaymentIntents: Write and Refunds: Write, in Stripe › Developers › API keys.";
+    "That's your Stripe secret key, which can do anything in your account. Make a restricted key instead (it starts rk_live_ or rk_test_) with Payment Intents: Write and Refunds: Write, in Stripe › Developers › API keys.";
 
 /** Stripe's form body: `key=value` pairs, nested keys already in brackets. */
 export function stripeForm(fields: Record<string, string | number>): string {

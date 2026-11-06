@@ -1,11 +1,12 @@
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import { webhookPath } from "@saroh/integrations";
 
 import { env } from "../../env";
 import { decryptSecret } from "./crypto";
 import type { SupportedProvider } from "./providers/provider.port";
-import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
 import type { SealedCredentials } from "./webhook-secret";
 import {
     needsWebhookSecret,
@@ -97,16 +98,18 @@ export interface WebhookSetup {
 }
 
 /**
- * Every provider's webhook for one business — connected or not, so setup
- * can show the address before the first connect. Scoped to the business
- * the caller proved (`ctx.organizationId`), never one it names.
+ * The webhook of every provider the business's edition takes payment
+ * through (DEC-208) — connected or not, so setup can show the address
+ * before the first connect. Scoped to the business the caller proved
+ * (`ctx.organizationId`), never one it names.
  */
 export function readWebhookSetup(
     organizationId: string,
+    edition: Edition | null | undefined,
     db: Pick<typeof prisma, "webhookEvent"> = prisma,
 ): Promise<WebhookSetup[]> {
     return Promise.all(
-        SUPPORTED_PROVIDERS.map(async (provider) => {
+        editionProfile(edition).paymentProviders.map(async (provider) => {
             const last = await db.webhookEvent.findFirst({
                 where: { organizationId, provider },
                 orderBy: { createdAt: "desc" },

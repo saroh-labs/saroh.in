@@ -49,6 +49,6 @@ account and its own keys (not Connect), cards only.
 
 - The exact dashboard label of the Refunds permission: the restricted-keys
   page names "Payment Intents: Write" by example only. Saroh's wording says
-  "PaymentIntents: Write and Refunds: Write".
+  "Payment Intents: Write and Refunds: Write".
 - The full zero-decimal list did not render on the currencies page; the
   adapter does not need it, as it allows only listed two-decimal currencies.

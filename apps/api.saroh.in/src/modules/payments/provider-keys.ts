@@ -59,7 +59,7 @@ export async function assertKeysAccepted(
     if (check === "PERMISSION_MISSING") {
         throw new BadRequestException({
             message:
-                "This key can't see payments or refunds. Give it PaymentIntents: Write and Refunds: Write.",
+                "This key can't see payments or refunds. Give it Payment Intents: Write and Refunds: Write.",
             field: "keySecret",
         });
     }

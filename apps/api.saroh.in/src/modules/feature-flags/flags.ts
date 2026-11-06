@@ -139,6 +139,18 @@ export const FlagKey = {
      * `account-phone/account-phone.service.ts` (`options().required`).
      */
     PHONE_REQUIRED_FOR_ACCOUNTS: "PHONE_REQUIRED_FOR_ACCOUNTS",
+
+    /**
+     * Taking payment through a business's own Stripe account (DEC-208).
+     * Off for everyone until a Stripe test-mode run has paid, refunded and
+     * cancelled through the checkout window. Off, Stripe can't be connected,
+     * and a business already connected can't take payment online through it
+     * ("can't take payment online right now"), as for any provider that's
+     * down. Webhooks and refunds of payments already taken never ask it.
+     * Readers: the Stripe adapter's `rolloutFlag`, asked by
+     * `PaymentsService.connectProvider` and its intent core.
+     */
+    STRIPE_PAYMENTS: "STRIPE_PAYMENTS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -314,5 +326,15 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Changing the address has been on for every business on every instance for a release, and its two readers (the change endpoint and the read's canChange) no longer ask it.",
+    },
+    STRIPE_PAYMENTS: {
+        shownAs: "Stripe payments",
+        group: "feature",
+        purpose:
+            "Lets a Global business connect its own Stripe account and take card payments through it. Turn it on only after a Stripe test-mode run has taken, refunded and cancelled a payment through the checkout window; off, Stripe can't be connected and a connected business can't take payment online through it, while webhooks and refunds of payments already taken still work.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Stripe payments have been on for every Global business for a release and needed no kill switch, and the adapter's rolloutFlag is removed.",
     },
 };

@@ -116,3 +116,39 @@ describe("booking.release-holds", () => {
         expect(jobCreate).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("a released hold's open intent (DEC-208)", () => {
+    it("is closed at its provider once per hold released, after the release", async () => {
+        findMany.mockResolvedValue([{ id: "bk_1" }, { id: "bk_2" }]);
+        // bk_2 was confirmed a moment ago: nothing released, nothing closed.
+        release.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+        const cancelHoldIntents = jest.fn().mockResolvedValue(undefined);
+        const handler = new ReleaseHoldsHandler(undefined, {
+            cancelHoldIntents,
+        } as never);
+
+        await handler.releaseExpired(NOW);
+
+        expect(cancelHoldIntents).toHaveBeenCalledTimes(1);
+        expect(cancelHoldIntents).toHaveBeenCalledWith("bk_1");
+        expect(release.mock.invocationCallOrder[0]).toBeLessThan(
+            cancelHoldIntents.mock.invocationCallOrder[0],
+        );
+    });
+
+    it("is never asked about a hold whose payment was taken", async () => {
+        findMany.mockResolvedValue([{ id: "bk_1" }]);
+        const cancelHoldIntents = jest.fn();
+        const handler = new ReleaseHoldsHandler(
+            {
+                confirmHoldPayment: jest.fn().mockResolvedValue("PAID"),
+            } as never,
+            { cancelHoldIntents } as never,
+        );
+
+        await handler.releaseExpired(NOW);
+
+        expect(release).not.toHaveBeenCalled();
+        expect(cancelHoldIntents).not.toHaveBeenCalled();
+    });
+});

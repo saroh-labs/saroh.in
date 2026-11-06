@@ -31,6 +31,17 @@ export function needsWebhookSecret(provider: string): boolean {
 export const WEBHOOK_SECRET_REQUIRED =
     "Add the webhook signing secret from Razorpay › Webhooks, so Saroh can confirm payments.";
 
+/** The same for Stripe, which shows it on the endpoint it made. */
+export const STRIPE_WEBHOOK_SECRET_REQUIRED =
+    "Add the signing secret from Stripe › Developers › Webhooks (on your endpoint), so Saroh can confirm payments.";
+
+/** What a connect of `provider` without its webhook secret is refused with. */
+export function webhookSecretRequired(provider: string): string {
+    return provider.toUpperCase() === "STRIPE"
+        ? STRIPE_WEBHOOK_SECRET_REQUIRED
+        : WEBHOOK_SECRET_REQUIRED;
+}
+
 /**
  * The webhook events to tick in the provider's dashboard: the ones
  * `webhooks/providers/*.webhook.ts` act on. Autopay adds its own when it is

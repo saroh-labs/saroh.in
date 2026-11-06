@@ -98,7 +98,11 @@ import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
 import { loadBookableService, reserve, reserveInTx } from "./reservation";
 import { KEPT } from "./sample-services";
 import type { ServiceView } from "./service-fields";
-import { assertDepositPriced, toServiceView } from "./service-fields";
+import {
+    assertDepositPriced,
+    assertServiceChargeTakes,
+    toServiceView,
+} from "./service-fields";
 import { businessZone } from "./staff-availability";
 import type { TreatmentView } from "./treatment-view";
 import { treatmentOf, treatmentOrderSelect } from "./treatment-view";
@@ -345,6 +349,12 @@ export class BookingsService {
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
+        await assertServiceChargeTakes(
+            ctx.organizationId,
+            dto.priceCents ?? null,
+            depositMode,
+            dto.currency ?? null,
+        );
         // A deposit is taken online, so it comes with a plan that takes
         // money online — asked here, where it is set (`deposit-plan.ts`).
         await assertDepositOnPlan(ctx.organizationId, depositMode);
@@ -552,6 +562,12 @@ export class BookingsService {
                 ctx.organizationId,
                 dto.depositMode,
                 service.depositMode,
+            );
+            await assertServiceChargeTakes(
+                ctx.organizationId,
+                priceAfter,
+                dto.depositMode ?? service.depositMode,
+                dto.currency ?? service.currency,
             );
             if (dto.depositMode !== undefined) {
                 data.depositMode = dto.depositMode;
@@ -955,7 +971,7 @@ export class BookingsService {
     ): Promise<CancelledBooking> {
         requireBookingPower(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);
-        return cancelFoundBooking(
+        const cancelled = await cancelFoundBooking(
             found,
             {
                 organizationId: ctx.organizationId,
@@ -972,6 +988,12 @@ export class BookingsService {
                     refundId,
                 ),
         );
+        // A pay-now hold let go by the team: after the commit, its open
+        // intent is closed at its provider (DEC-208). Never throws.
+        if (found.status === "PENDING") {
+            await this.payments?.cancelHoldIntents(found.id);
+        }
+        return cancelled;
     }
 
     /**

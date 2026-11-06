@@ -58,6 +58,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "./providers/fake.provider";
+import { IN_EDITION } from "./public-key";
 
 const providerFindMany = prisma.merchantPaymentProvider.findMany as jest.Mock;
 const providerFindUnique = prisma.merchantPaymentProvider
@@ -459,6 +460,7 @@ describe("Storefront settings on the buyer's path", () => {
                     organizationId: "org_1",
                     provider: "RAZORPAY",
                 },
+                ...IN_EDITION,
             },
         });
         expect(providerFindMany).not.toHaveBeenCalled();

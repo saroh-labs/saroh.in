@@ -112,6 +112,7 @@ describe("StripeProvider.verifyCredentials", () => {
                 keyId: "pk_test_madeup",
                 keySecret: "rk_test_madeup",
                 publicKey: "pk_test_madeup",
+                webhookSecret: "whsec_madeup",
             }),
         ).toBe("pk_test_madeup");
     });

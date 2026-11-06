@@ -53,6 +53,7 @@ import { prisma } from "@saroh/database";
 import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
+import { OPENS_CHECKOUT } from "../payments/public-key";
 import { InvoicesService } from "./invoices.service";
 import { hashPayToken } from "./pay-token";
 
@@ -216,15 +217,7 @@ describe("making a pay link", () => {
             where: {
                 organizationId: "org_1",
                 status: "CONNECTED",
-                OR: [
-                    { provider: { not: "RAZORPAY" } },
-                    {
-                        AND: [
-                            { publicKey: { not: null } },
-                            { publicKey: { not: "" } },
-                        ],
-                    },
-                ],
+                ...OPENS_CHECKOUT,
             },
             orderBy: { createdAt: "asc" },
         });

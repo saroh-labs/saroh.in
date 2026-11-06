@@ -5,6 +5,7 @@ import {
     ProviderKeysRefusedError,
     refusesKeys,
 } from "../../../common/providers/provider-attention";
+import { FlagKey } from "../../feature-flags/flags";
 import { providerCallSignal } from "./provider-call";
 import type {
     CancelIntentInput,
@@ -41,6 +42,7 @@ import {
  */
 export class StripeProvider implements MerchantProvider {
     readonly name = "STRIPE";
+    readonly rolloutFlag = FlagKey.STRIPE_PAYMENTS;
     private readonly logger = new Logger(StripeProvider.name);
 
     /**
