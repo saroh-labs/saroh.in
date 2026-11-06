@@ -133,6 +133,23 @@ seconds). Shared setup is `.github/actions/setup`.
   by file). Each phase keeps its traces under `e2e/test-results/<phase>/`,
   all uploaded on failure. Every spec owns its data
   (browser-tests skill), which is what makes this safe.
+- **Current** (2026-11-06) — **The browser stack runs the Global edition
+  too.** Each shard also builds the merchant app and accounts a second time
+  with `NEXT_PUBLIC_EDITION=GLOBAL` (turbo task `build:global`, into
+  `.next-global` through `NEXT_DIST_DIR`, after India's build so the two
+  never write one app's tsconfig at once) and starts them on **3007** (app)
+  and **3008** (accounts), against the same API, at `E2E_GLOBAL_APP_URL` and
+  `E2E_GLOBAL_ACCOUNTS_URL` (`e2e/fixtures/global.ts`,
+  `global-screens.spec.ts`). The API needs no host mapping: a business's
+  edition is the business's, set once when it is made (the spec makes it
+  through Global's API host, as `makeBusiness` does), and a bare-port host
+  belongs to no edition. Every shard builds it, as it builds India's, so
+  whichever shard saves the run's turbo cache holds both; an unchanged app
+  replays in seconds, a changed one adds a cold build of the two (about
+  2 min on a runner, Next's cache in `.next-global/cache` helping after the
+  first). India's stack is unchanged but for 3007 and 3008 in
+  `BETTER_AUTH_TRUSTED_ORIGINS`. `pnpm prepush --e2e` builds and starts it
+  only when a Global spec runs.
 - **Current** — **Postgres services poll `pg_isready -h 127.0.0.1` every 2s.**
   The check goes over TCP because the image's init server listens on the
   socket only.
@@ -226,7 +243,8 @@ and blocked real deploys. So work reaches GitHub in batches:
    seeded-stack job, not of `pnpm dev`: from a detached worktree of HEAD it
    re-creates `E2E_DATABASE_URL` (a throwaway `*test*` database), migrates
    it, seeds the showcase while building the api, accounts, app and
-   renderer, and starts them on CI's bare ports (3333, 3000, 3003, 3005)
+   renderer, and starts them on CI's bare ports (3333, 3000, 3003, 3005;
+   the Global app and accounts on 3007 and 3008 when a Global spec runs)
    with CI's placeholder env and `CI=1`. It tests committed work only. A spec
    run against `saroh-dev` fails on data drift, not code (DEV_LEARNINGS).
    Push only when it ends with ALL PASS.

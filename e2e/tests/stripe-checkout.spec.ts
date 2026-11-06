@@ -1,15 +1,15 @@
 // @covers app:/open app:/settings/providers site:/pay/[token] api:payments api:webhooks api:invoices api:organizations api:feature-flags api:admin pkg:site-blocks
 import { createHmac } from "node:crypto";
 
-import type { Browser, Page, TestInfo } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { rollOut } from "../fixtures/global";
 import type { OwnBusiness } from "../fixtures/own-business";
 import { makeBusiness } from "../fixtures/own-business";
 import { business, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
-import { useSession } from "../fixtures/sessions";
-import { ignoreHTTPSErrors, urls } from "../playwright.config";
+import { urls } from "../playwright.config";
 
 /**
  * Stripe end to end on the business's own keys (DEC-208, U8), without
@@ -28,9 +28,9 @@ import { ignoreHTTPSErrors, urls } from "../playwright.config";
  * out to it alone by Sam, Saroh staff, or an India one. Nothing another
  * spec reads is changed, so nothing here is `@serial`.
  *
- * The merchant app on this stack is India's deployment (`NEXT_PUBLIC_EDITION`
- * unset), so the setup sheet is checked for India only; that a Global
- * business is offered Stripe alone is checked at the API, which decides it.
+ * The setup sheet is checked here on India's app (`urls.APP_URL`); the
+ * Global app's sheet, Stripe alone and its key checks, is
+ * `global-screens.spec.ts`.
  */
 
 const FAKE = process.env.STRIPE_FAKE === "1";
@@ -46,47 +46,6 @@ const headers = (b: OwnBusiness) => ({
     origin: urls.APP_URL,
     "x-organization-id": b.id,
 });
-
-/**
- * Roll each release out to this business alone, as Sam would in admin
- * (a business set up here has none), then Asha turns Payments on.
- */
-async function rollOut(
-    browser: Browser,
-    page: Page,
-    b: OwnBusiness,
-    testInfo: TestInfo,
-    flags: string[],
-) {
-    const context = await browser.newContext({ ignoreHTTPSErrors });
-    try {
-        const staff = await context.newPage();
-        await useSession(staff, "staff");
-        for (const flag of flags) {
-            const res = await staff.request.put(
-                `${urls.API_URL}/admin/flags/${flag}/organizations/${b.id}`,
-                {
-                    headers: { origin: urls.APP_URL },
-                    data: {
-                        enabled: true,
-                        reason: "Stripe checkout browser test (U8)",
-                        idempotencyKey: `u8-${flag}-${stamp(testInfo)}`,
-                    },
-                },
-            );
-            expect(res.ok(), `roll out ${flag}: ${await res.text()}`).toBe(
-                true,
-            );
-        }
-    } finally {
-        await context.close();
-    }
-    const on = await page.request.put(
-        `${urls.API_URL}/organizations/${b.id}/modules/PAYMENTS`,
-        { headers: headers(b), data: { status: "ENABLED", setup: {} } },
-    );
-    expect(on.ok(), `turn on Payments: ${await on.text()}`).toBe(true);
-}
 
 /**
  * Stripe.js, faked: `Stripe(key)` keeps the key, the Payment Element is a
