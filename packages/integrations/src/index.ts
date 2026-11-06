@@ -12,7 +12,11 @@
  */
 
 /** The payment providers a business connects its own account for. */
-export const PAYMENT_WEBHOOK_PROVIDERS = ["RAZORPAY", "CASHFREE"] as const;
+export const PAYMENT_WEBHOOK_PROVIDERS = [
+    "RAZORPAY",
+    "CASHFREE",
+    "STRIPE",
+] as const;
 export type PaymentWebhookProvider = (typeof PAYMENT_WEBHOOK_PROVIDERS)[number];
 
 /**
@@ -51,5 +55,14 @@ export const WEBHOOK_EVENTS: Readonly<
         "PAYMENT_FAILED_WEBHOOK",
         "PAYMENT_USER_DROPPED_WEBHOOK",
         "REFUND_STATUS_WEBHOOK",
+    ],
+    // A refund can say `succeeded` already on `refund.created`; Stripe's
+    // `charge.refund.updated` covers some payment methods only.
+    STRIPE: [
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "refund.created",
+        "refund.updated",
+        "refund.failed",
     ],
 };

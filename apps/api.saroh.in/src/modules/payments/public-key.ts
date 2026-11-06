@@ -1,6 +1,11 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import {
+    isStripeSecretKey,
+    STRIPE_SECRET_KEY_REFUSED,
+} from "./providers/stripe-payments";
+
 /**
  * The public key a provider's checkout window opens with (DEC-054).
  *
@@ -40,6 +45,13 @@ export function publicKeyFor(input: {
     // An empty one is none.
     const trimmed = input.publicKey?.trim() ?? "";
     const sent = trimmed.length > 0 ? trimmed : null;
+    // Stripe takes a restricted key; a full secret key is never kept.
+    if (
+        input.provider.toUpperCase() === "STRIPE" &&
+        isStripeSecretKey(input.keySecret)
+    ) {
+        throw new BadRequestException(STRIPE_SECRET_KEY_REFUSED);
+    }
     if (!needsPublicKey(input.provider)) return sent;
 
     const keyId = input.keyId.trim();

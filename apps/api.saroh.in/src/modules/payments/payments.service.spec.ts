@@ -260,7 +260,7 @@ describe("PaymentsService.connectProvider", () => {
         const { service } = makeService();
         await expect(
             service.connectProvider(ctx(), {
-                provider: "STRIPE",
+                provider: "PAYPAL",
                 keyId: "k",
                 keySecret: "s",
             }),
@@ -789,7 +789,11 @@ describe("PaymentsService — a connection's webhook secret (DEC-063)", () => {
 
         const setup = await service.webhookSetup(ctx());
 
-        expect(setup.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);
+        expect(setup.map((s) => s.provider)).toEqual([
+            "RAZORPAY",
+            "CASHFREE",
+            "STRIPE",
+        ]);
         expect(setup[0].url).toMatch(/\/public\/webhooks\/razorpay\/org_1$/);
         expect(setup[0].secretRequired).toBe(true);
         expect(setup[1].secretRequired).toBe(false);

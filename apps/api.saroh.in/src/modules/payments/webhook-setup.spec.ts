@@ -153,6 +153,13 @@ describe("the webhook address", () => {
                 secretRequired: false,
                 lastReceivedAt: null,
             },
+            {
+                provider: "STRIPE",
+                url: "https://api.example.test/public/webhooks/stripe/org_1",
+                events: [...WEBHOOK_EVENTS.STRIPE],
+                secretRequired: true,
+                lastReceivedAt: null,
+            },
         ]);
         for (const [args] of findFirst.mock.calls) {
             expect(args.where).toEqual(

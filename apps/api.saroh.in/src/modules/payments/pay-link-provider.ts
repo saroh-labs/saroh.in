@@ -42,6 +42,7 @@ function label(provider: string): string {
     const p = provider.toUpperCase();
     if (p === "RAZORPAY") return "Razorpay";
     if (p === "CASHFREE") return "Cashfree";
+    if (p === "STRIPE") return "Stripe";
     return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 

@@ -22,7 +22,9 @@ import type { SupportedProvider } from "./providers/provider.port";
 
 /** Whether the provider signs its webhooks with a secret of its own. */
 export function needsWebhookSecret(provider: string): boolean {
-    return provider.toUpperCase() === "RAZORPAY";
+    const p = provider.toUpperCase();
+    // Stripe signs with the endpoint's own `whsec_` secret, never the API key.
+    return p === "RAZORPAY" || p === "STRIPE";
 }
 
 /** What a connect without the secret is refused with (400). */

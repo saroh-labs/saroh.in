@@ -1,0 +1,71 @@
+{
+    "id": "evt_3MtwBwLkdIwHu7ix0paymentfailed",
+    "object": "event",
+    "api_version": "2026-10-28.endive",
+    "created": 1762400000,
+    "data": {
+        "object": {
+            "id": "pi_3MtwBwLkdIwHu7ix28a3tqPa",
+            "object": "payment_intent",
+            "amount": 2000,
+            "amount_capturable": 0,
+            "amount_details": {
+                "tip": {}
+            },
+            "amount_received": 0,
+            "application": null,
+            "application_fee_amount": null,
+            "automatic_payment_methods": null,
+            "canceled_at": null,
+            "cancellation_reason": null,
+            "capture_method": "automatic_async",
+            "client_secret": "pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_made_up_for_tests",
+            "confirmation_method": "automatic",
+            "created": 1680800504,
+            "currency": "usd",
+            "customer": null,
+            "description": null,
+            "last_payment_error": {
+                "code": "card_declined",
+                "decline_code": "generic_decline",
+                "message": "Your card was declined.",
+                "type": "card_error"
+            },
+            "latest_charge": "ch_3MtwBwLkdIwHu7ix1declined",
+            "livemode": false,
+            "metadata": {
+                "saroh_ref": "cmorder000000000000000001"
+            },
+            "next_action": null,
+            "on_behalf_of": null,
+            "payment_method": null,
+            "payment_method_options": {
+                "card": {
+                    "installments": null,
+                    "mandate_options": null,
+                    "network": null,
+                    "request_three_d_secure": "automatic"
+                }
+            },
+            "payment_method_types": ["card"],
+            "processing": null,
+            "receipt_email": null,
+            "review": null,
+            "setup_future_usage": null,
+            "shipping": null,
+            "source": null,
+            "statement_descriptor": null,
+            "statement_descriptor_suffix": null,
+            "status": "requires_payment_method",
+            "transfer_data": null,
+            "transfer_group": null
+        }
+    },
+    "livemode": false,
+    "pending_webhooks": 1,
+    "request": {
+        "id": null,
+        "idempotency_key": null
+    },
+    "type": "payment_intent.payment_failed"
+}

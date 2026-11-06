@@ -31,6 +31,7 @@ const logger = new Logger("PaymentProviderKeys");
 export function providerLabel(provider: string): string {
     if (provider === "RAZORPAY") return "Razorpay";
     if (provider === "CASHFREE") return "Cashfree";
+    if (provider === "STRIPE") return "Stripe";
     return provider;
 }
 
@@ -52,6 +53,13 @@ export async function assertKeysAccepted(
     if (check === "REJECTED") {
         throw new BadRequestException({
             message: `${label} didn't accept these keys. Copy the key id and secret from your ${label} dashboard again, in the same mode (test or live).`,
+            field: "keySecret",
+        });
+    }
+    if (check === "PERMISSION_MISSING") {
+        throw new BadRequestException({
+            message:
+                "This key can't see payments or refunds. Give it PaymentIntents: Write and Refunds: Write.",
             field: "keySecret",
         });
     }

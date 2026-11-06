@@ -12,7 +12,7 @@ import type { CredentialCheck } from "../../../common/providers/provider-attenti
 import type { FlagKey } from "../../feature-flags/flags";
 
 /** The closed set of providers this app can connect. */
-export const SUPPORTED_PROVIDERS = ["RAZORPAY", "CASHFREE"] as const;
+export const SUPPORTED_PROVIDERS = ["RAZORPAY", "CASHFREE", "STRIPE"] as const;
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 /** Type guard for a runtime string against {@link SUPPORTED_PROVIDERS}. */
@@ -489,6 +489,23 @@ export interface MerchantProvider {
      * return is only a cue to ask {@link findOrderPayments}.
      */
     verifyCheckoutReturn?(input: CheckoutReturnInput): boolean;
+    /**
+     * Close an open intent nobody paid (a lapsed booking hold or checkout),
+     * so the provider takes no payment on it later. Only a provider whose
+     * intent stays payable needs it (Stripe: a PaymentIntent the customer's
+     * page still holds); Razorpay and Cashfree orders have none. Call it
+     * after the intent's payments were asked about and none was taken.
+     * True when the provider cancelled it; false when it was past
+     * cancelling (already cancelled, paid or processing). Throws a plain
+     * error when the provider could not say.
+     */
+    cancelIntent?(input: CancelIntentInput): Promise<boolean>;
+}
+
+/** Close one open intent at the provider. */
+export interface CancelIntentInput {
+    providerIntentId: string;
+    credentials: ProviderCredentials;
 }
 
 /** Ask the provider which payments were made on one of its orders (P1). */
