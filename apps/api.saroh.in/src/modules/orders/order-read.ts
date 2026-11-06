@@ -110,8 +110,11 @@ export interface DeliveryAddressDto {
     line1: string | null;
     line2: string | null;
     city: string | null;
+    /** India's GST state, or a Global delivery's region alone. */
     state: string | null;
     postalCode: string | null;
+    /** A Global delivery's ISO country (DEC-207); India's is null. */
+    country: string | null;
 }
 
 export interface OrderMoneyDto {
@@ -329,6 +332,7 @@ export interface RawOrderRead {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    deliveryCountry: string | null;
     store: { id: string; name: string };
     invoices?: RawOrderInvoice[];
     customer: {
@@ -510,6 +514,7 @@ export function serializeOrderRead(
         city: order.deliveryCity,
         state: order.deliveryState,
         postalCode: order.deliveryPostalCode,
+        country: order.deliveryCountry,
     };
     const hasAddress = Object.values(address).some((v) => v !== null);
     // Their details were removed for a privacy request (C11).

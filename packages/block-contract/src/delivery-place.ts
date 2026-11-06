@@ -2,13 +2,13 @@ import { PHONE_COUNTRIES } from "./phone";
 
 /**
  * Where a Global business's delivery goes, past the city: its region and
- * country. An order keeps both on one line (`Order.deliveryState`), "Texas,
- * United States", so every place that prints the address names the country
- * with no change, and no column is added. India's orders never come here:
- * theirs holds the GST state alone.
+ * country. An order keeps them apart, the region in `Order.deliveryState` and
+ * the ISO code in `Order.deliveryCountry` (DEC-207), and prints them as one
+ * line, "Texas, United States". India's orders hold the GST state alone and
+ * no country, so their line is the state as it was.
  */
 
-/** Longest region typed; with the longest country it fits `state`'s 100. */
+/** Longest region typed. */
 export const REGION_MAX = 60;
 /** Longest postcode a Global business's delivery takes. */
 export const POSTCODE_MAX = 12;
@@ -17,17 +17,17 @@ export const POSTCODE_MAX = 12;
 export const listedCountry = (code: string | null | undefined) =>
     PHONE_COUNTRIES.find((c) => c.code === code?.trim().toUpperCase()) ?? null;
 
-/** The stored line: "Texas, United States", "United States" or "Texas". */
+/** The printed line: "Texas, United States", "United States" or "Texas". */
 export function joinDeliveryPlace(
-    region: string,
+    region: string | null | undefined,
     country: string | null | undefined,
 ): string {
-    return [region.trim(), listedCountry(country)?.name ?? ""]
+    return [region?.trim() ?? "", listedCountry(country)?.name ?? ""]
         .filter(Boolean)
         .join(", ");
 }
 
-/** The stored line apart again; `country` is null when it names none. */
+/** A typed or older stored line apart; `country` is null when it names none. */
 export function splitDeliveryPlace(stored: string | null | undefined): {
     region: string;
     country: string | null;

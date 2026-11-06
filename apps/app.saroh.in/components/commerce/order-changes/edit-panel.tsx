@@ -12,6 +12,7 @@ import { useIndiaAddress } from "@/components/shared/fields/business-country";
 import { sentenceStart } from "@/lib/format/sentence";
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 import { addedLines } from "@/lib/orders/sellables";
 
@@ -32,7 +33,8 @@ interface AddressDraft {
 const draftOf = (a: DeliveryAddress | null): AddressDraft => ({
     line1: a?.line1 ?? "",
     city: a?.city ?? "",
-    state: a?.state ?? "",
+    // A Global delivery's region and country, one line to edit (DEC-207).
+    state: a ? (deliveryPlace(a) ?? "") : "",
     postalCode: a?.postalCode ?? "",
 });
 

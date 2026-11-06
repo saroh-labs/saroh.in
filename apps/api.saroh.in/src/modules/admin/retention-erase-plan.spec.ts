@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { PERSONAL_FIELDS } from "../customer-workspace/personal-data";
+import {
+    deliveryPlaceErased,
+    PERSONAL_FIELDS,
+} from "../customer-workspace/personal-data";
 import { REMOVAL_RULES } from "../customer-workspace/privacy-removal-plan";
 import {
     ERASE_STEPS,
@@ -85,9 +88,13 @@ describe("the retention erase plan (DEC-122)", () => {
         expect(writes).toContain("tx.activity.updateMany");
         expect(writes).toContain("tx.submission.updateMany");
         expect(writes).toContain("tx.lead.updateMany");
-        // And the fields kept for tax are never written.
+        // And the fields kept for tax are never written. The delivery state
+        // is written only through `deliveryPlaceErased`, which keeps it
+        // under GST (below).
+        expect(writes).toContain("...deliveryPlaceErased(business?.edition)");
         for (const kept of [
             "deliveryState",
+            "deliveryCountry",
             "billToName",
             "billToEmail",
             "billToAddress",
@@ -101,6 +108,14 @@ describe("the retention erase plan (DEC-122)", () => {
         ]) {
             expect(`${kept}: ${writes.includes(kept)}`).toBe(`${kept}: false`);
         }
+        // A GST business's orders keep their state, as before (DEC-122)...
+        expect(deliveryPlaceErased("INDIA")).toEqual({});
+        expect(deliveryPlaceErased(null)).toEqual({});
+        // ...and one with no GST loses its region and country (DEC-207).
+        expect(deliveryPlaceErased("GLOBAL")).toEqual({
+            deliveryState: null,
+            deliveryCountry: null,
+        });
         // An order is only ever updated, never deleted.
         expect(writes).not.toMatch(/tx\.order\.delete/);
         expect(writes).not.toMatch(/tx\.booking\.delete/);

@@ -25,6 +25,7 @@ import type { StepTone } from "@/lib/orders/list-row";
 import { onlinePaymentWords } from "@/lib/orders/online-payment";
 import { handoverPayment } from "@/lib/orders/pay-on-handover";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
 import { orderTimelineSteps } from "@/lib/orders/timeline-steps";
@@ -366,7 +367,7 @@ export function OrderDetail({
               [order.deliveryAddress.city, order.deliveryAddress.postalCode]
                   .filter(Boolean)
                   .join(" "),
-              order.deliveryAddress.state,
+              deliveryPlace(order.deliveryAddress),
           ]
               .filter(Boolean)
               .join("\n")

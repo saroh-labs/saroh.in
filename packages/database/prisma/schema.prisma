@@ -1950,7 +1950,9 @@ model Order {
   fulfilment OrderFulfilment @default(PICKUP)
 
   // Where a local delivery or a shipment goes. `deliveryState` is also the place of
-  // supply for GST when no bill-to state is set (U5).
+  // supply for GST when no bill-to state is set (U5). A Global business's
+  // delivery keeps its region there and its country, ISO 3166-1 alpha-2, in
+  // `deliveryCountry`; India's is null (DEC-207).
   deliveryName       String?
   deliveryPhone      String?
   deliveryLine1      String?
@@ -1958,6 +1960,7 @@ model Order {
   deliveryCity       String?
   deliveryState      String?
   deliveryPostalCode String?
+  deliveryCountry    String?
 
   // What the counter needs to know ("no sesame", "ring the bell").
   notes       String?

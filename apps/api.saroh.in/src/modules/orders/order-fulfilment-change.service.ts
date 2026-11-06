@@ -200,6 +200,7 @@ export class OrderFulfilmentChangeService {
                       deliveryCity: dto.address.city,
                       deliveryState: dto.address.state,
                       deliveryPostalCode: dto.address.postalCode,
+                      deliveryCountry: dto.address.country ?? null,
                   }
                 : {};
             if (shipsToAddress(type) && !dto.address && !order.deliveryLine1) {

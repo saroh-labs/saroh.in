@@ -15,6 +15,7 @@ import {
 } from "@/lib/orders/fulfilment-change";
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 
 import { CheckRow } from "@saroh/ui/check-row";
 import { ChipGroup } from "@saroh/ui/choice-group";
@@ -114,7 +115,7 @@ function FulfilmentDraft({
     const [addr, setAddr] = useState<AddressDraft>({
         line1: address?.line1 ?? "",
         city: address?.city ?? "",
-        state: address?.state ?? "",
+        state: address ? (deliveryPlace(address) ?? "") : "",
         postalCode: address?.postalCode ?? "",
     });
     const [tell, setTell] = useState(canTell);

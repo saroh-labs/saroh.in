@@ -706,6 +706,7 @@ export class OrderKitchenService {
                             deliveryCity: dto.address.city,
                             deliveryState: dto.address.state,
                             deliveryPostalCode: dto.address.postalCode,
+                            deliveryCountry: dto.address.country ?? null,
                         }
                       : {};
             const hasAddress =
@@ -1203,6 +1204,7 @@ const CLEARED_ADDRESS = {
     deliveryCity: null,
     deliveryState: null,
     deliveryPostalCode: null,
+    deliveryCountry: null,
 } as const;
 
 /** What Order Detail reads — see order-read.ts. */

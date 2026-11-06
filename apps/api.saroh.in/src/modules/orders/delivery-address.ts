@@ -1,6 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
 import {
-    joinDeliveryPlace,
     listedCountry,
     POSTCODE_MAX,
     REGION_MAX,
@@ -21,8 +20,8 @@ import type { DeliveryAddressInput } from "./dto";
  * - **Global**: region and postcode are optional and free text, and no tax
  *   reads them: a Global business can't register for GST. The country is one
  *   from the list, else the one already on the line (an edit sends back what
- *   it read), else the business's own. Region and country are kept as one
- *   line (`joinDeliveryPlace`), so no column is added.
+ *   it read), else the business's own. The region goes in `state` and the
+ *   country's ISO code in `country`, each to its own column (DEC-207).
  */
 export function deliveryAddressFor<A extends DeliveryAddressInput>(
     address: A,
@@ -63,12 +62,11 @@ export function deliveryAddressFor<A extends DeliveryAddressInput>(
     }
     return {
         ...rest,
-        state:
-            joinDeliveryPlace(
-                place.region,
-                sent ?? place.country ?? business.country,
-            ) || null,
+        state: place.region.trim() || null,
         postalCode: postcode || null,
+        country:
+            listedCountry(sent ?? place.country ?? business.country)?.code ??
+            null,
     } as A;
 }
 

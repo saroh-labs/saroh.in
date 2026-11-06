@@ -46,6 +46,7 @@ function order(over: Partial<OrderForInvoice> = {}): OrderForInvoice {
         deliveryCity: "Bengaluru",
         deliveryState: "Karnataka",
         deliveryPostalCode: "560001",
+        deliveryCountry: null,
         customer: { firstName: "Meera", lastName: "Iyer", email: "m@x.in" },
         items: [
             {
@@ -150,6 +151,21 @@ describe("an order's invoice", () => {
             state: null,
         });
         expect(orderBillTo(order({ fulfilment: "PICKUP" })).address).toBeNull();
+    });
+
+    it("bills a Global delivery to its region and country (DEC-207)", () => {
+        expect(
+            orderBillTo(
+                order({
+                    deliveryCity: "Austin",
+                    deliveryState: "Texas",
+                    deliveryPostalCode: "78701",
+                    deliveryCountry: "US",
+                }),
+            ).address,
+        ).toBe(
+            "Meera Iyer, 12 Church Street, Austin 78701, Texas, United States",
+        );
     });
 
     // B13: a walk-in has no customer. The paper names them, says so, and

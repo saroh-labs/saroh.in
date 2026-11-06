@@ -11,6 +11,9 @@
  * removal does with it. An entry that is kept says why.
  */
 
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
+
 export type PersonalFieldRule =
     /** Set to null (or blanked). */
     | "cleared"
@@ -27,6 +30,17 @@ export interface PersonalField {
     rule: PersonalFieldRule;
     why: string;
 }
+
+/**
+ * What a removal and the retention eraser write of an order's place past the
+ * city (DEC-207). Under GST the state is the place of supply and stays
+ * (DEC-122), and such an order has no country; with no GST, nothing reads the
+ * region, so it goes with the country.
+ */
+export const deliveryPlaceErased = (edition: Edition | null | undefined) =>
+    editionProfile(edition).taxSystem === "gst"
+        ? {}
+        : { deliveryState: null, deliveryCountry: null };
 
 /** Every personal-looking field reachable from a contact, keyed `Model.field`. */
 export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
@@ -65,7 +79,11 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
     "Order.deliveryPostalCode": { rule: "cleared", why: "The street." },
     "Order.deliveryState": {
         rule: "kept",
-        why: "The GST place of supply when no bill-to state is set; tax records need it.",
+        why: "The GST place of supply when no bill-to state is set; tax records need it. A business with no GST has its region cleared (DEC-207, `deliveryPlaceErased`).",
+    },
+    "Order.deliveryCountry": {
+        rule: "cleared",
+        why: "Where a Global delivery went; no tax reads it (DEC-207). Only a business with no GST has one.",
     },
     "Order.notes": { rule: "cleared", why: "Free text about the order." },
     // A walk-in who leaves only a name (B13) is the order's only record of

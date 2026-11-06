@@ -21,6 +21,7 @@ function row(over: Partial<ConfirmationRow> = {}): ConfirmationRow {
         deliveryCity: null,
         deliveryState: null,
         deliveryPostalCode: null,
+        deliveryCountry: null,
         store: {
             name: "Hill Road",
             settings: { address: "12 Hill Road, Bandra" },
@@ -141,6 +142,23 @@ describe("confirmationView (P4)", () => {
                 lines: ["Flat 4, Sea View", "Mumbai, Maharashtra 400050"],
             },
         });
+    });
+
+    it("reads a Global delivery's region and country as one line (DEC-207)", () => {
+        const view = confirmationView(
+            row({
+                fulfilment: "LOCAL_DELIVERY",
+                deliveryLine1: "1 Main St",
+                deliveryCity: "Austin",
+                deliveryState: "Texas",
+                deliveryPostalCode: "78701",
+                deliveryCountry: "US",
+            }),
+        );
+        expect(view.fulfilment.deliverTo?.lines).toEqual([
+            "1 Main St",
+            "Austin, Texas, United States 78701",
+        ]);
     });
 
     it("never invents an address or a pick-up place it doesn't have", () => {

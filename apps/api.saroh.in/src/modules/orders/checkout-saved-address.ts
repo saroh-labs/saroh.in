@@ -47,6 +47,7 @@ export interface SavedAddressRow {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    deliveryCountry: string | null;
 }
 
 const clean = (value: string | null | undefined): string | null => {
@@ -58,7 +59,8 @@ const clean = (value: string | null | undefined): string | null => {
 /**
  * The address on an order, or null when any part a delivery needs is
  * missing: half an address is never offered. A Global delivery needs no
- * region or postcode, and its country comes back apart. Pure.
+ * region or postcode, and its country comes from its own column (DEC-207),
+ * or from the line a delivery stored before that column. Pure.
  */
 export function savedAddressOf(
     row: SavedAddressRow | null | undefined,
@@ -71,7 +73,11 @@ export function savedAddressOf(
     const postalCode = clean(row.deliveryPostalCode);
     const global = editionProfile(edition).address === "country-and-region";
     if (!line1 || !city || (!global && (!state || !postalCode))) return null;
-    const place = global ? splitDeliveryPlace(state) : null;
+    const place = !global
+        ? null
+        : row.deliveryCountry
+          ? { region: state ?? "", country: row.deliveryCountry }
+          : splitDeliveryPlace(state);
     return {
         name: clean(row.deliveryName),
         phone: clean(row.deliveryPhone),
@@ -117,6 +123,7 @@ export class CheckoutSavedAddressService {
                     deliveryCity: true,
                     deliveryState: true,
                     deliveryPostalCode: true,
+                    deliveryCountry: true,
                 },
             }),
         );

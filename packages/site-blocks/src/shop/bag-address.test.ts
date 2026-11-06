@@ -178,4 +178,19 @@ describe("a Global business's delivery", () => {
         );
         expect(parseBagDraft(raw).address.state).toBe("");
     });
+
+    it("keeps the country apart through a reload, as its column holds it (DEC-207)", () => {
+        const raw = JSON.stringify({
+            address: { ...ABROAD, state: "Texas", country: "US" },
+        });
+        const { address } = parseBagDraft(raw, "country-and-region");
+        expect(trimmed(address, "country-and-region")).toMatchObject({
+            state: "Texas",
+            country: "US",
+        });
+        // India's never sends one.
+        expect(trimmed(parseBagDraft(raw).address)).not.toHaveProperty(
+            "country",
+        );
+    });
 });

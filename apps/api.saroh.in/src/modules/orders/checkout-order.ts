@@ -281,6 +281,7 @@ export async function createCheckoutOrder(
                                       deliveryCity: address.city,
                                       deliveryState: address.state,
                                       deliveryPostalCode: address.postalCode,
+                                      deliveryCountry: address.country ?? null,
                                   }
                                 : {}),
                             // Paid online: no stockRow, nothing is held until

@@ -7,6 +7,9 @@ describe("a Global delivery's region and country on one line", () => {
         expect(joinDeliveryPlace(" Texas ", "us")).toBe("Texas, United States");
         expect(joinDeliveryPlace("", "AE")).toBe("United Arab Emirates");
         expect(joinDeliveryPlace("Texas", null)).toBe("Texas");
+        // India's: the state as stored, and nothing at all is no line.
+        expect(joinDeliveryPlace("Karnataka", null)).toBe("Karnataka");
+        expect(joinDeliveryPlace(null, null)).toBe("");
     });
 
     it("comes apart again, a US state named like a country included", () => {
