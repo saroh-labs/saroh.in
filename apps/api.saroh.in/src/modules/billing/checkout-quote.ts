@@ -107,6 +107,8 @@ export interface QuoteSubscription {
     currentPeriodEnd: Date | null;
     pendingPlanId: string | null;
     pendingFrom: Date | null;
+    /** A renewal that wasn't paid stays until then (DEC-210). */
+    paymentDueUntil?: Date | null;
     plan: QuotePlanRow;
 }
 
@@ -374,6 +376,12 @@ function baseQuote(input: QuoteInput): BaseQuote {
             startAt: input.termEndsAt,
             effectiveAt: input.termEndsAt,
         };
+    }
+    // A renewal that wasn't paid (DEC-210): paying, for this plan or
+    // another, starts it again today on a new autopay, which replaces the
+    // one that failed.
+    if (live?.status === "PAST_DUE" && live.paymentDueUntil && price > 0) {
+        return { ...base, kind: "NEW", startAt: null, effectiveAt: null };
     }
     if (live?.plan.id === target.id) {
         return { ...base, kind: "NONE", startAt: null, effectiveAt: null };
