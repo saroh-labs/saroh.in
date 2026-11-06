@@ -44,6 +44,7 @@ export function FirstRunJobs({
     return (
         <section aria-labelledby="first-run-title">
             <h2
+                data-ph-unmask=""
                 id="first-run-title"
                 className="mb-[5px] font-display text-[21px] font-semibold tracking-[-0.025em]"
             >
@@ -51,7 +52,10 @@ export function FirstRunJobs({
             </h2>
             {/* The design's words. After a pick, Home leads with "Get ready
                 to take money" for the steps that pick needs (F8). */}
-            <p className="mb-3.5 max-w-[62ch] text-pretty text-[12.5px] leading-[1.55] text-neutral-600 dark:text-neutral-400">
+            <p
+                data-ph-unmask=""
+                className="mb-3.5 max-w-[62ch] text-pretty text-[12.5px] leading-[1.55] text-neutral-600 dark:text-neutral-400"
+            >
                 {jobs.some((job) => job.href)
                     ? "Pick one to start. Most add their own rows to the sidebar, and you can do the others whenever."
                     : "Pick one to start. It adds its own rows to the sidebar, and you can add the others whenever."}
@@ -74,7 +78,10 @@ export function FirstRunJobs({
                                 <span className="text-pretty text-[12px] leading-[1.45] text-neutral-600 dark:text-neutral-400">
                                     {job.note}
                                 </span>
-                                <span className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                <span
+                                    data-ph-unmask=""
+                                    className="mt-0.5 text-[11.5px] text-muted-foreground"
+                                >
                                     Nothing to turn on
                                 </span>
                             </Link>
@@ -119,7 +126,7 @@ export function FirstRunJobs({
 
             <p className="mt-4 text-[12.5px] text-muted-foreground">
                 Other modules build on these.{" "}
-                <TextLink href="/onboarding/modules">
+                <TextLink data-ph-unmask="" href="/onboarding/modules">
                     See everything, or pick several at once
                 </TextLink>
             </p>

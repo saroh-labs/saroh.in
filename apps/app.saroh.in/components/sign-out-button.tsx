@@ -8,6 +8,7 @@ import { TextLink } from "@saroh/ui/text-link";
 export function SignOutButton() {
     return (
         <TextLink
+            data-ph-unmask=""
             onClick={() =>
                 authClient.signOut().then(() => {
                     window.location.href = accountsLoginUrl;

@@ -46,7 +46,7 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
                 aria-labelledby="home-reviews"
                 className="grid min-w-0 gap-[9px]"
             >
-                <h2 id="home-reviews" className="label">
+                <h2 data-ph-unmask="" id="home-reviews" className="label">
                     Sent to you for review
                 </h2>
                 {rows.length > 0 ? (
@@ -94,7 +94,10 @@ function ReviewItem({ row, first }: { row: ReviewRow; first: boolean }) {
                     className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
                 >
                     {words}
-                    <span className="shrink-0 text-[12.5px] font-semibold text-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="shrink-0 text-[12.5px] font-semibold text-foreground"
+                    >
                         Open
                     </span>
                 </Link>

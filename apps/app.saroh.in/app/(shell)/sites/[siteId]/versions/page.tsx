@@ -54,7 +54,11 @@ export default async function SiteVersionsPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link key="site" href={`/sites/${siteId}/pages`}>
+                    <Link
+                        data-ph-unmask=""
+                        key="site"
+                        href={`/sites/${siteId}/pages`}
+                    >
                         Website
                     </Link>,
                     "Version history",

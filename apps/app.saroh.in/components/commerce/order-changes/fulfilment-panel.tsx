@@ -174,7 +174,10 @@ function FulfilmentDraft({
                 />
                 {moved && delivery ? (
                     <fieldset className="mt-2.5">
-                        <legend className="text-[12px] font-medium">
+                        <legend
+                            data-ph-unmask=""
+                            className="text-[12px] font-medium"
+                        >
                             Address
                         </legend>
                         <Input

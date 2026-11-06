@@ -86,6 +86,7 @@ export function OrdersTab({
                 <div className="min-w-[560px]">
                     <div
                         data-list-head=""
+                        data-ph-unmask=""
                         className={cn(COLS, listTable.head, "rounded-t-[10px]")}
                     >
                         <span>Order</span>
@@ -130,7 +131,10 @@ export function OrdersTab({
                                 })}
                             </span>
                             <span>
-                                <StatusBadge tone={isOpen(o) ? "ok" : "off"}>
+                                <StatusBadge
+                                    tone={isOpen(o) ? "ok" : "off"}
+                                    data-ph-unmask=""
+                                >
                                     {orderStatus(o)}
                                 </StatusBadge>
                             </span>
@@ -176,6 +180,7 @@ export function OrdersTab({
                                     </span>
                                     <StatusBadge
                                         tone={isOpen(o) ? "ok" : "off"}
+                                        data-ph-unmask=""
                                     >
                                         {orderStatus(o)}
                                     </StatusBadge>
@@ -203,7 +208,9 @@ export function OrdersTab({
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
                     The latest {rows.length} of {count} orders.{" "}
-                    <TextLink href="/commerce/orders">All orders</TextLink>
+                    <TextLink data-ph-unmask="" href="/commerce/orders">
+                        All orders
+                    </TextLink>
                 </p>
             ) : null}
         </>

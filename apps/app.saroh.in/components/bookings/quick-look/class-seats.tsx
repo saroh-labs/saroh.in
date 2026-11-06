@@ -82,7 +82,9 @@ export function ClassSeats({
     return (
         <div className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                <span className="label">Who&apos;s booked</span>
+                <span data-ph-unmask="" className="label">
+                    Who&apos;s booked
+                </span>
                 {note ? (
                     <span className="ml-auto text-[11.5px] text-muted-foreground">
                         {note}

@@ -201,7 +201,10 @@ export function PaperPreview({
                     >
                         {title}
                     </p>
-                    <p className="mt-0.5 font-mono text-[12px]">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-0.5 font-mono text-[12px]"
+                    >
                         Number when issued
                     </p>
                     {tag("Next in series")}
@@ -215,7 +218,7 @@ export function PaperPreview({
         { part: "buyer" },
         `Change who it's billed to${buyer.name ? `: ${buyer.name}` : ""}`,
         <div data-part="buyer" className="min-w-0">
-            <p className="label" style={accent}>
+            <p data-ph-unmask="" className="label" style={accent}>
                 Billed to
             </p>
             <p className="mt-0.5 text-[12.5px] font-semibold">
@@ -238,7 +241,7 @@ export function PaperPreview({
     const supplyBlock =
         registered && !exempt ? (
             <div data-part="supply" className="min-w-0">
-                <p className="label" style={accent}>
+                <p data-ph-unmask="" className="label" style={accent}>
                     Place of supply
                 </p>
                 <p className="mt-0.5 text-[11.5px]">
@@ -305,7 +308,10 @@ export function PaperPreview({
 
             <div data-part="lines" className="border-t border-border">
                 {sums.lines.length === 0 && !editing?.unfinished.length ? (
-                    <p className="py-3 text-[11.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="py-3 text-[11.5px] text-muted-foreground"
+                    >
                         The lines you write show here.
                     </p>
                 ) : (
@@ -369,7 +375,9 @@ export function PaperPreview({
                         )}
                         style={rule}
                     >
-                        <span className="flex-1">Total</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            Total
+                        </span>
                         <span className="tabular-nums">
                             {money(sums.totalCents)}
                         </span>
@@ -386,13 +394,16 @@ export function PaperPreview({
                           aria-label="How to pay us"
                           className="mt-3 text-[11px] leading-[1.5]"
                       >
-                          <p className="label" style={accent}>
+                          <p data-ph-unmask="" className="label" style={accent}>
                               How to pay us
                           </p>
                           {howToPay?.length ? (
                               howToPay.map((line) => <p key={line}>{line}</p>)
                           ) : (
-                              <p className="text-muted-foreground">
+                              <p
+                                  data-ph-unmask=""
+                                  className="text-muted-foreground"
+                              >
                                   Add your{" "}
                                   {PROFILE.payInstructions === "bank-code"
                                       ? "bank details"

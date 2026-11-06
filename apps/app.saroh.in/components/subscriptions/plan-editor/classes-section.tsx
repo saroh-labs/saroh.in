@@ -34,7 +34,11 @@ export function ClassesSection({
         other || !(CLASS_CHOICES as readonly string[]).includes(values.classes);
     return (
         <Section title="Classes included" className="[&>h2]:mb-1">
-            <p id={ids.note} className="text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                id={ids.note}
+                className="text-[12.5px] text-muted-foreground"
+            >
                 Each billing month. Unused classes don&apos;t carry over.
             </p>
             <div

@@ -78,6 +78,7 @@ export function WeeklyHours({
         <section aria-labelledby="weekly-hours" className="min-w-0">
             <div className="mb-2.5 mt-[26px] flex flex-wrap items-center gap-x-2 gap-y-2.5 min-[760px]:mt-0">
                 <h2
+                    data-ph-unmask=""
                     id="weekly-hours"
                     className="flex-1 font-display text-[16px] font-semibold tracking-[-0.01em] min-[760px]:text-[17px] min-[760px]:tracking-[-0.02em]"
                 >

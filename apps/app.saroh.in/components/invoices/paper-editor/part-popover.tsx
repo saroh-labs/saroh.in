@@ -177,6 +177,7 @@ export function LineEditor({
             {registered ? (
                 <div className="grid gap-1.5">
                     <span
+                        data-ph-unmask=""
                         id={`${id}-gst`}
                         className="text-[12.5px] font-medium"
                     >

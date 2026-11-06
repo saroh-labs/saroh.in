@@ -218,12 +218,17 @@ export function ListView({
                         : "min-[760px]:row-start-1",
                 )}
             >
-                <div className="label mb-1.5 mt-1 min-[760px]:hidden">
+                <div
+                    data-ph-unmask=""
+                    className="label mb-1.5 mt-1 min-[760px]:hidden"
+                >
                     Booked
                 </div>
                 <div className="overflow-hidden rounded-[12px] border border-border bg-card">
                     <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5 max-[759px]:hidden">
-                        <span className="label flex-1">Booked</span>
+                        <span data-ph-unmask="" className="label flex-1">
+                            Booked
+                        </span>
                         <span className="text-[12.5px] text-muted-foreground">
                             {count(live, "booking")}
                         </span>
@@ -266,7 +271,10 @@ function NextCard({
             data-list-next=""
             className="flex min-w-0 items-center gap-3 rounded-[12px] border border-foreground bg-card px-3.5 py-3 min-[760px]:col-start-1 min-[760px]:row-start-1 min-[760px]:gap-4 min-[760px]:px-[18px] min-[760px]:py-4 min-[760px]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
         >
-            <span className="label shrink-0 text-destructive min-[760px]:text-foreground">
+            <span
+                data-ph-unmask=""
+                className="label shrink-0 text-destructive min-[760px]:text-foreground"
+            >
                 Next
             </span>
             <span className="min-w-0 flex-1">
@@ -362,7 +370,9 @@ function BookedRow({
                     </StatusBadge>
                 ) : next && b.state === "booked" ? (
                     <StatusBadge tone={STATE_TONE.booked}>
-                        <span className="min-[760px]:hidden">Next</span>
+                        <span data-ph-unmask="" className="min-[760px]:hidden">
+                            Next
+                        </span>
                         <span className="max-[759px]:hidden">{label}</span>
                     </StatusBadge>
                 ) : (

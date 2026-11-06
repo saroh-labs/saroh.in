@@ -60,7 +60,10 @@ export function BusinessTaxRows({
             note={
                 <>
                     The invoices you send, and their numbers, are in{" "}
-                    <TextLink href="/billing/invoices">Invoices</TextLink>.
+                    <TextLink data-ph-unmask="" href="/billing/invoices">
+                        Invoices
+                    </TextLink>
+                    .
                 </>
             }
         >
@@ -85,7 +88,7 @@ export function BusinessTaxRows({
                     label="GST"
                     action={edit("gst", "Change", "Change GST registration")}
                 >
-                    <span className="block">
+                    <span data-ph-unmask="" className="block">
                         {registered ? "Registered" : "Not registered"}
                     </span>
                     <Follows>
@@ -140,7 +143,7 @@ export function BusinessTaxRows({
                 }
             >
                 {PROFILE.taxSystem === "named-line" ? (
-                    <span>
+                    <span data-ph-unmask="">
                         {saved.yearStartMonth === "1"
                             ? "January to December"
                             : "April to March"}
@@ -150,7 +153,7 @@ export function BusinessTaxRows({
                         {/* India's financial year, which invoices are
                             numbered by. GST law fixes it for every
                             business, so it is said rather than offered. */}
-                        <span>April to March</span>
+                        <span data-ph-unmask="">April to March</span>
                         <Locked>Set by GST law</Locked>
                     </span>
                 )}

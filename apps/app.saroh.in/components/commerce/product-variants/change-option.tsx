@@ -27,11 +27,15 @@ export function OptionShown({
         <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12px]">
             <span className="font-medium">Customers choose by {name}</span>
             {locked ? null : (
-                <TextLink onClick={onChange} className="coarse:min-h-11">
+                <TextLink
+                    data-ph-unmask=""
+                    onClick={onChange}
+                    className="coarse:min-h-11"
+                >
                     Change option…
                 </TextLink>
             )}
-            <TextLink href={productSettingsHref("options")}>
+            <TextLink data-ph-unmask="" href={productSettingsHref("options")}>
                 Manage options
             </TextLink>
         </div>

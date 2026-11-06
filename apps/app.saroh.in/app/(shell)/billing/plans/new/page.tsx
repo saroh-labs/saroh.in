@@ -56,7 +56,7 @@ export default async function NewPlanPage() {
                 <PageHeader
                     breadcrumb={[
                         "Payments",
-                        <Link key="plans" href={PLANS_HREF}>
+                        <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
                             Plans
                         </Link>,
                         "New plan",

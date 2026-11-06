@@ -37,9 +37,14 @@ export function KindChoice({
         const kind = KINDS.find((k) => k.value === value);
         return (
             <div className="space-y-1">
-                <p className="text-[12.5px] font-medium">How it fills</p>
+                <p data-ph-unmask="" className="text-[12.5px] font-medium">
+                    How it fills
+                </p>
                 <p className="text-[13px]">{kind?.label}</p>
-                <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[11.5px] leading-[1.5] text-muted-foreground"
+                >
                     A collection keeps the way it fills. For the other way, make
                     a new collection.
                 </p>
@@ -48,7 +53,10 @@ export function KindChoice({
     }
     return (
         <fieldset className="space-y-2">
-            <legend className="mb-2 text-[12.5px] font-medium">
+            <legend
+                data-ph-unmask=""
+                className="mb-2 text-[12.5px] font-medium"
+            >
                 How it fills
             </legend>
             <RadioCards

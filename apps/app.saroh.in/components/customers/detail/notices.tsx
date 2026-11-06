@@ -39,7 +39,7 @@ export function PossibleMatch({
         <Notice tone="info" role="note" className="mb-4" align="center">
             <div className="flex flex-wrap items-center gap-2.5">
                 <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground [overflow-wrap:anywhere]">
-                    <strong className="font-semibold">
+                    <strong data-ph-unmask="" className="font-semibold">
                         Possible match. Link them?
                     </strong>{" "}
                     {who}. Their orders stay apart until someone links them.
@@ -54,7 +54,10 @@ export function PossibleMatch({
                         Review and link
                     </Button>
                 ) : (
-                    <span className="text-[12px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[12px] text-muted-foreground"
+                    >
                         Your role can't link them.
                     </span>
                 )}
@@ -101,7 +104,10 @@ export function DuplicateNotice({
                                 Merge…
                             </Button>
                         ) : (
-                            <span className="text-[12px] text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="text-[12px] text-muted-foreground"
+                            >
                                 Your role can't merge them.
                             </span>
                         )}

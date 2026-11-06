@@ -44,7 +44,11 @@ function overlay(kind: string) {
                 <div role="dialog" data-kind={kind}>
                     {children}
                     {/* Escape, the close button, a press outside. */}
-                    <button type="button" onClick={() => set(false)}>
+                    <button
+                        data-ph-unmask=""
+                        type="button"
+                        onClick={() => set(false)}
+                    >
                         Dismiss
                     </button>
                 </div>

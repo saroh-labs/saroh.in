@@ -117,7 +117,10 @@ function MakeItYours({
             aria-label="Make it yours"
             className={cn("grid gap-2", ruled && "border-t border-border pt-3")}
         >
-            <h3 className="font-display text-[14px] font-semibold tracking-[-0.01em]">
+            <h3
+                data-ph-unmask=""
+                className="font-display text-[14px] font-semibold tracking-[-0.01em]"
+            >
                 Make it yours
             </h3>
             <ul className="grid gap-1">

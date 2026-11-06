@@ -140,6 +140,7 @@ function CourierDraft({
         <>
             <OrderSheetBody>
                 <div
+                    data-ph-unmask=""
                     className="mb-1.5 text-[12px] font-medium"
                     id={`${ids}-courier`}
                 >

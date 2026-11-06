@@ -48,7 +48,7 @@ export function PayOnHandoverRow({
     if (store.onlinePaymentsPlan === false) {
         return (
             <div className="grid gap-1">
-                <p className="text-[13.5px] font-medium">
+                <p data-ph-unmask="" className="text-[13.5px] font-medium">
                     Pay when they collect, or on delivery
                 </p>
                 <Note>

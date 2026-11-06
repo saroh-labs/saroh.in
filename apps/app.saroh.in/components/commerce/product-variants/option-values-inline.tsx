@@ -100,7 +100,10 @@ export function OptionValuesInline({
             >
                 Add
             </Button>
-            <span className="w-full text-[11.5px] text-muted-foreground">
+            <span
+                data-ph-unmask=""
+                className="w-full text-[11.5px] text-muted-foreground"
+            >
                 Separate them with commas. They join Settings › Options, so
                 every product spells them the same way.
             </span>

@@ -70,7 +70,10 @@ export function FirstHours({
                     When can customers book {who}?
                 </h2>
             </div>
-            <p className="mt-2.5 text-[13.5px] leading-normal text-muted-foreground min-[760px]:mt-0">
+            <p
+                data-ph-unmask=""
+                className="mt-2.5 text-[13.5px] leading-normal text-muted-foreground min-[760px]:mt-0"
+            >
                 {canStart
                     ? "Nobody's hours are set yet. Start with these, then change any day."
                     : "Nobody's hours are set yet. An owner or admin puts people on the diary."}
@@ -116,7 +119,10 @@ export function FirstHours({
 
     const untilThen = (
         <div className="px-3.5 pb-3.5 pt-3 min-[760px]:p-0">
-            <div className="text-[13px] font-semibold min-[760px]:text-[14.5px]">
+            <div
+                data-ph-unmask=""
+                className="text-[13px] font-semibold min-[760px]:text-[14.5px]"
+            >
                 Until then
             </div>
             <p className="mt-0.5 text-pretty text-[12.5px] leading-normal text-muted-foreground">
@@ -135,10 +141,16 @@ export function FirstHours({
         >
             <Face icon={<Plus aria-hidden className="size-[18px]" />} />
             <span className="flex-1">
-                <span className="block text-[14.5px] font-semibold">
+                <span
+                    data-ph-unmask=""
+                    className="block text-[14.5px] font-semibold"
+                >
                     Add someone else who takes bookings
                 </span>
-                <span className="block text-[12.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="block text-[12.5px] text-muted-foreground"
+                >
                     A trainer, a teacher, a therapist
                 </span>
             </span>

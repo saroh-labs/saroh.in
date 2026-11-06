@@ -95,6 +95,7 @@ export function QrMaker({
                 >
                     {cannotMake ? (
                         <span
+                            data-ph-unmask=""
                             role="note"
                             className="max-w-[34ch] text-center text-[13px] text-foreground/80"
                         >
@@ -135,7 +136,10 @@ export function QrMaker({
                         {bound && !m.isChanging && !m.dirty ? (
                             <p className="text-[13px] text-foreground/80">
                                 You already have this code.{" "}
-                                <TextLink onClick={m.makeAnother}>
+                                <TextLink
+                                    data-ph-unmask=""
+                                    onClick={m.makeAnother}
+                                >
                                     Make another
                                 </TextLink>
                             </p>
@@ -193,7 +197,10 @@ export function QrMaker({
                             ) : null}
                         </div>
                         {!bound && !cannotMake ? (
-                            <p className="text-[13px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-[13px] text-muted-foreground"
+                            >
                                 A download makes the code first, so the file
                                 carries its real short link.
                             </p>

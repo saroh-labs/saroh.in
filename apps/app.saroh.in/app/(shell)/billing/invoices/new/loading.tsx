@@ -9,7 +9,7 @@ export default function Loading() {
             width="full"
             breadcrumb={[
                 "Payments",
-                <Link key="1" href="/billing/invoices">
+                <Link data-ph-unmask="" key="1" href="/billing/invoices">
                     Invoices
                 </Link>,
                 "New invoice",

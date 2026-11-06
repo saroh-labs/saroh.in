@@ -121,7 +121,12 @@ export function PlaceNameSheet({
                 onChange={(e) => setName(e.target.value)}
             />
             {missing ? (
-                <p id="storefront-name-note" role="alert" className={PROBLEM}>
+                <p
+                    data-ph-unmask=""
+                    id="storefront-name-note"
+                    role="alert"
+                    className={PROBLEM}
+                >
                     Add a name.
                 </p>
             ) : (

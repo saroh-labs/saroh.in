@@ -369,6 +369,7 @@ export function CancelOrCorrectSheet({
                         />
                         {missing ? (
                             <p
+                                data-ph-unmask=""
                                 id={`${ids.why}-problem`}
                                 role="alert"
                                 className="text-[12.5px] font-medium text-destructive-subtle-foreground"
@@ -379,6 +380,7 @@ export function CancelOrCorrectSheet({
                             </p>
                         ) : null}
                         <p
+                            data-ph-unmask=""
                             id={`${ids.why}-help`}
                             className="text-[12px] text-muted-foreground"
                         >
@@ -416,7 +418,7 @@ function CreditNotePreview({
     const id = useId();
     return (
         <section aria-labelledby={id} className="grid gap-1.5">
-            <h3 id={id} className="label">
+            <h3 data-ph-unmask="" id={id} className="label">
                 The credit note
             </h3>
             <div

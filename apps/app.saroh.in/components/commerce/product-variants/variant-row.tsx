@@ -125,6 +125,7 @@ export function VariantRowView({
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
                 <TextLink
+                    data-ph-unmask=""
                     aria-expanded={open}
                     onClick={() => onOpen(!open)}
                     className="text-[12px] coarse:min-h-11"
@@ -198,7 +199,7 @@ function PhotoChoice({
     ];
     return (
         <>
-            <p className="mb-[7px] text-[12px] font-semibold">
+            <p data-ph-unmask="" className="mb-[7px] text-[12px] font-semibold">
                 Photo shown when someone picks it
             </p>
             <ChoiceGroup
@@ -265,7 +266,10 @@ function SellItAt({
 }) {
     return (
         <>
-            <p className="mb-[7px] mt-3 text-[12px] font-semibold">
+            <p
+                data-ph-unmask=""
+                className="mb-[7px] mt-3 text-[12px] font-semibold"
+            >
                 Sell it at
             </p>
             <div

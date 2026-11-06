@@ -228,6 +228,7 @@ export function StagesDialog({
             </div>
             {tried && blank ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                 >

@@ -8,7 +8,7 @@ export default function Loading() {
             shape="detail"
             width="full"
             breadcrumb={[
-                <Link key="0" href="/contacts">
+                <Link data-ph-unmask="" key="0" href="/contacts">
                     Contacts
                 </Link>,
             ]}

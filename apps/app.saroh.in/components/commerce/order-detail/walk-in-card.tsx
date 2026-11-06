@@ -32,7 +32,10 @@ export function NoCustomerCard({
 }) {
     if (!walkIn) {
         return (
-            <p className="rounded-xl border border-border bg-card px-4 py-[13px] text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="rounded-xl border border-border bg-card px-4 py-[13px] text-[12.5px] text-muted-foreground"
+            >
                 This customer&apos;s record is gone. The order keeps what was
                 bought.
             </p>
@@ -50,12 +53,18 @@ export function NoCustomerCard({
                 </span>
                 <div className="min-w-0">
                     <div className="break-words text-[14px] font-semibold text-foreground">
-                        <span className="font-medium text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-medium text-muted-foreground"
+                        >
                             Walk-in ·{" "}
                         </span>
                         {walkIn.name}
                     </div>
-                    <div className="text-[12px] text-muted-foreground">
+                    <div
+                        data-ph-unmask=""
+                        className="text-[12px] text-muted-foreground"
+                    >
                         No customer record
                     </div>
                 </div>
@@ -73,7 +82,7 @@ export function NoCustomerCard({
                             {phoneLabel(phone)}
                         </a>
                     ) : (
-                        <span>No phone</span>
+                        <span data-ph-unmask="">No phone</span>
                     )
                 ) : null}
                 {address ? (
@@ -84,8 +93,10 @@ export function NoCustomerCard({
             </div>
             {orderNote ? (
                 <p className="mt-2 text-pretty text-[12.5px] leading-[1.5]">
-                    <span className="text-muted-foreground">Note</span> “
-                    {orderNote}”
+                    <span data-ph-unmask="" className="text-muted-foreground">
+                        Note
+                    </span>{" "}
+                    “{orderNote}”
                 </p>
             ) : null}
             {shipment ? (

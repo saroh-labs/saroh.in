@@ -122,7 +122,10 @@ export function IdentityLinkDialog({
 
             {duplicates.length > 0 ? (
                 <div className="grid gap-2">
-                    <p className="text-sm text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-sm text-muted-foreground"
+                    >
                         These customer records look like the same person. Two
                         customers aren&apos;t linked. They&apos;re merged into
                         one.
@@ -158,7 +161,10 @@ export function IdentityLinkDialog({
                                         Merge…
                                     </Button>
                                 ) : (
-                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="shrink-0 text-xs text-muted-foreground"
+                                    >
                                         Your role can't merge them
                                     </span>
                                 )}

@@ -54,6 +54,7 @@ export default async function NewCoursePage() {
                     breadcrumb={[
                         "Bookings",
                         <Link
+                            data-ph-unmask=""
                             key="courses"
                             href="/courses"
                             className="hover:text-foreground"
@@ -74,6 +75,7 @@ export default async function NewCoursePage() {
                         A course runs on a bookable service, and there is none
                         yet.{" "}
                         <Link
+                            data-ph-unmask=""
                             href="/services/new"
                             className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                         >

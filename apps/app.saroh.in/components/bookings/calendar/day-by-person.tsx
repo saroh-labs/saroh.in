@@ -101,7 +101,10 @@ export function Hatches({
                         stretch too short to hold them keeps the hatch's
                         own direction and width. */}
                     {b - a >= OFF_LABEL_MINUTES ? (
-                        <span className="absolute left-1.5 top-1 rounded-[4px] bg-card px-1 text-[11px] font-medium leading-4 text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="absolute left-1.5 top-1 rounded-[4px] bg-card px-1 text-[11px] font-medium leading-4 text-muted-foreground"
+                        >
                             Time off
                         </span>
                     ) : null}
@@ -163,7 +166,11 @@ function ClosedTime({
                 className={cn("absolute inset-x-0", CLOSED_HATCH)}
                 style={place}
             >
-                {room ? <span className={pill}>Closed</span> : null}
+                {room ? (
+                    <span data-ph-unmask="" className={pill}>
+                        Closed
+                    </span>
+                ) : null}
             </div>
         );
     }
@@ -202,10 +209,10 @@ function ClosedTime({
                         "group-hover:border-foreground group-hover:text-foreground",
                     )}
                 >
-                    <span className="max-[759px]:hidden">
+                    <span data-ph-unmask="" className="max-[759px]:hidden">
                         Closed · click to open
                     </span>
-                    <span className="min-[760px]:hidden">
+                    <span data-ph-unmask="" className="min-[760px]:hidden">
                         Closed · tap to open
                     </span>
                 </span>

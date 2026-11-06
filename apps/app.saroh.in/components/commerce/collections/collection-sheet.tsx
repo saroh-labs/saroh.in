@@ -298,7 +298,10 @@ export function CollectionSheet({
 
                         {web ? (
                             <div className="space-y-1">
-                                <p className="text-[12.5px] font-medium">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-[12.5px] font-medium"
+                                >
                                     Shown on the website
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">

@@ -161,7 +161,11 @@ export function AttentionSheet({
             onSubmit={save}
         >
             <div className="grid gap-1.5">
-                <span id={`${id}-kind`} className="text-[12.5px] font-medium">
+                <span
+                    data-ph-unmask=""
+                    id={`${id}-kind`}
+                    className="text-[12.5px] font-medium"
+                >
                     Kind
                 </span>
                 <ChoiceGroup
@@ -188,6 +192,7 @@ export function AttentionSheet({
             {fromList ? (
                 <div className="grid gap-1.5">
                     <span
+                        data-ph-unmask=""
                         id={`${id}-allergen`}
                         className="text-[12.5px] font-medium"
                     >
@@ -298,7 +303,7 @@ export function AttentionSheet({
                     className="items-start text-[12.5px] leading-[1.45] text-foreground/75"
                     boxClassName="mt-px"
                 >
-                    <span>
+                    <span data-ph-unmask="">
                         Sensitive. Only people who can see sensitive notes can
                         read it. Everyone else sees that there is a note they
                         can&apos;t read.

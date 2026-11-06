@@ -368,7 +368,10 @@ export function CustomerStep({
             ) : null}
 
             {f.forbidden && !f.adding ? (
-                <p className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Your role can&apos;t look customers up. Type who it is to
                     add them.
                 </p>
@@ -468,7 +471,9 @@ export function CustomerStep({
                         }
                     }}
                 >
-                    <p className="text-[15px] font-semibold">New customer</p>
+                    <p data-ph-unmask="" className="text-[15px] font-semibold">
+                        New customer
+                    </p>
                     <Field label="Name" error={f.problems.name} holdsData>
                         <Input
                             id={ids.name}

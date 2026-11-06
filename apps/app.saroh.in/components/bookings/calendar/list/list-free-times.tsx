@@ -166,7 +166,9 @@ function FreeTimeRow({ row }: { row: FreeRow }) {
                         aria-hidden
                         className="size-4 min-[760px]:size-[13px]"
                     />
-                    <span className="max-[759px]:hidden">Book</span>
+                    <span data-ph-unmask="" className="max-[759px]:hidden">
+                        Book
+                    </span>
                 </span>
             ) : null}
         </>

@@ -74,10 +74,15 @@ export function AlsoSell({
             // (BKMServices, BKDStates).
             className="mt-3.5 rounded-xl border border-border bg-card px-3.5 pb-1 min-[760px]:mt-[22px] min-[760px]:border-0 min-[760px]:bg-transparent min-[760px]:p-0"
         >
-            <span aria-hidden className="label block pt-2.5 min-[760px]:hidden">
+            <span
+                data-ph-unmask=""
+                aria-hidden
+                className="label block pt-2.5 min-[760px]:hidden"
+            >
                 Also sell
             </span>
             <span
+                data-ph-unmask=""
                 aria-hidden
                 className="mb-2.5 hidden font-display text-base font-semibold tracking-tight min-[760px]:block"
             >

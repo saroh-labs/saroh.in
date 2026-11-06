@@ -81,6 +81,7 @@ export function PhoneSetup({
         title: words.title,
         foot: (
             <TextLink
+                data-ph-unmask=""
                 tone="muted"
                 onClick={hide}
                 className="text-[12.5px] coarse:min-h-11"

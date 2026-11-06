@@ -379,13 +379,17 @@ export function AddTimeOffSheet({
             </div>
 
             {problem ? null : taken === null ? (
-                <p className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Bookings then couldn&apos;t be checked.
                 </p>
             ) : taken > 0 ? (
                 <Notice tone="warning" className="mt-1">
                     {clashWords(taken)} They stay booked.{" "}
                     <TextLink
+                        data-ph-unmask=""
                         href={seeThem}
                         className="font-semibold text-inherit"
                     >
@@ -393,7 +397,10 @@ export function AddTimeOffSheet({
                     </TextLink>
                 </Notice>
             ) : (
-                <p className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     There are no bookings then.
                 </p>
             )}

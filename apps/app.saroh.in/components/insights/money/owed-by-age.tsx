@@ -209,7 +209,11 @@ function OwedBills({
         );
     }
     if (bills.data.length === 0) {
-        return <p className="text-[13.5px]">No bills here now.</p>;
+        return (
+            <p data-ph-unmask="" className="text-[13.5px]">
+                No bills here now.
+            </p>
+        );
     }
     return (
         <ul className="mb-1 mt-1.5" data-testid="owed-bills">

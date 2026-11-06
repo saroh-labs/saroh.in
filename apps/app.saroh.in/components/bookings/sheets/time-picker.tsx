@@ -257,7 +257,7 @@ export function TimePicker({
         <div className={cn("grid min-w-0 gap-3.5", className)}>
             {showWith ? (
                 <div className="grid min-w-0 gap-1.5">
-                    <span id={ids.with} className="label">
+                    <span data-ph-unmask="" id={ids.with} className="label">
                         With
                     </span>
                     <ChipGroup
@@ -279,7 +279,7 @@ export function TimePicker({
             ) : null}
 
             <div className={cn("grid min-w-0 gap-1.5", !strip && "hidden")}>
-                <span id={ids.day} className="label">
+                <span data-ph-unmask="" id={ids.day} className="label">
                     Day
                 </span>
                 <div className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 py-0.5 [scrollbar-width:none]">
@@ -388,7 +388,10 @@ export function TimePicker({
                                 />
                             ))}
                         </div>
-                        <p className="text-[12.5px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="text-[12.5px] text-muted-foreground"
+                        >
                             Finding free times…
                         </p>
                     </div>
@@ -413,7 +416,12 @@ export function TimePicker({
                             <div className="grid gap-3">
                                 {morning.length > 0 ? (
                                     <div className="grid gap-1.5">
-                                        <span className="label">Morning</span>
+                                        <span
+                                            data-ph-unmask=""
+                                            className="label"
+                                        >
+                                            Morning
+                                        </span>
                                         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                             {morning.map((s) =>
                                                 item(s.startAt),
@@ -423,7 +431,10 @@ export function TimePicker({
                                 ) : null}
                                 {later.length > 0 ? (
                                     <div className="grid gap-1.5">
-                                        <span className="label">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="label"
+                                        >
                                             Afternoon and evening
                                         </span>
                                         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -474,7 +485,7 @@ export function TimePicker({
                                 when nobody is booked then and it is far enough
                                 ahead for your booking rules. You can change
                                 them in{" "}
-                                <TextLink href={hoursHref}>
+                                <TextLink data-ph-unmask="" href={hoursHref}>
                                     Hours and time off
                                 </TextLink>
                                 .
@@ -492,7 +503,10 @@ export function TimePicker({
                                 {dayName(next.date, today, timezone)}
                             </Button>
                         ) : (
-                            <p className="text-[12.5px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-[12.5px] text-muted-foreground"
+                            >
                                 The days shown are full. Pick a date further
                                 ahead.
                             </p>

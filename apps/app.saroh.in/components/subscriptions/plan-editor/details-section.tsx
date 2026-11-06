@@ -57,7 +57,7 @@ export function DetailsSection({
                     onChange={(e) => set({ description: e.target.value })}
                 />
             </Field>
-            <p id={ids.help} className={HELP}>
+            <p data-ph-unmask="" id={ids.help} className={HELP}>
                 One line. It&apos;s what people read on the booking page and
                 their receipt.
             </p>

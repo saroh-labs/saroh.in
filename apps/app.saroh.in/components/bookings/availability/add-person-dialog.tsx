@@ -155,6 +155,7 @@ export function AddPersonDialog({
             />
             {nameless ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="mt-1 text-[12.5px] text-destructive-subtle-foreground"
                 >

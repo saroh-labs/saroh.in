@@ -183,12 +183,18 @@ export function PeopleSheet({
                         );
                     })}
                     {shown.length === 0 ? (
-                        <p className="px-1 py-2 text-[13px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="px-1 py-2 text-[13px] text-muted-foreground"
+                        >
                             Nobody by that name takes bookings.
                         </p>
                     ) : null}
                 </div>
-                <p className="mx-1 mt-1.5 text-[12.5px] leading-normal text-muted-foreground max-[759px]:mx-0 max-[759px]:mt-1">
+                <p
+                    data-ph-unmask=""
+                    className="mx-1 mt-1.5 text-[12.5px] leading-normal text-muted-foreground max-[759px]:mx-0 max-[759px]:mt-1"
+                >
                     {showFor === "last"
                         ? "Bookings remembers who you pick here and opens on them next time. Change it under ⋯ › Show bookings for."
                         : showFor === "all"

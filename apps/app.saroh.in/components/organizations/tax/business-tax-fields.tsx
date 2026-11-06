@@ -125,7 +125,10 @@ export function BusinessTaxFields({
         <>
             <p className="mt-2 basis-full border-t border-border pt-3 text-[13px] font-medium">
                 Registered address
-                <span className="ml-2 font-normal text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="ml-2 font-normal text-muted-foreground"
+                >
                     A tax invoice prints it
                 </span>
             </p>
@@ -211,7 +214,10 @@ export function BusinessTaxFields({
                         timezone={v.timezone || null}
                         at={at}
                     />
-                    <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="basis-full text-[11.5px] leading-normal text-muted-foreground"
+                    >
                         Invoices already numbered keep their numbers. A new
                         format starts with the next one, and the count carries
                         on. The financial year runs April to March, as GST law
@@ -258,7 +264,10 @@ export function BusinessTaxFields({
                             </FormItem>
                         )}
                     />
-                    <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="basis-full text-[11.5px] leading-normal text-muted-foreground"
+                    >
                         Delivery is its own line on an invoice, printed with its
                         SAC.
                     </p>
@@ -268,7 +277,10 @@ export function BusinessTaxFields({
             return (
                 <>
                     {address}
-                    <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="basis-full text-[11.5px] leading-normal text-muted-foreground"
+                    >
                         Invoices already issued keep the address they went out
                         with.
                     </p>

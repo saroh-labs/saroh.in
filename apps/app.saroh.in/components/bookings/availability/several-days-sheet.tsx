@@ -164,7 +164,11 @@ export function SeveralDaysSheet({
                     </PanelGroup>
                     <PanelGroup>
                         <div className={FIELD_ROW}>
-                            <span id={`${id}-lunch`} className="flex-1">
+                            <span
+                                data-ph-unmask=""
+                                id={`${id}-lunch`}
+                                className="flex-1"
+                            >
                                 Lunch break
                             </span>
                             <Switch

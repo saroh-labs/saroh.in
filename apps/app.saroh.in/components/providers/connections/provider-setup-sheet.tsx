@@ -389,7 +389,10 @@ function PaymentsForm({
                     </div>
                 ) : null}
                 {razorpay && missingKey ? (
-                    <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground"
+                    >
                         Razorpay needs its key id to open your checkout window,
                         and this connection was saved without one. Enter the key
                         id and secret again to take payments online.
@@ -455,6 +458,7 @@ function PaymentsForm({
                             </div>
                             {razorpay ? (
                                 <p
+                                    data-ph-unmask=""
                                     id={ids.keyHint}
                                     className={cn(
                                         "text-[11.5px] leading-[1.45]",
@@ -513,6 +517,7 @@ function PaymentsForm({
                 note={
                     tried && incomplete ? (
                         <p
+                            data-ph-unmask=""
                             role="alert"
                             className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                         >
@@ -710,6 +715,7 @@ function MessagingForm({
                 note={
                     tried && missing ? (
                         <p
+                            data-ph-unmask=""
                             role="alert"
                             className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                         >
@@ -894,7 +900,10 @@ function StripeSteps({
                 </StepHeading>
                 <p className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
                     In Stripe, open{" "}
-                    <span className="font-medium text-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="font-medium text-foreground"
+                    >
                         Developers › API keys
                     </span>
                     . Copy the publishable key, then create a restricted key
@@ -945,7 +954,10 @@ function StripeSteps({
                 />
             </section>
 
-            <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
+            >
                 Customers pay by card for now. If receipts are turned on in your
                 Stripe settings, Stripe also emails its own receipt, alongside
                 Saroh&apos;s confirmation.

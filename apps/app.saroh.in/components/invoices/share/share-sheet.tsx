@@ -516,6 +516,7 @@ export function ShareSheet({
                         <>
                             <div className="grid gap-1.5">
                                 <span
+                                    data-ph-unmask=""
                                     id={ids.kind}
                                     className="text-sm font-medium"
                                 >
@@ -555,7 +556,10 @@ export function ShareSheet({
                             </p>
                             {phone ? (
                                 <div className="grid gap-1.5">
-                                    <span className="text-sm font-medium">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-sm font-medium"
+                                    >
                                         To
                                     </span>
                                     <p
@@ -673,14 +677,20 @@ export function MessagePreview({ text }: { text: string }) {
                 {before}
                 {after !== null ? (
                     <>
-                        <span className="rounded bg-muted px-1 font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="rounded bg-muted px-1 font-mono text-[12px] text-muted-foreground"
+                        >
                             link made when you share
                         </span>
                         {after}
                     </>
                 ) : null}
             </blockquote>
-            <figcaption className="mt-1.5 text-[11.5px] text-muted-foreground">
+            <figcaption
+                data-ph-unmask=""
+                className="mt-1.5 text-[11.5px] text-muted-foreground"
+            >
                 Preview
             </figcaption>
         </figure>

@@ -173,7 +173,11 @@ export function DayEditor({
 
                     <PanelGroup>
                         <div className={FIELD_ROW}>
-                            <span id={`${id}-lunch`} className="flex-1">
+                            <span
+                                data-ph-unmask=""
+                                id={`${id}-lunch`}
+                                className="flex-1"
+                            >
                                 Lunch break
                             </span>
                             <Switch
@@ -248,7 +252,10 @@ export function DayEditor({
                                             }
                                             className="min-h-[52px] flex-1 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                         >
-                                            <span className="block text-[12.5px] text-muted-foreground">
+                                            <span
+                                                data-ph-unmask=""
+                                                className="block text-[12.5px] text-muted-foreground"
+                                            >
                                                 Another shift
                                             </span>
                                             <span className="tabular-nums">
@@ -325,7 +332,10 @@ export function DayEditor({
                             <Plus aria-hidden className="size-[18px]" />
                             <span className="flex-1">
                                 Add another shift
-                                <span className="block text-[12.5px] font-normal text-muted-foreground">
+                                <span
+                                    data-ph-unmask=""
+                                    className="block text-[12.5px] font-normal text-muted-foreground"
+                                >
                                     For a split day, like mornings and evenings
                                 </span>
                             </span>
@@ -341,6 +351,7 @@ export function DayEditor({
                     ) : null}
                     {noRoom ? (
                         <p
+                            data-ph-unmask=""
                             role="alert"
                             className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
                         >
@@ -370,7 +381,10 @@ export function DayEditor({
                     })
                 }
             />
-            <p className="mt-3.5 text-[12.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-3.5 text-[12.5px] leading-normal text-muted-foreground"
+            >
                 Bookings already made are never moved.
             </p>
         </div>

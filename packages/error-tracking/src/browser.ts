@@ -32,7 +32,8 @@ import {
  *    recorder, with every input masked and no network or console, and
  *    page visits (DEC-160): `$pageview` when the app says a page was
  *    opened ({@link BrowserTracking.pageview}) and `$pageleave` when the
- *    tab goes, so the time on a page is known. One instance for both, so a
+ *    tab goes, so the time on a page is known, and `$web_vitals` for the
+ *    page the tab loaded ({@link WEB_VITALS_CAPTURE}). One instance for both, so a
  *    page's visits and its recordings share a session. Each has its own
  *    switch (`POSTHOG_REPLAY`, `POSTHOG_ANALYTICS`); `before_send` drops
  *    every event that is not a recording or a page visit, and each of
@@ -87,6 +88,23 @@ export interface BrowserTrackingOptions {
      * the app's own bundle. Only the workspace and saroh.in pass it.
      */
     loadRecorder?: () => Promise<unknown>;
+    /**
+     * `() => import("posthog-js/dist/web-vitals")`: Google's web-vitals
+     * observers, from the app's own bundle. Loaded only while page visits
+     * are sent; without it no web vitals are measured.
+     */
+    loadWebVitals?: () => Promise<unknown>;
+    /**
+     * saroh.in only (owner, 6 Nov 2026): clicks, rage clicks and heatmaps
+     * beside page visits, gated by {@link clickBeforeSend}. Never the
+     * workspace: its buttons' words can be a customer's.
+     */
+    clicks?: boolean;
+    /**
+     * `() => import("posthog-js/dist/dead-clicks-autocapture")`, from the
+     * app's own bundle; without it no dead clicks are measured.
+     */
+    loadDeadClicks?: () => Promise<unknown>;
     /** `POSTHOG_REPLAY`: replay is possible only when this is "on". */
     replay?: string | undefined;
     /** `POSTHOG_REPLAY_SAMPLE`: a share from 0 to 1, or unset for the default. */
@@ -553,6 +571,38 @@ export interface PageRoutes {
     now?: string | undefined;
     /** The page before it. */
     previous?: string | undefined;
+    /**
+     * The first page the app named, beside the address it was at: the page
+     * the tab loaded, which is what web vitals measure.
+     */
+    landing?: { path: string; route: string } | undefined;
+}
+
+/**
+ * Web vitals, as posthog-js 1.435 reads `capture_performance`
+ * (`PerformanceCaptureConfig` in `@posthog/types`, and
+ * `extensions/web-vitals` in the SDK): LCP, INP, CLS and FCP, no
+ * attribution (it names the element and the address behind a slow number),
+ * and no network timing (it would record every request's address). Set
+ * explicitly, so the project's settings can't turn either on.
+ */
+export const WEB_VITALS_CAPTURE = {
+    web_vitals: true,
+    web_vitals_allowed_metrics: ["LCP", "INP", "CLS", "FCP"],
+    web_vitals_attribution: false,
+    network_timing: false,
+} satisfies PostHogConfig["capture_performance"];
+
+/** The properties of a `$web_vitals` event that may stay, and what each metric may say. */
+const WEB_VITAL_PROPERTY =
+    /^\$web_vitals_(?:LCP|INP|CLS|FCP)_(?:event|value)$/u;
+const WEB_VITAL_FIELDS = ["name", "value", "rating", "delta", "navigationType"];
+
+/** The path of an address: no origin, no query, no fragment. */
+function pathOfUrl(url: unknown): string | undefined {
+    if (typeof url !== "string") return undefined;
+    const rest = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu, "");
+    return rest.split(/[?#]/u)[0] || "/";
 }
 
 /** What the SDK adds about where a session began, and how far a page was scrolled. */
@@ -560,9 +610,19 @@ const ENTRY_PROPERTY =
     /^\$(?:initial_|session_entry_|prev_pageview_.*(?:scroll|content))/u;
 
 /**
- * A page visit's last gate (DEC-160): `$pageview` and `$pageleave` only,
- * and the address in each is the one the **app** named, never the
- * browser's. The workspace names a route's shape
+ * How far the page before was read, as fractions of 0 to 1: posthog-js 1.435
+ * adds these to `$pageview` and `$pageleave` (`_previousPageViewProperties`
+ * in `src/page-view.ts`) unless `disable_scroll_properties`. PostHog's Web
+ * analytics reads `$prev_pageview_max_content_percentage` for a path's
+ * scroll depth, by `$prev_pageview_pathname`. The pixel figures stay dropped.
+ */
+const SCROLL_PERCENTAGE =
+    /^\$prev_pageview_(?:last|max)_(?:scroll|content)_percentage$/u;
+
+/**
+ * A page visit's last gate (DEC-160): `$pageview`, `$pageleave` and
+ * `$web_vitals` only, and the address in each is the one the **app**
+ * named, never the browser's. The workspace names a route's shape
  * (`/commerce/orders/[orderId]`), so no record's id, token or business name
  * leaves; saroh.in names its public path and the query its allow-list
  * keeps. The tab's title (it names the business), referrers and where the
@@ -570,14 +630,150 @@ const ENTRY_PROPERTY =
  *
  * Null when the app has named no page: nothing is guessed from the address
  * bar.
+ *
+ * `$web_vitals` measure the page the tab loaded (soft navigations are not
+ * measured), so they go out under the route the app named for that
+ * address ({@link PageRoutes.landing}), or not at all. Each metric keeps
+ * its name, value, rating, delta and navigation type; its id, addresses,
+ * session ids and any attribution are dropped.
+ *
+ * `scrollDepth` (saroh.in only, DEC-160 6 Nov 2026) keeps how far the page
+ * before was scrolled, as percentages ({@link SCROLL_PERCENTAGE}); the
+ * workspace drops it.
  */
 export function pageBeforeSend(
     event: SdkEvent | null,
     routes: PageRoutes,
+    scrollDepth = false,
 ): SdkEvent | null {
-    if (event?.event !== "$pageview" && event?.event !== "$pageleave")
+    const vitals = event?.event === "$web_vitals";
+    if (
+        !vitals &&
+        event?.event !== "$pageview" &&
+        event?.event !== "$pageleave"
+    )
         return null;
-    if (!routes.now) return null;
+    const route = vitals
+        ? pathOfUrl(event.properties?.$current_url) === routes.landing?.path
+            ? routes.landing?.route
+            : undefined
+        : routes.now;
+    if (!route) return null;
+    const clean = withoutPersonalProperties(event);
+    const properties = { ...(clean.properties ?? {}) };
+    for (const key of Object.keys(properties))
+        if (
+            ENTRY_PROPERTY.test(key) &&
+            !(scrollDepth && !vitals && SCROLL_PERCENTAGE.test(key))
+        )
+            delete properties[key];
+    const origin =
+        typeof properties.$current_url === "string"
+            ? (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu.exec(
+                  properties.$current_url,
+              )?.[0] ?? "")
+            : "";
+    const pathOf = (route: string) => route.split(/[?#]/u)[0] ?? "";
+    properties.$current_url = `${origin}${route.split("#")[0] ?? ""}`;
+    properties.$pathname = pathOf(route);
+    if (vitals) {
+        for (const [key, value] of Object.entries(properties)) {
+            if (!key.startsWith("$web_vitals_")) continue;
+            if (!WEB_VITAL_PROPERTY.test(key)) delete properties[key];
+            else if (key.endsWith("_event"))
+                properties[key] = Object.fromEntries(
+                    WEB_VITAL_FIELDS.filter(
+                        (field) =>
+                            typeof value === "object" &&
+                            value !== null &&
+                            field in value,
+                    ).map((field) => [
+                        field,
+                        (value as Record<string, unknown>)[field],
+                    ]),
+                );
+        }
+        return { ...clean, properties };
+    }
+    // A leave is from the page on screen; a view comes after the one before.
+    const from = event.event === "$pageleave" ? routes.now : routes.previous;
+    if (from) properties.$prev_pageview_pathname = pathOf(from);
+    return { ...clean, properties };
+}
+
+/** What saroh.in's click capture may send (owner, 6 Nov 2026). */
+const CLICK_EVENTS = new Set([
+    "$autocapture",
+    "$rageclick",
+    "$dead_click",
+    "$$heatmap",
+]);
+
+/** The words of each element in an `$elements_chain`, and its title and label. */
+const MASKED_CHAIN_WORDS =
+    /(?:text|attr__title|attr__aria-label|attr__alt|attr__placeholder|attr__value)="(?:[^"\\]|\\.)*"/gu;
+
+const WORD_KEYS = new Set([
+    "text",
+    "$el_text",
+    "attr__title",
+    "attr__aria-label",
+    "attr__alt",
+    "attr__placeholder",
+    "attr__value",
+]);
+const keepNonWords = (record: Record<string, unknown>) =>
+    Object.fromEntries(
+        Object.entries(record).filter(([key]) => !WORD_KEYS.has(key)),
+    );
+/** An `$elements` entry without its words, its own or in `attributes`. */
+function withoutWords(element: Record<string, unknown>) {
+    const kept = keepNonWords(element);
+    if (typeof element.attributes === "object" && element.attributes !== null)
+        kept.attributes = keepNonWords(
+            element.attributes as Record<string, unknown>,
+        );
+    return kept;
+}
+
+/** Whether a click was on, or inside, an element the recordings mask. */
+function isMaskedClick(properties: Record<string, unknown>): boolean {
+    const attribute = `attr__${REPLAY_MASK_ATTRIBUTE}`;
+    if (
+        typeof properties.$elements_chain === "string" &&
+        properties.$elements_chain.includes(`${attribute}=`)
+    )
+        return true;
+    return (
+        Array.isArray(properties.$elements) &&
+        properties.$elements.some(
+            (element: Record<string, unknown>) =>
+                attribute in element ||
+                (typeof element.attributes === "object" &&
+                    element.attributes !== null &&
+                    attribute in element.attributes),
+        )
+    );
+}
+
+/** A link's address without its query or fragment: a referral code stays home. */
+const HREF_QUERY = /((?:attr__)?href=")([^"?#]*)[?#][^"]*"/gu;
+function bareHref(value: unknown): unknown {
+    return typeof value === "string" ? (value.split(/[?#]/u)[0] ?? "") : value;
+}
+
+/**
+ * saroh.in's click gate: `$autocapture`, `$rageclick`, `$dead_click` and
+ * `$$heatmap` only, under the page the app named (as {@link pageBeforeSend}
+ * does), with every link's query and fragment cut. Saroh's own marketing
+ * pages hold no one's data, so an element's words are kept; the SDK never
+ * sends what is typed into a field.
+ */
+export function clickBeforeSend(
+    event: SdkEvent | null,
+    routes: PageRoutes,
+): SdkEvent | null {
+    if (!event || !CLICK_EVENTS.has(event.event) || !routes.now) return null;
     const clean = withoutPersonalProperties(event);
     const properties = { ...(clean.properties ?? {}) };
     for (const key of Object.keys(properties))
@@ -588,12 +784,57 @@ export function pageBeforeSend(
                   properties.$current_url,
               )?.[0] ?? "")
             : "";
-    const pathOf = (route: string) => route.split(/[?#]/u)[0] ?? "";
-    properties.$current_url = `${origin}${routes.now.split("#")[0] ?? ""}`;
-    properties.$pathname = pathOf(routes.now);
-    // A leave is from the page on screen; a view comes after the one before.
-    const from = event.event === "$pageleave" ? routes.now : routes.previous;
-    if (from) properties.$prev_pageview_pathname = pathOf(from);
+    const route = routes.now.split("#")[0] ?? "";
+    const url = `${origin}${route}`;
+    properties.$current_url = url;
+    properties.$pathname = route.split("?")[0] ?? "";
+    // Clicked inside a part the recordings mask (a signed-in name, a form's
+    // thank-you): the click counts, its words do not leave.
+    const masked = isMaskedClick(properties);
+    if (masked) delete properties.$el_text;
+    if (typeof properties.$elements_chain === "string") {
+        const chain = properties.$elements_chain.replace(HREF_QUERY, '$1$2"');
+        properties.$elements_chain = masked
+            ? chain.replace(MASKED_CHAIN_WORDS, "")
+            : chain;
+    }
+    if (Array.isArray(properties.$elements))
+        properties.$elements = properties.$elements.map(
+            (element: Record<string, unknown>) => ({
+                ...element,
+                ...("attr__href" in element
+                    ? { attr__href: bareHref(element.attr__href) }
+                    : {}),
+                ...("href" in element ? { href: bareHref(element.href) } : {}),
+                ...(typeof element.attributes === "object" &&
+                element.attributes !== null
+                    ? {
+                          attributes: Object.fromEntries(
+                              Object.entries(element.attributes).map(
+                                  ([k, v]) => [
+                                      k,
+                                      k === "attr__href" || k === "href"
+                                          ? bareHref(v)
+                                          : v,
+                                  ],
+                              ),
+                          ),
+                      }
+                    : {}),
+            }),
+        );
+    if (masked && Array.isArray(properties.$elements))
+        properties.$elements = properties.$elements.map(withoutWords);
+    if (
+        typeof properties.$heatmap_data === "object" &&
+        properties.$heatmap_data !== null
+    )
+        properties.$heatmap_data = {
+            [url]: Object.values(properties.$heatmap_data).flat(),
+        };
+    for (const key of ["$external_click_url", "$dead_click_selector"])
+        if (typeof properties[key] === "string")
+            properties[key] = bareHref(properties[key]);
     return { ...clean, properties };
 }
 
@@ -819,7 +1060,12 @@ export function createBrowserTracking(
     const gate = (event: SdkEvent | null): SdkEvent | null => {
         if (event?.event === "$snapshot")
             return live.record ? replayBeforeSend(event) : null;
-        return live.count ? pageBeforeSend(event, routes) : null;
+        if (!live.count) return null;
+        // saroh.in's instance (nobody's) keeps scroll depth and clicks; the workspace's never.
+        const site = replayUser === ANONYMOUS;
+        if (site && options.clicks && CLICK_EVENTS.has(event?.event ?? ""))
+            return clickBeforeSend(event, routes);
+        return pageBeforeSend(event, routes, site);
     };
 
     /** Send the page the app named, once the instance may count visits. */
@@ -852,9 +1098,13 @@ export function createBrowserTracking(
         }
         const turn = ++replayTurn;
         try {
+            // Web vitals only with page visits, and only when the app hands
+            // the observers in: the SDK never fetches them itself.
+            const vitals = count && Boolean(options.loadWebVitals);
             const [loaded] = await Promise.all([
                 loadSdk(),
                 record ? options.loadRecorder?.() : undefined,
+                vitals ? options.loadWebVitals?.() : undefined,
             ]);
             if (turn !== replayTurn) return false;
             // One instance per page: who it is about is fixed when it is made.
@@ -869,6 +1119,9 @@ export function createBrowserTracking(
                         // `$pageleave` when the tab goes; `$pageview` is
                         // sent by hand, when the app names the page.
                         capture_pageleave: count,
+                        capture_performance: vitals
+                            ? WEB_VITALS_CAPTURE
+                            : false,
                         before_send: gate,
                     },
                     `saroh_replay_${turn}`,
@@ -1027,8 +1280,29 @@ export function createBrowserTracking(
             }
             const sample = replaySampleRate(options.replaySample);
             const allowed = { record, count: counting.record };
+            const clicks = counting.record && options.clicks === true;
+            const deadClicks =
+                clicks && options.loadDeadClicks
+                    ? await options.loadDeadClicks().then(
+                          () => true,
+                          () => false,
+                      )
+                    : false;
             return begin(ANONYMOUS, allowed, () => ({
                 ...siteReplayConfig(host, sample),
+                // Scroll depth on page visits (DEC-160, 6 Nov 2026); the gate keeps percentages only.
+                disable_scroll_properties: false,
+                // Clicks (owner, 6 Nov 2026), through clickBeforeSend.
+                ...(clicks
+                    ? {
+                          autocapture: { capture_copied_text: false },
+                          rageclick: true,
+                          capture_heatmaps: true,
+                          capture_dead_clicks: deadClicks,
+                          mask_all_text: false,
+                          mask_all_element_attributes: false,
+                      }
+                    : {}),
                 loaded: (instance: {
                     register?: (p: Record<string, unknown>) => void;
                 }) => instance.register?.({ app, environment }),
@@ -1037,6 +1311,8 @@ export function createBrowserTracking(
 
         pageview(route) {
             wanted = route.startsWith("/") ? route.slice(0, 300) : undefined;
+            if (wanted && !routes.landing && typeof location !== "undefined")
+                routes.landing = { path: location.pathname, route: wanted };
             sendPage();
         },
 

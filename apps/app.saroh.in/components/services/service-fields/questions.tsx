@@ -45,7 +45,9 @@ export function NameQuestion({
     const error = taken ? (
         <>
             {sameNameLine(taken.name)}{" "}
-            <TextLink href={`/services/${taken.id}`}>Open it</TextLink>
+            <TextLink data-ph-unmask="" href={`/services/${taken.id}`}>
+                Open it
+            </TextLink>
         </>
     ) : (
         problem("name")
@@ -81,7 +83,7 @@ export function WhoComesQuestion({ draft, set, problem, leave }: Edit) {
     };
     return (
         <div className="min-w-0">
-            <div id={id} className={cn(LABEL, "mb-2")}>
+            <div data-ph-unmask="" id={id} className={cn(LABEL, "mb-2")}>
                 Who comes?
             </div>
             <Segmented<ServiceKind>
@@ -213,7 +215,7 @@ export function WhoDoesItQuestion({
         });
     return (
         <div className="min-w-0">
-            <div id={id} className={cn(LABEL, "mb-2")}>
+            <div data-ph-unmask="" id={id} className={cn(LABEL, "mb-2")}>
                 Who does it?
             </div>
             {staff === null ? (
@@ -269,7 +271,7 @@ export function WhoDoesItQuestion({
                 <p className={cn(HELP, "mt-0")}>
                     Nobody is on the diary yet, so it&apos;s booked in its own
                     hours.{" "}
-                    <TextLink href={AVAILABILITY_HREF}>
+                    <TextLink data-ph-unmask="" href={AVAILABILITY_HREF}>
                         Add yourself or your team in Hours and time off
                     </TextLink>
                 </p>

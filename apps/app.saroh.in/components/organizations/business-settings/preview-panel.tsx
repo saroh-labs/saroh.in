@@ -35,7 +35,10 @@ export function PreviewPanel({
             <div className="flex items-baseline gap-2">
                 <span className="label">{label}</span>
                 {live ? (
-                    <span className="text-[11.5px] text-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[11.5px] text-foreground"
+                    >
                         Showing your unsaved edit
                     </span>
                 ) : null}

@@ -57,11 +57,36 @@ export type UpgradePromptEvent = (typeof UPGRADE_PROMPT_EVENTS)[number];
 /** The anonymous sign-up page count (DEC-187, added 24 Oct), its own send path. */
 export const FUNNEL_EVENTS = ["signup_page_viewed"] as const;
 
+/**
+ * What a business does in the workspace, every time, not only the first
+ * (owner, 6 Nov 2026, DEC-209): sent by the API after the write, so a
+ * browser never sends a product event. Each says the plan and kind of
+ * business, and at most a module key, a provider's name or an import's
+ * kind and counts; never a name, an amount or anything of a customer's.
+ */
+export const WORKSPACE_EVENTS = [
+    "product_created",
+    "service_created",
+    "customer_created",
+    "order_created",
+    "booking_created",
+    "website_published",
+    "provider_connected",
+    "module_turned_on",
+    "module_turned_off",
+    "import_finished",
+    "invoice_issued",
+    "discount_created",
+    "team_member_invited",
+] as const;
+export type WorkspaceEvent = (typeof WORKSPACE_EVENTS)[number];
+
 /** The closed list: every product event the API sends; more is the owner's decision. */
 export const PRODUCT_EVENTS = [
     ...PRODUCT_MILESTONES,
     ...UPGRADE_PROMPT_EVENTS,
     ...FUNNEL_EVENTS,
+    ...WORKSPACE_EVENTS,
 ] as const;
 
 /**
@@ -308,6 +333,83 @@ export function signupViewProperties(raw: unknown): Record<string, string> {
 export function signupPageViewed(properties: Record<string, string>): void {
     if (!telemetryOn()) return;
     captureProductEvent("signup_page_viewed", randomUUID(), properties);
+}
+
+/** The properties a workspace event may carry, by name; anything else is dropped. */
+const WORKSPACE_PROPERTIES = [
+    "module_key",
+    "provider",
+    "entity",
+    "created",
+    "updated",
+    "failed",
+] as const;
+type WorkspaceProperties = Partial<
+    Record<(typeof WORKSPACE_PROPERTIES)[number], string | number>
+>;
+
+const FACTS_TTL_MS = 10 * 60_000;
+// shortcut: one process's memory, so a plan change shows on events up to
+// ten minutes late; move to the database read if that ever matters.
+const factsCache = new Map<
+    string,
+    { at: number; facts: Promise<MilestoneFacts> }
+>();
+
+function cachedFacts(
+    organizationId: string,
+    read: MilestoneFactsReader,
+): Promise<MilestoneFacts> {
+    const now = Date.now();
+    const hit = factsCache.get(organizationId);
+    if (hit && now - hit.at < FACTS_TTL_MS) return hit.facts;
+    if (factsCache.size > 5_000) factsCache.clear();
+    const facts = read(organizationId);
+    factsCache.set(organizationId, { at: now, facts });
+    facts.catch(() => factsCache.delete(organizationId));
+    return facts;
+}
+
+/** Test seam: forget every cached business. */
+export function forgetWorkspaceFacts(): void {
+    factsCache.clear();
+}
+
+const workspaceLogger = new Logger("WorkspaceEvents");
+
+/**
+ * Send one workspace event (DEC-209). Returns at once; the read and the
+ * send happen after, and a failure of either is logged and goes no
+ * further. A demo business (DEC-188) sends nothing.
+ */
+export function workspaceAction(
+    event: WorkspaceEvent,
+    organizationId: string,
+    properties: WorkspaceProperties = {},
+    read: MilestoneFactsReader = readFacts,
+): void {
+    if (!telemetryOn()) return;
+    const kept = Object.fromEntries(
+        WORKSPACE_PROPERTIES.filter((k) => properties[k] !== undefined).map(
+            (k) => [k, properties[k]],
+        ),
+    );
+    void cachedFacts(organizationId, read).then(
+        (facts) => {
+            if (facts.isDemo) return;
+            captureProductEvent(event, organizationId, {
+                ...kept,
+                plan_key: facts.planKey ?? "none",
+                business_kind: facts.businessKind ?? "unknown",
+            });
+        },
+        (error: unknown) =>
+            workspaceLogger.warn(
+                `workspace_event_not_sent ${event} org=${organizationId}: ${
+                    error instanceof Error ? error.name : "unknown"
+                }`,
+            ),
+    );
 }
 
 @Injectable()

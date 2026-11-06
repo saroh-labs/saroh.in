@@ -113,7 +113,10 @@ export function PhoneNeeds({
             </div>
 
             {!any && !couldnt ? (
-                <p className="rounded-[14px] border border-border bg-card p-4 text-sm text-neutral-700 dark:text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="rounded-[14px] border border-border bg-card p-4 text-sm text-neutral-700 dark:text-muted-foreground"
+                >
                     {fresh
                         ? "New orders, bookings and enquiries show here."
                         : "Nothing needs you right now."}
@@ -260,7 +263,10 @@ function CouldntCheck({ text }: { text: string }) {
             <span className="min-w-0 flex-1 text-[14.5px] font-semibold [overflow-wrap:anywhere]">
                 {text}
             </span>
-            <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warning-subtle-foreground">
+            <span
+                data-ph-unmask=""
+                className="shrink-0 whitespace-nowrap text-xs font-semibold text-warning-subtle-foreground"
+            >
                 {pending ? "Checking…" : "Try again"}
             </span>
         </button>

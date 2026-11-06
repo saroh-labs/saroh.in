@@ -93,7 +93,10 @@ export function SubscribersList({
                                 {older ? (
                                     <>
                                         {" · "}
-                                        <span className="text-foreground">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="text-foreground"
+                                        >
                                             older price
                                         </span>
                                     </>

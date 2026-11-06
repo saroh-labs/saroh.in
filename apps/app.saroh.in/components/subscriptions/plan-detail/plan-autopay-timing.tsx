@@ -85,6 +85,7 @@ export function PlanAutopayTiming({
             className="rounded-[12px] border border-border bg-card px-[18px] py-4"
         >
             <h2
+                data-ph-unmask=""
                 id={`${id}-title`}
                 className="mb-1 font-display text-[16px] font-semibold tracking-[-0.01em] text-foreground"
             >

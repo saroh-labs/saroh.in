@@ -59,7 +59,9 @@ export function SubscriptionsTab({
                                 {r.when}
                             </div>
                         </div>
-                        <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
+                        <StatusBadge tone={r.tone} data-ph-unmask="">
+                            {r.status}
+                        </StatusBadge>
                         <span className="font-semibold tabular-nums">
                             {r.price}
                         </span>
@@ -128,7 +130,9 @@ export function InvoicesTab({
                             <div className="min-w-0 flex-[2_1_160px] text-[12.5px] text-muted-foreground">
                                 {r.from}
                             </div>
-                            <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
+                            <StatusBadge tone={r.tone} data-ph-unmask="">
+                                {r.status}
+                            </StatusBadge>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {r.total}
                             </span>

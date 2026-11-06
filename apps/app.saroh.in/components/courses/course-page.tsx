@@ -140,6 +140,7 @@ export function CoursePage({
                 breadcrumb={[
                     "Bookings",
                     <Link
+                        data-ph-unmask=""
                         key="courses"
                         href="/courses"
                         className="hover:text-foreground"
@@ -335,7 +336,9 @@ function Sessions({
     return (
         <section className="flex min-w-0 flex-col gap-2.5">
             <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
-                <h2 className="label">Sessions</h2>
+                <h2 data-ph-unmask="" className="label">
+                    Sessions
+                </h2>
                 {canAdd && !empty ? addButton : null}
             </div>
             {empty ? (
@@ -456,7 +459,9 @@ function Roster({
     return (
         <section className="min-w-0 overflow-hidden rounded-[14px] border border-border bg-card">
             <header className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-3 dark:bg-transparent">
-                <h2 className="text-sm font-semibold">Roster</h2>
+                <h2 data-ph-unmask="" className="text-sm font-semibold">
+                    Roster
+                </h2>
                 <Badge variant={full ? "warning" : "neutral"}>
                     {seatsLeftLine(course)}
                 </Badge>

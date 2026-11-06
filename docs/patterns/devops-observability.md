@@ -103,8 +103,9 @@ must keep:
   or an amount. A new fact beside an error goes through `scrubContext`.
 - **A product milestone is sent by the API, once, from the activation
   ledger** (`modules/analytics/product-milestones.ts`). The list is closed
-  (DEC-187: the nine milestones and the two upgrade-prompt events): one more
-  is the owner's decision, not a call site's. A milestone's properties are
+  (DEC-187: the nine milestones and the two upgrade-prompt events; DEC-209:
+  the thirteen workspace events, sent every time through `workspaceAction`):
+  one more is the owner's decision, not a call site's. A milestone's properties are
   the plan, the kind and where the business came from (`src`, utm,
   `referral_channel`, `referrer_code`, `manager_code`); codes go only to
   these server-side events, never to a browser tag (DEC-127). Never capture
@@ -118,7 +119,8 @@ must keep:
   admin console or a merchant site (`check:merchant-site-tracking`). What a
   screen marks, and how: `frontend-design-system.md` → Session recordings.
 - **Page visits are the same two apps, under the same rules** (DEC-160):
-  `$pageview` and `$pageleave` only, switched by
+  `$pageview` and `$pageleave` only (and `$web_vitals` with them, no
+  attribution, no network timing, owner 6 Nov 2026), switched by
   `NEXT_PUBLIC_POSTHOG_ANALYTICS`, sent by the instance that records. A
   page is named by the app (`browserTracking.pageview(route)`), never read
   from the address bar: the workspace gives the route's shape

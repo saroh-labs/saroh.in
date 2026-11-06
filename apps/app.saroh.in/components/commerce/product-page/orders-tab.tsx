@@ -96,7 +96,11 @@ export function ProductOrdersTab({
                         ? heldBy(data.recent, product.name)
                         : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
                 </p>
-                <TextLink href="/commerce/orders" className="text-[12.5px]">
+                <TextLink
+                    data-ph-unmask=""
+                    href="/commerce/orders"
+                    className="text-[12.5px]"
+                >
                     All orders for it in Orders →
                 </TextLink>
             </div>
@@ -129,6 +133,7 @@ export function ProductOrdersTab({
                             <thead>
                                 <tr
                                     data-list-head=""
+                                    data-ph-unmask=""
                                     className={cn(
                                         grid,
                                         listTable.head,

@@ -55,6 +55,13 @@ interface Common {
     dot?: boolean;
     className?: string;
     id?: string;
+    /**
+     * Its words are Saroh's own, from a closed set (an order's step, a
+     * booking's state): a session recording reads them (DEC-125). Leave it
+     * out where the words could be a record's; a `thing` badge is always
+     * read, its word comes from the vocabulary.
+     */
+    "data-ph-unmask"?: "";
 }
 
 export type StatusBadgeProps =
@@ -105,6 +112,7 @@ export function StatusBadge(props: StatusBadgeProps) {
             size={size}
             dot={dot}
             data-status={words?.state}
+            data-ph-unmask={words ? "" : props["data-ph-unmask"]}
             aria-description={hint === "" ? undefined : hint}
             className={cn("shrink-0 font-semibold", className)}
         >

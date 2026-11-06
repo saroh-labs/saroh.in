@@ -89,7 +89,11 @@ export default async function TestReleasePage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link key="site" href={`/sites/${siteId}/pages`}>
+                    <Link
+                        data-ph-unmask=""
+                        key="site"
+                        href={`/sites/${siteId}/pages`}
+                    >
                         Website
                     </Link>,
                     releaseTitle(release),
@@ -118,6 +122,7 @@ export default async function TestReleasePage({
                         <>
                             This test release is live now.{" "}
                             <Link
+                                data-ph-unmask=""
                                 href={`/sites/${siteId}/versions`}
                                 className="font-medium underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
                             >
@@ -143,7 +148,7 @@ export default async function TestReleasePage({
                     </p>
                 ) : null}
                 {open && release.draftChangedSince ? (
-                    <p className="text-muted-foreground">
+                    <p data-ph-unmask="" className="text-muted-foreground">
                         The draft has changed since this was made. Those changes
                         aren&apos;t in it.
                     </p>

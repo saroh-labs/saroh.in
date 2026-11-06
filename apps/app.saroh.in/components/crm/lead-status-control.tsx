@@ -44,7 +44,9 @@ export function LeadStatusControl({
 
     return (
         <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground">Status</span>
+            <span data-ph-unmask="" className="text-xs text-muted-foreground">
+                Status
+            </span>
             <OptionSelect
                 aria-label="Lead status"
                 value={status}

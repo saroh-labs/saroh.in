@@ -61,6 +61,7 @@ export function SoldOutActions({
                             {place.name}
                         </span>{" "}
                         <span
+                            data-ph-unmask=""
                             className={
                                 place.soldOut
                                     ? "text-destructive-subtle-foreground"

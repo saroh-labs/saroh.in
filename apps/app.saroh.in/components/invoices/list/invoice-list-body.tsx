@@ -119,10 +119,12 @@ export function InvoiceListBody({
                             rowAfter && "md:pr-[122px]",
                         )}
                     >
-                        <span>Billed to</span>
-                        <span>Invoice</span>
-                        <span>Status</span>
-                        <span className="text-right">Total</span>
+                        <span data-ph-unmask="">Billed to</span>
+                        <span data-ph-unmask="">Invoice</span>
+                        <span data-ph-unmask="">Status</span>
+                        <span data-ph-unmask="" className="text-right">
+                            Total
+                        </span>
                     </ListTableHead>
                     <ul aria-label="Invoices">
                         {paged.map((i) => (

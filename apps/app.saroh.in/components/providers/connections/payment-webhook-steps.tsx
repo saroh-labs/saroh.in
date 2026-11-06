@@ -122,7 +122,10 @@ export function WebhookAddressStep({
                         </div>
                     </div>
                     <div className="grid gap-1.5">
-                        <p className="text-[12.5px] font-medium">
+                        <p
+                            data-ph-unmask=""
+                            className="text-[12.5px] font-medium"
+                        >
                             Tick these events
                         </p>
                         <ul
@@ -139,7 +142,10 @@ export function WebhookAddressStep({
                         </ul>
                         {/* Only Razorpay takes autopay; Cashfree has none (#824). */}
                         {provider === "RAZORPAY" ? (
-                            <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-[11.5px] leading-[1.45] text-muted-foreground"
+                            >
                                 Autopay adds its own events when it is switched
                                 on.
                             </p>

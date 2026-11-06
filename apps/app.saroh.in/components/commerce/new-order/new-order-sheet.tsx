@@ -227,7 +227,9 @@ function NewOrderBody({
             <FormSheetBody className="auto-rows-max gap-3.5">
                 {stores.length > 1 ? (
                     <div>
-                        <div className="label mb-[7px]">Taken at</div>
+                        <div data-ph-unmask="" className="label mb-[7px]">
+                            Taken at
+                        </div>
                         <div
                             role="radiogroup"
                             aria-label="Location"

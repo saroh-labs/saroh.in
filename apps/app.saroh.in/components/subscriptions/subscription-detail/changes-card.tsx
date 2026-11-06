@@ -75,7 +75,11 @@ export function ChangesCard({
             aria-labelledby="changes-title"
             className={cn(CARD, "px-4 py-[13px]")}
         >
-            <h2 id="changes-title" className={cn(TITLE, "mb-2")}>
+            <h2
+                data-ph-unmask=""
+                id="changes-title"
+                className={cn(TITLE, "mb-2")}
+            >
                 Changes
             </h2>
             {page.state === "failed" ? (
@@ -84,7 +88,11 @@ export function ChangesCard({
                     reassurance="Everything else on this page is up to date."
                 />
             ) : page.state !== "ok" ? (
-                <p role="note" className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    role="note"
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Your role can&apos;t see what changed on this subscription.
                 </p>
             ) : (
@@ -125,7 +133,10 @@ export function ChangesCard({
                     ) : null}
                     {/* Said once the oldest recorded change is on show. */}
                     {first?.earlierUnrecorded && !more && !cursor ? (
-                        <p className="mt-1.5 text-[12px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="mt-1.5 text-[12px] text-muted-foreground"
+                        >
                             Earlier changes weren&apos;t recorded.
                         </p>
                     ) : rows.length === 0 ? (

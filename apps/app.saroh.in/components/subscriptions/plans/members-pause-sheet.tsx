@@ -75,6 +75,7 @@ export function MembersPauseSheet({
                         {PAUSE_LABEL}
                     </Label>
                     <p
+                        data-ph-unmask=""
                         id={`${id}-hint`}
                         className="mt-0.5 text-pretty text-[12.5px] leading-normal text-muted-foreground"
                     >

@@ -100,10 +100,17 @@ export function MoveStock({
             aria-labelledby="move-stock-title"
             className="mt-5 border-t border-border pt-4"
         >
-            <h3 id="move-stock-title" className="text-[12.5px] font-semibold">
+            <h3
+                data-ph-unmask=""
+                id="move-stock-title"
+                className="text-[12.5px] font-semibold"
+            >
                 Move stock between locations
             </h3>
-            <p className="mt-1 text-[11.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-1 text-[11.5px] text-muted-foreground"
+            >
                 Only what isn&apos;t promised can move. It shows in the log as
                 Moved, at both.
             </p>

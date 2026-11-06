@@ -76,7 +76,10 @@ export function TimingCard({
                 <span className="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">
                     {option.title}
                     {option.isDefault ? (
-                        <span className="ml-1.5 text-[11.5px] font-medium text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="ml-1.5 text-[11.5px] font-medium text-muted-foreground"
+                        >
                             Default
                         </span>
                     ) : null}

@@ -192,7 +192,7 @@ export function TakePayment({
 
     const how = panel ? (
         <>
-            <div id={ids.how} className="label">
+            <div data-ph-unmask="" id={ids.how} className="label">
                 How are they paying?
             </div>
             <Segmented
@@ -210,7 +210,11 @@ export function TakePayment({
         </>
     ) : (
         <>
-            <div id={ids.how} className="text-[12.5px] font-medium">
+            <div
+                data-ph-unmask=""
+                id={ids.how}
+                className="text-[12.5px] font-medium"
+            >
                 How they pay
             </div>
             <div

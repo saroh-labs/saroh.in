@@ -117,10 +117,16 @@ export function DraftChecklist({
 
     return (
         <Card className="px-5 py-4">
-            <h2 className="font-display text-[16px] font-semibold tracking-[-0.015em]">
+            <h2
+                data-ph-unmask=""
+                className="font-display text-[16px] font-semibold tracking-[-0.015em]"
+            >
                 Before it goes live
             </h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-1 text-[13px] text-muted-foreground"
+            >
                 A draft. Only the team can see it. Nothing here is required to
                 publish. These are what customers will look for.
             </p>
@@ -144,7 +150,7 @@ export function DraftChecklist({
                         <div className="min-w-0 flex-1">
                             <p className="text-[13.5px] font-medium">
                                 {row.title}
-                                <span className="sr-only">
+                                <span data-ph-unmask="" className="sr-only">
                                     {row.done ? ", done" : ", to do"}
                                 </span>
                             </p>
@@ -169,7 +175,10 @@ export function DraftChecklist({
             {canWrite ? (
                 <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3">
                     <PublishButton product={product} />
-                    <p className="text-[12.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] text-muted-foreground"
+                    >
                         Publishing makes it live at once, with Undo.
                     </p>
                 </div>

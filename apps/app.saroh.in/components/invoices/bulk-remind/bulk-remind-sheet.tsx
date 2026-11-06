@@ -363,7 +363,10 @@ export function BulkRemindSheet({
             cancelLabel: "Not now",
             footNote:
                 ways && ways.email.length > 0 ? (
-                    <p className="text-[12.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] text-muted-foreground"
+                    >
                         Email goes from your own provider. Saroh never emails
                         your customers from its address.
                     </p>
@@ -405,7 +408,10 @@ export function BulkRemindSheet({
                 {next ? (
                     <WalkCard row={next} message={messageFor(next.invoiceId)} />
                 ) : (
-                    <p className="text-[13px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[13px] text-muted-foreground"
+                    >
                         WhatsApp ones done. The emails go in a few seconds.
                     </p>
                 )}

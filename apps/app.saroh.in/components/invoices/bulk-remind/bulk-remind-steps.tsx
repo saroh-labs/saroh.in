@@ -175,7 +175,9 @@ export function WaysStep({
                 <Notice tone="neutral" role="note" data-no-provider="">
                     Reminders are emailed from your own email. Until it is
                     connected, they open on WhatsApp.{" "}
-                    <TextLink href={CONNECT_EMAIL_HREF}>Connect email</TextLink>
+                    <TextLink data-ph-unmask="" href={CONNECT_EMAIL_HREF}>
+                        Connect email
+                    </TextLink>
                 </Notice>
             ) : null}
         </div>
@@ -346,7 +348,9 @@ export function WalkCard({
     return (
         <div className="grid gap-3" data-remind-walk={row.invoiceId}>
             <p className="text-[13.5px]">
-                <span className="text-muted-foreground">Next: </span>
+                <span data-ph-unmask="" className="text-muted-foreground">
+                    Next:{" "}
+                </span>
                 <b data-ph-mask="" className="font-semibold">
                     {row.name}
                 </b>
@@ -355,7 +359,10 @@ export function WalkCard({
                 ) : null}
             </p>
             {message ? <MessagePreview text={message} /> : null}
-            <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12.5px] leading-[1.5] text-muted-foreground"
+            >
                 WhatsApp opens in a new tab. Press send there, come back, and
                 Saroh moves to the next one.
             </p>
@@ -397,7 +404,10 @@ export function DoneStep({
                     </li>
                 ))}
             </ul>
-            <p className="text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12.5px] text-muted-foreground"
+            >
                 Each one reminded shows “Reminded today” on the list and how,
                 and it is logged on the invoice.
             </p>

@@ -89,7 +89,11 @@ export function HomeHeader({
                                     !sinceOnPhone && "max-sm:hidden",
                                 )}
                             >
-                                <span id="home-last-24-hours" className="label">
+                                <span
+                                    data-ph-unmask=""
+                                    id="home-last-24-hours"
+                                    className="label"
+                                >
                                     Last 24 hours
                                 </span>
                                 {links.map((link) => (

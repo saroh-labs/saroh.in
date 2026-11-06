@@ -53,7 +53,10 @@ export function WhoseHoursCard({
                 <Face name={name} />
             )}
             <span className="min-w-0 flex-1">
-                <span className="block text-[12.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="block text-[12.5px] text-muted-foreground"
+                >
                     Whose hours
                 </span>
                 <span className="block truncate text-[14.5px] font-semibold min-[760px]:text-[15px]">

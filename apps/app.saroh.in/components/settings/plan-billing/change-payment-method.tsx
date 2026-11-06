@@ -14,6 +14,7 @@ import { showInfo } from "@saroh/ui/toast";
 export function ChangePaymentMethod() {
     return (
         <TextLink
+            data-ph-unmask=""
             onClick={() =>
                 showInfo(
                     "Changing how you pay Saroh isn't switched on yet.",

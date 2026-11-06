@@ -193,6 +193,7 @@ export function RulesList({
                 <p className="mt-2.5 text-pretty text-[12.5px] text-muted-foreground">
                     {blocked}{" "}
                     <TextLink
+                        data-ph-unmask=""
                         href={
                             onlineBlocker === "PAYMENTS_OFF"
                                 ? "/settings/modules"
@@ -360,10 +361,16 @@ export function ApprovalSwitch({
                     className="min-h-12 justify-between"
                 >
                     <span className="min-w-0 flex-1">
-                        <span className="block text-[14.5px] font-semibold">
+                        <span
+                            data-ph-unmask=""
+                            className="block text-[14.5px] font-semibold"
+                        >
                             Members&apos; rule changes need approval
                         </span>
-                        <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground"
+                        >
                             {on
                                 ? "On: a Member's change to their own rules waits until an owner or admin approves it."
                                 : "Off: a Member's change to their own rules applies at once, with Undo."}
@@ -371,7 +378,10 @@ export function ApprovalSwitch({
                     </span>
                 </SwitchRow>
             </div>
-            <p className="mt-2.5 text-pretty text-[12.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-2.5 text-pretty text-[12.5px] leading-normal text-muted-foreground"
+            >
                 On for every new business. Each person can also have their own
                 rules for notice, booking ahead, gaps and cancelling. Find them
                 on Hours and time off, under the person.

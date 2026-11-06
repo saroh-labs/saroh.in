@@ -134,10 +134,13 @@ function PrintSection({
             className="mt-6 flex flex-col gap-3"
         >
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h4 id={`${id}-title`} className={HEADING}>
+                <h4 data-ph-unmask="" id={`${id}-title`} className={HEADING}>
                     Ready to print
                 </h4>
-                <span className="text-[13px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[13px] text-muted-foreground"
+                >
                     PDF at real size, with crop marks.
                 </span>
             </div>

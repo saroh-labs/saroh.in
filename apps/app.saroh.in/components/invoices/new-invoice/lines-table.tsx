@@ -70,7 +70,7 @@ export function LinesTable({
             aria-labelledby={ids.heading}
             className="rounded-[12px] border border-border bg-card px-4 py-[13px]"
         >
-            <h2 id={ids.heading} className="label mb-2">
+            <h2 data-ph-unmask="" id={ids.heading} className="label mb-2">
                 What it&apos;s for
             </h2>
             {/* The desk's column heads (UX-080): a phone labels each field
@@ -83,10 +83,10 @@ export function LinesTable({
                     desk,
                 )}
             >
-                <span>Item</span>
-                <span>Qty</span>
-                <span>Price each</span>
-                {registered ? <span>HSN</span> : null}
+                <span data-ph-unmask="">Item</span>
+                <span data-ph-unmask="">Qty</span>
+                <span data-ph-unmask="">Price each</span>
+                {registered ? <span data-ph-unmask="">HSN</span> : null}
             </div>
             <ul className="grid gap-2 sm:gap-1.5">
                 {fields.map((line, i) => {
@@ -211,6 +211,7 @@ export function LinesTable({
                             {registered ? (
                                 <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
                                     <span
+                                        data-ph-unmask=""
                                         aria-hidden
                                         className="text-[12px] text-muted-foreground"
                                     >
@@ -278,7 +279,10 @@ export function LinesTable({
                 ) : null}
             </div>
             {registered ? (
-                <p className="mt-1 text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mt-1 text-[12px] text-muted-foreground"
+                >
                     Prices include GST. Each line needs its rate before the
                     invoice is issued: choose 0% for anything exempt or
                     nil-rated.

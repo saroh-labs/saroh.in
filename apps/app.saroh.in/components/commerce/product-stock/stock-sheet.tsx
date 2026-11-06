@@ -263,11 +263,11 @@ export function StockSheet({
                         {word ??
                             (product.variants.length ? "Variant" : "Product")}
                     </span>
-                    <span>Price</span>
+                    <span data-ph-unmask="">Price</span>
                     {counts ? (
                         <>
-                            <span>On hand</span>
-                            <span>Low stock at</span>
+                            <span data-ph-unmask="">On hand</span>
+                            <span data-ph-unmask="">Low stock at</span>
                         </>
                     ) : null}
                 </div>
@@ -348,7 +348,10 @@ export function StockSheet({
                     />
                 </Field>
             ) : null}
-            <p className="mt-3 text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-3 text-pretty text-[11.5px] leading-[1.5] text-muted-foreground"
+            >
                 {counts
                     ? "Promised stock comes from open orders, so it cannot be changed here. A count below it shows as short."
                     : "Not tracked, so there is no count. Track stock is in the editor's Stock section."}

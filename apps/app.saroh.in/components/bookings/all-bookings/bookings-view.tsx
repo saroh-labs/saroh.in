@@ -336,11 +336,13 @@ export function BookingsView({
                             className={`${ROW_GRID} max-[759px]:hidden`}
                         >
                             <span>When · {zoneLabel}</span>
-                            <span>Customer</span>
-                            <span>Service · with</span>
-                            <span>Did they come?</span>
-                            <span>Status</span>
-                            <span className="sr-only">Actions</span>
+                            <span data-ph-unmask="">Customer</span>
+                            <span data-ph-unmask="">Service · with</span>
+                            <span data-ph-unmask="">Did they come?</span>
+                            <span data-ph-unmask="">Status</span>
+                            <span data-ph-unmask="" className="sr-only">
+                                Actions
+                            </span>
                         </ListTableHead>
                         {groups.map((g) => (
                             <section

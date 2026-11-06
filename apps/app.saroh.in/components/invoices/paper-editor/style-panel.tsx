@@ -68,7 +68,9 @@ export function StylePanel({
             />
 
             <div className="grid gap-2">
-                <span className="label">Logo</span>
+                <span data-ph-unmask="" className="label">
+                    Logo
+                </span>
                 <div className="flex items-center gap-2.5">
                     {logo.url ? (
                         // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
@@ -96,7 +98,10 @@ export function StylePanel({
                             {logo.url ? "Change" : "Add logo"}
                         </Button>
                     ) : (
-                        <span className="text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="text-[12px] text-muted-foreground"
+                        >
                             {logo.url
                                 ? "Your business logo."
                                 : "No logo yet. An owner or admin adds it."}
@@ -136,7 +141,10 @@ export function StylePanel({
                     ) : null}
                 </div>
                 {!canSetDefault ? (
-                    <p className="text-[12px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12px] text-muted-foreground"
+                    >
                         Only an owner or admin can change the default.
                     </p>
                 ) : null}
@@ -145,7 +153,10 @@ export function StylePanel({
             <p className="text-[12px] leading-[1.5] text-muted-foreground">
                 {STYLE_PANEL_NOTE}
             </p>
-            <span className="w-fit rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+            <span
+                data-ph-unmask=""
+                className="w-fit rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
+            >
                 Custom styles: on the roadmap
             </span>
         </div>

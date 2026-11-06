@@ -137,7 +137,7 @@ export default async function LeadDetailPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link key="leads" href="/leads">
+                    <Link data-ph-unmask="" key="leads" href="/leads">
                         Leads
                     </Link>,
                     lead.title,
@@ -229,12 +229,16 @@ export default async function LeadDetailPage({
                 </div>
             ) : null}
 
-            <h2 className="mb-3 text-lg font-semibold">Messages</h2>
+            <h2 data-ph-unmask="" className="mb-3 text-lg font-semibold">
+                Messages
+            </h2>
             <div className="mb-8">
                 <MessageHistory messages={messages} />
             </div>
 
-            <h2 className="mb-3 text-lg font-semibold">Activity</h2>
+            <h2 data-ph-unmask="" className="mb-3 text-lg font-semibold">
+                Activity
+            </h2>
             <div className="mb-8">
                 <ActivityTimeline
                     leadId={lead.id}
@@ -247,7 +251,7 @@ export default async function LeadDetailPage({
                 here, so there is no consent to show. */}
             {contactId && gates.EMAIL.kind !== "off" ? (
                 <div className="grid gap-2 rounded-lg border p-4">
-                    <h2 className="text-sm font-medium">
+                    <h2 data-ph-unmask="" className="text-sm font-medium">
                         Consent and unsubscribe
                     </h2>
                     <ConsentToggle

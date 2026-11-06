@@ -53,7 +53,10 @@ export function CustomerStep({
                     <div className="text-[14px] font-semibold">
                         {pickName(pick)}
                         {pick.kind === "new" ? (
-                            <span className="font-normal text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="font-normal text-muted-foreground"
+                            >
                                 {" "}
                                 · new
                             </span>

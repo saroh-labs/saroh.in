@@ -40,7 +40,7 @@ export function StorefrontList({
             aria-label="Locations"
             className="min-w-0 max-w-[280px] flex-[0_1_236px] overflow-hidden rounded-xl border border-border bg-card max-sm:max-w-none max-sm:flex-[1_1_100%]"
         >
-            <p className={cn(listTable.head, "flex")}>
+            <p data-ph-unmask="" className={cn(listTable.head, "flex")}>
                 {storefronts.length === 1
                     ? "1 location"
                     : `${storefronts.length} locations`}

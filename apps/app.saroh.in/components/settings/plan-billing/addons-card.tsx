@@ -60,7 +60,10 @@ export function AddonsCard({
     return (
         <section aria-label="Add-ons" className={card}>
             <div className="flex flex-wrap items-baseline gap-2 border-b border-border/70 px-[18px] py-3">
-                <span className="flex-auto font-display text-[15px] font-semibold">
+                <span
+                    data-ph-unmask=""
+                    className="flex-auto font-display text-[15px] font-semibold"
+                >
                     Add-ons
                 </span>
                 {sum ? (

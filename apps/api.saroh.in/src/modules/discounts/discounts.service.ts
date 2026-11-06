@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { workspaceAction } from "../analytics/product-milestones";
 import type { DiscountInputDto } from "./dto";
 import type {
     CodeRefusal,
@@ -132,6 +133,7 @@ export class DiscountsService {
             await this.writeReach(tx, created.id, resolved);
             return created.id;
         });
+        workspaceAction("discount_created", organizationId);
         return this.get(organizationId, id);
     }
 

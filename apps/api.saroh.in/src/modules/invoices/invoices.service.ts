@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { workspaceAction } from "../analytics/product-milestones";
 import {
     assertPlanTakesOnlinePayment,
     isRenewalInvoice,
@@ -933,6 +934,7 @@ export class InvoicesService {
                 actor: personActor(ctx),
             });
         });
+        workspaceAction("invoice_issued", ctx.organizationId);
         return this.read(ctx.organizationId, id);
     }
 

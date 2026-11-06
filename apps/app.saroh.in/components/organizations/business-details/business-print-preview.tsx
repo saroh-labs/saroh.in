@@ -52,7 +52,7 @@ export function BusinessPrintPreview({
         >
             <div className="rounded-[10px] border border-border bg-[#FFFDF6] px-[18px] pb-4 pt-[18px] text-[12px] leading-normal text-[#1C1C1A] shadow-[0_1px_2px_rgba(28,28,26,0.06)]">
                 <div className="mb-2.5 flex items-baseline gap-2 border-b border-[rgba(28,28,26,0.12)] pb-2">
-                    <span className="label">
+                    <span data-ph-unmask="" className="label">
                         {registered ? "Tax invoice" : "Invoice"}
                     </span>
                     <span className="ml-auto font-mono text-[11px]">
@@ -92,7 +92,9 @@ export function BusinessPrintPreview({
                 ) : null}
                 {registered ? (
                     <div className="mt-3 flex gap-2 border-t border-dashed border-[rgba(28,28,26,0.2)] pt-2 text-[11.5px]">
-                        <span className="flex-1">Delivery</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            Delivery
+                        </span>
                         <span className="font-mono">
                             SAC {deliverySac || "not set"}
                         </span>

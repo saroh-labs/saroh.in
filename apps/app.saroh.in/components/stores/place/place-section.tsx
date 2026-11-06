@@ -185,7 +185,10 @@ export function PlaceSection({
                         // here.
                         <Notice role="status" className="mt-2" align="center">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                                <span className="min-w-0 flex-[1_1_220px]">
+                                <span
+                                    data-ph-unmask=""
+                                    className="min-w-0 flex-[1_1_220px]"
+                                >
                                     Pick-up is still on, but with no counter
                                     nobody can collect from here.
                                 </span>
@@ -222,6 +225,7 @@ export function PlaceSection({
                         </span>
                         {address && store.mapUrl ? (
                             <span
+                                data-ph-unmask=""
                                 data-testid="location-map-link-summary"
                                 className="block text-[12.5px] text-muted-foreground"
                             >

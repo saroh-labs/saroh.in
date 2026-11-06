@@ -233,7 +233,7 @@ function ChangeForm({
                 />
 
                 <div className="grid gap-1.5 rounded-lg border border-border bg-muted/50 px-3.5 py-3">
-                    <p className="text-[12.5px] font-medium">
+                    <p data-ph-unmask="" className="text-[12.5px] font-medium">
                         When you change it
                     </p>
                     <ul className="grid list-disc gap-1 pl-4 text-[12.5px] leading-normal text-muted-foreground">

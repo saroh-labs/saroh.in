@@ -133,6 +133,7 @@ export function RemoveDetailsDialog({
                 </Notice>
             ) : !preview ? (
                 <p
+                    data-ph-unmask=""
                     role="status"
                     className="mt-3.5 text-[12.5px] text-muted-foreground"
                 >

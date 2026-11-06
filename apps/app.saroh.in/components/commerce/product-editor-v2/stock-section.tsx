@@ -300,6 +300,7 @@ export function StockSection({
                 />
                 {hasVariants && canWrite ? (
                     <TextLink
+                        data-ph-unmask=""
                         onClick={() => setOpened(true)}
                         className="mt-2 text-[12px] coarse:min-h-11"
                     >

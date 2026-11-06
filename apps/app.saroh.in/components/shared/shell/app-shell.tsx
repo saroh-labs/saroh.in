@@ -255,6 +255,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * Visible only when focused, so it costs sighted users nothing.
              */}
             <a
+                data-ph-unmask=""
                 href="#main-content"
                 className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >

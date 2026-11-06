@@ -277,7 +277,10 @@ export function DetailsSheet({
 
                     <fieldset className="flex flex-col gap-3">
                         <div className="flex items-center justify-between gap-2">
-                            <legend className="text-sm font-medium">
+                            <legend
+                                data-ph-unmask=""
+                                className="text-sm font-medium"
+                            >
                                 Who makes it
                             </legend>
                             <ShopSwitch
@@ -376,7 +379,10 @@ export function DetailsSheet({
 
                     <fieldset className="flex flex-col gap-3">
                         <div className="flex items-center justify-between gap-2">
-                            <legend className="text-sm font-medium">
+                            <legend
+                                data-ph-unmask=""
+                                className="text-sm font-medium"
+                            >
                                 Returns
                             </legend>
                             <ShopSwitch

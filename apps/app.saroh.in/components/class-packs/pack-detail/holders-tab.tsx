@@ -72,7 +72,10 @@ export function HoldersTab({
 
     const head = (
         <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-            <h2 className="m-0 font-display text-[15px] font-semibold tracking-[-0.015em]">
+            <h2
+                data-ph-unmask=""
+                className="m-0 font-display text-[15px] font-semibold tracking-[-0.015em]"
+            >
                 Who has it
             </h2>
             <span className="text-[12px] text-muted-foreground">

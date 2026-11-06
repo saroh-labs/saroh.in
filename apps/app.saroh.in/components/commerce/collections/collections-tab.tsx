@@ -138,6 +138,7 @@ export function ProductCollectionsTab({
             <section aria-labelledby="in-collections">
                 <div className="mb-2 flex items-center gap-2.5">
                     <h2
+                        data-ph-unmask=""
                         id="in-collections"
                         className="flex-1 text-[12.5px] font-semibold"
                     >
@@ -185,6 +186,7 @@ export function ProductCollectionsTab({
                                             {c.name}
                                         </p>
                                         <TextLink
+                                            data-ph-unmask=""
                                             onClick={() => setOpened(c.id)}
                                             aria-label={`Open ${c.name}`}
                                             className="shrink-0 text-[12px] coarse:min-h-11"
@@ -201,7 +203,10 @@ export function ProductCollectionsTab({
                                         </p>
                                     ) : null}
                                     {!c.showing ? (
-                                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                        <p
+                                            data-ph-unmask=""
+                                            className="mt-0.5 text-[12px] text-muted-foreground"
+                                        >
                                             Hidden while it is archived. Selling
                                             it again brings it back.
                                         </p>
@@ -221,6 +226,7 @@ export function ProductCollectionsTab({
             </section>
             <section aria-labelledby="on-website">
                 <h2
+                    data-ph-unmask=""
                     id="on-website"
                     className="mb-2 text-[12.5px] font-semibold"
                 >
@@ -246,7 +252,10 @@ export function ProductCollectionsTab({
                     )}
                 </div>
                 {placement.data.website.pages.length > 0 ? (
-                    <p className="mt-2.5 text-[11.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-2.5 text-[11.5px] leading-[1.5] text-muted-foreground"
+                    >
                         Archive it and it leaves{" "}
                         {placement.data.website.pages.length === 1
                             ? "that page"

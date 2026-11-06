@@ -31,7 +31,7 @@ export function ValidityChips({
 
     return (
         <div className="mt-3.5">
-            <div id={ids.label} className={LABEL}>
+            <div data-ph-unmask="" id={ids.label} className={LABEL}>
                 Use within
             </div>
             <div

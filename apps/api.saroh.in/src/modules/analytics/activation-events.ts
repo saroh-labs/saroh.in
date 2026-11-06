@@ -15,7 +15,40 @@ import {
     ONBOARDING_COMPLETED_TYPE,
     ORGANIZATION_CREATED_TYPE,
 } from "./event-contract";
-import { ProductMilestones } from "./product-milestones";
+import type { WorkspaceEvent } from "./product-milestones";
+import { ProductMilestones, workspaceAction } from "./product-milestones";
+
+/**
+ * The workspace event each ledger call also sends, on EVERY call, not only
+ * the first one the ledger keeps (DEC-209), and the ledger property it may
+ * carry under its PostHog name.
+ */
+const WORKSPACE_EVENT_BY_TYPE: Readonly<
+    Partial<Record<string, WorkspaceEvent>>
+> = {
+    [MODULE_ENABLED_TYPE]: "module_turned_on",
+    [FIRST_PRODUCT_CREATED_TYPE]: "product_created",
+    [FIRST_CUSTOMER_CREATED_TYPE]: "customer_created",
+    [FIRST_ORDER_CREATED_TYPE]: "order_created",
+    [FIRST_BOOKING_CREATED_TYPE]: "booking_created",
+    [FIRST_SERVICE_CREATED_TYPE]: "service_created",
+    [FIRST_SITE_PUBLISHED_TYPE]: "website_published",
+    [FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE]: "provider_connected",
+    [IMPORT_COMPLETED_TYPE]: "import_finished",
+};
+
+function workspaceProperties(properties: Record<string, unknown>) {
+    const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const count = (v: unknown) => (typeof v === "number" ? v : undefined);
+    return {
+        module_key: text(properties.moduleKey),
+        provider: text(properties.provider),
+        entity: text(properties.entity),
+        created: count(properties.created),
+        updated: count(properties.updated),
+        failed: count(properties.failed),
+    };
+}
 
 /**
  * Activation instrumentation (#176, and the last open line of #119).
@@ -200,6 +233,14 @@ export class ActivationEvents {
         properties: Record<string, unknown>,
         dedupeKey: string | null,
     ): Promise<void> {
+        const workspaceEvent = WORKSPACE_EVENT_BY_TYPE[type];
+        if (workspaceEvent) {
+            workspaceAction(
+                workspaceEvent,
+                organizationId,
+                workspaceProperties(properties),
+            );
+        }
         try {
             const stored = await this.analytics.record({
                 organizationId,

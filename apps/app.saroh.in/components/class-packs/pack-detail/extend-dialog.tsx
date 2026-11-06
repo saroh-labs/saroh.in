@@ -136,6 +136,7 @@ export function ExtendDialog({
                 />
                 {whyless ? (
                     <p
+                        data-ph-unmask=""
                         role="alert"
                         className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                     >
@@ -143,6 +144,7 @@ export function ExtendDialog({
                     </p>
                 ) : null}
                 <p
+                    data-ph-unmask=""
                     id={ids.help}
                     className="m-0 text-[12px] text-muted-foreground"
                 >

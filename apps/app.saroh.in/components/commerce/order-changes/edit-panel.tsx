@@ -211,7 +211,10 @@ function EditDraft({
                         >
                             <span className="min-w-0 flex-1">
                                 {name}{" "}
-                                <span className="text-muted-foreground">
+                                <span
+                                    data-ph-unmask=""
+                                    className="text-muted-foreground"
+                                >
                                     · added
                                 </span>
                             </span>
@@ -258,7 +261,10 @@ function EditDraft({
                 ) : null}
                 {delivery ? (
                     <fieldset className="mt-3">
-                        <legend className="text-[12px] font-medium">
+                        <legend
+                            data-ph-unmask=""
+                            className="text-[12px] font-medium"
+                        >
                             Delivery address
                         </legend>
                         <Input

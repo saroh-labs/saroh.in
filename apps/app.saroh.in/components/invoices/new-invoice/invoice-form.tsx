@@ -440,7 +440,9 @@ export function InvoiceForm({
                                 disabled={busy}
                             />
                             <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-                                <h2 className="label mb-2">Due</h2>
+                                <h2 data-ph-unmask="" className="label mb-2">
+                                    Due
+                                </h2>
                                 <DueStrip
                                     value={values.due}
                                     onChange={(due) =>
@@ -471,6 +473,7 @@ export function InvoiceForm({
                 )}
                 {noLine && typed ? (
                     <p
+                        data-ph-unmask=""
                         id={ids.why}
                         className="mt-3 text-[12px] text-destructive-subtle-foreground"
                     >

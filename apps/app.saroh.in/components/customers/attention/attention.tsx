@@ -146,9 +146,12 @@ export function AttentionCard({
     return (
         <section className={CARD} aria-label="Needs attention">
             <div className="flex items-baseline gap-2">
-                <span className={cn(LABEL, "flex-1")}>Needs attention</span>
+                <span data-ph-unmask="" className={cn(LABEL, "flex-1")}>
+                    Needs attention
+                </span>
                 {canWrite && state.read ? (
                     <TextLink
+                        data-ph-unmask=""
                         onClick={state.add}
                         className="text-[12.5px] coarse:min-h-11"
                     >
@@ -242,7 +245,10 @@ export function AttentionCard({
                         </p>
                     ) : null}
                     {!canWrite ? (
-                        <p className="mt-2.5 text-[11.5px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="mt-2.5 text-[11.5px] text-muted-foreground"
+                        >
                             Your role can read this but not change their record.
                         </p>
                     ) : null}

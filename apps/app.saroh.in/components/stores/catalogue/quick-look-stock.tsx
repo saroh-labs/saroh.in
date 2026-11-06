@@ -104,7 +104,10 @@ export function StockBlock({
     return (
         <div className="flex flex-col gap-2 border-b border-muted pb-[11px]">
             <div className="flex items-baseline gap-3">
-                <dt className="w-[86px] shrink-0 text-[12.5px] text-muted-foreground">
+                <dt
+                    data-ph-unmask=""
+                    className="w-[86px] shrink-0 text-[12.5px] text-muted-foreground"
+                >
                     Stock
                 </dt>
                 <dd
@@ -157,6 +160,7 @@ export function StockBlock({
                             If an order will be late, open it to tell the
                             customer.{" "}
                             <Link
+                                data-ph-unmask=""
                                 href={waitingOrdersHref(row.id, storeId)}
                                 className="font-semibold underline underline-offset-2"
                             >

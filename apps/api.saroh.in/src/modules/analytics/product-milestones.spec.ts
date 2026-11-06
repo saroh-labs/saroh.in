@@ -18,6 +18,7 @@ import {
     PRODUCT_MILESTONES,
     ProductMilestones,
     UPGRADE_PROMPT_EVENTS,
+    WORKSPACE_EVENTS,
     signedUp,
     signupViewProperties,
     sourceProperties,
@@ -119,16 +120,21 @@ describe("product milestones (DEC-125)", () => {
         expect(Object.keys(properties)).toHaveLength(7);
     });
 
-    it("grows the closed list by exactly the two prompt events and the sign-up page count (DEC-187), none from the ledger", () => {
+    it("grows the closed list by exactly the two prompt events, the sign-up page count (DEC-187) and the workspace events (DEC-209), none a milestone", () => {
         expect([...PRODUCT_EVENTS].sort()).toEqual(
             [
                 ...PRODUCT_MILESTONES,
                 "upgrade_prompt_shown",
                 "upgrade_prompt_pressed",
                 "signup_page_viewed",
+                ...WORKSPACE_EVENTS,
             ].sort(),
         );
-        for (const event of [...UPGRADE_PROMPT_EVENTS, "signup_page_viewed"])
+        for (const event of [
+            ...UPGRADE_PROMPT_EVENTS,
+            "signup_page_viewed",
+            ...WORKSPACE_EVENTS,
+        ])
             expect(Object.values(MILESTONE_BY_LEDGER_TYPE)).not.toContain(
                 event,
             );

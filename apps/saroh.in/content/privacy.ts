@@ -15,7 +15,9 @@
  * (DEC-181), the owner's agreed wording; the free tools' emails, 26 Oct
  * (DEC-194), the owner agreed it in chat; the free downloads' email or
  * WhatsApp number, 31 Oct (plan 2026-10-31-002 U9), NOT YET in the owner's
- * doc: a minimal factual addition for the owner to review). Published VERBATIM at
+ * doc: a minimal factual addition for the owner to review; how fast pages
+ * load, 6 Nov (DEC-160), NOT YET in the owner's doc: a minimal factual
+ * addition for the owner to review). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -59,7 +61,7 @@ Sites on Saroh also count visits for your business without cookies or personal d
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites set no tracking cookies of their own: they count visits only as totals, and run other tools only if you connect them. |
 | Product usage | Which setup steps your business has completed (a first product, a first order), and errors that happen while you use Saroh. Never your customers' details | To fix problems and make Saroh easier to use |
-| Recordings of use and page visits | On saroh.in, only if you accept the cookie notice: what you click, scroll and open, and which pages are opened and for how long. In the workspace: how signed-in people use the screens, and which pages are opened and for how long, kept against an internal id, not your name or email. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken, and to make Saroh easier. You can turn this off for the workspace in Settings › Your profile |
+| Recordings of use and page visits | On saroh.in, only if you accept the cookie notice: what you click, scroll and open, which pages are opened, for how long and how fast they load. In the workspace: how signed-in people use the screens, which pages are opened, for how long and how fast they load, kept against an internal id, not your name or email. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken, and to make Saroh easier. You can turn this off for the workspace in Settings › Your profile |
 
 ## Why we're allowed to
 
@@ -118,7 +120,7 @@ If a breach affects your personal data, we'll tell you and the Data Protection B
 
 ## Cookies
 
-Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
+Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. With your consent, it also measures how fast pages load, how far down a page people scroll and what they click. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
 
 If you reach saroh.in from a link on a business's site, saroh.in keeps that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.
 

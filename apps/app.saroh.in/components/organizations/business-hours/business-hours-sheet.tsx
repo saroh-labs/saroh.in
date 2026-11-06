@@ -162,7 +162,10 @@ export function BusinessHoursSheet({
                 setWeek={setWeek}
                 saved={saved !== null}
             />
-            <p className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[11.5px] leading-normal text-muted-foreground"
+            >
                 Online orders placed while you&apos;re closed are ready from the
                 next opening time.
             </p>

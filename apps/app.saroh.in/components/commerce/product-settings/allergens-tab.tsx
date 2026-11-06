@@ -262,7 +262,10 @@ function AllergenList({
             )}
 
             {allergens.length > 0 ? (
-                <p className="mt-2 text-[11.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mt-2 text-[11.5px] text-muted-foreground"
+                >
                     One a product lists cannot be removed. Take it off those
                     products first.
                 </p>

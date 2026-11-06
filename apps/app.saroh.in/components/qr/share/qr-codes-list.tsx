@@ -91,12 +91,12 @@ export function QrCodesList({
                             "hidden border-b border-muted py-2.5 min-[760px]:grid",
                         )}
                     >
-                        <span>Placed at</span>
-                        <span>Opens</span>
+                        <span data-ph-unmask="">Placed at</span>
+                        <span data-ph-unmask="">Opens</span>
                         {included ? (
                             <>
-                                <span>Scans</span>
-                                <span>Bookings</span>
+                                <span data-ph-unmask="">Scans</span>
+                                <span data-ph-unmask="">Bookings</span>
                             </>
                         ) : null}
                         <span />
@@ -230,8 +230,13 @@ export function QrCodesList({
                     aria-label="Retired codes"
                     className="mt-1 flex flex-col gap-1.5"
                 >
-                    <h5 className={HEAD}>Retired</h5>
-                    <p className="text-[13px] text-muted-foreground">
+                    <h5 data-ph-unmask="" className={HEAD}>
+                        Retired
+                    </h5>
+                    <p
+                        data-ph-unmask=""
+                        className="text-[13px] text-muted-foreground"
+                    >
                         A printed copy of one of these opens your home page.
                     </p>
                     <ul className="rounded-[14px] border border-border text-[13px] text-muted-foreground">

@@ -128,7 +128,10 @@ export function NewRoleSheet({
                 placeholder="Stock clerk"
             />
             <fieldset className="grid gap-2">
-                <legend className="mb-1.5 text-sm font-medium">
+                <legend
+                    data-ph-unmask=""
+                    className="mb-1.5 text-sm font-medium"
+                >
                     Start from
                 </legend>
                 <RadioCards
@@ -142,7 +145,10 @@ export function NewRoleSheet({
                     }))}
                     rowClassName="font-normal"
                 />
-                <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[11.5px] leading-[1.45] text-muted-foreground"
+                >
                     A copy, not a link. Changing this role later does not change
                     the one it started from.
                 </p>

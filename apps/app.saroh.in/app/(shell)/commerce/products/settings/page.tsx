@@ -72,6 +72,7 @@ export default async function ProductSettingsPage({
                 title="Product settings"
                 actions={
                     <TextLink
+                        data-ph-unmask=""
                         href="/commerce/products"
                         className="text-[12.5px]"
                     >

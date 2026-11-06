@@ -23,4 +23,9 @@ export const browserTracking = createBrowserTracking({
     loadRecorder: () => import("posthog-js/dist/posthog-recorder"),
     // Page visits (DEC-160): off unless this is "on"; the same consent.
     analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
+    // Web vitals ride with page visits, never without them.
+    loadWebVitals: () => import("posthog-js/dist/web-vitals"),
+    // Clicks, rage and dead clicks and heatmaps ride with page visits too (owner, 6 Nov 2026).
+    clicks: true,
+    loadDeadClicks: () => import("posthog-js/dist/dead-clicks-autocapture"),
 });

@@ -101,6 +101,7 @@ export function QrTargetPicker({
             {targets.more.length > 0 ? (
                 <div className="flex flex-col gap-2">
                     <TextLink
+                        data-ph-unmask=""
                         aria-expanded={open}
                         aria-controls={`${id}-more`}
                         onClick={() => setOpen((v) => !v)}

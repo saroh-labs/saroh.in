@@ -128,11 +128,13 @@ describe("InvoiceForm's line editor", () => {
         // The rate is buttons under the line (DEC-176), named for the line.
         expect(gst).toMatch(/role="radiogroup" aria-label="Line 1: GST rate"/);
         expect(gst).toContain('aria-label="Line 1: HSN or SAC"');
-        expect(gst).toMatch(/<span aria-hidden="true"[^>]*>GST rate<\/span>/);
+        expect(gst).toMatch(
+            /<span [^>]*aria-hidden="true"[^>]*>GST rate<\/span>/,
+        );
         expect(gst).toMatch(/<label[^>]*>HSN \/ SAC<\/label>/);
         // The desk's one row has an HSN column; the rate sits under it.
-        expect(gst).toContain("<span>HSN</span>");
-        expect(gst).not.toContain("<span>GST</span>");
+        expect(gst).toContain('<span data-ph-unmask="">HSN</span>');
+        expect(gst).not.toMatch(/<span[^>]*>GST<\/span>/);
         expect(out).not.toContain("Line 1: GST rate");
     });
 });

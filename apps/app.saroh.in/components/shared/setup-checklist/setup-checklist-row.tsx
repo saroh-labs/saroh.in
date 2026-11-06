@@ -33,7 +33,9 @@ export function ChecklistStep({ row }: { row: ChecklistRow }) {
                     className="size-4 shrink-0 text-success-subtle-foreground"
                 />
                 <span className="min-w-0 [overflow-wrap:anywhere]">
-                    <span className="sr-only">Done: </span>
+                    <span data-ph-unmask="" className="sr-only">
+                        Done:{" "}
+                    </span>
                     {row.label}
                     {row.note ? `${FACT_DOT}${row.note}` : null}
                 </span>
@@ -59,7 +61,7 @@ export function ChecklistStep({ row }: { row: ChecklistRow }) {
                     id={labelId}
                     className="font-medium [overflow-wrap:anywhere]"
                 >
-                    <span className="sr-only">
+                    <span data-ph-unmask="" className="sr-only">
                         {row.broken ? "Needs fixing: " : "To do: "}
                     </span>
                     {row.label}
@@ -124,7 +126,9 @@ export function ViewLink({ view }: { view: { label: string; href: string } }) {
         >
             {view.label}
             <ExternalLink aria-hidden className="size-3.5" />
-            <span className="sr-only">(opens in a new tab)</span>
+            <span data-ph-unmask="" className="sr-only">
+                (opens in a new tab)
+            </span>
         </a>
     );
 }
@@ -142,6 +146,7 @@ export function HideForNow({
 }) {
     return (
         <TextLink
+            data-ph-unmask=""
             tone="muted"
             onClick={() => {
                 hide.onHide();

@@ -32,7 +32,9 @@ export function UsedTab({
 }) {
     const head = (
         <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-            <h2 className={H2}>Used this week</h2>
+            <h2 data-ph-unmask="" className={H2}>
+                Used this week
+            </h2>
         </div>
     );
     if (denied) {

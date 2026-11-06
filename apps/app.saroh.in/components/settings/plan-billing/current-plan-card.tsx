@@ -58,7 +58,7 @@ export function CurrentPlanCard({
             </Link>
         </Button>
     ) : (
-        <TextLink href={PLANS_HREF} className="text-[13px]">
+        <TextLink data-ph-unmask="" href={PLANS_HREF} className="text-[13px]">
             See Saroh&apos;s plans
         </TextLink>
     );

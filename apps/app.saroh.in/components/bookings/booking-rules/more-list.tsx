@@ -82,6 +82,7 @@ export function MoreSection({
     return (
         <section aria-labelledby="hours-more" className="min-w-0">
             <h2
+                data-ph-unmask=""
                 id="hours-more"
                 className="mb-2.5 mt-[26px] font-display text-[16px] font-semibold tracking-[-0.01em] min-[760px]:mt-0 min-[760px]:text-[17px] min-[760px]:tracking-[-0.02em]"
             >

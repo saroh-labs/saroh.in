@@ -194,7 +194,9 @@ function Body({
                         Since {formatDate(sub.startedAt, tz, { now })}
                     </span>
                 </div>
-                <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
+                <div data-ph-unmask="" className={cn(EYEBROW, "mt-3")}>
+                    Next charge
+                </div>
                 <div className="mt-0.5 font-display text-[24px] font-semibold tabular-nums tracking-[-0.02em]">
                     {nextBig ?? <AbsentValue says="None" />}
                 </div>
@@ -218,7 +220,10 @@ function Body({
                     <div className="text-[13px] font-bold text-destructive-subtle-foreground">
                         {failWhy(sub, now)}
                     </div>
-                    <div className="mt-[3px] text-[12px] text-foreground/75">
+                    <div
+                        data-ph-unmask=""
+                        className="mt-[3px] text-[12px] text-foreground/75"
+                    >
                         Saroh doesn&apos;t charge cards. Open it to send a new
                         payment link, record a payment, pause or cancel.
                     </div>
@@ -280,6 +285,7 @@ function Body({
                     />
                 ) : (
                     <p
+                        data-ph-unmask=""
                         role="note"
                         className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground"
                     >
@@ -306,14 +312,20 @@ function Body({
                             </Link>
                         ))}
                     </div>
-                    <p className="mt-2 text-[11.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-2 text-[11.5px] text-muted-foreground"
+                    >
                         {tab === "cancelled"
                             ? "Starts a new subscription at today's price. The old one keeps its history."
                             : "Opens the subscription with that step ready. Nothing changes until you confirm there."}
                     </p>
                 </QuickLookCard>
             ) : (
-                <p className="text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12px] text-muted-foreground"
+                >
                     Your role can see this subscription but not change it.
                 </p>
             )}

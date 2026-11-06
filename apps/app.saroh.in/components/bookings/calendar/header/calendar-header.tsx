@@ -329,7 +329,10 @@ export function CalendarHeader({
             </div>
 
             {calOnly ? (
-                <p className="order-7 m-0 basis-full text-[12.5px] text-muted-foreground max-[759px]:pb-2 min-[760px]:pl-[84px]">
+                <p
+                    data-ph-unmask=""
+                    className="order-7 m-0 basis-full text-[12.5px] text-muted-foreground max-[759px]:pb-2 min-[760px]:pl-[84px]"
+                >
                     Your role sees the calendar only, so you can't book or
                     change bookings. An owner can change this in Settings ›
                     Team.

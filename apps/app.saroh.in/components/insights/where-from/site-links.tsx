@@ -329,6 +329,7 @@ function MakeLinkDialog({
             {sites.length > 1 ? (
                 <div className="grid gap-1.5">
                     <p
+                        data-ph-unmask=""
                         id={ids.site}
                         className="text-[12.5px] font-medium leading-none"
                     >

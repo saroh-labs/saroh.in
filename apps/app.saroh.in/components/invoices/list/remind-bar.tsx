@@ -52,6 +52,7 @@ export function RemindBar({
                         Remind {n}
                     </button>
                     <button
+                        data-ph-unmask=""
                         type="button"
                         onClick={onClear}
                         className={cn(
