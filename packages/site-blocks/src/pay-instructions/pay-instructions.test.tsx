@@ -270,21 +270,79 @@ describe("a Global business's card (DEC-204)", () => {
         bankName: "Example Bank",
     };
 
-    it("names the code by edition, with no IFSC, UPI or QR, even with a stray UPI ID", () => {
+    it("names each number as the API says, with no IFSC, UPI or QR, even with a stray UPI ID", () => {
         const { container } = render(
             <PayInstructionsCard
-                instructions={{ ...GLOBAL, upiId: UPI }}
+                instructions={{
+                    ...GLOBAL,
+                    upiId: UPI,
+                    bankAccountNumber: "000123456789",
+                    bankIfsc: "021000021",
+                    bankSwift: "BOFAUS3N",
+                    bankLabels: {
+                        account: "Account number",
+                        code: "Routing number",
+                        swift: "SWIFT/BIC",
+                    },
+                }}
                 businessName="Rye"
             />,
         );
         const text = container.textContent;
-        expect(text).toContain("Bank code");
-        expect(text).toContain("12-34-56");
-        expect(text).toContain("Account number or IBAN");
-        expect(text).toContain("GB82 WEST 1234 5698 7654 32");
+        expect(text).toContain("Routing number");
+        expect(text).toContain("021000021");
+        expect(text).toContain("SWIFT/BIC");
+        expect(text).toContain("BOFAUS3N");
+        expect(text).not.toContain("Bank code");
         expect(text).not.toContain("IFSC");
         expect(text).not.toContain("UPI");
         expect(screen.queryByTestId("upi-qr")).toBeNull();
+        expect(
+            screen.getByRole("button", { name: /copy routing number/i }),
+        ).toBeTruthy();
+    });
+
+    it("calls an IBAN an IBAN, grouped in fours", () => {
+        const { container } = render(
+            <PayInstructionsCard
+                instructions={{
+                    ...GLOBAL,
+                    bankIfsc: null,
+                    bankLabels: {
+                        account: "IBAN",
+                        code: null,
+                        swift: "SWIFT/BIC",
+                    },
+                }}
+                businessName="Rye"
+            />,
+        );
+        expect(container.textContent).toContain("IBAN");
+        expect(container.textContent).toContain("GB82 WEST 1234 5698 7654 32");
+        expect(container.textContent).not.toContain("Account number");
+    });
+
+    it("reads the API's labels and SWIFT/BIC, and drops them with India's", () => {
+        const read = payInstructionsOf({
+            ...GLOBAL,
+            bankSwift: " NWBKGB2L ",
+            bankLabels: { account: "IBAN", code: null, swift: "SWIFT/BIC" },
+        });
+        expect(read?.bankSwift).toBe("NWBKGB2L");
+        expect(read?.bankLabels).toEqual({
+            account: "IBAN",
+            code: null,
+            swift: "SWIFT/BIC",
+        });
+        const india = payInstructionsOf({
+            ...NONE,
+            bankAccountName: "Rye Studio",
+            bankAccountNumber: "123456789012",
+            bankIfsc: "ABCD0123456",
+            bankSwift: "NWBKGB2L",
+        });
+        expect(india).not.toHaveProperty("bankSwift");
+        expect(india).not.toHaveProperty("bankLabels");
     });
 
     it("draws whole details without a code, and leaves that row out", () => {

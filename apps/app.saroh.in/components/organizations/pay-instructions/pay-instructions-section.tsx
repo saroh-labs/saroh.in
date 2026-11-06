@@ -78,6 +78,7 @@ export function PayInstructionsSection({
                   saved.bankAccountName,
                   accountLabel(saved.bankAccountNumber),
                   saved.bankIfsc,
+                  saved.bankSwift,
                   saved.bankName,
               ]
                   .filter(Boolean)

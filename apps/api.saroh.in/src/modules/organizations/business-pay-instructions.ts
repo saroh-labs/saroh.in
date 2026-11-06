@@ -2,7 +2,17 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
-import { editionProfile } from "@saroh/edition";
+import {
+    bankCodesOf,
+    bankDetailsWhole,
+    bankFormatFor,
+    checkBankAccount,
+    checkBankCode,
+    checkSwift,
+    editionProfile,
+    joinBankCodes,
+    SWIFT_LABEL,
+} from "@saroh/edition";
 
 import { publicPhone } from "./business-phone";
 
@@ -21,8 +31,11 @@ import { publicPhone } from "./business-phone";
  * still not something to scatter: never logged, and the audit stream names
  * a change without its value (`audit/audit-changes.ts`, NAME_ONLY_FIELDS).
  *
- * A Global business (DEC-204) has no UPI, and its banks ask for many shapes of
- * number and code, so the rules go by the business's edition, never the caller.
+ * A Global business (DEC-204) has no UPI, and its bank details follow its
+ * country (`@saroh/edition` bank-details): an IBAN, or a country's own account
+ * number and code (a US routing number, an Australian BSB), and an optional
+ * SWIFT/BIC kept after the code in the same column. The rules go by the
+ * business's edition and country, never the caller.
  */
 
 /** "asha.kapoor@okhdfc": a handle, an @, and the bank's PSP handle. */
@@ -31,11 +44,6 @@ export const UPI_ID = /^[a-z0-9][a-z0-9._-]{1,255}@[a-z][a-z0-9.-]{1,63}$/;
 export const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 /** Indian bank account numbers run 9 to 18 digits. */
 export const ACCOUNT_NUMBER = /^\d{9,18}$/;
-
-/** IBAN's own limit: the longest account number any bank has to fit. */
-export const GLOBAL_ACCOUNT = /^(?=.*\d)[A-Z0-9]{1,34}$/;
-/** A sort code, routing number or SWIFT, as the bank writes it. */
-export const GLOBAL_BANK_CODE = /^(?=.*[A-Z0-9])[A-Z0-9 -]{1,34}$/;
 
 export const MAX_ACCOUNT_NAME = 100;
 export const MAX_BANK_NAME = 100;
@@ -54,15 +62,30 @@ export const PAY_FIELDS = {
 export type PayField = keyof typeof PAY_FIELDS;
 type PayColumn = (typeof PAY_FIELDS)[PayField];
 
+/** A Global business's SWIFT/BIC: no column, it follows the code in `payBankIfsc`. */
+type InputField = PayField | "bankSwift";
+
 /** What the settings save takes: absent leaves a field, "" clears it. */
-export type PayInstructionsInput = Partial<Record<PayField, string>>;
+export type PayInstructionsInput = Partial<Record<InputField, string>>;
+
+/** What a Global business's bank calls each number, for the customer's card. */
+export interface BankLabels {
+    account: string;
+    code: string | null;
+    swift: string;
+}
 
 /**
  * The business's pay instructions as stored, every field or null. `edition` is
- * sent only for a Global business; absent reads as India.
+ * sent only for a Global business; absent reads as India. A Global business's
+ * `bankIfsc` is its country's own code, and it also has its `bankSwift`, its
+ * `country` and the `bankLabels` its customers read.
  */
 export type PayInstructionsView = Record<PayField, string | null> & {
     edition?: Edition;
+    bankSwift?: string | null;
+    country?: string | null;
+    bankLabels?: BankLabels;
 };
 
 /** The columns a read selects. */
@@ -77,13 +100,18 @@ export const PAY_SELECT = {
     payNote: true,
 } as const;
 
-/** A customer's read: the columns, and the edition that says how to read them. */
+/**
+ * A customer's read: the columns, and the edition and country that say how to
+ * read them. The save reads the same, to judge a Global business's bank.
+ */
 export const PAY_PUBLIC_SELECT = {
     ...PAY_SELECT,
+    country: true,
     organization: { select: { edition: true } },
 } as const;
 
 export type PayRow = Partial<Record<PayColumn, string | null>> & {
+    country?: string | null;
     organization?: { edition: Edition } | null;
 };
 
@@ -101,11 +129,12 @@ export function normalisePayField(
     field: PayField,
     raw: string,
     edition: Edition = "INDIA",
+    country?: string | null,
 ): { value: string | null } | { problem: string } {
     const trimmed = raw.trim();
     if (trimmed === "") return { value: null };
     if (bankCode(edition)) {
-        const global = normaliseGlobalBankField(field, trimmed);
+        const global = normaliseGlobalBankField(field, trimmed, country);
         if (global) return global;
     }
     switch (field) {
@@ -159,34 +188,22 @@ export function normalisePayField(
 function normaliseGlobalBankField(
     field: PayField,
     trimmed: string,
+    country: string | null | undefined,
 ): { value: string } | { problem: string } | null {
     switch (field) {
         case "upiId":
             return { problem: "UPI only works for a business in India." };
-        case "bankAccountNumber": {
-            const account = trimmed.replace(/\s/g, "").toUpperCase();
-            return GLOBAL_ACCOUNT.test(account)
-                ? { value: account }
-                : {
-                      problem:
-                          "That isn't an account number or IBAN. Use letters, digits and spaces, up to 34 characters.",
-                  };
-        }
-        case "bankIfsc": {
-            const code = trimmed.replace(/\s+/g, " ").toUpperCase();
-            return GLOBAL_BANK_CODE.test(code)
-                ? { value: code }
-                : {
-                      problem:
-                          "That isn't a bank code. Use letters, digits, spaces and hyphens, up to 34 characters.",
-                  };
-        }
+        case "bankAccountNumber":
+            return checkBankAccount(country, trimmed);
+        // The country's own code alone; the save adds the SWIFT/BIC after it.
+        case "bankIfsc":
+            return checkBankCode(country, trimmed);
         default:
             return null;
     }
 }
 
-function refuse(field: PayField, message: string): never {
+function refuse(field: InputField, message: string): never {
     throw new BadRequestException({ message, details: { field } });
 }
 
@@ -203,14 +220,23 @@ export function payInstructionsWrite(
     edition: Edition = "INDIA",
 ): Partial<Record<PayColumn, string | null>> {
     if (!input) return {};
+    const global = bankCode(edition);
+    const country = current?.country;
     const written: Partial<Record<PayColumn, string | null>> = {};
     for (const field of Object.keys(PAY_FIELDS) as PayField[]) {
         const raw = input[field];
         if (raw === undefined) continue;
         if (typeof raw !== "string") refuse(field, "That isn't text.");
-        const result = normalisePayField(field, raw, edition);
+        if (global && field === "bankIfsc") continue;
+        const result = normalisePayField(field, raw, edition, country);
         if ("problem" in result) refuse(field, result.problem);
         written[PAY_FIELDS[field]] = result.value;
+    }
+    if (
+        global &&
+        (input.bankIfsc !== undefined || input.bankSwift !== undefined)
+    ) {
+        written.payBankIfsc = globalCodesWrite(input, current);
     }
     if (Object.keys(written).length === 0) return {};
 
@@ -231,12 +257,16 @@ export function payInstructionsWrite(
         if (!has("payBankAccountNumber")) {
             refuse(
                 "bankAccountNumber",
-                bankCode(edition)
-                    ? "Add the account number or IBAN, or clear the bank details."
+                global
+                    ? bankFormatFor(country).accountMissing
                     : "Add the account number, or clear the bank details.",
             );
         }
-        if (!bankCode(edition) && !has("payBankIfsc")) {
+        if (global) {
+            const { codeMissing } = bankFormatFor(country);
+            if (codeMissing && !bankCodesOf(country, after.payBankIfsc).code)
+                refuse("bankIfsc", codeMissing);
+        } else if (!has("payBankIfsc")) {
             refuse(
                 "bankIfsc",
                 "Add the IFSC: a transfer needs it with the account number.",
@@ -244,6 +274,55 @@ export function payInstructionsWrite(
         }
     }
     return written;
+}
+
+/**
+ * A Global business's codes column: its country's own code, then its
+ * SWIFT/BIC, each the one sent or else the one already kept.
+ */
+function globalCodesWrite(
+    input: PayInstructionsInput,
+    current: PayRow | null,
+): string | null {
+    const country = current?.country;
+    const before = bankCodesOf(country, current?.payBankIfsc);
+    const part = (
+        field: "bankIfsc" | "bankSwift",
+        check: (typed: string) => { value: string } | { problem: string },
+        kept: string | null,
+    ) => {
+        const raw = input[field];
+        if (raw === undefined) return kept;
+        if (typeof raw !== "string") refuse(field, "That isn't text.");
+        const trimmed = raw.trim();
+        if (trimmed === "") return null;
+        const result = check(trimmed);
+        if ("problem" in result) refuse(field, result.problem);
+        return result.value;
+    };
+    return joinBankCodes(
+        part("bankIfsc", (t) => checkBankCode(country, t), before.code),
+        part("bankSwift", checkSwift, before.swift),
+    );
+}
+
+/** A Global business's codes split, its country, and its customers' words. */
+function globalBankView(
+    country: string | null | undefined,
+    codes: string | null | undefined,
+) {
+    const format = bankFormatFor(country);
+    const { code, swift } = bankCodesOf(country, codes);
+    return {
+        bankIfsc: code,
+        bankSwift: swift,
+        country: country ?? null,
+        bankLabels: {
+            account: format.account,
+            code: format.code,
+            swift: SWIFT_LABEL,
+        },
+    };
 }
 
 /** Every field as stored, for the business's own settings read. */
@@ -258,7 +337,12 @@ export function payInstructionsView(
         bankIfsc: row?.payBankIfsc ?? null,
         bankName: row?.payBankName ?? null,
         note: row?.payNote ?? null,
-        ...(bankCode(edition) ? { edition } : {}),
+        ...(bankCode(edition)
+            ? {
+                  edition,
+                  ...globalBankView(row?.country, row?.payBankIfsc),
+              }
+            : {}),
     };
 }
 
@@ -283,8 +367,11 @@ export function publicPayInstructions(
         !!row.payBankAccountName &&
         !!row.payBankAccountNumber &&
         (global
-            ? GLOBAL_ACCOUNT.test(row.payBankAccountNumber) &&
-              (!row.payBankIfsc || GLOBAL_BANK_CODE.test(row.payBankIfsc))
+            ? bankDetailsWhole(
+                  row.country,
+                  row.payBankAccountNumber,
+                  row.payBankIfsc,
+              )
             : ACCOUNT_NUMBER.test(row.payBankAccountNumber) &&
               !!row.payBankIfsc &&
               IFSC.test(row.payBankIfsc));
@@ -299,7 +386,15 @@ export function publicPayInstructions(
         bankIfsc: bankWhole ? (row.payBankIfsc ?? null) : null,
         bankName: bankWhole ? (row.payBankName ?? null) : null,
         note,
-        ...(global && edition ? { edition } : {}),
+        ...(global && edition
+            ? {
+                  edition,
+                  ...globalBankView(
+                      row.country,
+                      bankWhole ? row.payBankIfsc : null,
+                  ),
+              }
+            : {}),
     };
 }
 

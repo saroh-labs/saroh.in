@@ -1045,6 +1045,31 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
         expect(done({ note: "Pay at the counter" })).toBe(false);
     });
 
+    it("Free, Global: a US business needs its routing number, and the step asks for it", () => {
+        const step = (pay: Partial<typeof none>) =>
+            readyChecklist({
+                settings: {
+                    ...settled,
+                    setup: facts(false),
+                    payInstructions: {
+                        ...none,
+                        ...pay,
+                        edition: "GLOBAL",
+                        country: "US",
+                    },
+                },
+                modules: selling,
+            }).steps.find((s) => s.key === "howToPay");
+        expect(step({ bankAccountNumber: "000123456789" })?.done).toBe(false);
+        expect(
+            step({ bankAccountNumber: "000123456789", bankIfsc: "021000021" })
+                ?.done,
+        ).toBe(true);
+        expect(step({})?.why).toBe(
+            "Add your account and routing number. Customers see your bank details on every unpaid invoice, order and booking.",
+        );
+    });
+
     it("Grow (online payments): not a step, connecting payments is", () => {
         const r = readyChecklist({
             settings: { ...settled, setup: facts(true), payInstructions: none },

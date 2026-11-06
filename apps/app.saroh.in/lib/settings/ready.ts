@@ -1,6 +1,8 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
+import { bankFormatFor } from "@saroh/edition";
+
 import { PROFILE } from "@/lib/edition";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -347,15 +349,20 @@ function howToPay(
     if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
     const pay = settings.payInstructions;
     if (!pay) return null;
-    // A Global business has no UPI, and its bank code is optional.
+    // A Global business has no UPI, and its bank's code only where its
+    // country has one (`@saroh/edition` bank-details).
     const global = payByBankCode(pay.edition);
-    const set =
-        (!global && filled(pay.upiId)) ||
-        (filled(pay.bankAccountNumber) && (global || filled(pay.bankIfsc)));
+    const set = global
+        ? filled(pay.bankAccountNumber) &&
+          (!bankFormatFor(pay.country).code || filled(pay.bankIfsc))
+        : filled(pay.upiId) ||
+          (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
     return {
         key: "howToPay",
         label: "Tell customers how to pay you",
-        why: `Add your ${PROFILE.payInstructions === "bank-code" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
+        why: global
+            ? `${bankFormatFor(pay.country).asks}. Customers see your bank details on every unpaid invoice, order and booking.`
+            : `Add your ${PROFILE.payInstructions === "bank-code" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
         cta:
             PROFILE.payInstructions === "bank-code"
                 ? "Add bank details"

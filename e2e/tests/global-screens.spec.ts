@@ -72,7 +72,7 @@ test.describe("the Global app (DEC-204)", () => {
         );
     });
 
-    test("How to pay us asks for no UPI or IFSC, saves an IBAN and a US routing number, and the invoice's page shows them as a customer sees", async ({
+    test("How to pay us asks for no UPI or IFSC, checks and saves a US account and routing number, and the invoice's page shows them as a customer sees", async ({
         page,
         context,
     }, testInfo) => {
@@ -87,22 +87,18 @@ test.describe("the Global app (DEC-204)", () => {
         await expect(sheet.getByText(/IFSC/)).toHaveCount(0);
         await expect(page.getByText("UPI ID", { exact: true })).toHaveCount(0);
 
-        // An IBAN, no bank code: the save that was a 500 (6 Nov).
-        await sheet.getByLabel("Account name").fill("Own Studio LLC");
-        await sheet
-            .getByLabel("Account number or IBAN")
-            .fill("GB33BUKB20201555555555");
+        // A US business gives its account and routing number (its country's
+        // own fields, checked as typed); the save that was a 500 (6 Nov).
+        const field = (name: string) => sheet.getByRole("textbox", { name });
+        await field("Account name").fill("Own Studio LLC");
+        await field("Account number").fill("000123456789");
+        // A routing number whose check digit is off is caught before saving.
+        await field("Routing number").fill("021000022");
         await sheet.getByRole("button", { name: "Save" }).click();
-        await expect(sheet).toBeHidden();
-        await expect(row).toContainText("GB33 BUKB 2020 1555 5555 55");
-
-        // A US account and its routing number.
-        await page.goto(app("/settings/organization?section=pay&edit=pay"));
-        await expect(sheet).toBeVisible();
-        await sheet.getByLabel("Account number or IBAN").fill("000123456789");
-        await sheet
-            .getByLabel("Sort code, routing number or SWIFT")
-            .fill("021000021");
+        await expect(sheet).toContainText(
+            "That routing number doesn't check out",
+        );
+        await field("Routing number").fill("021000021");
         await sheet.getByRole("button", { name: "Save" }).click();
         await expect(sheet).toBeHidden();
         await expect(row).toContainText("0001 2345 6789");
@@ -121,9 +117,9 @@ test.describe("the Global app (DEC-204)", () => {
             name: `How to pay ${b.name}`,
         });
         await expect(card).toContainText("Pay by bank transfer");
-        await expect(card).toContainText("Account number or IBAN");
+        await expect(card).toContainText("Account number");
         await expect(card).toContainText("0001 2345 6789");
-        await expect(card).toContainText("Bank code");
+        await expect(card).toContainText("Routing number");
         await expect(card).toContainText("021000021");
         await expect(card).not.toContainText("UPI");
         await expect(card).not.toContainText("IFSC");

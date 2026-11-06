@@ -55,25 +55,39 @@ describe("howToPayLines (#833)", () => {
 });
 
 describe("howToPayLines for a Global business (DEC-204)", () => {
-    it("says Bank code, leaves out a UPI ID, and takes no code at all", () => {
+    it("names the numbers as its country does, and leaves out a UPI ID", () => {
         const global = {
             ...PAY,
             edition: "GLOBAL" as const,
             bankAccountNumber: "GB82WEST12345698765432",
-            bankIfsc: "12-34-56",
+            bankIfsc: null,
+            bankSwift: "NWBKGB2L",
             bankName: "Example Bank",
+            country: "GB",
+            bankLabels: { account: "IBAN", code: null, swift: "SWIFT/BIC" },
         };
         expect(howToPayLines({ standing: "ISSUED" }, global)).toEqual([
-            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Bank code 12-34-56 · Example Bank",
+            "Bank transfer: Rye and Company · IBAN GB82 WEST 1234 5698 7654 32 · SWIFT/BIC NWBKGB2L · Example Bank",
             "Put the invoice number in the note.",
         ]);
         expect(
             howToPayLines(
                 { standing: "ISSUED" },
-                { ...global, bankIfsc: null },
+                {
+                    ...global,
+                    bankAccountNumber: "12345678",
+                    bankIfsc: "062-000",
+                    bankSwift: null,
+                    country: "AU",
+                    bankLabels: {
+                        account: "Account number",
+                        code: "BSB",
+                        swift: "SWIFT/BIC",
+                    },
+                },
             )?.[0],
         ).toBe(
-            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Example Bank",
+            "Bank transfer: Rye and Company · Account number 1234 5678 · BSB 062-000 · Example Bank",
         );
     });
 });

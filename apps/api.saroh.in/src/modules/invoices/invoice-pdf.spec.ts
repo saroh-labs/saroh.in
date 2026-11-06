@@ -586,29 +586,46 @@ describe("How to pay us on an unpaid invoice (#833)", () => {
         ).toEqual(["UPI: rye@okhdfc"]);
     });
 
-    it("a Global business's paper says Bank code, and no IFSC or UPI, in the PDF too", async () => {
+    it("a Global business's paper names its country's numbers, and no IFSC or UPI, in the PDF too", async () => {
         const global = {
             ...PAY,
             upiId: "rye@okhdfc",
             bankAccountNumber: "GB82WEST12345698765432",
-            bankIfsc: "12-34-56",
+            bankIfsc: null,
+            bankSwift: "NWBKGB2L",
             bankName: "Example Bank",
             edition: "GLOBAL" as const,
+            country: "GB",
+            bankLabels: { account: "IBAN", code: null, swift: "SWIFT/BIC" },
         };
         const lines = paper(row(), global).howToPay;
         expect(lines).toEqual([
-            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Bank code 12-34-56 · Example Bank",
+            "Bank transfer: Rye and Company · IBAN GB82 WEST 1234 5698 7654 32 · SWIFT/BIC NWBKGB2L · Example Bank",
             "Put the invoice number in the note.",
         ]);
-        expect(paper(row(), { ...global, bankIfsc: null }).howToPay?.[0]).toBe(
-            "Bank transfer: Rye and Company · Account GB82 WEST 1234 5698 7654 32 · Example Bank",
+        expect(
+            paper(row(), {
+                ...global,
+                bankAccountNumber: "000123456789",
+                bankIfsc: "021000021",
+                bankSwift: null,
+                country: "US",
+                bankLabels: {
+                    account: "Account number",
+                    code: "Routing number",
+                    swift: "SWIFT/BIC",
+                },
+            }).howToPay?.[0],
+        ).toBe(
+            "Bank transfer: Rye and Company · Account number 0001 2345 6789 · Routing number 021000021 · Example Bank",
         );
         const file = await renderInvoicePdf(paper(row(), global));
         const out = execFileSync(process.execPath, ["-e", EXTRACT], {
             input: file,
         });
         const { text } = JSON.parse(out.toString()) as { text: string };
-        expect(text).toContain("Bank code 12-34-56");
+        expect(text).toContain("SWIFT/BIC NWBKGB2L");
+        expect(text).not.toContain("Bank code");
         expect(text).not.toContain("IFSC");
         expect(text).not.toContain("UPI");
     });

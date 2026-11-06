@@ -290,8 +290,15 @@ describe("payWaysWords (R32)", () => {
 });
 
 describe("a Global business's pay instructions (DEC-204)", () => {
-    const write = (input: Parameters<typeof payInstructionsWrite>[0]) =>
-        payInstructionsWrite(input, null, "GLOBAL");
+    const write = (
+        input: Parameters<typeof payInstructionsWrite>[0],
+        current: Parameters<typeof payInstructionsWrite>[1] = null,
+    ) => payInstructionsWrite(input, current, "GLOBAL");
+    const inCountry = (
+        country: string,
+        input: Parameters<typeof payInstructionsWrite>[0],
+        kept: Record<string, string> = {},
+    ) => write(input, { country, ...kept });
     const bank = { bankAccountName: "Example Traders" };
     const refusal = (fn: () => unknown) => {
         try {
@@ -314,26 +321,150 @@ describe("a Global business's pay instructions (DEC-204)", () => {
         });
     });
 
-    it("accepts a US account and routing number, and a UK account and sort code", () => {
+    it("a UK business gives an IBAN, checked, and an optional SWIFT/BIC", () => {
         expect(
-            write({
+            inCountry("GB", {
                 ...bank,
-                bankAccountNumber: "000123456789",
+                bankAccountNumber: "GB82 WEST 1234 5698 7654 32",
+                bankSwift: "nwbk gb 2l",
+            }),
+        ).toEqual({
+            payBankAccountName: "Example Traders",
+            payBankAccountNumber: "GB82WEST12345698765432",
+            payBankIfsc: "NWBKGB2L",
+        });
+        expect(
+            refusal(() =>
+                inCountry("GB", {
+                    ...bank,
+                    bankAccountNumber: "GB83WEST12345698765432",
+                }),
+            ),
+        ).toEqual({
+            message:
+                "That IBAN doesn't check out. Look for a missing or swapped character.",
+            details: { field: "bankAccountNumber" },
+        });
+        // A sort code isn't a SWIFT/BIC.
+        expect(
+            refusal(() =>
+                inCountry("GB", {
+                    ...bank,
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankSwift: "12-34-56",
+                }),
+            ),
+        ).toMatchObject({ details: { field: "bankSwift" } });
+        expect(
+            refusal(() =>
+                inCountry("GB", { ...bank, bankAccountNumber: "" }, {}),
+            ),
+        ).toMatchObject({
+            message: "Add the IBAN, or clear the bank details.",
+        });
+    });
+
+    it("a US business gives a routing number that checks, then its SWIFT/BIC", () => {
+        expect(
+            inCountry("US", {
+                ...bank,
+                bankAccountNumber: "0001 2345 6789",
                 bankIfsc: "021000021",
+                bankSwift: "BOFAUS3N",
             }),
         ).toMatchObject({
             payBankAccountNumber: "000123456789",
-            payBankIfsc: "021000021",
+            payBankIfsc: "021000021 BOFAUS3N",
         });
         expect(
-            write({
+            refusal(() =>
+                inCountry("US", {
+                    ...bank,
+                    bankAccountNumber: "000123456789",
+                    bankIfsc: "021000022",
+                }),
+            ),
+        ).toEqual({
+            message:
+                "That routing number doesn't check out. Look for a missing or swapped digit.",
+            details: { field: "bankIfsc" },
+        });
+        expect(
+            refusal(() =>
+                inCountry("US", { ...bank, bankAccountNumber: "000123456789" }),
+            ),
+        ).toEqual({
+            message:
+                "Add the routing number: a transfer needs it with the account number.",
+            details: { field: "bankIfsc" },
+        });
+    });
+
+    it("changing the SWIFT/BIC alone keeps the code, and clearing it keeps it too", () => {
+        const kept = {
+            payBankAccountName: "Example Traders",
+            payBankAccountNumber: "1234567",
+            payBankIfsc: "12345-003 ROYCCAT2",
+        };
+        expect(inCountry("CA", { bankSwift: "ROYCCAT2XXX" }, kept)).toEqual({
+            payBankIfsc: "12345-003 ROYCCAT2XXX",
+        });
+        expect(inCountry("CA", { bankSwift: "" }, kept)).toEqual({
+            payBankIfsc: "12345-003",
+        });
+        expect(inCountry("CA", { bankIfsc: "000454321" }, kept)).toEqual({
+            payBankIfsc: "54321-004 ROYCCAT2",
+        });
+    });
+
+    it.each([
+        ["AU", "12345678", "062000", "062-000"],
+        ["SG", "1234567890", "7171 081", "7171-081"],
+        ["ZA", "6212345678", "250655", "250655"],
+    ])(
+        "a business in %s saves its account and its own code",
+        (country, account, code, stored) => {
+            expect(
+                inCountry(country, {
+                    ...bank,
+                    bankAccountNumber: account,
+                    bankIfsc: code,
+                }),
+            ).toMatchObject({
+                payBankAccountNumber: account,
+                payBankIfsc: stored,
+            });
+        },
+    );
+
+    it("a New Zealand business gives one number, and no other code", () => {
+        expect(
+            inCountry("NZ", {
                 ...bank,
-                bankAccountNumber: "12345678",
-                bankIfsc: " 12-34-56 ",
+                bankAccountNumber: "12-3456-7654321-00",
+            }),
+        ).toMatchObject({ payBankAccountNumber: "123456765432100" });
+        expect(
+            refusal(() =>
+                inCountry("NZ", {
+                    ...bank,
+                    bankAccountNumber: "123456765432100",
+                    bankIfsc: "123456",
+                }),
+            ),
+        ).toMatchObject({ details: { field: "bankIfsc" } });
+    });
+
+    it("anywhere else: an account number and a SWIFT/BIC", () => {
+        expect(
+            inCountry("JP", {
+                ...bank,
+                bankAccountNumber: "1234567",
+                bankSwift: "MHCBJPJT",
             }),
         ).toMatchObject({
-            payBankAccountNumber: "12345678",
-            payBankIfsc: "12-34-56",
+            payBankAccountNumber: "1234567",
+            payBankIfsc: "MHCBJPJT",
         });
     });
 
@@ -354,7 +485,7 @@ describe("a Global business's pay instructions (DEC-204)", () => {
 
     it.each([
         ["bankAccountNumber", "not an account"],
-        ["bankAccountNumber", "12-34-56-78"],
+        ["bankAccountNumber", "ABCD-EFGH"],
         ["bankAccountNumber", "1".repeat(35)],
         ["bankIfsc", "???"],
         ["bankIfsc", "---"],
@@ -403,7 +534,47 @@ describe("a Global business's pay instructions (DEC-204)", () => {
             bankName: null,
             note: null,
             edition: "GLOBAL",
+            bankSwift: null,
+            country: null,
+            bankLabels: {
+                account: "Account number",
+                code: null,
+                swift: "SWIFT/BIC",
+            },
         });
+    });
+
+    it("shows a customer the US labels, the code and SWIFT/BIC apart, and hides a code that fails", () => {
+        const row = {
+            organization: { edition: "GLOBAL" as const },
+            country: "US",
+            payBankAccountName: "Example Traders",
+            payBankAccountNumber: "000123456789",
+            payBankIfsc: "021000021 BOFAUS3N",
+        };
+        expect(publicPayInstructions(row)).toMatchObject({
+            bankAccountNumber: "000123456789",
+            bankIfsc: "021000021",
+            bankSwift: "BOFAUS3N",
+            country: "US",
+            bankLabels: {
+                account: "Account number",
+                code: "Routing number",
+                swift: "SWIFT/BIC",
+            },
+        });
+        // Bad ABA check digit: bank details are only any use whole.
+        expect(
+            publicPayInstructions({ ...row, payBankIfsc: "021000022" }),
+        ).toBeNull();
+        expect(
+            publicPayInstructions({
+                ...row,
+                country: "DE",
+                payBankAccountNumber: "DE89370400440532013000",
+                payBankIfsc: null,
+            }),
+        ).toMatchObject({ bankLabels: { account: "IBAN", code: null } });
     });
 
     it("says only bank transfer in the invoice email's words", () => {
@@ -435,6 +606,36 @@ describe("a Global business's pay instructions (DEC-204)", () => {
                 ),
             ),
         ).toMatchObject({ details: { field: "bankIfsc" } });
+    });
+
+    it("the save reads the business's own country, and judges by it", async () => {
+        const service = new OrganizationSettingsService(
+            { record: jest.fn() } as unknown as AuditService,
+            {} as MediaService,
+        );
+        profileFindUnique.mockResolvedValue({ country: "US" });
+        const ctx = {
+            organizationId: "org_1",
+            userId: "user_1",
+            role: "OWNER" as const,
+            edition: "GLOBAL" as const,
+        };
+        await expect(
+            service.update(ctx, {
+                payInstructions: {
+                    bankAccountName: "Example Traders",
+                    bankAccountNumber: "000123456789",
+                    bankIfsc: "021000022",
+                },
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "bankIfsc" } },
+        });
+        expect(profileFindUnique).toHaveBeenCalledWith(
+            expect.objectContaining({
+                select: expect.objectContaining({ country: true }),
+            }),
+        );
     });
 
     it("the save goes by the business's edition, not by anything sent", async () => {

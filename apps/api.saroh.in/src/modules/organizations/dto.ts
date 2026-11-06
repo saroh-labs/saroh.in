@@ -440,7 +440,8 @@ export class RegisteredAddressDto {
  * field. Only the type and an outer length are checked here; the shapes
  * (UPI ID, IFSC, account number) and that bank details go together are the
  * service's (`business-pay-instructions.ts`), which names the field, by the
- * business's edition. `bankIfsc` holds a Global business's bank code.
+ * business's edition. `bankIfsc` holds a Global business's own code (a
+ * routing number, a BSB), by its country.
  */
 export class PayInstructionsDto {
     @IsOptional()
@@ -462,6 +463,12 @@ export class PayInstructionsDto {
     @IsString()
     @MaxLength(64)
     bankIfsc?: string;
+
+    /** A Global business's SWIFT/BIC, kept after its code in the same column. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    bankSwift?: string;
 
     @IsOptional()
     @IsString()

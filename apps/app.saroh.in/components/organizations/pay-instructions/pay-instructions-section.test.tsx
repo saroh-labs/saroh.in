@@ -313,20 +313,31 @@ describe("How to pay us for a Global business (DEC-204)", () => {
         expect(preview()?.textContent).toContain("Pay by bank transfer");
     });
 
-    it("the sheet asks for its own fields, and sends an IBAN with no code", async () => {
-        draw(GLOBAL);
+    it("a UK business's sheet asks for an IBAN, checks it, and sends it with no code", async () => {
+        draw({ ...GLOBAL, country: "GB" });
         await press("Add bank details");
         expect(sheet()?.querySelector('[name="upiId"]')).toBeNull();
+        expect(sheet()?.querySelector('[name="bankIfsc"]')).toBeNull();
         const words = sheet()?.textContent;
         expect(words).toContain("Account name");
-        expect(words).toContain("Account number or IBAN");
-        expect(words).toContain("Sort code, routing number or SWIFT");
+        expect(words).toContain("IBAN");
+        expect(words).toContain("SWIFT/BIC (optional)");
         expect(words).toContain("Bank name");
         expect(words).not.toContain("IFSC");
+        expect(words).not.toContain("Bank code");
 
         await typeInto("bankAccountName", "Northwind Supply");
+        await typeInto("bankAccountNumber", "GB83 WEST 1234 5698 7654 32");
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
+            "That IBAN doesn't check out. Look for a missing or swapped character.",
+        );
+        expect(save).not.toHaveBeenCalled();
+
         await typeInto("bankAccountNumber", IBAN);
+        expect(sheet()?.textContent).not.toContain("doesn't check out");
         expect(draft()?.textContent).toContain("Pay by bank transfer");
+        expect(draft()?.textContent).toContain("IBAN");
         save.mockResolvedValue({ ok: true, data: {} });
         await press("Save");
         expect(save).toHaveBeenCalledWith({
@@ -337,29 +348,86 @@ describe("How to pay us for a Global business (DEC-204)", () => {
         });
     });
 
-    it("sends a sort code as typed, and refuses nonsense on its field", async () => {
-        draw(GLOBAL);
+    it("a US business's sheet asks for a routing number that checks, and a SWIFT/BIC", async () => {
+        draw({ ...GLOBAL, country: "US" });
         await press("Add bank details");
+        const words = sheet()?.textContent;
+        expect(words).toContain("Account number");
+        expect(words).toContain("Routing number");
+        expect(words).not.toContain("IBAN");
+
         await typeInto("bankAccountName", "Northwind Supply");
-        await typeInto("bankAccountNumber", "not@an-account");
-        await typeInto("bankIfsc", "12-34-56!");
+        await typeInto("bankAccountNumber", "000123456789");
         await press("Save");
         expect(sheet()?.textContent).toContain(
-            "That isn't an account number or IBAN.",
+            "Add the routing number: a transfer needs it with the account number.",
         );
-        expect(sheet()?.textContent).toContain("That isn't a bank code.");
+        await typeInto("bankIfsc", "021000022");
+        await typeInto("bankSwift", "BOFA");
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
+            "That routing number doesn't check out. Look for a missing or swapped digit.",
+        );
+        expect(sheet()?.textContent).toContain("That isn't a SWIFT/BIC.");
         expect(save).not.toHaveBeenCalled();
 
-        await typeInto("bankAccountNumber", "12345678");
-        await typeInto("bankIfsc", "12-34-56");
+        await typeInto("bankIfsc", "021000021");
+        await typeInto("bankSwift", "BOFAUS3N");
+        expect(draft()?.textContent).toContain("Routing number");
+        expect(draft()?.textContent).toContain("BOFAUS3N");
         save.mockResolvedValue({ ok: true, data: {} });
         await press("Save");
         expect(save).toHaveBeenCalledWith({
             payInstructions: {
                 bankAccountName: "Northwind Supply",
-                bankAccountNumber: "12345678",
-                bankIfsc: "12-34-56",
+                bankAccountNumber: "000123456789",
+                bankIfsc: "021000021",
+                bankSwift: "BOFAUS3N",
             },
         });
+    });
+
+    it.each([
+        ["AU", "BSB", "06200", "A BSB is 6 digits, like 062-000."],
+        [
+            "CA",
+            "Transit and institution number",
+            "1234-003",
+            "Add the 5-digit transit number and the 3-digit institution number, like 12345-003.",
+        ],
+        [
+            "SG",
+            "Bank and branch code",
+            "717108",
+            "Add the 4-digit bank code and the 3-digit branch code, like 7171-081.",
+        ],
+        [
+            "ZA",
+            "Branch code",
+            "25065",
+            "A branch code is 6 digits, like 250655.",
+        ],
+    ])(
+        "a business in %s names its code %s, and refuses a bad one",
+        async (country, label, bad, why) => {
+            draw({ ...GLOBAL, country });
+            await press("Add bank details");
+            expect(sheet()?.textContent).toContain(label);
+            await typeInto("bankIfsc", bad);
+            await press("Save");
+            expect(sheet()?.textContent).toContain(why);
+        },
+    );
+
+    it("a New Zealand business gives one number, and no code field", async () => {
+        draw({ ...GLOBAL, country: "NZ" });
+        await press("Add bank details");
+        expect(sheet()?.querySelector('[name="bankIfsc"]')).toBeNull();
+        await typeInto("bankAccountName", "Northwind Supply");
+        await typeInto("bankAccountNumber", "12-3456-765432-00");
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
+            "A New Zealand account number is 15 or 16 digits",
+        );
     });
 });

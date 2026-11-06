@@ -5,10 +5,12 @@ import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import type { PayInstructions } from "./model";
 import {
+    bankLabelsOf,
     byBankCode,
     groupedAccount,
     hasPayInstructions,
     qrPath,
+    spokenOf,
     upiPayUri,
 } from "./model";
 
@@ -41,7 +43,8 @@ export interface PayInstructionsCardProps {
  * on a phone, a link that opens their UPI app; bank details with a copy
  * button on each; the business's note. Only what is set is drawn, and a
  * business that set nothing gets nothing — the page keeps its own line. A
- * Global business has no UPI, and its bank code is optional and named as such.
+ * Global business has no UPI, and its numbers are named as its country's
+ * banks name them ("IBAN", "Routing number", "BSB"), words the API sends.
  *
  * Merchant chrome in the `--site-*` layer, never Saroh's. The QR itself is
  * black on white whatever the theme: a scanner reads dark modules on a light
@@ -59,9 +62,15 @@ export function PayInstructionsCard({
 }: PayInstructionsCardProps) {
     const headingId = useId();
     if (!hasPayInstructions(instructions)) return null;
-    const { bankAccountName, bankAccountNumber, bankIfsc, bankName } =
-        instructions;
+    const {
+        bankAccountName,
+        bankAccountNumber,
+        bankIfsc,
+        bankSwift,
+        bankName,
+    } = instructions;
     const global = byBankCode(instructions);
+    const labels = bankLabelsOf(instructions);
     const upiId = global ? null : instructions.upiId;
     const bank =
         bankAccountNumber && (bankIfsc || global) ? bankAccountNumber : null;
@@ -142,16 +151,8 @@ export function PayInstructionsCard({
                             />
                         ) : null}
                         <CopyRow
-                            label={
-                                global
-                                    ? "Account number or IBAN"
-                                    : "Account number"
-                            }
-                            spoken={
-                                global
-                                    ? "account number or IBAN"
-                                    : "account number"
-                            }
+                            label={labels.account}
+                            spoken={spokenOf(labels.account)}
                             value={bank}
                             shown={groupedAccount(bank)}
                             mono
@@ -159,9 +160,18 @@ export function PayInstructionsCard({
                         />
                         {bankIfsc ? (
                             <CopyRow
-                                label={global ? "Bank code" : "IFSC"}
-                                spoken={global ? "bank code" : "IFSC"}
+                                label={labels.code}
+                                spoken={spokenOf(labels.code)}
                                 value={bankIfsc}
+                                mono
+                                asFact
+                            />
+                        ) : null}
+                        {global && bankSwift ? (
+                            <CopyRow
+                                label={labels.swift}
+                                spoken={labels.swift}
+                                value={bankSwift}
                                 mono
                                 asFact
                             />

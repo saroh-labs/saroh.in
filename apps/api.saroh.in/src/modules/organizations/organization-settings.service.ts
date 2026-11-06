@@ -539,7 +539,7 @@ export class OrganizationSettingsService {
                   dto.payInstructions,
                   await prisma.businessProfile.findUnique({
                       where: { organizationId: ctx.organizationId },
-                      select: PAY_SELECT,
+                      select: { ...PAY_SELECT, country: true },
                   }),
                   ctx.edition,
               )

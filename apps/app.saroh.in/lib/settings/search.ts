@@ -150,7 +150,11 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
                       "Account number",
                       "Sort code",
                       "Routing number",
+                      "BSB",
+                      "Transit number",
+                      "Branch code",
                       "SWIFT",
+                      "BIC",
                   ]
                 : [
                       "UPI",

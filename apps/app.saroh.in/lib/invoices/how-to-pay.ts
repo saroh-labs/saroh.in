@@ -31,9 +31,13 @@ export function howToPayLines(
         lines.push(
             [
                 `Bank transfer: ${pay.bankAccountName}`,
-                `${global ? "Account" : "A/c"} ${accountLabel(pay.bankAccountNumber)}`,
+                // A Global business's words follow its country: IBAN, BSB.
+                `${global ? (pay.bankLabels?.account ?? "Account") : "A/c"} ${accountLabel(pay.bankAccountNumber)}`,
                 pay.bankIfsc &&
-                    `${global ? "Bank code" : "IFSC"} ${pay.bankIfsc}`,
+                    `${global ? (pay.bankLabels?.code ?? "Bank code") : "IFSC"} ${pay.bankIfsc}`,
+                global &&
+                    pay.bankSwift &&
+                    `${pay.bankLabels?.swift ?? "SWIFT/BIC"} ${pay.bankSwift}`,
                 pay.bankName,
             ]
                 .filter(Boolean)
