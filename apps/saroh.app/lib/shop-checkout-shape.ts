@@ -231,6 +231,7 @@ export function savedAddressOf(
     if (isString(a.name) && a.name) address.name = a.name;
     if (isString(a.phone) && a.phone) address.phone = a.phone;
     if (isString(a.line2) && a.line2) address.line2 = a.line2;
+    if (isString(a.country) && a.country) address.country = a.country;
     return { address };
 }
 
@@ -414,6 +415,7 @@ export function startBody(v: unknown): Record<string, unknown> | null {
             ["city", 100],
             ["state", 100],
             ["postalCode", 16],
+            ["country", 2],
         ] as const) {
             const value = text(a[name], max);
             if (value) address[name] = value;

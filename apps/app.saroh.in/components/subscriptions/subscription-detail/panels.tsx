@@ -41,7 +41,11 @@ export function CollectionsCard({
             className={cn(CARD, "px-4 pb-1.5 pt-[13px]")}
         >
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                <h2 id="collections-title" className={cn(TITLE, "flex-1")}>
+                <h2
+                    data-ph-unmask=""
+                    id="collections-title"
+                    className={cn(TITLE, "flex-1")}
+                >
                     Next collections
                 </h2>
                 <span className="text-[12px] text-muted-foreground">
@@ -108,6 +112,7 @@ export function ChargesCard({
             className={cn(CARD, "overflow-hidden")}
         >
             <h2
+                data-ph-unmask=""
                 id="charges-title"
                 className={cn(TITLE, "px-4 pb-1.5 pt-[13px]")}
             >
@@ -121,6 +126,7 @@ export function ChargesCard({
                 />
             ) : state === "denied" ? (
                 <p
+                    data-ph-unmask=""
                     role="note"
                     className="border-t border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground"
                 >
@@ -240,7 +246,9 @@ export function PlanCard({
 }) {
     return (
         <section aria-label="Plan" className={cn(CARD, "px-4 py-[13px]")}>
-            <div className={cn(EYEBROW, "mb-1.5")}>Plan</div>
+            <div data-ph-unmask="" className={cn(EYEBROW, "mb-1.5")}>
+                Plan
+            </div>
             <div className="text-[14px] font-semibold">{name}</div>
             {what ? (
                 <div className="mt-0.5 text-[12.5px] text-muted-foreground">

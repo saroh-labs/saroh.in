@@ -95,7 +95,10 @@ export function CategoryField({
                 {categories.length === 0 ? (
                     <p className="text-[12.5px] text-muted-foreground">
                         There are no categories yet.{" "}
-                        <TextLink href={productSettingsHref("categories")}>
+                        <TextLink
+                            data-ph-unmask=""
+                            href={productSettingsHref("categories")}
+                        >
                             Manage categories
                         </TextLink>
                     </p>
@@ -137,7 +140,10 @@ export function SheetNotices({
     return (
         <>
             {!canWrite ? (
-                <p className="rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] text-muted-foreground"
+                >
                     Your role can see collections but not change them. An owner
                     or admin can.
                 </p>
@@ -145,6 +151,7 @@ export function SheetNotices({
             {loadError ? <Notice tone="error">{loadError}</Notice> : null}
             {loading ? (
                 <p
+                    data-ph-unmask=""
                     role="status"
                     aria-busy
                     className="text-[12.5px] text-muted-foreground"

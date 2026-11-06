@@ -22,12 +22,25 @@ import type { SupportedProvider } from "./providers/provider.port";
 
 /** Whether the provider signs its webhooks with a secret of its own. */
 export function needsWebhookSecret(provider: string): boolean {
-    return provider.toUpperCase() === "RAZORPAY";
+    const p = provider.toUpperCase();
+    // Stripe signs with the endpoint's own `whsec_` secret, never the API key.
+    return p === "RAZORPAY" || p === "STRIPE";
 }
 
 /** What a connect without the secret is refused with (400). */
 export const WEBHOOK_SECRET_REQUIRED =
     "Add the webhook signing secret from Razorpay › Webhooks, so Saroh can confirm payments.";
+
+/** The same for Stripe, which shows it on the endpoint it made. */
+export const STRIPE_WEBHOOK_SECRET_REQUIRED =
+    "Add the signing secret from Stripe › Developers › Webhooks (on your endpoint), so Saroh can confirm payments.";
+
+/** What a connect of `provider` without its webhook secret is refused with. */
+export function webhookSecretRequired(provider: string): string {
+    return provider.toUpperCase() === "STRIPE"
+        ? STRIPE_WEBHOOK_SECRET_REQUIRED
+        : WEBHOOK_SECRET_REQUIRED;
+}
 
 /**
  * The webhook events to tick in the provider's dashboard: the ones

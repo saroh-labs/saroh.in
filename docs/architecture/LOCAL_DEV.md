@@ -63,6 +63,13 @@ that host and drops it from the address; without the cookie every page of the
 host shows "Open this test release from its link". On a bare-port stack (CI,
 `pnpm prepush --e2e`) the same host is `http://test--northwind.localhost:3005`.
 
+The **Global edition** has no portless names: `pnpm dev` runs India's app and
+accounts. The bare-port stack (`pnpm prepush --e2e` when a Global spec runs,
+and CI's browser shards) adds a Global build of each, the app on
+`http://localhost:3007` and accounts on `http://localhost:3008`, built into
+`.next-global` (`pnpm turbo run build:global`) and started with
+`NEXT_DIST_DIR=.next-global`. Leave 3007 and 3008 free for it.
+
 ## Seeded data
 
 ```bash

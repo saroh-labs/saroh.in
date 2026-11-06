@@ -253,6 +253,26 @@ a note saying so.
   the sealed blob on a serving path: connections made before D22 were
   filled by the `razorpay-public-keys` backfill
   (`ROUND_2_PHASE_2_ROLLOUT.md`). Cashfree's public key stays optional.
+- **Current** (DEC-208) — **Stripe is the business's own account, checked
+  before it is kept.** Connect takes three values, each checked by shape
+  before any call (`payments/public-key.ts`): the publishable key
+  (`pk_live_…` / `pk_test_…`, the key id and the connection's `publicKey`,
+  which the Payment Element opens with), a restricted key (`rk_…`, the key
+  secret; a full `sk_…` key is refused and never sent) in the same mode as
+  the publishable key, and the endpoint's signing secret (`whsec_…`). Each
+  refusal is a 400 naming its `field`. Then one read each of PaymentIntents
+  and Refunds (`verifyCredentials`): a 403 says which permission is missing.
+  Webhooks are signed per endpoint, not with the API key: `Stripe-Signature:
+t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
+  `whsec_…` secret, compared in constant time; `v0` and any other scheme is
+  ignored, several `v1` (a rolling secret) may match, and a `t` more than
+  300 s off is refused (`webhooks/providers/stripe.webhook.ts`). Every call
+  pins `Stripe-Version` (`STRIPE_API_VERSION`), and the merchant makes the
+  endpoint on that version, because events carry the endpoint's version.
+  Which providers a business may connect is its edition's
+  `paymentProviders`, and every provider choice for a payment filters by it
+  (`IN_EDITION`, inside `OPENS_CHECKOUT`). Facts and sources:
+  `payments/providers/STRIPE.md`.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

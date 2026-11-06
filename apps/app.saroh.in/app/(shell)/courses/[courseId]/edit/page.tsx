@@ -47,6 +47,7 @@ export default async function EditCoursePage({
                     breadcrumb={[
                         "Bookings",
                         <Link
+                            data-ph-unmask=""
                             key="courses"
                             href="/courses"
                             className="hover:text-foreground"
@@ -55,6 +56,7 @@ export default async function EditCoursePage({
                         </Link>,
                         <Link
                             key="course"
+                            data-ph-mask=""
                             href={`/courses/${course.id}`}
                             className="hover:text-foreground"
                         >

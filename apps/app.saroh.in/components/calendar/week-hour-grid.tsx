@@ -72,7 +72,10 @@ export function WeekHourGrid({
                 </div>
 
                 <div className={cn(COLS, "border-b border-border")}>
-                    <div className="px-1.5 pt-1.5 text-right text-[10.5px] text-muted-foreground">
+                    <div
+                        data-ph-unmask=""
+                        className="px-1.5 pt-1.5 text-right text-[10.5px] text-muted-foreground"
+                    >
                         All day
                     </div>
                     {days.map(({ column: col, allDay, allDayMore }) => (

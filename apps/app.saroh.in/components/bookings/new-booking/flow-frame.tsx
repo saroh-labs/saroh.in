@@ -103,7 +103,10 @@ export function PhoneHeader({
 export function DeskHeader({ step }: { step: Step | null }) {
     return (
         <div className="hidden shrink-0 items-baseline gap-3.5 border-b border-border px-6 pb-3.5 pr-16 pt-[18px] min-[760px]:flex">
-            <p className="font-display text-[18px] font-semibold tracking-[-0.02em]">
+            <p
+                data-ph-unmask=""
+                className="font-display text-[18px] font-semibold tracking-[-0.02em]"
+            >
                 New booking
             </p>
             {step ? (

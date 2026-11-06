@@ -84,7 +84,10 @@ export function ServiceList({
                 <p data-ph-mask="" className="text-[15px] font-semibold">
                     {firstName(staffName)} takes no one-to-one services yet
                 </p>
-                <p className="text-[13px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[13px] text-muted-foreground"
+                >
                     Choose who takes each service, then come back to this free
                     time.
                 </p>
@@ -96,7 +99,7 @@ export function ServiceList({
     }
     return (
         <div className="grid gap-2">
-            <span id={id} className="sr-only">
+            <span data-ph-unmask="" id={id} className="sr-only">
                 Service
             </span>
             <RadioCards
@@ -133,6 +136,7 @@ export function ServiceList({
             />
             {loading ? (
                 <p
+                    data-ph-unmask=""
                     role="status"
                     className="text-[12.5px] text-muted-foreground"
                 >
@@ -243,6 +247,7 @@ function CheckRow({
             </span>
             {change ? (
                 <TextLink
+                    data-ph-unmask=""
                     onClick={change.onPress}
                     aria-label={change.label}
                     className="shrink-0 text-[13px] coarse:min-h-11"
@@ -288,7 +293,10 @@ export function BlockFields({
                 <p className="text-[15px] font-semibold tabular-nums">
                     Blocked · {blockRange(free[0], length)}
                 </p>
-                <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] leading-[1.5] text-muted-foreground"
+                >
                     Customers won’t be offered this time. It shows as time off
                     on the calendar.
                 </p>
@@ -364,6 +372,7 @@ export function GapFoot({
             {extra ? (
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-[760px]:order-first">
                     <TextLink
+                        data-ph-unmask=""
                         onClick={extra.onClose}
                         className="text-[13px] coarse:min-h-11"
                     >

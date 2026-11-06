@@ -73,7 +73,7 @@ export function ActivityList({
                                     {line.who}
                                 </strong>{" "}
                                 {line.what}
-                                <span className="sr-only">
+                                <span data-ph-unmask="" className="sr-only">
                                     . Show the details
                                 </span>
                             </button>
@@ -175,7 +175,10 @@ function ActivitySheet({
                         ))}
                     </dl>
                     {detail.withoutValues ? (
-                        <p className="mt-3 text-[12.5px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="mt-3 text-[12.5px] text-muted-foreground"
+                        >
                             Earlier changes were recorded without their values.
                         </p>
                     ) : null}
@@ -194,14 +197,21 @@ function ChangeText({
     after: string | null;
 }) {
     if (before === null && after === null) {
-        return <span className="text-muted-foreground">Changed</span>;
+        return (
+            <span data-ph-unmask="" className="text-muted-foreground">
+                Changed
+            </span>
+        );
     }
     if (before === null) return <>{after}</>;
     return (
         <>
             <span className="text-muted-foreground">{before}</span>
             <span aria-hidden> → </span>
-            <span className="sr-only"> to </span>
+            <span data-ph-unmask="" className="sr-only">
+                {" "}
+                to{" "}
+            </span>
             {after ?? "Not set"}
         </>
     );

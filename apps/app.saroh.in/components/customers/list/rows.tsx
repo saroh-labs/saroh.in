@@ -62,15 +62,19 @@ export function Rows({
             <div className="sm:overflow-x-auto">
                 <div className="sm:min-w-[520px]">
                     <ListTableHead className={cn("hidden gap-3 sm:grid", cols)}>
-                        <span>Customer</span>
+                        <span data-ph-unmask="">Customer</span>
                         {page.sees.orders ? (
                             <>
-                                <span>Last order</span>
-                                <span className="text-right">Orders</span>
+                                <span data-ph-unmask="">Last order</span>
+                                <span data-ph-unmask="" className="text-right">
+                                    Orders
+                                </span>
                             </>
                         ) : null}
                         {page.sees.spent ? (
-                            <span className="text-right">Spent</span>
+                            <span data-ph-unmask="" className="text-right">
+                                Spent
+                            </span>
                         ) : null}
                     </ListTableHead>
                     {page.rows.length === 0

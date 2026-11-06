@@ -125,7 +125,10 @@ export function ProductFilter({
                             )
                         ) : null}
                         {!found && !error ? (
-                            <p className="px-3 py-2.5 text-[12.5px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="px-3 py-2.5 text-[12.5px] text-muted-foreground"
+                            >
                                 Searching…
                             </p>
                         ) : null}
@@ -135,7 +138,9 @@ export function ProductFilter({
                                 onSelect={() => pick(null)}
                                 className="min-h-10 coarse:min-h-11"
                             >
-                                <span className="ml-6">All products</span>
+                                <span data-ph-unmask="" className="ml-6">
+                                    All products
+                                </span>
                             </CommandItem>
                         ) : null}
                         {(found ?? []).map((p) => (

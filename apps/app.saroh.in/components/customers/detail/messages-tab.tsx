@@ -100,7 +100,10 @@ export function MessagesTab({
                 team&apos;s notes are never shown to them.
             </p>
             {thread.earlier ? (
-                <p className="mb-2 text-center text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mb-2 text-center text-[12px] text-muted-foreground"
+                >
                     Older messages aren&apos;t shown.
                 </p>
             ) : null}

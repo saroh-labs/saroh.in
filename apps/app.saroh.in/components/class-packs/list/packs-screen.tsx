@@ -133,6 +133,7 @@ export function PacksScreen({
                 holdsData="description"
                 breadcrumb={[
                     <Link
+                        data-ph-unmask=""
                         key="bookings"
                         href="/bookings"
                         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -174,7 +175,10 @@ export function PacksScreen({
                 business: one line, and the sheet to choose them in. */}
             <MissingRatesNotice missing={missingRates} />
 
-            <p className="text-pretty text-[13px] text-foreground/80">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[13px] text-foreground/80"
+            >
                 Changing a pack only changes what&apos;s sold next. Packs people
                 already have keep their classes, price and dates.
             </p>

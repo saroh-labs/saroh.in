@@ -54,14 +54,19 @@ export function chequeNumber(): string {
 
 /** Northwind's API as the signed-in owner; writes carry an Origin (#50). */
 export function northwind(request: APIRequestContext) {
+    return business(request, NORTHWIND_ORG);
+}
+
+/** {@link northwind}'s calls, for any business the signed-in person is in. */
+export function business(request: APIRequestContext, organizationId: string) {
     const headers = {
-        "x-organization-id": NORTHWIND_ORG,
+        "x-organization-id": organizationId,
         origin: urls.APP_URL,
     };
     const url = (path: string) =>
         path.startsWith("/stores/")
             ? `${urls.API_URL}${path}`
-            : `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
+            : `${urls.API_URL}/organizations/${organizationId}${path}`;
     const ok = async <T>(res: APIResponse): Promise<T> => {
         // A 401 here is almost always a context with no session: sign the
         // page in (`useSession(page)`) before using its `page.request`.

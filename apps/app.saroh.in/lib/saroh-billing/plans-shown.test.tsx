@@ -1,13 +1,19 @@
 /**
  * The one switch for Saroh's own plans in the workspace (DEC-136,
  * `NEXT_PUBLIC_PLANS`): off, Settings › Plan and billing isn't there and
- * nothing names a plan; on, everything is as it was. Made-up plans.
+ * nothing names a plan; on, everything is as it was. An edition Saroh
+ * doesn't bill (Global) hides them as off does, whatever the switch says.
+ * Made-up plans.
  */
 import Link from "next/link";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const flag = vi.hoisted(() => ({ plans: undefined as string | undefined }));
+interface Flag {
+    plans: string | undefined;
+    edition: "INDIA" | "GLOBAL";
+}
+const flag = vi.hoisted((): Flag => ({ plans: undefined, edition: "INDIA" }));
 const apiFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("@/env", () => ({
@@ -17,6 +23,15 @@ vi.mock("@/env", () => ({
         },
     },
 }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(flag.edition);
+        },
+    };
+});
 vi.mock("@/lib/api/http", () => ({
     apiFetch,
     orgBase: () => Promise.resolve("/organizations/org_1"),
@@ -150,6 +165,7 @@ function okJson(body: unknown) {
 
 beforeEach(() => {
     apiFetch.mockReset();
+    flag.edition = "INDIA";
 });
 
 describe("plansShown", () => {
@@ -161,11 +177,21 @@ describe("plansShown", () => {
         flag.plans = "on";
         expect(plansShown()).toBe(true);
     });
+
+    it("is off on an edition Saroh doesn't bill, even with the switch on", () => {
+        flag.plans = "on";
+        flag.edition = "GLOBAL";
+        expect(plansShown()).toBe(false);
+    });
 });
 
-describe("with plans hidden (the switch unset)", () => {
+describe.each([
+    ["the switch unset", undefined, "INDIA"],
+    ["Global, the switch on", "on", "GLOBAL"],
+] as const)("with plans hidden (%s)", (_, plans, edition) => {
     beforeEach(() => {
-        flag.plans = undefined;
+        flag.plans = plans;
+        flag.edition = edition;
     });
 
     it("leaves Plan and billing out of the Settings sections, for the owner too", () => {

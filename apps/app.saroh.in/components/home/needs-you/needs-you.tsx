@@ -84,7 +84,7 @@ export function NeedsYou({
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
             <div className="flex items-baseline gap-[9px]">
-                <h2 id={headingId} className="label">
+                <h2 data-ph-unmask="" id={headingId} className="label">
                     Needs you
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
@@ -114,7 +114,10 @@ export function NeedsYou({
                 // Not a success: nothing came back from the parts that
                 // answered, and one didn't, so all Home can say is that.
                 <p className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm text-neutral-700 dark:text-muted-foreground">
-                    <strong className="font-semibold text-foreground">
+                    <strong
+                        data-ph-unmask=""
+                        className="font-semibold text-foreground"
+                    >
                         Nothing else we could check needs you.
                     </strong>{" "}
                     {formatList(unavailable.map((u) => u.label))} couldn't be

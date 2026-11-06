@@ -105,9 +105,9 @@ export function RequestsView({
                         <ListTableHead
                             className={cn("hidden gap-3 sm:grid", COLS)}
                         >
-                            <span>Customer</span>
-                            <span>Asked</span>
-                            <span>Status</span>
+                            <span data-ph-unmask="">Customer</span>
+                            <span data-ph-unmask="">Asked</span>
+                            <span data-ph-unmask="">Status</span>
                         </ListTableHead>
                         <ul aria-label="Requests to remove data">
                             {rows.map((row) => (

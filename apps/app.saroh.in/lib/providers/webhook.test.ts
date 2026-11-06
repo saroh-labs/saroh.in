@@ -58,6 +58,9 @@ describe("the rest", () => {
             "Accounts & Settings › Webhooks › Add New Webhook",
         );
         expect(WEBHOOK_PLACE.CASHFREE).toMatch(/Webhooks/);
+        expect(WEBHOOK_PLACE.STRIPE).toBe(
+            "Developers › Webhooks › Add endpoint",
+        );
     });
 
     it("finds a provider's setup, or none", () => {
@@ -77,5 +80,14 @@ describe("the rest", () => {
         expect(isTestKey("rzp_test_Abc")).toBe(true);
         expect(isTestKey("  rzp_test_Abc")).toBe(true);
         expect(isTestKey("rzp_live_Abc")).toBe(false);
+    });
+
+    it("spots a Stripe test key, publishable or restricted", () => {
+        expect(isTestKey("pk_test_example")).toBe(true);
+        expect(isTestKey(" rk_test_example")).toBe(true);
+        expect(isTestKey("pk_live_example")).toBe(false);
+        expect(isTestKey("rk_live_example")).toBe(false);
+        // A full secret key is never taken, test or not.
+        expect(isTestKey("sk_test_example")).toBe(false);
     });
 });

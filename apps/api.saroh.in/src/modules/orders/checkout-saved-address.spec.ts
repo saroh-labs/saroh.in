@@ -9,6 +9,7 @@ const row = (over: Partial<SavedAddressRow> = {}): SavedAddressRow => ({
     deliveryCity: "Bengaluru",
     deliveryState: "Karnataka",
     deliveryPostalCode: "560038",
+    deliveryCountry: null,
     ...over,
 });
 

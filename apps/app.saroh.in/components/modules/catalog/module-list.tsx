@@ -94,7 +94,10 @@ export function ModuleList({
                     />
                 ))}
             </div>
-            <p className="mt-2.5 text-pretty text-[11.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-2.5 text-pretty text-[11.5px] leading-normal text-muted-foreground"
+            >
                 {canManage
                     ? "Turning one off removes its section from the rail at once. Nothing is deleted. The data waits for it to come back on."
                     : // Shown disabled rather than hidden: knowing what this

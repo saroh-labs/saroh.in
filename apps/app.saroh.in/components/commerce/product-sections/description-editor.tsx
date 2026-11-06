@@ -368,6 +368,7 @@ function DescriptionSurface({
                     }
                 />
                 <button
+                    data-ph-unmask=""
                     type="button"
                     role="switch"
                     aria-checked={source}

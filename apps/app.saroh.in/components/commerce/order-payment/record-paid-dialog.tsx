@@ -104,6 +104,7 @@ export function RecordPaidDialog({
             {amounts ? (
                 <fieldset className="grid gap-2">
                     <legend
+                        data-ph-unmask=""
                         id={`${id}-much`}
                         className="mb-2 text-[13px] font-semibold"
                     >

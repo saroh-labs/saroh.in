@@ -136,7 +136,10 @@ export function SubscribeDialog({
                 onSubmit={save}
             >
                 {active.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[13px] text-muted-foreground"
+                    >
                         There is no plan to put anyone on yet. Make one in Plans
                         first.
                     </p>

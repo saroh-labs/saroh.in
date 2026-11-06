@@ -82,9 +82,12 @@ function stateCodeOf(name: string | null | undefined): string {
     );
 }
 
-/** The draft the sheet opens with. A new address starts in India. */
-export function draftFrom(c: CustomerDetail["contact"]): DetailsDraft {
-    const country = c.country ?? "IN";
+/** The draft the sheet opens with. A new address starts on the business's country. */
+export function draftFrom(
+    c: CustomerDetail["contact"],
+    businessCountry = "IN",
+): DetailsDraft {
+    const country = c.country ?? businessCountry;
     return {
         firstName: c.firstName ?? "",
         lastName: c.lastName ?? "",

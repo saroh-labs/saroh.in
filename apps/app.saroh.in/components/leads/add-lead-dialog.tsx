@@ -182,7 +182,10 @@ export function AddLeadDialog({
             onSubmit={submit}
         >
             <fieldset className="grid gap-2">
-                <legend className="mb-2 text-[12.5px] font-medium">
+                <legend
+                    data-ph-unmask=""
+                    className="mb-2 text-[12.5px] font-medium"
+                >
                     Who are they?
                 </legend>
                 {contacts.length > 0 ? (

@@ -20,7 +20,7 @@ export function PausedDiary({
             aria-label="Paused on the diary"
             className="space-y-2 rounded-xl border border-border px-4 py-3"
         >
-            <p className="text-[12.5px] font-semibold">
+            <p data-ph-unmask="" className="text-[12.5px] font-semibold">
                 On the diary, no sign-in
             </p>
             <ul className="flex flex-wrap gap-x-4 gap-y-1.5">

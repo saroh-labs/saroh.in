@@ -90,7 +90,7 @@ export function PendingInvites({
             aria-label="Invited, not joined yet"
             className={listTable.card}
         >
-            <p className={cn(listTable.head, "flex")}>
+            <p data-ph-unmask="" className={cn(listTable.head, "flex")}>
                 Invited · not joined yet
             </p>
             <ul>

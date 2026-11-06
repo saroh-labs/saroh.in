@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { assertSarohBills } from "./saroh-bills";
 
 /** A `Subscription` with its resolved `Plan` embedded (the common read shape). */
 export type SubscriptionWithPlan = Subscription & { plan: Plan };
@@ -42,6 +43,7 @@ export class SubscriptionsService {
     // eslint-disable-next-line @typescript-eslint/require-await -- refuses as a rejection, as the routes always did
     async subscribe(ctx: OrganizationContext): Promise<SubscriptionWithPlan> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         throw new GoneException(RETIRED_BILLING_WRITE);
     }
 

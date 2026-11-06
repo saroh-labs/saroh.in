@@ -48,7 +48,7 @@ function filesWith(app: string, shape: RegExp): string[] {
 
 /** Anything that could hand over or start the recorder, or page visits (DEC-160). */
 const RECORDER =
-    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/;
+    /posthog-recorder|loadRecorder|posthog-js\/dist\/web-vitals|loadWebVitals|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/;
 
 const read = (file: string) => readFileSync(path.join(appsDir, file), "utf8");
 
@@ -81,9 +81,12 @@ describe("session replay is the workspace and saroh.in only", () => {
     it.each(["app.saroh.in", "saroh.in"])(
         "only %s's tracker is handed the recorder",
         (app) => {
-            expect(filesWith(app, /loadRecorder|posthog-recorder/)).toEqual([
-                "lib/error-tracking-browser.ts",
-            ]);
+            expect(
+                filesWith(
+                    app,
+                    /loadRecorder|posthog-recorder|loadWebVitals|posthog-js\/dist\/web-vitals/,
+                ),
+            ).toEqual(["lib/error-tracking-browser.ts"]);
         },
     );
 

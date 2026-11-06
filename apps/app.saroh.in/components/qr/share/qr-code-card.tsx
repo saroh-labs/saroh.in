@@ -3,6 +3,7 @@ import type { QrArtLogo } from "@saroh/ui/qr-art";
 import { QrArt } from "@saroh/ui/qr-art";
 import { useMemo } from "react";
 
+import { PROFILE } from "@/lib/edition";
 import type { QrStyle } from "@/lib/qr/types";
 import { linkWords, TOO_LIGHT } from "@/lib/qr/words";
 
@@ -11,8 +12,9 @@ import { artOf } from "@/components/qr/link-qr/qr-download";
 import { Notice } from "@saroh/ui/notice";
 
 /** The design's line that keeps this code apart from the UPI QR (R5). */
-export const UPI_LINE =
-    "Your UPI QR stays separate. This one opens your page, not a payment.";
+export const UPI_LINE = PROFILE.upi
+    ? "Your UPI QR stays separate. This one opens your page, not a payment."
+    : "This code opens your page, not a payment.";
 
 /**
  * The code as it will print ("Saroh QR Codes" design, the middle column):

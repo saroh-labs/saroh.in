@@ -9,7 +9,6 @@ import { Button } from "@saroh/ui/button";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
-import { PhoneInput } from "@saroh/ui/phone-input";
 import { Segmented } from "@saroh/ui/segmented";
 import { TabStrip } from "@saroh/ui/tabs";
 import { showError } from "@saroh/ui/toast";
@@ -22,6 +21,7 @@ import { EmailNoteText } from "@/components/communications/email-note";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
@@ -516,6 +516,7 @@ export function ShareSheet({
                         <>
                             <div className="grid gap-1.5">
                                 <span
+                                    data-ph-unmask=""
                                     id={ids.kind}
                                     className="text-sm font-medium"
                                 >
@@ -555,7 +556,10 @@ export function ShareSheet({
                             </p>
                             {phone ? (
                                 <div className="grid gap-1.5">
-                                    <span className="text-sm font-medium">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-sm font-medium"
+                                    >
                                         To
                                     </span>
                                     <p
@@ -575,7 +579,7 @@ export function ShareSheet({
                                     hint={`No number for ${first} on this invoice. It's used for this message only.`}
                                     error={typedProblem}
                                 >
-                                    <PhoneInput
+                                    <BusinessPhoneInput
                                         id={ids.to}
                                         value={typed}
                                         onValueChange={setTyped}
@@ -673,14 +677,20 @@ export function MessagePreview({ text }: { text: string }) {
                 {before}
                 {after !== null ? (
                     <>
-                        <span className="rounded bg-muted px-1 font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="rounded bg-muted px-1 font-mono text-[12px] text-muted-foreground"
+                        >
                             link made when you share
                         </span>
                         {after}
                     </>
                 ) : null}
             </blockquote>
-            <figcaption className="mt-1.5 text-[11.5px] text-muted-foreground">
+            <figcaption
+                data-ph-unmask=""
+                className="mt-1.5 text-[11.5px] text-muted-foreground"
+            >
                 Preview
             </figcaption>
         </figure>

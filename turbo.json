@@ -163,6 +163,9 @@
         // the api's test-only switch for them (refused in production).
         "E2E_DOMAIN_HOSTING",
         "DOMAIN_HOSTING_FAKE",
+        // Stripe on a fake in the stack's api (U8), and the stripe-checkout
+        // spec runs when it is set: test only, refused in production.
+        "STRIPE_FAKE",
         // Runs the workspace's paused-by-plan e2e (#800) against a business
         // the stack was prepared to have paused (its id).
         "E2E_PAUSED_ORG",
@@ -189,6 +192,24 @@
                 "!**/jest.config.*"
             ],
             "outputs": ["dist/**", ".next/**", "!.next/cache/**", "public/downloads/**", "public/templates/**", "out/**"]
+        },
+        // The Global edition's copy of the merchant app and accounts, for the
+        // browser stack only (CI's shards, `pnpm prepush --e2e`): built
+        // into `.next-global` with NEXT_PUBLIC_EDITION=GLOBAL and the Global
+        // ports' addresses. Its own task, so its cache never stands in for
+        // India's build (NEXT_PUBLIC_EDITION is passed through, not hashed).
+        "build:global": {
+            "dependsOn": ["^build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "!**/*.test.{ts,tsx,js,mjs}",
+                "!**/*.spec.{ts,tsx,js,mjs}",
+                "!**/*.stories.{ts,tsx}",
+                "!**/__tests__/**",
+                "!**/*.md",
+                "!**/vitest.config.*"
+            ],
+            "outputs": [".next-global/**", "!.next-global/cache/**"]
         },
         "db:migrate:deploy": {},
         "db:push": {},

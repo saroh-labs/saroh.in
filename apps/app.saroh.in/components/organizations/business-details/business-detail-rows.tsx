@@ -135,7 +135,9 @@ export function BusinessDetailRows({
                                 alt="Business logo"
                                 className="size-9 flex-none rounded-lg border border-border bg-white object-cover"
                             />
-                            <span>On your invoices and receipts</span>
+                            <span data-ph-unmask="">
+                                On your invoices and receipts
+                            </span>
                         </span>
                     ) : (
                         <Absent>No logo yet</Absent>

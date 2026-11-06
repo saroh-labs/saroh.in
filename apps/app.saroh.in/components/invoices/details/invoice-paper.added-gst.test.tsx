@@ -213,7 +213,7 @@ const amounts = (out: string) =>
 const sums = (out: string) =>
     Array.from(
         out.matchAll(
-            /<span class="flex-1">([^<]*)<\/span><span class="tabular-nums">([^<]*)</g,
+            /<span (?:data-ph-unmask="" )?class="flex-1">([^<]*)<\/span><span class="tabular-nums">([^<]*)</g,
         ),
         (m) => [m[1], m[2]],
     );

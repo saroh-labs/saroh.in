@@ -1,12 +1,18 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
-import { EDITION } from "@/lib/edition";
+import { bankFormatFor } from "@saroh/edition";
+
+import { PROFILE } from "@/lib/edition";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
 import { businessEditHref } from "@/lib/organizations/business-rows";
 import { businessTypeOf } from "@/lib/organizations/business-types";
+import {
+    payByBankCode,
+    payOffered,
+} from "@/lib/organizations/pay-instructions";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -345,15 +351,26 @@ function howToPay(
 ): Check | null {
     if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
     const pay = settings.payInstructions;
-    if (!pay) return null;
-    const set =
-        filled(pay.upiId) ||
-        (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
+    // Off where the edition offers no How to pay us (DEC-208): not a step.
+    if (!pay || !payOffered(pay.edition)) return null;
+    // A Global business has no UPI, and its bank's code only where its
+    // country has one (`@saroh/edition` bank-details).
+    const global = payByBankCode(pay.edition);
+    const set = global
+        ? filled(pay.bankAccountNumber) &&
+          (!bankFormatFor(pay.country).code || filled(pay.bankIfsc))
+        : filled(pay.upiId) ||
+          (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
     return {
         key: "howToPay",
         label: "Tell customers how to pay you",
-        why: `Add your ${EDITION === "GLOBAL" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
-        cta: EDITION === "GLOBAL" ? "Add bank details" : "Add UPI or bank",
+        why: global
+            ? `${bankFormatFor(pay.country).asks}. Customers see your bank details on every unpaid invoice, order and booking.`
+            : `Add your ${PROFILE.payInstructions === "bank-code" ? "bank details" : "UPI ID or bank details"}. Customers see them on every unpaid invoice, order and booking.`,
+        cta:
+            PROFILE.payInstructions === "bank-code"
+                ? "Add bank details"
+                : "Add UPI or bank",
         // The tab, with its sheet open: the step is done there.
         href: businessEditHref("pay"),
         broken: false,

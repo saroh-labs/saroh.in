@@ -14,8 +14,8 @@ import { useSession } from "./sessions";
  * pay and share spec, and the film sets are never written to. The business
  * is Asha's alone, so it runs beside everything else.
  *
- * Its address is stamped, so desk, phone and every run get their own. It
- * keeps time in Kolkata, so a date the screen names is a day there.
+ * Its address is stamped, so desk, phone and every run get their own. An
+ * India one keeps time in Kolkata, so a date the screen names is a day there.
  */
 export interface OwnBusiness {
     id: string;
@@ -44,22 +44,44 @@ export async function billingChoice(
     return first ? { billingProfileId: first.id } : {};
 }
 
+/**
+ * Where a business set up through the API is. India (the default) is set up
+ * as every business was; a Global country is set up through the Global
+ * edition's API address (DEC-204: the address decides the edition), sent as
+ * the Host header since the stack has no such address. Global has no Saroh
+ * billing, so no billing profile is chosen.
+ */
+const COUNTRIES = {
+    IN: { timezone: "Asia/Kolkata" },
+    US: { timezone: "America/New_York" },
+    GB: { timezone: "Europe/London" },
+} as const;
+export type OwnCountry = keyof typeof COUNTRIES;
+
+/** The Global edition's API host (`@saroh/edition`, production). */
+const GLOBAL_API_HOST = "api.saroh.tech";
+
 export async function makeBusiness(
     page: Page,
     testInfo: TestInfo,
     prefix = "own",
+    { country = "IN" }: { country?: OwnCountry } = {},
 ): Promise<OwnBusiness> {
     await useSession(page, "founder");
     const address = ownAddress(prefix, testInfo);
     const name = `Own ${address}`;
+    const india = country === "IN";
     const res = await page.request.post(`${urls.API_URL}/organizations`, {
-        headers: { origin: urls.APP_URL },
+        headers: {
+            origin: urls.APP_URL,
+            ...(india ? {} : { host: GLOBAL_API_HOST }),
+        },
         data: {
             name,
             kind: "BUSINESS",
             address,
-            profile: { country: "IN", timezone: "Asia/Kolkata" },
-            ...(await billingChoice(page)),
+            profile: { country, timezone: COUNTRIES[country].timezone },
+            ...(india ? await billingChoice(page) : {}),
         },
     });
     expect(res.ok(), `set up ${name}: ${await res.text()}`).toBe(true);

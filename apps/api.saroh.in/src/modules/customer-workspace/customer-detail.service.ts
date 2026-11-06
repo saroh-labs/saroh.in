@@ -4,6 +4,7 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
+import { joinDeliveryPlace } from "@saroh/block-contract";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
@@ -1001,6 +1002,7 @@ export class CustomerDetailService {
                     deliveryCity: true,
                     deliveryState: true,
                     deliveryPostalCode: true,
+                    deliveryCountry: true,
                     items: {
                         take: ORDER_LINES,
                         orderBy: { id: "asc" },
@@ -1046,7 +1048,13 @@ export class CustomerDetailService {
                           o.deliveryLine1,
                           o.deliveryLine2,
                           o.deliveryCity,
-                          [o.deliveryState, o.deliveryPostalCode]
+                          [
+                              joinDeliveryPlace(
+                                  o.deliveryState,
+                                  o.deliveryCountry,
+                              ),
+                              o.deliveryPostalCode,
+                          ]
                               .filter(Boolean)
                               .join(" "),
                       ]

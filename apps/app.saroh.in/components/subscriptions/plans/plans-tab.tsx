@@ -313,7 +313,10 @@ export function PlansTab({
                 }
                 if (r.monthly === null) {
                     return (
-                        <span className="font-sans font-normal text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-sans font-normal text-muted-foreground"
+                        >
                             None paying right now
                         </span>
                     );

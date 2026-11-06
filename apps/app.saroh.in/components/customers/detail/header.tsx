@@ -85,13 +85,21 @@ export function Header({
                     sells
                         ? [
                               "Sell",
-                              <Link key="list" href="/commerce/customers">
+                              <Link
+                                  data-ph-unmask=""
+                                  key="list"
+                                  href="/commerce/customers"
+                              >
                                   Customers
                               </Link>,
                               name,
                           ]
                         : [
-                              <Link key="list" href="/contacts">
+                              <Link
+                                  data-ph-unmask=""
+                                  key="list"
+                                  href="/contacts"
+                              >
                                   Contacts
                               </Link>,
                               name,
@@ -113,7 +121,12 @@ export function Header({
                         <>
                             {tag ? (
                                 <span title={tag.title} className="inline-flex">
-                                    <StatusBadge tone={tag.tone}>
+                                    {/* Returning, New, Member: a word from
+                                        a closed set, never the person's. */}
+                                    <StatusBadge
+                                        tone={tag.tone}
+                                        data-ph-unmask=""
+                                    >
                                         {tag.label}
                                     </StatusBadge>
                                 </span>
@@ -141,7 +154,10 @@ export function Header({
                                     {email}
                                 </a>
                             ) : (
-                                <span className="text-foreground/75">
+                                <span
+                                    data-ph-unmask=""
+                                    className="text-foreground/75"
+                                >
                                     No email
                                 </span>
                             )}
@@ -222,7 +238,10 @@ export function Header({
                 }
             />
             {!canEdit ? (
-                <p className="-mt-1.5 mb-3 text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="-mt-1.5 mb-3 text-[12px] text-muted-foreground"
+                >
                     Your role can see this customer but not edit them.
                 </p>
             ) : null}

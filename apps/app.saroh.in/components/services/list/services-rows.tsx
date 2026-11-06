@@ -143,6 +143,7 @@ function TakingSwitch({
             }
         >
             <span
+                data-ph-unmask=""
                 className={cn(
                     "text-muted-foreground",
                     stacked ? "text-[10.5px] font-semibold" : "text-[12.5px]",
@@ -188,24 +189,28 @@ export function ServicesTable({
                     <div role="rowgroup">
                         <ListTableHead role="row" className={DESK_GRID}>
                             <span
+                                data-ph-unmask=""
                                 role="columnheader"
                                 className="whitespace-nowrap"
                             >
                                 Service
                             </span>
                             <span
+                                data-ph-unmask=""
                                 role="columnheader"
                                 className="whitespace-nowrap"
                             >
                                 How long · price · who
                             </span>
                             <span
+                                data-ph-unmask=""
                                 role="columnheader"
                                 className="whitespace-nowrap"
                             >
                                 This week
                             </span>
                             <span
+                                data-ph-unmask=""
                                 role="columnheader"
                                 className="whitespace-nowrap"
                             >

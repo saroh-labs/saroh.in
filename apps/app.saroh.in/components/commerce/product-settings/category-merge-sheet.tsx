@@ -92,7 +92,7 @@ export function CategoryMergeSheet({
                     {`The ${count(category.productCount, "product")} in ${category.name} move to ${into}, and ${category.name} goes away.`}
                 </Notice>
             ) : tried ? (
-                <p role="alert" className={PROBLEM}>
+                <p data-ph-unmask="" role="alert" className={PROBLEM}>
                     Pick where its products go.
                 </p>
             ) : null}

@@ -8,10 +8,10 @@ export default function Loading() {
             shape="detail"
             width="default"
             breadcrumb={[
-                <Link key="0" href="/bookings">
+                <Link data-ph-unmask="" key="0" href="/bookings">
                     Bookings
                 </Link>,
-                <Link key="1" href="/bookings/all">
+                <Link data-ph-unmask="" key="1" href="/bookings/all">
                     All bookings
                 </Link>,
             ]}

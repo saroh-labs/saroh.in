@@ -77,6 +77,7 @@ import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import { validationPipeOptions } from "../../common/validation";
 import { planMeter } from "../billing/metering.service";
 import { hashPayToken } from "../invoices/pay-token";
+import { OPENS_CHECKOUT } from "../payments/public-key";
 import { BookServiceDto } from "./dto";
 import { daysSkipOf } from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
@@ -264,15 +265,7 @@ describe("pay now (U19)", () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     status: "CONNECTED",
-                    OR: [
-                        { provider: { not: "RAZORPAY" } },
-                        {
-                            AND: [
-                                { publicKey: { not: null } },
-                                { publicKey: { not: "" } },
-                            ],
-                        },
-                    ],
+                    ...OPENS_CHECKOUT,
                 }),
             }),
         );
@@ -1251,11 +1244,14 @@ describe("a hold, by its token (U19)", () => {
             ...hold,
             status: "CANCELLED",
         });
-        const out = await new PublicBookingsService().releasePublicHold(
-            "tok",
-            "ip",
-            NOW,
-        );
+        // Its open intent is closed at the provider once, after the
+        // release (DEC-208).
+        const cancelHoldIntents = jest.fn().mockResolvedValue(undefined);
+        const out = await new PublicBookingsService(undefined, undefined, {
+            cancelHoldIntents,
+        } as never).releasePublicHold("tok", "ip", NOW);
+        expect(cancelHoldIntents).toHaveBeenCalledTimes(1);
+        expect(cancelHoldIntents).toHaveBeenCalledWith(hold.id);
         expect(db.booking.update.mock.calls[0][0].data).toMatchObject({
             status: "CANCELLED",
         });

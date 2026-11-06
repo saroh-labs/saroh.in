@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { PROFILE } from "@/lib/edition";
 
 /**
  * Whether the workspace shows Saroh's own plans (DEC-136): Settings › Plan
@@ -16,6 +17,10 @@ import { env } from "@/env";
  * switch changes neither. A business's own plans on sale (Payments ›
  * Subscriptions) are its product and are not behind it.
  *
+ * An edition Saroh doesn't bill (Global, DEC-204: `sarohBilling`) shows
+ * none of them whatever the switch says; the API refuses its plans too
+ * (`saroh-bills.ts`).
+ *
  * Everything asks this function; nothing else reads the variable. Server
  * and client safe.
  *
@@ -29,5 +34,5 @@ import { env } from "@/env";
  * for the business's own email and the footer note in the site editor.
  */
 export function plansShown(): boolean {
-    return env.NEXT_PUBLIC_PLANS === "on";
+    return PROFILE.sarohBilling && env.NEXT_PUBLIC_PLANS === "on";
 }

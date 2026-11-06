@@ -15,6 +15,7 @@ import type {
     OrganizationContext,
     OrgRole,
 } from "../../common/types/organization-context";
+import { workspaceAction } from "../analytics/product-milestones";
 import {
     AuditAction,
     AuditOutcome,
@@ -443,6 +444,7 @@ export class OrganizationMembersService {
                 ...(staff ? { onDiary: true } : {}),
             },
         });
+        workspaceAction("team_member_invited", ctx.organizationId);
 
         return {
             ...invitation,

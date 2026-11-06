@@ -53,6 +53,7 @@ export function ProductChecks({ checks }: { checks: readonly StockCheck[] }) {
                     <div className="flex flex-wrap items-baseline gap-2.5">
                         <strong className="font-semibold">{c.title}</strong>
                         <Link
+                            data-ph-unmask=""
                             href={STOCK_CHECKS_HREF}
                             className="ml-auto rounded-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                         >
@@ -95,10 +96,14 @@ export function RecentChanges({
     return (
         <Card className="mt-3.5 rounded-[12px] p-0">
             <div className="flex flex-wrap items-center gap-2 px-[18px] pb-1.5 pt-3.5">
-                <h2 className="flex-1 font-display text-[15px] font-semibold tracking-[-0.015em]">
+                <h2
+                    data-ph-unmask=""
+                    className="flex-1 font-display text-[15px] font-semibold tracking-[-0.015em]"
+                >
                     Recent changes
                 </h2>
                 <TextLink
+                    data-ph-unmask=""
                     href={stockLogHref(productId)}
                     className="text-[12.5px] coarse:min-h-11"
                 >

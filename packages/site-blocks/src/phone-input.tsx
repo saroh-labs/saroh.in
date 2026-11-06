@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { focusRing } from "./booking-flow/styles";
 import { cn } from "./lib/utils";
+import { useSiteBusiness } from "./site-business";
 
 /**
  * The merchant site's phone field (#1036): a country-code picker and the
@@ -48,7 +49,7 @@ export function SitePhoneInput({
     id: string;
     value: string;
     onValueChange: (value: string) => void;
-    /** ISO code of the business's country; India when not given. */
+    /** ISO code to start on; the site's business's country when not given. */
     defaultCountry?: string | null;
     /** The look of a box on this surface (its edge, height, radius, fill). */
     box: string;
@@ -61,8 +62,9 @@ export function SitePhoneInput({
     placeholder?: string;
     autoComplete?: string;
 }) {
+    const business = useSiteBusiness();
     const [parts, setParts] = useState<PhoneParts>(() =>
-        splitPhone(value, defaultCountry ?? undefined),
+        splitPhone(value, defaultCountry ?? business.country ?? undefined),
     );
     // A value from outside that this field didn't send (a reset, a saved
     // number arriving) is read into the box again.

@@ -252,7 +252,10 @@ export function CustomerPicker({
                 />
             ) : null}
             {forbidden && canSearch ? (
-                <p className="mb-2 text-[11.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mb-2 text-[11.5px] text-muted-foreground"
+                >
                     Your role can&apos;t look customers up. Type who it is to
                     add them.
                 </p>

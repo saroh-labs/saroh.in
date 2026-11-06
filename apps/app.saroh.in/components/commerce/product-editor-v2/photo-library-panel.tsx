@@ -44,7 +44,10 @@ export function LibraryPanel({
     return (
         <div className="mt-3 rounded-[10px] bg-muted/50 p-3">
             <div className="mb-2.5 flex items-center gap-2.5">
-                <span className="flex-1 text-[12.5px] font-semibold">
+                <span
+                    data-ph-unmask=""
+                    className="flex-1 text-[12.5px] font-semibold"
+                >
                     Your photos · tap to add or take off
                 </span>
                 <Button size="xs" type="button" onClick={onDone}>
@@ -53,7 +56,9 @@ export function LibraryPanel({
             </div>
             {items === "loading" ? (
                 <div role="status" aria-busy="true" className="flex gap-2">
-                    <span className="sr-only">Loading your photos</span>
+                    <span data-ph-unmask="" className="sr-only">
+                        Loading your photos
+                    </span>
                     <Skeleton aria-hidden className="h-16 w-20" />
                     <Skeleton aria-hidden className="h-16 w-20" />
                     <Skeleton aria-hidden className="h-16 w-20" />

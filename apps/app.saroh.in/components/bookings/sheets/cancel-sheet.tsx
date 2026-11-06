@@ -249,7 +249,10 @@ function CancelDraft({
             <FormSheetBody className="gap-3.5">
                 {read.state === "loading" ? (
                     <div aria-busy="true" className="grid gap-2">
-                        <p className="text-[13px] text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="text-[13px] text-muted-foreground"
+                        >
                             Checking what was paid…
                         </p>
                         <Skeleton className="h-[60px] rounded-[12px]" />
@@ -301,6 +304,7 @@ function CancelDraft({
                             <>
                                 {" "}
                                 <TextLink
+                                    data-ph-unmask=""
                                     href={`/commerce/orders/${encodeURIComponent(choice.treatmentOrderId)}`}
                                 >
                                     Open the order

@@ -24,6 +24,7 @@ import {
     LookShopListing,
     shopWhenLine,
 } from "../product/shop-listing-look";
+import { SiteBusinessProvider } from "../site-business";
 import { viewport } from "../test-viewport";
 import type { CheckoutQuote, CheckoutStarted, ShopCheckoutApi } from "./api";
 import { ShopBag } from "./bag";
@@ -708,6 +709,15 @@ describe("the place button follows the choice", () => {
         }
     });
 
+    it("says nothing of UPI to a customer of a business that doesn't take it", () => {
+        const body = payingWords("confirming", {
+            handover: null,
+            upi: false,
+        }).body;
+        expect(body).not.toMatch(/UPI/);
+        expect(body).toMatch(/no need to pay again/);
+    });
+
     it("titles the page per look", () => {
         expect(checkoutTitle("folio", "PICKUP")).toBe("Pick-up and pay");
         expect(checkoutTitle("folio", "LOCAL_DELIVERY")).toBe(
@@ -719,6 +729,72 @@ describe("the place button follows the choice", () => {
             sameAddress("3 Hill Road, Indiranagar", "3 hill road indiranagar"),
         ).toBe(true);
         expect(sameAddress(null, null)).toBe(false);
+    });
+});
+
+describe("a look's checkout for a Global business", () => {
+    it("takes a delivery with no region or postcode", async () => {
+        stubVisit();
+        fillBag();
+        const { api, start } = makeApi();
+        render(
+            <SiteBusinessProvider
+                value={{
+                    country: "US",
+                    address: "country-and-region",
+                    phoneNumbers: "with-country-code",
+                }}
+            >
+                <LookCheckout
+                    look="quiet"
+                    site={SITE}
+                    businessName="Rye & Co."
+                    api={api}
+                    apiUrl="https://api.example.com"
+                    account={{
+                        customer: {
+                            email: "asha.kumar@example.com",
+                            name: "Asha",
+                        },
+                        options: OPTIONS,
+                        signIn: SIGN_IN,
+                    }}
+                />
+            </SiteBusinessProvider>,
+        );
+        const ways = await screen.findByRole("radiogroup", {
+            name: "1 · Pick-up or delivery",
+        });
+        fireEvent.click(
+            within(ways).getByRole("radio", { name: /Local delivery/ }),
+        );
+        expect(await screen.findByLabelText(/^Country \*/)).toHaveValue("US");
+        expect(screen.queryByLabelText(/^PIN code/)).toBeNull();
+        for (const [label, value] of [
+            ["Phone", "415 555 0100"],
+            ["Address", "1 Main St"],
+            ["Town or city", "Austin"],
+        ] as const) {
+            fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), {
+                target: { value },
+            });
+        }
+        await waitFor(() => expect(placeButton()).toBeEnabled());
+        await act(async () => {
+            fireEvent.click(placeButton());
+            await Promise.resolve();
+        });
+        expect(start).toHaveBeenCalledWith(
+            expect.objectContaining({
+                address: {
+                    line1: "1 Main St",
+                    city: "Austin",
+                    state: "",
+                    postalCode: "",
+                    phone: "+14155550100",
+                },
+            }),
+        );
     });
 });
 

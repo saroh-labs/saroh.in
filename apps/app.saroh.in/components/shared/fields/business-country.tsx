@@ -24,6 +24,16 @@ export function BusinessCountryProvider({
     );
 }
 
+/**
+ * Whether a delivery follows India's rule (a GST state and a PIN code), by the
+ * active business's country, which set its edition (DEC-204). The demo seeds
+ * store "India" in full. The API decides; this only words the form.
+ */
+export function useIndiaAddress(): boolean {
+    const country = useBusinessCountry();
+    return !country || !/^[A-Za-z]{2}$/.test(country) || /^in$/i.test(country);
+}
+
 /** What a Global business chose at setup, given by the shell; else null. */
 const BusinessCurrencyContext = createContext<string | null>(null);
 

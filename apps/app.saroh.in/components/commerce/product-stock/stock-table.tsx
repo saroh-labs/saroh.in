@@ -86,9 +86,11 @@ export function StockTable({
                         <div
                             role="row"
                             data-list-head=""
+                            data-ph-unmask=""
                             className={cn(GRID, listTable.head, GUTTER)}
                         >
-                            <span role="columnheader">
+                            {/* The option's name is the merchant's own. */}
+                            <span role="columnheader" data-ph-mask="">
                                 {product.option?.name ?? "Size"}
                             </span>
                             <span role="columnheader" className="text-right">
@@ -294,7 +296,9 @@ export function StockTable({
                                 "items-center pb-3 pt-[11px] text-[12.5px] text-muted-foreground",
                             )}
                         >
-                            <span role="cell">Total</span>
+                            <span data-ph-unmask="" role="cell">
+                                Total
+                            </span>
                             <span role="cell" />
                             <span
                                 role="cell"

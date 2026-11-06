@@ -122,7 +122,10 @@ export function RequestSheet({
                 </dl>
 
                 {open ? (
-                    <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         {request.contactId
                             ? "Removing their details takes away their name, email, phone, address and website account. Receipts and invoices are kept as the law requires."
                             : "This request isn't linked to a customer yet. Find them by the email they asked from and run the removal there, or close it with a reason."}

@@ -134,7 +134,7 @@ export function OptionsSheet({
                         className="flex-1 justify-between text-[13.5px] font-medium max-[759px]:text-[15px]"
                     >
                         <span className="min-w-0 flex-1">
-                            <span className="block">
+                            <span data-ph-unmask="" className="block">
                                 Show cancelled bookings
                             </span>
                             <span className="block text-[12px] font-normal text-muted-foreground max-[759px]:text-[12.5px]">
@@ -151,7 +151,9 @@ export function OptionsSheet({
                     <span className={ICON}>
                         <List aria-hidden />
                     </span>
-                    <span className="flex-1">All bookings</span>
+                    <span data-ph-unmask="" className="flex-1">
+                        All bookings
+                    </span>
                     <ChevronRight
                         aria-hidden
                         className="size-3.5 text-muted-foreground max-[759px]:size-4"
@@ -183,7 +185,9 @@ export function OptionsSheet({
                     className="mt-3.5"
                 />
 
-                <div className={cn(LABEL, "mt-3.5")}>What the colours mean</div>
+                <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
+                    What the colours mean
+                </div>
                 <ul className="mt-1.5 grid gap-0.5 max-[759px]:mt-0 max-[759px]:gap-0">
                     <Key swatch="bg-diary-one" name="A booking for one person">
                         {tap} it to see who, mark them arrived or take payment.

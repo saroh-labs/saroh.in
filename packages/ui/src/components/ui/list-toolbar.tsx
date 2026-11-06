@@ -271,8 +271,8 @@ export function ListFilter<V extends string>({
     footer?: React.ReactNode;
     /**
      * The options are records' own names (locations, products), so a
-     * session recording masks the box. A select's value is masked unless
-     * someone marks it, so this only documents the call.
+     * session recording masks the box. Left out, the options are Saroh's
+     * own words ("Show", "All customers", "Open") and the box is read.
      */
     holdsData?: boolean;
     className?: string;
@@ -282,7 +282,7 @@ export function ListFilter<V extends string>({
         <span
             data-list-filter=""
             data-narrowed={on ? "" : undefined}
-            data-ph-mask={holdsData ? "" : undefined}
+            {...(holdsData ? { "data-ph-mask": "" } : { "data-ph-unmask": "" })}
             className="inline-flex min-w-0 max-w-full"
         >
             <OptionSelect

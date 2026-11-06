@@ -14,6 +14,7 @@ import { usePhone } from "@/components/bookings/calendar/header/use-phone";
 import { BusinessLogoSheet } from "@/components/organizations/logo/business-logo-sheet";
 import { PayInstructionsSheet } from "@/components/organizations/pay-instructions/pay-instructions-sheet";
 import { runAction } from "@/lib/api/run-action";
+import { PROFILE } from "@/lib/edition";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {
     InvoiceFormBusiness,
@@ -205,11 +206,14 @@ export function PaperEditor({
                     title: "Your business",
                     body: () => (
                         <FromElsewhere>
-                            <p>
+                            <p data-ph-unmask="">
                                 Your name, address and GSTIN come from Settings
                                 › Business, the same on every invoice.
                             </p>
-                            <p className="text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
                                 A tax invoice always carries them (GST Rule 46):
                                 no style leaves them off.
                             </p>
@@ -222,7 +226,10 @@ export function PaperEditor({
                     body: () => (
                         <FromElsewhere>
                             <p>{issueLine(business?.nextNumber ?? null)}</p>
-                            <p className="text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
                                 It is the next in your series, so it can't be
                                 typed or taken off.
                             </p>
@@ -261,10 +268,12 @@ export function PaperEditor({
                     title: "How to pay us",
                     body: () => (
                         <FromElsewhere>
-                            <p>
-                                Printed on every unpaid invoice: your UPI ID,
-                                bank details and a note, set once for the
-                                business.
+                            <p data-ph-unmask="">
+                                Printed on every unpaid invoice:{" "}
+                                {PROFILE.payInstructions === "bank-code"
+                                    ? "your bank details"
+                                    : "your UPI ID, bank details"}{" "}
+                                and a note, set once for the business.
                             </p>
                             {canSetDefault && business?.pay !== undefined ? (
                                 <Button
@@ -278,7 +287,10 @@ export function PaperEditor({
                                     Change how to pay us
                                 </Button>
                             ) : (
-                                <p className="text-muted-foreground">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-muted-foreground"
+                                >
                                     An owner or admin changes it in Settings ›
                                     Business.
                                 </p>
@@ -358,7 +370,10 @@ export function PaperEditor({
         <div className="grid items-start gap-5 min-[1100px]:grid-cols-[minmax(0,820px)_260px]">
             <div className="min-w-0 max-w-[820px]">
                 <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                    <p className="flex-1 text-[13px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="flex-1 text-[13px] text-muted-foreground"
+                    >
                         {phone
                             ? "Tap any part to change it."
                             : "Click any part of the paper to change it."}

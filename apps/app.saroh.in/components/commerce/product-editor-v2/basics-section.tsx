@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { MrpPricing } from "@/lib/gst/mrp";
 import { overMrpProblem, toPayLine } from "@/lib/gst/mrp";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
@@ -280,7 +280,10 @@ export function BasicsSection({
             {creating ? (
                 <>
                     <div className="flex flex-wrap items-center gap-2 rounded-[9px] bg-muted/50 px-[13px] py-[11px]">
-                        <span className="font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-mono text-[12px] text-muted-foreground"
+                        >
                             /products/
                         </span>
                         <span
@@ -302,7 +305,10 @@ export function BasicsSection({
             ) : (
                 <>
                     <div className="flex flex-wrap items-center gap-2 rounded-[9px] bg-muted/50 px-[11px] py-[9px]">
-                        <span className="font-mono text-[12px] text-muted-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="font-mono text-[12px] text-muted-foreground"
+                        >
                             /products/
                         </span>
                         <Input
@@ -407,7 +413,7 @@ export function BasicsSection({
                             ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
                             : sameAsPrice
                               ? "Same as the price, so nothing is struck through."
-                              : EDITION === "GLOBAL"
+                              : PROFILE.struckPrice === "original-price"
                                 ? "A higher price, shown struck through. Leave it empty if there isn't one."
                                 : "The printed price, shown struck through. Leave it empty if it sells at MRP."
                     }

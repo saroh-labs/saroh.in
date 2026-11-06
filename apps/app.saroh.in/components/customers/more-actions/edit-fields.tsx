@@ -113,10 +113,16 @@ export function AddressFields({
     return (
         <fieldset className="grid gap-3 border-t border-border pt-3.5">
             <legend className="float-left mb-0.5 w-full">
-                <span className="block text-[12.5px] font-medium">
+                <span
+                    data-ph-unmask=""
+                    className="block text-[12.5px] font-medium"
+                >
                     Delivery address
                 </span>
-                <span className="block text-[11.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="block text-[11.5px] text-muted-foreground"
+                >
                     Only used for deliveries.
                 </span>
             </legend>

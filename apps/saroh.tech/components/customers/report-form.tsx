@@ -10,7 +10,7 @@ import type { ReportBody, ReportField } from "@/lib/business-report";
 import {
     prefilledSite,
     REPORT_LIMITS,
-    reportProblem,
+    reportProblems,
     sendReport,
 } from "@/lib/business-report";
 
@@ -21,13 +21,14 @@ const faultOf = (name: ReportField) =>
 
 type State =
     | { at: "idle" | "sending" | "done" }
-    | { at: "error"; message: string; field: ReportField | null };
+    | { at: "fields"; fields: ReportField[] }
+    | { at: "error"; message: string };
 
 /**
  * Report a business: the site's address, what happened, and the reporter's
- * own email and phone, as saroh.in's form asks. Send checks the fields in order:
- * the first at fault says what it needs under itself, and the keyboard goes to
- * it. A send that fails keeps everything typed.
+ * own email and phone, as saroh.in's form asks. Send checks every field, as the
+ * contact form does: each at fault says what it needs under itself, and the
+ * keyboard goes to the first. A send that fails keeps everything typed.
  */
 export function ReportForm({ apiUrl }: { apiUrl: string }) {
     const given = useSyncExternalStore(
@@ -42,9 +43,11 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
     const value = (name: ReportField) =>
         typed[name] ?? (name === "site" ? given : "");
 
-    const fault = (field: ReportField) => {
-        setState({ at: "error", message: faultOf(field), field });
-        form.current?.querySelector<HTMLElement>(`[name="${field}"]`)?.focus();
+    const fault = (fields: ReportField[]) => {
+        setState({ at: "fields", fields });
+        form.current
+            ?.querySelector<HTMLElement>(`[name="${fields[0]}"]`)
+            ?.focus();
     };
 
     const onSubmit = async (e: FormEvent) => {
@@ -55,19 +58,18 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
             email: value("email").trim(),
             phone: value("phone").trim(),
         };
-        const problem = reportProblem(body);
-        if (problem) {
-            fault(problem);
+        const problems = reportProblems(body);
+        if (problems.length > 0) {
+            fault(problems);
             return;
         }
         setState({ at: "sending" });
         const result = await sendReport(apiUrl, body);
         if (result === "sent") setState({ at: "done" });
-        else if (result === "site") fault("site");
+        else if (result === "site") fault(["site"]);
         else {
             setState({
                 at: "error",
-                field: null,
                 message:
                     result === "rate-limited" ? copy.rateLimited : copy.failed,
             });
@@ -90,15 +92,9 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
             ref={form}
             noValidate
             onSubmit={onSubmit}
-            aria-labelledby="report-title"
+            aria-label={copy.title}
             className="grid max-w-[600px] gap-4"
         >
-            <h2
-                id="report-title"
-                className="m-0 font-display text-[22px] font-semibold tracking-[-0.02em]"
-            >
-                {copy.title}
-            </h2>
             {REPORT_FIELDS.map((field) => {
                 const shared = {
                     id: `report-${field.name}`,
@@ -106,15 +102,26 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
                     label: field.label,
                     hint: field.hint,
                     error:
-                        state.at === "error" && state.field === field.name
-                            ? state.message
+                        state.at === "fields" &&
+                        state.fields.includes(field.name)
+                            ? faultOf(field.name)
                             : undefined,
                     "aria-required": true,
                     maxLength: REPORT_LIMITS[field.name],
                     value: value(field.name),
                     onChange: (e: { target: { value: string } }) => {
                         setTyped({ ...typed, [field.name]: e.target.value });
-                        if (state.at === "error") setState({ at: "idle" });
+                        if (state.at === "fields") {
+                            // Mending one field leaves the others' words up.
+                            setState({
+                                at: "fields",
+                                fields: state.fields.filter(
+                                    (f) => f !== field.name,
+                                ),
+                            });
+                        } else if (state.at === "error") {
+                            setState({ at: "idle" });
+                        }
                     },
                 };
                 return field.name === "message" ? (
@@ -141,7 +148,7 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
                     />
                 );
             })}
-            {state.at === "error" && state.field === null ? (
+            {state.at === "error" ? (
                 <p
                     role="alert"
                     className="m-0 text-[14px] font-medium text-destructive"

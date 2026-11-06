@@ -30,10 +30,13 @@ export interface ProviderConnection {
  * A connection a customer's checkout window can open with (DEC-054): a
  * Razorpay one needs its public key id, so one still missing it counts as
  * none wherever a payment link is offered — the link could only fail on the
- * customer's phone. The API refuses the same (`OPENS_CHECKOUT`).
+ * customer's phone. A Stripe one needs its publishable key the same way.
+ * The API refuses the same (`OPENS_CHECKOUT`).
  */
 export function opensCheckout(row: ProviderConnection): boolean {
     if (row.status !== "CONNECTED") return false;
-    if ((row.provider ?? "").toUpperCase() !== "RAZORPAY") return true;
+    // Razorpay opens with its key id, Stripe with its publishable key.
+    const provider = (row.provider ?? "").toUpperCase();
+    if (provider !== "RAZORPAY" && provider !== "STRIPE") return true;
     return Boolean(row.publicKey?.trim());
 }

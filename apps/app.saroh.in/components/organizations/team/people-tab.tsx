@@ -93,9 +93,11 @@ export function PeopleTab({
 
             <ListTable>
                 <ListTableHead className={cn(grid, "hidden xl:grid")}>
-                    <span>Person</span>
-                    <span>Role</span>
-                    {withExtras ? <span>Extra permissions</span> : null}
+                    <span data-ph-unmask="">Person</span>
+                    <span data-ph-unmask="">Role</span>
+                    {withExtras ? (
+                        <span data-ph-unmask="">Extra permissions</span>
+                    ) : null}
                     <span />
                 </ListTableHead>
                 <ul>
@@ -132,7 +134,10 @@ export function PeopleTab({
                                         <p className="truncate text-[13.5px] font-medium">
                                             {nameOf(m)}
                                             {m.isSelf ? (
-                                                <span className="font-normal text-muted-foreground">
+                                                <span
+                                                    data-ph-unmask=""
+                                                    className="font-normal text-muted-foreground"
+                                                >
                                                     {" "}
                                                     · you
                                                 </span>

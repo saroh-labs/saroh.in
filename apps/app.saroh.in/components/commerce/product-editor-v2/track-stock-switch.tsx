@@ -79,7 +79,10 @@ export function TrackStockSwitch({
 
     return (
         <>
-            <span className="text-[12.5px] text-foreground/75">
+            <span
+                data-ph-unmask=""
+                className="text-[12.5px] text-foreground/75"
+            >
                 Track stock
             </span>
             <Switch

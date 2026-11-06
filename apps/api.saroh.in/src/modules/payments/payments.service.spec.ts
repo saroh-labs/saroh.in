@@ -62,6 +62,8 @@ jest.mock("@saroh/database", () => {
         order: { findUnique: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
         webhookEvent: { findFirst: jest.fn() },
+        // The business's edition, where a plan check reads it: unset, India.
+        organization: { findUnique: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -89,14 +91,18 @@ import { prisma } from "@saroh/database";
 import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { encryptSecret } from "./crypto";
 import { PaymentsService } from "./payments.service";
+import { PROVIDER_FAILED_MESSAGE } from "./provider-keys";
 import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "./providers/fake.provider";
 import { RefundCallError } from "./providers/provider.port";
+import { IN_EDITION } from "./public-key";
 
 const providerUpsert = prisma.merchantPaymentProvider.upsert as jest.Mock;
 const providerFindMany = prisma.merchantPaymentProvider.findMany as jest.Mock;
@@ -260,7 +266,7 @@ describe("PaymentsService.connectProvider", () => {
         const { service } = makeService();
         await expect(
             service.connectProvider(ctx(), {
-                provider: "STRIPE",
+                provider: "PAYPAL",
                 keyId: "k",
                 keySecret: "s",
             }),
@@ -789,7 +795,11 @@ describe("PaymentsService — a connection's webhook secret (DEC-063)", () => {
 
         const setup = await service.webhookSetup(ctx());
 
+        // An India business (unset is India) sees India's providers only.
         expect(setup.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);
+        const global = await service.webhookSetup(ctx({ edition: "GLOBAL" }));
+        expect(global.map((s) => s.provider)).toEqual(["STRIPE"]);
+        expect(global[0].secretRequired).toBe(true);
         expect(setup[0].url).toMatch(/\/public\/webhooks\/razorpay\/org_1$/);
         expect(setup[0].secretRequired).toBe(true);
         expect(setup[1].secretRequired).toBe(false);
@@ -1843,5 +1853,379 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
         await expect(
             service.createIntentForOrder(ctx(), "order_1"),
         ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+});
+
+describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
+    let isEnabled: jest.SpyInstance;
+
+    /** A fake Stripe behind its rollout flag, as the real adapter is. */
+    function stripeService() {
+        const fake = new FakeMerchantProvider("STRIPE");
+        Object.assign(fake, { rolloutFlag: FlagKey.STRIPE_PAYMENTS });
+        return {
+            service: new PaymentsService(new FakeProviderFactory(fake)),
+            fake,
+        };
+    }
+
+    const STRIPE_KEYS = {
+        provider: "stripe",
+        keyId: "pk_test_Madeup1",
+        keySecret: "rk_test_Madeup1",
+        webhookSecret: "whsec_Madeup1",
+    };
+    const global = () => ctx({ edition: "GLOBAL" });
+    const stripeRow = () =>
+        connectedRow({
+            provider: "STRIPE",
+            publicKey: "pk_test_Madeup1",
+            keyId: "pk_test_Madeup1",
+            keySecret: "rk_test_Madeup1",
+        });
+
+    /** The 400's body, or a failure when it wasn't one. */
+    async function refusal(promise: Promise<unknown>) {
+        const err = await promise.then(
+            () => {
+                throw new Error("expected a refusal");
+            },
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(BadRequestException);
+        return (err as BadRequestException).getResponse() as {
+            message: string;
+            field?: string;
+        };
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        isEnabled = jest
+            .spyOn(FeatureFlagService.prototype, "isEnabled")
+            .mockResolvedValue(true);
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "mpp_1",
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-01"),
+                    ...create,
+                }),
+        );
+    });
+    afterEach(() => isEnabled.mockRestore());
+
+    it("connects Stripe for a Global business, its publishable key the public key", async () => {
+        const { service } = stripeService();
+
+        const result = await service.connectProvider(global(), STRIPE_KEYS);
+
+        expect(result.provider).toBe("STRIPE");
+        expect(result.publicKey).toBe("pk_test_Madeup1");
+        expect(isEnabled).toHaveBeenCalledWith(
+            FlagKey.STRIPE_PAYMENTS,
+            "org_1",
+        );
+        const persisted = JSON.stringify(providerUpsert.mock.calls[0][0]);
+        expect(persisted).not.toContain("rk_test_Madeup1");
+        expect(persisted).not.toContain("whsec_Madeup1");
+    });
+
+    it("connects Stripe on a plan without online payments or room for its own accounts (owner, 6 Nov 2026)", async () => {
+        const { service } = stripeService();
+        (prisma.merchantPaymentProvider.count as jest.Mock).mockResolvedValue(
+            0,
+        );
+        // Every row locked: payments and integrations alike.
+        const enforced = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockImplementation((_org: string, moduleId: string) =>
+                Promise.resolve({
+                    ...fakePaymentsRow("free", "payments"),
+                    moduleId,
+                }),
+            );
+
+        try {
+            await expect(
+                service.connectProvider(global(), STRIPE_KEYS),
+            ).resolves.toMatchObject({ provider: "STRIPE" });
+            expect(providerUpsert).toHaveBeenCalledTimes(1);
+        } finally {
+            enforced.mockRestore();
+        }
+    });
+
+    it.each(["razorpay", "cashfree"])(
+        "refuses %s for a Global business, naming Stripe",
+        async (provider) => {
+            const { service } = makeService();
+            const body = await refusal(
+                service.connectProvider(global(), {
+                    provider,
+                    keyId: "rzp_test_Key123",
+                    keySecret: "super-secret-value",
+                    webhookSecret: "whsec_x",
+                }),
+            );
+            expect(body).toEqual({
+                message:
+                    "Razorpay and Cashfree take payments in India. Connect Stripe instead.",
+                field: "provider",
+            });
+            expect(providerUpsert).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each([undefined, "INDIA" as const])(
+        "refuses Stripe for an India business (edition %p)",
+        async (edition) => {
+            const { service } = stripeService();
+            const body = await refusal(
+                service.connectProvider(ctx({ edition }), STRIPE_KEYS),
+            );
+            expect(body.message).toBe(
+                "Stripe isn't available for businesses in India. Connect Razorpay or Cashfree.",
+            );
+            expect(providerUpsert).not.toHaveBeenCalled();
+        },
+    );
+
+    it("refuses Stripe while its flag is off for the business", async () => {
+        const { service, fake } = stripeService();
+        isEnabled.mockResolvedValue(false);
+        const verify = jest.spyOn(fake, "verifyCredentials");
+
+        const body = await refusal(
+            service.connectProvider(global(), STRIPE_KEYS),
+        );
+
+        expect(body).toEqual({
+            message: "Stripe isn't available yet.",
+            field: "provider",
+        });
+        expect(verify).not.toHaveBeenCalled();
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            "a full secret key",
+            { keySecret: "sk_test_Madeup1" },
+            "keySecret",
+            /restricted key/,
+        ],
+        [
+            "a publishable key that isn't one",
+            { keyId: "rk_test_Madeup1" },
+            "keyId",
+            /starts pk_live_ or pk_test_/,
+        ],
+        [
+            "a secret that isn't a restricted key",
+            { keySecret: "pk_test_Madeup1" },
+            "keySecret",
+            /starts rk_live_ or rk_test_/,
+        ],
+        [
+            "a test key beside a live one",
+            { keySecret: "rk_live_Madeup1" },
+            "keySecret",
+            /both from test mode, or both from live mode/,
+        ],
+        [
+            "a live key beside a test one",
+            { keyId: "pk_live_Madeup1" },
+            "keySecret",
+            /both from test mode, or both from live mode/,
+        ],
+        [
+            "no webhook secret",
+            { webhookSecret: undefined },
+            "webhookSecret",
+            /starts whsec_/,
+        ],
+        [
+            "a webhook secret that isn't Stripe's",
+            { webhookSecret: "rzp_webhook_secret" },
+            "webhookSecret",
+            /Developers › Webhooks/,
+        ],
+    ])("refuses %s before any call", async (_label, over, field, message) => {
+        const { service, fake } = stripeService();
+        const verify = jest.spyOn(fake, "verifyCredentials");
+
+        const body = await refusal(
+            service.connectProvider(global(), { ...STRIPE_KEYS, ...over }),
+        );
+
+        expect(body.field).toBe(field);
+        expect(body.message).toMatch(message);
+        expect(verify).not.toHaveBeenCalled();
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it("takes live keys as surely as test ones (no test business yet)", async () => {
+        const { service } = stripeService();
+        const result = await service.connectProvider(global(), {
+            ...STRIPE_KEYS,
+            keyId: "pk_live_Madeup1",
+            keySecret: "rk_live_Madeup1",
+        });
+        expect(result.publicKey).toBe("pk_live_Madeup1");
+    });
+
+    describe("starting a payment", () => {
+        const ORDER = {
+            id: "order_1",
+            organizationId: "org_1",
+            total: "20.00",
+            currency: "USD",
+        };
+
+        it("only looks at the business's edition's providers", async () => {
+            const { service } = stripeService();
+            orderFindUnique.mockResolvedValue(ORDER);
+            providerFindMany.mockResolvedValue([stripeRow()]);
+            intentCreate.mockResolvedValue({ id: "pi_1" });
+            attemptCreate.mockResolvedValue({ id: "att_1" });
+
+            await service.createIntentForOrder(global(), "order_1");
+
+            expect(providerFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining(IN_EDITION),
+                }),
+            );
+        });
+
+        it("says online payment is down while Stripe's flag is off", async () => {
+            const { service, fake } = stripeService();
+            isEnabled.mockResolvedValue(false);
+            orderFindUnique.mockResolvedValue(ORDER);
+            providerFindMany.mockResolvedValue([stripeRow()]);
+
+            const err = await service
+                .createIntentForOrder(global(), "order_1")
+                .catch((e: unknown) => e);
+
+            expect(err).toBeInstanceOf(ServiceUnavailableException);
+            expect((err as ServiceUnavailableException).getResponse()).toEqual({
+                message: PROVIDER_FAILED_MESSAGE,
+                details: { reason: "provider-off" },
+            });
+            expect(fake.calls).toHaveLength(0);
+            expect(intentCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses a charge under Stripe's minimum before calling it", async () => {
+            const { service, fake } = stripeService();
+            orderFindUnique.mockResolvedValue({ ...ORDER, total: "0.40" });
+            providerFindMany.mockResolvedValue([stripeRow()]);
+
+            const err = await service
+                .createIntentForOrder(global(), "order_1")
+                .catch((e: unknown) => e);
+
+            expect(err).toBeInstanceOf(ConflictException);
+            expect((err as ConflictException).getResponse()).toEqual({
+                message: "Stripe can't take less than $0.50 in one payment.",
+                details: { reason: "below-provider-minimum" },
+            });
+            expect(fake.calls).toHaveLength(0);
+        });
+
+        it("leaves Razorpay's small charges as they were", async () => {
+            const { service, fake } = makeService();
+            orderFindUnique.mockResolvedValue({
+                ...ORDER,
+                total: "0.40",
+                currency: "INR",
+            });
+            providerFindMany.mockResolvedValue([connectedRow()]);
+            intentCreate.mockResolvedValue({ id: "pi_1" });
+            attemptCreate.mockResolvedValue({ id: "att_1" });
+
+            await service.createIntentForOrder(ctx(), "order_1");
+
+            expect(fake.calls[0].amountCents).toBe(40);
+            expect(isEnabled).not.toHaveBeenCalledWith(
+                FlagKey.STRIPE_PAYMENTS,
+                expect.anything(),
+            );
+        });
+    });
+
+    describe("cancelHoldIntents", () => {
+        const intentFindMany = prisma.paymentIntent.findMany as jest.Mock;
+        const OPEN = {
+            id: "pi_1",
+            organizationId: "org_1",
+            provider: "STRIPE",
+            providerIntentId: "pi_stripe_1",
+        };
+
+        it("closes each open intent of the hold once, with its credentials", async () => {
+            const { service, fake } = stripeService();
+            const cancelIntent = jest.fn().mockResolvedValue(true);
+            Object.assign(fake, { cancelIntent });
+            intentFindMany.mockResolvedValue([OPEN]);
+            providerFindUnique.mockResolvedValue(stripeRow());
+
+            await service.cancelHoldIntents("bk_1");
+
+            expect(intentFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        invoice: { bookingId: "bk_1", source: "BOOKING" },
+                    }),
+                }),
+            );
+            expect(cancelIntent).toHaveBeenCalledTimes(1);
+            expect(cancelIntent).toHaveBeenCalledWith({
+                providerIntentId: "pi_stripe_1",
+                credentials: {
+                    keyId: "pk_test_Madeup1",
+                    keySecret: "rk_test_Madeup1",
+                },
+            });
+        });
+
+        it("logs a failure, without the key, and never throws", async () => {
+            const { service, fake } = stripeService();
+            Object.assign(fake, {
+                cancelIntent: jest
+                    .fn()
+                    .mockRejectedValue(
+                        new Error("Stripe intent cancel failed (HTTP 500)"),
+                    ),
+            });
+            intentFindMany.mockResolvedValue([OPEN]);
+            providerFindUnique.mockResolvedValue(stripeRow());
+            const warn = jest
+                .spyOn(Logger.prototype, "warn")
+                .mockImplementation(() => undefined);
+
+            await expect(
+                service.cancelHoldIntents("bk_1"),
+            ).resolves.toBeUndefined();
+
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(String(warn.mock.calls[0][0])).toMatch(/HTTP 500/);
+            expect(String(warn.mock.calls[0][0])).not.toContain("rk_test");
+            warn.mockRestore();
+        });
+
+        it("asks nothing of a provider without cancelIntent", async () => {
+            const { service } = makeService();
+            intentFindMany.mockResolvedValue([
+                { ...OPEN, provider: "RAZORPAY" },
+            ]);
+
+            await service.cancelHoldIntents("bk_1");
+
+            expect(providerFindUnique).not.toHaveBeenCalled();
+        });
     });
 });

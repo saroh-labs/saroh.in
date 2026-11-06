@@ -1,6 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Edition } from "@saroh/edition";
-import { editionForCountry } from "@saroh/edition";
+import { editionForCountry, editionProfile } from "@saroh/edition";
 
 const refuse = (message: string) =>
     new BadRequestException({ message, details: { field: "country" } });
@@ -24,7 +24,7 @@ export function refuseCountryOutsideEdition(
 ): void {
     const country = sent?.trim().toUpperCase();
     const stored = (current ?? "").trim().toUpperCase();
-    if (edition === "INDIA") {
+    if (editionProfile(edition).businessCountry === "india-only") {
         if (country === undefined) return;
         // The demo seeds store "India" in full, which the tax rules read as IN.
         if (country === "" || country === "IN" || country === "INDIA") return;
@@ -35,7 +35,7 @@ export function refuseCountryOutsideEdition(
         if (!country || !/^[A-Z]{2}$/.test(country)) {
             throw refuse("Choose your business's country.");
         }
-        if (editionForCountry(country) !== "GLOBAL") {
+        if (editionForCountry(country) !== edition) {
             throw refuse("Businesses in India use Saroh for India.");
         }
         return;

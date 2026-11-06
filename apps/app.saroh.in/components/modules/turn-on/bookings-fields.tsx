@@ -52,7 +52,10 @@ export function BookingsFields({
     return (
         <>
             <fieldset className="grid min-w-0 gap-1.5">
-                <legend className="mb-1.5 text-[12.5px] font-medium">
+                <legend
+                    data-ph-unmask=""
+                    className="mb-1.5 text-[12.5px] font-medium"
+                >
                     Opening hours
                 </legend>
                 <div className="grid min-w-0 divide-y divide-border/70 rounded-[9px] border border-border">
@@ -89,6 +92,7 @@ export function BookingsFields({
                                             className="h-9 w-[6.75rem] text-[13px] coarse:h-11"
                                         />
                                         <span
+                                            data-ph-unmask=""
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
@@ -107,7 +111,10 @@ export function BookingsFields({
                                         />
                                     </span>
                                 ) : (
-                                    <span className="text-[12.5px] text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="text-[12.5px] text-muted-foreground"
+                                    >
                                         Closed
                                     </span>
                                 )}
@@ -125,7 +132,10 @@ export function BookingsFields({
                         {errors.hours}
                     </span>
                 ) : (
-                    <span className="text-[11.5px] text-muted-foreground">
+                    <span
+                        data-ph-unmask=""
+                        className="text-[11.5px] text-muted-foreground"
+                    >
                         People can book inside these hours.
                     </span>
                 )}

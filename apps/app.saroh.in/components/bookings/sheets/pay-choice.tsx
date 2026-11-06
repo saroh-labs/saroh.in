@@ -8,6 +8,7 @@ import { CANT_TAKE_PAYMENTS } from "@/lib/organizations/permits";
 import type { PayChoice as Choice, PaidBy } from "@/lib/services/booking-pay";
 import {
     PAID_BY,
+    PAID_BY_MISSING,
     paidByNote,
     payChoices,
     payNote,
@@ -100,7 +101,7 @@ export function PayChoice({
             ) : null}
             {usingPack ? null : (
                 <div className="grid min-w-0 gap-1.5">
-                    <span id={ids.heading} className="label">
+                    <span data-ph-unmask="" id={ids.heading} className="label">
                         How will they pay?
                     </span>
                     <RadioCards
@@ -152,7 +153,7 @@ export function PayChoice({
                             >
                                 {paidBy
                                     ? paidByNote(paidBy, amount)
-                                    : "Say how they paid: Cash, UPI or Card."}
+                                    : PAID_BY_MISSING}
                             </p>
                         </div>
                     ) : null}

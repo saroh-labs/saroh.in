@@ -121,7 +121,11 @@ export function MoreBookingFilters({
                     />
                 </div>
                 <div className="grid gap-1.5">
-                    <span id={ids.status} className="text-[13px] font-semibold">
+                    <span
+                        data-ph-unmask=""
+                        id={ids.status}
+                        className="text-[13px] font-semibold"
+                    >
                         Status
                     </span>
                     <div

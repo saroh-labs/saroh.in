@@ -171,7 +171,9 @@ export function MoneyCard({
                     </div>
                 ))}
                 <div className="mt-[5px] flex border-t border-foreground/10 pb-[3px] pt-[7px] text-[14px] font-bold">
-                    <dt className="flex-1">Total</dt>
+                    <dt data-ph-unmask="" className="flex-1">
+                        Total
+                    </dt>
                     <dd className="tabular-nums">{format(n(money.total))}</dd>
                 </div>
             </dl>

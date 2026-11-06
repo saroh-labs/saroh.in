@@ -42,6 +42,7 @@ import {
     FakeBillingProvider,
     FakeBillingProviderFactory,
 } from "./providers/fake.provider";
+import { SAROH_BILLS_ONLY_IN_INDIA } from "./saroh-bills";
 import { SubscriptionsService } from "./subscriptions.service";
 
 const providers = new FakeBillingProviderFactory(
@@ -175,6 +176,63 @@ describe.each(Object.keys(WRITES))("%s", (route) => {
         expect(outcome?.status).not.toBe(403);
         expect(outcome?.message).not.toMatch(/^Only the owner can /);
     });
+});
+
+/**
+ * Saroh bills only an edition whose profile says so (DEC-204): a Global
+ * Owner is refused every plan, charge and billing profile before anything
+ * is read, and an India Owner gets past as before.
+ */
+const checkout = new CheckoutService(new PlansService(), providers);
+const SAROH_BILLED: Record<
+    string,
+    (ctx: OrganizationContext) => Promise<unknown>
+> = {
+    ...Object.fromEntries(
+        Object.entries(WRITES).filter(
+            ([route]) =>
+                !["POST cancel", "PATCH profile/:profileId"].includes(route),
+        ),
+    ),
+    "GET change-plan": (ctx) =>
+        checkout.quote(ctx, { plan: "grow", cycle: "month" }),
+    "a one-off charge (message top-up)": (ctx) =>
+        checkout.startOneOff(ctx, {
+            amountPaise: 11800,
+            reference: "ref_1",
+            itemKey: "messaging.pack",
+        }),
+    "a profile switch at the renewal": (ctx) =>
+        checkout.startProfileSwitch(ctx, {
+            billingProfileId: "bprof_1",
+            plan: {} as never,
+            startAt: new Date(),
+        }),
+};
+
+describe.each(Object.keys(SAROH_BILLED))("%s", (route) => {
+    const write = SAROH_BILLED[route]!;
+    const owner = OWNERS["the Owner, resolved"]!;
+
+    it("refuses a Global business before reading anything", async () => {
+        await expect(
+            write({ ...owner, edition: "GLOBAL" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { message: SAROH_BILLS_ONLY_IN_INDIA },
+        });
+    });
+
+    it.each(["INDIA", undefined] as const)(
+        "lets an India business (%s) past it",
+        async (edition) => {
+            const outcome = await write({ ...owner, edition }).then(
+                () => null,
+                (error: { message?: string }) => error,
+            );
+            expect(outcome?.message).not.toBe(SAROH_BILLS_ONLY_IN_INDIA);
+        },
+    );
 });
 
 describe("the refusal", () => {

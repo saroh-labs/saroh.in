@@ -381,6 +381,7 @@ export function DiscountForm({
                 <FormCard>
                     <div className="grid gap-2">
                         <span
+                            data-ph-unmask=""
                             id="discount-reach"
                             className="text-[12.5px] font-medium"
                         >

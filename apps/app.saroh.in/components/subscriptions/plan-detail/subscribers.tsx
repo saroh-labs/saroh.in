@@ -75,7 +75,10 @@ export function PlanSubscribers({
                             <span className="flex-[0_0_150px] text-[13px] tabular-nums">
                                 {r.price}
                                 {r.olderPrice ? (
-                                    <span className="block text-[11.5px] text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="block text-[11.5px] text-muted-foreground"
+                                    >
                                         Older price
                                     </span>
                                 ) : null}

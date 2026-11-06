@@ -5,6 +5,8 @@ import { CashfreeProvider } from "./cashfree.provider";
 import type { MerchantProvider, ProviderFactory } from "./provider.port";
 import { PROVIDER_FACTORY } from "./provider.port";
 import { RazorpayProvider } from "./razorpay.provider";
+import { FakeStripeProvider, stripeFakeOn } from "./stripe-fake";
+import { StripeProvider } from "./stripe.provider";
 
 /**
  * Default {@link ProviderFactory}: resolves a provider name to its concrete
@@ -30,7 +32,12 @@ export class DefaultProviderFactory implements ProviderFactory {
 }
 
 function defaultProviders(): MerchantProvider[] {
-    return [new RazorpayProvider(), new CashfreeProvider()];
+    return [
+        new RazorpayProvider(),
+        new CashfreeProvider(),
+        // STRIPE_FAKE (test only): Stripe without the network.
+        stripeFakeOn() ? new FakeStripeProvider() : new StripeProvider(),
+    ];
 }
 
 /**

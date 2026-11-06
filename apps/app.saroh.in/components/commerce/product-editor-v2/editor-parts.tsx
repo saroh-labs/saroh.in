@@ -27,10 +27,16 @@ export function NextSteps() {
             aria-label="After you create it"
             className="rounded-[12px] border border-dashed border-border-strong px-[18px] py-[15px]"
         >
-            <h2 className="font-display text-[15px] font-semibold tracking-[-0.015em]">
+            <h2
+                data-ph-unmask=""
+                className="font-display text-[15px] font-semibold tracking-[-0.015em]"
+            >
                 Next: variants and stock
             </h2>
-            <p className="mt-1.5 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
+            <p
+                data-ph-unmask=""
+                className="mt-1.5 text-pretty text-[12.5px] leading-[1.55] text-foreground/75"
+            >
                 Both are saved against the product, so they open here the moment
                 it is created. You stay on this page.
             </p>
@@ -40,7 +46,10 @@ export function NextSteps() {
                         1
                     </span>
                     <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        <strong className="font-semibold text-foreground/75">
+                        <strong
+                            data-ph-unmask=""
+                            className="font-semibold text-foreground/75"
+                        >
                             Variants
                         </strong>
                         : one per size, shade or colour. Each starts at the
@@ -52,7 +61,10 @@ export function NextSteps() {
                         2
                     </span>
                     <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        <strong className="font-semibold text-foreground/75">
+                        <strong
+                            data-ph-unmask=""
+                            className="font-semibold text-foreground/75"
+                        >
                             Stock
                         </strong>
                         : how many you have, and when to warn you. With

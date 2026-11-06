@@ -80,7 +80,9 @@ export function MediaThumb({
                 />
                 {length ? (
                     <>
-                        <span className="sr-only">Video, </span>
+                        <span data-ph-unmask="" className="sr-only">
+                            Video,{" "}
+                        </span>
                         {length}
                     </>
                 ) : (

@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { formatMoney } from "@/lib/format/money";
 import type { Place, PreviewSeller } from "@/lib/invoices/new-invoice";
 import type { PreviewSums } from "@/lib/invoices/new-invoice-lines";
@@ -157,7 +157,7 @@ export function PaperPreview({
                 ) : null}
                 {registered
                     ? `GSTIN ${seller.gstin ?? ""}${seller.state ? ` · ${seller.state}` : ""}`
-                    : EDITION === "GLOBAL"
+                    : PROFILE.taxSystem === "named-line"
                       ? seller.taxId
                           ? `Tax ID ${seller.taxId}`
                           : null
@@ -201,7 +201,10 @@ export function PaperPreview({
                     >
                         {title}
                     </p>
-                    <p className="mt-0.5 font-mono text-[12px]">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-0.5 font-mono text-[12px]"
+                    >
                         Number when issued
                     </p>
                     {tag("Next in series")}
@@ -215,7 +218,7 @@ export function PaperPreview({
         { part: "buyer" },
         `Change who it's billed to${buyer.name ? `: ${buyer.name}` : ""}`,
         <div data-part="buyer" className="min-w-0">
-            <p className="label" style={accent}>
+            <p data-ph-unmask="" className="label" style={accent}>
                 Billed to
             </p>
             <p className="mt-0.5 text-[12.5px] font-semibold">
@@ -238,7 +241,7 @@ export function PaperPreview({
     const supplyBlock =
         registered && !exempt ? (
             <div data-part="supply" className="min-w-0">
-                <p className="label" style={accent}>
+                <p data-ph-unmask="" className="label" style={accent}>
                     Place of supply
                 </p>
                 <p className="mt-0.5 text-[11.5px]">
@@ -305,7 +308,10 @@ export function PaperPreview({
 
             <div data-part="lines" className="border-t border-border">
                 {sums.lines.length === 0 && !editing?.unfinished.length ? (
-                    <p className="py-3 text-[11.5px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="py-3 text-[11.5px] text-muted-foreground"
+                    >
                         The lines you write show here.
                     </p>
                 ) : (
@@ -369,7 +375,9 @@ export function PaperPreview({
                         )}
                         style={rule}
                     >
-                        <span className="flex-1">Total</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            Total
+                        </span>
                         <span className="tabular-nums">
                             {money(sums.totalCents)}
                         </span>
@@ -377,7 +385,7 @@ export function PaperPreview({
                 </div>
             </div>
 
-            {howToPay?.length || editing
+            {howToPay?.length || (editing && PROFILE.payInstructionsOffered)
                 ? wrap(
                       { part: "notes" },
                       "How to pay you: printed on every unpaid invoice",
@@ -386,15 +394,18 @@ export function PaperPreview({
                           aria-label="How to pay us"
                           className="mt-3 text-[11px] leading-[1.5]"
                       >
-                          <p className="label" style={accent}>
+                          <p data-ph-unmask="" className="label" style={accent}>
                               How to pay us
                           </p>
                           {howToPay?.length ? (
                               howToPay.map((line) => <p key={line}>{line}</p>)
                           ) : (
-                              <p className="text-muted-foreground">
+                              <p
+                                  data-ph-unmask=""
+                                  className="text-muted-foreground"
+                              >
                                   Add your{" "}
-                                  {EDITION === "GLOBAL"
+                                  {PROFILE.payInstructions === "bank-code"
                                       ? "bank details"
                                       : "UPI ID or bank details"}
                                   , and every unpaid invoice carries them.
@@ -413,7 +424,7 @@ export function PaperPreview({
                         ? exempt
                             ? "Bill of supply under section 31(3)(c), CGST Act. Supply exempt from GST."
                             : "Tax invoice under section 31, CGST Act. Reverse charge does not apply."
-                        : EDITION === "GLOBAL"
+                        : PROFILE.taxSystem === "named-line"
                           ? null
                           : `${seller.name} is not registered for GST, so no tax is charged.`}
                 </p>

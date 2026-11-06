@@ -225,7 +225,10 @@ export function HoursField({
                     </Button>
                 </div>
             )}
-            <p className="text-[12.5px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12.5px] leading-normal text-muted-foreground"
+            >
                 Times are 12-hour, in 15-minute steps, the same as Hours and
                 time off.
             </p>

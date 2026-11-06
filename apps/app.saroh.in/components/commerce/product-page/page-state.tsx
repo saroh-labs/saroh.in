@@ -27,7 +27,11 @@ export function ProductPageBar() {
             <PageHeader
                 breadcrumb={[
                     "Sell",
-                    <Link key="list" href="/commerce/products">
+                    <Link
+                        data-ph-unmask=""
+                        key="list"
+                        href="/commerce/products"
+                    >
                         Products
                     </Link>,
                 ]}

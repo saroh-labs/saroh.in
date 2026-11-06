@@ -9,7 +9,7 @@
 import type { CustomerPick } from "@/lib/customers/picker";
 import { count } from "@/lib/format/plural";
 import { phoneLabel } from "@/lib/organizations/business-phone";
-import { METHOD_WORD } from "@/lib/payments/method-words";
+import { METHOD_WORD, offered } from "@/lib/payments/method-words";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How it is paid, as the API takes it. */
@@ -124,9 +124,9 @@ export function payOptions(input: {
     if (input.money === false) return [later];
     return [
         // One word each (UX-078); where it's taken is the note's to say.
-        { key: "CASH", label: METHOD_WORD.CASH, off: null },
-        { key: "UPI", label: METHOD_WORD.UPI, off: null },
-        { key: "CARD", label: METHOD_WORD.CARD, off: null },
+        ...(["CASH", "UPI", "CARD"] as const)
+            .filter(offered)
+            .map((key) => ({ key, label: METHOD_WORD[key], off: null })),
         ...(input.online === false
             ? []
             : [
@@ -253,6 +253,8 @@ export function sheetProblem(input: {
     payOff: string | null;
     cash: CashChange;
     format: (cents: number) => string;
+    /** A Global business's delivery needs no state or PIN code. */
+    looseAddress?: boolean;
 }): string | null {
     if (input.lines === 0) return "Add at least one item.";
     if (!input.pick) return "Pick a customer, or take a walk-in's name.";
@@ -260,7 +262,9 @@ export function sheetProblem(input: {
     if (goesToAddress(input.way)) {
         const a = input.address;
         if (!a.line1.trim()) return "Add the delivery address.";
-        if (!a.city.trim() || !a.state.trim() || !a.postalCode.trim()) {
+        if (input.looseAddress) {
+            if (!a.city.trim()) return "Add the town or city.";
+        } else if (!a.city.trim() || !a.state.trim() || !a.postalCode.trim()) {
             return "Add the town, state and PIN code.";
         }
         if (!reachOf(input.pick)) {

@@ -42,8 +42,16 @@ export function UntrackedStat({
     const oneButton = canMark && places.length === 1;
     return (
         <Card className="rounded-[12px] px-[15px] py-[13px]">
-            <p className="text-[11.5px] text-muted-foreground">Stock</p>
-            <p className="mt-1 font-display text-[18px] font-semibold leading-tight">
+            <p
+                data-ph-unmask=""
+                className="text-[11.5px] text-muted-foreground"
+            >
+                Stock
+            </p>
+            <p
+                data-ph-unmask=""
+                className="mt-1 font-display text-[18px] font-semibold leading-tight"
+            >
                 Not tracked
             </p>
             <p

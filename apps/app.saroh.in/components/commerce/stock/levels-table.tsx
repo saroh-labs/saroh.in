@@ -77,7 +77,10 @@ export function LevelsTable({
                         "gap-3 rounded-t-[10px] max-[759px]:hidden",
                     )}
                 >
-                    <span className="sticky left-0 z-10 -ml-[14px] bg-muted pl-[14px]">
+                    <span
+                        data-ph-unmask=""
+                        className="sticky left-0 z-10 -ml-[14px] bg-muted pl-[14px]"
+                    >
                         Product
                     </span>
                     {storefronts.map((s) => (
@@ -88,7 +91,7 @@ export function LevelsTable({
                             {s.name}
                         </span>
                     ))}
-                    <span>Last change</span>
+                    <span data-ph-unmask="">Last change</span>
                 </ListTableHead>
                 <div role="list" aria-label="Stock levels">
                     {rows.map((row) => {

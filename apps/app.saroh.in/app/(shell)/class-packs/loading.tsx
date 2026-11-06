@@ -9,7 +9,7 @@ export default function Loading() {
             shape="list"
             width="full"
             breadcrumb={[
-                <Link key="0" href="/bookings">
+                <Link data-ph-unmask="" key="0" href="/bookings">
                     Bookings
                 </Link>,
                 "Class packs",

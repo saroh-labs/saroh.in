@@ -69,6 +69,9 @@ const PAGE_POLICIES = pageSecurityHeaders({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // The browser stack's Global copy builds and starts from `.next-global`
+    // (`build:global`, CI's browser shards), beside India's `.next`.
+    distDir: process.env.NEXT_DIST_DIR || ".next",
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
     poweredByHeader: false,
     async headers() {

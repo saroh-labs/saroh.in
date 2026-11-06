@@ -104,7 +104,9 @@ export function DateSheet({
                     ? `Swipe the calendar left or right to go a ${word} back or on.`
                     : `The arrows beside the date go a ${word} back or on.`}
             </p>
-            <div className={cn(LABEL, "mt-3.5")}>Show as</div>
+            <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
+                Show as
+            </div>
             <div
                 className="mt-1.5"
                 // A view is a link: the page under the popover stays, so
@@ -282,6 +284,7 @@ function DateSheetBody({
                         <span>{c.day}</span>
                         {c.closed ? (
                             <span
+                                data-ph-unmask=""
                                 className={cn(
                                     "text-[8.5px] leading-[5px] max-[759px]:text-[9px]",
                                     c.picked

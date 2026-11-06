@@ -193,7 +193,9 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
 
             <div className="rounded-[12px] border border-border bg-muted/50 px-4 py-3.5">
                 <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-                    <h3 className="text-[14px] font-semibold">All products</h3>
+                    <h3 data-ph-unmask="" className="text-[14px] font-semibold">
+                        All products
+                    </h3>
                     <span className="text-[12px] text-muted-foreground">
                         {count(counts.all ?? 0, "product")}
                     </span>
@@ -232,7 +234,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                         />
                     </Field>
                     <div className="min-w-0 flex-[1_1_100%]">
-                        <p className="mb-1.5 text-[12px] font-medium">
+                        <p
+                            data-ph-unmask=""
+                            className="mb-1.5 text-[12px] font-medium"
+                        >
                             Returns
                         </p>
                         <ChipGroup
@@ -312,7 +317,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                 </div>
             ) : null}
 
-            <h3 className="mb-2 mt-[22px] text-[13.5px] font-semibold">
+            <h3
+                data-ph-unmask=""
+                className="mb-2 mt-[22px] text-[13.5px] font-semibold"
+            >
                 Categories
             </h3>
             {line ? (

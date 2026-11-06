@@ -95,7 +95,10 @@ export function ListNote() {
         <p className="mt-2.5 text-pretty text-[12px] text-muted-foreground">
             Customers are people who&apos;ve paid, signed in on your website or
             been added here. Everyone else is in{" "}
-            <TextLink href="/contacts">Contacts</TextLink>.
+            <TextLink data-ph-unmask="" href="/contacts">
+                Contacts
+            </TextLink>
+            .
         </p>
     );
 }

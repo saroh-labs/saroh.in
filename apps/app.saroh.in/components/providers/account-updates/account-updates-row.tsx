@@ -47,7 +47,7 @@ export function AccountUpdatesBlock({ state }: { state: AccountUpdates }) {
 
     return (
         <section aria-labelledby={id}>
-            <h3 id={id} className="label mb-2">
+            <h3 data-ph-unmask="" id={id} className="label mb-2">
                 Messages in customer accounts
             </h3>
             <div className="overflow-hidden rounded-xl border border-border bg-card">

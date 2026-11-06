@@ -9,6 +9,98 @@ export type Edition = (typeof EDITIONS)[number];
 
 export type DeployEnvironment = "production" | "development";
 
+/**
+ * What code asks of an edition (DEC-204 item 7). Each fact is a question some
+ * code answers by reading it, never "is this India?"; a new edition fills
+ * every one, or the build fails.
+ */
+export interface EditionProfile {
+    /** GST (registration, GSTIN, CGST/SGST/IGST, April to March), or one named tax line ("VAT 20%") with a numbering year the business picks. */
+    taxSystem: "gst" | "named-line";
+    /** "How to pay us": UPI and an IFSC-backed bank account, or a bank account with an optional bank code and no UPI. */
+    payInstructions: "upi-and-ifsc" | "bank-code";
+    /**
+     * Whether a business offers "How to pay us" at all: its settings, Home's
+     * step, and the bank details its customers see. Off for Global, which
+     * takes payment through Stripe only, until each country's transfer
+     * conventions are researched (owner, 6 Nov 2026, DEC-208); its
+     * per-country bank rules (`bank-details.ts`) stay, off.
+     */
+    payInstructionsOffered: boolean;
+    /** An address's last lines: an Indian state and six-digit PIN, both required, or a free region and postcode with a country. */
+    address: "indian-state-and-pin" | "country-and-region";
+    /** A phone without "+" reads as Indian, or every number starts with its country code. */
+    phoneNumbers: "indian" | "with-country-code";
+    /** The business's country: India, never asked, or asked once at setup, where it suggests the currency. */
+    businessCountry: "india-only" | "asked-at-setup";
+    /** Whether Saroh bills the business itself, through a billing profile. */
+    sarohBilling: boolean;
+    /** Whether people can sign in to Saroh with a phone (each code costs money). */
+    phoneSignIn: boolean;
+    /** The higher, struck-through price: India's printed MRP, or an original price. */
+    struckPrice: "mrp" | "original-price";
+    /** Whether the site has each tool's own page, or only the tools hub. */
+    toolPages: "own" | "hub";
+    /** Help and docs on the edition's own addresses, or the shared ones. */
+    helpAndDocs: "own-addresses" | "shared";
+    /** How numbers group: lakh and crore (DEC-079), or thousands. */
+    numberLocale: "en-IN" | "en-US";
+    /** Whether customers pay by UPI: a way a payment taken by hand is recorded, and named where they pay. A payment already recorded as UPI still reads "UPI". */
+    upi: boolean;
+    /** The payment providers a business may connect to take its customers' money; no two editions share one. */
+    paymentProviders: readonly ("RAZORPAY" | "CASHFREE" | "STRIPE")[];
+    /**
+     * Whether a business takes its customers' money online whatever Saroh
+     * plan it is on: its plan's online payments row, and its room for its
+     * own accounts when it connects a payment provider, are not asked
+     * (owner, 6 Nov 2026, DEC-208). Memberships and its own email stay the
+     * plan's to say.
+     */
+    onlinePaymentsOnEveryPlan: boolean;
+}
+
+export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
+    INDIA: {
+        taxSystem: "gst",
+        payInstructions: "upi-and-ifsc",
+        payInstructionsOffered: true,
+        address: "indian-state-and-pin",
+        phoneNumbers: "indian",
+        businessCountry: "india-only",
+        sarohBilling: true,
+        phoneSignIn: true,
+        struckPrice: "mrp",
+        toolPages: "own",
+        helpAndDocs: "own-addresses",
+        numberLocale: "en-IN",
+        upi: true,
+        paymentProviders: ["RAZORPAY", "CASHFREE"],
+        onlinePaymentsOnEveryPlan: false,
+    },
+    GLOBAL: {
+        taxSystem: "named-line",
+        payInstructions: "bank-code",
+        payInstructionsOffered: false,
+        address: "country-and-region",
+        phoneNumbers: "with-country-code",
+        businessCountry: "asked-at-setup",
+        sarohBilling: false,
+        phoneSignIn: false,
+        struckPrice: "original-price",
+        toolPages: "hub",
+        helpAndDocs: "shared",
+        numberLocale: "en-US",
+        upi: false,
+        paymentProviders: ["STRIPE"],
+        onlinePaymentsOnEveryPlan: true,
+    },
+};
+
+/** An edition's profile. Unset is India, as every business was before Global. */
+export const editionProfile = (
+    edition: Edition | null | undefined,
+): EditionProfile => EDITION_PROFILES[edition ?? "INDIA"];
+
 export interface EditionHosts {
     /** The marketing site. saroh.in redirects to `www`; saroh.tech has none. */
     site: string;
@@ -147,7 +239,7 @@ export function parseEdition(value: string | undefined): Edition {
  * elsewhere. Dates are written day first everywhere, so they don't vary.
  */
 export const numberLocaleOf = (edition: Edition) =>
-    edition === "INDIA" ? "en-IN" : "en-US";
+    editionProfile(edition).numberLocale;
 
 /**
  * The same for an amount where one deployment serves both editions, as the
@@ -189,3 +281,5 @@ export function currencyForCountry(country: string): string {
     if (EURO_COUNTRIES.includes(code)) return "EUR";
     return COUNTRY_CURRENCY[code] ?? "USD";
 }
+
+export * from "./bank-details";

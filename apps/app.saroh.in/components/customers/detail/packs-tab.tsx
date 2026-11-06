@@ -83,7 +83,10 @@ export function PacksTab({
     const list = lists[which];
     const head = (
         <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-            <p className="m-0 min-w-0 flex-1 text-pretty text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="m-0 min-w-0 flex-1 text-pretty text-[12.5px] text-muted-foreground"
+            >
                 Each booking uses one from a pack, and it goes back if they
                 cancel in time.
                 {canExtend
@@ -241,7 +244,10 @@ function PackItem({
                                         <span className="min-w-0 flex-[1_1_140px] font-semibold">
                                             {u.what}
                                         </span>
-                                        <StatusBadge tone={u.state.tone}>
+                                        <StatusBadge
+                                            tone={u.state.tone}
+                                            data-ph-unmask=""
+                                        >
                                             {u.state.label}
                                         </StatusBadge>
                                     </Link>

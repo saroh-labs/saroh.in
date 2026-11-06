@@ -20,6 +20,7 @@ import {
     SITE_REPLAY_BLOCK_SELECTOR,
     siteReplayConfig,
     siteReplayDecision,
+    WEB_VITALS_CAPTURE,
 } from "./browser";
 import { MAX_BROWSER_EXCEPTIONS_PER_SESSION } from "./names";
 
@@ -912,6 +913,21 @@ describe("page visits (DEC-160)", () => {
         $set_once: { $initial_current_url: "https://app.saroh.in/open/x" },
     };
 
+    /** What posthog-js 1.435 adds about the page before (`src/page-view.ts`). */
+    const SDK_SCROLL = {
+        $current_url: "https://saroh.in/pricing?q=asha",
+        $initial_referrer: "https://mail.example.com/",
+        $prev_pageview_duration: 12.5,
+        $prev_pageview_last_scroll: 400,
+        $prev_pageview_last_scroll_percentage: 0.4,
+        $prev_pageview_max_scroll: 600,
+        $prev_pageview_max_scroll_percentage: 0.6,
+        $prev_pageview_last_content: 1000,
+        $prev_pageview_last_content_percentage: 0.5,
+        $prev_pageview_max_content: 1400,
+        $prev_pageview_max_content_percentage: 0.7,
+    };
+
     it("says only the page the app named: no id, no title, no referrer, no person", () => {
         const sent = must(
             pageBeforeSend(SDK_PAGEVIEW, {
@@ -996,6 +1012,14 @@ describe("page visits (DEC-160)", () => {
         });
         expect(gate({ event: "$snapshot", properties: {} })).not.toBeNull();
         expect(gate({ event: "$autocapture", properties: {} })).toBeNull();
+        // The workspace sends no scroll depth.
+        expect(config).not.toHaveProperty("disable_scroll_properties", false);
+        expect(
+            Object.keys(
+                must(gate({ event: "$pageleave", properties: SDK_SCROLL }))
+                    .properties ?? {},
+            ).filter((key) => /scroll|content/u.test(key)),
+        ).toEqual([]);
 
         // Opted out: nothing more leaves, a leave at tab close included.
         tracking.stopReplay();
@@ -1076,8 +1100,366 @@ describe("page visits (DEC-160)", () => {
             person_profiles: "never",
             persistence: "memory",
             capture_pageleave: true,
+            // Scroll depth (DEC-160, 6 Nov 2026).
+            disable_scroll_properties: false,
         });
         expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+        // Percentages only; the pixel figures and nothing else besides.
+        const gate = config.before_send as Gate;
+        for (const event of ["$pageview", "$pageleave"])
+            expect(
+                must(gate({ event, properties: SDK_SCROLL })).properties,
+            ).toEqual({
+                $current_url: "https://saroh.in/pricing",
+                $pathname: "/pricing",
+                ...(event === "$pageleave"
+                    ? { $prev_pageview_pathname: "/pricing" }
+                    : {}),
+                $prev_pageview_duration: 12.5,
+                $prev_pageview_last_scroll_percentage: 0.4,
+                $prev_pageview_max_scroll_percentage: 0.6,
+                $prev_pageview_last_content_percentage: 0.5,
+                $prev_pageview_max_content_percentage: 0.7,
+            });
+    });
+
+    const consented = {
+        consent: "granted",
+        teamBrowser: false,
+        doNotTrack: null,
+        globalPrivacyControl: false,
+    } as const;
+
+    it("saroh.in clicks: on with clicks, link queries cut, under the named page (owner, 6 Nov 2026)", async () => {
+        const loadDeadClicks = vi.fn(() => Promise.resolve({}));
+        const { tracking, instances } = tracker({
+            app: "web",
+            clicks: true,
+            loadDeadClicks,
+        });
+        tracking.pageview("/pricing");
+        expect(await tracking.startSiteReplay(consented)).toBe(true);
+        const { config } = instances[0];
+        expect(loadDeadClicks).toHaveBeenCalled();
+        expect(config).toMatchObject({
+            autocapture: { capture_copied_text: false },
+            rageclick: true,
+            capture_heatmaps: true,
+            capture_dead_clicks: true,
+        });
+        const gate = config.before_send as Gate;
+        const url = "https://saroh.in/pricing?ref=ABC123#top";
+        const click = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $current_url: url,
+                    $pathname: "/pricing",
+                    $referrer: "https://example.com/x",
+                    $elements_chain:
+                        'a.cta:text="Start free"href="/signup?plan=grow&ref=ABC123"attr__href="/signup?ref=ABC123"',
+                    $elements: [
+                        { tag_name: "a", attr__href: "/signup?ref=ABC123" },
+                    ],
+                    $external_click_url: "https://x.com/s?u=1",
+                },
+            }),
+        ).properties;
+        expect(click).toMatchObject({
+            $current_url: "https://saroh.in/pricing",
+            $pathname: "/pricing",
+            $elements_chain:
+                'a.cta:text="Start free"href="/signup"attr__href="/signup"',
+            $elements: [{ tag_name: "a", attr__href: "/signup" }],
+            $external_click_url: "https://x.com/s",
+        });
+        expect(click).not.toHaveProperty("$referrer");
+        expect(JSON.stringify(click)).not.toContain("ABC123");
+        const heat = must(
+            gate({
+                event: "$$heatmap",
+                properties: {
+                    $current_url: url,
+                    $heatmap_data: { [url]: [{ x: 1, y: 2 }] },
+                },
+            }),
+        ).properties;
+        expect(heat?.$heatmap_data).toEqual({
+            "https://saroh.in/pricing": [{ x: 1, y: 2 }],
+        });
+        expect(gate({ event: "$rageclick", properties: {} })).not.toBeNull();
+        expect(gate({ event: "$dead_click", properties: {} })).not.toBeNull();
+        expect(gate({ event: "$identify", properties: {} })).toBeNull();
+    });
+
+    it("saroh.in clicks: inside a masked part, counted without its words", async () => {
+        const { tracking, instances } = tracker({ app: "web", clicks: true });
+        tracking.pageview("/");
+        await tracking.startSiteReplay(consented);
+        const gate = instances[0].config.before_send as Gate;
+        const click = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $current_url: "https://saroh.in/",
+                    $el_text: "Priya Sharma",
+                    $elements_chain:
+                        'span:text="Priya Sharma"attr__aria-label="Priya Sharma"nth-child="1";button.account:attr__data-ph-mask=""text="P"',
+                    $elements: [
+                        {
+                            tag_name: "span",
+                            $el_text: "Priya Sharma",
+                            attr__title: "priya@example.com",
+                        },
+                        {
+                            tag_name: "button",
+                            attributes: {
+                                "attr__data-ph-mask": "",
+                                "attr__aria-label": "Priya Sharma",
+                            },
+                        },
+                    ],
+                },
+            }),
+        ).properties;
+        expect(JSON.stringify(click)).not.toMatch(/Priya|priya/u);
+        expect(click?.$elements_chain).toBe(
+            'span:nth-child="1";button.account:attr__data-ph-mask=""',
+        );
+        // An unmasked click keeps its words: saroh.in's own.
+        const plain = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $el_text: "Start free",
+                    $elements_chain: 'a:text="Start free"',
+                },
+            }),
+        ).properties;
+        expect(plain).toMatchObject({ $el_text: "Start free" });
+    });
+
+    it("clicks stay off without the option, and never in the workspace", async () => {
+        const site = tracker({ app: "web" });
+        site.tracking.pageview("/pricing");
+        await site.tracking.startSiteReplay(consented);
+        expect(site.instances[0].config.autocapture).toBe(false);
+        expect(
+            (site.instances[0].config.before_send as Gate)({
+                event: "$autocapture",
+                properties: {},
+            }),
+        ).toBeNull();
+    });
+
+    /** What posthog-js 1.435 sends (`extensions/web-vitals`), attribution forced on. */
+    function sdkWebVitals(url: string) {
+        const metric = (name: string, value: number) => ({
+            name,
+            value,
+            rating: "good",
+            delta: value,
+            id: "v6-1762400000000-1234567890123",
+            navigationType: "navigate",
+            navigationId: 1,
+            navigationInteractionId: undefined,
+            navigationURL: url,
+            navigationStartTime: 0,
+            $current_url: url,
+            timestamp: 1762400000000,
+            $session_id: "s1",
+            $window_id: "w1",
+            attribution: {
+                interactionTarget: "button#pay-asha-rao",
+                target: "img.product[alt='Northwind tea']",
+                url: `${url}&img=1`,
+            },
+        });
+        return {
+            event: "$web_vitals",
+            properties: {
+                $current_url: url,
+                $pathname: "/commerce/orders/seed_order_7",
+                title: "Order ORD-007 \u00b7 Northwind Supply \u00b7 Saroh",
+                $referrer: "https://mail.example.com/",
+                $session_id: "s1",
+                $web_vitals_LCP_event: metric("LCP", 1200.5),
+                $web_vitals_LCP_value: 1200.5,
+                $web_vitals_INP_event: metric("INP", 96),
+                $web_vitals_INP_value: 96,
+                $web_vitals_TTFB_event: metric("TTFB", 80),
+            },
+            $set: { name: "Asha" },
+        };
+    }
+    const CLEAN_LCP = {
+        name: "LCP",
+        value: 1200.5,
+        rating: "good",
+        delta: 1200.5,
+        navigationType: "navigate",
+    };
+
+    it("web vitals in the workspace: the route's shape, the numbers, nothing else", () => {
+        const sent = must(
+            pageBeforeSend(
+                sdkWebVitals(
+                    "https://app.saroh.in/commerce/orders/seed_order_7?tab=notes",
+                ),
+                {
+                    now: "/settings/profile",
+                    landing: {
+                        path: "/commerce/orders/seed_order_7",
+                        route: "/commerce/orders/[orderId]",
+                    },
+                },
+            ),
+        );
+        expect(sent.properties).toEqual({
+            $current_url: "https://app.saroh.in/commerce/orders/[orderId]",
+            $pathname: "/commerce/orders/[orderId]",
+            $session_id: "s1",
+            $web_vitals_LCP_event: CLEAN_LCP,
+            $web_vitals_LCP_value: 1200.5,
+            $web_vitals_INP_event: {
+                name: "INP",
+                value: 96,
+                rating: "good",
+                delta: 96,
+                navigationType: "navigate",
+            },
+            $web_vitals_INP_value: 96,
+        });
+        expect(sent).not.toHaveProperty("$set");
+        expect(JSON.stringify(sent)).not.toMatch(
+            /seed_order_7|asha|Northwind|mail\.example|tab=notes|button|img|w1/iu,
+        );
+    });
+
+    it("web vitals on saroh.in: the allow-listed path the app named", () => {
+        const sent = must(
+            pageBeforeSend(
+                sdkWebVitals(
+                    "https://saroh.in/pricing?utm_source=x&email=a@example.com",
+                ),
+                {
+                    now: "/pricing?utm_source=x",
+                    landing: {
+                        path: "/pricing",
+                        route: "/pricing?utm_source=x",
+                    },
+                },
+            ),
+        );
+        expect(sent.properties).toMatchObject({
+            $current_url: "https://saroh.in/pricing?utm_source=x",
+            $pathname: "/pricing",
+            $web_vitals_LCP_event: CLEAN_LCP,
+        });
+        expect(JSON.stringify(sent)).not.toMatch(/email|example\.com|img/u);
+    });
+
+    it("web vitals for a page the app never named are not sent", () => {
+        const event = sdkWebVitals("https://saroh.in/blog/x");
+        expect(pageBeforeSend(event, { now: "/pricing" })).toBeNull();
+        expect(
+            pageBeforeSend(event, {
+                now: "/blog/x",
+                landing: { path: "/pricing", route: "/pricing" },
+            }),
+        ).toBeNull();
+    });
+
+    it("web vitals are measured only where page visits are sent", async () => {
+        const loadWebVitals = vi.fn(() => Promise.resolve({}));
+        const on = tracker({ loadWebVitals });
+        expect(await on.tracking.startReplay(WORKSPACE)).toBe(true);
+        expect(loadWebVitals).toHaveBeenCalledTimes(1);
+        expect(on.instances[0].config.capture_performance).toEqual(
+            WEB_VITALS_CAPTURE,
+        );
+        expect(WEB_VITALS_CAPTURE).toMatchObject({
+            web_vitals: true,
+            web_vitals_attribution: false,
+            network_timing: false,
+        });
+
+        const site = tracker({ app: "web", loadWebVitals });
+        expect(
+            await site.tracking.startSiteReplay({
+                consent: "granted",
+                teamBrowser: false,
+                doNotTrack: null,
+                globalPrivacyControl: false,
+            }),
+        ).toBe(true);
+        expect(site.instances[0].config.capture_performance).toEqual(
+            WEB_VITALS_CAPTURE,
+        );
+
+        // Recording only: no observers loaded, nothing measured.
+        loadWebVitals.mockClear();
+        const recordOnly = tracker({ analytics: "off", loadWebVitals });
+        expect(await recordOnly.tracking.startReplay(WORKSPACE)).toBe(true);
+        expect(recordOnly.instances[0].config.capture_performance).toBe(false);
+        expect(loadWebVitals).not.toHaveBeenCalled();
+
+        for (const change of [
+            { sharesUsage: false },
+            { doNotTrack: "1" },
+            { globalPrivacyControl: true },
+        ]) {
+            const off = tracker({ loadWebVitals });
+            expect(
+                await off.tracking.startReplay({ ...WORKSPACE, ...change }),
+            ).toBe(false);
+        }
+        const refused = tracker({ app: "web", loadWebVitals });
+        await refused.tracking.startSiteReplay({
+            consent: "refused",
+            teamBrowser: false,
+        });
+        const team = tracker({ app: "web", loadWebVitals });
+        await team.tracking.startSiteReplay({
+            consent: "granted",
+            teamBrowser: true,
+        });
+        expect(loadWebVitals).not.toHaveBeenCalled();
+    });
+
+    it("the page the tab loaded is the first one the app names", async () => {
+        vi.stubGlobal("location", {
+            pathname: "/commerce/orders/seed_order_7",
+        });
+        try {
+            const { tracking, instances } = tracker({
+                loadWebVitals: () => Promise.resolve({}),
+            });
+            tracking.pageview("/commerce/orders/[orderId]");
+            await tracking.startReplay(WORKSPACE);
+            vi.stubGlobal("location", { pathname: "/settings/profile" });
+            tracking.pageview("/settings/profile");
+            const gate = instances[0].config.before_send as Gate;
+            expect(
+                must(
+                    gate(
+                        sdkWebVitals(
+                            "https://app.saroh.in/commerce/orders/seed_order_7",
+                        ),
+                    ),
+                ).properties?.$pathname,
+            ).toBe("/commerce/orders/[orderId]");
+            tracking.stopReplay();
+            expect(
+                gate(
+                    sdkWebVitals(
+                        "https://app.saroh.in/commerce/orders/seed_order_7",
+                    ),
+                ),
+            ).toBeNull();
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it("accounts and the admin console never count a visit", async () => {

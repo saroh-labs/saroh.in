@@ -107,7 +107,9 @@ export function DiscountsScreen({
                         <ViewerDate iso={d.endsAt} />
                     </span>
                 ) : (
-                    <span className="text-muted-foreground">No end date</span>
+                    <span data-ph-unmask="" className="text-muted-foreground">
+                        No end date
+                    </span>
                 ),
         },
         {
@@ -166,7 +168,10 @@ export function DiscountsScreen({
                     ) : undefined,
                 }}
             />
-            <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
+            >
                 A code works on an order you take at the counter and, when your
                 website sells, in your customers&rsquo; bag there, with the same
                 dates, limit and reach, and one count of uses. An expired code

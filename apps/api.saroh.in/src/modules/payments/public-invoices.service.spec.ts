@@ -73,6 +73,7 @@ import {
     parseIntentBody,
     PublicInvoicesService,
 } from "./public-invoices.service";
+import { IN_EDITION, OPENS_CHECKOUT } from "./public-key";
 
 const invoiceFindUnique = prisma.invoice.findUnique as jest.Mock;
 const invoiceFindFirst = prisma.invoice.findFirst as jest.Mock;
@@ -754,15 +755,7 @@ describe("PublicInvoicesService.createIntent", () => {
             where: {
                 organizationId: "org_1",
                 status: "CONNECTED",
-                OR: [
-                    { provider: { not: "RAZORPAY" } },
-                    {
-                        AND: [
-                            { publicKey: { not: null } },
-                            { publicKey: { not: "" } },
-                        ],
-                    },
-                ],
+                ...OPENS_CHECKOUT,
             },
             orderBy: { createdAt: "asc" },
         });
@@ -896,6 +889,7 @@ describe("PublicInvoicesService.createIntent", () => {
                     organizationId: "org_1",
                     provider: "CASHFREE",
                 },
+                ...IN_EDITION,
             },
         });
         expect(intentCreate).not.toHaveBeenCalled();

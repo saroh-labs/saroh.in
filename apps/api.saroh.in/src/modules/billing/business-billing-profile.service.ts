@@ -32,6 +32,7 @@ import {
     profileSwitchStateInTx,
 } from "./profile-switch";
 import type { CheckoutHandoff } from "./providers/billing-provider.port";
+import { assertSarohBills } from "./saroh-bills";
 
 /**
  * A business's billing profile as its Plan & billing shows it (DEC-167,
@@ -183,6 +184,7 @@ export class BusinessBillingProfileService {
         options: { linkedForRenewal?: boolean } = {},
     ): Promise<BillingProfileChosen> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         const move = await prisma.$transaction(async (tx) => {
             const org = await tx.organization.findUnique({
                 where: { id: ctx.organizationId },
@@ -244,6 +246,7 @@ export class BusinessBillingProfileService {
         BillingProfileChosen & { created: string; notMoved: string | null }
     > {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         let made: { id: string; move: ProfileMove | null };
         try {
             made = await prisma.$transaction(async (tx) => {

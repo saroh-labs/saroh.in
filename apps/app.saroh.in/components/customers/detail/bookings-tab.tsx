@@ -86,7 +86,7 @@ export function BookingsTab({
                             >
                                 {r.pay}
                             </div>
-                            <StatusBadge tone={r.state.tone}>
+                            <StatusBadge tone={r.state.tone} data-ph-unmask="">
                                 {r.state.label}
                             </StatusBadge>
                         </Link>

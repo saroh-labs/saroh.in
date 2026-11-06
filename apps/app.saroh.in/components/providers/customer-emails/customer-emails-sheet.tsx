@@ -266,7 +266,10 @@ function OverdueTimingFields({
             <Field label="Until" className="min-w-0">
                 {select("untilHour")}
             </Field>
-            <p className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground sm:col-span-2">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground sm:col-span-2"
+            >
                 In your business&apos;s time zone. If one can&apos;t go on its
                 day, it goes in the days after.
             </p>

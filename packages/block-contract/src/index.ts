@@ -1,3 +1,4 @@
+export * from "./delivery-place";
 export * from "./examples";
 export * from "./fixtures";
 export * from "./fonts";

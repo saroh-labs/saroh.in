@@ -7,7 +7,7 @@ import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
  * them and never returns them, so nothing here can read one back.
  */
 
-export type PaymentProviderName = "RAZORPAY" | "CASHFREE";
+export type PaymentProviderName = "RAZORPAY" | "CASHFREE" | "STRIPE";
 
 /**
  * Why a connection that is still CONNECTED needs a person (UX-012): its

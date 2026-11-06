@@ -56,6 +56,7 @@ const ORDER = {
     deliveryCity: "Bengaluru",
     deliveryState: "Karnataka",
     deliveryPostalCode: "560038",
+    deliveryCountry: null,
     items: [
         {
             productId: "prod_1",
@@ -1195,6 +1196,24 @@ describe("CustomerDetailService", () => {
             "possibleMatches",
         ]);
         expect(detail.bookings?.upcoming).toHaveLength(1);
+    });
+
+    it("prints a Global delivery's region and country from their columns (DEC-207)", async () => {
+        const { svc, db } = make();
+        db.order.findMany.mockResolvedValue([
+            {
+                ...ORDER,
+                deliveryLine1: "1 Main St",
+                deliveryCity: "Austin",
+                deliveryState: "Texas",
+                deliveryPostalCode: "78701",
+                deliveryCountry: "US",
+            },
+        ]);
+        const detail = await svc.detail(OWNER, "c1");
+        expect(detail.orders?.rows[0]?.delivery).toBe(
+            "1 Main St, Austin, Texas, United States 78701",
+        );
     });
 
     // #531: products belong to the business, so the same product bought at

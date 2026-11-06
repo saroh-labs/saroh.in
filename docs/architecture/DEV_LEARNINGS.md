@@ -6527,3 +6527,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: readers shared in a render are in React's `cache()`, with a normalised host as the key; pages read `getSiteForPage`, which throws on a failed read; a custom domain is looked up by hostname alone, in `getSiteForHost` and `siteReadFailed`; with no root domain set, behaviour is as it was. `lib/site-read-failed.test.ts` counts fetches through a `cache` stand-in and fails a page that reads the site and calls `notFound()`.
 **Rule**: a reader shared in one render goes in `cache()`, because a signal means nothing else shares it (`frontend-data-and-state.md`). A test of `cache()` outside a render proves nothing: the real one calls straight through.
 **Category**: data · merchant sites
+
+---
+
+## A field read from the wrong table passed every unit test
+
+**Symptom**: 6 Nov, the full gate failed every privacy removal and the retention eraser: `Invalid tx.organization.findUnique()`, `taxRate` unknown.
+**Cause**: the tax rate lives on `BusinessProfile`, not `Organization`. The unit test passed a hand-made business, so nothing checked the select against Prisma's schema. The Stripe webhook db spec also made an India business and used made-up keys with underscores, which the key check rightly refused.
+**Fix**: read `businessProfile.taxRate` through the relation; the db spec makes a Global business and uses key-shaped fake values.
+**Rule**: a new field in a Prisma `select` is not done until a db spec that runs it has run. Fake keys in tests take the real key's shape.
+**Category**: tests · database

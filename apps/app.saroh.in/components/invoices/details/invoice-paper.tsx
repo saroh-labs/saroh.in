@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {
@@ -197,7 +197,7 @@ export function InvoicePaper({
                     ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
                     : i.sellerTaxId
                       ? `Tax ID ${i.sellerTaxId}`
-                      : EDITION === "GLOBAL"
+                      : PROFILE.taxSystem === "named-line"
                         ? null
                         : "Not registered for GST"}
             </p>
@@ -258,7 +258,7 @@ export function InvoicePaper({
     );
     const buyerBlock = (
         <div className="min-w-0 flex-[1_1_200px]">
-            <p className="label" style={accent}>
+            <p data-ph-unmask="" className="label" style={accent}>
                 Billed to
             </p>
             <p className="mt-1 text-[14px] font-semibold">{who.name}</p>
@@ -318,7 +318,7 @@ export function InvoicePaper({
                 {compact && !band ? null : buyerBlock}
                 {taxed ? (
                     <div className="min-w-0 flex-[0_1_200px]">
-                        <p className="label" style={accent}>
+                        <p data-ph-unmask="" className="label" style={accent}>
                             Place of supply
                         </p>
                         <p className="mt-1 text-[13px]">
@@ -343,12 +343,21 @@ export function InvoicePaper({
                         "label border-b border-border py-2",
                     )}
                 >
-                    <span>Item</span>
+                    <span data-ph-unmask="">Item</span>
                     {hsnColumn ? (
-                        <span className={DESK_ONLY}>HSN / SAC</span>
+                        <span data-ph-unmask="" className={DESK_ONLY}>
+                            HSN / SAC
+                        </span>
                     ) : null}
-                    <span className={cn(DESK_ONLY, "text-right")}>Qty</span>
-                    <span className="text-right">Amount</span>
+                    <span
+                        data-ph-unmask=""
+                        className={cn(DESK_ONLY, "text-right")}
+                    >
+                        Qty
+                    </span>
+                    <span data-ph-unmask="" className="text-right">
+                        Amount
+                    </span>
                 </div>
                 {(i.lines ?? []).map((l) => {
                     // A line GST was added to prints its rate and its
@@ -462,7 +471,7 @@ export function InvoicePaper({
                         )}
                         style={rule}
                     >
-                        <span className="flex-1">
+                        <span data-ph-unmask="" className="flex-1">
                             {credit ? "Credited" : "Total"}
                         </span>
                         <span className="tabular-nums">{money(i.total)}</span>
@@ -480,7 +489,7 @@ export function InvoicePaper({
                     aria-label="How to pay us"
                     className="mt-[18px] break-inside-avoid"
                 >
-                    <p className="label" style={accent}>
+                    <p data-ph-unmask="" className="label" style={accent}>
                         How to pay us
                     </p>
                     {howToPay.map((line) => (

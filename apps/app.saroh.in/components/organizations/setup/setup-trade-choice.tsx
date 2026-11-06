@@ -23,7 +23,11 @@ export function SetupTradeChoice({
     const line = tradeLine("APPOINTMENTS", value);
     return (
         <div className="mt-5" data-trade-choice="">
-            <div className="mb-1.5 text-[12px] font-medium" id={`${id}-label`}>
+            <div
+                data-ph-unmask=""
+                className="mb-1.5 text-[12px] font-medium"
+                id={`${id}-label`}
+            >
                 What kind of place is it?
             </div>
             <ChipGroup

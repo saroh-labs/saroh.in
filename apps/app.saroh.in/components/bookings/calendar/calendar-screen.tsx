@@ -307,6 +307,7 @@ export function CalendarScreen({
                         own yet, so customers have no free times to book.{" "}
                         {addPerson ? (
                             <TextLink
+                                data-ph-unmask=""
                                 onClick={addPerson}
                                 className="coarse:min-h-11"
                             >

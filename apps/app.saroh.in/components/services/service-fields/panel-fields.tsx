@@ -136,7 +136,7 @@ function Visits({ edit, setup }: { edit: Edit; setup: PanelSetup }) {
     const { draft, set, problem, leave } = edit;
     if (draft.kind === "class") {
         return (
-            <p className={cn(HELP, "mt-0")}>
+            <p data-ph-unmask="" className={cn(HELP, "mt-0")}>
                 A group class is one visit. Visits in a package are for one
                 person at a time.
             </p>
@@ -250,7 +250,9 @@ function Hours({
     return (
         <div className="min-w-0">
             {titled ? (
-                <div className={cn(LABEL, "mb-2")}>When it can be booked</div>
+                <div data-ph-unmask="" className={cn(LABEL, "mb-2")}>
+                    When it can be booked
+                </div>
             ) : null}
             <p className={cn(HELP, "mb-2.5 mt-0")}>
                 {narrows ? (
@@ -261,7 +263,7 @@ function Hours({
                             " hours",
                         )}
                         .{" "}
-                        <TextLink href={AVAILABILITY_HREF}>
+                        <TextLink data-ph-unmask="" href={AVAILABILITY_HREF}>
                             Change them in Hours and time off
                         </TextLink>
                         , or give it hours of its own: only the free time inside

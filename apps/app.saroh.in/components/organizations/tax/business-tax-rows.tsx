@@ -10,7 +10,7 @@ import {
     rowActions,
     Saved,
 } from "@/components/organizations/business-settings/business-row-parts";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
@@ -60,11 +60,14 @@ export function BusinessTaxRows({
             note={
                 <>
                     The invoices you send, and their numbers, are in{" "}
-                    <TextLink href="/billing/invoices">Invoices</TextLink>.
+                    <TextLink data-ph-unmask="" href="/billing/invoices">
+                        Invoices
+                    </TextLink>
+                    .
                 </>
             }
         >
-            {EDITION === "GLOBAL" ? (
+            {PROFILE.taxSystem === "named-line" ? (
                 <Row
                     id={BUSINESS_ROW_ID.gst}
                     label="Tax"
@@ -85,7 +88,7 @@ export function BusinessTaxRows({
                     label="GST"
                     action={edit("gst", "Change", "Change GST registration")}
                 >
-                    <span className="block">
+                    <span data-ph-unmask="" className="block">
                         {registered ? "Registered" : "Not registered"}
                     </span>
                     <Follows>
@@ -129,16 +132,18 @@ export function BusinessTaxRows({
             ) : null}
             <Row
                 label={
-                    EDITION === "GLOBAL" ? "Numbering year" : "Financial year"
+                    PROFILE.taxSystem === "named-line"
+                        ? "Numbering year"
+                        : "Financial year"
                 }
                 action={
-                    EDITION === "GLOBAL"
+                    PROFILE.taxSystem === "named-line"
                         ? edit("gst", "Change", "Change numbering year")
                         : undefined
                 }
             >
-                {EDITION === "GLOBAL" ? (
-                    <span>
+                {PROFILE.taxSystem === "named-line" ? (
+                    <span data-ph-unmask="">
                         {saved.yearStartMonth === "1"
                             ? "January to December"
                             : "April to March"}
@@ -148,7 +153,7 @@ export function BusinessTaxRows({
                         {/* India's financial year, which invoices are
                             numbered by. GST law fixes it for every
                             business, so it is said rather than offered. */}
-                        <span>April to March</span>
+                        <span data-ph-unmask="">April to March</span>
                         <Locked>Set by GST law</Locked>
                     </span>
                 )}

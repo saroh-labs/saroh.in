@@ -4,6 +4,7 @@ import {
     settingsPagesFor,
 } from "@/components/shared/navigation/nav-items";
 import { mayChangePlan } from "@/lib/billing/plan-access";
+import { PROFILE } from "@/lib/edition";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
@@ -140,7 +141,29 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         ...business("How to pay us", "pay"),
         // What customers pay with when the business doesn't take payment
         // online (R32).
-        words: ["UPI", "UPI ID", "QR", "Bank details", "IFSC", "Bank transfer"],
+        words:
+            PROFILE.payInstructions === "bank-code"
+                ? [
+                      "Bank details",
+                      "Bank transfer",
+                      "IBAN",
+                      "Account number",
+                      "Sort code",
+                      "Routing number",
+                      "BSB",
+                      "Transit number",
+                      "Branch code",
+                      "SWIFT",
+                      "BIC",
+                  ]
+                : [
+                      "UPI",
+                      "UPI ID",
+                      "QR",
+                      "Bank details",
+                      "IFSC",
+                      "Bank transfer",
+                  ],
     },
     {
         ...business("Registered address", "address"),
@@ -274,6 +297,10 @@ export function searchSettings(
         // An actor we cannot judge holds everything, so of a pair they are
         // offered the first half — never both, never neither.
         if (entry.unless && holds(actor, entry.unless)) continue;
+        // How to pay us is off where the edition doesn't offer it (DEC-208).
+        if (entry.tab?.value === "pay" && !PROFILE.payInstructionsOffered) {
+            continue;
+        }
         const found =
             !needle ||
             entry.label.toLowerCase().includes(needle) ||

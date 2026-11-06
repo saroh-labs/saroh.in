@@ -110,7 +110,7 @@ export function Details({
                 />
             </Field>
 
-            <div id={ids.kind} className={cn(LABEL, "mt-3")}>
+            <div data-ph-unmask="" id={ids.kind} className={cn(LABEL, "mt-3")}>
                 Credits are for
             </div>
             <div

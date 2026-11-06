@@ -1,3 +1,4 @@
+import { PROFILE } from "@/lib/edition";
 import { membershipsWarning } from "@/lib/payments/memberships-warning";
 import { providerName } from "@/lib/payments/providers";
 import type { ProviderHealth } from "@/lib/provider-health/service";
@@ -167,16 +168,15 @@ export function commsProviderName(provider: string): string {
 }
 
 /**
- * What the API can actually connect — its `SUPPORTED_PROVIDERS` for
- * payments and the adapters registered per channel for messaging. Stripe
- * and Dodo Payments are in the database's list of providers but the API
- * has no way to connect either, so offering them would be a Connect button
- * that fails.
+ * What the API can actually connect: the edition's payment providers
+ * (Razorpay and Cashfree in India, Stripe on Global: never both) and the
+ * adapters registered per channel for messaging. Dodo Payments is in the
+ * database's list of providers but the API has no way to connect it, so
+ * offering it would be a Connect button that fails.
  */
-export const CONNECTABLE_PAYMENTS: readonly PaymentProviderName[] = [
-    "RAZORPAY",
-    "CASHFREE",
-];
+export function connectablePayments(): readonly PaymentProviderName[] {
+    return PROFILE.paymentProviders;
+}
 export const CONNECTABLE_COMMS: Record<CommsChannel, readonly string[]> = {
     EMAIL: ["RESEND", "SENDGRID", "SMTP"],
     WHATSAPP: ["META", "TWILIO"],
@@ -231,6 +231,60 @@ export interface ProviderRowsInput {
  */
 export const RAZORPAY_KEY_ID = /^rzp_(test|live)_[A-Za-z0-9]+$/;
 
+/** A Stripe publishable key, test or live: the checkout opens with it. */
+export const STRIPE_PUBLISHABLE_KEY = /^pk_(test|live)_[A-Za-z0-9]+$/;
+/** A Stripe restricted key, test or live: the only secret key Saroh takes. */
+export const STRIPE_RESTRICTED_KEY = /^rk_(test|live)_[A-Za-z0-9]+$/;
+/** A Stripe webhook endpoint's signing secret. */
+export const STRIPE_WEBHOOK_SECRET = /^whsec_[A-Za-z0-9+/=]+$/;
+
+/** What Stripe setup asks for. */
+export interface StripeKeys {
+    publishable: string;
+    restricted: string;
+    webhookSecret: string;
+}
+
+const modeOf = (key: string) =>
+    key.trim().includes("_test_") ? "test" : "live";
+
+/**
+ * What is wrong with each Stripe key as typed, in the merchant's words, by
+ * field. A key that looks wrong is said at once; one left empty only once
+ * the button is pressed (`tried`). A full secret key (`sk_`) is refused here
+ * as the API refuses it, and the two keys must be in the same mode.
+ */
+export function stripeKeyProblems(
+    keys: StripeKeys,
+    tried: boolean,
+): Partial<Record<keyof StripeKeys, string>> {
+    const out: Partial<Record<keyof StripeKeys, string>> = {};
+    const pk = keys.publishable.trim();
+    const rk = keys.restricted.trim();
+    const wh = keys.webhookSecret.trim();
+    if (pk ? !STRIPE_PUBLISHABLE_KEY.test(pk) : tried) {
+        out.publishable = pk
+            ? "That isn't a publishable key. It starts pk_live_ or pk_test_."
+            : "Enter the publishable key. It starts pk_live_ or pk_test_.";
+    }
+    if (rk.startsWith("sk_")) {
+        out.restricted =
+            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.";
+    } else if (rk ? !STRIPE_RESTRICTED_KEY.test(rk) : tried) {
+        out.restricted = rk
+            ? "That isn't a restricted key. It starts rk_live_ or rk_test_."
+            : "Enter the restricted key. It starts rk_live_ or rk_test_.";
+    } else if (!out.publishable && pk && modeOf(pk) !== modeOf(rk)) {
+        out.restricted = `The publishable key is a ${modeOf(pk)} key and the restricted key is a ${modeOf(rk)} key. Use two test keys or two live keys.`;
+    }
+    if (wh ? !STRIPE_WEBHOOK_SECRET.test(wh) : tried) {
+        out.webhookSecret = wh
+            ? "That isn't a webhook signing secret. It starts whsec_."
+            : "Enter the webhook signing secret. It starts whsec_.";
+    }
+    return out;
+}
+
 /**
  * A connected Razorpay account without its public key id (DEC-054): its
  * checkout window can't open, so the API takes no online payment through
@@ -239,8 +293,9 @@ export const RAZORPAY_KEY_ID = /^rzp_(test|live)_[A-Za-z0-9]+$/;
  * entered again.
  */
 export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
+    // Stripe's checkout opens with its publishable key the same way.
     return (
-        p.provider === "RAZORPAY" &&
+        (p.provider === "RAZORPAY" || p.provider === "STRIPE") &&
         p.status === "CONNECTED" &&
         !p.publicKey?.trim()
     );
@@ -302,7 +357,7 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
             for (const p of input.payments) {
                 view.connected.push(paymentEntry(p, input));
             }
-            for (const provider of CONNECTABLE_PAYMENTS) {
+            for (const provider of connectablePayments()) {
                 if (input.payments.some((p) => p.provider === provider))
                     continue;
                 view.available.push({
@@ -368,7 +423,7 @@ function paymentEntry(
             : refused
               ? `Needs attention. ${providerName(p.provider)} refused its keys, so no one can pay online through it. Enter the keys again to clear it.`
               : noKey
-                ? "Needs its key id. Checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+                ? `Needs its ${keyName(p.provider)}. Checkout can't open the payment window, so no one can pay online through it until you enter the keys again.`
                 : noSecret
                   ? "Needs its webhook signing secret. Payments can't be confirmed until you add it."
                   : stores.length > 0
@@ -377,7 +432,7 @@ function paymentEntry(
         fix: refused
             ? "Enter keys again"
             : noKey
-              ? "Add key id"
+              ? `Add ${keyName(p.provider)}`
               : noSecret
                 ? "Add webhook secret"
                 : null,
@@ -405,6 +460,11 @@ function paymentEntry(
                   : input.locks.paymentsAgain
               : null,
     };
+}
+
+/** What the key a checkout opens with is called, in its provider's words. */
+function keyName(provider: PaymentProviderName): string {
+    return provider === "STRIPE" ? "publishable key" : "key id";
 }
 
 function availablePayment(provider: PaymentProviderName): ProviderEntry {

@@ -141,7 +141,7 @@ export function PersonRulesPanels({
                                 })
                             }
                         />
-                        <p className={`mt-2.5 ${HELP}`}>
+                        <p data-ph-unmask="" className={`mt-2.5 ${HELP}`}>
                             How customers pay, refunds and free cancelling are
                             the same for everyone · set in the business&apos;s
                             Booking rules.

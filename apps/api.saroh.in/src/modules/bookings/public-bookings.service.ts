@@ -18,6 +18,7 @@ import { hashPayToken } from "../invoices/pay-token";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { takingNewActivity } from "../orders/checkout-paused";
 import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
+import { PaymentsService } from "../payments/payments.service";
 import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
@@ -150,6 +151,8 @@ export class PublicBookingsService {
         @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
         @Optional() private readonly activation?: ActivationEvents,
+        // Closes a let-go hold's open intent at its provider (DEC-208).
+        @Optional() private readonly payments?: PaymentsService,
     ) {}
 
     /**
@@ -314,7 +317,12 @@ export class PublicBookingsService {
     ): Promise<PublicHold> {
         this.takeHoldHit(token, ipHash, now);
         const found = await this.holdBooking(token);
-        await prisma.$transaction((tx) => releaseHoldInTx(tx, found.id, now));
+        const released = await prisma.$transaction((tx) =>
+            releaseHoldInTx(tx, found.id, now),
+        );
+        // After the commit: its open intent can't be paid any more. Never
+        // throws; a failure is only logged.
+        if (released) await this.payments?.cancelHoldIntents(found.id);
         const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: found.id },
         });

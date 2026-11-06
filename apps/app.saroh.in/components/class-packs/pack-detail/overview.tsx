@@ -70,8 +70,13 @@ export function PackOverviewTab({
             </div>
 
             <div className="mb-2.5 mt-1 flex flex-wrap items-baseline gap-2.5">
-                <h2 className={H2}>Linked to this pack</h2>
-                <span className="text-[12px] text-muted-foreground">
+                <h2 data-ph-unmask="" className={H2}>
+                    Linked to this pack
+                </h2>
+                <span
+                    data-ph-unmask=""
+                    className="text-[12px] text-muted-foreground"
+                >
                     Read-only here. Each has its own tab, or links on to where
                     it is managed.
                 </span>
@@ -89,6 +94,7 @@ export function PackOverviewTab({
                             </span>
                             {"href" in c.open ? (
                                 <Link
+                                    data-ph-unmask=""
                                     href={c.open.href}
                                     aria-label={`Open ${c.k}`}
                                     className={`${QUIET_LINK} text-[12px] coarse:inline-flex coarse:min-h-11 coarse:items-center`}
@@ -97,6 +103,7 @@ export function PackOverviewTab({
                                 </Link>
                             ) : (
                                 <button
+                                    data-ph-unmask=""
                                     type="button"
                                     aria-label={`Open ${c.k}`}
                                     onClick={() => {
@@ -135,7 +142,9 @@ export function PackOverviewTab({
             </div>
 
             <div className="mb-2.5 mt-1 flex flex-wrap items-baseline gap-2.5">
-                <h2 className={H2}>Everything about it</h2>
+                <h2 data-ph-unmask="" className={H2}>
+                    Everything about it
+                </h2>
                 {editHref ? (
                     <Button asChild variant="outline" size="sm">
                         <Link href={editHref}>
@@ -144,7 +153,10 @@ export function PackOverviewTab({
                         </Link>
                     </Button>
                 ) : null}
-                <span className="flex-[1_1_220px] text-[12px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="flex-[1_1_220px] text-[12px] text-muted-foreground"
+                >
                     Changes only affect new sales. Packs already sold keep their
                     terms.
                 </span>

@@ -218,7 +218,9 @@ export function InvoiceDetailsView({
                 {moneyCard}
                 {side}
                 <section aria-label="The invoice" className="grid gap-1.5">
-                    <h3 className="label print:hidden">The invoice</h3>
+                    <h3 data-ph-unmask="" className="label print:hidden">
+                        The invoice
+                    </h3>
                     {paper}
                 </section>
                 <SheetFoot>{foot ? foot(bar) : bar}</SheetFoot>
@@ -235,7 +237,7 @@ export function InvoiceDetailsView({
                 breadcrumb={[
                     // Invoices sit under Payments only while it is on (DEC-070).
                     ...(details.paymentsOn ? ["Payments"] : []),
-                    <Link key="list" href="/billing/invoices">
+                    <Link data-ph-unmask="" key="list" href="/billing/invoices">
                         Invoices
                     </Link>,
                     i.number ?? "Draft",

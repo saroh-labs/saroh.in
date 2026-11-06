@@ -44,7 +44,7 @@ export function OrderHeading({
             className="mb-0"
             breadcrumb={[
                 "Sell",
-                <Link key="orders" href="/commerce/orders">
+                <Link data-ph-unmask="" key="orders" href="/commerce/orders">
                     Orders
                 </Link>,
                 number,

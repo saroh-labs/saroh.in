@@ -381,7 +381,10 @@ export function AvailabilityEditor({
                         />
                     ) : null}
                     {canEdit ? (
-                        <p className="mt-2.5 hidden text-[12.5px] text-muted-foreground min-[760px]:block">
+                        <p
+                            data-ph-unmask=""
+                            className="mt-2.5 hidden text-[12.5px] text-muted-foreground min-[760px]:block"
+                        >
                             Click a day to change it. Its hours save as you
                             change them, and a toast lets you undo.
                         </p>

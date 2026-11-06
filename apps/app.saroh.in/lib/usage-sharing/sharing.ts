@@ -22,7 +22,7 @@ export const USAGE_SHARING_HELP =
  * until they dismiss it; nothing is recorded before it has been shown.
  */
 export const USAGE_NOTICE = {
-    body: "We record how Saroh is used and which pages are opened, to make it easier. Your customers' details and anything you type are hidden.",
+    body: "We record how Saroh is used, which pages are opened and how fast they load, to make it easier. Your customers' details and anything you type are hidden.",
     turnOff: "Turn it off in",
     settings: "Settings › Your profile",
     href: "/settings/profile",

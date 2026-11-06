@@ -11,6 +11,9 @@
  * removal does with it. An entry that is kept says why.
  */
 
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
+
 export type PersonalFieldRule =
     /** Set to null (or blanked). */
     | "cleared"
@@ -27,6 +30,27 @@ export interface PersonalField {
     rule: PersonalFieldRule;
     why: string;
 }
+
+/**
+ * What a removal and the retention eraser write of an order's place past the
+ * city (DEC-207). Under GST the state is the place of supply and stays
+ * (DEC-122). A business that charges a tax of its own (VAT, sales tax) keeps
+ * the region and country too: they show where the sale was taxed. Only a
+ * business charging no tax loses them.
+ */
+export const deliveryPlaceErased = (
+    business:
+        | {
+              edition?: Edition | null;
+              taxRate?: { toString(): string } | number | null;
+          }
+        | null
+        | undefined,
+) =>
+    editionProfile(business?.edition).taxSystem === "gst" ||
+    Number(business?.taxRate?.toString() ?? 0) > 0
+        ? {}
+        : { deliveryState: null, deliveryCountry: null };
 
 /** Every personal-looking field reachable from a contact, keyed `Model.field`. */
 export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
@@ -65,7 +89,11 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
     "Order.deliveryPostalCode": { rule: "cleared", why: "The street." },
     "Order.deliveryState": {
         rule: "kept",
-        why: "The GST place of supply when no bill-to state is set; tax records need it.",
+        why: "The GST place of supply when no bill-to state is set; tax records need it. A business with no GST has its region cleared (DEC-207, `deliveryPlaceErased`).",
+    },
+    "Order.deliveryCountry": {
+        rule: "cleared",
+        why: "Where a Global delivery went; no tax reads it (DEC-207). Only a business with no GST has one.",
     },
     "Order.notes": { rule: "cleared", why: "Free text about the order." },
     // A walk-in who leaves only a name (B13) is the order's only record of

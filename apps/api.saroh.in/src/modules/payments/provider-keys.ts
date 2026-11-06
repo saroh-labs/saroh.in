@@ -31,6 +31,7 @@ const logger = new Logger("PaymentProviderKeys");
 export function providerLabel(provider: string): string {
     if (provider === "RAZORPAY") return "Razorpay";
     if (provider === "CASHFREE") return "Cashfree";
+    if (provider === "STRIPE") return "Stripe";
     return provider;
 }
 
@@ -40,6 +41,11 @@ export function providerLabel(provider: string): string {
  * when it can't say, so a typo is never saved as connected. An adapter
  * without a check (none today) is let through.
  */
+/** What each provider calls the two keys a merchant copies. */
+const KEY_WORDS: Readonly<Record<string, string>> = {
+    STRIPE: "the publishable key and the restricted key",
+};
+
 export async function assertKeysAccepted(
     adapter: MerchantProvider,
     provider: string,
@@ -51,7 +57,14 @@ export async function assertKeysAccepted(
     if (check === "ACCEPTED") return;
     if (check === "REJECTED") {
         throw new BadRequestException({
-            message: `${label} didn't accept these keys. Copy the key id and secret from your ${label} dashboard again, in the same mode (test or live).`,
+            message: `${label} didn't accept these keys. Copy ${KEY_WORDS[provider] ?? "the key id and secret"} from your ${label} dashboard again, in the same mode (test or live).`,
+            field: "keySecret",
+        });
+    }
+    if (check === "PERMISSION_MISSING") {
+        throw new BadRequestException({
+            message:
+                "This key can't see payments or refunds. Give it Payment Intents: Write and Refunds: Write.",
             field: "keySecret",
         });
     }

@@ -148,7 +148,7 @@ export function PlanEditor({
             readOnlyText={readOnlyText}
             breadcrumb={[
                 "Payments",
-                <Link key="plans" href={PLANS_HREF}>
+                <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
                     Plans
                 </Link>,
                 first ? planTitle(first.values, true) : "New plan",

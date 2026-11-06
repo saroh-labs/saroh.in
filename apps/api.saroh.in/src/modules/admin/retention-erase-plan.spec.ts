@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { PERSONAL_FIELDS } from "../customer-workspace/personal-data";
+import {
+    deliveryPlaceErased,
+    PERSONAL_FIELDS,
+} from "../customer-workspace/personal-data";
 import { REMOVAL_RULES } from "../customer-workspace/privacy-removal-plan";
 import {
     ERASE_STEPS,
@@ -85,9 +88,13 @@ describe("the retention erase plan (DEC-122)", () => {
         expect(writes).toContain("tx.activity.updateMany");
         expect(writes).toContain("tx.submission.updateMany");
         expect(writes).toContain("tx.lead.updateMany");
-        // And the fields kept for tax are never written.
+        // And the fields kept for tax are never written. The delivery state
+        // is written only through `deliveryPlaceErased`, which keeps it
+        // under GST (below).
+        expect(writes).toContain("...deliveryPlaceErased({");
         for (const kept of [
             "deliveryState",
+            "deliveryCountry",
             "billToName",
             "billToEmail",
             "billToAddress",
@@ -100,6 +107,32 @@ describe("the retention erase plan (DEC-122)", () => {
             "tx.orderItem.",
         ]) {
             expect(`${kept}: ${writes.includes(kept)}`).toBe(`${kept}: false`);
+        }
+        // A GST business's orders keep their state, as before (DEC-122)...
+        expect(deliveryPlaceErased({ edition: "INDIA" })).toEqual({});
+        expect(deliveryPlaceErased({ edition: "INDIA", taxRate: 0 })).toEqual(
+            {},
+        );
+        expect(deliveryPlaceErased(null)).toEqual({});
+        // ...a Global business charging its own tax keeps them, where the
+        // sale was taxed (DEC-207)...
+        expect(deliveryPlaceErased({ edition: "GLOBAL", taxRate: 20 })).toEqual(
+            {},
+        );
+        expect(
+            deliveryPlaceErased({
+                edition: "GLOBAL",
+                taxRate: { toString: () => "8.25" },
+            }),
+        ).toEqual({});
+        // ...and one charging no tax loses its region and country.
+        for (const taxRate of [null, 0, undefined]) {
+            expect(deliveryPlaceErased({ edition: "GLOBAL", taxRate })).toEqual(
+                {
+                    deliveryState: null,
+                    deliveryCountry: null,
+                },
+            );
         }
         // An order is only ever updated, never deleted.
         expect(writes).not.toMatch(/tx\.order\.delete/);

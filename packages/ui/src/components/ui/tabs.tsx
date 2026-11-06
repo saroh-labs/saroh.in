@@ -35,6 +35,11 @@ const TAB_OFF =
 
 export interface TabItem<V extends string = string> {
     value: V;
+    /**
+     * Saroh's own words: a session recording reads it (DEC-125). A label
+     * that is a record's (a location's name) wraps it in
+     * `<span data-ph-mask="">`.
+     */
     label: React.ReactNode;
     /** Link mode: where this tab lives. */
     href?: string;
@@ -148,6 +153,8 @@ export function TabStrip<V extends string = string>({
                 {links ? (
                     <Link
                         id={idOf(t.value)}
+                        // A tab's name is Saroh's own words, as on `TabsTrigger`.
+                        data-ph-unmask=""
                         href={t.href ?? "#"}
                         scroll={false}
                         aria-current={on ? "page" : undefined}
@@ -158,6 +165,7 @@ export function TabStrip<V extends string = string>({
                 ) : (
                     <button
                         id={idOf(t.value)}
+                        data-ph-unmask=""
                         type="button"
                         role="tab"
                         aria-selected={on}

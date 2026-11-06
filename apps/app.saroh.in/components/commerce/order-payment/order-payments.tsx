@@ -20,7 +20,10 @@ export function OrderPayments({
 
     if (intents.length === 0) {
         return (
-            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+            >
                 {paymentStatus === "PAID" || paymentStatus === "REFUNDED"
                     ? "Settled outside a card provider, in cash or by transfer, and recorded by hand."
                     : "No card payment has been tried. A payment taken in cash or by transfer is recorded from the order's menu."}

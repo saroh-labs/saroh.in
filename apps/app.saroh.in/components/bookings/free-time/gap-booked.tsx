@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PayLinkResult } from "@/components/bookings/booking-page/pay-link-panel";
 import { PayLinkPanel } from "@/components/bookings/booking-page/pay-link-panel";
 import { firstName } from "@/lib/names";
+import { methodLabel } from "@/lib/payments/method-words";
 import type { MessagePay } from "@/lib/services/booking-message";
 import {
     bookingMessage,
@@ -19,7 +20,6 @@ import {
     whatsAppHref,
 } from "@/lib/services/booking-message";
 import type { PaidBy, PayChoice } from "@/lib/services/booking-pay";
-import { PAID_BY } from "@/lib/services/booking-pay";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { zoneShortName } from "@/lib/services/time-picker";
 
@@ -46,7 +46,7 @@ export interface GapBookedInfo {
 /** "Pays at the visit", "Paid by UPI", "Awaiting payment". */
 export function payWords(pay: PayChoice, paidBy: PaidBy | null): string {
     if (pay === "PAID") {
-        const how = PAID_BY.find((p) => p.key === paidBy)?.label;
+        const how = methodLabel(paidBy);
         return how ? `Paid by ${how}` : "Paid";
     }
     if (pay === "LINK") return BOOKING_WORDS.awaitingPayment;
@@ -172,7 +172,10 @@ export function GapBooked({
                             </span>
                         </Button>
                     </div>
-                    <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         These open WhatsApp or SMS with the message filled in,
                         or copy it. Saroh sends nothing itself.
                     </p>

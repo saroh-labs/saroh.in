@@ -102,7 +102,10 @@ export function BookingRow({
             aria-label={`Did ${who} come?`}
             className="flex flex-wrap items-center gap-1.5"
         >
-            <span className="mr-auto text-[12.5px] text-muted-foreground min-[760px]:sr-only">
+            <span
+                data-ph-unmask=""
+                className="mr-auto text-[12.5px] text-muted-foreground min-[760px]:sr-only"
+            >
                 Did they come?
             </span>
             {canMark ? (
@@ -157,7 +160,9 @@ export function BookingRow({
                     {formatTime(b.startAt, zone)}
                 </span>
                 <span className="block text-[12px] text-muted-foreground">
-                    <span className="max-[759px]:hidden">to </span>
+                    <span data-ph-unmask="" className="max-[759px]:hidden">
+                        to{" "}
+                    </span>
                     {formatTime(b.endAt, zone)}
                 </span>
             </span>

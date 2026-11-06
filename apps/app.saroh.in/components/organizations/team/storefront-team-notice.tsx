@@ -73,7 +73,10 @@ export function StorefrontTeamNotice({
                     >
                         {storefrontNoticeTitle(people.length, roleLabel)}
                     </p>
-                    <p className="mt-0.5 text-[12px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-0.5 text-[12px] leading-[1.5] text-muted-foreground"
+                    >
                         They can see the team, and see and move their own
                         location&apos;s orders, but not customers, bookings or
                         money. What they do in their location hasn&apos;t

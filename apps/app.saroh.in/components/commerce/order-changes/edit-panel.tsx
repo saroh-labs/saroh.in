@@ -8,9 +8,11 @@ import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { useState } from "react";
 
+import { useIndiaAddress } from "@/components/shared/fields/business-country";
 import { sentenceStart } from "@/lib/format/sentence";
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
+import { deliveryPlace } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 import { addedLines } from "@/lib/orders/sellables";
 
@@ -31,7 +33,8 @@ interface AddressDraft {
 const draftOf = (a: DeliveryAddress | null): AddressDraft => ({
     line1: a?.line1 ?? "",
     city: a?.city ?? "",
-    state: a?.state ?? "",
+    // A Global delivery's region and country, one line to edit (DEC-207).
+    state: a ? (deliveryPlace(a) ?? "") : "",
     postalCode: a?.postalCode ?? "",
 });
 
@@ -107,6 +110,7 @@ function EditDraft({
     const [qty, setQty] = useState<Record<string, number>>(() =>
         Object.fromEntries(lines.map((l) => [l.id, l.quantity])),
     );
+    const india = useIndiaAddress();
     const [addr, setAddr] = useState<AddressDraft>(() => draftOf(address));
     const [added, setAdded] = useState<Sellable[]>([]);
     useOrderSheetDraft([qty, addr, added.map((a) => a.key)]);
@@ -136,16 +140,20 @@ function EditDraft({
     };
     const addressMissing =
         addressChanged &&
-        (Object.keys(addr) as (keyof AddressDraft)[]).some(
-            (k) => !addr[k].trim(),
-        );
+        (india
+            ? (Object.keys(addr) as (keyof AddressDraft)[]).some(
+                  (k) => !addr[k].trim(),
+              )
+            : !addr.line1.trim() || !addr.city.trim());
     const off = same || empty || busy || addressMissing;
     const money = (n: number) => (format ? format(n) : "");
 
     const note = empty
         ? "Nothing left. Cancel the order with a full refund instead."
         : addressMissing
-          ? "An address needs its first line, town, state and PIN code."
+          ? india
+              ? "An address needs its first line, town, state and PIN code."
+              : "An address needs its first line and town."
           : diff > 0
             ? `${sentenceStart(first)} owes ${money(diff)} more. It shows as due on the order. Nothing is sent to ${first}.`
             : diff < 0
@@ -203,7 +211,10 @@ function EditDraft({
                         >
                             <span className="min-w-0 flex-1">
                                 {name}{" "}
-                                <span className="text-muted-foreground">
+                                <span
+                                    data-ph-unmask=""
+                                    className="text-muted-foreground"
+                                >
                                     · added
                                 </span>
                             </span>
@@ -250,7 +261,10 @@ function EditDraft({
                 ) : null}
                 {delivery ? (
                     <fieldset className="mt-3">
-                        <legend className="text-[12px] font-medium">
+                        <legend
+                            data-ph-unmask=""
+                            className="text-[12px] font-medium"
+                        >
                             Delivery address
                         </legend>
                         <Input
@@ -278,8 +292,12 @@ function EditDraft({
                                 className="w-full"
                             />
                             <Input
-                                aria-label="State"
-                                placeholder="State"
+                                aria-label={
+                                    india ? "State" : "Region and country"
+                                }
+                                placeholder={
+                                    india ? "State" : "Region, country"
+                                }
                                 value={addr.state}
                                 onChange={(e) =>
                                     setAddr((a) => ({
@@ -290,9 +308,9 @@ function EditDraft({
                                 className="w-full"
                             />
                             <Input
-                                aria-label="PIN code"
-                                placeholder="PIN"
-                                inputMode="numeric"
+                                aria-label={india ? "PIN code" : "Postcode"}
+                                placeholder={india ? "PIN" : "Postcode"}
+                                inputMode={india ? "numeric" : undefined}
                                 value={addr.postalCode}
                                 onChange={(e) =>
                                     setAddr((a) => ({

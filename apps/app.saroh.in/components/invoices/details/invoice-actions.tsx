@@ -235,6 +235,7 @@ export function RefundInvoiceDialog({
                 />
                 {missing ? (
                     <p
+                        data-ph-unmask=""
                         id={`${reasonId}-problem`}
                         role="alert"
                         className="text-[12.5px] font-medium text-destructive-subtle-foreground"
@@ -242,7 +243,10 @@ export function RefundInvoiceDialog({
                         Say why it is being cancelled.
                     </p>
                 ) : null}
-                <p className="text-[12px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12px] text-muted-foreground"
+                >
                     Printed on the credit note.
                 </p>
             </div>

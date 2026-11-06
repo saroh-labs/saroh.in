@@ -87,7 +87,10 @@ export function ProductPick({
                                 </Button>
                             </div>
                         ) : found === null ? (
-                            <p className="px-3 py-3 text-[12.5px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="px-3 py-3 text-[12.5px] text-muted-foreground"
+                            >
                                 Looking through your products…
                             </p>
                         ) : (
@@ -129,6 +132,7 @@ export function ProductPick({
                                               </span>
                                           </span>
                                           <span
+                                              data-ph-unmask=""
                                               aria-hidden
                                               className="text-[12px] font-semibold"
                                           >

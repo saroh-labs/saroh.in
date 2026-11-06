@@ -100,7 +100,10 @@ export function InvoicePaperSheet({
                 onStyle={(style) => setLook((l) => ({ ...l, style }))}
                 onColour={(colour) => setLook((l) => ({ ...l, colour }))}
             />
-            <p className="text-[12px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12px] leading-[1.5] text-muted-foreground"
+            >
                 A tax invoice always keeps the fields GST requires (Rule 46),
                 whatever its style.
             </p>

@@ -80,6 +80,7 @@ function ShopControls({
             >
                 {(["team", "customer"] as const).map((v) => (
                     <Link
+                        data-ph-unmask=""
                         key={v}
                         href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
                         scroll={false}
@@ -203,7 +204,11 @@ export function ProductHeader({
                 className="mb-0"
                 breadcrumb={[
                     "Sell",
-                    <Link key="list" href="/commerce/products">
+                    <Link
+                        data-ph-unmask=""
+                        key="list"
+                        href="/commerce/products"
+                    >
                         Products
                     </Link>,
                     product.name,

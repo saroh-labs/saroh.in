@@ -173,6 +173,12 @@ const envSchema = z.object({
     // run — NODE_ENV declared `test`, or `CI` set — never under a declared
     // production (`domains/domain-fakes.ts`).
     DOMAIN_HOSTING_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: Stripe runs on a fake (U8's browser spec): any
+    // restricted key connects, an intent is made up, and only the signed
+    // webhook settles a payment; nothing calls Stripe. Refused at boot under
+    // NODE_ENV=production (below), and honoured only in a test run, as
+    // DOMAIN_HOSTING_FAKE is (`payments/providers/stripe-fake.ts`).
+    STRIPE_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -384,7 +390,11 @@ const REQUIRED_IN_PRODUCTION = [
  * Test-only switches: a deployed API refuses to boot with any of them set,
  * and each is honoured only in a test run besides (`common/test-run.ts`).
  */
-const TEST_ONLY = ["LINK_PREVIEW_TEST_HOSTS", "DOMAIN_HOSTING_FAKE"] as const;
+const TEST_ONLY = [
+    "LINK_PREVIEW_TEST_HOSTS",
+    "DOMAIN_HOSTING_FAKE",
+    "STRIPE_FAKE",
+] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;

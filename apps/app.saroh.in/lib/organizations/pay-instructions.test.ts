@@ -140,3 +140,96 @@ describe("read-back words", () => {
         ).toBe("UPI and bank transfer");
     });
 });
+
+describe("a Global business's bank by its country (DEC-204)", () => {
+    const GB = ["GLOBAL", "GB"] as const;
+    const US = ["GLOBAL", "US"] as const;
+
+    it("checks an IBAN and a SWIFT/BIC, and asks no code", () => {
+        expect(
+            payFieldProblem(
+                "bankAccountNumber",
+                "GB83WEST12345698765432",
+                ...GB,
+            ),
+        ).toBe(
+            "That IBAN doesn't check out. Look for a missing or swapped character.",
+        );
+        expect(
+            payFieldProblem(
+                "bankAccountNumber",
+                "GB82 WEST 1234 5698 7654 32",
+                ...GB,
+            ),
+        ).toBeNull();
+        expect(payFieldProblem("bankSwift", "NWBKGB2L", ...GB)).toBeNull();
+        expect(
+            bankProblem(
+                {
+                    upiId: "",
+                    bankAccountName: "Rye",
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankIfsc: "",
+                    bankSwift: "",
+                    bankName: "",
+                    note: "",
+                },
+                ...GB,
+            ),
+        ).toBeNull();
+    });
+
+    it("wants a US routing number, and sends only what changed", () => {
+        const v = {
+            upiId: "",
+            bankAccountName: "Rye",
+            bankAccountNumber: "000123456789",
+            bankIfsc: "",
+            bankSwift: "",
+            bankName: "",
+            note: "",
+        };
+        expect(bankProblem(v, ...US)).toEqual({
+            field: "bankIfsc",
+            message:
+                "Add the routing number: a transfer needs it with the account number.",
+        });
+        const saved = {
+            upiId: null,
+            bankAccountName: "Rye",
+            bankAccountNumber: "000123456789",
+            bankIfsc: "021000021",
+            bankSwift: null,
+            bankName: null,
+            note: null,
+            edition: "GLOBAL" as const,
+            country: "US",
+        };
+        expect(
+            payInputOf(
+                { ...v, bankIfsc: "021 000 021", bankSwift: "bofaus3n" },
+                saved,
+            ),
+        ).toEqual({ bankSwift: "bofaus3n" });
+        expect(payPreviewOf(v, ...US).bankLabels).toEqual({
+            account: "Account number",
+            code: "Routing number",
+            swift: "SWIFT/BIC",
+        });
+    });
+
+    it("India's fields and words don't change", () => {
+        expect(payFieldProblem("bankSwift", "anything")).toBeNull();
+        expect(
+            payPreviewOf({
+                upiId: "",
+                bankAccountName: "",
+                bankAccountNumber: "",
+                bankIfsc: "",
+                bankSwift: "",
+                bankName: "",
+                note: "",
+            }),
+        ).not.toHaveProperty("bankLabels");
+    });
+});

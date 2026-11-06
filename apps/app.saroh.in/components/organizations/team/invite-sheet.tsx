@@ -232,6 +232,7 @@ export function InviteSheet({
                     render={({ field }) => (
                         <FormItem className="space-y-1.5">
                             <p
+                                data-ph-unmask=""
                                 id="invite-role-label"
                                 className="text-[12.5px] font-medium"
                             >
@@ -305,11 +306,17 @@ export function InviteSheet({
                         name="siteIds"
                         render={({ field }) => (
                             <FormItem className="space-y-1.5">
-                                <p className="text-[12.5px] font-medium">
+                                <p
+                                    data-ph-unmask=""
+                                    className="text-[12.5px] font-medium"
+                                >
                                     Websites they may review
                                 </p>
                                 {sites.length === 0 ? (
-                                    <p className="text-[12.5px] text-muted-foreground">
+                                    <p
+                                        data-ph-unmask=""
+                                        className="text-[12.5px] text-muted-foreground"
+                                    >
                                         You have no websites yet. Make one
                                         first, then invite someone to review it.
                                     </p>

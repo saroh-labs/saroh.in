@@ -48,7 +48,7 @@
         "@saroh/tsconfig": "workspace:*",
         "@types/node": "catalog:",
         "jsdom": "^25.0.1",
-        "posthog-js": "1.435.9",
+        "posthog-js": "1.447.2",
         "rimraf": "^6.0.1",
         "tsup": "^8.5.0",
         "typescript": "catalog:",

@@ -276,6 +276,7 @@ function UnlinkedItem({
                     // A way to compare the two before linking, so it is quiet:
                     // the link, not the row's action.
                     <TextLink
+                        data-ph-unmask=""
                         href={customerHref(c.storefront.id, c.customerId)}
                         className="shrink-0 text-[12.5px] coarse:flex coarse:min-h-11 coarse:items-center"
                     >
@@ -310,7 +311,10 @@ function UnlinkedItem({
                                 {`Link to ${holderName}`}
                             </Button>
                         ) : (
-                            <p className="w-full text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="w-full text-muted-foreground"
+                            >
                                 Someone who can edit customers can link them.
                             </p>
                         )}

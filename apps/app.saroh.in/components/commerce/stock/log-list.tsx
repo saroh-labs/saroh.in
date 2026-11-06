@@ -231,12 +231,14 @@ export function LogList({
                                     "rounded-t-[10px] max-[759px]:hidden",
                                 )}
                             >
-                                <span>Time</span>
-                                <span>Product</span>
-                                <span>Kind</span>
-                                <span className="text-right">Change</span>
-                                <span>On hand</span>
-                                <span>Note</span>
+                                <span data-ph-unmask="">Time</span>
+                                <span data-ph-unmask="">Product</span>
+                                <span data-ph-unmask="">Kind</span>
+                                <span data-ph-unmask="" className="text-right">
+                                    Change
+                                </span>
+                                <span data-ph-unmask="">On hand</span>
+                                <span data-ph-unmask="">Note</span>
                             </ListTableHead>
                             {days.map((d) => (
                                 <section
@@ -404,7 +406,10 @@ export function LogList({
                     router.push(href({ size }), { scroll: false });
                 }}
             />
-            <p className="mt-3.5 max-w-[72ch] text-pretty text-[12px] leading-normal text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-3.5 max-w-[72ch] text-pretty text-[12px] leading-normal text-muted-foreground"
+            >
                 Sold and Returned come from orders, so nobody can type them.
                 Entries can&apos;t be deleted. A mistake is fixed with a new
                 entry, so the log always adds up to what&apos;s on the shelf.

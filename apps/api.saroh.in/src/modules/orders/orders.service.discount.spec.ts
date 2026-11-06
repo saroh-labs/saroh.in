@@ -4,6 +4,12 @@
 // database, so the order and discount halves are tested together.
 // The order's invoice (ADR-008, U5) has its own specs; here the business
 // is unregistered and the invoice writes are recorded, not run.
+// The rule by edition has its own spec; here a delivery is any address.
+jest.mock("./delivery-address", () => ({
+    settleDeliveryAddress: (_: unknown, address: unknown) =>
+        Promise.resolve(address),
+}));
+
 jest.mock("../invoices/order-invoicing", () => ({
     loadTaxProfile: jest.fn().mockResolvedValue({
         registered: false,

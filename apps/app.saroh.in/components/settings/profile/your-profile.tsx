@@ -115,7 +115,10 @@ export function YourProfile({
                         </div>
                     ))}
                 </dl>
-                <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80">
+                <p
+                    data-ph-unmask=""
+                    className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80"
+                >
                     These are your Saroh account&apos;s, the same in every
                     business you belong to. They&apos;re changed on
                     accounts.saroh.in.

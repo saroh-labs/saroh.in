@@ -108,7 +108,9 @@ runs:
       if: inputs.next-cache == 'true' && github.event_name != 'pull_request'
       uses: actions/cache@v4
       with:
-        path: apps/*/.next/cache
+        path: |
+          apps/*/.next/cache
+          apps/*/.next-global/cache
         key: next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
         restore-keys: |
           next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-
@@ -117,7 +119,9 @@ runs:
       if: inputs.next-cache == 'true' && github.event_name == 'pull_request'
       uses: actions/cache/restore@v4
       with:
-        path: apps/*/.next/cache
+        path: |
+          apps/*/.next/cache
+          apps/*/.next-global/cache
         key: next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
         restore-keys: |
           next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-

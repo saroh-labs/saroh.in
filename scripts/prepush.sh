@@ -321,7 +321,7 @@ e2e_stack() {
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
     export BETTER_AUTH_URL=http://localhost:3333
-    export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3006,http://localhost:3333
+    export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3333
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
     # Where accounts sends a new account (onboarding); unset, a production
@@ -358,6 +358,18 @@ e2e_stack() {
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""
     if specs_open_admin "$specs"; then admin_filter=--filter=admin; fi
+    # The Global edition's app and accounts (DEC-204), built into
+    # `.next-global` and started on 3007 and 3008 only when a Global spec
+    # runs, as CI does on every shard. Unset, those specs skip themselves.
+    local global=""
+    # shellcheck disable=SC2086,SC2116
+    case " $(echo $specs) " in *global-screens.spec.ts*) global=1 ;; esac
+    if [ -n "$global" ]; then
+        export E2E_GLOBAL_APP_URL=http://localhost:3007
+        export E2E_GLOBAL_ACCOUNTS_URL=http://localhost:3008
+    else
+        unset E2E_GLOBAL_APP_URL E2E_GLOBAL_ACCOUNTS_URL
+    fi
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
@@ -380,6 +392,10 @@ e2e_stack() {
     # own-domain spec's hosting states run. Test only, as above; the spec
     # runs them when E2E_DOMAIN_HOSTING says the API has them.
     export DOMAIN_HOSTING_FAKE=1 E2E_DOMAIN_HOSTING=fake
+    # Stripe on a fake (U8): made-up keys connect and intents are made without
+    # calling Stripe; only the signed webhook settles. Test only, as above;
+    # the stripe-checkout spec runs when the runner sees it too.
+    export STRIPE_FAKE=1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
@@ -432,6 +448,13 @@ e2e_stack() {
         echo "    kept as $tpl for the next run"
     fi
 
+    if [ -n "$global" ]; then
+        echo "--- build the Global app and accounts"
+        NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
+            pnpm turbo run build:global --log-order=grouped \
+            --filter=application --filter=auth
+    fi
+
     # Each server's PID goes in $E2E_LOGS/pids, and teardown (stop_stack)
     # stops those and what they started — never "whatever listens on 3000",
     # which once was another run's stack.
@@ -452,6 +475,16 @@ e2e_stack() {
         pnpm --filter admin exec next start -p 3006 >"$E2E_LOGS/admin.log" 2>&1 &
         echo $! >>"$E2E_LOGS/pids"
     fi
+    if [ -n "$global" ]; then
+        NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL \
+            NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
+            pnpm --filter auth exec next start -p 3008 >"$E2E_LOGS/accounts-global.log" 2>&1 &
+        echo $! >>"$E2E_LOGS/pids"
+        NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL \
+            NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
+            pnpm --filter application exec next start -p 3007 >"$E2E_LOGS/app-global.log" 2>&1 &
+        echo $! >>"$E2E_LOGS/pids"
+    fi
     wait_up api http://localhost:3333/health "200 307"
     wait_up accounts http://localhost:3000/login "200 307"
     wait_up app http://localhost:3003/ "200 307"
@@ -459,6 +492,8 @@ e2e_stack() {
     [ -z "$web_filter" ] || wait_up web http://localhost:3002/ "200"
     # 307: the console sends someone signed out to accounts' sign-in.
     [ -z "$admin_filter" ] || wait_up admin http://localhost:3006/ "200 307"
+    [ -z "$global" ] || wait_up accounts-global http://localhost:3008/login "200 307"
+    [ -z "$global" ] || wait_up app-global http://localhost:3007/ "200 307"
 
     # The runner (e2e/run.mjs): sign in once, then desk and phone in
     # parallel on PW_WORKERS, then the @serial tests one at a time.
@@ -878,6 +913,7 @@ bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step domains pnpm run check:domains
 bg_step shared-data pnpm run check:shared-data
+bg_step edition-branches pnpm run check:edition-branches
 bg_step date-inputs pnpm run check:date-inputs
 bg_step native-selects pnpm run check:native-selects
 bg_step history-state pnpm run check:history-state

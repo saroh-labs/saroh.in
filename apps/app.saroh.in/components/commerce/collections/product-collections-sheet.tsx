@@ -85,7 +85,10 @@ export function ProductCollectionsSheet({
             onSave={save}
         >
             {rows.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     There are no collections yet. Make one from Products ›
                     Collections.
                 </p>
@@ -123,7 +126,10 @@ export function ProductCollectionsSheet({
                     ))}
                 </div>
             )}
-            <p className="mt-2.5 text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-2.5 text-pretty text-[11.5px] leading-[1.5] text-muted-foreground"
+            >
                 {placement.website.showsProducts
                     ? "Website pages show collections, so this also decides where it appears on the site."
                     : "The website doesn't show products yet."}

@@ -332,7 +332,11 @@ export function OptionSheet({
 
             <div className="grid gap-2">
                 <div className="flex items-center justify-between gap-2">
-                    <p id={`${id}-values`} className="text-sm font-medium">
+                    <p
+                        data-ph-unmask=""
+                        id={`${id}-values`}
+                        className="text-sm font-medium"
+                    >
                         Values
                     </p>
                     {rows.length > 1 ? (

@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
+    LEGAL_PATHS,
     PUBLISHED_ON,
     SAROH_OLD_HELP_URL,
     SAROH_SITE_URL,
@@ -76,5 +77,44 @@ describe("sarohFooterLinks", () => {
             "Privacy",
         );
         expect(labels(midnight)).toContain("Privacy");
+    });
+});
+
+describe("each edition's links open a real page", () => {
+    const tech = path.resolve(__dirname, "../../../../apps/saroh.tech/app");
+    const page = (route: string) =>
+        existsSync(path.join(tech, route, "page.tsx"));
+
+    it("sends Global to saroh.tech's /legal/privacy, /legal/terms and /help", () => {
+        expect(
+            sarohFooterLinks(new Date("2026-11-06T00:00:00+05:30"), "GLOBAL"),
+        ).toEqual([
+            { label: "Privacy", href: "https://saroh.tech/legal/privacy" },
+            { label: "Terms", href: "https://saroh.tech/legal/terms" },
+            { label: "Help", href: "https://saroh.tech/help" },
+        ]);
+    });
+
+    it("names only routes saroh.tech has", () => {
+        for (const route of [
+            LEGAL_PATHS.GLOBAL.privacy,
+            LEGAL_PATHS.GLOBAL.terms,
+            "/help",
+        ]) {
+            expect(page(route), route).toBe(true);
+        }
+    });
+
+    it("keeps India's at saroh.in's root", () => {
+        expect(
+            sarohFooterLinks(
+                new Date("2026-11-06T00:00:00+05:30"),
+                "INDIA",
+            ).map((l) => l.href),
+        ).toEqual([
+            "https://www.saroh.in/privacy",
+            "https://www.saroh.in/terms",
+            "https://www.saroh.in/help",
+        ]);
     });
 });

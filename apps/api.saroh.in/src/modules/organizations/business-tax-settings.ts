@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import {
     bpsToRate,
@@ -324,7 +325,7 @@ export function taxChanges(
     }
     // GST is India's, and a tax line is Global's (DEC-204). Neither edition
     // stores the other's for a day it would never come.
-    if (edition === "GLOBAL") {
+    if (editionProfile(edition).taxSystem === "named-line") {
         if (tax?.registered)
             taxError("GST is for businesses in India.", "gstRegistered");
         if (tax?.taxName !== undefined) data.taxName = tax.taxName || null;

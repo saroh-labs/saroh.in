@@ -1,5 +1,6 @@
 "use client";
 
+import { phoneCountry } from "@saroh/block-contract";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -12,6 +13,7 @@ import {
     useScrollLock,
 } from "../lib/sheet-shell";
 import { cn } from "../lib/utils";
+import { useSiteBusiness } from "../site-business";
 import { useTestRelease } from "../test-release/context";
 import { SIGN_IN_OFF_TEXT } from "../test-release/words";
 import type {
@@ -132,6 +134,13 @@ export function SignInSheet({
     const ids = useId();
     const sheet = useRef<HTMLDivElement>(null);
     const field = useRef<HTMLInputElement>(null);
+    // The whole number, country code and all, so only the hint can start
+    // on the business's country.
+    const { phoneNumbers, country } = useSiteBusiness();
+    const phoneHint =
+        phoneNumbers === "indian"
+            ? "+91 98450 12345"
+            : `+${phoneCountry(country).dial}`;
     const opener = useRef<Element | null>(null);
     const testRelease = useTestRelease() !== null;
 
@@ -462,7 +471,7 @@ export function SignInSheet({
                                 type="tel"
                                 inputMode="tel"
                                 autoComplete="tel"
-                                placeholder="+91 98450 12345"
+                                placeholder={phoneHint}
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
                                 className={input}

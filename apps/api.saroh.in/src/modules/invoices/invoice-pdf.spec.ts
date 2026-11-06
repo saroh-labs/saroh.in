@@ -7,6 +7,7 @@
  */
 import { execFileSync } from "node:child_process";
 
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import type { PaperBusiness } from "./invoice-paper-view";
 import { paperDay, paperMoney, paperView } from "./invoice-paper-view";
 import { pdfFileName, renderInvoicePdf } from "./invoice-pdf";
@@ -547,7 +548,7 @@ describe("How to pay us on an unpaid invoice (#833)", () => {
         bankName: "HDFC Bank",
         note: "Put the invoice number in the note.",
     };
-    const paper = (r: InvoiceRow, pay: typeof PAY | null = PAY) => {
+    const paper = (r: InvoiceRow, pay: PayInstructionsView | null = PAY) => {
         const i = serializeInvoice(r, NOW, { detail: true });
         return paperView({ ...i, number: i.number! }, RYE, ZONE, pay);
     };
@@ -583,6 +584,50 @@ describe("How to pay us on an unpaid invoice (#833)", () => {
                 note: null,
             }).howToPay,
         ).toEqual(["UPI: rye@okhdfc"]);
+    });
+
+    it("a Global business's paper names its country's numbers, and no IFSC or UPI, in the PDF too", async () => {
+        const global = {
+            ...PAY,
+            upiId: "rye@okhdfc",
+            bankAccountNumber: "GB82WEST12345698765432",
+            bankIfsc: null,
+            bankSwift: "NWBKGB2L",
+            bankName: "Example Bank",
+            edition: "GLOBAL" as const,
+            country: "GB",
+            bankLabels: { account: "IBAN", code: null, swift: "SWIFT/BIC" },
+        };
+        const lines = paper(row(), global).howToPay;
+        expect(lines).toEqual([
+            "Bank transfer: Rye and Company · IBAN GB82 WEST 1234 5698 7654 32 · SWIFT/BIC NWBKGB2L · Example Bank",
+            "Put the invoice number in the note.",
+        ]);
+        expect(
+            paper(row(), {
+                ...global,
+                bankAccountNumber: "000123456789",
+                bankIfsc: "021000021",
+                bankSwift: null,
+                country: "US",
+                bankLabels: {
+                    account: "Account number",
+                    code: "Routing number",
+                    swift: "SWIFT/BIC",
+                },
+            }).howToPay?.[0],
+        ).toBe(
+            "Bank transfer: Rye and Company · Account number 0001 2345 6789 · Routing number 021000021 · Example Bank",
+        );
+        const file = await renderInvoicePdf(paper(row(), global));
+        const out = execFileSync(process.execPath, ["-e", EXTRACT], {
+            input: file,
+        });
+        const { text } = JSON.parse(out.toString()) as { text: string };
+        expect(text).toContain("SWIFT/BIC NWBKGB2L");
+        expect(text).not.toContain("Bank code");
+        expect(text).not.toContain("IFSC");
+        expect(text).not.toContain("UPI");
     });
 
     it("the PDF's text carries it", async () => {

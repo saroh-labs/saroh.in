@@ -10,6 +10,7 @@
  */
 import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import { planMeter } from "../billing/metering.service";
+import { businessEdition } from "../billing/online-payments-plan";
 import {
     checkoutReadiness,
     onHandoverLabel,
@@ -50,6 +51,14 @@ function onPlan(plan: "free" | "grow" | null) {
         .mockResolvedValue(plan ? fakePaymentsRow(plan, "payments") : null);
 }
 
+/** India unless a case says Global (takes money online on every plan). */
+function everyPlan(yes: boolean) {
+    return jest
+        .spyOn(businessEdition, "takesOnlineOnEveryPlan")
+        .mockResolvedValue(yes);
+}
+
+beforeEach(() => everyPlan(false));
 afterEach(() => jest.restoreAllMocks());
 
 describe("checkout readiness and the plan", () => {
@@ -76,6 +85,15 @@ describe("checkout readiness and the plan", () => {
                 "store_1",
             ),
         ).resolves.toEqual({ ok: true, online: false, onHandover: true });
+    });
+
+    it("pays online on Free where the edition takes money online on every plan (Global)", async () => {
+        onPlan("free");
+        everyPlan(true);
+
+        await expect(
+            checkoutReadiness(db() as never, "org_1", "store_1"),
+        ).resolves.toEqual({ ok: true, online: true, onHandover: false });
     });
 
     it("says a paused storefront first", async () => {

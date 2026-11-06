@@ -13,6 +13,7 @@ import type { OpenCheckout } from "../booking-flow/checkout";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { readQrSource } from "../qr-source";
+import { useSiteBusiness } from "../site-business";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { itemsText } from "../test-release/words";
@@ -119,6 +120,7 @@ export function ShopBag({
     const items = useBag(site);
     const count = bagCount(items);
     const testRelease = useTestRelease() !== null;
+    const { address: addressBy } = useSiteBusiness();
     const [step, setStep] = useState<Step>({ kind: "closed" });
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
@@ -128,7 +130,9 @@ export function ShopBag({
     // key as they were. Never drawn until the bag opens, so the server's
     // empty draft and the browser's kept one can differ.
     const [draft, setDraft] = useState<BagDraft>(() =>
-        typeof window === "undefined" ? EMPTY_DRAFT : readBagDraft(site),
+        typeof window === "undefined"
+            ? EMPTY_DRAFT
+            : readBagDraft(site, addressBy),
     );
     useEffect(() => writeBagDraft(site, draft), [site, draft]);
     // The QR code whose scan opened this page load, when the address it
@@ -154,10 +158,10 @@ export function ShopBag({
             onOpenBag(() => {
                 // A look's checkout page keeps the way and the address in
                 // the visit's draft: the bag opens on what it holds now.
-                if (look) setDraft(readBagDraft(site));
+                if (look) setDraft(readBagDraft(site, addressBy));
                 setStep({ kind: "bag" });
             }),
-        [look, site],
+        [look, site, addressBy],
     );
     // Whoever said "added to your bag" takes it down once the bag is open.
     const open = step.kind !== "closed";
@@ -294,7 +298,7 @@ export function ShopBag({
                 <button
                     type="button"
                     onClick={() => {
-                        if (look) setDraft(readBagDraft(site));
+                        if (look) setDraft(readBagDraft(site, addressBy));
                         setStep({ kind: "bag" });
                     }}
                     aria-label={`Your bag, ${count} ${count === 1 ? "item" : "items"}`}

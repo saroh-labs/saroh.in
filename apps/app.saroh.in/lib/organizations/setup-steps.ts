@@ -5,7 +5,7 @@ import {
 } from "@saroh/ui/lib/setup-plan";
 import { z } from "zod";
 
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import type { OrganizationKind } from "./kind";
 import { kindOf, ORGANIZATION_KINDS } from "./kind";
 import { managerCodeProblem } from "./referral-carry";
@@ -66,7 +66,7 @@ export function setupSchema(
                 .string()
                 .refine(
                     (code) =>
-                        EDITION === "INDIA"
+                        PROFILE.businessCountry === "india-only"
                             ? code === "IN"
                             : /^[A-Z]{2}$/.test(code) && code !== "IN",
                     { error: "Choose where your business is, outside India" },
@@ -466,7 +466,10 @@ export function readSetupDraft(email: string): SetupDraft | null {
             values: {
                 ...values,
                 yourName,
-                country: EDITION === "INDIA" ? "IN" : values.country,
+                country:
+                    PROFILE.businessCountry === "india-only"
+                        ? "IN"
+                        : values.country,
             },
         };
     } catch {

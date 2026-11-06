@@ -79,7 +79,9 @@ export function PackCard({
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2.5 border-t border-border pt-3">
                 <div className="min-w-0">
-                    <div className={EYEBROW}>Sold</div>
+                    <div data-ph-unmask="" className={EYEBROW}>
+                        Sold
+                    </div>
                     <div className="mt-0.5 text-[17px] font-semibold tabular-nums">
                         {card.sold}
                     </div>
@@ -90,7 +92,9 @@ export function PackCard({
                     ) : null}
                 </div>
                 <div className="min-w-0">
-                    <div className={EYEBROW}>Still to use</div>
+                    <div data-ph-unmask="" className={EYEBROW}>
+                        Still to use
+                    </div>
                     <div className="mt-0.5 text-[17px] font-semibold tabular-nums">
                         <AbsentOr says="Not known">{card.stillToUse}</AbsentOr>
                     </div>

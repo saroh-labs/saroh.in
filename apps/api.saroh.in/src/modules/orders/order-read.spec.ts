@@ -46,6 +46,7 @@ const base: RawOrderRead = {
     deliveryCity: "Bengaluru",
     deliveryState: "Karnataka",
     deliveryPostalCode: "560001",
+    deliveryCountry: null,
     store: { id: "store_1", name: "Rye & Co." },
     customer: null,
     items: [
@@ -342,6 +343,30 @@ describe("serializeOrderRead", () => {
                 opts(false),
             ).deliveryAddress,
         ).toBeNull();
+    });
+
+    it("carries a Global delivery's region and country apart (DEC-207)", () => {
+        expect(serializeOrderRead(base, opts(false)).deliveryAddress).toEqual(
+            expect.objectContaining({ state: "Karnataka", country: null }),
+        );
+        expect(
+            serializeOrderRead(
+                {
+                    ...base,
+                    deliveryCity: "Austin",
+                    deliveryState: "Texas",
+                    deliveryPostalCode: "78701",
+                    deliveryCountry: "US",
+                },
+                opts(false),
+            ).deliveryAddress,
+        ).toEqual(
+            expect.objectContaining({
+                state: "Texas",
+                postalCode: "78701",
+                country: "US",
+            }),
+        );
     });
 
     it("without a money read, no figure leaves the API", () => {

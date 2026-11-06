@@ -143,6 +143,7 @@ export function AddLine({
                                             </span>
                                         </span>
                                         <span
+                                            data-ph-unmask=""
                                             aria-hidden
                                             className="text-[12px] font-semibold"
                                         >
@@ -176,7 +177,10 @@ export function AddLine({
                                     <span className="block truncate">
                                         &ldquo;{typed}&rdquo; as a new line
                                     </span>
-                                    <span className="block text-[12px] text-muted-foreground">
+                                    <span
+                                        data-ph-unmask=""
+                                        className="block text-[12px] text-muted-foreground"
+                                    >
                                         {registered
                                             ? "You'll set price and GST"
                                             : "You'll set its price"}

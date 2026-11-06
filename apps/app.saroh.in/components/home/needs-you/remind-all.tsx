@@ -192,7 +192,9 @@ export function RemindAllBody({
                 <>
                     {preview.message ? (
                         <div className="grid gap-1.5 rounded-[10px] bg-muted px-3.5 py-3">
-                            <p className="label">What they get</p>
+                            <p data-ph-unmask="" className="label">
+                                What they get
+                            </p>
                             <p
                                 data-ph-mask=""
                                 className="whitespace-pre-line text-[13px] leading-normal"
@@ -208,7 +210,9 @@ export function RemindAllBody({
                             {channelNote(preview)}
                         </p>
                     )}
-                    <h3 className="label mt-4">Getting a reminder</h3>
+                    <h3 data-ph-unmask="" className="label mt-4">
+                        Getting a reminder
+                    </h3>
                     <ul
                         aria-label="Getting a reminder"
                         className="mb-3.5 mt-1.5"
@@ -256,7 +260,11 @@ function None({ preview }: { preview: RemindAllPreview }) {
         <div className="mb-4 grid gap-1">
             <p className="text-sm text-muted-foreground">{none.body}</p>
             {none.connect ? (
-                <TextLink href={PROVIDERS_HREF} className="text-sm">
+                <TextLink
+                    data-ph-unmask=""
+                    href={PROVIDERS_HREF}
+                    className="text-sm"
+                >
                     Open Settings › Providers
                 </TextLink>
             ) : null}

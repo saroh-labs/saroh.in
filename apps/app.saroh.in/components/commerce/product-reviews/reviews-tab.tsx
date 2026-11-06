@@ -97,7 +97,10 @@ export function ProductReviewsTab({
                         </li>
                     ))}
                 </ul>
-                <p className="mt-3.5 border-t border-border pt-3 text-[11.5px] leading-[1.5] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mt-3.5 border-t border-border pt-3 text-[11.5px] leading-[1.5] text-muted-foreground"
+                >
                     Customers are asked after their order is delivered. Only
                     people with an order can review, so each shows what they
                     bought.

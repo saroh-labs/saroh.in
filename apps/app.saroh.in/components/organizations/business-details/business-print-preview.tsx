@@ -1,5 +1,5 @@
 import { PreviewPanel } from "@/components/organizations/business-settings/preview-panel";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 
 /**
  * "How it prints" ("Saroh Settings" design): the top of an invoice as the
@@ -52,7 +52,7 @@ export function BusinessPrintPreview({
         >
             <div className="rounded-[10px] border border-border bg-[#FFFDF6] px-[18px] pb-4 pt-[18px] text-[12px] leading-normal text-[#1C1C1A] shadow-[0_1px_2px_rgba(28,28,26,0.06)]">
                 <div className="mb-2.5 flex items-baseline gap-2 border-b border-[rgba(28,28,26,0.12)] pb-2">
-                    <span className="label">
+                    <span data-ph-unmask="" className="label">
                         {registered ? "Tax invoice" : "Invoice"}
                     </span>
                     <span className="ml-auto font-mono text-[11px]">
@@ -92,7 +92,9 @@ export function BusinessPrintPreview({
                 ) : null}
                 {registered ? (
                     <div className="mt-3 flex gap-2 border-t border-dashed border-[rgba(28,28,26,0.2)] pt-2 text-[11.5px]">
-                        <span className="flex-1">Delivery</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            Delivery
+                        </span>
                         <span className="font-mono">
                             SAC {deliverySac || "not set"}
                         </span>
@@ -103,7 +105,7 @@ export function BusinessPrintPreview({
             <p className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
                 {registered
                     ? `A sale inside ${stateName || "your state"} splits into CGST + SGST. To anywhere else it's IGST.`
-                    : EDITION === "GLOBAL"
+                    : PROFILE.taxSystem === "named-line"
                       ? "Your tax line and tax ID print on each new invoice."
                       : "Not GST-registered, so invoices carry no GSTIN and no tax split."}
             </p>

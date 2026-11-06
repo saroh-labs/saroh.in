@@ -4,7 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Copy } from "lucide-react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
-import { EDITION } from "@/lib/edition";
+import { PROFILE } from "@/lib/edition";
 import {
     addedLineOf,
     isExemptPaper,
@@ -57,7 +57,10 @@ export function ShownLink({
                     }}
                 />
             </div>
-            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="text-[12px] leading-[1.45] text-muted-foreground"
+            >
                 Kept here until you close this tab. Copying it again
                 doesn&apos;t make a new link.
             </p>
@@ -128,7 +131,7 @@ export function TaxRows({
             ]
           : Number(i.tax) > 0
             ? [[i.taxLabel ?? "Tax", money(i.tax)]]
-            : EDITION === "GLOBAL"
+            : PROFILE.taxSystem === "named-line"
               ? []
               : [[`No GST. ${seller} isn't registered`, ""]];
     return (

@@ -240,7 +240,9 @@ export function EditService(props: EditorProps & { service: Service }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[300px] max-w-[90vw]">
                 <DropdownMenuItem asChild>
-                    <Link href={ALL_BOOKINGS_HREF}>See its bookings</Link>
+                    <Link data-ph-unmask="" href={ALL_BOOKINGS_HREF}>
+                        See its bookings
+                    </Link>
                 </DropdownMenuItem>
                 {canEdit ? (
                     <>
@@ -313,7 +315,10 @@ export function EditService(props: EditorProps & { service: Service }) {
                                 )}
                                 .
                             </span>{" "}
-                            <TextLink href={AVAILABILITY_HREF}>
+                            <TextLink
+                                data-ph-unmask=""
+                                href={AVAILABILITY_HREF}
+                            >
                                 Change them in Hours and time off
                             </TextLink>
                             , or give it hours of its own under Time and place.
@@ -330,7 +335,10 @@ export function EditService(props: EditorProps & { service: Service }) {
                             />
                         </Section>
                     ) : null}
-                    <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-pretty text-[12px] leading-[1.5] text-muted-foreground"
+                    >
                         A change applies to bookings made after it. Bookings
                         already made keep their time and price.
                     </p>

@@ -180,6 +180,7 @@ export function SellPackDialog({
                 footNote={
                     tried && missing ? (
                         <p
+                            data-ph-unmask=""
                             id={ids.missing}
                             role="alert"
                             className="text-[12.5px] font-medium text-destructive-subtle-foreground"
@@ -198,6 +199,7 @@ export function SellPackDialog({
                     <p className="text-[13px] text-muted-foreground">
                         There is no pack on sale yet.{" "}
                         <Link
+                            data-ph-unmask=""
                             href="/class-packs/new"
                             className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
@@ -206,7 +208,10 @@ export function SellPackDialog({
                         first.
                     </p>
                 ) : nobody ? (
-                    <p className="text-[13px] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-[13px] text-muted-foreground"
+                    >
                         A pack is sold to one of your customers, and there is
                         nobody there yet, or Customers is not open to you. Add
                         them in Customers first.
@@ -265,6 +270,7 @@ export function SellPackDialog({
                         </div>
                         <div className="grid gap-1.5">
                             <div
+                                data-ph-unmask=""
                                 id={ids.paid}
                                 className="text-[12.5px] font-medium"
                             >

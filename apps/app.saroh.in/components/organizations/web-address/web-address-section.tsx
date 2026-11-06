@@ -69,8 +69,13 @@ export function WebAddressSection({
 function Header({ action }: { action?: React.ReactNode }) {
     return (
         <div className="flex min-h-[58px] flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
-            <h2 className="text-[13.5px] font-semibold">Web address</h2>
-            <span className="text-[12.5px] text-muted-foreground">
+            <h2 data-ph-unmask="" className="text-[13.5px] font-semibold">
+                Web address
+            </h2>
+            <span
+                data-ph-unmask=""
+                className="text-[12.5px] text-muted-foreground"
+            >
                 Where customers find you
             </span>
             {action}
@@ -103,7 +108,10 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
             />
             <dl>
                 <div className="grid grid-cols-[minmax(110px,170px)_minmax(0,1fr)] gap-x-4 gap-y-1 px-[18px] py-[11px]">
-                    <dt className="text-[13px] text-muted-foreground">
+                    <dt
+                        data-ph-unmask=""
+                        className="text-[13px] text-muted-foreground"
+                    >
                         Web address
                     </dt>
                     <dd className="grid min-w-0 gap-1">
@@ -144,7 +152,10 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                             aria-hidden
                                             className="size-3.5"
                                         />
-                                        <span className="sr-only">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="sr-only"
+                                        >
                                             your website (opens in a new tab)
                                         </span>
                                     </a>
@@ -181,7 +192,10 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                 </div>
             </dl>
             {readOnly ? (
-                <p className="border-t border-border/70 bg-muted/50 px-[18px] pb-3 pt-2.5 text-[12px] leading-normal text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="border-t border-border/70 bg-muted/50 px-[18px] pb-3 pt-2.5 text-[12px] leading-normal text-muted-foreground"
+                >
                     Only the owner can change this.
                 </p>
             ) : null}

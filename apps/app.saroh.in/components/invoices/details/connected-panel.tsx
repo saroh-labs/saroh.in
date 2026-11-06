@@ -129,7 +129,10 @@ export function ConnectedPanel({
     return (
         <SidePanel label="Connected">
             {links.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="text-[13px] text-muted-foreground"
+                >
                     Written by hand for someone no longer in your contacts.
                     Nothing else is connected to it.
                 </p>

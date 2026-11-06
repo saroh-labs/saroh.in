@@ -75,6 +75,7 @@ export function ProductsPicker({
         <div className="space-y-3">
             <div className="flex items-baseline gap-2">
                 <span
+                    data-ph-unmask=""
                     id="collection-products-label"
                     className="flex-1 text-[12.5px] font-medium"
                 >
@@ -121,7 +122,10 @@ export function ProductsPicker({
                                 <span className="min-w-0 flex-1 truncate text-[13px]">
                                     {name}
                                     {p?.status === "DRAFT" ? (
-                                        <span className="text-muted-foreground">
+                                        <span
+                                            data-ph-unmask=""
+                                            className="text-muted-foreground"
+                                        >
                                             {" "}
                                             · draft
                                         </span>
@@ -206,7 +210,10 @@ export function ProductsPicker({
                                 {searchError}
                             </p>
                         ) : found === null ? (
-                            <p className="text-[12px] text-muted-foreground">
+                            <p
+                                data-ph-unmask=""
+                                className="text-[12px] text-muted-foreground"
+                            >
                                 Looking…
                             </p>
                         ) : found.items.length === 0 ? (
@@ -254,7 +261,10 @@ export function ProductsPicker({
                                                 {p.name}
                                             </span>
                                             {p.status !== "PUBLISHED" ? (
-                                                <span className="shrink-0 text-[11.5px] text-muted-foreground">
+                                                <span
+                                                    data-ph-unmask=""
+                                                    className="shrink-0 text-[11.5px] text-muted-foreground"
+                                                >
                                                     {p.status === "DRAFT"
                                                         ? "Draft"
                                                         : "Archived"}
@@ -264,7 +274,10 @@ export function ProductsPicker({
                                     );
                                 })}
                                 {found.more ? (
-                                    <p className="text-[11.5px] text-muted-foreground">
+                                    <p
+                                        data-ph-unmask=""
+                                        className="text-[11.5px] text-muted-foreground"
+                                    >
                                         Showing the first 20. Type more of a
                                         name to narrow it.
                                     </p>

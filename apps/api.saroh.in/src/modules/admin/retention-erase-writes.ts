@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { deliveryPlaceErased } from "../customer-workspace/personal-data";
 import {
     REMOVED_BODY,
     REMOVED_NAME,
@@ -207,9 +208,17 @@ export async function eraseRecords(
             OR: [{ organizationId }, { store: { organizationId } }],
         };
 
-        // Orders keep their lines, amounts, status and `deliveryState` (the
-        // GST place of supply); the recipient, the note and a walk-in's
-        // name and phone go.
+        // Orders keep their lines, amounts, status and, under GST, the
+        // state (the place of supply); the recipient, the note and a
+        // walk-in's name and phone go, and with no GST the region and
+        // country too (DEC-207).
+        const business = await tx.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                edition: true,
+                businessProfile: { select: { taxRate: true } },
+            },
+        });
         const orders = await tx.order.updateMany({
             where: ofBusiness,
             data: {
@@ -219,6 +228,10 @@ export async function eraseRecords(
                 deliveryLine2: null,
                 deliveryCity: null,
                 deliveryPostalCode: null,
+                ...deliveryPlaceErased({
+                    edition: business?.edition,
+                    taxRate: business?.businessProfile?.taxRate,
+                }),
                 notes: null,
                 walkInName: null,
                 walkInPhone: null,

@@ -36,6 +36,7 @@ import {
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows } from "../organizations/organization-policy";
+import { assertStripeTakes } from "../payments/stripe-minimum";
 import { assertClassPacksOn } from "./class-packs-on";
 import type {
     ExtendPurchaseDto,
@@ -352,6 +353,13 @@ export class ClassPacksService {
             dto.serviceIds,
         );
         const { name, credits, validityDays, price, currency } = dto;
+        // A pack bought online is one payment (DEC-208).
+        await assertStripeTakes(
+            prisma,
+            ctx.organizationId,
+            { amountCents: toCents(price), currency },
+            "price",
+        );
         const gst = gstColumns(dto);
 
         const id = await prisma.$transaction(async (tx) => {
@@ -400,8 +408,19 @@ export class ClassPacksService {
         dto: PackInputDto,
     ): Promise<PackView> {
         requireBookingPower(ctx, "pack:write");
-        await this.readPack(ctx.organizationId, id);
+        const current = await this.readPack(ctx.organizationId, id);
         assertValidity(dto.validityDays);
+        if (dto.price !== undefined) {
+            await assertStripeTakes(
+                prisma,
+                ctx.organizationId,
+                {
+                    amountCents: toCents(dto.price),
+                    currency: dto.currency ?? current.currency,
+                },
+                "price",
+            );
+        }
         const serviceIds = dto.serviceIds
             ? await this.assertServices(ctx.organizationId, dto.serviceIds)
             : undefined;

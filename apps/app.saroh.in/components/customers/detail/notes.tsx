@@ -88,7 +88,10 @@ export function Notes({
     return (
         <>
             <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <p className="min-w-0 flex-[1_1_240px] text-[12.5px] text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="min-w-0 flex-[1_1_240px] text-[12.5px] text-muted-foreground"
+                >
                     Team only. Never shown to the customer.{" "}
                     {canWrite
                         ? "Everyone on the team can read and add notes."

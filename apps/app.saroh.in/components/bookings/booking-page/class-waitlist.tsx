@@ -33,7 +33,11 @@ export function ClassWaitlist({
             className="rounded-xl border border-border bg-card p-4 min-[760px]:px-[18px]"
         >
             <div className="flex items-baseline gap-2">
-                <h2 id="class-waitlist-title" className="text-sm font-medium">
+                <h2
+                    data-ph-unmask=""
+                    id="class-waitlist-title"
+                    className="text-sm font-medium"
+                >
                     Waitlist
                 </h2>
                 {rows && rows.length > 0 ? (

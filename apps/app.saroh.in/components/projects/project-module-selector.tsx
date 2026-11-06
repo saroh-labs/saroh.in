@@ -84,12 +84,15 @@ function ProjectModuleRow({
                 {!orgEnabled ? (
                     <p className="text-sm text-muted-foreground">
                         Not turned on for the business.{" "}
-                        <TextLink href="/settings/modules">
+                        <TextLink data-ph-unmask="" href="/settings/modules">
                             Turn it on first
                         </TextLink>
                     </p>
                 ) : !module.canManage ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="text-sm text-muted-foreground"
+                    >
                         {module.selectedForProject
                             ? "In this project"
                             : "Not in this project"}

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { joinDeliveryPlace } from "@saroh/block-contract";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
@@ -128,6 +129,7 @@ export interface ConfirmationRow {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    deliveryCountry: string | null;
     store: {
         name: string;
         settings: { address: string | null; openingHours?: unknown } | null;
@@ -163,7 +165,10 @@ function unlessZero(value: { toString(): string }): string | null {
 export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
     const type = typeOf(row.fulfilment);
     const goes = shipsToAddress(type);
-    const cityLine = [clean(row.deliveryCity), clean(row.deliveryState)]
+    const cityLine = [
+        clean(row.deliveryCity),
+        clean(joinDeliveryPlace(row.deliveryState, row.deliveryCountry)),
+    ]
         .filter(Boolean)
         .join(", ");
     const cityAndPin = [cityLine || null, clean(row.deliveryPostalCode)]
@@ -280,6 +285,7 @@ export class CheckoutConfirmationService {
                     deliveryCity: true,
                     deliveryState: true,
                     deliveryPostalCode: true,
+                    deliveryCountry: true,
                     store: {
                         select: {
                             name: true,

@@ -117,6 +117,7 @@ export function AddSessionDialog({
             </div>
             {tried && !day ? (
                 <p
+                    data-ph-unmask=""
                     role="alert"
                     className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                 >

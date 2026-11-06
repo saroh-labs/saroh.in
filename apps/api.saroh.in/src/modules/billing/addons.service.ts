@@ -34,6 +34,7 @@ import {
     catalogueOfVersion,
     MAX_ADDON_QUANTITY,
 } from "./offers";
+import { assertSarohBills } from "./saroh-bills";
 
 /** One add-on as Settings › Plan shows it. */
 export interface AddonView {
@@ -138,6 +139,7 @@ export class AddonsService {
         now: Date = new Date(),
     ): Promise<AddonsView> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         const changed = await prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${ctx.organizationId} FOR UPDATE`;
             const sub = await tx.subscription.findUnique({

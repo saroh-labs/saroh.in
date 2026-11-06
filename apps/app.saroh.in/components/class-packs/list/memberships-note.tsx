@@ -16,19 +16,24 @@ export function MembershipsNote({ plans }: { plans: MembershipPlan[] }) {
         >
             <div className="flex flex-wrap items-baseline gap-2.5">
                 <h2
+                    data-ph-unmask=""
                     id="packs-memberships"
                     className="flex-1 text-[14px] font-semibold"
                 >
                     Memberships include classes too
                 </h2>
                 <TextLink
+                    data-ph-unmask=""
                     href="/billing/subscriptions?tab=plans"
                     className="text-[12.5px]"
                 >
                     Change in Plans
                 </TextLink>
             </div>
-            <p className="mt-[3px] text-pretty text-[12.5px] text-muted-foreground">
+            <p
+                data-ph-unmask=""
+                className="mt-[3px] text-pretty text-[12.5px] text-muted-foreground"
+            >
                 Given at each renewal and not carried over. Members use these
                 before any pack they own.
             </p>

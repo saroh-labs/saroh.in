@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "build": "next build",
+        "build:global": "NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL next build",
         "dev": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} portless app.saroh next dev",
         "dev:app": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} next dev",
         "lint": "eslint .",
@@ -76,7 +77,7 @@
         "lucide-react": "catalog:",
         "next": "catalog:next16",
         "next-themes": "^0.4.6",
-        "posthog-js": "1.435.9",
+        "posthog-js": "1.447.2",
         "react": "catalog:react19",
         "react-day-picker": "catalog:",
         "react-dom": "catalog:react19",

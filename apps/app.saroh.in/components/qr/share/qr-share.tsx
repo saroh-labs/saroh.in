@@ -112,10 +112,13 @@ export function QrShare({
             className="flex flex-col gap-5"
         >
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h3 id="qr-codes-title" className={HEADING}>
+                <h3 data-ph-unmask="" id="qr-codes-title" className={HEADING}>
                     QR codes
                 </h3>
-                <span className="text-[13px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[13px] text-muted-foreground"
+                >
                     For the counter, the mirror or a card. Each opens one of
                     your pages and counts its scans.
                 </span>
@@ -174,8 +177,13 @@ export function QrShare({
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h4 className={HEADING}>Your QR codes</h4>
-                <span className="text-[13px] text-muted-foreground">
+                <h4 data-ph-unmask="" className={HEADING}>
+                    Your QR codes
+                </h4>
+                <span
+                    data-ph-unmask=""
+                    className="text-[13px] text-muted-foreground"
+                >
                     {canChange
                         ? "Change where a code goes any time. The printed one keeps working."
                         : "Where each code is placed and what it opens."}

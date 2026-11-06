@@ -96,10 +96,16 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-border/70 px-[18px] py-3">
-                <h3 className="font-display text-[15px] font-semibold">
+                <h3
+                    data-ph-unmask=""
+                    className="font-display text-[15px] font-semibold"
+                >
                     What you hear about
                 </h3>
-                <span className="text-[12.5px] text-muted-foreground">
+                <span
+                    data-ph-unmask=""
+                    className="text-[12.5px] text-muted-foreground"
+                >
                     Only for you. Your team picks their own.
                 </span>
             </div>
@@ -140,7 +146,9 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                         {/* In the grid's flow, so the channel headings sit over
                             their switches; only the word is hidden. */}
                         <span role="columnheader">
-                            <span className="sr-only">Alert</span>
+                            <span data-ph-unmask="" className="sr-only">
+                                Alert
+                            </span>
                         </span>
                         {grid.columns.map((channel) => (
                             <span

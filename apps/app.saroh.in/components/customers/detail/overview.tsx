@@ -83,7 +83,9 @@ export function Overview({
                 // Their saved address shows before their first order too —
                 // someone added by hand often has one (DEC-073).
                 <section className={CARD} aria-label="Delivery address">
-                    <div className={cn(LABEL, "mb-1.5")}>Delivery address</div>
+                    <div data-ph-unmask="" className={cn(LABEL, "mb-1.5")}>
+                        Delivery address
+                    </div>
                     <div className="text-[13.5px] leading-[1.5]">{saved}</div>
                 </section>
             ) : null}
@@ -109,7 +111,10 @@ export function Overview({
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
                         {usual.length > 0 ? (
                             <section className={CARD} aria-label="Usually buys">
-                                <div className={cn(LABEL, "mb-2")}>
+                                <div
+                                    data-ph-unmask=""
+                                    className={cn(LABEL, "mb-2")}
+                                >
                                     Usually buys
                                 </div>
                                 {usual.map((f) => (
@@ -134,13 +139,19 @@ export function Overview({
                             className={CARD}
                             aria-label="How they get orders"
                         >
-                            <div className={cn(LABEL, "mb-2")}>
+                            <div
+                                data-ph-unmask=""
+                                className={cn(LABEL, "mb-2")}
+                            >
                                 How they get orders
                             </div>
                             <div className="text-[13.5px]">
                                 {howTheyGet(rows)}
                             </div>
-                            <div className={cn(LABEL, "mb-1.5 mt-3.5")}>
+                            <div
+                                data-ph-unmask=""
+                                className={cn(LABEL, "mb-1.5 mt-3.5")}
+                            >
                                 Delivery address
                             </div>
                             <div className="text-[13.5px] leading-[1.5]">
@@ -152,11 +163,16 @@ export function Overview({
             ) : null}
             {d.consent ? (
                 <section className={CARD} aria-label="Offers and news">
-                    <div className={cn(LABEL, "mb-1.5")}>Offers and news</div>
+                    <div data-ph-unmask="" className={cn(LABEL, "mb-1.5")}>
+                        Offers and news
+                    </div>
                     <div className="text-[13.5px]">
                         {offersText(d.consent, d.timezone, now)}
                     </div>
-                    <p className="mt-[5px] text-pretty text-[12px] leading-[1.5] text-muted-foreground">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-[5px] text-pretty text-[12px] leading-[1.5] text-muted-foreground"
+                    >
                         Only the customer can say yes. You can record that they
                         asked to stop, and no offers go to them by email after
                         that.
@@ -195,7 +211,10 @@ function OrderTile({
 }) {
     const body = (
         <>
-            <div className="text-[11.5px] text-muted-foreground">
+            <div
+                data-ph-unmask=""
+                className="text-[11.5px] text-muted-foreground"
+            >
                 {tile.label}
             </div>
             <div className="mt-1 font-display text-[22px] font-semibold tabular-nums leading-[1.2]">
@@ -242,10 +261,16 @@ function ClassesLeft({
     return (
         <section className={CARD} aria-label="Classes left">
             <div className="flex items-baseline gap-2">
-                <span className={cn(LABEL, "flex-1")}>Classes left</span>
+                <span data-ph-unmask="" className={cn(LABEL, "flex-1")}>
+                    Classes left
+                </span>
                 {/* The sell dialog with them chosen (C7), not a trip away. */}
                 {onSell ? (
-                    <TextLink onClick={onSell} className="text-[12.5px]">
+                    <TextLink
+                        data-ph-unmask=""
+                        onClick={onSell}
+                        className="text-[12.5px]"
+                    >
                         Sell a pack
                     </TextLink>
                 ) : null}
@@ -363,7 +388,9 @@ function NextBooking({
     ];
     return (
         <section className={CARD} aria-label="Next booking">
-            <div className={LABEL}>Next booking</div>
+            <div data-ph-unmask="" className={LABEL}>
+                Next booking
+            </div>
             {d.bookings === null ? (
                 <FailedRead className="mt-1.5" things="bookings" />
             ) : (
@@ -395,7 +422,10 @@ function NextBooking({
                                 <AbsentValue says="Not known" />
                             )}
                         </div>
-                        <div className="text-[11.5px] text-muted-foreground">
+                        <div
+                            data-ph-unmask=""
+                            className="text-[11.5px] text-muted-foreground"
+                        >
                             {s.label}
                         </div>
                     </div>

@@ -93,7 +93,11 @@ export function BusinessHoursSection({
         hours.state === "sell-off" ? (
             <>
                 Hours are kept on your locations, and Sell is switched off.{" "}
-                <Link href="/settings/modules" className={LINK}>
+                <Link
+                    data-ph-unmask=""
+                    href="/settings/modules"
+                    className={LINK}
+                >
                     Turn on Sell
                 </Link>
             </>
@@ -105,7 +109,11 @@ export function BusinessHoursSection({
         ) : !first ? (
             <>
                 Hours are kept on a location, and this business has none yet.{" "}
-                <Link href={newStorefrontHref} className={LINK}>
+                <Link
+                    data-ph-unmask=""
+                    href={newStorefrontHref}
+                    className={LINK}
+                >
                     Create a location
                 </Link>
             </>
@@ -172,7 +180,9 @@ export function BusinessHoursSection({
                 </Row>
                 <Row label="Booking page">
                     <span className="flex flex-wrap items-baseline gap-2">
-                        <span>Doesn&apos;t mention closures</span>
+                        <span data-ph-unmask="">
+                            Doesn&apos;t mention closures
+                        </span>
                         <ComingSoon />
                     </span>
                 </Row>

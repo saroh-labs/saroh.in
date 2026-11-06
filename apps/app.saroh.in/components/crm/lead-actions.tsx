@@ -69,7 +69,7 @@ export function LeadActions({
             <ComposerNotice gate={off} />
         ) : null
     ) : contactId ? null : (
-        <p className="text-sm text-muted-foreground">
+        <p data-ph-unmask="" className="text-sm text-muted-foreground">
             Link a contact to this lead to send a message.
         </p>
     );

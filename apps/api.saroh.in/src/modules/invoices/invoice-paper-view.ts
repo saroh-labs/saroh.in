@@ -1,4 +1,5 @@
 import type { PaperColours } from "@saroh/block-contract";
+import { editionProfile } from "@saroh/edition";
 
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { paperPrices, pricesSentence } from "./added-line";
@@ -353,7 +354,7 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
 
 /** "1234 5678 9012": an account number in fours, as the pay page groups it. */
 function groupedAccount(number: string): string {
-    return number.replace(/(\d{4})(?=\d)/g, "$1 ");
+    return number.replace(/([0-9A-Z]{4})(?=[0-9A-Z])/g, "$1 ");
 }
 
 /**
@@ -382,13 +383,23 @@ export function payInstructionLines(
 ): string[] | null {
     if (!pay) return null;
     const lines: string[] = [];
-    if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
-    if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {
+    const global = editionProfile(pay.edition).payInstructions === "bank-code";
+    if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);
+    if (
+        pay.bankAccountNumber &&
+        (pay.bankIfsc || global) &&
+        pay.bankAccountName
+    ) {
         lines.push(
             [
                 `Bank transfer: ${pay.bankAccountName}`,
-                `A/c ${groupedAccount(pay.bankAccountNumber)}`,
-                `IFSC ${pay.bankIfsc}`,
+                // A Global business's words follow its country: IBAN, BSB.
+                `${global ? (pay.bankLabels?.account ?? "Account") : "A/c"} ${groupedAccount(pay.bankAccountNumber)}`,
+                pay.bankIfsc &&
+                    `${global ? (pay.bankLabels?.code ?? "Bank code") : "IFSC"} ${pay.bankIfsc}`,
+                global &&
+                    pay.bankSwift &&
+                    `${pay.bankLabels?.swift ?? "SWIFT/BIC"} ${pay.bankSwift}`,
                 pay.bankName,
             ]
                 .filter(Boolean)

@@ -39,6 +39,7 @@ export function RoleNameField({
             />
             {nameless ? (
                 <p
+                    data-ph-unmask=""
                     id={problem}
                     role="alert"
                     className="text-[12.5px] font-medium text-destructive-subtle-foreground"

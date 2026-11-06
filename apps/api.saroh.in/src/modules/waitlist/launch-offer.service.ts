@@ -13,6 +13,7 @@ import { catalogPlanIdForKey, validateCatalog } from "@saroh/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { env } from "../../env";
+import { assertSarohBills } from "../billing/saroh-bills";
 import { authorize } from "../organizations/organization-policy";
 import type { PublicLaunchOffer } from "./invite-token";
 import {
@@ -134,6 +135,8 @@ export class LaunchOfferService {
         now = new Date(),
     ): Promise<LaunchOfferGranted> {
         authorize(ctx, "billing:manage");
+        // It grants a plan, which Saroh only bills in India for now.
+        assertSarohBills(ctx.edition);
         const row = await findByToken(token);
         if (row?.joinedOrganizationId === ctx.organizationId) {
             return this.granted(ctx.organizationId);

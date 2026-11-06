@@ -61,7 +61,9 @@ export function BillingProfilePanel({
     if (view === null) {
         return (
             <section aria-label="Who Saroh bills" className={card}>
-                <h3 className={cardHead}>Who Saroh bills</h3>
+                <h3 data-ph-unmask="" className={cardHead}>
+                    Who Saroh bills
+                </h3>
                 <FailedState
                     data-ph-unmask=""
                     size="panel"
@@ -129,7 +131,9 @@ export function BillingProfilePanel({
             className={card}
             data-billing-profile-panel=""
         >
-            <h3 className={cardHead}>Who Saroh bills</h3>
+            <h3 data-ph-unmask="" className={cardHead}>
+                Who Saroh bills
+            </h3>
             <div className="grid items-start gap-x-4 gap-y-2 px-[18px] py-3 text-[13px] sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
                 <span className="text-muted-foreground">{BILLED_TO}</span>
                 <div className="min-w-0" data-ph-mask="">
@@ -195,13 +199,14 @@ export function BillingProfilePanel({
                 the owner alone, as the card is. */}
             <p className="border-t border-muted bg-muted/40 px-[18px] pb-3 pt-2.5 text-[12.5px]">
                 <a
+                    data-ph-unmask=""
                     href={billingProfilesUrl}
                     className={textLinkClass()}
                     data-all-billing-profiles=""
                 >
                     All your billing profiles ↗
                 </a>
-                <span className="text-muted-foreground">
+                <span data-ph-unmask="" className="text-muted-foreground">
                     {" "}
                     in your Saroh account
                 </span>

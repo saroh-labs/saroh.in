@@ -1,0 +1,46 @@
+{
+    "id": "evt_1Nispe2eZvKYlo2C0refundfailed",
+    "object": "event",
+    "api_version": "2026-10-28.endive",
+    "created": 1762400000,
+    "data": {
+        "object": {
+            "id": "re_1Nispe2eZvKYlo2Cd31jOCgZ",
+            "object": "refund",
+            "amount": 1000,
+            "balance_transaction": "txn_1Nispe2eZvKYlo2CYezqFhEx",
+            "charge": "ch_3MtwBwLkdIwHu7ix28a3tqPa",
+            "created": 1692942318,
+            "currency": "usd",
+            "destination_details": {
+                "card": {
+                    "reference": "123456789012",
+                    "reference_status": "available",
+                    "reference_type": "acquirer_reference_number",
+                    "type": "refund"
+                },
+                "type": "card"
+            },
+            "metadata": {
+                "saroh_refund_id": "cmrefund00000000000000001"
+            },
+            "payment_intent": "pi_3MtwBwLkdIwHu7ix28a3tqPa",
+            "reason": null,
+            "receipt_number": null,
+            "source_transfer_reversal": null,
+            "status": "failed",
+            "transfer_reversal": null,
+            "failure_reason": "expired_or_canceled_card"
+        },
+        "previous_attributes": {
+            "status": "succeeded"
+        }
+    },
+    "livemode": false,
+    "pending_webhooks": 1,
+    "request": {
+        "id": null,
+        "idempotency_key": null
+    },
+    "type": "refund.failed"
+}
