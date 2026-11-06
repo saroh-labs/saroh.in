@@ -25,4 +25,7 @@ export const browserTracking = createBrowserTracking({
     analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     // Web vitals ride with page visits, never without them.
     loadWebVitals: () => import("posthog-js/dist/web-vitals"),
+    // Clicks, rage and dead clicks and heatmaps ride with page visits too (owner, 6 Nov 2026).
+    clicks: true,
+    loadDeadClicks: () => import("posthog-js/dist/dead-clicks-autocapture"),
 });

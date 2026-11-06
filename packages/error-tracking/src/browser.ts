@@ -94,6 +94,17 @@ export interface BrowserTrackingOptions {
      * are sent; without it no web vitals are measured.
      */
     loadWebVitals?: () => Promise<unknown>;
+    /**
+     * saroh.in only (owner, 6 Nov 2026): clicks, rage clicks and heatmaps
+     * beside page visits, gated by {@link clickBeforeSend}. Never the
+     * workspace: its buttons' words can be a customer's.
+     */
+    clicks?: boolean;
+    /**
+     * `() => import("posthog-js/dist/dead-clicks-autocapture")`, from the
+     * app's own bundle; without it no dead clicks are measured.
+     */
+    loadDeadClicks?: () => Promise<unknown>;
     /** `POSTHOG_REPLAY`: replay is possible only when this is "on". */
     replay?: string | undefined;
     /** `POSTHOG_REPLAY_SAMPLE`: a share from 0 to 1, or unset for the default. */
@@ -690,6 +701,89 @@ export function pageBeforeSend(
     return { ...clean, properties };
 }
 
+/** What saroh.in's click capture may send (owner, 6 Nov 2026). */
+const CLICK_EVENTS = new Set([
+    "$autocapture",
+    "$rageclick",
+    "$dead_click",
+    "$$heatmap",
+]);
+
+/** A link's address without its query or fragment: a referral code stays home. */
+const HREF_QUERY = /((?:attr__)?href=")([^"?#]*)[?#][^"]*"/gu;
+function bareHref(value: unknown): unknown {
+    return typeof value === "string" ? (value.split(/[?#]/u)[0] ?? "") : value;
+}
+
+/**
+ * saroh.in's click gate: `$autocapture`, `$rageclick`, `$dead_click` and
+ * `$$heatmap` only, under the page the app named (as {@link pageBeforeSend}
+ * does), with every link's query and fragment cut. Saroh's own marketing
+ * pages hold no one's data, so an element's words are kept; the SDK never
+ * sends what is typed into a field.
+ */
+export function clickBeforeSend(
+    event: SdkEvent | null,
+    routes: PageRoutes,
+): SdkEvent | null {
+    if (!event || !CLICK_EVENTS.has(event.event) || !routes.now) return null;
+    const clean = withoutPersonalProperties(event);
+    const properties = { ...(clean.properties ?? {}) };
+    for (const key of Object.keys(properties))
+        if (ENTRY_PROPERTY.test(key)) delete properties[key];
+    const origin =
+        typeof properties.$current_url === "string"
+            ? (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu.exec(
+                  properties.$current_url,
+              )?.[0] ?? "")
+            : "";
+    const route = routes.now.split("#")[0] ?? "";
+    const url = `${origin}${route}`;
+    properties.$current_url = url;
+    properties.$pathname = route.split("?")[0] ?? "";
+    if (typeof properties.$elements_chain === "string")
+        properties.$elements_chain = properties.$elements_chain.replace(
+            HREF_QUERY,
+            '$1$2"',
+        );
+    if (Array.isArray(properties.$elements))
+        properties.$elements = properties.$elements.map(
+            (element: Record<string, unknown>) => ({
+                ...element,
+                ...("attr__href" in element
+                    ? { attr__href: bareHref(element.attr__href) }
+                    : {}),
+                ...("href" in element ? { href: bareHref(element.href) } : {}),
+                ...(typeof element.attributes === "object" &&
+                element.attributes !== null
+                    ? {
+                          attributes: Object.fromEntries(
+                              Object.entries(element.attributes).map(
+                                  ([k, v]) => [
+                                      k,
+                                      k === "attr__href" || k === "href"
+                                          ? bareHref(v)
+                                          : v,
+                                  ],
+                              ),
+                          ),
+                      }
+                    : {}),
+            }),
+        );
+    if (
+        typeof properties.$heatmap_data === "object" &&
+        properties.$heatmap_data !== null
+    )
+        properties.$heatmap_data = {
+            [url]: Object.values(properties.$heatmap_data).flat(),
+        };
+    for (const key of ["$external_click_url", "$dead_click_selector"])
+        if (typeof properties[key] === "string")
+            properties[key] = bareHref(properties[key]);
+    return { ...clean, properties };
+}
+
 /** The errors instance: exceptions, and nothing else the SDK can do. */
 export function errorsConfig(host: string): Record<string, unknown> {
     return {
@@ -912,10 +1006,12 @@ export function createBrowserTracking(
     const gate = (event: SdkEvent | null): SdkEvent | null => {
         if (event?.event === "$snapshot")
             return live.record ? replayBeforeSend(event) : null;
-        // saroh.in's instance (nobody's) keeps scroll depth; the workspace's never.
-        return live.count
-            ? pageBeforeSend(event, routes, replayUser === ANONYMOUS)
-            : null;
+        if (!live.count) return null;
+        // saroh.in's instance (nobody's) keeps scroll depth and clicks; the workspace's never.
+        const site = replayUser === ANONYMOUS;
+        if (site && options.clicks && CLICK_EVENTS.has(event?.event ?? ""))
+            return clickBeforeSend(event, routes);
+        return pageBeforeSend(event, routes, site);
     };
 
     /** Send the page the app named, once the instance may count visits. */
@@ -1130,10 +1226,29 @@ export function createBrowserTracking(
             }
             const sample = replaySampleRate(options.replaySample);
             const allowed = { record, count: counting.record };
+            const clicks = counting.record && options.clicks === true;
+            const deadClicks =
+                clicks && options.loadDeadClicks
+                    ? await options.loadDeadClicks().then(
+                          () => true,
+                          () => false,
+                      )
+                    : false;
             return begin(ANONYMOUS, allowed, () => ({
                 ...siteReplayConfig(host, sample),
                 // Scroll depth on page visits (DEC-160, 6 Nov 2026); the gate keeps percentages only.
                 disable_scroll_properties: false,
+                // Clicks (owner, 6 Nov 2026), through clickBeforeSend.
+                ...(clicks
+                    ? {
+                          autocapture: { capture_copied_text: false },
+                          rageclick: true,
+                          capture_heatmaps: true,
+                          capture_dead_clicks: deadClicks,
+                          mask_all_text: false,
+                          mask_all_element_attributes: false,
+                      }
+                    : {}),
                 loaded: (instance: {
                     register?: (p: Record<string, unknown>) => void;
                 }) => instance.register?.({ app, environment }),

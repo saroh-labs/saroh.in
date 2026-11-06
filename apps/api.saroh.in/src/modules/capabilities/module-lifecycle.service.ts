@@ -26,6 +26,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { workspaceAction } from "../analytics/product-milestones";
 import { auditMetadata } from "../audit/audit.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -360,6 +361,9 @@ export class ModuleLifecycleService {
                 { module: descriptor.label, enabled: false },
             );
             await alsoInTransaction?.(tx);
+        });
+        workspaceAction("module_turned_off", ctx.organizationId, {
+            module_key: moduleKey,
         });
     }
 

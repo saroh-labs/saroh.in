@@ -120,7 +120,7 @@ If a breach affects your personal data, we'll tell you and the Data Protection B
 
 ## Cookies
 
-Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. With your consent, it also measures how fast pages load and how far down a page people scroll. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
+Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. With your consent, it also measures how fast pages load, how far down a page people scroll and what they click. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
 
 If you reach saroh.in from a link on a business's site, saroh.in keeps that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.
 

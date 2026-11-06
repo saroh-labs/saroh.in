@@ -1123,6 +1123,88 @@ describe("page visits (DEC-160)", () => {
             });
     });
 
+    const consented = {
+        consent: "granted",
+        teamBrowser: false,
+        doNotTrack: null,
+        globalPrivacyControl: false,
+    } as const;
+
+    it("saroh.in clicks: on with clicks, link queries cut, under the named page (owner, 6 Nov 2026)", async () => {
+        const loadDeadClicks = vi.fn(() => Promise.resolve({}));
+        const { tracking, instances } = tracker({
+            app: "web",
+            clicks: true,
+            loadDeadClicks,
+        });
+        tracking.pageview("/pricing");
+        expect(await tracking.startSiteReplay(consented)).toBe(true);
+        const { config } = instances[0];
+        expect(loadDeadClicks).toHaveBeenCalled();
+        expect(config).toMatchObject({
+            autocapture: { capture_copied_text: false },
+            rageclick: true,
+            capture_heatmaps: true,
+            capture_dead_clicks: true,
+        });
+        const gate = config.before_send as Gate;
+        const url = "https://saroh.in/pricing?ref=ABC123#top";
+        const click = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $current_url: url,
+                    $pathname: "/pricing",
+                    $referrer: "https://example.com/x",
+                    $elements_chain:
+                        'a.cta:text="Start free"href="/signup?plan=grow&ref=ABC123"attr__href="/signup?ref=ABC123"',
+                    $elements: [
+                        { tag_name: "a", attr__href: "/signup?ref=ABC123" },
+                    ],
+                    $external_click_url: "https://x.com/s?u=1",
+                },
+            }),
+        ).properties;
+        expect(click).toMatchObject({
+            $current_url: "https://saroh.in/pricing",
+            $pathname: "/pricing",
+            $elements_chain:
+                'a.cta:text="Start free"href="/signup"attr__href="/signup"',
+            $elements: [{ tag_name: "a", attr__href: "/signup" }],
+            $external_click_url: "https://x.com/s",
+        });
+        expect(click).not.toHaveProperty("$referrer");
+        expect(JSON.stringify(click)).not.toContain("ABC123");
+        const heat = must(
+            gate({
+                event: "$$heatmap",
+                properties: {
+                    $current_url: url,
+                    $heatmap_data: { [url]: [{ x: 1, y: 2 }] },
+                },
+            }),
+        ).properties;
+        expect(heat?.$heatmap_data).toEqual({
+            "https://saroh.in/pricing": [{ x: 1, y: 2 }],
+        });
+        expect(gate({ event: "$rageclick", properties: {} })).not.toBeNull();
+        expect(gate({ event: "$dead_click", properties: {} })).not.toBeNull();
+        expect(gate({ event: "$identify", properties: {} })).toBeNull();
+    });
+
+    it("clicks stay off without the option, and never in the workspace", async () => {
+        const site = tracker({ app: "web" });
+        site.tracking.pageview("/pricing");
+        await site.tracking.startSiteReplay(consented);
+        expect(site.instances[0].config.autocapture).toBe(false);
+        expect(
+            (site.instances[0].config.before_send as Gate)({
+                event: "$autocapture",
+                properties: {},
+            }),
+        ).toBeNull();
+    });
+
     /** What posthog-js 1.435 sends (`extensions/web-vitals`), attribution forced on. */
     function sdkWebVitals(url: string) {
         const metric = (name: string, value: number) => ({

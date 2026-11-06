@@ -38,7 +38,9 @@ which app with `app` (`api` | `application` | `auth` | `admin` | `web` |
    data. Besides errors there are two things, in two apps, under the rules
    below: session replay, and page visits (`$pageview` and `$pageleave`,
    DEC-160, which replaced "no pageviews" on 14 Oct 2026 and nothing else,
-   and with them `$web_vitals`, 6 Nov 2026).
+   and with them `$web_vitals`, 6 Nov 2026). saroh.in alone also sends
+   clicks, rage clicks, dead clicks and heatmaps beside its page visits
+   (DEC-209, through `clickBeforeSend`); the workspace never autocaptures.
 
 ## What is sent, from where
 
@@ -452,7 +454,8 @@ apps): one `GET …/array/<key>/config` when the instance is made (the
 project's settings: a recording starts only if the project records at
 all), `POST …/s/` with the recording (`$snapshot` events), and `POST
 …/e/` or `…/i/v0/e/` with each `$pageview`, `$pageleave` and
-`$web_vitals`. `before_send` drops every other event, and autocapture,
+`$web_vitals` (and on saroh.in `$autocapture`, `$rageclick`,
+`$dead_click` and `$$heatmap`, DEC-209). `before_send` drops every other event, and autocapture,
 heatmaps, network timing, web vitals attribution, exceptions, surveys and
 flags are switched off in the config as well. An error is one `POST …/e/` from the browser (`$exception`), and
 one `POST …/i/v0/e/` from the server when the server threw it.
@@ -511,8 +514,9 @@ list it.
 3. Production the same, with `POSTHOG_ENVIRONMENT=production`.
 4. Page visits (DEC-160): nothing to turn on in PostHog; Web analytics
    reads `$pageview` and `$pageleave` as they arrive. In the project's
-   settings leave **autocapture, heatmaps, dead clicks and exception
-   autocapture off** (the SDK has them off whatever is set there), and
+   settings turn **autocapture, heatmaps and dead clicks on** (DEC-209:
+   the project's "off" overrides saroh.in's SDK; the workspace's SDK has
+   them off whatever is set there), leave **exception autocapture off**, and
    **web vitals autocapture on** (owner, 6 Nov 2026; the SDK sends them
    only with page visits, and its own config wins either way), leave "Cookieless server hash mode" off (not used), and keep
    **discard client IP data** on. The production `vars` of the workspace

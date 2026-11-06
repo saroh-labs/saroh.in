@@ -103,8 +103,9 @@ must keep:
   or an amount. A new fact beside an error goes through `scrubContext`.
 - **A product milestone is sent by the API, once, from the activation
   ledger** (`modules/analytics/product-milestones.ts`). The list is closed
-  (DEC-187: the nine milestones and the two upgrade-prompt events): one more
-  is the owner's decision, not a call site's. A milestone's properties are
+  (DEC-187: the nine milestones and the two upgrade-prompt events; DEC-209:
+  the thirteen workspace events, sent every time through `workspaceAction`):
+  one more is the owner's decision, not a call site's. A milestone's properties are
   the plan, the kind and where the business came from (`src`, utm,
   `referral_channel`, `referrer_code`, `manager_code`); codes go only to
   these server-side events, never to a browser tag (DEC-127). Never capture
