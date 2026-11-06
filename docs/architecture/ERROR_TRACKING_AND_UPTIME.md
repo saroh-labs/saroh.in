@@ -382,8 +382,14 @@ console or a merchant site.
 - **What is sent**: `$pageview` for the first page and each page after it,
   and `$pageleave` when the tab closes or leaves. Each view says how long
   the page before it was open (`$prev_pageview_duration`), which is how
-  PostHog knows the time on a page. Nothing else: no click, no scroll
-  depth, no heatmap.
+  PostHog knows the time on a page. saroh.in's also say how far down the
+  page before was scrolled (owner, 6 Nov 2026), as fractions of 0 to 1:
+  `$prev_pageview_last_scroll_percentage`, `…max_scroll_percentage`,
+  `…last_content_percentage` and `…max_content_percentage` (posthog-js's
+  own, `disable_scroll_properties: false` on saroh.in's instance only);
+  Web analytics' scroll depth reads `…max_content_percentage` by
+  `$prev_pageview_pathname`. The pixel figures are dropped. The workspace
+  sends no scroll depth. Nothing else: no click, no heatmap.
 - **Web vitals** (owner, 6 Nov 2026): with page visits, and only where
   and when they are sent, one `$web_vitals` event for the page the tab
   loaded: LCP, INP, CLS and FCP (`WEB_VITALS_CAPTURE`). The observers come
@@ -416,7 +422,8 @@ console or a merchant site.
 - **Never sent** (`pageBeforeSend`, the last gate): the tab's title (in
   the workspace it names the business and sometimes a record), the
   referrer, where the session began, any person property (`$set`,
-  `$set_once`), scroll figures.
+  `$set_once`), scroll pixel figures, and in the workspace any scroll
+  figure.
 - **Who**: the workspace, the signed-in person who shares usage and has
   been told (one choice, "Help improve Saroh", and one notice for both
   recording and page visits), by internal user id and organization id.

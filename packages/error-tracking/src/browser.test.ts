@@ -913,6 +913,21 @@ describe("page visits (DEC-160)", () => {
         $set_once: { $initial_current_url: "https://app.saroh.in/open/x" },
     };
 
+    /** What posthog-js 1.435 adds about the page before (`src/page-view.ts`). */
+    const SDK_SCROLL = {
+        $current_url: "https://saroh.in/pricing?q=asha",
+        $initial_referrer: "https://mail.example.com/",
+        $prev_pageview_duration: 12.5,
+        $prev_pageview_last_scroll: 400,
+        $prev_pageview_last_scroll_percentage: 0.4,
+        $prev_pageview_max_scroll: 600,
+        $prev_pageview_max_scroll_percentage: 0.6,
+        $prev_pageview_last_content: 1000,
+        $prev_pageview_last_content_percentage: 0.5,
+        $prev_pageview_max_content: 1400,
+        $prev_pageview_max_content_percentage: 0.7,
+    };
+
     it("says only the page the app named: no id, no title, no referrer, no person", () => {
         const sent = must(
             pageBeforeSend(SDK_PAGEVIEW, {
@@ -997,6 +1012,14 @@ describe("page visits (DEC-160)", () => {
         });
         expect(gate({ event: "$snapshot", properties: {} })).not.toBeNull();
         expect(gate({ event: "$autocapture", properties: {} })).toBeNull();
+        // The workspace sends no scroll depth.
+        expect(config).not.toHaveProperty("disable_scroll_properties", false);
+        expect(
+            Object.keys(
+                must(gate({ event: "$pageleave", properties: SDK_SCROLL }))
+                    .properties ?? {},
+            ).filter((key) => /scroll|content/u.test(key)),
+        ).toEqual([]);
 
         // Opted out: nothing more leaves, a leave at tab close included.
         tracking.stopReplay();
@@ -1077,8 +1100,27 @@ describe("page visits (DEC-160)", () => {
             person_profiles: "never",
             persistence: "memory",
             capture_pageleave: true,
+            // Scroll depth (DEC-160, 6 Nov 2026).
+            disable_scroll_properties: false,
         });
         expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+        // Percentages only; the pixel figures and nothing else besides.
+        const gate = config.before_send as Gate;
+        for (const event of ["$pageview", "$pageleave"])
+            expect(
+                must(gate({ event, properties: SDK_SCROLL })).properties,
+            ).toEqual({
+                $current_url: "https://saroh.in/pricing",
+                $pathname: "/pricing",
+                ...(event === "$pageleave"
+                    ? { $prev_pageview_pathname: "/pricing" }
+                    : {}),
+                $prev_pageview_duration: 12.5,
+                $prev_pageview_last_scroll_percentage: 0.4,
+                $prev_pageview_max_scroll_percentage: 0.6,
+                $prev_pageview_last_content_percentage: 0.5,
+                $prev_pageview_max_content_percentage: 0.7,
+            });
     });
 
     /** What posthog-js 1.435 sends (`extensions/web-vitals`), attribution forced on. */

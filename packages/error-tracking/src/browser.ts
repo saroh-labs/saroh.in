@@ -599,6 +599,16 @@ const ENTRY_PROPERTY =
     /^\$(?:initial_|session_entry_|prev_pageview_.*(?:scroll|content))/u;
 
 /**
+ * How far the page before was read, as fractions of 0 to 1: posthog-js 1.435
+ * adds these to `$pageview` and `$pageleave` (`_previousPageViewProperties`
+ * in `src/page-view.ts`) unless `disable_scroll_properties`. PostHog's Web
+ * analytics reads `$prev_pageview_max_content_percentage` for a path's
+ * scroll depth, by `$prev_pageview_pathname`. The pixel figures stay dropped.
+ */
+const SCROLL_PERCENTAGE =
+    /^\$prev_pageview_(?:last|max)_(?:scroll|content)_percentage$/u;
+
+/**
  * A page visit's last gate (DEC-160): `$pageview`, `$pageleave` and
  * `$web_vitals` only, and the address in each is the one the **app**
  * named, never the browser's. The workspace names a route's shape
@@ -615,10 +625,15 @@ const ENTRY_PROPERTY =
  * address ({@link PageRoutes.landing}), or not at all. Each metric keeps
  * its name, value, rating, delta and navigation type; its id, addresses,
  * session ids and any attribution are dropped.
+ *
+ * `scrollDepth` (saroh.in only, DEC-160 6 Nov 2026) keeps how far the page
+ * before was scrolled, as percentages ({@link SCROLL_PERCENTAGE}); the
+ * workspace drops it.
  */
 export function pageBeforeSend(
     event: SdkEvent | null,
     routes: PageRoutes,
+    scrollDepth = false,
 ): SdkEvent | null {
     const vitals = event?.event === "$web_vitals";
     if (
@@ -636,7 +651,11 @@ export function pageBeforeSend(
     const clean = withoutPersonalProperties(event);
     const properties = { ...(clean.properties ?? {}) };
     for (const key of Object.keys(properties))
-        if (ENTRY_PROPERTY.test(key)) delete properties[key];
+        if (
+            ENTRY_PROPERTY.test(key) &&
+            !(scrollDepth && !vitals && SCROLL_PERCENTAGE.test(key))
+        )
+            delete properties[key];
     const origin =
         typeof properties.$current_url === "string"
             ? (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu.exec(
@@ -893,7 +912,10 @@ export function createBrowserTracking(
     const gate = (event: SdkEvent | null): SdkEvent | null => {
         if (event?.event === "$snapshot")
             return live.record ? replayBeforeSend(event) : null;
-        return live.count ? pageBeforeSend(event, routes) : null;
+        // saroh.in's instance (nobody's) keeps scroll depth; the workspace's never.
+        return live.count
+            ? pageBeforeSend(event, routes, replayUser === ANONYMOUS)
+            : null;
     };
 
     /** Send the page the app named, once the instance may count visits. */
@@ -1110,6 +1132,8 @@ export function createBrowserTracking(
             const allowed = { record, count: counting.record };
             return begin(ANONYMOUS, allowed, () => ({
                 ...siteReplayConfig(host, sample),
+                // Scroll depth on page visits (DEC-160, 6 Nov 2026); the gate keeps percentages only.
+                disable_scroll_properties: false,
                 loaded: (instance: {
                     register?: (p: Record<string, unknown>) => void;
                 }) => instance.register?.({ app, environment }),
