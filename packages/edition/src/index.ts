@@ -39,6 +39,8 @@ export interface EditionProfile {
     numberLocale: "en-IN" | "en-US";
     /** Whether customers pay by UPI: a way a payment taken by hand is recorded, and named where they pay. A payment already recorded as UPI still reads "UPI". */
     upi: boolean;
+    /** The payment providers a business may connect to take its customers' money; no two editions share one. */
+    paymentProviders: readonly ("RAZORPAY" | "CASHFREE" | "STRIPE")[];
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -55,6 +57,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         helpAndDocs: "own-addresses",
         numberLocale: "en-IN",
         upi: true,
+        paymentProviders: ["RAZORPAY", "CASHFREE"],
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -69,6 +72,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         helpAndDocs: "shared",
         numberLocale: "en-US",
         upi: false,
+        paymentProviders: ["STRIPE"],
     },
 };
 

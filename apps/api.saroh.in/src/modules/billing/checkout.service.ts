@@ -103,6 +103,7 @@ import {
     BillingProviderError,
 } from "./providers/billing-provider.port";
 import { billingNotes } from "./providers/razorpay.provider";
+import { assertSarohBills } from "./saroh-bills";
 
 /**
  * The quote's word on who is billed: the billing profile (its id and legal
@@ -387,6 +388,7 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
+        assertSarohBills(ctx.edition);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, coupon, addonsEnding } = await this.resolve(
             ctx.organizationId,
@@ -619,6 +621,7 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
@@ -732,6 +735,7 @@ export class CheckoutService {
         now: Date = new Date(),
     ): Promise<Extract<ChangePlanResult, { checkout: CheckoutView }>> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         const { plan, startAt } = input;
         const party = await readBillingParty(
             prisma,
@@ -1438,6 +1442,7 @@ export class CheckoutService {
         handoff: CheckoutHandoff | null;
     }> {
         authorize(ctx, "billing:manage");
+        assertSarohBills(ctx.edition);
         await assertWorkspaceWrite(ctx.organizationId, "new");
         await assertBillingMayStart(prisma, ctx.organizationId);
         const party = await readBillingParty(prisma, ctx.organizationId);

@@ -176,14 +176,25 @@ describe("the edition profiles (DEC-204 item 7)", () => {
         helpAndDocs: { INDIA: "own-addresses", GLOBAL: "shared" },
         numberLocale: { INDIA: "en-IN", GLOBAL: "en-US" },
         upi: { INDIA: true, GLOBAL: false },
+        paymentProviders: {
+            INDIA: ["RAZORPAY", "CASHFREE"],
+            GLOBAL: ["STRIPE"],
+        },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {
             for (const edition of EDITIONS) {
                 expect(
                     editionProfile(edition)[fact as keyof EditionProfile],
-                ).toBe(byEdition[edition]);
+                ).toEqual(byEdition[edition]);
             }
         });
     }
+
+    it("gives no two editions the same payment provider", () => {
+        const all = EDITIONS.flatMap(
+            (edition) => editionProfile(edition).paymentProviders,
+        );
+        expect(new Set(all).size).toBe(all.length);
+    });
 });

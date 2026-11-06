@@ -28,6 +28,7 @@ import { pendingSwitchOf, profileSwitchStateInTx } from "./profile-switch";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
 import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
+import { assertSarohBills } from "./saroh-bills";
 
 /**
  * An owner's billing profiles at the account level (DEC-167 step 2, #1015):
@@ -208,7 +209,11 @@ export class BillingProfilesAccountService {
         notMoved: string | null;
     }> {
         // The business is checked first, so a refusal leaves nothing made.
-        if (organizationId) await this.ownerContext(userId, organizationId);
+        if (organizationId) {
+            assertSarohBills(
+                (await this.ownerContext(userId, organizationId)).edition,
+            );
+        }
         const made = await this.profiles.create(userId, input);
         let moved: BillingProfileChosen["outcome"] | null = null;
         let notMoved: string | null = null;
