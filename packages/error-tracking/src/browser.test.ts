@@ -1192,6 +1192,53 @@ describe("page visits (DEC-160)", () => {
         expect(gate({ event: "$identify", properties: {} })).toBeNull();
     });
 
+    it("saroh.in clicks: inside a masked part, counted without its words", async () => {
+        const { tracking, instances } = tracker({ app: "web", clicks: true });
+        tracking.pageview("/");
+        await tracking.startSiteReplay(consented);
+        const gate = instances[0].config.before_send as Gate;
+        const click = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $current_url: "https://saroh.in/",
+                    $el_text: "Priya Sharma",
+                    $elements_chain:
+                        'span:text="Priya Sharma"attr__aria-label="Priya Sharma"nth-child="1";button.account:attr__data-ph-mask=""text="P"',
+                    $elements: [
+                        {
+                            tag_name: "span",
+                            $el_text: "Priya Sharma",
+                            attr__title: "priya@example.com",
+                        },
+                        {
+                            tag_name: "button",
+                            attributes: {
+                                "attr__data-ph-mask": "",
+                                "attr__aria-label": "Priya Sharma",
+                            },
+                        },
+                    ],
+                },
+            }),
+        ).properties;
+        expect(JSON.stringify(click)).not.toMatch(/Priya|priya/u);
+        expect(click?.$elements_chain).toBe(
+            'span:nth-child="1";button.account:attr__data-ph-mask=""',
+        );
+        // An unmasked click keeps its words: saroh.in's own.
+        const plain = must(
+            gate({
+                event: "$autocapture",
+                properties: {
+                    $el_text: "Start free",
+                    $elements_chain: 'a:text="Start free"',
+                },
+            }),
+        ).properties;
+        expect(plain).toMatchObject({ $el_text: "Start free" });
+    });
+
     it("clicks stay off without the option, and never in the workspace", async () => {
         const site = tracker({ app: "web" });
         site.tracking.pageview("/pricing");

@@ -709,6 +709,53 @@ const CLICK_EVENTS = new Set([
     "$$heatmap",
 ]);
 
+/** The words of each element in an `$elements_chain`, and its title and label. */
+const MASKED_CHAIN_WORDS =
+    /(?:text|attr__title|attr__aria-label|attr__alt|attr__placeholder|attr__value)="(?:[^"\\]|\\.)*"/gu;
+
+const WORD_KEYS = new Set([
+    "text",
+    "$el_text",
+    "attr__title",
+    "attr__aria-label",
+    "attr__alt",
+    "attr__placeholder",
+    "attr__value",
+]);
+const keepNonWords = (record: Record<string, unknown>) =>
+    Object.fromEntries(
+        Object.entries(record).filter(([key]) => !WORD_KEYS.has(key)),
+    );
+/** An `$elements` entry without its words, its own or in `attributes`. */
+function withoutWords(element: Record<string, unknown>) {
+    const kept = keepNonWords(element);
+    if (typeof element.attributes === "object" && element.attributes !== null)
+        kept.attributes = keepNonWords(
+            element.attributes as Record<string, unknown>,
+        );
+    return kept;
+}
+
+/** Whether a click was on, or inside, an element the recordings mask. */
+function isMaskedClick(properties: Record<string, unknown>): boolean {
+    const attribute = `attr__${REPLAY_MASK_ATTRIBUTE}`;
+    if (
+        typeof properties.$elements_chain === "string" &&
+        properties.$elements_chain.includes(`${attribute}=`)
+    )
+        return true;
+    return (
+        Array.isArray(properties.$elements) &&
+        properties.$elements.some(
+            (element: Record<string, unknown>) =>
+                attribute in element ||
+                (typeof element.attributes === "object" &&
+                    element.attributes !== null &&
+                    attribute in element.attributes),
+        )
+    );
+}
+
 /** A link's address without its query or fragment: a referral code stays home. */
 const HREF_QUERY = /((?:attr__)?href=")([^"?#]*)[?#][^"]*"/gu;
 function bareHref(value: unknown): unknown {
@@ -741,11 +788,16 @@ export function clickBeforeSend(
     const url = `${origin}${route}`;
     properties.$current_url = url;
     properties.$pathname = route.split("?")[0] ?? "";
-    if (typeof properties.$elements_chain === "string")
-        properties.$elements_chain = properties.$elements_chain.replace(
-            HREF_QUERY,
-            '$1$2"',
-        );
+    // Clicked inside a part the recordings mask (a signed-in name, a form's
+    // thank-you): the click counts, its words do not leave.
+    const masked = isMaskedClick(properties);
+    if (masked) delete properties.$el_text;
+    if (typeof properties.$elements_chain === "string") {
+        const chain = properties.$elements_chain.replace(HREF_QUERY, '$1$2"');
+        properties.$elements_chain = masked
+            ? chain.replace(MASKED_CHAIN_WORDS, "")
+            : chain;
+    }
     if (Array.isArray(properties.$elements))
         properties.$elements = properties.$elements.map(
             (element: Record<string, unknown>) => ({
@@ -771,6 +823,8 @@ export function clickBeforeSend(
                     : {}),
             }),
         );
+    if (masked && Array.isArray(properties.$elements))
+        properties.$elements = properties.$elements.map(withoutWords);
     if (
         typeof properties.$heatmap_data === "object" &&
         properties.$heatmap_data !== null
