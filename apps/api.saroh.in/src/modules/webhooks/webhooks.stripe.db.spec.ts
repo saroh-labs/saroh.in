@@ -33,7 +33,7 @@ import { StripeWebhookProvider } from "./providers/stripe.webhook";
 import { DefaultWebhookProviderFactory } from "./providers/webhook-provider.factory";
 import { WebhooksService } from "./webhooks.service";
 
-const WEBHOOK_SECRET = "whsec_made_up_stripe_db_spec";
+const WEBHOOK_SECRET = "whsec_madeupstripedbspec";
 const tag = `${process.pid}-${Date.now()}`;
 
 const payments = new PaymentsService(
@@ -55,7 +55,13 @@ beforeAll(async () => {
     });
     orgId = (
         await prisma.organization.create({
-            data: { name: "Harbour Tea", slug: `stripe-harbour-${tag}` },
+            data: {
+                name: "Harbour Tea",
+                slug: `stripe-harbour-${tag}`,
+                // Stripe is the Global edition's provider (DEC-208).
+                edition: "GLOBAL",
+                currency: "USD",
+            },
         })
     ).id;
     await prisma.membership.create({
@@ -65,6 +71,7 @@ beforeAll(async () => {
         organizationId: orgId,
         userId: owner.id,
         role: "OWNER",
+        edition: "GLOBAL",
     };
     await giveBusinessDetails(orgId);
     storeId = (
@@ -89,9 +96,9 @@ beforeAll(async () => {
     ).id;
     await payments.connectProvider(ctx, {
         provider: "STRIPE",
-        publicKey: "pk_test_made_up",
-        keyId: "pk_test_made_up",
-        keySecret: "rk_test_made_up",
+        publicKey: "pk_test_madeup",
+        keyId: "pk_test_madeup",
+        keySecret: "rk_test_madeup",
         webhookSecret: WEBHOOK_SECRET,
     });
 });

@@ -91,7 +91,7 @@ describe("the retention erase plan (DEC-122)", () => {
         // And the fields kept for tax are never written. The delivery state
         // is written only through `deliveryPlaceErased`, which keeps it
         // under GST (below).
-        expect(writes).toContain("...deliveryPlaceErased(business)");
+        expect(writes).toContain("...deliveryPlaceErased({");
         for (const kept of [
             "deliveryState",
             "deliveryCountry",

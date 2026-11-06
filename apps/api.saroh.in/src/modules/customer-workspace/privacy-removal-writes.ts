@@ -128,7 +128,10 @@ export async function removeDetailsInTx(
     // GST the region and country too (DEC-207).
     const business = await tx.organization.findUnique({
         where: { id: organizationId },
-        select: { edition: true, taxRate: true },
+        select: {
+            edition: true,
+            businessProfile: { select: { taxRate: true } },
+        },
     });
     const scrubbed = await tx.order.updateMany({
         where: { id: { in: orderIds } },
@@ -139,7 +142,10 @@ export async function removeDetailsInTx(
             deliveryLine2: null,
             deliveryCity: null,
             deliveryPostalCode: null,
-            ...deliveryPlaceErased(business),
+            ...deliveryPlaceErased({
+                edition: business?.edition,
+                taxRate: business?.businessProfile?.taxRate,
+            }),
             notes: null,
         },
     });
