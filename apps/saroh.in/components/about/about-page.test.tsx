@@ -97,6 +97,14 @@ describe("/about before launch (waitlist mode)", () => {
         ).toBeTruthy();
     });
 
+    it("once open, names no launch date: early access is here", () => {
+        render(<AboutPage mode="open" ctx={shown} />);
+        expect(
+            screen.getByRole("heading", { name: "In early access." }),
+        ).toBeTruthy();
+        expect(screen.queryByText(/17 October/)).toBeNull();
+    });
+
     it("closes by asking for the waitlist", () => {
         const { container } = render(<AboutPage mode="waitlist" ctx={shown} />);
         expect(

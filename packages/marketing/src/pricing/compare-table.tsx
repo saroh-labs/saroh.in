@@ -27,7 +27,7 @@ export function CompareTable({
         <Section
             titleId="compare-title"
             title="Compare the plans"
-            className="grid gap-[22px] pt-[110px]"
+            className="grid gap-[22px] pt-[72px]"
         >
             <PlanTable
                 label="Plan comparison table"

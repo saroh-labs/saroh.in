@@ -70,8 +70,7 @@ describe("llmsText", () => {
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
-            // Privacy republishes on 17 Oct with Help (DEC-165).
-            "/terms",
+            // Privacy republishes on 17 Oct with Help (DEC-165), Terms on 6 Nov.
             "/refunds",
         ]);
         expect(paths.some((p) => p.startsWith("/help"))).toBe(false);

@@ -30,7 +30,7 @@ export function UsageTable({
             title={title}
             lead={lead}
             size="sm"
-            className="grid scroll-mt-6 gap-[18px] pt-[72px]"
+            className="grid scroll-mt-6 gap-[18px] pt-[110px]"
         >
             <PlanTable
                 label="Usage table"
