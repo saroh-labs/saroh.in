@@ -23,7 +23,8 @@ import { urls } from "../playwright.config";
  * the bugs these hold shut: the header and the data picking different
  * businesses (9d995356c), a Global bank account's save a 500 (migration
  * `20270127100000_pay_bank_shapes_by_edition`), and sign-in's legal links
- * pointing at pages saroh.tech doesn't have.
+ * pointing at pages saroh.tech doesn't have. Since 6 Nov a Global business
+ * is offered no How to pay us at all (DEC-208): Stripe only.
  *
  * Each test sets up a Global business of Asha's own; only the one about
  * which business opens with none chosen is `@serial`, since it depends on
@@ -72,57 +73,61 @@ test.describe("the Global app (DEC-204)", () => {
         );
     });
 
-    test("How to pay us asks for no UPI or IFSC, checks and saves a US account and routing number, and the invoice's page shows them as a customer sees", async ({
+    test("a Global business is offered no bank details, and its customer's invoice page shows none", async ({
         page,
         context,
     }, testInfo) => {
+        // Global takes payment through Stripe only for now (owner, 6 Nov
+        // 2026, DEC-208): How to pay us is off, its code kept for later.
         const b = await globalBusiness(page, testInfo, "global-pay");
         await openGlobal(page, b);
-        const sheet = page.getByRole("dialog", { name: "How to pay us" });
-        const row = page.locator("#business-pay-upi");
 
+        // No tab, and a link to its sheet opens nothing.
         await page.goto(app("/settings/organization?section=pay&edit=pay"));
-        await expect(sheet).toBeVisible();
-        await expect(sheet.getByLabel("UPI ID")).toHaveCount(0);
-        await expect(sheet.getByText(/IFSC/)).toHaveCount(0);
-        await expect(page.getByText("UPI ID", { exact: true })).toHaveCount(0);
+        await expect(page.getByRole("tab", { name: "Identity" })).toBeVisible();
+        await expect(
+            page.getByRole("tab", { name: "How to pay us" }),
+        ).toHaveCount(0);
+        await expect(
+            page.getByRole("dialog", { name: "How to pay us" }),
+        ).toHaveCount(0);
+        await expect(page.locator("#business-pay-upi")).toHaveCount(0);
 
-        // A US business gives its account and routing number (its country's
-        // own fields, checked as typed); the save that was a 500 (6 Nov).
-        const field = (name: string) => sheet.getByRole("textbox", { name });
-        await field("Account name").fill("Own Studio LLC");
-        await field("Account number").fill("000123456789");
-        // A routing number whose check digit is off is caught before saving.
-        await field("Routing number").fill("021000022");
-        await sheet.getByRole("button", { name: "Save" }).click();
-        await expect(sheet).toContainText(
-            "That routing number doesn't check out",
+        // The API refuses a write, calmly.
+        const api = business(page.request, b.id);
+        const refused = await page.request.patch(
+            `${urls.API_URL}/organizations/${b.id}`,
+            {
+                headers: api.headers,
+                data: {
+                    payInstructions: {
+                        bankAccountName: "Own Studio LLC",
+                        bankAccountNumber: "000123456789",
+                    },
+                },
+            },
         );
-        await field("Routing number").fill("021000021");
-        await sheet.getByRole("button", { name: "Save" }).click();
-        await expect(sheet).toBeHidden();
-        await expect(row).toContainText("0001 2345 6789");
-        await expect(row).toContainText("021000021");
+        expect(refused.status()).toBe(400);
+        expect(await refused.text()).toContain(
+            "Bank transfer details aren't available for businesses outside India yet.",
+        );
 
-        // What the customer's link shows: bank transfer, no UPI.
+        // What the customer's link shows: no way to pay by bank transfer.
         const inv = await globalInvoice(page, b, testInfo);
-        const { url } = await business(page.request, b.id).post<{
-            url: string;
-        }>(`/invoices/${inv.id}/view-link`);
+        const { url } = await api.post<{ url: string }>(
+            `/invoices/${inv.id}/view-link`,
+        );
         const customer = await context.newPage();
         await customer.goto(
             new URL(new URL(url).pathname, urls.RENDERER_URL).toString(),
         );
-        const card = customer.getByRole("region", {
-            name: `How to pay ${b.name}`,
-        });
-        await expect(card).toContainText("Pay by bank transfer");
-        await expect(card).toContainText("Account number");
-        await expect(card).toContainText("0001 2345 6789");
-        await expect(card).toContainText("Routing number");
-        await expect(card).toContainText("021000021");
-        await expect(card).not.toContainText("UPI");
-        await expect(card).not.toContainText("IFSC");
+        await expect(customer.locator("body")).toContainText(b.name);
+        await expect(
+            customer.getByRole("region", { name: `How to pay ${b.name}` }),
+        ).toHaveCount(0);
+        await expect(customer.locator("body")).not.toContainText(
+            /[Bb]ank transfer|Account number|Routing number|IBAN|UPI|IFSC/,
+        );
         await customer.close();
     });
 

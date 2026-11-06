@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { EDITION_PROFILES } from "@saroh/edition";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { ModuleView } from "@/lib/modules/schema";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
@@ -1026,7 +1027,34 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
         expect(done({ ...none, note: "Pay at the counter" })).toBe(false);
     });
 
+    it("Global: never a step while How to pay us is off, whatever a row holds (DEC-208)", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                setup: facts(false),
+                payInstructions: {
+                    ...none,
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankAccountName: "Example Traders",
+                    edition: "GLOBAL",
+                },
+            },
+            modules: selling,
+        });
+        expect(r.steps.map((s) => s.key)).not.toContain("howToPay");
+        expect(r.left.map((s) => s.key)).not.toContain("howToPay");
+    });
+
+    // Global's per-country checks stay, off: judged as they'll be when back on.
+    const globalPayOn = () => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = true;
+    };
+    afterEach(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = false;
+    });
+
     it("Free, Global: bank details with no code tick it, and a stale UPI ID doesn't", () => {
+        globalPayOn();
         const done = (pay: Partial<typeof none>) =>
             readyChecklist({
                 settings: {
@@ -1046,6 +1074,7 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
     });
 
     it("Free, Global: a US business needs its routing number, and the step asks for it", () => {
+        globalPayOn();
         const step = (pay: Partial<typeof none>) =>
             readyChecklist({
                 settings: {

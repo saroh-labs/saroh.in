@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import type { Edition } from "@saroh/edition";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     SETTINGS_INDEX,
@@ -8,10 +9,38 @@ import {
     tabFromParam,
 } from "./search";
 
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+
+afterEach(() => {
+    edition.name = "INDIA";
+});
+
 const owner = { role: "OWNER" as const };
 const member = { role: "MEMBER" as const };
 
 describe("searchSettings", () => {
+    it("offers How to pay us only where the edition does (DEC-208)", () => {
+        const pay = (q: string) =>
+            searchSettings(q, owner).filter((h) =>
+                h.href.endsWith("section=pay"),
+            );
+        expect(pay("how to pay")).toHaveLength(1);
+        expect(pay("bank details")).toHaveLength(1);
+        edition.name = "GLOBAL";
+        expect(pay("how to pay")).toEqual([]);
+        expect(pay("bank details")).toEqual([]);
+        expect(searchSettings("gstin", owner)).not.toEqual([]);
+    });
+
     it("finds a Business setting on its tab", () => {
         expect(searchSettings("gstin", owner)).toEqual([
             {

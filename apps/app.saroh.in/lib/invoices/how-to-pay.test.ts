@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { EDITION_PROFILES } from "@saroh/edition";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { howToPayLines } from "./how-to-pay";
 
@@ -54,7 +55,33 @@ describe("howToPayLines (#833)", () => {
     });
 });
 
+describe("howToPayLines while Global takes Stripe only (DEC-208)", () => {
+    it("prints nothing for a Global business, whatever it saved, and India's as before", () => {
+        expect(
+            howToPayLines(
+                { standing: "ISSUED" },
+                {
+                    ...PAY,
+                    edition: "GLOBAL",
+                    bankAccountNumber: "GB82WEST12345698765432",
+                    bankIfsc: null,
+                    country: "GB",
+                },
+            ),
+        ).toBeNull();
+        expect(howToPayLines({ standing: "ISSUED" }, PAY)).not.toBeNull();
+    });
+});
+
 describe("howToPayLines for a Global business (DEC-204)", () => {
+    // Its per-country lines stay, off: judged as they'll be when back on.
+    beforeAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = true;
+    });
+    afterAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = false;
+    });
+
     it("names the numbers as its country does, and leaves out a UPI ID", () => {
         const global = {
             ...PAY,

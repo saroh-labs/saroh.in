@@ -19,6 +19,14 @@ export interface EditionProfile {
     taxSystem: "gst" | "named-line";
     /** "How to pay us": UPI and an IFSC-backed bank account, or a bank account with an optional bank code and no UPI. */
     payInstructions: "upi-and-ifsc" | "bank-code";
+    /**
+     * Whether a business offers "How to pay us" at all: its settings, Home's
+     * step, and the bank details its customers see. Off for Global, which
+     * takes payment through Stripe only, until each country's transfer
+     * conventions are researched (owner, 6 Nov 2026, DEC-208); its
+     * per-country bank rules (`bank-details.ts`) stay, off.
+     */
+    payInstructionsOffered: boolean;
     /** An address's last lines: an Indian state and six-digit PIN, both required, or a free region and postcode with a country. */
     address: "indian-state-and-pin" | "country-and-region";
     /** A phone without "+" reads as Indian, or every number starts with its country code. */
@@ -55,6 +63,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
     INDIA: {
         taxSystem: "gst",
         payInstructions: "upi-and-ifsc",
+        payInstructionsOffered: true,
         address: "indian-state-and-pin",
         phoneNumbers: "indian",
         businessCountry: "india-only",
@@ -71,6 +80,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
     GLOBAL: {
         taxSystem: "named-line",
         payInstructions: "bank-code",
+        payInstructionsOffered: false,
         address: "country-and-region",
         phoneNumbers: "with-country-code",
         businessCountry: "asked-at-setup",

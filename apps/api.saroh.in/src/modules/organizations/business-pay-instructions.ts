@@ -36,7 +36,16 @@ import { publicPhone } from "./business-phone";
  * number and code (a US routing number, an Australian BSB), and an optional
  * SWIFT/BIC kept after the code in the same column. The rules go by the
  * business's edition and country, never the caller.
+ *
+ * Off where the edition doesn't offer it (`payInstructionsOffered`): Global
+ * takes payment through Stripe only for now (owner, 6 Nov 2026, DEC-208). A
+ * write is refused and a customer is shown nothing, even from a row saved
+ * before; the per-country rules below stay for when it returns.
  */
+
+/** The refusal of a pay write where the edition doesn't offer How to pay us. */
+export const PAY_INSTRUCTIONS_OFF =
+    "Bank transfer details aren't available for businesses outside India yet. Customers pay online with Stripe.";
 
 /** "asha.kapoor@okhdfc": a handle, an @, and the bank's PSP handle. */
 export const UPI_ID = /^[a-z0-9][a-z0-9._-]{1,255}@[a-z][a-z0-9.-]{1,63}$/;
@@ -220,6 +229,15 @@ export function payInstructionsWrite(
     edition: Edition = "INDIA",
 ): Partial<Record<PayColumn, string | null>> {
     if (!input) return {};
+    if (
+        !editionProfile(edition).payInstructionsOffered &&
+        Object.values<string | undefined>(input).some((v) => v !== undefined)
+    ) {
+        throw new BadRequestException({
+            message: PAY_INSTRUCTIONS_OFF,
+            details: { field: "payInstructions" },
+        });
+    }
     const global = bankCode(edition);
     const country = current?.country;
     const written: Partial<Record<PayColumn, string | null>> = {};
@@ -358,6 +376,7 @@ export function publicPayInstructions(
 ): PayInstructionsView | null {
     if (!row) return null;
     const edition = row.organization?.edition;
+    if (!editionProfile(edition).payInstructionsOffered) return null;
     const global = bankCode(edition);
     const upi =
         !global && row.payUpiId && UPI_ID.test(row.payUpiId)

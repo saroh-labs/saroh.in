@@ -42,6 +42,13 @@ export interface PayInstructionsSettings {
 export const payByBankCode = (edition: Edition | null | undefined) =>
     editionProfile(edition).payInstructions === "bank-code";
 
+/**
+ * Whether How to pay us is offered at all: off for Global, which takes
+ * payment through Stripe only for now (owner, 6 Nov 2026, DEC-208).
+ */
+export const payOffered = (edition: Edition | null | undefined) =>
+    editionProfile(edition).payInstructionsOffered;
+
 export type PayField = Exclude<
     keyof PayInstructionsSettings,
     "edition" | "country" | "bankLabels"

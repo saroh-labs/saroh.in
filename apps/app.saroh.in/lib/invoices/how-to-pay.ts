@@ -2,6 +2,7 @@ import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructio
 import {
     accountLabel,
     payByBankCode,
+    payOffered,
 } from "@/lib/organizations/pay-instructions";
 
 import type { InvoiceStanding } from "./service";
@@ -12,7 +13,8 @@ import type { InvoiceStanding } from "./service";
  * `howToPayLines` (`invoices/invoice-paper-view.ts` there) draws the same
  * lines on the PDF, so the printed screen and the download agree. Only an
  * unpaid invoice — issued or overdue, never a credit note — asks to be
- * paid; null otherwise, and when nothing is set. Pure.
+ * paid; null otherwise, when nothing is set, and where the edition offers
+ * no How to pay us (DEC-208). Pure.
  */
 export function howToPayLines(
     i: { standing: InvoiceStanding; kind?: string },
@@ -20,6 +22,7 @@ export function howToPayLines(
 ): string[] | null {
     const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
     if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
+    if (!payOffered(pay.edition)) return null;
     const lines: string[] = [];
     const global = payByBankCode(pay.edition);
     if (pay.upiId && !global) lines.push(`UPI: ${pay.upiId}`);

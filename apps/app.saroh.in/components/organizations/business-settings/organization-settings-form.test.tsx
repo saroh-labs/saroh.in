@@ -9,6 +9,7 @@
  * `business-hours-section.test.tsx`; the logo, `business-logo-sheet.test.tsx`.
  * Made-up details only.
  */
+import type { Edition } from "@saroh/edition";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,6 +33,17 @@ import {
     type,
     unmount,
 } from "./business-settings.test-kit";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
 
 const save = vi.fn();
 const undoSettings = vi.fn();
@@ -240,6 +252,29 @@ describe("Identity's rows and sheets", () => {
         await press(item("Cancel"));
         expect(sheet()).toBeNull();
         expect(window.location.search).toBe("?section=identity");
+    });
+
+    it("How to pay us is a tab in India, and Global has none, nor its sheet by link (DEC-208)", () => {
+        const tabs = () =>
+            Array.from(host.querySelectorAll('[role="tab"]')).map(
+                (t) => t.textContent,
+            );
+        onTab("pay", "&edit=pay");
+        draw(settings());
+        expect(tabs()).toContain("How to pay us");
+        expect(sheet()).not.toBeNull();
+        unmount();
+        mount();
+        edition.name = "GLOBAL";
+        try {
+            onTab("pay", "&edit=pay");
+            draw(settings());
+            expect(tabs()).not.toContain("How to pay us");
+            expect(host.querySelector("#business-pay-panel")).toBeNull();
+            expect(sheet()).toBeNull();
+        } finally {
+            edition.name = "INDIA";
+        }
     });
 
     it("a link to a row on another tab opens nothing", () => {

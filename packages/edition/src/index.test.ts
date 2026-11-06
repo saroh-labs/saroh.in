@@ -163,6 +163,8 @@ describe("the edition profiles (DEC-204 item 7)", () => {
     } = {
         taxSystem: { INDIA: "gst", GLOBAL: "named-line" },
         payInstructions: { INDIA: "upi-and-ifsc", GLOBAL: "bank-code" },
+        // Global takes payment through Stripe only for now (owner, 6 Nov 2026).
+        payInstructionsOffered: { INDIA: true, GLOBAL: false },
         address: {
             INDIA: "indian-state-and-pin",
             GLOBAL: "country-and-region",

@@ -17,6 +17,10 @@ export const BUSINESS_TABS = [
 
 export type BusinessTab = (typeof BUSINESS_TABS)[number];
 
+/** The tabs drawn: How to pay us only where the edition offers it (DEC-208). */
+export const businessTabsFor = (payOffered: boolean): readonly BusinessTab[] =>
+    payOffered ? BUSINESS_TABS : BUSINESS_TABS.filter((t) => t !== "pay");
+
 /** The query the page reads its tab from (`?section=tax`). */
 export const BUSINESS_TAB_PARAM = "section";
 
@@ -128,13 +132,20 @@ export const businessEditId = (sheet: BusinessSheet) =>
  * the right to change one; and GST on delivery is only a registered
  * business's, so asking for it asks about the registration first. How
  * prices carry GST is a registered business's too, and one that isn't is
- * never asked about it: a link for it opens nothing.
+ * never asked about it: a link for it opens nothing. Nor does How to pay
+ * us where the edition doesn't offer it (DEC-208).
  */
 export function businessSheetToOpen(
     which: BusinessSheet,
-    page: { canEdit: boolean; canEditHours: boolean; registered: boolean },
+    page: {
+        canEdit: boolean;
+        canEditHours: boolean;
+        registered: boolean;
+        payOffered: boolean;
+    },
 ): BusinessSheet | null {
     if (!page.canEdit) return null;
+    if (which === "pay" && !page.payOffered) return null;
     if (which === "hours") return page.canEditHours ? which : null;
     if (which === "delivery" && !page.registered) return "gst";
     if (which === "priceMode" && !page.registered) return null;

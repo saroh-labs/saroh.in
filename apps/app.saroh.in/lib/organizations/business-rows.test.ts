@@ -10,6 +10,7 @@ import {
     businessSheetFromParam,
     businessSheetToOpen,
     businessTabHref,
+    businessTabsFor,
 } from "./business-rows";
 import { nameLabelOf, savedWords, sheetWords } from "./business-sheet-words";
 
@@ -50,7 +51,26 @@ describe("Settings › Business's sheets", () => {
     });
 
     describe("the sheet a request really opens", () => {
-        const page = { canEdit: true, canEditHours: true, registered: true };
+        const page = {
+            canEdit: true,
+            canEditHours: true,
+            registered: true,
+            payOffered: true,
+        };
+
+        it("opens no How to pay us, nor its tab, where the edition doesn't offer it (DEC-208)", () => {
+            expect(
+                businessSheetToOpen("pay", { ...page, payOffered: false }),
+            ).toBeNull();
+            expect(
+                businessSheetToOpen("name", { ...page, payOffered: false }),
+            ).toBe("name");
+            expect(businessTabsFor(true)).toEqual(BUSINESS_TABS);
+            expect(businessTabsFor(false)).not.toContain("pay");
+            expect(businessTabsFor(false)).toHaveLength(
+                BUSINESS_TABS.length - 1,
+            );
+        });
 
         it("is the one asked for, for someone who may change the business", () => {
             for (const sheet of BUSINESS_SHEETS) {

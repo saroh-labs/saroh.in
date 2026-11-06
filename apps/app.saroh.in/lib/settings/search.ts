@@ -297,6 +297,10 @@ export function searchSettings(
         // An actor we cannot judge holds everything, so of a pair they are
         // offered the first half — never both, never neither.
         if (entry.unless && holds(actor, entry.unless)) continue;
+        // How to pay us is off where the edition doesn't offer it (DEC-208).
+        if (entry.tab?.value === "pay" && !PROFILE.payInstructionsOffered) {
+            continue;
+        }
         const found =
             !needle ||
             entry.label.toLowerCase().includes(needle) ||

@@ -377,7 +377,7 @@ export function PaperPreview({
                 </div>
             </div>
 
-            {howToPay?.length || editing
+            {howToPay?.length || (editing && PROFILE.payInstructionsOffered)
                 ? wrap(
                       { part: "notes" },
                       "How to pay you: printed on every unpaid invoice",

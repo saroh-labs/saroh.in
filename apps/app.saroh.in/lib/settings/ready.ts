@@ -9,7 +9,10 @@ import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
 import { businessEditHref } from "@/lib/organizations/business-rows";
 import { businessTypeOf } from "@/lib/organizations/business-types";
-import { payByBankCode } from "@/lib/organizations/pay-instructions";
+import {
+    payByBankCode,
+    payOffered,
+} from "@/lib/organizations/pay-instructions";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -348,7 +351,8 @@ function howToPay(
 ): Check | null {
     if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
     const pay = settings.payInstructions;
-    if (!pay) return null;
+    // Off where the edition offers no How to pay us (DEC-208): not a step.
+    if (!pay || !payOffered(pay.edition)) return null;
     // A Global business has no UPI, and its bank's code only where its
     // country has one (`@saroh/edition` bank-details).
     const global = payByBankCode(pay.edition);

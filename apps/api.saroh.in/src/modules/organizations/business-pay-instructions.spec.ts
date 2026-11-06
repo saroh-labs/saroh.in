@@ -27,6 +27,7 @@ jest.mock("@saroh/database", () => {
 });
 
 import { prisma } from "@saroh/database";
+import { EDITION_PROFILES } from "@saroh/edition";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
@@ -36,6 +37,7 @@ import type { MediaService } from "../media/media.service";
 import {
     businessPayInstructionsOf,
     normalisePayField,
+    PAY_INSTRUCTIONS_OFF,
     payInstructionsWrite,
     payWaysWords,
     publicPayInstructions,
@@ -59,6 +61,19 @@ const refusal = (fn: () => unknown) => {
         return (e as BadRequestException).getResponse();
     }
     throw new Error("expected a refusal");
+};
+
+/**
+ * Global's How to pay us is off (owner, 6 Nov 2026), its per-country rules
+ * kept: these judge them as they will be when it is switched back on.
+ */
+const withGlobalPayOn = () => {
+    beforeAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = true;
+    });
+    afterAll(() => {
+        EDITION_PROFILES.GLOBAL.payInstructionsOffered = false;
+    });
 };
 
 describe("normalisePayField (R32)", () => {
@@ -289,7 +304,93 @@ describe("payWaysWords (R32)", () => {
     });
 });
 
+describe("while Global takes payment through Stripe only (DEC-208)", () => {
+    const whole = {
+        payBankAccountName: "Example Traders",
+        payBankAccountNumber: "GB82WEST12345698765432",
+        payBankIfsc: null,
+        payNote: "Thanks",
+        country: "GB",
+    };
+
+    it("refuses any pay write from a Global business, calmly", () => {
+        expect(
+            refusal(() =>
+                payInstructionsWrite(
+                    { bankAccountName: "Example Traders" },
+                    null,
+                    "GLOBAL",
+                ),
+            ),
+        ).toMatchObject({
+            message: PAY_INSTRUCTIONS_OFF,
+            details: { field: "payInstructions" },
+        });
+        expect(() =>
+            payInstructionsWrite({ note: "" }, null, "GLOBAL"),
+        ).toThrow(BadRequestException);
+        expect(payInstructionsWrite({}, null, "GLOBAL")).toEqual({});
+    });
+
+    it("still takes India's write", () => {
+        expect(payInstructionsWrite({ upiId: UPI }, null, "INDIA")).toEqual({
+            payUpiId: UPI,
+        });
+    });
+
+    it("shows a Global customer nothing, even from a row saved before", () => {
+        expect(
+            publicPayInstructions({
+                ...whole,
+                organization: { edition: "GLOBAL" },
+            }),
+        ).toBeNull();
+        expect(
+            publicPayInstructions({
+                payUpiId: UPI,
+                payBankAccountName: "Rye Studio",
+                payBankAccountNumber: ACCOUNT,
+                payBankIfsc: IFSC_CODE,
+                organization: { edition: "INDIA" },
+            }),
+        ).toMatchObject({ upiId: UPI, bankAccountNumber: ACCOUNT });
+    });
+
+    it("so the invoice email names no bank transfer for a Global business", async () => {
+        profileFindUnique.mockResolvedValue({
+            ...whole,
+            organization: { edition: "GLOBAL" },
+        });
+        const view = await businessPayInstructionsOf("org_1");
+        expect(view).toBeNull();
+        expect(payWaysWords(view)).toBeNull();
+    });
+
+    it("the settings save refuses it and writes nothing", async () => {
+        const service = new OrganizationSettingsService(
+            { record: jest.fn() } as unknown as AuditService,
+            {} as MediaService,
+        );
+        profileUpsert.mockClear();
+        await expect(
+            service.update(
+                {
+                    organizationId: "org_1",
+                    userId: "user_1",
+                    role: "OWNER",
+                    edition: "GLOBAL",
+                },
+                { payInstructions: { note: "Thanks" } },
+            ),
+        ).rejects.toMatchObject({
+            response: { message: PAY_INSTRUCTIONS_OFF },
+        });
+        expect(profileUpsert).not.toHaveBeenCalled();
+    });
+});
+
 describe("a Global business's pay instructions (DEC-204)", () => {
+    withGlobalPayOn();
     const write = (
         input: Parameters<typeof payInstructionsWrite>[0],
         current: Parameters<typeof payInstructionsWrite>[1] = null,
@@ -681,6 +782,7 @@ describe("UpdateOrganizationDto.payInstructions", () => {
 });
 
 describe("OrganizationSettingsService: how to pay us (R32)", () => {
+    withGlobalPayOn();
     const record = jest.fn().mockResolvedValue(undefined);
     const service = new OrganizationSettingsService(
         { record } as unknown as AuditService,
