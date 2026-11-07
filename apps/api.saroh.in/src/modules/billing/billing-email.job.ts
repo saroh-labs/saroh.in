@@ -300,6 +300,7 @@ export class BillingEmailHandler {
                     cancelAtPeriodEnd: true,
                     provider: true,
                     providerSubscriptionId: true,
+                    paymentDueUntil: true,
                     plan: { select: { name: true, priceCents: true } },
                     organization: { select: { name: true } },
                 },
@@ -309,10 +310,17 @@ export class BillingEmailHandler {
             if (p.kind === "PAYMENT_FAILED") {
                 // Paid since (a retry went through): nothing to say.
                 if (sub.status === "ACTIVE" && !p.final) return "paid_since";
+                const base = await appBaseOf(p.organizationId);
                 return paymentFailedEmail({
                     businessName,
                     planName: sub.plan.name,
                     final: p.final,
+                    dueBy: sub.paymentDueUntil
+                        ? day(sub.paymentDueUntil)
+                        : null,
+                    payUrl: p.final
+                        ? `${base}/settings/billing`
+                        : `${base}/settings/billing#pay-due`,
                 });
             }
             const endsAt = new Date(p.endsAt);

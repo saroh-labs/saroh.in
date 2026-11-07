@@ -46,6 +46,7 @@ import { gstinCheckChar } from "../invoices/gst-states";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutService } from "./checkout.service";
+import { closeOverduePayments } from "./payment-due";
 import { PlansService } from "./plans.service";
 import type { BillingEventPhase } from "./providers/billing-provider.port";
 import {
@@ -893,6 +894,22 @@ describe("billing emails", () => {
 
         await deliver(providerSub, "pending");
         await deliver(providerSub, "halted");
+        // Halted keeps the plan while the payment is due (DEC-210): the
+        // final email comes when the 7 days run out unpaid.
+        const due = (
+            await prisma.subscription.findFirstOrThrow({
+                where: { providerSubscriptionId: providerSub },
+            })
+        ).paymentDueUntil as Date;
+        expect(
+            (await emailJobs()).filter(
+                (j) => (j.payload as { final?: boolean }).final === true,
+            ),
+        ).toHaveLength(0);
+        await closeOverduePayments(new Date(due.getTime() + 1000), {
+            log: () => undefined,
+            error: () => undefined,
+        });
         const final = (await emailJobs()).filter(
             (j) => (j.payload as { final?: boolean }).final === true,
         );

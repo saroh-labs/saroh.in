@@ -2807,3 +2807,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Not counted yet: who made an order or a booking (the business or its customer on the site); add a property if the funnel needs it.
 - The words: the Privacy Policy's sentence now reads "With your consent, it also measures how fast pages load, how far down a page people scroll and what they click." The workspace's notice already says "We record how Saroh is used".
 - Rules: `CLICK_EVENTS` and `clickBeforeSend` in `packages/error-tracking/src/browser.ts`, `clicks` and `loadDeadClicks` in `apps/saroh.in/lib/error-tracking-browser.ts`; `WORKSPACE_EVENTS` and `workspaceAction` in `apps/api.saroh.in/src/modules/analytics/product-milestones.ts`, `WORKSPACE_EVENT_BY_TYPE` in `activation-events.ts`.
+
+## DEC-210 A failed renewal becomes a payment due, with 7 days to pay, on both editions
+
+- Decision (owner, 6 Nov 2026, "charging again won't solve anything, if payment fails, method won't work"): when an automatic renewal of a Saroh plan fails, on India or Global, Saroh doesn't wait on the provider's retries.
+    - At the first failure the business gets an invoice or pay link in its plan's currency.
+    - It **keeps its plan for 7 days**, and can pay by any method or set up a new autopay.
+    - A banner across the workspace says the payment is due and that the payment method failed, with Pay now. Only people who manage billing see it, and it is the one message in that slot.
+    - Unpaid after 7 days, the business moves to Free under DEC-114: what is over Free's limits is paused, and nothing is deleted.
+- Replaces: India's drop to Free the moment Razorpay halts a subscription after its retries. Razorpay may still retry on its own; a retry that succeeds pays the due and withdraws the link, and paying both is refunded automatically (DEC-164).
+- Global: the same route is the whole monthly route if Razorpay can't put USD on Subscriptions for Saroh's account. In test mode on 6 Nov, USD plans were refused while USD orders and payment links were accepted.
+- Built in #1317 (stage 9, epic #1306).

@@ -85,7 +85,16 @@ export function YourPlan(props: YourPlanProps) {
         pending: Boolean(props.pending && canChange),
     });
     return (
-        <section aria-label="Your plan" className="grid gap-3">
+        <section
+            aria-label="Your plan"
+            // The banner's Pay now lands here (DEC-210).
+            id={
+                message && message !== "pending" && message.kind === "overdue"
+                    ? "pay-due"
+                    : undefined
+            }
+            className="grid scroll-mt-6 gap-3"
+        >
             <div className="grid gap-1.5">
                 <h2 data-ph-unmask="" className="label">
                     Your plan

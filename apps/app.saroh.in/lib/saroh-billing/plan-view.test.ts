@@ -108,6 +108,31 @@ describe("yourPlan", () => {
         });
     });
 
+    it("a payment that's due: the date to pay by, and Pay now on its plan (DEC-210)", () => {
+        const v = yourPlan({
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                paymentDue: {
+                    planName: "Plan B",
+                    dueBy: "2026-11-08T00:00:00.000Z",
+                },
+            }),
+            subscription: sub({ status: "PAST_DUE" }),
+            catalog: CATALOG,
+            liveVersion: 3,
+            checkouts: null,
+            addonsHeld: false,
+        });
+        expect(v.notes).toContainEqual(
+            expect.objectContaining({
+                kind: "overdue",
+                iso: "2026-11-08T00:00:00.000Z",
+                action: { label: "Pay now", planId: "b", cycle: "month" },
+            }),
+        );
+    });
+
     it("says an older version, add-ons on the charge, and a yearly row's price", () => {
         const v = yourPlan({
             access: access({

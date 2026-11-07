@@ -578,12 +578,13 @@ describe("the business's return after the webhook (17 Oct 2026)", () => {
 });
 
 describe("a charge on a subscription Saroh ended or left", () => {
-    it("halted, then paid through Razorpay's link: the plan is back, invoiced, its cancel withdrawn", async () => {
+    it("halted, then paid through Razorpay's link: the plan is back, invoiced, nothing cancelled (DEC-210)", async () => {
         const ctx = await business();
         const { ref } = await onPaidPlan(ctx, "b");
         await deliver(ref, "halted");
-        expect((await sub(ctx.organizationId)).status).toBe("CANCELLED");
-        expect(await cancelJobs("PENDING")).toHaveLength(1);
+        // The payment is due for 7 days; nothing is cancelled meanwhile.
+        expect((await sub(ctx.organizationId)).status).toBe("PAST_DUE");
+        expect(await cancelJobs("PENDING")).toHaveLength(0);
 
         // A month after the period paid (+20 days).
         const next = new Date(Date.now() + 50 * DAY);

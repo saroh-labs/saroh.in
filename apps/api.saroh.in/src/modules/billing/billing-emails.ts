@@ -153,22 +153,38 @@ export function paymentFailedEmail(input: {
     businessName: string;
     planName: string;
     final: boolean;
+    /** The day the plan is kept to (DEC-210), in words. */
+    dueBy?: string | null;
+    /** Plan and billing, where the payment is made. */
+    payUrl?: string | null;
 }): RenderedEmail {
     if (input.final) {
         return {
             subject: `${input.businessName} is now on the Free plan`,
-            html: wrap("Your payment didn't go through", [
-                `We tried several times to take the payment for ${input.businessName}'s ${input.planName} plan, and it didn't go through. ${input.businessName} is now on the Free plan.`,
-                "Everything you made is kept. Choose a plan again in Settings › Plan whenever you're ready.",
-            ]),
+            html: wrap(
+                "Your payment wasn't made",
+                [
+                    `The payment for ${input.businessName}'s ${input.planName} plan wasn't made${input.dueBy ? ` by ${input.dueBy}` : ""}, so ${input.businessName} is now on the Free plan.`,
+                    "Everything you made is kept. Choose a plan again in Settings › Plan and billing whenever you're ready.",
+                ],
+                input.payUrl
+                    ? { label: "Open Plan and billing", href: input.payUrl }
+                    : undefined,
+            ),
         };
     }
     return {
         subject: `Payment for ${input.businessName}'s plan didn't go through`,
-        html: wrap("Your payment didn't go through", [
-            `The payment for ${input.businessName}'s ${input.planName} plan didn't go through. We'll try again over the next few days.`,
-            "Check the card or UPI autopay you paid with. If every try fails, the business moves to the Free plan. Nothing you made is lost.",
-        ]),
+        html: wrap(
+            "Your payment didn't go through",
+            [
+                `The payment for ${input.businessName}'s ${input.planName} plan didn't go through, and the card or autopay it was paid with may not work again.`,
+                input.dueBy
+                    ? `Pay by ${input.dueBy} to keep ${input.planName}. You can pay with another card or UPI, or set up a new autopay. If it isn't paid by then, ${input.businessName} moves to the Free plan. Nothing you made is lost.`
+                    : `Pay to keep ${input.planName}. You can pay with another card or UPI, or set up a new autopay. If it isn't paid, ${input.businessName} moves to the Free plan. Nothing you made is lost.`,
+            ],
+            input.payUrl ? { label: "Pay now", href: input.payUrl } : undefined,
+        ),
     };
 }
 

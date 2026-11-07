@@ -41,6 +41,7 @@ import {
     dropOpenCheckoutsInTx,
     droppedCheckoutConflictInTx,
 } from "./paid-after-end";
+import { paymentDueFrom } from "./payment-due";
 import type { AppliedMove } from "./plan-moves";
 import { applyDueMoveInTx } from "./plan-moves";
 import {
@@ -812,6 +813,7 @@ export class BillingWebhookService {
                 planId: checkout.planId,
                 billingCycle: cycle,
                 status: "ACTIVE",
+                paymentDueUntil: null,
                 provider: checkout.provider,
                 providerSubscriptionId: ref,
                 ...(checkout.providerCustomerId
@@ -1103,6 +1105,8 @@ export class BillingWebhookService {
             freeChosenAt: null,
             pendingPlanId: null,
             pendingFrom: null,
+            // A new autopay pays what was due (DEC-210).
+            paymentDueUntil: null,
             providerEventAt: event.eventAt ?? null,
         };
         const saved = sub
@@ -1242,6 +1246,7 @@ export class BillingWebhookService {
                 currentPeriodEnd: true,
                 cancelAtPeriodEnd: true,
                 pendingFrom: true,
+                paymentDueUntil: true,
                 plan: { select: { version: true } },
                 pendingPlan: { select: { priceCents: true } },
             },
@@ -1380,13 +1385,30 @@ export class BillingWebhookService {
             }
         }
 
-        // Halted: the provider gave up retrying the charge. Down to Free —
-        // a cancelled catalogue subscription reads as Free (U12).
-        const target: SubscriptionStatus =
-            phase === "halted" ? "CANCELLED" : event.status;
+        // A failed charge, or the provider giving up on it (DEC-210): the
+        // payment is due. The plan stays until `paymentDueUntil`, the
+        // business is told once with a way to pay, and the deadline job
+        // (`payment-due.ts`) moves it to Free if nothing is paid by then.
+        // The provider's own retries and retry link still work meanwhile,
+        // so nothing is cancelled there yet.
+        const failed = phase === "pending" || phase === "halted";
+        const target: SubscriptionStatus = failed ? "PAST_DUE" : event.status;
+        const opensDue = failed && !sub.paymentDueUntil;
+        const due = opensDue ? { paymentDueUntil: paymentDueFrom(now) } : {};
+        // Paid again (a retry, Razorpay's link): nothing is due any more.
+        const settled =
+            target === "ACTIVE" && sub.paymentDueUntil
+                ? { paymentDueUntil: null }
+                : {};
 
-        if (current === target) {
+        if (current === target && !opensDue) {
             if (target === "ACTIVE" && phase === "charged") {
+                if (sub.paymentDueUntil) {
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: settled,
+                    });
+                }
                 return this.renewed(tx, sub.id, event, now);
             }
             return ignored;
@@ -1396,25 +1418,26 @@ export class BillingWebhookService {
         }
         await tx.subscription.update({
             where: { id: sub.id },
-            data: { status: target, ...stamp },
+            data: { status: target, ...stamp, ...due, ...settled },
         });
-        // A charge that failed (U17): the business is told, retrying or not.
-        if (phase === "pending" || phase === "halted") {
+        // Paid by the provider's retry or link while a Pay now checkout was
+        // open: that checkout is dropped, so paying it too reads as a double
+        // charge and is refunded (DEC-164), never a second plan.
+        if (sub.paymentDueUntil && target === "ACTIVE") {
+            await dropOpenCheckoutsInTx(
+                tx,
+                sub.organizationId,
+                null,
+                "plan-reinstated",
+            );
+        }
+        // Told once, when the payment first falls due (U17, DEC-210).
+        if (opensDue) {
             await this.invoices?.paymentFailedInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: sub.id,
                 providerEventId: event.providerEventId,
-                final: phase === "halted",
-            });
-        }
-        // A halted subscription is ended at the provider too, so it can never
-        // charge for a plan the business no longer has.
-        if (phase === "halted" && sub.provider && sub.providerSubscriptionId) {
-            await enqueueProviderCancel(tx, {
-                organizationId: sub.organizationId,
-                provider: sub.provider,
-                providerSubscriptionId: sub.providerSubscriptionId,
-                atCycleEnd: false,
+                final: false,
             });
         }
         const renewal =

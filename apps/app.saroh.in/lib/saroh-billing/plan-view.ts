@@ -445,14 +445,27 @@ export function yourPlan(input: {
         next = { kind: "text", text: "Nothing to pay. The plan has ended" };
     } else if (sub?.status === "PAST_DUE") {
         next = { kind: "text", text: "Payment overdue" };
-        notes.push({
-            kind: "overdue",
-            tone: "attention",
-            lead: "The last payment didn't go through. Nothing has been switched off yet.",
-            iso: null,
-            tail: "",
-            action: null,
-        });
+        const due = access.paymentDue;
+        notes.push(
+            due && planId
+                ? // DEC-210: the date the plan is kept to, and the way to pay.
+                  {
+                      kind: "overdue",
+                      tone: "attention",
+                      lead: "The last payment didn't go through, and the card or autopay it was paid with failed. Pay by ",
+                      iso: due.dueBy,
+                      tail: ` to keep ${name}. After that you move to Free, and everything you made is kept.`,
+                      action: { label: "Pay now", planId, cycle },
+                  }
+                : {
+                      kind: "overdue",
+                      tone: "attention",
+                      lead: "The last payment didn't go through. Nothing has been switched off yet.",
+                      iso: null,
+                      tail: "",
+                      action: null,
+                  },
+        );
     } else if (sub?.cancelAtPeriodEnd && sub.currentPeriodEnd) {
         next = { kind: "ends", iso: sub.currentPeriodEnd };
     } else if (!given && paise > 0 && term?.payment === "ONE_TIME") {

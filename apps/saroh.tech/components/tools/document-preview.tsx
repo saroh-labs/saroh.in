@@ -73,26 +73,26 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                 <table className="w-full border-collapse">
                     <thead>
                         <tr className="border-b border-foreground text-left">
-                            <th scope="col" className="py-2 font-semibold">
+                            <th scope="col" className="py-2 pr-2 font-semibold">
                                 Description
                             </th>
                             <th
                                 scope="col"
-                                className={`py-2 font-semibold ${view.headers ? "w-24" : "w-10"}`}
+                                className={`py-2 pr-2 font-semibold ${view.headers ? "w-16 sm:w-24" : "w-10"}`}
                             >
                                 {view.headers?.qty ?? "Qty"}
                             </th>
                             {rateHeader ? (
                                 <th
                                     scope="col"
-                                    className="w-20 py-2 text-right font-semibold"
+                                    className="w-16 py-2 pl-2 text-right font-semibold sm:w-20"
                                 >
                                     {rateHeader}
                                 </th>
                             ) : null}
                             <th
                                 scope="col"
-                                className="w-[90px] py-2 text-right font-semibold"
+                                className="w-[76px] py-2 pl-2 text-right font-semibold sm:w-[90px]"
                             >
                                 {view.headers?.amount ?? "Amount"}
                             </th>
@@ -102,13 +102,13 @@ export function DocumentPreview({ view }: { view: DocumentView }) {
                         {view.rows.map((r, i) => (
                             <tr key={i} className="border-b border-border">
                                 <td className="py-2 pr-2">{r.description}</td>
-                                <td className="py-2">{r.qty}</td>
+                                <td className="py-2 pr-2">{r.qty}</td>
                                 {rateHeader ? (
-                                    <td className="py-2 text-right font-mono">
+                                    <td className="py-2 pl-2 text-right font-mono">
                                         {r.rate}
                                     </td>
                                 ) : null}
-                                <td className="py-2 text-right font-mono">
+                                <td className="py-2 pl-2 text-right font-mono">
                                     {r.amount}
                                 </td>
                             </tr>
