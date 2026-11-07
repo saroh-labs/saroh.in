@@ -1,7 +1,11 @@
 // `team.alert` (F14) against a stand-in transaction: what is worded, what
 // is never announced, the bell's one notice, and who is emailed.
 jest.mock("@saroh/database", () => ({
-    prisma: { $transaction: jest.fn() },
+    prisma: {
+        $transaction: jest.fn(),
+        // The sender's edition (KTD6): India's when there's no row.
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
+    },
     runInOrgContext: jest.fn((_org: string, fn: () => unknown) => fn()),
 }));
 jest.mock("../../env", () => ({

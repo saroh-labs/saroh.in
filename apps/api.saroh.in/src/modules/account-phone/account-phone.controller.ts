@@ -149,11 +149,14 @@ export class AccountPhoneController {
         @CurrentUser() user: AuthUser,
         @Ip() ip: string,
         @Req() req: Request,
+        @Headers("host") host?: string,
     ): Promise<void> {
         return this.phones.remove({
             userId: user.id,
             ip,
             place: placeOf(fromNodeHeaders(req.headers)),
+            // A phone added on India can be removed on Global (KTD6).
+            edition: editionOfHost(host ?? "") ?? "INDIA",
         });
     }
 }

@@ -181,7 +181,7 @@ export function sendPasswordResetEmail(
     to: string,
     resetUrl: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(`[Password reset] (no SMTP) ${to}: ${resetUrl}`);
@@ -283,9 +283,9 @@ export function existingAccountEmail(to: string, base: string | null): string {
 /** See {@link existingAccountEmail}. Console-only without SMTP, like its neighbours. */
 export function sendExistingAccountEmail(
     to: string,
-    origin?: string,
+    origin: string | undefined,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const base = accountsBase(
         env,
@@ -330,7 +330,7 @@ export async function sendWelcomeEmail(
     to: string,
     mail: WelcomeMail,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<EmailOutcome> {
     const { subject, html } = welcomeEmail(mail);
     if (!transporter) {
@@ -412,7 +412,7 @@ export function sendVerificationOtpEmail(
     type: VerificationOtpType,
     expiresInSeconds: number,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const mail = verificationOtpEmail(type, otp, expiresInSeconds);
     if (!transporter) {
@@ -446,7 +446,7 @@ export function sendChangeEmailConfirmationEmail(
     confirmUrl: string,
     newEmail: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -479,7 +479,7 @@ export function sendSignInEmailChangedNotice(
     to: string,
     maskedNewEmail: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const html = signInEmailChangedEmail(maskedNewEmail);
     if (!transporter) {
@@ -508,7 +508,7 @@ export function sendDeleteAccountEmail(
     to: string,
     confirmUrl: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(`[Delete account] (no SMTP) ${to}: ${confirmUrl}`);
@@ -545,7 +545,7 @@ export function sendEnquiryNotificationEmail(
         message?: string | null;
     },
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const { contactName, formName, leadUrl, message } = details;
     if (!transporter) {
@@ -601,7 +601,7 @@ export function sendTeamAlertEmail(
     to: string,
     mail: TeamAlertMail,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -656,7 +656,7 @@ export async function sendDataExportReadyEmail(
     to: string,
     mail: DataExportReadyMail,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<"sent" | "not-configured" | "failed"> {
     // One line: a name is tenant text, and a subject takes no line break.
     const name = mail.businessName.replace(/\s+/g, " ").trim().slice(0, 80);
@@ -697,7 +697,7 @@ export function sendCustomerMessageNotificationEmail(
         threadUrl: string;
     },
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const { customerName, message, threadUrl } = details;
     const name = customerName.replace(/[\r\n]+/g, " ").trim();
@@ -744,7 +744,7 @@ export function sendSelfTestEmail(
     to: string,
     details: { templateLabel: string; html: string },
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     const { templateLabel, html } = details;
     const subject = `${SAROH_TEST_LABEL} ${templateLabel}`;
@@ -773,7 +773,7 @@ export function sendStoreInvitationEmail(
     acceptUrl: string,
     storeName: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -806,7 +806,7 @@ export function sendOrganizationInvitationEmail(
     acceptUrl: string,
     organizationName: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -846,7 +846,7 @@ export type EmailOutcome = "sent" | "not-configured" | "failed";
 export async function sendWaitlistLaunchInviteEmail(
     to: string,
     details: { url: string; businessName: string | null; validDays: number },
-    /** Whose sender it goes from (KTD6). */
+    /** Whose sender it goes from (KTD6). Defaulted only while the waitlist's callers are being moved over; make it required once they pass it. */
     edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     const { url, businessName, validDays } = details;
@@ -920,7 +920,7 @@ export async function sendAccountPhoneNotice(
     to: string,
     notice: PhoneNotice,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
@@ -985,7 +985,7 @@ export async function sendStaffInviteEmail(
         invitedByName: string | null;
         validDays: number;
     },
-    /** Whose sender it goes from (KTD6). */
+    /** Whose sender it goes from (KTD6). Saroh's staff: India's, unless a caller says otherwise. */
     edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     if (!transporter) {
@@ -1101,7 +1101,7 @@ export async function sendLinkReportEmail(
     subject: string,
     text: string,
     /** Whose sender it goes from (KTD6). */
-    edition: Edition = "INDIA",
+    edition: Edition,
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (env.NODE_ENV === "development") {

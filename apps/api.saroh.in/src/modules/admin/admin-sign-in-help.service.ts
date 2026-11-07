@@ -267,7 +267,11 @@ export class AdminSignInHelpService {
                 await tx.job.create({
                     data: {
                         type: SIGN_IN_EMAIL_RELEASE_TYPE,
-                        payload: { changeId: change.id },
+                        // The console's edition: the held code's sender (KTD6).
+                        payload: {
+                            changeId: change.id,
+                            edition: staff.edition,
+                        },
                         runAt: codeHeldUntil,
                     },
                 });
@@ -303,7 +307,11 @@ export class AdminSignInHelpService {
             });
 
         try {
-            await sendSignInEmailChangedNotice(user.email, maskEmail(email));
+            await sendSignInEmailChangedNotice(
+                user.email,
+                maskEmail(email),
+                staff.edition ?? "INDIA",
+            );
         } catch (error) {
             // The change stands; the ledger has it. Logged without the address.
             this.logger.error(

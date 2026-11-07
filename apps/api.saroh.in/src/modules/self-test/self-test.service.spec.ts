@@ -44,6 +44,7 @@ describe("SelfTestService (S6-004)", () => {
         expect(sendEmail).toHaveBeenCalledWith(
             "ada@example.com",
             expect.objectContaining({ templateLabel: expect.any(String) }),
+            "INDIA",
         );
         // Response echoes back only the (redacted) user's own email + template.
         expect(result).toEqual({
@@ -110,6 +111,7 @@ describe("SelfTestService (S6-004)", () => {
                 templateLabel: "Order receipt preview",
                 html: expect.stringContaining("receipt"),
             }),
+            "INDIA",
         );
     });
 });
