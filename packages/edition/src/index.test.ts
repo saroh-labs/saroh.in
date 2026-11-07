@@ -183,6 +183,17 @@ describe("the edition profiles (DEC-204 item 7)", () => {
             GLOBAL: ["STRIPE"],
         },
         onlinePaymentsOnEveryPlan: { INDIA: false, GLOBAL: true },
+        envSuffix: { INDIA: "", GLOBAL: "_GLOBAL" },
+        defaultSenders: {
+            INDIA: {
+                mail: "Saroh <noreply@saroh.in>",
+                codes: "codes@saroh.in",
+            },
+            GLOBAL: {
+                mail: "Saroh <noreply@saroh.tech>",
+                codes: "codes@saroh.tech",
+            },
+        },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {

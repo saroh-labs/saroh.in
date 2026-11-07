@@ -1,7 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import { isEdition, type Edition } from "@saroh/edition";
+import type { Edition } from "@saroh/edition";
+import { isEdition } from "@saroh/edition";
 
 import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
 

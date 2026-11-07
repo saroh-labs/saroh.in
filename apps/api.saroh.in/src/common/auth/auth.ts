@@ -2,7 +2,8 @@ import { Logger } from "@nestjs/common";
 import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 import { prisma } from "@saroh/database";
-import { editionProfile, type Edition } from "@saroh/edition";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import { env } from "../../env";
 import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-freshness";
