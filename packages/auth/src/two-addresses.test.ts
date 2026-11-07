@@ -55,6 +55,15 @@ const post = (url: string, body: unknown) =>
         body: JSON.stringify(body),
     });
 
+/** GitHub's client id on an instance; the option may also be a function. */
+function githubId(auth: { options: { socialProviders?: unknown } }) {
+    const github = (
+        auth.options.socialProviders as
+            { github?: { clientId?: string } } | undefined
+    )?.github;
+    return github?.clientId;
+}
+
 describe("one API on two domains", () => {
     beforeEach(() => {
         vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-for-two-addresses-only");
@@ -187,12 +196,8 @@ describe("one API on two domains", () => {
         const { india, global } = pair({
             github: { clientId: "global-id", clientSecret: "global-secret" },
         });
-        expect(india.options.socialProviders?.github?.clientId).toBe(
-            "india-id",
-        );
-        expect(global.options.socialProviders?.github?.clientId).toBe(
-            "global-id",
-        );
+        expect(githubId(india)).toBe("india-id");
+        expect(githubId(global)).toBe("global-id");
         expect(global.options.baseURL).toBe("https://api.saroh.tech");
     });
 
@@ -202,9 +207,7 @@ describe("one API on two domains", () => {
         const { india, global } = pair({ github: null });
         expect(global.options.socialProviders?.github).toBeUndefined();
         expect(global.options.socialProviders?.google).toBeDefined();
-        expect(india.options.socialProviders?.github?.clientId).toBe(
-            "india-id",
-        );
+        expect(githubId(india)).toBe("india-id");
         const refused = await global.handler(
             post("https://api.saroh.tech/api/auth/sign-in/social", {
                 provider: "github",

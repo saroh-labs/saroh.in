@@ -2,7 +2,7 @@ import { Logger } from "@nestjs/common";
 import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 import { prisma } from "@saroh/database";
-import type { Edition } from "@saroh/edition";
+import { editionProfile, type Edition } from "@saroh/edition";
 
 import { env } from "../../env";
 import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-freshness";
@@ -76,7 +76,8 @@ const githubWarned = new Set<Edition>();
  * half a pair WARNs once, naming the missing one.
  */
 function githubOf(edition: Edition): Parameters<typeof createAuth>[0] {
-    if (edition === "INDIA") return {};
+    // India keeps reading the original names inside createAuth.
+    if (!editionProfile(edition).envSuffix) return {};
     const { pair, half } = githubKeysOf(edition, env);
     if (half && !githubWarned.has(edition)) {
         githubWarned.add(edition);

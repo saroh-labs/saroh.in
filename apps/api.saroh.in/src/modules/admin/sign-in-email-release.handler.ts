@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { Edition } from "@saroh/edition";
+import { isEdition, type Edition } from "@saroh/edition";
 
 import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
 
@@ -73,7 +73,7 @@ function editionOfPayload(payload: unknown): Edition | null {
         payload && typeof payload === "object" && "edition" in payload
             ? payload.edition
             : null;
-    return edition === "INDIA" || edition === "GLOBAL" ? edition : null;
+    return isEdition(edition) ? edition : null;
 }
 
 function changeIdOf(payload: unknown): string | null {

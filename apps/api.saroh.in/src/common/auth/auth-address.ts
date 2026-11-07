@@ -2,6 +2,7 @@ import type { Edition } from "@saroh/edition";
 import {
     EDITIONS,
     editionOfHost,
+    editionProfile,
     environmentOfHost,
     hostsFor,
     urlOf,
@@ -79,10 +80,9 @@ export function githubKeysOf(
     pair: { clientId: string; clientSecret: string } | null;
     half: string | null;
 } {
-    const [idName, secretName] =
-        edition === "GLOBAL"
-            ? (["AUTH_GITHUB_GLOBAL_ID", "AUTH_GITHUB_GLOBAL_SECRET"] as const)
-            : (["AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET"] as const);
+    const { envSuffix } = editionProfile(edition);
+    const idName = `AUTH_GITHUB${envSuffix}_ID` as keyof GithubKeys;
+    const secretName = `AUTH_GITHUB${envSuffix}_SECRET` as keyof GithubKeys;
     const clientId = keys[idName]?.trim() ?? "";
     const clientSecret = keys[secretName]?.trim() ?? "";
     if (clientId && clientSecret) {

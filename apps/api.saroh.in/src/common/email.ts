@@ -1,5 +1,11 @@
 import type { Edition } from "@saroh/edition";
-import { EDITIONS, environmentOfHost, hostsFor, urlOf } from "@saroh/edition";
+import {
+    EDITIONS,
+    editionProfile,
+    environmentOfHost,
+    hostsFor,
+    urlOf,
+} from "@saroh/edition";
 import type { SendMailOptions, Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
@@ -20,7 +26,9 @@ import {
 import { dayWords, whenWords } from "./words-format";
 
 const FROM =
-    env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
+    env.EMAIL_FROM ??
+    env.SENDER_EMAIL_ID ??
+    editionProfile("INDIA").defaultSenders.mail;
 
 function getTransporter(): Transporter | null {
     const host = env.SMTP_HOST ?? env.SMTP_HOSTNAME;
@@ -51,8 +59,10 @@ function getTransporter(): Transporter | null {
 const transporter = getTransporter();
 
 /** Global's senders until their env names are set (KTD6). */
-export const GLOBAL_EMAIL_FROM_DEFAULT = "Saroh <noreply@saroh.tech>";
-export const GLOBAL_SITE_CODES_FROM_DEFAULT = "codes@saroh.tech";
+export const GLOBAL_EMAIL_FROM_DEFAULT =
+    editionProfile("GLOBAL").defaultSenders.mail;
+export const GLOBAL_SITE_CODES_FROM_DEFAULT =
+    editionProfile("GLOBAL").defaultSenders.codes;
 
 /**
  * Which transport a mail goes out on: Saroh's identity mail, or the site
@@ -71,15 +81,18 @@ function senderOf(
     edition: Edition,
     name: string | undefined,
 ): SendMailOptions["from"] {
-    const address =
-        stream === "site-codes"
-            ? edition === "GLOBAL"
-                ? (env.SITE_CODES_EMAIL_FROM_GLOBAL ??
-                  GLOBAL_SITE_CODES_FROM_DEFAULT)
-                : SITE_CODES_FROM_ADDRESS
-            : edition === "GLOBAL"
-              ? (env.EMAIL_FROM_GLOBAL ?? GLOBAL_EMAIL_FROM_DEFAULT)
-              : FROM;
+    // India keeps its original env names; another edition reads its own
+    // (`EMAIL_FROM_GLOBAL`), else its domain's default.
+    const { envSuffix, defaultSenders } = editionProfile(edition);
+    const own = (base: "EMAIL_FROM" | "SITE_CODES_EMAIL_FROM") =>
+        env[`${base}${envSuffix}` as keyof typeof env] as string | undefined;
+    const address = !envSuffix
+        ? stream === "site-codes"
+            ? SITE_CODES_FROM_ADDRESS
+            : FROM
+        : stream === "site-codes"
+          ? (own("SITE_CODES_EMAIL_FROM") ?? defaultSenders.codes)
+          : (own("EMAIL_FROM") ?? defaultSenders.mail);
     return name ? { name, address } : address;
 }
 
@@ -124,12 +137,16 @@ export async function send(
             from: senderOf(stream, edition, fromName),
         });
     } catch (error) {
-        if (edition === "INDIA" || !isUnverifiedSender(error)) throw error;
+        const fallback = senderOf(stream, "INDIA", fromName);
+        if (
+            !isUnverifiedSender(error) ||
+            JSON.stringify(fallback) ===
+                JSON.stringify(senderOf(stream, edition, fromName))
+        ) {
+            throw error;
+        }
         structuredLogger.error("email_global_sender_fallback", { stream });
-        await via.sendMail({
-            ...rest,
-            from: senderOf(stream, "INDIA", fromName),
-        });
+        await via.sendMail({ ...rest, from: fallback });
     }
 }
 
@@ -1276,7 +1293,8 @@ export async function sendManagerSignalsEmail(
  * from workspace sign-in mail, so a complaint about one merchant's codes
  * cannot hurt the workspace's delivery.
  */
-const SITE_CODES_FROM_ADDRESS = env.SITE_CODES_EMAIL_FROM ?? "codes@saroh.in";
+const SITE_CODES_FROM_ADDRESS =
+    env.SITE_CODES_EMAIL_FROM ?? editionProfile("INDIA").defaultSenders.codes;
 
 /**
  * The code email's own transport: its own SMTP credentials (its sending
