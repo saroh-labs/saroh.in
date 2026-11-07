@@ -320,6 +320,8 @@ const ADDRESS = /^[a-z0-9](?:[a-z0-9-]{1,55}[a-z0-9])$/;
 export function problemsOf(
     draft: TurnOnDraft,
     order: readonly string[],
+    /** The business's currency (ISO 4217), named in the price's message. */
+    currency = "INR",
 ): Partial<Record<string, FieldErrors>> {
     const out: Partial<Record<string, FieldErrors>> = {};
     const put = (key: string, path: string, message: string) => {
@@ -364,7 +366,7 @@ export function problemsOf(
             put(
                 "APPOINTMENTS",
                 "service.price",
-                "Write the price in rupees, like 500 or 499.50.",
+                `Write the price in ${currency === "INR" ? "rupees" : currency}, like 500 or 499.50.`,
             );
         }
     }
@@ -386,6 +388,25 @@ export function problemsOf(
                 "address",
                 "An address can't have two hyphens in a row.",
             );
+        }
+    }
+    return out;
+}
+
+/**
+ * The errors still to show after an edit: only those already shown that the
+ * draft still has, so a field's message goes as it is fixed and no new one
+ * appears before the next try.
+ */
+export function stillWrong(
+    shown: Partial<Record<string, FieldErrors>>,
+    now: Partial<Record<string, FieldErrors>>,
+): Partial<Record<string, FieldErrors>> {
+    const out: Partial<Record<string, FieldErrors>> = {};
+    for (const [key, fields] of Object.entries(shown)) {
+        for (const path of Object.keys(fields ?? {})) {
+            const message = now[key]?.[path];
+            if (message) out[key] = { ...(out[key] ?? {}), [path]: message };
         }
     }
     return out;

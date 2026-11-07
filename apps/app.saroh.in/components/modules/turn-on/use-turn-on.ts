@@ -5,6 +5,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useStartingCurrency } from "@/components/shared/fields/business-country";
 import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -20,6 +21,7 @@ import {
     problemsOf,
     sellsOnline,
     setupFor,
+    stillWrong,
     turnedOnToast,
     turnOnPlan,
 } from "@/lib/modules/turn-on";
@@ -60,6 +62,7 @@ export function useTurnOn({
     firstRun?: boolean;
 }) {
     const router = useRouter();
+    const currency = useStartingCurrency();
     const [loaded, setLoaded] = useState<SetupDefaults[] | null>(null);
     const [draft, setDraft] = useState<TurnOnDraft | null>(null);
     const [errors, setErrors] = useState<Partial<Record<string, FieldErrors>>>(
@@ -133,7 +136,13 @@ export function useTurnOn({
     );
 
     const update = (change: (d: TurnOnDraft) => TurnOnDraft) => {
-        setDraft((d) => (d ? change(d) : d));
+        if (!draft) return;
+        const next = change(draft);
+        setDraft(next);
+        // A shown message goes as soon as its field is fixed.
+        setErrors((shown) =>
+            stillWrong(shown, problemsOf(next, plan.order, currency)),
+        );
         setFailure(null);
     };
 
@@ -162,7 +171,7 @@ export function useTurnOn({
                 ]),
             ),
         };
-        const problems = problemsOf(sent, plan.order);
+        const problems = problemsOf(sent, plan.order, currency);
         setErrors(problems);
         if (problems.WEBSITE?.address) setAddressUnlocked(true);
         setFailure(null);

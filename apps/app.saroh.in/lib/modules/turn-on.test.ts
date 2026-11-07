@@ -13,6 +13,7 @@ import {
     PROVIDERS_HREF,
     sellsOnline,
     setupFor,
+    stillWrong,
     tidyAddress,
     turnedOnToast,
     turnOnPlan,
@@ -355,6 +356,32 @@ describe("problems found before sending", () => {
             "siteName",
             "address",
         ]);
+    });
+
+    it("names the business's currency in the price's message", () => {
+        const d = draft();
+        d.APPOINTMENTS.price = "5,00";
+        expect(
+            problemsOf(d, ["APPOINTMENTS"]).APPOINTMENTS?.["service.price"],
+        ).toBe("Write the price in rupees, like 500 or 499.50.");
+        expect(
+            problemsOf(d, ["APPOINTMENTS"], "GBP").APPOINTMENTS?.[
+                "service.price"
+            ],
+        ).toBe("Write the price in GBP, like 500 or 499.50.");
+    });
+
+    it("takes a shown message away as its field is fixed, and adds none before the next try", () => {
+        const d = draft();
+        const shown = problemsOf(d, ["APPOINTMENTS"]);
+        expect(shown.APPOINTMENTS?.["service.name"]).toBeTruthy();
+        d.APPOINTMENTS.name = "Booking Test";
+        d.APPOINTMENTS.price = "abc";
+        const now = stillWrong(shown, problemsOf(d, ["APPOINTMENTS"]));
+        expect(now.APPOINTMENTS?.["service.name"]).toBeUndefined();
+        // Price was already wrong and still is, so it stays.
+        expect(now.APPOINTMENTS?.["service.price"]).toBeTruthy();
+        expect(stillWrong({}, problemsOf(d, ["APPOINTMENTS"]))).toEqual({});
     });
 
     it("refuses a web address the API would: two hyphens, or past 57 (DEC-071)", () => {
