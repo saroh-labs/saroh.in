@@ -36,7 +36,7 @@ export function PaymentDueBanner({
                         Your payment for {due.planName} didn&rsquo;t go through
                     </span>
                     . The card or autopay it was paid with failed. Pay by{" "}
-                    <ViewerDate iso={due.dueBy} /> to keep {due.planName}; after
+                    <ViewerDate iso={due.dueBy} /> to keep {due.planName}. After
                     that you move to Free, and everything you made is kept.
                 </p>
                 <Button asChild size="sm" className="shrink-0">
