@@ -49,6 +49,19 @@ function fakeLedger() {
     return { record } as unknown as AnalyticsService;
 }
 
+/**
+ * The milestone sends only. A milestone's fact can also be a workspace
+ * event (DEC-209), which reads the real database's facts where one is
+ * reachable (the integration runner), so it may arrive too.
+ */
+function milestoneCalls(transport: { capture: jest.Mock }) {
+    return transport.capture.mock.calls.filter(([call]) =>
+        (PRODUCT_MILESTONES as readonly string[]).includes(
+            (call as { event: string }).event,
+        ),
+    );
+}
+
 function build() {
     const transport = {
         capture: jest.fn(),
@@ -310,7 +323,7 @@ describe("product milestones (DEC-125)", () => {
         setTelemetry({ transport, environment: "production" });
         await events.firstSitePublished(ORG, "site_1");
         await settle();
-        const [[{ properties }]] = transport.capture.mock.calls as [
+        const [[{ properties }]] = milestoneCalls(transport) as [
             [{ properties: Record<string, unknown> }],
         ];
         expect(properties.referral_channel).toBe("none");
@@ -346,7 +359,7 @@ describe("product milestones (DEC-125)", () => {
             }),
         );
         await events.firstOrderCreated(ORG, "order_1");
-        expect(transport.capture).not.toHaveBeenCalled();
+        expect(milestoneCalls(transport)).toHaveLength(0);
         release({
             planKey: "pro",
             businessKind: "BUSINESS",
@@ -355,7 +368,7 @@ describe("product milestones (DEC-125)", () => {
             managerCode: null,
         });
         await settle();
-        expect(transport.capture).toHaveBeenCalledTimes(1);
+        expect(milestoneCalls(transport)).toHaveLength(1);
     });
 
     it("sends signed_up for the user's id, with no plan, kind or personal detail", () => {
