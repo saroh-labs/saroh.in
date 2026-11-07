@@ -67,8 +67,9 @@ In this order, any subset as needed:
    unreachable at once.
 3. Set `GLOBAL_ROUTES` off and redeploy `all-global`, so the Workers carry
    no routes again.
-4. If Stripe stays off for long, revert the commit that put "your own
-   Stripe" on saroh.tech's Features and redeploy `tech`.
+4. If Stripe stays off, revert the commit that says customers can pay by
+   card online (saroh.tech's Features, FAQ, Help and Contact, all four) and
+   redeploy `tech`, so the site never claims what is switched off.
 
 ## After
 
