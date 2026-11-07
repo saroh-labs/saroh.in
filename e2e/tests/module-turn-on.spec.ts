@@ -2,6 +2,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { rollOut } from "../fixtures/global";
+import { makeBusiness } from "../fixtures/own-business";
 import { northwind } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG } from "../playwright.config";
@@ -133,59 +135,38 @@ test.describe(
         // none is made either way; what is checked is that a blank first
         // service never stops the sheet.
         test("Settings › Modules: Bookings turns on with its first service left blank", async ({
+            browser,
             page,
-        }) => {
+        }, testInfo) => {
             test.setTimeout(120_000);
-            await signIn(page);
-            // What needs Bookings is turned off first, and put back after.
-            const keys = ["CLASS_PACKS", "COURSES", "APPOINTMENTS"];
-            const was = new Map<string, string | null>();
-            for (const key of keys) {
-                was.set(key, await lifecycleOf(page.request, key));
-            }
-            test.skip(
-                was.get("APPOINTMENTS") === null,
-                "Northwind has no Bookings module.",
-            );
-            try {
-                for (const key of keys) {
-                    if (was.get(key) === "ENABLED") {
-                        await setLifecycle(page.request, key, "DISABLED");
-                    }
-                }
-                await page.goto("/settings/modules");
-                await page
-                    .getByRole("switch", { name: "Bookings" })
-                    .filter({ visible: true })
-                    .click();
+            // A business of its own (Northwind's Class packs can't be turned
+            // off and on again): Bookings and Contacts rolled out, both off.
+            const b = await makeBusiness(page, testInfo, "blank-service");
+            await rollOut(browser, page, b, testInfo, [
+                "MODULE_CRM",
+                "MODULE_APPOINTMENTS",
+                "MODULE_PAYMENTS",
+            ]);
+            await page.goto(`/open/${b.id}`);
+            await page.goto("/settings/modules");
+            await page
+                .getByRole("switch", { name: "Bookings" })
+                .filter({ visible: true })
+                .click();
 
-                const sheet = await theSheet(page, "Turn on Bookings");
-                const service = sheet
-                    .getByLabel("First service (optional)")
-                    .filter({ visible: true });
-                await expect(sheet).toContainText("Add one now, or later.");
-                await service.fill("");
-                await (await turnOnButton(page, sheet)).click();
+            const sheet = await theSheet(page, "Turn on Bookings");
+            const service = sheet
+                .getByLabel("First service (optional)")
+                .filter({ visible: true });
+            await expect(sheet).toContainText("Add one now, or later.");
+            await service.fill("");
+            await (await turnOnButton(page, sheet)).click();
 
-                await expect(sheet).toBeHidden();
-                await expect(page).toHaveURL(/\/bookings/);
-                await expect(
-                    page.getByText(/Bookings (is|are) on\./),
-                ).toBeVisible();
-                expect(await lifecycleOf(page.request, "APPOINTMENTS")).toBe(
-                    "ENABLED",
-                );
-            } finally {
-                // Bookings back first, then what needs it.
-                for (const key of [...keys].reverse()) {
-                    // Only what this test turned off goes back on; a module
-                    // that wasn't on (or isn't offered) is left alone.
-                    const now = await lifecycleOf(page.request, key);
-                    if (was.get(key) === "ENABLED" && now !== "ENABLED") {
-                        await setLifecycle(page.request, key, "ENABLED");
-                    }
-                }
-            }
+            await expect(sheet).toBeHidden();
+            await expect(page).toHaveURL(/\/bookings/);
+            await expect(
+                page.getByText(/Bookings (is|are) on\./),
+            ).toBeVisible();
         });
 
         // Courses, since class packs aren't offered on any plan (DEC-099):
