@@ -106,6 +106,9 @@ export class StripeProvider implements MerchantProvider {
                     // `payment_method_types` is refused on this version.
                     "allowed_payment_method_types[]": "card",
                     "metadata[saroh_ref]": orderId,
+                    ...(input.description
+                        ? { description: input.description }
+                        : {}),
                 }),
                 signal: providerCallSignal(),
             });

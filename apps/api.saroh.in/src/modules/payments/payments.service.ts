@@ -2162,6 +2162,11 @@ export class PaymentsService {
         } catch (err) {
             throw credentialsUnreadable(providerRow, err);
         }
+        // Stripe only: the others take no description.
+        const description =
+            providerRow.provider === "STRIPE"
+                ? await paymentDescription(organizationId, target.kind)
+                : undefined;
         let intent: CreateOrderIntentResult;
         try {
             intent = await provider.createOrderIntent({
@@ -2169,6 +2174,7 @@ export class PaymentsService {
                 currency,
                 orderId: target.id,
                 credentials,
+                ...(description ? { description } : {}),
             });
         } catch (err) {
             // A handled 503 in the customer's words, never an unhandled
@@ -2668,4 +2674,26 @@ export class PaymentsService {
         } = order;
         return { ...payable, organizationId: order.organizationId };
     }
+}
+
+/**
+ * A payment's few words for the provider: the business and what it is for.
+ * Never the customer's details. Falls back to the kind alone.
+ */
+export async function paymentDescription(
+    organizationId: string,
+    kind: "order" | "invoice",
+): Promise<string> {
+    let name: string | null = null;
+    try {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        });
+        name = org?.name ?? null;
+    } catch {
+        // The words are a nicety: the payment goes ahead without the name.
+    }
+    const what = kind === "order" ? "order" : "invoice";
+    return (name ? `${name} ${what}` : `Saroh ${what}`).slice(0, 200);
 }

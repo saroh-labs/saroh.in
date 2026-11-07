@@ -443,13 +443,13 @@ function stripeAppearance(
 }
 
 /**
- * A field's corners, at most 12px: a template whose buttons are pills
+ * A field's corners, at most 10px: a template whose buttons are pills
  * (`--site-radius` 999px) would turn Stripe's card fields into ovals.
  */
 export function cappedRadius(css: string | null | undefined): string | null {
     const px = Number.parseFloat(css ?? "");
     if (!Number.isFinite(px)) return null;
-    return `${Math.min(px, 12)}px`;
+    return `${Math.min(px, 10)}px`;
 }
 
 /**
@@ -467,8 +467,10 @@ function ensurePayStyles(): void {
     document.head.appendChild(style);
 }
 
+// The payment window looks the same on every look (owner, 7 Nov 2026):
+// Classic's window, with corners that never grow into pills or circles.
 const BUTTON =
-    "min-height:44px;min-width:44px;padding:0 1rem;font:inherit;cursor:pointer;border-radius:var(--site-radius);";
+    "min-height:44px;min-width:44px;padding:0 1rem;font:inherit;cursor:pointer;border-radius:min(var(--site-radius, 0.625rem), 0.625rem);";
 
 let stripeWindows = 0;
 
@@ -511,8 +513,8 @@ function openStripe(
             dialog.tabIndex = -1;
             dialog.style.cssText =
                 "width:min(28rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);overflow:auto;box-sizing:border-box;padding:1.25rem;" +
-                // A window, never a pill: the site's radius, at most 1rem.
-                "border:1px solid hsl(var(--site-border));border-radius:min(var(--site-radius, 0.75rem), 1rem);margin:auto;" +
+                // A window, never a pill: the site's radius, at most 0.75rem.
+                "border:1px solid hsl(var(--site-border));border-radius:min(var(--site-radius, 0.75rem), 0.75rem);margin:auto;" +
                 "background:hsl(var(--site-surface));color:hsl(var(--site-fg));font-family:var(--site-font-body);";
 
             const title = document.createElement("h2");

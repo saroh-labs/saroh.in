@@ -716,7 +716,7 @@ describe("Stripe's Payment Element, in a window of the site's own (U7)", () => {
 
 describe("the payment window's corners", () => {
     it("caps a pill template's radius so card fields stay fields", () => {
-        expect(cappedRadius("9999px")).toBe("12px");
+        expect(cappedRadius("9999px")).toBe("10px");
         expect(cappedRadius("6px")).toBe("6px");
         expect(cappedRadius("")).toBeNull();
     });
