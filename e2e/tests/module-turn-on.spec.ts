@@ -178,14 +178,11 @@ test.describe(
             } finally {
                 // Bookings back first, then what needs it.
                 for (const key of [...keys].reverse()) {
-                    const before = was.get(key);
+                    // Only what this test turned off goes back on; a module
+                    // that wasn't on (or isn't offered) is left alone.
                     const now = await lifecycleOf(page.request, key);
-                    if (before && now !== before) {
-                        await setLifecycle(
-                            page.request,
-                            key,
-                            before === "ENABLED" ? "ENABLED" : "DISABLED",
-                        );
+                    if (was.get(key) === "ENABLED" && now !== "ENABLED") {
+                        await setLifecycle(page.request, key, "ENABLED");
                     }
                 }
             }
