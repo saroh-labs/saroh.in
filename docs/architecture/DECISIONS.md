@@ -2799,6 +2799,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Unchanged: India, Razorpay and Cashfree. Their keys, minimums, methods and webhooks are as before. Test business mode (DEC-145) is not built, so a connection takes test or live keys, as Razorpay's does; only a mix of the two is refused.
 - Rules: `apps/api.saroh.in/src/modules/payments/providers/stripe.provider.ts`, `stripe-payments.ts` and `STRIPE.md` (verified facts and sources); `payments/public-key.ts` (key checks, `IN_EDITION`, `OPENS_CHECKOUT`); `payments/stripe-minimum.ts`; `payments/payments.service.ts` (`connectProvider`, the intent core, `cancelHoldIntents`); `webhooks/providers/stripe.webhook.ts`; `feature-flags/flags.ts` (`STRIPE_PAYMENTS`); `docs/patterns/backend-integrations.md`.
 
+- **Amended 7 Nov 2026 (owner): Stripe's hosted Checkout is the only Stripe path.** The test on an Indian Stripe account was refused by Stripe's export rules ("As per Indian regulations, export transactions require a description"), and the owner's answer: "we can't say the user that you are not able to do this because we tested on india account… better we make things better instead of getting complaints… also we should let them use stripe checkout too… and I hope we are creating customers on stripe too, so that users can track?" Chosen over a fallback after the in-page window, and over embedded Checkout:
+    - The customer pays on Stripe's page for the merchant's own account and comes back to the booking or order. Stripe asks for whatever the account's country requires (an Indian export's address, card checks) and shows the payment methods the merchant turned on in their dashboard, so "cards only" no longer holds.
+    - Each payer is found or created as a Stripe customer in the merchant's account, by email, and the id is kept on the business's contact, so the merchant can follow who paid.
+    - The session carries Saroh's reference and a description, so the existing webhook settles it; it expires with the booking's hold. Saroh's own card window goes.
+    - Facts to verify against Stripe's docs before building, recorded in `payments/providers/STRIPE.md`.
+
 ## DEC-209 Clicks on saroh.in, and what a business does in the workspace, every time
 
 - Decision (owner, 6 Nov 2026, "autocapture on saroh.in and track the important events like creating new, enabling modules etc"): two additions to what PostHog receives (DEC-125, DEC-160, DEC-187).
