@@ -251,7 +251,7 @@ describe("product milestones (DEC-125)", () => {
             failed: 0,
         });
         await settle();
-        expect(transport.capture).not.toHaveBeenCalled();
+        expect(milestoneCalls(transport)).toHaveLength(0);
     });
 
     it("reads and sends nothing with PostHog off", async () => {

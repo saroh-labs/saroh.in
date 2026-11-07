@@ -248,9 +248,13 @@ test.describe("the Global app (DEC-204)", () => {
             await noRupee(page);
             await noPlanToBuy();
 
-            // The Change plan screen isn't there.
-            const plans = await page.goto(app("/settings/billing/plans"));
-            expect(plans?.status()).toBe(404);
+            // The Change plan screen isn't there. Plan and billing streams
+            // (its loading screen) before the child answers, so the status is
+            // 200 and the page is the app's not-found.
+            await page.goto(app("/settings/billing/plans"));
+            await expect(
+                page.getByRole("heading", { name: "Page not found" }),
+            ).toBeVisible();
         }
 
         // Tell me when takes the signed-in person's address, and says so once.
