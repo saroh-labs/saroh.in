@@ -318,7 +318,7 @@ describe("trials", () => {
         });
     });
 
-    it("a failed charge at the trial's end lands the business on Free", async () => {
+    it("a failed charge at the trial's end makes it due for 7 days, then lands the business on Free (DEC-210)", async () => {
         await install();
         const ctx = await business();
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
@@ -328,6 +328,10 @@ describe("trials", () => {
         await deliver(providerSub, "pending");
         expect((await sub(ctx.organizationId)).status).toBe("PAST_DUE");
         await deliver(providerSub, "halted");
+        // Still on the plan while the payment is due.
+        const due = (await sub(ctx.organizationId)).paymentDueUntil as Date;
+        expect((await sub(ctx.organizationId)).status).toBe("PAST_DUE");
+        await sweep.sweep(new Date(due.getTime() + 1000));
         expect((await sub(ctx.organizationId)).status).toBe("CANCELLED");
         expect(await access.resolve(ctx.organizationId)).toMatchObject({
             source: "catalogue",

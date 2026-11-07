@@ -579,7 +579,7 @@ describe("changing a paid plan", () => {
 });
 
 describe("renewals and failed payments", () => {
-    it("a renewal moves the period on; a failed charge is PAST_DUE; halted is Free, cancelled at the provider", async () => {
+    it("a renewal moves the period on; a failed charge makes the payment due for 7 days, halted included; unpaid, the sweep moves it to Free (DEC-210)", async () => {
         await install(1);
         const ctx = await business();
         await onPaidPlan(ctx, "b");
@@ -591,17 +591,44 @@ describe("renewals and failed payments", () => {
         expect(await sub(ctx.organizationId)).toMatchObject({
             status: "ACTIVE",
             currentPeriodEnd: next,
+            paymentDueUntil: null,
         });
 
-        await deliver(providerSub, "pending");
+        const failedAt = new Date();
+        await deliver(providerSub, "pending", { now: failedAt });
+        const due = (await sub(ctx.organizationId)).paymentDueUntil as Date;
         expect((await sub(ctx.organizationId)).status).toBe("PAST_DUE");
-        // Still on its plan while the provider retries.
+        expect(due.getTime() - failedAt.getTime()).toBe(7 * DAY);
+        // Still on its plan while the payment is due.
         expect(await access.resolve(ctx.organizationId)).toMatchObject({
             planId: "b",
         });
 
+        // The provider gives up: still on its plan, the date unchanged,
+        // nothing cancelled at the provider yet.
         await deliver(providerSub, "halted");
-        expect((await sub(ctx.organizationId)).status).toBe("CANCELLED");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "PAST_DUE",
+            paymentDueUntil: due,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "b",
+        });
+        expect(await cancelJobs()).toEqual([]);
+
+        // Paying it starts the plan again today, on a new autopay.
+        expect(
+            (await checkout.quote(ctx, { plan: "b", cycle: "month" })).kind,
+        ).toBe("NEW");
+
+        // Not paid by the date: the sweep moves it to Free.
+        await sweep.sweep(new Date(due.getTime() - 1000));
+        expect((await sub(ctx.organizationId)).status).toBe("PAST_DUE");
+        await sweep.sweep(new Date(due.getTime() + 1000));
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "CANCELLED",
+            paymentDueUntil: null,
+        });
         expect(await access.resolve(ctx.organizationId)).toMatchObject({
             source: "catalogue",
             planId: "free",
@@ -610,6 +637,70 @@ describe("renewals and failed payments", () => {
             provider: "RAZORPAY",
             providerSubscriptionId: providerSub,
             atCycleEnd: false,
+        });
+    });
+
+    it("a payment that's due, paid by the provider's retry: back to ACTIVE, nothing due (DEC-210)", async () => {
+        await install(1);
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        const providerSub = (await sub(ctx.organizationId))
+            .providerSubscriptionId as string;
+        await deliver(providerSub, "pending");
+        await deliver(providerSub, "halted");
+        const next = new Date(Date.now() + 30 * DAY);
+        await deliver(providerSub, "charged", { currentPeriodEnd: next });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "ACTIVE",
+            paymentDueUntil: null,
+            currentPeriodEnd: next,
+        });
+        expect(await cancelJobs()).toEqual([]);
+    });
+
+    it("a payment that's due, paid with Pay now: a new autopay on the plan, nothing due (DEC-210)", async () => {
+        await install(1);
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        const old = (await sub(ctx.organizationId))
+            .providerSubscriptionId as string;
+        await deliver(old, "pending");
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const fresh = (
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: r.checkout.id },
+            })
+        ).providerSubscriptionId;
+        await deliver(fresh, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "ACTIVE",
+            providerSubscriptionId: fresh,
+            paymentDueUntil: null,
+        });
+        // The autopay that failed is ended at the provider.
+        expect(await cancelJobs()).toContainEqual(
+            expect.objectContaining({ providerSubscriptionId: old }),
+        );
+    });
+
+    it("a payment that's due, and the owner chooses Free: Free now, nothing due (DEC-210)", async () => {
+        await install(1);
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        const providerSub = (await sub(ctx.organizationId))
+            .providerSubscriptionId as string;
+        await deliver(providerSub, "pending");
+        await checkout.changePlan(ctx, { plan: "free", cycle: "month" });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "ACTIVE",
+            paymentDueUntil: null,
+            provider: null,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "free",
         });
     });
 

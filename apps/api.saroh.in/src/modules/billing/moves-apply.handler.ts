@@ -21,6 +21,7 @@ import type { DomainPlanService } from "./domain-plan.service";
 import { domainPlan } from "./domain-plan.service";
 import { noticeMoveDowns, pausesForMoveInTx } from "./move-down-notice";
 import { overLimit, OverLimitService } from "./over-limit.service";
+import { closeOverduePayments } from "./payment-due";
 import {
     PLAN_ENDING_NOTICE_KIND,
     PLAN_ENDING_NOTIFICATION_TYPE,
@@ -67,6 +68,8 @@ import { remindEndingTerms } from "./term-ending-notice";
  *    domain is paused (`domain-plan.ts`, `domain-plan-notice.ts`).
  * 7. **Renewals** (#804). An autopay charge due within 3 days is told once,
  *    by email (`renewal-reminder.ts`, `renewal-reminder-notice.ts`).
+ * 8. **Payments still due** (DEC-210). A renewal that wasn't paid within 7
+ *    days of falling due moves to Free (`payment-due.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -185,6 +188,7 @@ export class MovesApplyHandler {
         );
         out.reminded += await sweepDomains(now, this.logger, this.domains);
         out.reminded += await remindRenewals(now, this.logger);
+        out.lapsed += await closeOverduePayments(now, this.logger);
         return out;
     }
 

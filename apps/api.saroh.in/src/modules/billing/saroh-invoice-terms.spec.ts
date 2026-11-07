@@ -583,14 +583,18 @@ describe("billing emails", () => {
         );
     });
 
-    it("says what happens next when a payment fails", () => {
-        expect(
-            paymentFailedEmail({
-                businessName: "Shop",
-                planName: "Plan B",
-                final: false,
-            }).html,
-        ).toContain("try again");
+    it("says what happens next when a payment fails: the date to pay by, and Pay now (DEC-210)", () => {
+        const due = paymentFailedEmail({
+            businessName: "Shop",
+            planName: "Plan B",
+            final: false,
+            dueBy: "13 Nov 2026",
+            payUrl: "https://app.example.test/settings/billing#pay-due",
+        }).html;
+        expect(due).toContain("Pay by 13 Nov 2026 to keep Plan B");
+        expect(due).toContain("Pay now");
+        expect(due).toContain("#pay-due");
+        expect(due).not.toContain("try again");
         expect(
             paymentFailedEmail({
                 businessName: "Shop",

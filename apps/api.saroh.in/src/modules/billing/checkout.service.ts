@@ -312,6 +312,7 @@ const SUB_SELECT = {
     cancelAtPeriodEnd: true,
     pendingPlanId: true,
     pendingFrom: true,
+    paymentDueUntil: true,
     plan: {
         select: {
             id: true,
@@ -1133,7 +1134,13 @@ export class CheckoutService {
                 });
                 return now;
             }
-            if (live?.provider && live.providerSubscriptionId && paidTo) {
+            // A payment still due (DEC-210) has nothing paid ahead: Free now.
+            if (
+                live?.provider &&
+                live.providerSubscriptionId &&
+                paidTo &&
+                !live.paymentDueUntil
+            ) {
                 await tx.subscription.update({
                     where: { id: sub.id },
                     data: {
@@ -1181,6 +1188,7 @@ export class CheckoutService {
                     planId: target.id,
                     billingCycle: "month",
                     status: "ACTIVE",
+                    paymentDueUntil: null,
                     provider: null,
                     providerSubscriptionId: null,
                     // The provider's customer is kept (17 Oct 2026).

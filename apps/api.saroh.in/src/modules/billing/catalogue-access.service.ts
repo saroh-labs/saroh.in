@@ -517,6 +517,7 @@ export class CatalogueAccessService {
                 pricePaise: null,
                 planOverride,
                 planEnding: null,
+                paymentDue: null,
                 pendingMove: null,
                 modules: [],
             };
@@ -533,6 +534,7 @@ export class CatalogueAccessService {
                 a,
                 new Date(),
             ),
+            paymentDue: await paymentDueOf(ctx.organizationId),
             pendingMove: a.pendingMove
                 ? {
                       planId: a.pendingMove.planId,
@@ -694,4 +696,23 @@ export class CatalogueAccessService {
         parsedVersions.set(row.id, r.catalog);
         return { version: row.version, catalog: r.catalog };
     }
+}
+
+/** A renewal still due (DEC-210), for the app's banner. */
+async function paymentDueOf(
+    organizationId: string,
+): Promise<BillingAccessView["paymentDue"]> {
+    const sub = await prisma.subscription.findUnique({
+        where: { organizationId },
+        select: {
+            status: true,
+            paymentDueUntil: true,
+            plan: { select: { name: true } },
+        },
+    });
+    if (sub?.status !== "PAST_DUE" || !sub.paymentDueUntil) return null;
+    return {
+        planName: sub.plan.name,
+        dueBy: sub.paymentDueUntil.toISOString(),
+    };
 }

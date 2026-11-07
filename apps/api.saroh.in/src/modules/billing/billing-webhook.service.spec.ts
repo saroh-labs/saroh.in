@@ -63,7 +63,9 @@ const bweCreate = prisma.billingWebhookEvent.createMany as jest.Mock;
 const bweUpdate = prisma.billingWebhookEvent.update as jest.Mock;
 
 /** The subscription the event names: found, then read under its lock. */
-function onSubscription(row: { status: string } | null) {
+function onSubscription(
+    row: { status: string; paymentDueUntil?: Date | null } | null,
+) {
     subFindFirst.mockResolvedValue(
         row ? { id: "sub_1", organizationId: "org_1" } : null,
     );
@@ -145,10 +147,10 @@ describe("BillingWebhookService signature verification", () => {
         });
 
         expect(result).toEqual({ status: "processed", changed: true });
-        // ACTIVE → PAST_DUE moved once.
+        // ACTIVE → PAST_DUE moved once, the payment due for 7 days (DEC-210).
         expect(subUpdate).toHaveBeenCalledWith({
             where: { id: "sub_1" },
-            data: { status: "PAST_DUE" },
+            data: { status: "PAST_DUE", paymentDueUntil: expect.any(Date) },
         });
         // Inbox row written and stamped processed, with the resolved org id.
         expect(bweCreate).toHaveBeenCalledWith(
@@ -214,7 +216,11 @@ describe("BillingWebhookService idempotency", () => {
 
     it("a same→same target is an ignored no-op (never asserted, never written)", async () => {
         const { service } = makeService();
-        onSubscription({ status: "PAST_DUE" });
+        // Already due (DEC-210): a second failure changes nothing.
+        onSubscription({
+            status: "PAST_DUE",
+            paymentDueUntil: new Date(Date.now() + 86_400_000),
+        });
         bweCreate.mockResolvedValue({ count: 1 });
 
         const raw = bodyOf({ phase: "pending" }); // PAST_DUE == PAST_DUE

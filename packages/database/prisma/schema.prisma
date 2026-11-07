@@ -6372,11 +6372,16 @@ model Subscription {
   // nothing, so a late `activated` can't undo a newer `cancelled`.
   providerEventAt DateTime?
 
+  // A renewal that wasn't paid (DEC-210): the plan stays until this date,
+  // with a way to pay, then moves to Free. Null when nothing is due.
+  paymentDueUntil DateTime?
+
   @@unique([provider, providerSubscriptionId])
   @@unique([id, organizationId])
   @@index([planId])
   @@index([pendingPlanId])
   @@index([pendingFrom])
+  @@index([paymentDueUntil])
 }
 
 // EntitlementOverride — one per-business exception, set by an operator (admin

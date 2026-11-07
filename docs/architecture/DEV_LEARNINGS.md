@@ -6537,3 +6537,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 **Fix**: read `businessProfile.taxRate` through the relation; the db spec makes a Global business and uses key-shaped fake values.
 **Rule**: a new field in a Prisma `select` is not done until a db spec that runs it has run. Fake keys in tests take the real key's shape.
 **Category**: tests · database
+
+## A changed webhook rule broke a spec I hadn't run (7 Nov 2026)
+
+- **Symptom:** PR #1318 (DEC-210) failed CI integration shard 4. `offers.db.spec.ts` › "a failed charge at the trial's end lands the business on Free" still expected `halted` to mean CANCELLED.
+- **Cause:** the change moved what `halted` does in `billing-webhook.service.ts`. Only the three specs I edited were run locally. Nine db specs deliver `halted`, and this was one of the six not run.
+- **Fix:** the spec now expects the payment due for 7 days, then Free from the sweep. All nine specs that deliver `halted` pass.
+- **Rule:** before changing what an event does, grep every spec that sends it (`rg -l '"halted"' --glob '*.db.spec.ts'`) and run them all, not only the ones being edited.
+- **Category:** tests · billing

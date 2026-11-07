@@ -2,6 +2,7 @@ import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
 import { PausedBanner } from "@/components/billing/paused-banner";
+import { PaymentDueBanner } from "@/components/billing/payment-due-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
@@ -369,10 +370,15 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                                 />
                                 {/* Scheduled for deletion (#921). */}
                                 <ClosingBanner view={closing} />
+                                {/* A renewal that wasn't paid (DEC-210): one
+                                plan message at a time, this one first. */}
+                                <PaymentDueBanner due={billing?.paymentDue} />
                                 {/* A plan that ends within 30 days (#805). */}
-                                <PlanEndingBanner
-                                    ending={billing?.planEnding}
-                                />
+                                {billing?.paymentDue ? null : (
+                                    <PlanEndingBanner
+                                        ending={billing?.planEnding}
+                                    />
+                                )}
                                 {/* What a lower plan paused, or will (#800). */}
                                 <PausedBanner view={paused} />
                                 <BusinessCurrencyProvider
