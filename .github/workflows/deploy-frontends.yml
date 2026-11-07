@@ -7,6 +7,7 @@ name: Build and deploy apps on Cloudflare
 #
 #   push to development   -> the dev Workers (saroh-*-dev, *.saroh.io)
 #   push to main          -> the production Workers (saroh-*, *.saroh.in, saroh.app)
+#                            and Global's (saroh-tech, saroh-*-global): see below
 #   no schedule           -> nothing deploys at night; a marketing-site page
 #                            dated today appears with that site's next deploy.
 #                            One exception, once: the two `schedule` lines
@@ -29,6 +30,17 @@ name: Build and deploy apps on Cloudflare
 # environments `cloudflare-development` and `cloudflare-production`: they are
 # passed to the build and copied onto the Worker on every deploy, and never
 # printed (the repo, and so this log, is public).
+#
+# Global's production Workers (stage 10): saroh.tech (`tech`) and Global
+# variants of the workspace, accounts and admin (`*-global`), built from the
+# same code with scripts/cf-global-prod.mjs's settings. They have no routes and
+# no workers.dev address until the repo variable GLOBAL_ROUTES is "on" (the
+# launch step), so until then nothing Global answers anywhere. Flipping it
+# changes their fingerprints, so the next run redeploys exactly those four.
+#
+# Every production build first refuses settings naming a local or development
+# host (scripts/assert-production-hosts.mjs), and builds with CF_DEPLOY=1, so
+# saroh.tech's build stops instead of falling back to the local stack.
 
 # A manual run says which app and where, so the admin console's Deployments
 # page (#886) can tell its runs apart before their deploy jobs exist. Other
@@ -75,7 +87,20 @@ on:
             app:
                 description: Which app
                 type: choice
-                options: [web, application, auth, admin, sites, all]
+                options:
+                    [
+                        web,
+                        application,
+                        auth,
+                        admin,
+                        sites,
+                        all,
+                        tech,
+                        application-global,
+                        auth-global,
+                        admin-global,
+                        all-global,
+                    ]
                 default: web
             environment:
                 description: Where
@@ -100,6 +125,8 @@ jobs:
             # Read-only use here: the live Workers' fingerprints.
             CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
             CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+            # Part of Global's fingerprints: flipping it redeploys them.
+            GLOBAL_ROUTES: ${{ vars.GLOBAL_ROUTES }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -121,8 +148,8 @@ jobs:
                   with_ref() { jq -c --arg r "$(ref_of "$1")" 'map(. + {ref: $r})'; }
                   case "$EVENT" in
                     workflow_dispatch)
-                      only=$([ "$INPUT_APP" = all ] && echo "" || echo "$INPUT_APP")
-                      json=$(FORCE=1 node scripts/cf-plan.mjs "$INPUT_ENV" "$only" | with_ref "$INPUT_ENV") ;;
+                      # "all" is India's five, "all-global" Global's four.
+                      json=$(FORCE=1 node scripts/cf-plan.mjs "$INPUT_ENV" "$INPUT_APP" | with_ref "$INPUT_ENV") ;;
                     push)
                       env=$([ "$REF" = main ] && echo production || echo development)
                       json=$(node scripts/cf-plan.mjs "$env" | jq -c --arg r "$REF" 'map(. + {ref: $r})') ;;
@@ -150,7 +177,8 @@ jobs:
                   echo "To deploy: $json"
 
     deploy:
-        name: Deploy ${{ matrix.pkg }} (${{ matrix.env }})
+        # The admin console finds India's jobs by this name (admin-deployments.ts).
+        name: Deploy ${{ matrix.app || matrix.pkg }} (${{ matrix.env }})
         needs: plan
         if: needs.plan.outputs.matrix != '[]'
         runs-on: ubuntu-latest
@@ -162,12 +190,15 @@ jobs:
             matrix:
                 include: ${{ fromJson(needs.plan.outputs.matrix) }}
         concurrency:
-            group: deploy-cloudflare-${{ matrix.pkg }}-${{ matrix.env }}
+            group: deploy-cloudflare-${{ matrix.app || matrix.pkg }}-${{ matrix.env }}
             cancel-in-progress: false
         env:
             CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
             CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
             NEXT_TELEMETRY_DISABLED: "1"
+            GLOBAL_ROUTES: ${{ vars.GLOBAL_ROUTES }}
+            # A production build never falls back to local hosts (saroh.tech's site.config.ts).
+            CF_DEPLOY: ${{ matrix.env == 'production' && '1' || '' }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -179,11 +210,24 @@ jobs:
             - uses: ./.github/actions/setup
               with:
                   prisma: "false"
-                  turbo-cache: cf-${{ matrix.pkg }}-${{ matrix.env }}
+                  turbo-cache: cf-${{ matrix.app || matrix.pkg }}-${{ matrix.env }}
                   next-cache: "true"
+
+            # A Global Worker's settings, written into this checkout's
+            # wrangler.jsonc before anything reads it.
+            - name: Global's settings
+              if: matrix.variant == 'global'
+              run: node scripts/cf-global-prod.mjs "${{ matrix.dir }}"
 
             - name: Settings from wrangler.jsonc
               run: node scripts/cf-env.mjs "${{ matrix.dir }}" "${{ matrix.env }}" >> "$GITHUB_ENV"
+
+            # Names the setting, never the value: Global's development domain is a secret.
+            - name: Production hosts only
+              if: matrix.env == 'production'
+              env:
+                  GLOBAL_DEV_DOMAIN: ${{ secrets.GLOBAL_DEV_DOMAIN }}
+              run: node scripts/assert-production-hosts.mjs "${{ matrix.dir }}"
 
             # Secrets for the build and the Worker. A gated dev app without its
             # access key would be open to anyone, so its deploy stops here.
@@ -263,12 +307,22 @@ jobs:
             # empty until LAUNCH_AT has passed; then it is the launch switches
             # this build was given (the "Settings" step), for the Worker too.
             - name: Deploy
+              if: matrix.pkg != 'tech'
               working-directory: ${{ matrix.dir }}
               run: >-
                   pnpm exec opennextjs-cloudflare deploy
                   ${{ matrix.env == 'production' && '--env production' || '' }}
                   --var BUILD_FINGERPRINT:${{ matrix.fingerprint }}
                   ${LAUNCH_DEPLOY_VARS:-}
+
+            # saroh.tech is a static export (out/) behind its own Worker:
+            # wrangler's deploy, with the same fingerprint label.
+            - name: Deploy saroh.tech
+              if: matrix.pkg == 'tech'
+              working-directory: ${{ matrix.dir }}
+              run: >-
+                  pnpm cf:deploy --env production
+                  --var BUILD_FINGERPRINT:${{ matrix.fingerprint }}
 
             # A deploy recreates the routes in wrangler.jsonc "fail closed";
             # Wrangler can't say otherwise. Set them to fail open, so a failing

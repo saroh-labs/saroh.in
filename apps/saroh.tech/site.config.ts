@@ -16,7 +16,20 @@ const hosts = process.env.GLOBAL_DEV_DOMAIN?.trim()
     ? hostsFor("GLOBAL", "development")
     : process.env.GLOBAL_PRODUCTION_HOSTS === "on"
       ? hostsFor("GLOBAL", "production")
-      : LOCAL_HOSTS;
+      : localHosts();
+
+/**
+ * A deploy's build (`CF_DEPLOY=1`, deploy-frontends.yml) that got neither
+ * setting would ship pages posting to the local stack: it stops instead. Only
+ * the build reads `CF_DEPLOY`; the browser's copy of this file never has it.
+ */
+function localHosts() {
+    if (process.env.CF_DEPLOY === "1")
+        throw new Error(
+            "CF_DEPLOY=1 with neither GLOBAL_PRODUCTION_HOSTS=on nor GLOBAL_DEV_DOMAIN: this deploy would use local hosts",
+        );
+    return LOCAL_HOSTS;
+}
 
 const ACCOUNTS_URL = urlOf(hosts.accounts);
 

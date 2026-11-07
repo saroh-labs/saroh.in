@@ -152,5 +152,12 @@ describe("what saroh.tech may not say", () => {
         it("fails rather than passes when nothing was built", () => {
             expect(() => checkSite(join(dir, "nope"))).toThrow(/missing/);
         });
+
+        it("fails on an out/ with no HTML in it", () => {
+            const empty = join(dir, "empty");
+            mkdirSync(empty);
+            writeFileSync(join(empty, "robots.txt"), "User-agent: *");
+            expect(() => checkSite(empty)).toThrow(/no HTML/);
+        });
     });
 });

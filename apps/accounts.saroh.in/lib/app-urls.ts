@@ -1,5 +1,11 @@
+import { hostsFor, urlOf } from "@saroh/edition";
+
 import { env } from "@/env";
 import { viaWelcome } from "@/lib/signup-welcome";
+
+/** This build's edition's production hosts: Global's accounts sends to Global's app. */
+const productionHosts = () =>
+    hostsFor(env.NEXT_PUBLIC_EDITION ?? "INDIA", "production");
 
 /**
  * Where accounts sends a user once they are authenticated.
@@ -7,7 +13,8 @@ import { viaWelcome } from "@/lib/signup-welcome";
  * accounts is the identity provider, so every destination it hands out lives on
  * another origin. `NEXT_PUBLIC_APP_URL` overrides the default when the app is
  * served from somewhere other than the usual pair (preview deploys, tunnels).
- * Otherwise we fall back to the standard dev and production origins.
+ * Otherwise we fall back to the standard dev and production origins, the
+ * production one being this build's edition's (`NEXT_PUBLIC_EDITION`).
  *
  * This is where a sign-in lands when nothing else was asked for
  * (`lib/return-to.ts`): the app's front door sends someone with no business
@@ -16,7 +23,7 @@ import { viaWelcome } from "@/lib/signup-welcome";
 export function getAppUrl(): string {
     if (env.NEXT_PUBLIC_APP_URL) return env.NEXT_PUBLIC_APP_URL;
     return env.NODE_ENV === "production"
-        ? "https://app.saroh.in"
+        ? urlOf(productionHosts().app)
         : "https://app.saroh.localhost";
 }
 
@@ -27,7 +34,7 @@ export function getAppUrl(): string {
 export function getAccountsUrl(): string {
     if (env.NEXT_PUBLIC_ACCOUNTS_URL) return env.NEXT_PUBLIC_ACCOUNTS_URL;
     return env.NODE_ENV === "production"
-        ? "https://accounts.saroh.in"
+        ? urlOf(productionHosts().accounts)
         : "https://accounts.saroh.localhost";
 }
 

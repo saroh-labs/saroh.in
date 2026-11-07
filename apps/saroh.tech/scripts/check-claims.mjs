@@ -131,19 +131,21 @@ export function findClaims(path, text) {
 export function checkSite(out) {
     if (!existsSync(out))
         throw new Error(`${out} is missing: build the site first`);
-    return readdirSync(out, { recursive: true })
+    const pages = readdirSync(out, { recursive: true })
         .map(String)
-        .filter((f) => f.endsWith(".html"))
-        .flatMap((f) => {
-            const path = `/${relative(".", f).replace(/\.html$/, "")}`.replace(
-                /^\/index$/,
-                "/",
-            );
-            return findClaims(
-                path,
-                visibleText(readFileSync(join(out, f), "utf8")),
-            );
-        });
+        .filter((f) => f.endsWith(".html"));
+    // A build that wrote no page would pass with nothing checked, and deploy.
+    if (pages.length === 0) throw new Error(`${out} has no HTML pages`);
+    return pages.flatMap((f) => {
+        const path = `/${relative(".", f).replace(/\.html$/, "")}`.replace(
+            /^\/index$/,
+            "/",
+        );
+        return findClaims(
+            path,
+            visibleText(readFileSync(join(out, f), "utf8")),
+        );
+    });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
