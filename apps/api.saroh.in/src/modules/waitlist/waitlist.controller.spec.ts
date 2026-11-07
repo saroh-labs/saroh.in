@@ -1,6 +1,6 @@
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
-import { HttpException } from "@nestjs/common";
+import { HttpException, Logger } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
 import { signSiteRelay } from "../site-accounts/site-relay";
@@ -56,11 +56,18 @@ describe("WaitlistController", () => {
         expect(join).toHaveBeenLastCalledWith(
             expect.objectContaining({ edition: "INDIA" }),
         );
-        // Local, or an address of no edition.
+        // Local, or an address of no edition: India, with a WARN (KTD11).
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
         await call("localhost:3333");
         expect(join).toHaveBeenLastCalledWith(
             expect.objectContaining({ edition: "INDIA" }),
         );
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining("form_host_of_no_edition"),
+        );
+        warn.mockRestore();
     });
 
     it("answers a repeat with neither", async () => {

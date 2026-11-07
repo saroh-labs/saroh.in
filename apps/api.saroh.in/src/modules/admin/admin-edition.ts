@@ -1,5 +1,5 @@
 import type { ExecutionContext } from "@nestjs/common";
-import { createParamDecorator } from "@nestjs/common";
+import { createParamDecorator, NotFoundException } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
@@ -92,4 +92,24 @@ export function peopleWhere(edition: Edition | null) {
               ],
           }
         : {};
+}
+
+/**
+ * A query naming one business (not a path, which `AdminEditionGuard` checks):
+ * another edition's is a 404, as any cross-tenant read is. One that doesn't
+ * exist passes, and the route answers as it would.
+ */
+export async function assertBusinessInEdition(
+    organizationId: string | undefined,
+    edition: Edition | null,
+): Promise<void> {
+    if (!edition || !organizationId) return;
+    const row = await outsideOrgContext(() =>
+        prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { edition: true },
+        }),
+    );
+    if (row && row.edition !== edition)
+        throw new NotFoundException("Not found");
 }

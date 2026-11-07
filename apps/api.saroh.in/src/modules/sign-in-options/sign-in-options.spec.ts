@@ -25,4 +25,35 @@ describe("configuredProviders", () => {
             }),
         ).toEqual(["google", "github"]);
     });
+
+    it("gives Global its own GitHub pair, and no GitHub without it (KTD5)", () => {
+        const india = {
+            AUTH_GITHUB_ID: "a",
+            AUTH_GITHUB_SECRET: "b",
+            AUTH_GOOGLE_ID: "c",
+            AUTH_GOOGLE_SECRET: "d",
+        };
+        expect(configuredProviders(india, "GLOBAL")).toEqual(["google"]);
+        expect(
+            configuredProviders(
+                { ...india, AUTH_GITHUB_GLOBAL_ID: "e" },
+                "GLOBAL",
+            ),
+        ).toEqual(["google"]);
+        expect(
+            configuredProviders(
+                {
+                    AUTH_GOOGLE_ID: "c",
+                    AUTH_GOOGLE_SECRET: "d",
+                    AUTH_GITHUB_GLOBAL_ID: "e",
+                    AUTH_GITHUB_GLOBAL_SECRET: "f",
+                },
+                "GLOBAL",
+            ),
+        ).toEqual(["google", "github"]);
+        expect(configuredProviders(india, "INDIA")).toEqual([
+            "google",
+            "github",
+        ]);
+    });
 });

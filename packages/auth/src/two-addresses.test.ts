@@ -14,7 +14,7 @@ import { authOptions } from "./server";
  * its own domain's cookie, and a session from either reads on the other, which
  * is why the API's guard needs only one instance.
  */
-function pair() {
+function pair(global: Parameters<typeof authOptions>[0] = {}) {
     type Rows = Record<string, unknown>[];
     const db = {
         user: [] as Rows,
@@ -24,9 +24,10 @@ function pair() {
         rateLimit: [] as Rows,
     };
     const codes: string[] = [];
-    const build = (baseURL: string) =>
+    const build = (baseURL: string, extra: typeof global = {}) =>
         betterAuth({
             ...authOptions({
+                ...extra,
                 baseURL,
                 sendVerificationOTP: ({ otp }) => {
                     codes.push(otp);
@@ -39,7 +40,7 @@ function pair() {
         });
     return {
         india: build("https://api.saroh.in"),
-        global: build("https://api.saroh.tech"),
+        global: build("https://api.saroh.tech", global),
         codes,
     };
 }
@@ -151,5 +152,66 @@ describe("one API on two domains", () => {
             expect(origins).toContain(origin);
         }
         expect(origins.join()).not.toMatch(/saroh\.io|saroh\.dev/);
+    });
+
+    it("never sets a SameSite=None session cookie, on either address", async () => {
+        const { india, global, codes } = pair();
+        const email = "lax@example.com";
+        for (const [instance, base] of [
+            [india, "https://api.saroh.in/api/auth"],
+            [global, "https://api.saroh.tech/api/auth"],
+        ] as const) {
+            await instance.handler(
+                post(`${base}/email-otp/send-verification-otp`, {
+                    email,
+                    type: "sign-in",
+                }),
+            );
+            const signedIn = await instance.handler(
+                post(`${base}/sign-in/email-otp`, { email, otp: codes.at(-1) }),
+            );
+            expect(signedIn.status).toBe(200);
+            const cookies = signedIn.headers.getSetCookie();
+            expect(cookies.length).toBeGreaterThan(0);
+            for (const cookie of cookies) {
+                expect(cookie).not.toMatch(/SameSite=None/i);
+            }
+            const session = cookies.find((c) => c.includes("session_token"));
+            expect(session).toMatch(/SameSite=Lax/i);
+        }
+    });
+
+    it("gives each address its own GitHub app (KTD5)", () => {
+        vi.stubEnv("AUTH_GITHUB_ID", "india-id");
+        vi.stubEnv("AUTH_GITHUB_SECRET", "india-secret");
+        const { india, global } = pair({
+            github: { clientId: "global-id", clientSecret: "global-secret" },
+        });
+        expect(india.options.socialProviders?.github?.clientId).toBe(
+            "india-id",
+        );
+        expect(global.options.socialProviders?.github?.clientId).toBe(
+            "global-id",
+        );
+        expect(global.options.baseURL).toBe("https://api.saroh.tech");
+    });
+
+    it("leaves GitHub off an address with no pair, and refuses it cleanly", async () => {
+        vi.stubEnv("AUTH_GITHUB_ID", "india-id");
+        vi.stubEnv("AUTH_GITHUB_SECRET", "india-secret");
+        const { india, global } = pair({ github: null });
+        expect(global.options.socialProviders?.github).toBeUndefined();
+        expect(global.options.socialProviders?.google).toBeDefined();
+        expect(india.options.socialProviders?.github?.clientId).toBe(
+            "india-id",
+        );
+        const refused = await global.handler(
+            post("https://api.saroh.tech/api/auth/sign-in/social", {
+                provider: "github",
+                callbackURL: "https://accounts.saroh.tech/",
+            }),
+        );
+        expect(refused.status).toBeGreaterThanOrEqual(400);
+        expect(refused.status).toBeLessThan(500);
     });
 });

@@ -61,10 +61,24 @@ describe("deployable apps (#886)", () => {
             join(ROOT, ".github/workflows/deploy-frontends.yml"),
             "utf8",
         );
-        expect(workflow).toContain(`options: [${DEPLOY_APPS.join(", ")}, all]`);
+        // The workflow also deploys Global's production Workers (stage 10),
+        // dispatched from GitHub for now; the console lists India's.
+        const options = workflow
+            .slice(
+                workflow.indexOf("options:"),
+                workflow.indexOf("default: web"),
+            )
+            .replace(/[\s[\]]/g, "")
+            .replace(/^options:/, "")
+            .split(",")
+            .filter(Boolean);
+        expect(options.slice(0, DEPLOY_APPS.length + 1)).toEqual([
+            ...DEPLOY_APPS,
+            "all",
+        ]);
         expect(workflow).toContain("format('Deploy {0} to {1}'");
         expect(workflow).toContain(
-            "name: Deploy ${{ matrix.pkg }} (${{ matrix.env }})",
+            "name: Deploy ${{ matrix.app || matrix.pkg }} (${{ matrix.env }})",
         );
     });
 

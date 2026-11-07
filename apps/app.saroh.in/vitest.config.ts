@@ -42,6 +42,8 @@ export default defineConfig({
             // The editor's shell, pinned while it was split (#260). It opts
             // into jsdom itself; everything else stays on `node`.
             "components/**/*.test.tsx",
+            // A route handler's own decisions (`app/open/[organizationId]`).
+            "app/**/route.test.ts",
         ],
     },
 });

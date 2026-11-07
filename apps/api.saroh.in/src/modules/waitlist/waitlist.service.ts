@@ -80,6 +80,7 @@ export class WaitlistService {
         const businessName = textOrNull(input.business);
         const bKey = businessKey(businessName);
 
+        // As `editionOfFormHost`: no edition files under India.
         const edition = input.edition ?? "INDIA";
         if (await this.exists(key, bKey, edition)) {
             this.logger.log(`waitlist: repeat signup for ${maskEmail(email)}`);

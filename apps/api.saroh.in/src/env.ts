@@ -54,6 +54,10 @@ const envSchema = z.object({
     // OAuth providers (optional — email/password works without them).
     AUTH_GITHUB_ID: z.string().optional(),
     AUTH_GITHUB_SECRET: z.string().optional(),
+    // The Global instance's own GitHub app (one callback per app, KTD5).
+    // Without both, GitHub is off on Global.
+    AUTH_GITHUB_GLOBAL_ID: z.string().optional(),
+    AUTH_GITHUB_GLOBAL_SECRET: z.string().optional(),
     AUTH_GOOGLE_ID: z.string().optional(),
     AUTH_GOOGLE_SECRET: z.string().optional(),
 
@@ -90,6 +94,8 @@ const envSchema = z.object({
     // Email (Nodemailer). Legacy aliases kept until callers converge.
     EMAIL_FROM: z.string().optional(),
     SENDER_EMAIL_ID: z.string().optional(),
+    // Global mail's sender (KTD6). Unset: "Saroh <noreply@saroh.tech>".
+    EMAIL_FROM_GLOBAL: z.string().optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_HOSTNAME: z.string().optional(),
     SMTP_PORT: z.string().optional(),
@@ -187,6 +193,8 @@ const envSchema = z.object({
     // The code email's own sending address and stream, apart from workspace
     // sign-in mail. The SMTP_* set below is the fallback transport.
     SITE_CODES_EMAIL_FROM: z.email().optional(),
+    // Global sites' code sender (KTD6). Unset: codes@saroh.tech.
+    SITE_CODES_EMAIL_FROM_GLOBAL: z.email().optional(),
     SITE_CODES_SMTP_HOST: z.string().optional(),
     SITE_CODES_SMTP_PORT: z.string().optional(),
     SITE_CODES_SMTP_USER: z.string().optional(),

@@ -8,8 +8,8 @@ import {
     Post,
     UseGuards,
 } from "@nestjs/common";
-import { editionOfHost } from "@saroh/edition";
 
+import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { SiteRelay } from "../site-accounts/site-relay";
 import { RelayContext, SiteRelayGuard } from "../site-accounts/site-relay";
@@ -58,7 +58,7 @@ export class QrMakerController {
             email: dto.email,
             tool: dto.tool,
             ipHash: key,
-            edition: editionOfHost(host ?? "") ?? "INDIA",
+            edition: editionOfFormHost(host),
         });
     }
 }

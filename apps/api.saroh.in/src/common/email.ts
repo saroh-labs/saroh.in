@@ -1,5 +1,6 @@
-import { EDITIONS, environmentOfHost, hostsFor } from "@saroh/edition";
-import type { Transporter } from "nodemailer";
+import type { Edition } from "@saroh/edition";
+import { EDITIONS, environmentOfHost, hostsFor, urlOf } from "@saroh/edition";
+import type { SendMailOptions, Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
 import { declaredNodeEnv, env } from "../env";
@@ -10,6 +11,7 @@ import {
 } from "../modules/site-accounts/sender-name";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
+import { structuredLogger } from "./logging/structured-logger";
 import {
     siteCodesFakeAllowed,
     writeSiteCodeOutbox,
@@ -48,6 +50,104 @@ function getTransporter(): Transporter | null {
 
 const transporter = getTransporter();
 
+/** Global's senders until their env names are set (KTD6). */
+export const GLOBAL_EMAIL_FROM_DEFAULT = "Saroh <noreply@saroh.tech>";
+export const GLOBAL_SITE_CODES_FROM_DEFAULT = "codes@saroh.tech";
+
+/**
+ * Which transport a mail goes out on: Saroh's identity mail, or the site
+ * codes' own stream (`SITE_CODES_SMTP_*`).
+ */
+export type MailStream = "identity" | "site-codes";
+
+/** A mail without its sender: {@link send} picks that by edition. */
+export type OutgoingMail = Omit<SendMailOptions, "from"> & {
+    /** The display name, on the site-codes stream ("‹Business› via Saroh"). */
+    fromName?: string;
+};
+
+function senderOf(
+    stream: MailStream,
+    edition: Edition,
+    name: string | undefined,
+): SendMailOptions["from"] {
+    const address =
+        stream === "site-codes"
+            ? edition === "GLOBAL"
+                ? (env.SITE_CODES_EMAIL_FROM_GLOBAL ??
+                  GLOBAL_SITE_CODES_FROM_DEFAULT)
+                : SITE_CODES_FROM_ADDRESS
+            : edition === "GLOBAL"
+              ? (env.EMAIL_FROM_GLOBAL ?? GLOBAL_EMAIL_FROM_DEFAULT)
+              : FROM;
+    return name ? { name, address } : address;
+}
+
+/**
+ * SES refusing the sender because its identity isn't verified (SMTP 554
+ * "Email address is not verified"). The one refusal that a second try from
+ * another sender can fix: anything else may have been delivered already,
+ * or will fail again.
+ */
+export function isUnverifiedSender(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+    const { response, message } = error as {
+        response?: unknown;
+        message?: unknown;
+    };
+    const text = typeof response === "string" ? response : message;
+    return typeof text === "string" && /\bnot verified\b/i.test(text);
+}
+
+/**
+ * Every Saroh mail goes out here (KTD6): from the edition's sender, on the
+ * stream's transport. A business's mail takes the business's edition, and
+ * account mail the sign-in instance's. Throws as the transport does, and
+ * when the stream has no transport (callers check that first).
+ *
+ * Global's sender unverified at SES retries once from India's, at ERROR
+ * (`email_global_sender_fallback`): a safety net that never loses a code,
+ * not a way to launch without the identity. No other failure is retried, so
+ * nothing goes out twice.
+ */
+export async function send(
+    edition: Edition,
+    mail: OutgoingMail,
+    stream: MailStream = "identity",
+): Promise<void> {
+    const via = stream === "site-codes" ? siteCodesTransporter : transporter;
+    if (!via) throw new Error(`No ${stream} mail transport`);
+    const { fromName, ...rest } = mail;
+    try {
+        await via.sendMail({
+            ...rest,
+            from: senderOf(stream, edition, fromName),
+        });
+    } catch (error) {
+        if (edition === "INDIA" || !isUnverifiedSender(error)) throw error;
+        structuredLogger.error("email_global_sender_fallback", { stream });
+        await via.sendMail({
+            ...rest,
+            from: senderOf(stream, "INDIA", fromName),
+        });
+    }
+}
+
+/**
+ * {@link send} for a mail nobody waits on: a failure is logged, never an
+ * unhandled rejection. The line names no address and no subject.
+ */
+function sendQuietly(edition: Edition, mail: OutgoingMail): void {
+    send(edition, mail).catch((error: unknown) => {
+        structuredLogger.error("email_send_failed", {
+            edition,
+            reason: error instanceof Error ? error.name : "unknown error",
+            responseCode: (error as { responseCode?: unknown } | null)
+                ?.responseCode,
+        });
+    });
+}
+
 // Minimal inline HTML. The richer React-Email templates in @saroh/emails need
 // that package to ship a build (it currently exports raw .tsx, unusable from
 // plain Node) — wiring them is a follow-up; links are delivered fine here.
@@ -80,13 +180,14 @@ function actionEmail(heading: string, body: string, url: string, cta: string) {
 export function sendPasswordResetEmail(
     to: string,
     resetUrl: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(`[Password reset] (no SMTP) ${to}: ${resetUrl}`);
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: "Reset your Saroh password",
         html: actionEmail(
@@ -138,6 +239,22 @@ export function accountsBase(
     return base ? base.replace(/\/$/, "") : null;
 }
 
+/**
+ * {@link accountsBase} for an edition: that edition's accounts in the same
+ * environment as `ACCOUNTS_URL`, for a link in mail sent without a request
+ * (a staff invite from the Global console goes to Global sign-in). A local
+ * stack has one accounts app, so it stays on it.
+ */
+export function accountsBaseFor(
+    edition: Edition,
+    source: { ACCOUNTS_URL?: string; NODE_ENV?: string } = env,
+): string | null {
+    const base = accountsBase(source);
+    if (!base) return null;
+    const environment = environmentOfHost(new URL(base).host);
+    return environment ? urlOf(hostsFor(edition, environment).accounts) : base;
+}
+
 export const EXISTING_ACCOUNT_SUBJECT = "You already have a Saroh account";
 
 const BUTTON =
@@ -167,16 +284,20 @@ export function existingAccountEmail(to: string, base: string | null): string {
 export function sendExistingAccountEmail(
     to: string,
     origin?: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
-    const base = accountsBase(env, origin);
+    const base = accountsBase(
+        env,
+        origin ?? accountsBaseFor(edition) ?? undefined,
+    );
     if (!transporter) {
         console.info(
             `[Existing account] (no SMTP) ${to}: ${base ? `${base}/login` : "no accounts address"}`,
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: EXISTING_ACCOUNT_SUBJECT,
         html: existingAccountEmail(to, base),
@@ -208,6 +329,8 @@ function codeEmail(
 export async function sendWelcomeEmail(
     to: string,
     mail: WelcomeMail,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     const { subject, html } = welcomeEmail(mail);
     if (!transporter) {
@@ -215,7 +338,7 @@ export async function sendWelcomeEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({ from: FROM, to, subject, html });
+        await send(edition, { to, subject, html });
         return "sent";
     } catch {
         return "failed";
@@ -288,6 +411,8 @@ export function sendVerificationOtpEmail(
     otp: string,
     type: VerificationOtpType,
     expiresInSeconds: number,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     const mail = verificationOtpEmail(type, otp, expiresInSeconds);
     if (!transporter) {
@@ -297,8 +422,7 @@ export function sendVerificationOtpEmail(
         }
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: mail.subject,
         html: mail.html,
@@ -321,6 +445,8 @@ export function sendChangeEmailConfirmationEmail(
     to: string,
     confirmUrl: string,
     newEmail: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -328,8 +454,7 @@ export function sendChangeEmailConfirmationEmail(
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: "Confirm your new Saroh email address",
         html: actionEmail(
@@ -353,14 +478,15 @@ export function sendChangeEmailConfirmationEmail(
 export function sendSignInEmailChangedNotice(
     to: string,
     maskedNewEmail: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     const html = signInEmailChangedEmail(maskedNewEmail);
     if (!transporter) {
         console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: "Your Saroh sign-in email was changed",
         html,
@@ -381,13 +507,14 @@ export function signInEmailChangedEmail(maskedNewEmail: string): string {
 export function sendDeleteAccountEmail(
     to: string,
     confirmUrl: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(`[Delete account] (no SMTP) ${to}: ${confirmUrl}`);
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: "Confirm deleting your Saroh account",
         html: actionEmail(
@@ -417,6 +544,8 @@ export function sendEnquiryNotificationEmail(
         /** A short line of what they wrote (UX-002); null when nothing but an address. */
         message?: string | null;
     },
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     const { contactName, formName, leadUrl, message } = details;
     if (!transporter) {
@@ -425,8 +554,7 @@ export function sendEnquiryNotificationEmail(
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: `New enquiry from ${contactName}`,
         html: actionEmail(
@@ -472,6 +600,8 @@ export interface TeamAlertMail {
 export function sendTeamAlertEmail(
     to: string,
     mail: TeamAlertMail,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -482,8 +612,7 @@ export function sendTeamAlertEmail(
     const button = mail.url
         ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${esc(mail.cta ?? "Open it in Saroh")}</a></p>`
         : "";
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: mail.subject,
         html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
@@ -526,6 +655,8 @@ function dayOf(date: Date): string {
 export async function sendDataExportReadyEmail(
     to: string,
     mail: DataExportReadyMail,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<"sent" | "not-configured" | "failed"> {
     // One line: a name is tenant text, and a subject takes no line break.
     const name = mail.businessName.replace(/\s+/g, " ").trim().slice(0, 80);
@@ -543,7 +674,7 @@ export async function sendDataExportReadyEmail(
   <p style="color:#666;font-size:12px">${esc("You asked for this from your business's Settings in Saroh. The file holds your customers' details, so keep it somewhere safe.")}</p>
 </div>`;
     try {
-        await transporter.sendMail({ from: FROM, to, subject, html });
+        await send(edition, { to, subject, html });
         return "sent";
     } catch {
         return "failed";
@@ -565,6 +696,8 @@ export function sendCustomerMessageNotificationEmail(
         message: string;
         threadUrl: string;
     },
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     const { customerName, message, threadUrl } = details;
     const name = customerName.replace(/[\r\n]+/g, " ").trim();
@@ -574,8 +707,7 @@ export function sendCustomerMessageNotificationEmail(
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: `${name} sent you a message`,
         html: actionEmail(
@@ -611,6 +743,8 @@ export const SAROH_TEST_LABEL = "[Saroh test]";
 export function sendSelfTestEmail(
     to: string,
     details: { templateLabel: string; html: string },
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     const { templateLabel, html } = details;
     const subject = `${SAROH_TEST_LABEL} ${templateLabel}`;
@@ -626,8 +760,7 @@ export function sendSelfTestEmail(
         console.info(`[Saroh self-test] (no SMTP) ${to}: ${subject}`);
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject,
         html: bodyHtml,
@@ -639,6 +772,8 @@ export function sendStoreInvitationEmail(
     to: string,
     acceptUrl: string,
     storeName: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -646,8 +781,7 @@ export function sendStoreInvitationEmail(
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: `You've been invited to ${storeName} on Saroh`,
         html: actionEmail(
@@ -671,6 +805,8 @@ export function sendOrganizationInvitationEmail(
     to: string,
     acceptUrl: string,
     organizationName: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (!transporter) {
         console.info(
@@ -678,8 +814,7 @@ export function sendOrganizationInvitationEmail(
         );
         return Promise.resolve();
     }
-    void transporter.sendMail({
-        from: FROM,
+    sendQuietly(edition, {
         to,
         subject: `You've been invited to ${organizationName} on Saroh`,
         html: actionEmail(
@@ -711,6 +846,8 @@ export type EmailOutcome = "sent" | "not-configured" | "failed";
 export async function sendWaitlistLaunchInviteEmail(
     to: string,
     details: { url: string; businessName: string | null; validDays: number },
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     const { url, businessName, validDays } = details;
     if (!transporter) {
@@ -722,8 +859,7 @@ export async function sendWaitlistLaunchInviteEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send(edition, {
             to,
             subject: LAUNCH_INVITE_SUBJECT,
             html: launchInviteEmail(url, businessName, validDays),
@@ -783,6 +919,8 @@ export const PHONE_NOTICE_SUBJECTS: Record<PhoneNoticeKind, string> = {
 export async function sendAccountPhoneNotice(
     to: string,
     notice: PhoneNotice,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
@@ -793,8 +931,7 @@ export async function sendAccountPhoneNotice(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send(edition, {
             to,
             subject: PHONE_NOTICE_SUBJECTS[notice.kind],
             html: accountPhoneNoticeEmail(notice),
@@ -848,6 +985,8 @@ export async function sendStaffInviteEmail(
         invitedByName: string | null;
         validDays: number;
     },
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
@@ -859,8 +998,7 @@ export async function sendStaffInviteEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send(edition, {
             to,
             subject: STAFF_INVITE_SUBJECT,
             html: staffInviteEmail(details),
@@ -903,6 +1041,8 @@ export interface SarohBillingEmail {
     /** Where a reply goes (`SAROH_BILLING_EMAIL`), when set. */
     replyTo?: string | null;
     attachments?: { filename: string; content: Buffer }[];
+    /** The business's edition: whose sender it goes from (KTD6). */
+    edition?: Edition;
 }
 
 /**
@@ -932,8 +1072,7 @@ export async function sendSarohBillingEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send(email.edition ?? "INDIA", {
             to: email.to,
             ...(email.replyTo ? { replyTo: email.replyTo } : {}),
             subject: email.subject,
@@ -961,6 +1100,8 @@ export async function sendLinkReportEmail(
     to: string,
     subject: string,
     text: string,
+    /** Whose sender it goes from (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (env.NODE_ENV === "development") {
@@ -970,7 +1111,7 @@ export async function sendLinkReportEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({ from: FROM, to, subject, text });
+        await send(edition, { to, subject, text });
         return "sent";
     } catch {
         return "failed";
@@ -1019,8 +1160,7 @@ export async function sendContactMessageNotice(notice: {
         "Reply to this email to answer them. The message is also in the admin console, under Messages.",
     ].join("\n");
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send("INDIA", {
             to: CONTACT_INBOX,
             replyTo: notice.email,
             subject,
@@ -1116,8 +1256,7 @@ export async function sendManagerSignalsEmail(
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
+        await send("INDIA", {
             to: manager.email,
             subject,
             text: managerSignalsEmail(manager.name, businesses, adminBase(env)),
@@ -1267,9 +1406,15 @@ const siteCodesTransporter = getSiteCodesTransporter();
  */
 export async function sendSiteSignInCodeEmail(
     to: string,
-    details: { code: string; businessName: string; minutes: number },
+    details: {
+        code: string;
+        businessName: string;
+        minutes: number;
+        /** The business's edition: whose sender it goes from (KTD6). */
+        edition?: Edition;
+    },
 ): Promise<EmailOutcome> {
-    const { code, businessName, minutes } = details;
+    const { code, businessName, minutes, edition = "INDIA" } = details;
     if (!siteCodesTransporter) {
         // NODE_ENV as declared, not the schema's default (review A-4).
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
@@ -1284,15 +1429,16 @@ export async function sendSiteSignInCodeEmail(
         return "not-configured";
     }
     try {
-        await siteCodesTransporter.sendMail({
-            from: {
-                name: codeSenderName(businessName),
-                address: SITE_CODES_FROM_ADDRESS,
+        await send(
+            edition,
+            {
+                fromName: codeSenderName(businessName),
+                to,
+                subject: codeSubject(businessName),
+                html: siteCodeEmail(businessName, code, minutes),
             },
-            to,
-            subject: codeSubject(businessName),
-            html: siteCodeEmail(businessName, code, minutes),
-        });
+            "site-codes",
+        );
         return "sent";
     } catch {
         return "failed";
@@ -1328,9 +1474,9 @@ export function siteCodeEmail(
  */
 export async function sendSiteEmailChangedEmail(
     to: string,
-    details: { businessName: string },
+    details: { businessName: string; edition?: Edition },
 ): Promise<EmailOutcome> {
-    const { businessName } = details;
+    const { businessName, edition = "INDIA" } = details;
     if (!siteCodesTransporter) {
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
             if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
@@ -1342,15 +1488,16 @@ export async function sendSiteEmailChangedEmail(
         return "not-configured";
     }
     try {
-        await siteCodesTransporter.sendMail({
-            from: {
-                name: codeSenderName(businessName),
-                address: SITE_CODES_FROM_ADDRESS,
+        await send(
+            edition,
+            {
+                fromName: codeSenderName(businessName),
+                to,
+                subject: emailChangedSubject(businessName),
+                html: siteEmailChangedEmail(businessName),
             },
-            to,
-            subject: emailChangedSubject(businessName),
-            html: siteEmailChangedEmail(businessName),
-        });
+            "site-codes",
+        );
         return "sent";
     } catch {
         return "failed";
@@ -1370,9 +1517,14 @@ export async function sendSiteEmailChangedEmail(
  */
 export async function sendSiteAccountNoticeEmail(
     to: string,
-    details: { businessName: string; subject: string; html: string },
+    details: {
+        businessName: string;
+        subject: string;
+        html: string;
+        edition?: Edition;
+    },
 ): Promise<EmailOutcome> {
-    const { businessName, subject, html } = details;
+    const { businessName, subject, html, edition = "INDIA" } = details;
     if (!siteCodesTransporter) {
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
             if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
@@ -1384,15 +1536,16 @@ export async function sendSiteAccountNoticeEmail(
         return "not-configured";
     }
     try {
-        await siteCodesTransporter.sendMail({
-            from: {
-                name: codeSenderName(businessName),
-                address: SITE_CODES_FROM_ADDRESS,
+        await send(
+            edition,
+            {
+                fromName: codeSenderName(businessName),
+                to,
+                subject,
+                html,
             },
-            to,
-            subject,
-            html,
-        });
+            "site-codes",
+        );
         return "sent";
     } catch {
         return "failed";

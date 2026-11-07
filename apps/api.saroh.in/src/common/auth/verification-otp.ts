@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import { sendVerificationOtpEmail } from "../email";
 import { signInHeldForEmail } from "./sign-in-holds";
@@ -31,10 +32,12 @@ export async function deliverVerificationOtp(
             | "change-email";
     },
     expiresInSeconds: number,
+    /** The instance's edition: its sender (KTD6). */
+    edition: Edition = "INDIA",
 ): Promise<void> {
     if (await signInHeldForEmail(to)) {
         logger.log(`No ${type} code sent: the address is held.`);
         return;
     }
-    await sendVerificationOtpEmail(to, otp, type, expiresInSeconds);
+    await sendVerificationOtpEmail(to, otp, type, expiresInSeconds, edition);
 }

@@ -8,8 +8,8 @@ import {
     Ip,
     Post,
 } from "@nestjs/common";
-import { editionOfHost } from "@saroh/edition";
 
+import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { JoinWaitlistDto } from "./dto";
@@ -76,7 +76,7 @@ export class WaitlistController {
             ref: dto.ref,
             template: dto.template,
             ipHash,
-            edition: editionOfHost(host ?? "") ?? "INDIA",
+            edition: editionOfFormHost(host),
         });
 
         return result.created

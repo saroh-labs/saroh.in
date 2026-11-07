@@ -113,7 +113,7 @@ export class AdminSignInHelpService {
         }
 
         try {
-            await this.codes.send(user.email);
+            await this.codes.send(user.email, staff.edition);
         } catch (error) {
             this.logger.error(
                 `Sign-in code for ${userId} could not be sent: ${
@@ -368,13 +368,15 @@ export class AdminSignInHelpService {
         });
         // Best effort once confirmed: if it doesn't arrive, the person asks
         // for one at sign-in, or staff send one.
-        await this.codes.send(hold.newEmail).catch((error: unknown) => {
-            this.logger.error(
-                `The confirmed change's code for ${userId} could not be sent: ${
-                    error instanceof Error ? error.name : "unknown error"
-                }`,
-            );
-        });
+        await this.codes
+            .send(hold.newEmail, staff.edition)
+            .catch((error: unknown) => {
+                this.logger.error(
+                    `The confirmed change's code for ${userId} could not be sent: ${
+                        error instanceof Error ? error.name : "unknown error"
+                    }`,
+                );
+            });
         return { confirmed: true, to: maskEmail(hold.newEmail) };
     }
 }
