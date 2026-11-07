@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/[invoiceId] app:/settings/organization app:/settings/providers app:/settings/billing site:/pay/[token] api:organizations api:invoices api:payments pkg:edition pkg:ui pkg:site-blocks
+// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/[invoiceId] app:/settings/organization app:/settings/providers app:/settings/billing app:/settings/billing/plans site:/pay/[token] api:organizations api:invoices api:payments api:waitlist pkg:edition pkg:ui pkg:site-blocks
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -195,35 +195,73 @@ test.describe("the Global app (DEC-204)", () => {
         await expect(sheet).toBeVisible();
     });
 
-    test("no Plan and billing, and no rupee on Home, invoices or settings", async ({
+    test("Free-only: no rupee and no way to a plan on Home, invoices or settings, at the desk and on a phone", async ({
         page,
     }, testInfo) => {
         const b = await globalBusiness(page, testInfo, "global-money");
         const inv = await globalInvoice(page, b, testInfo);
         await openGlobal(page, b);
 
-        await page.goto(app("/"));
-        await noRupee(page);
+        /** No plan to buy (KTD7): no link to the plans, and no buy button. */
+        async function noPlanToBuy() {
+            await expect(
+                page.locator('a[href^="/settings/billing/plans"]'),
+            ).toHaveCount(0);
+            await expect(
+                page.getByRole("button", { name: /upgrade|change plan/i }),
+            ).toHaveCount(0);
+        }
 
-        await page.goto(app("/billing/invoices"));
-        await expect(page.getByText(inv.billedTo).first()).toBeVisible();
-        await expect(page.locator("body")).toContainText("$25");
-        await noRupee(page);
+        for (const size of [
+            { width: 1440, height: 900 },
+            { width: 390, height: 844 },
+        ]) {
+            await page.setViewportSize(size);
 
-        await page.goto(app(`/billing/invoices/${inv.id}`));
-        await expect(page.locator("body")).toContainText("$25");
-        await noRupee(page);
+            await page.goto(app("/"));
+            await noRupee(page);
+            await noPlanToBuy();
 
-        await page.goto(app("/settings/organization"));
-        await noRupee(page);
-        await expect(
-            page.getByRole("link", { name: "Plan and billing" }),
-        ).toHaveCount(0);
+            await page.goto(app("/billing/invoices"));
+            await expect(page.getByText(inv.billedTo).first()).toBeVisible();
+            await expect(page.locator("body")).toContainText("$25");
+            await noRupee(page);
+            await noPlanToBuy();
 
+            await page.goto(app(`/billing/invoices/${inv.id}`));
+            await expect(page.locator("body")).toContainText("$25");
+            await noRupee(page);
+            await noPlanToBuy();
+
+            await page.goto(app("/settings/organization"));
+            await noRupee(page);
+            await noPlanToBuy();
+
+            await page.goto(app("/settings/billing"));
+            await expect(page.getByText("You're on Free")).toBeVisible();
+            await expect(
+                page.getByText("Paid plans aren't available yet."),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("region", { name: "Your plan" }),
+            ).toHaveCount(0);
+            await noRupee(page);
+            await noPlanToBuy();
+
+            // The Change plan screen isn't there.
+            const plans = await page.goto(app("/settings/billing/plans"));
+            expect(plans?.status()).toBe(404);
+        }
+
+        // Tell me when takes the signed-in person's address, and says so once.
         await page.goto(app("/settings/billing"));
+        await page.getByRole("button", { name: "Tell me when" }).click();
         await expect(
-            page.getByRole("region", { name: "Your plan" }),
-        ).toHaveCount(0);
+            page.getByRole("button", { name: "We'll tell you" }),
+        ).toBeDisabled();
+        await expect(
+            page.getByText("We'll email you when paid plans are available."),
+        ).toBeVisible();
     });
 
     test("with none chosen, a person in an India and a Global business sees the Global one's name over its own data @serial", async ({

@@ -13,6 +13,7 @@ import { WaitlistInvitesService } from "../waitlist/invites.service";
 import {
     LINK_PREVIEW_SOURCE,
     normaliseEmail,
+    PAID_PLANS_SOURCE,
     QR_MAKER_SOURCE,
     TOOL_SOURCE_PREFIX,
 } from "../waitlist/waitlist-keys";
@@ -46,9 +47,18 @@ const TOOL_GATE: Prisma.WaitlistSignupWhereInput = {
     ],
 };
 // A null source is a person (the form records none on old entries); `NOT`
-// alone would drop those, as SQL's NOT does with NULL.
+// alone would drop those, as SQL's NOT does with NULL. "Tell me when" on
+// Global's paid plans isn't waiting for an invite either: those people are
+// leads, labelled there (DEC-211).
 const NOT_TOOL_GATE: Prisma.WaitlistSignupWhereInput = {
-    OR: [{ source: null }, { NOT: TOOL_GATE }],
+    OR: [
+        { source: null },
+        {
+            NOT: {
+                OR: [...(TOOL_GATE.OR ?? []), { source: PAID_PLANS_SOURCE }],
+            },
+        },
+    ],
 };
 
 /** How many cities and referrers the summary names. */

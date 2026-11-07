@@ -25,6 +25,7 @@ import {
 import { mayAddWebsite } from "@/lib/business-limits";
 import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
+import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /**
@@ -1284,13 +1285,17 @@ export const SETTINGS_PAGES = [
  *
  * Plan and billing is nobody's while plans aren't shown (DEC-136): the
  * tabs, `/settings`, the command menu and Settings search all ask here, so
- * it leaves them together, and its address is a 404.
+ * it leaves them together, and its address is a 404. On an edition Saroh
+ * doesn't bill (Global, DEC-211) it stays, holding only the Free note
+ * (`freeNoteShown`).
  */
 export function mayOpenSettingsPage(
     actor: { role: NavRole | null; actions?: readonly string[] | null },
     page: SettingsPage,
 ): boolean {
-    if (page.href === PLAN_PAGE_HREF && !plansShown()) return false;
+    if (page.href === PLAN_PAGE_HREF && !plansShown() && !freeNoteShown()) {
+        return false;
+    }
     if (page.action && !navCan(actor, page.action)) return false;
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
         return false;

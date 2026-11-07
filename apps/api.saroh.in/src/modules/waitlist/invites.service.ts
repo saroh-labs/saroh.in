@@ -13,7 +13,11 @@ import {
     newInviteToken,
     STALE_CLAIM_MS,
 } from "./invite-token";
-import { isFreeToolSource, maskEmail } from "./waitlist-keys";
+import {
+    isFreeToolSource,
+    maskEmail,
+    PAID_PLANS_SOURCE,
+} from "./waitlist-keys";
 
 /** What a dry run says about one entry (the admin operations' shape). */
 export interface InvitePlanItem {
@@ -114,6 +118,13 @@ export class WaitlistInvitesService {
                     targetId: id,
                     verdict: "skip",
                     detail: `${who}: came from a free tool, not waiting for Saroh`,
+                };
+            }
+            if (row.source === PAID_PLANS_SOURCE) {
+                return {
+                    targetId: id,
+                    verdict: "skip",
+                    detail: `${who}: asked to hear about paid plans, not waiting for Saroh`,
                 };
             }
             if (row.inviteSentAt) {

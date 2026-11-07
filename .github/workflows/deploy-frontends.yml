@@ -199,6 +199,9 @@ jobs:
             GLOBAL_ROUTES: ${{ vars.GLOBAL_ROUTES }}
             # A production build never falls back to local hosts (saroh.tech's site.config.ts).
             CF_DEPLOY: ${{ matrix.env == 'production' && '1' || '' }}
+            # saroh.tech's "Tell me when" form: the public key of the API's
+            # Turnstile widget (a repo variable; public by design).
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ matrix.pkg == 'tech' && vars.TURNSTILE_SITE_KEY || '' }}
         steps:
             - uses: actions/checkout@v4
               with:

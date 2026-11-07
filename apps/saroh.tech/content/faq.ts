@@ -28,7 +28,7 @@ export const faqs = {
     },
     pay: {
         q: "How do my customers pay?",
-        a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Paying online isn't available yet.",
+        a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Customers can also pay by card online, into your own account.",
     },
     team: {
         q: "Can more than one person use it?",

@@ -25,6 +25,7 @@
         "@saroh/edition": "workspace:*",
         "@saroh/marketing": "workspace:*",
         "@saroh/pricing-catalog": "workspace:^",
+        "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",
         "jspdf": "4.2.1",
         "lucide-react": "catalog:",

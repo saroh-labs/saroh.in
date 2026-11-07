@@ -45,6 +45,13 @@ export const site = {
     india: "https://www.saroh.in",
     company: "Virashi Softwares LLP",
     posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    /**
+     * Turnstile's public site key for "Tell me when" (KTD8), given to the
+     * build. Unset, the form shows no check, and the API takes it only while
+     * its own Turnstile keys are unset too.
+     */
+    turnstileSiteKey:
+        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null,
     posthogHost: "https://eu.i.posthog.com",
 } as const;
 

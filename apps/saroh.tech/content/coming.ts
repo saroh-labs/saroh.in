@@ -16,10 +16,6 @@ export const COMING = [
         label: "Coming next",
         rows: [
             {
-                name: "Stripe",
-                line: "Take payments online through Stripe, into your own account: online checkout, deposits, payment at booking and payment links.",
-            },
-            {
                 name: "Plans in US dollars",
                 line: "Grow and Pro, on sale on saroh.tech.",
             },

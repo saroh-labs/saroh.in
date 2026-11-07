@@ -260,7 +260,7 @@ export const HELP: readonly HelpArticle[] = [
                 text: "Choose Copy link, and send it to whoever you like.",
             },
         ],
-        note: "People pay you at the visit, and you record it. Paying online isn't available yet.",
+        note: "People pay you at the visit, and you record it, or by card online once you connect your own account.",
         next: doInSaroh("/services"),
         related: [
             "set-your-hours",
@@ -553,7 +553,7 @@ export const helpArticle = (slug: string) => HELP.find((a) => a.slug === slug);
 export const HELP_FAQS = [
     {
         question: "How do my customers pay me?",
-        answer: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Paying online isn't available yet.",
+        answer: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Customers can also pay by card online, into your own account.",
     },
     {
         question: "Do the free tools need an account?",

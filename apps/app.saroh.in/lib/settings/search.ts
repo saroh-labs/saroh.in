@@ -8,6 +8,7 @@ import { PROFILE } from "@/lib/edition";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /**
  * Search settings ("Saroh Settings" design): the things a person comes to
@@ -66,6 +67,8 @@ export interface SettingsEntry {
      * one that is off.
      */
     module?: string;
+    /** About Saroh's plans themselves: offered only while they're shown. */
+    plans?: true;
 }
 
 const business = (label: string, value: string): SettingsEntry => ({
@@ -194,8 +197,9 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         label: "Change plan",
         page: "/settings/billing",
         action: "billing:manage",
+        plans: true,
     },
-    { label: "Invoices from Saroh", page: "/settings/billing" },
+    { label: "Invoices from Saroh", page: "/settings/billing", plans: true },
     { label: "Your profile and password", page: "/settings/profile" },
     { label: "Alerts: the bell and email", page: "/settings/profile" },
     {
@@ -297,6 +301,8 @@ export function searchSettings(
         // An actor we cannot judge holds everything, so of a pair they are
         // offered the first half — never both, never neither.
         if (entry.unless && holds(actor, entry.unless)) continue;
+        // Plan and billing holds only the Free note while plans are hidden.
+        if (entry.plans && !plansShown()) continue;
         // How to pay us is off where the edition doesn't offer it (DEC-208).
         if (entry.tab?.value === "pay" && !PROFILE.payInstructionsOffered) {
             continue;

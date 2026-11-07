@@ -3,6 +3,7 @@ jest.mock("@saroh/database", () => ({ prisma: {} }));
 import { HttpException, Logger } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import type { ChallengeVerifier } from "../site-accounts/challenge";
 import { signSiteRelay } from "../site-accounts/site-relay";
 import { siteRelaySecret } from "../site-accounts/site-secrets";
 import { WaitlistController } from "./waitlist.controller";
@@ -14,16 +15,22 @@ const DTO = {
     kind: "salon" as const,
 };
 
-function build() {
+function build(
+    challenge: { configured: boolean; verify?: jest.Mock } = {
+        configured: false,
+    },
+) {
     const join = jest.fn().mockResolvedValue({
         created: true,
         position: 7,
         refCode: "abcdefgh",
     });
-    const controller = new WaitlistController({
-        join,
-    } as unknown as WaitlistService);
-    return { controller, join };
+    const tellMeWhen = jest.fn().mockResolvedValue(undefined);
+    const controller = new WaitlistController(
+        { join, tellMeWhen } as unknown as WaitlistService,
+        challenge as unknown as ChallengeVerifier,
+    );
+    return { controller, join, tellMeWhen };
 }
 
 const relayFor = (address: string) =>
@@ -116,5 +123,81 @@ describe("WaitlistController", () => {
         await expect(
             controller.join(DTO, "10.0.0.99", relayFor("198.51.100.10")),
         ).resolves.toMatchObject({ ok: true });
+    });
+
+    describe("Tell me when (paid-plans, KTD8)", () => {
+        const ASK = {
+            email: "owner@example.test",
+            source: "paid-plans",
+            turnstileToken: "tok",
+        };
+
+        it("answers a new and a repeat address with the same body", async () => {
+            const verify = jest.fn().mockResolvedValue(true);
+            const { controller, tellMeWhen, join } = build({
+                configured: true,
+                verify,
+            });
+
+            const first = await controller.join(
+                ASK,
+                "203.0.113.5",
+                undefined,
+                "api.saroh.tech",
+            );
+            const again = await controller.join(
+                ASK,
+                "203.0.113.6",
+                undefined,
+                "api.saroh.tech",
+            );
+
+            expect(first).toEqual({ ok: true });
+            expect(again).toEqual(first);
+            expect(tellMeWhen).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    email: ASK.email,
+                    edition: "GLOBAL",
+                }),
+            );
+            expect(join).not.toHaveBeenCalled();
+            expect(verify).toHaveBeenCalledWith("tok", "203.0.113.5");
+        });
+
+        it("refuses a post without a valid Turnstile token, writing nothing", async () => {
+            const verify = jest.fn().mockResolvedValue(false);
+            const { controller, tellMeWhen } = build({
+                configured: true,
+                verify,
+            });
+
+            await expect(
+                controller.join(
+                    { email: ASK.email, source: "paid-plans" },
+                    "203.0.113.7",
+                    undefined,
+                    "api.saroh.tech",
+                ),
+            ).rejects.toMatchObject({ status: 403 });
+            expect(tellMeWhen).not.toHaveBeenCalled();
+        });
+
+        it("still takes it while Turnstile isn't set up, and says so at ERROR", async () => {
+            const error = jest
+                .spyOn(Logger.prototype, "error")
+                .mockImplementation(() => undefined);
+            const { controller, tellMeWhen } = build();
+
+            await expect(
+                controller.join(
+                    { email: ASK.email, source: "paid-plans" },
+                    "203.0.113.8",
+                    undefined,
+                    "api.saroh.tech",
+                ),
+            ).resolves.toEqual({ ok: true });
+            expect(tellMeWhen).toHaveBeenCalled();
+            error.mockRestore();
+        });
     });
 });
