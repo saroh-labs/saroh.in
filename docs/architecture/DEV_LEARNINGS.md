@@ -6545,3 +6545,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the spec now expects the payment due for 7 days, then Free from the sweep. All nine specs that deliver `halted` pass.
 - **Rule:** before changing what an event does, grep every spec that sends it (`rg -l '"halted"' --glob '*.db.spec.ts'`) and run them all, not only the ones being edited.
 - **Category:** tests · billing
+
+## A new export the code called wasn't in a spec's mock (7 Nov 2026)
+
+- **Symptom:** `admin-people.db.spec.ts` failed in the full gate: staff couldn't send a sign-in code ("couldn't be sent"). Separately, `product-milestones.spec.ts` failed only when run after another file.
+- **Cause:** `SignInCodeSender` began calling `authOfEdition()` from `common/auth/auth`, and the spec's `jest.mock` of that module exported only `auth`, so the call threw. The unit run never loaded that spec: it's a `.db.spec`. The analytics spec shared the 10-minute workspace facts cache between tests, so its result hung on run order.
+- **Fix:** the mock exports `authOfEdition` returning the same stub; the analytics spec calls `forgetWorkspaceFacts()` before each test.
+- **Rule:** when a module gains an export its callers now use, grep the specs that `jest.mock` that module (`grep -rn 'jest.mock(".*<module>"'`) and run them, `.db.spec` included, before calling the change done. A module-level cache needs its test seam called in `beforeEach`.

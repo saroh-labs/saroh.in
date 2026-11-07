@@ -36,8 +36,8 @@ jest.mock("../../common/email", () => ({
 // The endpoint `SignInCodeSender` calls, as the plugin runs it: a fresh
 // code, then the sender `auth.ts` configures.
 const askedForCodes: { email: string; type: string }[] = [];
-jest.mock("../../common/auth/auth", () => ({
-    auth: {
+jest.mock("../../common/auth/auth", () => {
+    const auth = {
         api: {
             sendVerificationOTP: async ({
                 body,
@@ -56,8 +56,10 @@ jest.mock("../../common/auth/auth", () => ({
                 return { success: true };
             },
         },
-    },
-}));
+    };
+    // Every edition's instance sends through the same endpoint here.
+    return { auth, authOfEdition: () => auth };
+});
 // The controller is loaded for its route metadata only.
 jest.mock("../../common/guards/better-auth.guard", () => ({
     BetterAuthGuard: class BetterAuthGuard {},

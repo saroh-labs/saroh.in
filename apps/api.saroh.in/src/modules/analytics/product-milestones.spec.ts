@@ -19,6 +19,7 @@ import {
     ProductMilestones,
     UPGRADE_PROMPT_EVENTS,
     WORKSPACE_EVENTS,
+    forgetWorkspaceFacts,
     signedUp,
     signupViewProperties,
     sourceProperties,
@@ -72,6 +73,8 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("product milestones (DEC-125)", () => {
     beforeEach(() => {
+        // Facts are cached per business for 10 minutes: every test reads its own.
+        forgetWorkspaceFacts();
         jest.spyOn(structuredLogger, "warn").mockImplementation(
             () => undefined,
         );
