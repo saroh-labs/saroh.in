@@ -6,7 +6,7 @@ import { rollOut } from "../fixtures/global";
 import { makeBusiness } from "../fixtures/own-business";
 import { northwind } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG } from "../playwright.config";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The one "Turn on" sheet (DEC-068), desk and phone. Northwind has every
@@ -147,6 +147,21 @@ test.describe(
                 "MODULE_APPOINTMENTS",
                 "MODULE_PAYMENTS",
             ]);
+            // Contacts first: Bookings needs it, and a switch whose need is
+            // off waits for it (the row offers both instead).
+            const crm = await page.request.put(
+                `${urls.API_URL}/organizations/${b.id}/modules/CRM`,
+                {
+                    headers: {
+                        origin: urls.APP_URL,
+                        "x-organization-id": b.id,
+                    },
+                    data: { status: "ENABLED", setup: {} },
+                },
+            );
+            expect(crm.ok(), `turn on Contacts: ${await crm.text()}`).toBe(
+                true,
+            );
             await page.goto(`/open/${b.id}`);
             await page.goto("/settings/modules");
             await page
