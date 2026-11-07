@@ -367,3 +367,30 @@ describe("signing up through an invite (U31)", () => {
         expect(row.joinedAt).toBeNull();
     });
 });
+
+describe("Tell me when entries (Global launch plan KTD8)", () => {
+    it("gets no invite (so no invite key and no opening-day mail)", async () => {
+        await waitlist.tellMeWhen({
+            email: `quiet-${tag}@example.test`,
+            edition: "GLOBAL",
+        });
+        const row = await prisma.waitlistSignup.findFirstOrThrow({
+            where: { emailKey: `quiet-${tag}@example.test` },
+            select: { id: true },
+        });
+
+        const [plan] = await invites.classify([row.id]);
+        expect(plan?.verdict).toBe("skip");
+        const sent = await invites.sendOne(row.id);
+        expect(sent.status).not.toBe("DONE");
+        expect(send).not.toHaveBeenCalled();
+        const after = await prisma.waitlistSignup.findUniqueOrThrow({
+            where: { id: row.id },
+            select: { inviteTokenHash: true, invitedAt: true },
+        });
+        expect(after).toEqual({ inviteTokenHash: null, invitedAt: null });
+        await prisma.sarohLead.deleteMany({
+            where: { email: `quiet-${tag}@example.test` },
+        });
+    });
+});

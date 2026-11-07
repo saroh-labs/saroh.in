@@ -178,7 +178,10 @@ describe("saroh.tech's words", () => {
         // `currencies` says who uses saroh.in. Nothing else may.
         const { tools: _tools, ...homeWords } = home;
         const { HELP: _help, ...rest } = { ...all, home: homeWords };
-        expect(words(rest)).not.toMatch(banned);
+        // Features alone says card payments go through your own Stripe (KTD9).
+        const stripe = /through your own Stripe/g;
+        expect(words(features).match(stripe)?.length).toBeGreaterThan(0);
+        expect(words(rest).replace(stripe, "")).not.toMatch(banned);
         expect(
             words(
                 HELP.filter((a) => a.group !== "Free tools").map(

@@ -42,6 +42,12 @@ export interface CreateOrderIntentInput {
      */
     orderId: string;
     credentials: ProviderCredentials;
+    /**
+     * What the payment is for, in a few words ("Rye & Co. order"). Stripe
+     * shows it on the payment, and an Indian Stripe account refuses a
+     * payment from abroad without one (an export); others may ignore it.
+     */
+    description?: string;
 }
 
 export interface CreateOrderIntentResult {

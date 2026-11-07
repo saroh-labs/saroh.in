@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Headers,
+    HttpCode,
+    Post,
+    UseGuards,
+} from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -24,11 +32,17 @@ export class SelfTestController {
 
     @Post("email")
     @HttpCode(200)
-    sendEmail(@CurrentUser() user: AuthUser, @Body() dto: SelfTestEmailDto) {
+    sendEmail(
+        @CurrentUser() user: AuthUser,
+        @Body() dto: SelfTestEmailDto,
+        @Headers("host") host?: string,
+    ) {
         // `dto.template` is validated by the DTO to be one of the fixed keys.
         return this.selfTest.sendSelfTest(
             user,
             dto.template as SelfTestTemplate,
+            // Sent from the edition it was asked through (KTD6).
+            editionOfHost(host ?? "") ?? "INDIA",
         );
     }
 }

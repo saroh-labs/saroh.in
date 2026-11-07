@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 /**
  * Sends a person a sign-in code the way the accounts sign-in does: through
@@ -13,11 +14,17 @@ import { Injectable } from "@nestjs/common";
  */
 @Injectable()
 export class SignInCodeSender {
-    async send(email: string): Promise<void> {
+    /**
+     * `edition` picks the instance, and so the sender and the sign-in
+     * address: a code sent from the Global console comes from saroh.tech
+     * (KTD6). None: the configured instance.
+     */
+    async send(email: string, edition?: Edition | null): Promise<void> {
         // Loaded on first use, not at import: the admin controllers' specs
         // read route metadata under a CommonJS runner that cannot load
         // Better Auth (ESM), and this file is on their import path.
-        const { auth } = await import("./auth");
+        const { authOfEdition } = await import("./auth");
+        const auth = authOfEdition(edition);
         await (auth.api as unknown as CodeApi).sendVerificationOTP({
             body: { email, type: "sign-in" },
         });

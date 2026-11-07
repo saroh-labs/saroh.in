@@ -1,6 +1,7 @@
 import type { BillingAccessView } from "@/lib/billing/access";
 import { accessRow, upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
@@ -30,10 +31,22 @@ export const TRACKERS_LOCKED_LINE =
 export const TRACKERS_KEPT_LINE =
     "Saved, not running on your site. Upgrade to turn it back on.";
 
+/**
+ * The same, while plans aren't shown (an edition with no plans to buy,
+ * Global at launch, DEC-211): no "paid plans" and no "Upgrade", and the
+ * link is drawn by nobody (`PlanWay`).
+ */
+export const TRACKERS_LOCKED_LINE_NO_PLANS =
+    "Connect your own analytics and ad tracking. Your plan doesn't include it.";
+
+export const TRACKERS_KEPT_LINE_NO_PLANS =
+    "Saved, not running on your site. Your plan doesn't include it.";
+
 function lockTo(up: { planId: string; name: string } | null): TrackersLock {
+    const shown = plansShown();
     return {
-        line: TRACKERS_LOCKED_LINE,
-        kept: TRACKERS_KEPT_LINE,
+        line: shown ? TRACKERS_LOCKED_LINE : TRACKERS_LOCKED_LINE_NO_PLANS,
+        kept: shown ? TRACKERS_KEPT_LINE : TRACKERS_KEPT_LINE_NO_PLANS,
         cta: planLabel(up?.name),
         href: upgradeHref(up?.planId),
     };

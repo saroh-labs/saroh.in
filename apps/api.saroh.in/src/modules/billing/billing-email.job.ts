@@ -580,7 +580,13 @@ export class BillingEmailHandler {
         attachments?: SarohBillingEmail["attachments"],
         also?: string | null,
     ): Promise<boolean> {
-        const people = await billingRecipients(organizationId);
+        const [people, business] = await Promise.all([
+            billingRecipients(organizationId),
+            prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: { edition: true },
+            }),
+        ]);
         const extra = also?.trim().toLowerCase();
         const to =
             extra && !people.some((e) => e.toLowerCase() === extra)
@@ -596,6 +602,8 @@ export class BillingEmailHandler {
             html: words.html,
             replyTo: sarohSeller().email,
             ...(attachments ? { attachments } : {}),
+            // From the business's edition's sender (KTD6).
+            ...(business ? { edition: business.edition } : {}),
         });
         if (outcome === "failed") {
             throw new Error(`billing_email_send_failed job=${job.id}`);

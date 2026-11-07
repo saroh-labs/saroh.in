@@ -180,7 +180,7 @@ export class DataRequestEmailHandler {
                 if (stands && request.status !== stands) return null;
                 const org = await tx.organization.findUnique({
                     where: { id: organizationId },
-                    select: { name: true },
+                    select: { name: true, edition: true },
                 });
                 return {
                     to: request.requesterEmail,
@@ -191,6 +191,7 @@ export class DataRequestEmailHandler {
                         org?.name ?? "",
                         "the business",
                     ),
+                    edition: org?.edition,
                 };
             }),
         );
@@ -211,6 +212,7 @@ export class DataRequestEmailHandler {
             outcome = await this.send(to, {
                 businessName: due.business,
                 ...words,
+                edition: due.edition,
             });
         } catch {
             outcome = "failed";

@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { moduleRolledOut } from "../capabilities/module-registry";
 import {
+    bookableOnline,
     bookingSiteBlocker,
     mayMakeBookingSite,
 } from "../capabilities/setup/booking-site";
@@ -145,8 +146,11 @@ export class BookingPageService {
 
     /**
      * `POST …/booking-page/publish`: publish the business's website, which
-     * the booking page is on. `site:publish`; 404 with no website. Answers
-     * the read, now live.
+     * the booking page is on. `site:publish`; 404 with no website; refused
+     * until a service customers can book online exists (DEC-212: Bookings
+     * turns on with none, but its page doesn't go live with nothing to
+     * book). Website › Publish is not gated here. Answers the read, now
+     * live.
      */
     async publish(
         ctx: OrganizationContext,
@@ -158,6 +162,16 @@ export class BookingPageService {
             throw new NotFoundException(
                 "There's no booking page to publish yet.",
             );
+        }
+        const service = await prisma.service.findFirst({
+            where: bookableOnline(ctx.organizationId),
+            select: { id: true },
+        });
+        if (!service) {
+            throw new ConflictException({
+                message: MAKE_REFUSED["no-service"],
+                details: { reason: "no-service" },
+            });
         }
         await this.sites.publishSite(ctx, site.id, options);
         return this.read(ctx);

@@ -8,7 +8,7 @@
         "check:catalog-lock": "node scripts/check-catalog-lock.mjs",
         "check:client-calls": "node scripts/check-client-calls.mjs",
         "check:decision-ids": "node scripts/check-decision-ids.mjs",
-        "check:deploy-env": "node --test scripts/cf-env.test.mjs scripts/cf-global-dev.test.mjs && node scripts/check-deploy-env.mjs",
+        "check:deploy-env": "node --test scripts/cf-env.test.mjs scripts/cf-global-dev.test.mjs scripts/cf-global-prod.test.mjs scripts/cf-plan.test.mjs scripts/assert-production-hosts.test.mjs scripts/smoke-global.test.mjs && node scripts/check-deploy-env.mjs",
         "check:date-inputs": "node scripts/check-date-inputs.mjs",
         "check:native-selects": "node scripts/check-native-selects.mjs",
         "check:db-teardown": "node scripts/check-db-teardown.mjs",

@@ -497,3 +497,64 @@ describe("the link preview tool's entries (resources plan U2)", () => {
         ]);
     });
 });
+
+describe("Tell me when (Global launch plan KTD8)", () => {
+    afterEach(async () => {
+        await prisma.sarohLead.deleteMany({
+            where: { email: { endsWith: `-${tag}@example.test` } },
+        });
+    });
+
+    it("keeps one quiet GLOBAL paid-plans entry and a lead labelled Paid plans interest", async () => {
+        const email = mail("paid");
+        await service.tellMeWhen({ email, edition: "GLOBAL" });
+        await service.tellMeWhen({ email, edition: "GLOBAL" });
+
+        const rows = await prisma.waitlistSignup.findMany({
+            where: { emailKey: email },
+            select: { edition: true, source: true, refCode: true },
+        });
+        expect(rows).toEqual([
+            { edition: "GLOBAL", source: "paid-plans", refCode: null },
+        ]);
+        const leads = await prisma.sarohLead.findMany({
+            where: { emailKey: email },
+            select: { edition: true, source: true, notes: true },
+        });
+        // A second press merges into the lead; the label is there once.
+        expect(leads).toEqual([
+            {
+                edition: "GLOBAL",
+                source: "WAITLIST",
+                notes: "Paid plans interest",
+            },
+        ]);
+    });
+
+    it("turns a free tool's entry for the same address into a paid-plans one, so the tool's sweep no longer takes it", async () => {
+        const email = mail("tooluser");
+        await prisma.waitlistSignup.create({
+            data: {
+                email,
+                emailKey: email,
+                source: "qr-maker",
+                checkedAt: new Date(),
+                newsConsent: false,
+                edition: "GLOBAL",
+            },
+        });
+
+        await service.tellMeWhen({ email, edition: "GLOBAL" });
+
+        const rows = await prisma.waitlistSignup.findMany({
+            where: { emailKey: email },
+            select: { source: true },
+        });
+        expect(rows).toEqual([{ source: "paid-plans" }]);
+        const lead = await prisma.sarohLead.findFirst({
+            where: { emailKey: email },
+            select: { notes: true },
+        });
+        expect(lead?.notes).toBe("Paid plans interest");
+    });
+});

@@ -7,6 +7,11 @@
 export const EDITIONS = ["INDIA", "GLOBAL"] as const;
 export type Edition = (typeof EDITIONS)[number];
 
+/** Whether a stored value names an edition. */
+export function isEdition(value: unknown): value is Edition {
+    return (EDITIONS as readonly unknown[]).includes(value);
+}
+
 export type DeployEnvironment = "production" | "development";
 
 /**
@@ -57,6 +62,14 @@ export interface EditionProfile {
      * plan's to say.
      */
     onlinePaymentsOnEveryPlan: boolean;
+    /**
+     * The suffix on the env names an edition sets for itself (its GitHub
+     * sign-in app, its senders): India's are the original names, Global's
+     * end in `_GLOBAL` (stage 10, KTD5 and KTD6).
+     */
+    envSuffix: "" | "_GLOBAL";
+    /** Saroh's senders on the edition's own domain, until their env names are set. */
+    defaultSenders: { mail: string; codes: string };
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -76,6 +89,11 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         upi: true,
         paymentProviders: ["RAZORPAY", "CASHFREE"],
         onlinePaymentsOnEveryPlan: false,
+        envSuffix: "",
+        defaultSenders: {
+            mail: "Saroh <noreply@saroh.in>",
+            codes: "codes@saroh.in",
+        },
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -93,6 +111,11 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         upi: false,
         paymentProviders: ["STRIPE"],
         onlinePaymentsOnEveryPlan: true,
+        envSuffix: "_GLOBAL",
+        defaultSenders: {
+            mail: "Saroh <noreply@saroh.tech>",
+            codes: "codes@saroh.tech",
+        },
     },
 };
 

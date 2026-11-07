@@ -729,7 +729,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-068 Turning a module on asks for its minimum first
 
-**Status: Accepted — 2026-09-29** · user · launch readiness
+**Status: Accepted — 2026-09-29** · user · launch readiness · **amended by DEC-212 (2026-11-07)**: from Settings › Modules, what this table asks at turn-on is offered with its defaults and never required
 
 - Context: today a module switches on at once and works out its readiness afterwards, so a merchant meets what is missing only when it fails in use ("No connected payment provider…"). Four entry points (Settings › Modules, Home's first run, `/onboarding/modules`, "Also sell") each behave differently, and some can enable a module Saroh hasn't rolled out.
 - Decision:
@@ -2799,6 +2799,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Unchanged: India, Razorpay and Cashfree. Their keys, minimums, methods and webhooks are as before. Test business mode (DEC-145) is not built, so a connection takes test or live keys, as Razorpay's does; only a mix of the two is refused.
 - Rules: `apps/api.saroh.in/src/modules/payments/providers/stripe.provider.ts`, `stripe-payments.ts` and `STRIPE.md` (verified facts and sources); `payments/public-key.ts` (key checks, `IN_EDITION`, `OPENS_CHECKOUT`); `payments/stripe-minimum.ts`; `payments/payments.service.ts` (`connectProvider`, the intent core, `cancelHoldIntents`); `webhooks/providers/stripe.webhook.ts`; `feature-flags/flags.ts` (`STRIPE_PAYMENTS`); `docs/patterns/backend-integrations.md`.
 
+- **Amended 7 Nov 2026 (owner): Stripe's hosted Checkout is the only Stripe path.** The test on an Indian Stripe account was refused by Stripe's export rules ("As per Indian regulations, export transactions require a description"), and the owner's answer: "we can't say the user that you are not able to do this because we tested on india account… better we make things better instead of getting complaints… also we should let them use stripe checkout too… and I hope we are creating customers on stripe too, so that users can track?" Chosen over a fallback after the in-page window, and over embedded Checkout:
+    - The customer pays on Stripe's page for the merchant's own account and comes back to the booking or order. Stripe asks for whatever the account's country requires (an Indian export's address, card checks) and shows the payment methods the merchant turned on in their dashboard, so "cards only" no longer holds.
+    - Each payer is found or created as a Stripe customer in the merchant's account, by email, and the id is kept on the business's contact, so the merchant can follow who paid.
+    - The session carries Saroh's reference and a description, so the existing webhook settles it; it expires with the booking's hold. Saroh's own card window goes.
+    - Facts to verify against Stripe's docs before building, recorded in `payments/providers/STRIPE.md`.
+
 ## DEC-209 Clicks on saroh.in, and what a business does in the workspace, every time
 
 - Decision (owner, 6 Nov 2026, "autocapture on saroh.in and track the important events like creating new, enabling modules etc"): two additions to what PostHog receives (DEC-125, DEC-160, DEC-187).
@@ -2818,3 +2824,34 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Replaces: India's drop to Free the moment Razorpay halts a subscription after its retries. Razorpay may still retry on its own; a retry that succeeds pays the due and withdraws the link, and paying both is refunded automatically (DEC-164).
 - Global: the same route is the whole monthly route if Razorpay can't put USD on Subscriptions for Saroh's account. In test mode on 6 Nov, USD plans were refused while USD orders and payment links were accepted.
 - Built in #1317 (stage 9, epic #1306).
+
+## DEC-211 Global opens Free-only; Saroh's own billing abroad is built but stays switched off
+
+- Decision (owner, 7 Nov 2026): "Build the international payments with razorpay for saroh subscriptions and work as planned, and keep the plans as free only for now… we build the full flow, but not enable that… once we are ready with all things, we will enable it. Till then the product will be free, with its limits."
+- Stage 9 (USD plans and Saroh's own billing on Razorpay with international cards, epic #1306) is built as planned, behind the `SAROH_BILLING_GLOBAL` switch, off in production. Turning it on is the owner's call once the outside gates are met: Razorpay's confirmation of USD renewals, purpose code, CA export wording and LUT, Global invoice prefix, a published Global catalogue, and the foreign-tax read.
+- On in local development and on the development environment (owner, 7 Nov): the team buys, renews and fails payments there with test keys before anyone else can. Production is the only place it starts off.
+- Until then saroh.tech and the Global edition launch Free-only, with Free's limits. Nothing on Global lets a business buy a plan; paid plans may be shown as coming soon, with no price to buy.
+- Merchants' own Stripe (DEC-208, built, on main) is not Saroh billing: it is switched on for Global at launch (owner, 7 Nov). A Global business connects its own keys and its customers pay it directly; Saroh holds no money. saroh.tech's "Stripe coming next" and "Saroh doesn't take payments" words change with that switch.
+- Global is email only (owner, 7 Nov): no phone or WhatsApp sign-in or verification codes, for Saroh accounts or for a Global business's customers. `phoneSignIn` is false in Global's edition profile, and `VerificationService.approved` refuses every Global business whatever its flag.
+- DEC-210's payment-due flow covers both editions and needs no change.
+
+## DEC-212 Turning a module on needs nothing first
+
+**Status: Accepted — 2026-11-07** · owner · amends DEC-068
+
+- Decision (owner, 7 Nov 2026): "when we enable booking, dont make it necessary to create booking when we enable the module, it should be able to enable without any requirement to setup service before enabling, same should be applied to other modules too".
+- Scope (owner, 7 Nov 2026): "I meant in the settings they can enable bookings feature, but in order to publish or make their booking page live, they have to create a service, that requirement is still there. Only changed from the settings → modules flow."
+- **Turning a module on from Settings › Modules needs nothing.** DEC-068's one Turn on sheet opens there with its defaults shown and editable, but no field blocks turning on. Its "Asked at turn-on" column is offered with its default there:
+
+    | Module   | Left empty                                                                                                                                     |
+    | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+    | Sell     | the location is named after the business (an existing one keeps its name); no way chosen is Pick-up                                            |
+    | Bookings | no first service is made, and "Add a service to open your booking page" is the Finish setup step; a service with no open day gets Mon–Sat 10–7 |
+    | Website  | the site is named after the business, at the address chosen at setup or a free one like it                                                     |
+    - A web address left as offered isn't sent, so the API takes a free one at the moment of saving: an address taken since the sheet opened never stops it.
+    - What the merchant typed is still judged: a price like "5,00", 0 minutes for a named service, a web address with two hyphens or one that is taken. The rule is "nothing required", not "anything accepted".
+
+- **Going live still needs its first service.** With no service customers can book online, no booking page is made (DEC-175), Publish booking page is refused in the merchant's words, and a published site's `/book` says the business isn't taking bookings, with no Book button and out of search.
+- **The other entry points keep DEC-068's minimum**: Home's first run, the module picker and "Also sell" still ask for it.
+- The API accepts each module's setup with any field blank or absent, makes nothing it wasn't asked for, and still takes the full payload the sheet sent before.
+- Known limit: Bookings' hours live on its services, so hours set in the sheet with no first service are not kept. They are set again on the first service.

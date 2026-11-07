@@ -93,6 +93,7 @@ export class QrMakerGateService {
             email,
             mail.subject,
             mail.text,
+            input.edition ?? "INDIA",
         );
         if (outcome !== "sent") {
             this.logger.warn(

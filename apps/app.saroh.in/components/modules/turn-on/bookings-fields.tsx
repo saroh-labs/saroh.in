@@ -16,18 +16,23 @@ import { Label } from "@saroh/ui/label";
 import type { Update } from "./setup-fields";
 
 /**
- * Bookings' minimum (DEC-068): the opening hours, Mon–Sat 10 to 7 to
- * start, and the first service with its length and price. A compact week:
+ * Bookings' starting answers (DEC-068): the opening hours, Mon–Sat 10 to 7
+ * to start, and the first service with its length and price. From
+ * Settings › Modules none is required (DEC-212): a service left unnamed
+ * is added later. A compact week:
  * a box for each day that is open, and its open and close times beside it.
  */
 export function BookingsFields({
     draft,
     update,
     errors,
+    serviceOptional = false,
 }: {
     draft: TurnOnDraft;
     update: Update;
     errors: FieldErrors;
+    /** Settings › Modules (DEC-212): the first service can wait. */
+    serviceOptional?: boolean;
 }) {
     const currency = useStartingCurrency();
     const id = useId();
@@ -143,9 +148,17 @@ export function BookingsFields({
 
             <Field
                 htmlFor={`${id}-service`}
-                label="First service"
+                label={
+                    serviceOptional
+                        ? "First service (optional)"
+                        : "First service"
+                }
                 error={errors["service.name"]}
-                hint="What people book, like “Haircut” or “Consultation”."
+                hint={
+                    serviceOptional
+                        ? "Add one now, or later. Your booking page opens once you have one."
+                        : "What people book, like “Haircut” or “Consultation”."
+                }
             >
                 <Input
                     id={`${id}-service`}

@@ -15,6 +15,7 @@ import type {
     VerificationModule,
 } from "@saroh/database";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 import {
     INDIAN_MOBILE_E164,
@@ -113,6 +114,15 @@ export class VerificationService {
      */
     async approved(organizationId: string): Promise<boolean> {
         if (!VerificationService.sendsForBusinesses) return false;
+        // Global is email only (owner, 7 Nov 2026): no phone or WhatsApp
+        // codes for its businesses' customers, whatever the flag says.
+        const org = await outsideOrgContext(() =>
+            prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: { edition: true },
+            }),
+        );
+        if (!org || !editionProfile(org.edition).phoneSignIn) return false;
         return this.flags.isEnabled(
             FlagKey.CUSTOMER_PHONE_CODES,
             organizationId,

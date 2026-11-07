@@ -5,12 +5,14 @@ import { env } from "../../env";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
+import { ChallengeVerifier } from "../site-accounts/challenge";
 import { WaitlistInvitesService } from "./invites.service";
 import {
     LaunchOfferController,
     WaitlistInviteController,
 } from "./launch-offer.controller";
 import { LaunchOfferService } from "./launch-offer.service";
+import { PaidPlansInterestController } from "./paid-plans.controller";
 import { PublicLaunchOfferController } from "./public-offer.controller";
 import {
     WAITLIST_RETENTION_TYPE,
@@ -38,12 +40,14 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         WaitlistInviteController,
         LaunchOfferController,
         PublicLaunchOfferController,
+        PaidPlansInterestController,
     ],
     providers: [
         WaitlistService,
         WaitlistRetentionHandler,
         WaitlistInvitesService,
         LaunchOfferService,
+        ChallengeVerifier,
     ],
     exports: [WaitlistService, WaitlistInvitesService],
 })

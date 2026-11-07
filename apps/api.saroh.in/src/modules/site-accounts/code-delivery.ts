@@ -25,10 +25,7 @@ import type { CeilingAlert } from "./code-limits";
 export const SITE_CODE_SENDER = Symbol("SITE_CODE_SENDER");
 export const SITE_CODE_RETRY_DELAYS = Symbol("SITE_CODE_RETRY_DELAYS");
 
-export type SiteCodeSender = (
-    to: string,
-    details: { code: string; businessName: string; minutes: number },
-) => Promise<EmailOutcome>;
+export type SiteCodeSender = typeof sendSiteSignInCodeEmail;
 
 const FAILURE_WINDOW_MS = 5 * 60_000;
 const FAILURE_THRESHOLD = 3;
@@ -128,7 +125,7 @@ export class SiteCodeDelivery {
     async deliver(
         organizationId: string,
         to: string,
-        details: { code: string; businessName: string; minutes: number },
+        details: Parameters<SiteCodeSender>[1],
     ): Promise<boolean> {
         const tries = this.retryDelaysMs.length + 1;
         for (let attempt = 1; attempt <= tries; attempt += 1) {

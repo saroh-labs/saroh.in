@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { isEdition } from "@saroh/edition";
 
 import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
 
@@ -52,7 +54,10 @@ export class SignInEmailReleaseHandler {
         });
         if (marked.count === 0) return;
         try {
-            await this.codes.send(change.newEmail);
+            await this.codes.send(
+                change.newEmail,
+                editionOfPayload(job.payload),
+            );
         } catch (error) {
             this.logger.error(
                 `The released code for ${change.userId} could not be sent: ${
@@ -61,6 +66,15 @@ export class SignInEmailReleaseHandler {
             );
         }
     };
+}
+
+/** The console's edition the change was made on; none (older jobs, local): the configured instance. */
+function editionOfPayload(payload: unknown): Edition | null {
+    const edition =
+        payload && typeof payload === "object" && "edition" in payload
+            ? payload.edition
+            : null;
+    return isEdition(edition) ? edition : null;
 }
 
 function changeIdOf(payload: unknown): string | null {

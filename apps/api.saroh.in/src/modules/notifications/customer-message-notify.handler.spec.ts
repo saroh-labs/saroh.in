@@ -95,11 +95,33 @@ describe("CustomerMessageNotifyHandler (UX-014)", () => {
             },
         });
         expect(sendEmail).toHaveBeenCalledTimes(2);
-        expect(sendEmail).toHaveBeenCalledWith("owner@example.in", {
-            customerName: "Priya",
-            message: "Hi, any update on my Friday delivery question?",
-            threadUrl: "https://app.saroh.in/contacts/contact_1?tab=msg",
+        expect(sendEmail).toHaveBeenCalledWith(
+            "owner@example.in",
+            {
+                customerName: "Priya",
+                message: "Hi, any update on my Friday delivery question?",
+                threadUrl: "https://app.saroh.in/contacts/contact_1?tab=msg",
+            },
+            "INDIA",
+        );
+    });
+
+    it("comes from Global's sender, linking Global's app, for a Global business (KTD6)", async () => {
+        findMessage.mockResolvedValue(message());
+        notificationCreate.mockResolvedValue({ id: "n_1" });
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValueOnce({
+            edition: "GLOBAL",
         });
+
+        await handler.handle(job());
+
+        expect(sendEmail).toHaveBeenCalledWith(
+            "owner@example.in",
+            expect.objectContaining({
+                threadUrl: "https://app.saroh.tech/contacts/contact_1?tab=msg",
+            }),
+            "GLOBAL",
+        );
     });
 
     it("names a separate contact by the email they sign in with, never the placeholder", async () => {

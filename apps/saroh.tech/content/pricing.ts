@@ -18,6 +18,16 @@ export const PRICING = {
     /** The absent mark, where a price would be. */
     noPrice: "—",
     notYet: "Not available yet",
+    /** "Tell me when" under a paid plan (KTD8): one email when paid plans open. */
+    tellMe: {
+        ask: "Tell me when",
+        asked: "We'll tell you",
+        askedLine: "We'll email you when paid plans are available.",
+        label: "Your email",
+        invalid: "Enter an email like name@shop.com.",
+        check: "The check didn't pass. Try again.",
+        failed: "We couldn't send that just now. Try again in a minute.",
+    },
     words: {
         free: {
             tagline: "For getting your business online.",

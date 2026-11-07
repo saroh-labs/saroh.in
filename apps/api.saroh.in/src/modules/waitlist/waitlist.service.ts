@@ -10,10 +10,15 @@ import {
     businessKey,
     cleanSource,
     isFreeToolSource,
+    LINK_PREVIEW_SOURCE,
     maskEmail,
     newRefCode,
     normaliseEmail,
+    PAID_PLANS_LEAD_NOTE,
+    PAID_PLANS_SOURCE,
+    QR_MAKER_SOURCE,
     REF_CODE_PATTERN,
+    TOOL_SOURCE_PREFIX,
     waitlistTemplate,
 } from "./waitlist-keys";
 
@@ -80,6 +85,7 @@ export class WaitlistService {
         const businessName = textOrNull(input.business);
         const bKey = businessKey(businessName);
 
+        // As `editionOfFormHost`: no edition files under India.
         const edition = input.edition ?? "INDIA";
         if (await this.exists(key, bKey, edition)) {
             this.logger.log(`waitlist: repeat signup for ${maskEmail(email)}`);
@@ -135,6 +141,9 @@ export class WaitlistService {
                         kind: data.kind,
                         city: data.city,
                         edition,
+                        ...(data.source === PAID_PLANS_SOURCE && {
+                            note: PAID_PLANS_LEAD_NOTE,
+                        }),
                     }).catch(() => "failed" as const);
                 }
                 return {
@@ -156,6 +165,45 @@ export class WaitlistService {
         throw new Error(
             "Could not draw a free referral id for a waitlist entry",
         );
+    }
+
+    /**
+     * "Tell me when" (Global launch plan KTD8): one quiet `paid-plans` entry
+     * and a sales lead labelled "Paid plans interest". Answers nothing, so a
+     * caller can't tell a new address from a repeat. An address already
+     * there from a free tool's email gate becomes a `paid-plans` entry, so
+     * the tool's 12-month sweep no longer takes it; one already waiting for
+     * Saroh keeps its entry, and its lead still gets the label.
+     */
+    async tellMeWhen(input: {
+        email: string;
+        edition: Edition;
+        ipHash?: string;
+    }): Promise<void> {
+        const joined = await this.join({
+            ...input,
+            source: PAID_PLANS_SOURCE,
+        });
+        if (joined.created) return;
+        const { email, key } = normaliseEmail(input.email);
+        await prisma.waitlistSignup.updateMany({
+            where: {
+                edition: input.edition,
+                emailKey: key,
+                businessKey: "",
+                OR: [
+                    { source: { in: [LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE] } },
+                    { source: { startsWith: TOOL_SOURCE_PREFIX } },
+                ],
+            },
+            data: { source: PAID_PLANS_SOURCE },
+        });
+        await recordWebsiteLead({
+            source: "WAITLIST",
+            email,
+            edition: input.edition,
+            note: PAID_PLANS_LEAD_NOTE,
+        }).catch(() => "failed" as const);
     }
 
     private async exists(

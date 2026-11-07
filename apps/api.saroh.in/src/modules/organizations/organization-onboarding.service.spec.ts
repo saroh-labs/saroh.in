@@ -581,13 +581,30 @@ describe("OrganizationOnboardingService.onboard", () => {
                 { email: "asha@example.com" },
             );
             expect(sendWelcomeEmail).toHaveBeenCalledTimes(1);
-            expect(sendWelcomeEmail).toHaveBeenCalledWith("asha@example.com", {
-                businessName: "Acme",
-                goal: "WEBSITE",
-                // The app's own address differs by environment.
-                openUrl: expect.stringMatching(/\/open\/org_1$/) as string,
-                address: "acme",
-            });
+            expect(sendWelcomeEmail).toHaveBeenCalledWith(
+                "asha@example.com",
+                {
+                    businessName: "Acme",
+                    goal: "WEBSITE",
+                    // The app's own address differs by environment.
+                    openUrl: expect.stringMatching(/\/open\/org_1$/) as string,
+                    address: "acme",
+                },
+                "INDIA",
+            );
+        });
+
+        it("comes from Global's sender for a business set up on Global (KTD6)", async () => {
+            await service.onboard(
+                "user_1",
+                { name: "Acme", profile: { country: "GB" } },
+                { email: "asha@example.com", host: "api.saroh.tech" },
+            );
+            expect(sendWelcomeEmail).toHaveBeenCalledWith(
+                "asha@example.com",
+                expect.anything(),
+                "GLOBAL",
+            );
         });
 
         it("says no goal for someone who will decide later", async () => {
@@ -599,6 +616,7 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(sendWelcomeEmail).toHaveBeenCalledWith(
                 "asha@example.com",
                 expect.objectContaining({ goal: null }),
+                "INDIA",
             );
         });
 

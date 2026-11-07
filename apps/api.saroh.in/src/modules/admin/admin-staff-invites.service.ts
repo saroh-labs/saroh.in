@@ -219,7 +219,7 @@ export class AdminStaffInvitesService {
             throw new BadRequestException("Choose what they work as.");
         }
         await this.assertMayInvite(input.staff, roles, "staff.invite.create");
-        const base = this.requireAccountsBase();
+        const base = this.requireAccountsBase(input.staff.edition);
         const token = newStaffInviteToken();
         const now = new Date();
 
@@ -318,7 +318,7 @@ export class AdminStaffInvitesService {
             inviteRoles(current),
             "staff.invite.resend",
         );
-        const base = this.requireAccountsBase();
+        const base = this.requireAccountsBase(input.staff.edition);
         const token = newStaffInviteToken();
         const now = new Date();
 
@@ -667,8 +667,8 @@ export class AdminStaffInvitesService {
         });
     }
 
-    private requireAccountsBase(): string {
-        const base = this.mailer.accountsBase();
+    private requireAccountsBase(edition: Edition | null): string {
+        const base = this.mailer.accountsBase(edition);
         if (!base) {
             throw new ServiceUnavailableException(
                 "Saroh doesn't know where its sign-in site is, so the invite would have no link. Set ACCOUNTS_URL on the API.",

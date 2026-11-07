@@ -426,6 +426,7 @@ export class OrganizationMembersService {
             dto.email,
             `${appBase(organization?.edition)}/join/${token}`,
             organization?.name ?? "a business on Saroh",
+            organization?.edition ?? "INDIA",
         );
 
         await this.audit.record({

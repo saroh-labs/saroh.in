@@ -6,10 +6,11 @@ import { PricingCards } from "@saroh/marketing/pricing-cards";
 import type { PricingPageModel } from "@saroh/marketing/pricing-model";
 import { usePricingSwitches } from "@saroh/marketing/use-pricing-switches";
 
+import { TellMeWhen } from "@/components/pricing/tell-me-when";
 import { PRICING } from "@/content/pricing";
 import { signupHref } from "@/site.config";
 
-/** The shared plan cards. Free starts; a paid plan has nothing to press yet. */
+/** The shared plan cards. Free starts; a paid plan isn't available yet, and offers Tell me when. */
 export function Plans({
     model,
     src = "pricing",
@@ -29,12 +30,15 @@ export function Plans({
             compare={compare}
             cta={(plan, look) =>
                 plan.cta.paid ? (
-                    <Pill
-                        tone="outline"
-                        className="justify-self-start text-muted-foreground"
-                    >
-                        {PRICING.notYet}
-                    </Pill>
+                    <div className="grid justify-items-start gap-3">
+                        <Pill
+                            tone="outline"
+                            className="justify-self-start text-muted-foreground"
+                        >
+                            {PRICING.notYet}
+                        </Pill>
+                        <TellMeWhen plan={plan.id} />
+                    </div>
                 ) : (
                     <ButtonLink
                         {...look}

@@ -40,6 +40,7 @@ const SITE: SiteHost = {
     host: HOST,
     businessName: "Kavi Dental",
     businessCreatedAt: new Date("2026-01-01"),
+    edition: "INDIA",
 };
 const CUSTOMER: CustomerContext = {
     organizationId: "org_kavi",

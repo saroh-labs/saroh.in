@@ -342,6 +342,44 @@ describe("who may", () => {
         expect((await sitesOf(ctx))[0]?.currentPublicationId).not.toBeNull();
     });
 
+    it("Bookings on with no service (DEC-212): no page is made, and none goes live until a service exists", async () => {
+        // No website: turning Bookings on makes no booking page.
+        const bare = await business();
+        await setup.enable(bare, "CRM", {});
+        await setup.enable(bare, "APPOINTMENTS", {});
+        expect(await bookingPage.read(bare)).toMatchObject({
+            state: "none",
+            make: "no-service",
+        });
+        expect(await sitesOf(bare)).toHaveLength(0);
+
+        // A website already: its booking page isn't published from Bookings.
+        const ctx = await business();
+        await setup.enable(ctx, "WEBSITE", {});
+        await setup.enable(ctx, "CRM", {});
+        await setup.enable(ctx, "APPOINTMENTS", {});
+        const e = await bookingPage.publish(ctx).then(
+            () => null,
+            (err: unknown) => err,
+        );
+        expect(e).toBeInstanceOf(ConflictException);
+        expect((e as ConflictException).message).toBe(
+            "Add a service customers can book online first. Your booking page lists it.",
+        );
+        expect((await sitesOf(ctx))[0]?.currentPublicationId).toBeNull();
+
+        await prisma.service.create({
+            data: {
+                organizationId: ctx.organizationId,
+                name: "Physio session",
+                durationMinutes: 45,
+                timezone: "Asia/Kolkata",
+                status: "ACTIVE",
+            },
+        });
+        expect((await bookingPage.publish(ctx)).published).toBe(true);
+    });
+
     it("Publish booking page goes live once, and the read says so", async () => {
         const ctx = await business();
         await setup.enable(ctx, "CRM", {});

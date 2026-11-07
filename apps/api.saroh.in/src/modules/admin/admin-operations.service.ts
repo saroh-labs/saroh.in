@@ -6,6 +6,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { WaitlistInvitesService } from "../waitlist/invites.service";
@@ -112,8 +113,10 @@ export class AdminOperationsService implements OnApplicationBootstrap {
     async plan(
         kind: OperationKind,
         targetIds: string[],
+        edition: Edition | null = null,
     ): Promise<OperationPlan> {
         const ids = requireTargets(targetIds);
+        await assertTargetsInEdition(kind, ids, edition);
         const items = await this.classify(kind, ids);
         return summarize(kind, items);
     }
@@ -130,6 +133,7 @@ export class AdminOperationsService implements OnApplicationBootstrap {
             throw new BadRequestException("Give a reason for this operation.");
         }
         const ids = requireTargets(input.targetIds);
+        await assertTargetsInEdition(input.kind, ids, input.staff.edition);
         const idempotencyKey = [
             input.staff.userId,
             input.kind,
@@ -195,7 +199,8 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         return this.get(operation.id);
     }
 
-    async get(operationId: string) {
+    /** Another edition's operation is a 404, as its targets are (DEC-204 item 6). */
+    async get(operationId: string, edition: Edition | null = null) {
         const operation = await prisma.adminOperation.findUnique({
             where: { id: operationId },
             select: {
@@ -222,12 +227,24 @@ export class AdminOperationsService implements OnApplicationBootstrap {
                 },
             },
         });
-        if (!operation) throw new NotFoundException("Operation not found");
+        if (
+            !operation ||
+            (edition && (await operationsOutside([operation], edition)).size)
+        ) {
+            throw new NotFoundException("Operation not found");
+        }
         return operation;
     }
 
-    async list(limit = 20) {
-        return prisma.adminOperation.findMany({
+    /**
+     * The latest operations this console's edition reaches.
+     *
+     * shortcut: filters the latest `limit` after reading them, so a console
+     * can see fewer than `limit` while the other edition is busy; give the
+     * operation its edition if that starts to hide work.
+     */
+    async list(limit = 20, edition: Edition | null = null) {
+        const rows = await prisma.adminOperation.findMany({
             select: {
                 id: true,
                 kind: true,
@@ -244,10 +261,26 @@ export class AdminOperationsService implements OnApplicationBootstrap {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: limit,
         });
+        if (!edition) return rows;
+        const hidden = await operationsOutside(rows, edition);
+        return rows.filter((row) => !hidden.has(row.id));
     }
 
     /** Stop an operation's rows that have not started (#907). */
-    cancel(input: CancelOperationInput) {
+    async cancel(input: CancelOperationInput) {
+        const edition = input.staff.edition;
+        if (edition) {
+            const operation = await prisma.adminOperation.findUnique({
+                where: { id: input.operationId },
+                select: { id: true, kind: true },
+            });
+            if (
+                operation &&
+                (await operationsOutside([operation], edition)).size
+            ) {
+                throw new NotFoundException("Operation not found");
+            }
+        }
         return cancelOperation(
             this.audit,
             (kind) =>
@@ -550,4 +583,77 @@ function isUniqueViolation(error: unknown): boolean {
         error !== null &&
         (error as { code?: string }).code === "P2002"
     );
+}
+
+/**
+ * The targets among these that belong to another edition: a job's or a
+ * delivery's business, a waitlist signup's own edition. A target of no
+ * business is the machinery's, reached from both consoles (DEC-204 item 6).
+ */
+async function targetsOutside(
+    kind: string,
+    ids: string[],
+    edition: Edition,
+): Promise<string[]> {
+    const select = { id: true } as const;
+    const otherBusiness = {
+        id: { in: ids },
+        organization: { edition: { not: edition } },
+    };
+    const rows =
+        kind === "jobs.retry" || kind === "jobs.cancel"
+            ? await prisma.job.findMany({ where: otherBusiness, select })
+            : kind === "webhooks.replay"
+              ? await prisma.webhookEvent.findMany({
+                    where: otherBusiness,
+                    select,
+                })
+              : kind === "waitlist.invite"
+                ? await prisma.waitlistSignup.findMany({
+                      where: { id: { in: ids }, edition: { not: edition } },
+                      select,
+                  })
+                : [];
+    return rows.map((row) => row.id);
+}
+
+/**
+ * Acting on another edition's target is a 404 for the whole request, and
+ * nothing runs: a 403 would say the id exists.
+ */
+async function assertTargetsInEdition(
+    kind: OperationKind,
+    ids: string[],
+    edition: Edition | null,
+): Promise<void> {
+    if (edition && (await targetsOutside(kind, ids, edition)).length) {
+        throw new NotFoundException("Not found");
+    }
+}
+
+/** The operations, among these, with a target of another edition. */
+async function operationsOutside(
+    operations: { id: string; kind: string }[],
+    edition: Edition,
+): Promise<Set<string>> {
+    const items = await prisma.adminOperationItem.findMany({
+        where: { operationId: { in: operations.map((o) => o.id) } },
+        select: { operationId: true, targetId: true },
+    });
+    const kindOf = new Map(operations.map((o) => [o.id, o.kind]));
+    const outside = new Set<string>();
+    for (const kind of new Set(kindOf.values())) {
+        const ofKind = items.filter((i) => kindOf.get(i.operationId) === kind);
+        const foreign = new Set(
+            await targetsOutside(
+                kind,
+                ofKind.map((i) => i.targetId),
+                edition,
+            ),
+        );
+        for (const item of ofKind) {
+            if (foreign.has(item.targetId)) outside.add(item.operationId);
+        }
+    }
+    return outside;
 }

@@ -112,6 +112,15 @@ export class JoinWaitlistDto {
     @IsString()
     @MaxLength(64)
     ref?: string;
+
+    /**
+     * Turnstile's token. saroh.tech's "Tell me when" posts straight from the
+     * browser, so a `paid-plans` join needs one while Turnstile is set up.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    turnstileToken?: string;
 }
 
 /** An opening-day invite's token, as onboarding sends it back (U31). */

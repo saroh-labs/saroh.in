@@ -46,7 +46,12 @@ const PROVIDER_FIX: OnlineFix = {
     href: "/settings/providers",
     label: "Connect one in Settings › Providers",
 };
-/** Where a plan without online payments is changed (#821, #835). */
+/**
+ * Where a plan without online payments is changed (#821, #835). Every
+ * place that draws it wraps it in `PlanWay`, which draws nothing while
+ * plans aren't shown (Global, DEC-211), so the words around it never say
+ * "upgrade": "your plan doesn't take payment online".
+ */
 export const PLAN_FIX: OnlineFix = {
     href: "/settings/billing/plans",
     label: planLabel(),

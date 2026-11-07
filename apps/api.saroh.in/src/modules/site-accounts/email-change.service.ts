@@ -50,10 +50,7 @@ import type { SiteRelay } from "./site-relay";
 
 export const EMAIL_CHANGED_SENDER = Symbol("EMAIL_CHANGED_SENDER");
 
-export type EmailChangedSender = (
-    to: string,
-    details: { businessName: string },
-) => Promise<EmailOutcome>;
+export type EmailChangedSender = typeof sendSiteEmailChangedEmail;
 
 /** What a change answers, the same every time. */
 export interface EmailChanged {
@@ -282,6 +279,7 @@ export class EmailChangeService {
         try {
             outcome = await this.notify(to, {
                 businessName: cleanBusinessName(site.businessName, site.host),
+                edition: site.edition,
             });
         } catch {
             outcome = "failed";
