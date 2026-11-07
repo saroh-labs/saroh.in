@@ -2818,3 +2818,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Replaces: India's drop to Free the moment Razorpay halts a subscription after its retries. Razorpay may still retry on its own; a retry that succeeds pays the due and withdraws the link, and paying both is refunded automatically (DEC-164).
 - Global: the same route is the whole monthly route if Razorpay can't put USD on Subscriptions for Saroh's account. In test mode on 6 Nov, USD plans were refused while USD orders and payment links were accepted.
 - Built in #1317 (stage 9, epic #1306).
+
+## DEC-211 Global opens Free-only; Saroh's own billing abroad is built but stays switched off
+
+- Decision (owner, 7 Nov 2026): "Build the international payments with razorpay for saroh subscriptions and work as planned, and keep the plans as free only for now… we build the full flow, but not enable that… once we are ready with all things, we will enable it. Till then the product will be free, with its limits."
+- Stage 9 (USD plans and Saroh's own billing on Razorpay with international cards, epic #1306) is built as planned, behind the `SAROH_BILLING_GLOBAL` switch, off in production. Turning it on is the owner's call once the outside gates are met: Razorpay's confirmation of USD renewals, purpose code, CA export wording and LUT, Global invoice prefix, a published Global catalogue, and the foreign-tax read.
+- On in local development and on the development environment (owner, 7 Nov): the team buys, renews and fails payments there with test keys before anyone else can. Production is the only place it starts off.
+- Until then saroh.tech and the Global edition launch Free-only, with Free's limits. Nothing on Global lets a business buy a plan; paid plans may be shown as coming soon, with no price to buy.
+- Merchants' own Stripe (DEC-208, built, on main) is not Saroh billing: it is switched on for Global at launch (owner, 7 Nov). A Global business connects its own keys and its customers pay it directly; Saroh holds no money. saroh.tech's "Stripe coming next" and "Saroh doesn't take payments" words change with that switch.
+- DEC-210's payment-due flow covers both editions and needs no change.
