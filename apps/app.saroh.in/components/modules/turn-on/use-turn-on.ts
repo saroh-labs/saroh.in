@@ -54,12 +54,15 @@ export function useTurnOn({
     modules,
     onClose,
     firstRun = false,
+    nothingRequired = false,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
     /** A first run (Home, the module picker): land on the thing itself. */
     firstRun?: boolean;
+    /** Settings › Modules (DEC-212): no field blocks turning on. */
+    nothingRequired?: boolean;
 }) {
     const router = useRouter();
     const currency = useStartingCurrency();
@@ -141,7 +144,10 @@ export function useTurnOn({
         setDraft(next);
         // A shown message goes as soon as its field is fixed.
         setErrors((shown) =>
-            stillWrong(shown, problemsOf(next, plan.order, currency)),
+            stillWrong(
+                shown,
+                problemsOf(next, plan.order, currency, !nothingRequired),
+            ),
         );
         setFailure(null);
     };
@@ -161,9 +167,21 @@ export function useTurnOn({
                           Array.from(CONNECT_KEYS).map((k) => [k, connect]),
                       ),
                   };
+        // From Settings › Modules the web address as offered, untouched,
+        // isn't sent: the API takes a free one then, so one taken since
+        // never stops it (DEC-212).
+        const offered = (loaded ?? []).find((d) => d.key === "WEBSITE")
+            ?.defaults as { address?: string } | null | undefined;
+        const untouched =
+            nothingRequired &&
+            !!offered?.address &&
+            asked.WEBSITE.address.trim() === offered.address;
         // Never sent to connect what the plan won't let it (UX-006).
         const sent: TurnOnDraft = {
             ...asked,
+            WEBSITE: untouched
+                ? { ...asked.WEBSITE, address: "" }
+                : asked.WEBSITE,
             connect: Object.fromEntries(
                 Object.entries(asked.connect).map(([k, v]) => [
                     k,
@@ -171,7 +189,12 @@ export function useTurnOn({
                 ]),
             ),
         };
-        const problems = problemsOf(sent, plan.order, currency);
+        const problems = problemsOf(
+            sent,
+            plan.order,
+            currency,
+            !nothingRequired,
+        );
         setErrors(problems);
         if (problems.WEBSITE?.address) setAddressUnlocked(true);
         setFailure(null);

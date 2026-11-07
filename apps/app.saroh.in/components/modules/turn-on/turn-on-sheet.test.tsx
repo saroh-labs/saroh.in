@@ -211,13 +211,18 @@ async function settle() {
     }
 }
 
-async function open(picked: string[], modules: ModuleView[] = ALL_OFF) {
+async function open(
+    picked: string[],
+    modules: ModuleView[] = ALL_OFF,
+    nothingRequired = false,
+) {
     act(() => {
         root.render(
             <TurnOnSheet
                 picked={picked}
                 modules={modules}
                 onOpenChange={onOpenChange}
+                nothingRequired={nothingRequired}
             />,
         );
     });
@@ -343,6 +348,74 @@ describe("Bookings", () => {
         expect(showSuccess).toHaveBeenCalledWith(
             "Contacts and Bookings are on. Finish setup: Set your availability so customers can book.",
         );
+    });
+});
+
+describe("from Settings › Modules, nothing is required (DEC-212)", () => {
+    const fromSettings = (picked: string[]) => open(picked, ALL_OFF, true);
+
+    it("Bookings turns on with no first service, left for Finish setup", async () => {
+        enableModuleAction.mockImplementation((key) =>
+            Promise.resolve({
+                ok: true,
+                module: view(key, {
+                    lifecycle: "ENABLED",
+                    readiness:
+                        key === "APPOINTMENTS" ? "SETUP_REQUIRED" : "ACTIVE",
+                    blockers:
+                        key === "APPOINTMENTS"
+                            ? [{ code: "APPOINTMENTS_NO_SERVICE" }]
+                            : [],
+                }),
+                alreadyEnabled: false,
+            }),
+        );
+        await fromSettings(["APPOINTMENTS"]);
+        expect(text()).toContain(
+            "Add one now, or later. Your booking page opens once you have one.",
+        );
+        typeInto(byLabel("First service (optional)"), " ");
+        // Unnamed, its length and price aren't judged.
+        typeInto(byLabel("Takes (minutes)"), "0");
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
+            "CRM",
+            "APPOINTMENTS",
+        ]);
+        expect(enableModuleAction.mock.calls[1]?.[1]).not.toHaveProperty(
+            "service",
+        );
+        expect(push).toHaveBeenCalledWith("/bookings");
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Contacts and Bookings are on. Finish setup: Add a service to open your booking page.",
+        );
+    });
+
+    it("still refuses a named service's length typed wrong, on its field", async () => {
+        await fromSettings(["APPOINTMENTS"]);
+        typeInto(byLabel("Takes (minutes)"), "0");
+        await press(button(/^Turn on$/));
+        expect(text()).toContain(
+            "Say how long it takes, from 5 to 1440 minutes.",
+        );
+        expect(enableModuleAction).not.toHaveBeenCalled();
+    });
+
+    it("Sell with its name emptied sends nothing to name it, and the API names it", async () => {
+        await fromSettings(["COMMERCE"]);
+        typeInto(byLabel("Location name"), "");
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenCalledWith("COMMERCE", {
+            fulfilment: ["PICKUP"],
+        });
+    });
+
+    it("Website never sends the address it offered, so one taken since can't stop it", async () => {
+        await fromSettings(["WEBSITE"]);
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenLastCalledWith("WEBSITE", {
+            siteName: "Northwind",
+        });
     });
 });
 

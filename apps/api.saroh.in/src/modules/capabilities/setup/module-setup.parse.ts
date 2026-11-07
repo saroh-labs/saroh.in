@@ -108,6 +108,42 @@ function hoursProblems(setup: AppointmentsSetupDto): SetupFieldError[] {
     );
 }
 
+const blank = (v: unknown) =>
+    v === undefined || v === null || (typeof v === "string" && !v.trim());
+
+/**
+ * What the merchant left empty, dropped (DEC-212: turning a module on needs
+ * nothing first). A blank name or address, no way chosen, no open day or a
+ * first service with no name is the same as not sending it, so it takes its
+ * default or is left for Finish setup. Anything typed is still judged.
+ */
+function dropBlanks(
+    moduleKey: ModuleKey,
+    raw: Record<string, unknown>,
+): Record<string, unknown> {
+    const out = { ...raw };
+    const fields: Partial<Record<ModuleKey, string[]>> = {
+        COMMERCE: ["storefrontName", "fulfilment"],
+        APPOINTMENTS: ["hours"],
+        WEBSITE: ["siteName", "address"],
+    };
+    for (const field of fields[moduleKey] ?? []) {
+        const v = out[field];
+        if (blank(v) || (Array.isArray(v) && v.length === 0)) delete out[field];
+    }
+    const service = out.service;
+    if (
+        moduleKey === "APPOINTMENTS" &&
+        service !== null &&
+        typeof service === "object" &&
+        !Array.isArray(service) &&
+        blank((service as { name?: unknown }).name)
+    ) {
+        delete out.service;
+    }
+    return out;
+}
+
 /**
  * The module's setup, validated, or a 400 naming every field. `raw` is the
  * body's `setup` as sent; it must be an object.
@@ -134,9 +170,12 @@ export function parseModuleSetup<K extends ModuleKey>(
                 })),
             );
         }
-        return new EmptySetupDto() as ModuleSetups[K];
+        return new EmptySetupDto();
     }
-    const instance = plainToInstance(shape, raw);
+    const instance = plainToInstance(
+        shape,
+        dropBlanks(moduleKey, raw as Record<string, unknown>),
+    );
     const errors = flatten(
         validateSync(instance, {
             whitelist: true,

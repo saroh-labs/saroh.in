@@ -35,7 +35,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     WEBSITE_SHOP_NOT_CHOSEN:
         "Choose which location your online shop sells from. Until then your shop page isn't live.",
     CRM_NO_PIPELINE: "Add your first lead to start your pipeline.",
-    APPOINTMENTS_NO_SERVICE: "Add a bookable service.",
+    APPOINTMENTS_NO_SERVICE: "Add a service to open your booking page.",
     APPOINTMENTS_NO_AVAILABILITY:
         "Set your availability so customers can book.",
     COURSES_NO_COURSE: "Make a course to start taking enrolments.",

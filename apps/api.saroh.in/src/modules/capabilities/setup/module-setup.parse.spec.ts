@@ -72,7 +72,7 @@ describe("COMMERCE", () => {
         const r = refusal(() =>
             parseModuleSetup("COMMERCE", {
                 storefrontName: "x".repeat(81),
-                fulfilment: [],
+                fulfilment: ["DIGITAL"],
             }),
         );
         expect(r.details.fields.map((f) => f.field)).toEqual([
@@ -81,6 +81,16 @@ describe("COMMERCE", () => {
         ]);
         expect(r.details.field).toBe("setup.storefrontName");
         expect(r.message).toBe("Keep the name to 80 characters or fewer.");
+    });
+
+    it("needs nothing: blank, empty or absent is left for its default (DEC-212)", () => {
+        expect(parseModuleSetup("COMMERCE", {})).toEqual({});
+        expect(
+            parseModuleSetup("COMMERCE", {
+                storefrontName: "   ",
+                fulfilment: [],
+            }),
+        ).toEqual({});
     });
 
     it("refuses a way it doesn't know, and a way twice", () => {
@@ -95,7 +105,7 @@ describe("COMMERCE", () => {
         }
     });
 
-    it("refuses a blank name and a field it doesn't ask for", () => {
+    it("refuses a field it doesn't ask for", () => {
         const r = refusal(() =>
             parseModuleSetup("COMMERCE", {
                 storefrontName: "   ",
@@ -103,19 +113,12 @@ describe("COMMERCE", () => {
                 slug: "rye",
             }),
         );
-        expect(r.details.fields).toHaveLength(2);
-        expect(r.details.fields).toEqual(
-            expect.arrayContaining([
-                {
-                    field: "setup.storefrontName",
-                    message: "Give your location a name.",
-                },
-                {
-                    field: "setup.slug",
-                    message: "This isn't something turning it on asks for.",
-                },
-            ]),
-        );
+        expect(r.details.fields).toEqual([
+            {
+                field: "setup.slug",
+                message: "This isn't something turning it on asks for.",
+            },
+        ]);
     });
 });
 
@@ -156,12 +159,18 @@ describe("APPOINTMENTS", () => {
         expect(r.message).toBe("Choose Salon or Gym, or something else.");
     });
 
-    it("without a trade, the first service and hours are still asked", () => {
-        const r = refusal(() => parseModuleSetup("APPOINTMENTS", {}));
-        expect(r.details.fields.map((f) => f.field)).toEqual([
-            "setup.hours",
-            "setup.service",
-        ]);
+    it("needs nothing: no hours, no service, or a service with no name (DEC-212)", () => {
+        expect(parseModuleSetup("APPOINTMENTS", {})).toEqual({});
+        // An unnamed service is no service: its length and price go unjudged.
+        expect(
+            parseModuleSetup("APPOINTMENTS", {
+                hours: [],
+                service: { name: " ", durationMinutes: 0, price: "5,00" },
+            }),
+        ).toEqual({});
+        expect(
+            parseModuleSetup("APPOINTMENTS", { hours: HOURS }).service,
+        ).toBeUndefined();
     });
 
     it("names nested fields by their path", () => {
@@ -200,14 +209,13 @@ describe("APPOINTMENTS", () => {
         });
     });
 
-    it("needs a day open and a service", () => {
-        const r = refusal(() =>
-            parseModuleSetup("APPOINTMENTS", { hours: [] }),
-        );
-        expect(r.details.fields.map((f) => f.field)).toEqual([
-            "setup.hours",
-            "setup.service",
-        ]);
+    it("a named service with no hours sent is accepted (the writer gives Mon–Sat 10 to 7)", () => {
+        const setup = parseModuleSetup("APPOINTMENTS", {
+            hours: [],
+            service: SERVICE,
+        });
+        expect(setup.hours).toBeUndefined();
+        expect(setup.service?.name).toBe("Haircut");
     });
 
     it("takes whole minutes, never a string", () => {
@@ -231,12 +239,11 @@ describe("WEBSITE", () => {
         ).toEqual({ siteName: "Rye", address: "rye-studio" });
     });
 
-    it("needs both", () => {
-        const r = refusal(() => parseModuleSetup("WEBSITE", {}));
-        expect(r.details.fields.map((f) => f.field)).toEqual([
-            "setup.siteName",
-            "setup.address",
-        ]);
+    it("needs neither: blank or absent is the business's name at a free address (DEC-212)", () => {
+        expect(parseModuleSetup("WEBSITE", {})).toEqual({});
+        expect(
+            parseModuleSetup("WEBSITE", { siteName: " ", address: "" }),
+        ).toEqual({});
     });
 
     // The Turn on sheet's choice of template (industry templates U12).

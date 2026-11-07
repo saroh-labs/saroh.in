@@ -56,6 +56,7 @@ export function TurnOnSheet({
     modules,
     onOpenChange,
     firstRun,
+    nothingRequired,
 }: {
     /** The modules to turn on; null when the sheet is closed. */
     picked: readonly string[] | null;
@@ -67,6 +68,12 @@ export function TurnOnSheet({
      * module picker): it lands on the thing itself, as setup does.
      */
     firstRun?: boolean;
+    /**
+     * Opened from Settings › Modules (DEC-212): no field blocks turning on.
+     * An empty one takes its default, and Bookings' first service may be
+     * left for Finish setup.
+     */
+    nothingRequired?: boolean;
 }) {
     const [session, setSession] = useState(0);
     // Said by the body, which knows what the plan lets the business connect.
@@ -99,6 +106,7 @@ export function TurnOnSheet({
                     onClose={close}
                     onSays={setSays}
                     firstRun={firstRun}
+                    nothingRequired={nothingRequired}
                 />
             ) : null}
         </FormSheet>
@@ -111,15 +119,23 @@ function TurnOnBody({
     onClose,
     onSays,
     firstRun,
+    nothingRequired,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
     firstRun?: boolean;
+    nothingRequired?: boolean;
     /** The line under the title, once what can be connected is known. */
     onSays: (line: string | null) => void;
 }) {
-    const t = useTurnOn({ picked, modules, onClose, firstRun });
+    const t = useTurnOn({
+        picked,
+        modules,
+        onClose,
+        firstRun,
+        nothingRequired,
+    });
     const { draft, plan } = t;
     const single = picked.length === 1 ? picked[0] : undefined;
     const fielded = plan.order.filter(hasSetup);
@@ -224,6 +240,7 @@ function TurnOnBody({
                                             draft={draft}
                                             update={t.update}
                                             errors={errorsOf(k)}
+                                            serviceOptional={nothingRequired}
                                         />
                                     </Section>
                                 );

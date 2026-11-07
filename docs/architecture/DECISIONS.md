@@ -729,7 +729,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-068 Turning a module on asks for its minimum first
 
-**Status: Accepted — 2026-09-29** · user · launch readiness
+**Status: Accepted — 2026-09-29** · user · launch readiness · **amended by DEC-212 (2026-11-07)**: from Settings › Modules, what this table asks at turn-on is offered with its defaults and never required
 
 - Context: today a module switches on at once and works out its readiness afterwards, so a merchant meets what is missing only when it fails in use ("No connected payment provider…"). Four entry points (Settings › Modules, Home's first run, `/onboarding/modules`, "Also sell") each behave differently, and some can enable a module Saroh hasn't rolled out.
 - Decision:
@@ -2828,3 +2828,24 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Merchants' own Stripe (DEC-208, built, on main) is not Saroh billing: it is switched on for Global at launch (owner, 7 Nov). A Global business connects its own keys and its customers pay it directly; Saroh holds no money. saroh.tech's "Stripe coming next" and "Saroh doesn't take payments" words change with that switch.
 - Global is email only (owner, 7 Nov): no phone or WhatsApp sign-in or verification codes, for Saroh accounts or for a Global business's customers. `phoneSignIn` is false in Global's edition profile, and `VerificationService.approved` refuses every Global business whatever its flag.
 - DEC-210's payment-due flow covers both editions and needs no change.
+
+## DEC-212 Turning a module on needs nothing first
+
+**Status: Accepted — 2026-11-07** · owner · amends DEC-068
+
+- Decision (owner, 7 Nov 2026): "when we enable booking, dont make it necessary to create booking when we enable the module, it should be able to enable without any requirement to setup service before enabling, same should be applied to other modules too".
+- Scope (owner, 7 Nov 2026): "I meant in the settings they can enable bookings feature, but in order to publish or make their booking page live, they have to create a service, that requirement is still there. Only changed from the settings → modules flow."
+- **Turning a module on from Settings › Modules needs nothing.** DEC-068's one Turn on sheet opens there with its defaults shown and editable, but no field blocks turning on. Its "Asked at turn-on" column is offered with its default there:
+
+    | Module   | Left empty                                                                                                                                     |
+    | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+    | Sell     | the location is named after the business (an existing one keeps its name); no way chosen is Pick-up                                            |
+    | Bookings | no first service is made, and "Add a service to open your booking page" is the Finish setup step; a service with no open day gets Mon–Sat 10–7 |
+    | Website  | the site is named after the business, at the address chosen at setup or a free one like it                                                     |
+    - A web address left as offered isn't sent, so the API takes a free one at the moment of saving: an address taken since the sheet opened never stops it.
+    - What the merchant typed is still judged: a price like "5,00", 0 minutes for a named service, a web address with two hyphens or one that is taken. The rule is "nothing required", not "anything accepted".
+
+- **Going live still needs its first service.** With no service customers can book online, no booking page is made (DEC-175), Publish booking page is refused in the merchant's words, and a published site's `/book` says the business isn't taking bookings, with no Book button and out of search.
+- **The other entry points keep DEC-068's minimum**: Home's first run, the module picker and "Also sell" still ask for it.
+- The API accepts each module's setup with any field blank or absent, makes nothing it wasn't asked for, and still takes the full payload the sheet sent before.
+- Known limit: Bookings' hours live on its services, so hours set in the sheet with no first service are not kept. They are set again on the first service.

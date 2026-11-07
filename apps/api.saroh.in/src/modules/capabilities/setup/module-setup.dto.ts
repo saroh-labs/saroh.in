@@ -1,10 +1,8 @@
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
-    ArrayMinSize,
     ArrayUnique,
     IsArray,
-    IsDefined,
     IsIn,
     IsInt,
     IsObject,
@@ -15,7 +13,6 @@ import {
     MaxLength,
     Min,
     MinLength,
-    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -46,22 +43,27 @@ const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Rupees and paise as a decimal string: "500", "499.50". Empty: no price. */
 const PRICE = /^(\d{1,7}(\.\d{1,2})?)?$/;
 
-/** Sell: the location's name and how orders leave. */
+/**
+ * Sell: the location's name and how orders leave. Neither is required
+ * (DEC-212): a blank name is the business's (or the location's own), and no
+ * way chosen is Pick-up.
+ */
 export class CommerceSetupDto {
+    @IsOptional()
     @Transform(trim)
     @IsString({ message: "Give your location a name." })
     @MinLength(1, { message: "Give your location a name." })
     @MaxLength(80, { message: "Keep the name to 80 characters or fewer." })
-    storefrontName!: string;
+    storefrontName?: string;
 
+    @IsOptional()
     @IsArray({ message: "Choose how orders leave." })
-    @ArrayMinSize(1, { message: "Choose at least one way orders leave." })
     @ArrayUnique({ message: "Choose each way once." })
     @IsIn(STOREFRONT_FULFILMENT_TYPES, {
         each: true,
         message: "Choose Pick-up, Local delivery or Shipping.",
     })
-    fulfilment!: StorefrontFulfilmentType[];
+    fulfilment?: StorefrontFulfilmentType[];
 }
 
 /** One opening window on one day of the week. */
@@ -100,46 +102,52 @@ export class FirstServiceDto {
 }
 
 /**
- * Bookings: opening hours and the first service — or a trade (DEC-189),
+ * Bookings: opening hours and the first service, or a trade (DEC-189),
  * whose sample services replace the first service and whose hours are used
- * when none are sent. Without a trade, both are asked, as before.
+ * when none are sent. Nothing is required (DEC-212): no service sent (or one
+ * with no name) makes none, and a service with no hours sent gets
+ * Mon–Sat 10 to 7.
  */
 export class AppointmentsSetupDto {
     @IsOptional()
     @IsIn(TRADES, { message: "Choose Salon or Gym, or something else." })
     trade?: Trade;
 
-    @ValidateIf((o: AppointmentsSetupDto) => !o.trade || o.hours !== undefined)
+    @IsOptional()
     @IsArray({ message: "Set your opening hours." })
-    @ArrayMinSize(1, { message: "Open on at least one day." })
     @ArrayMaxSize(21, { message: "Up to three windows a day." })
     @ValidateNested({ each: true })
     @Type(() => OpeningHoursDto)
     hours?: OpeningHoursDto[];
 
-    @ValidateIf((o: AppointmentsSetupDto) => !o.trade)
-    @IsDefined({ message: "Add your first service." })
+    @IsOptional()
     @IsObject({ message: "Add your first service." })
     @ValidateNested()
     @Type(() => FirstServiceDto)
     service?: FirstServiceDto;
 }
 
-/** Website: the site's name and its address, `<address>.saroh.app`. */
+/**
+ * Website: the site's name and its address, `<address>.saroh.app`. Neither
+ * is required (DEC-212): blank, they are the business's name and a free
+ * address like the one chosen at setup.
+ */
 export class WebsiteSetupDto {
+    @IsOptional()
     @Transform(trim)
     @IsString({ message: "Give your site a name." })
     @MinLength(1, { message: "Give your site a name." })
     @MaxLength(120, { message: "Keep the name to 120 characters or fewer." })
-    siteName!: string;
+    siteName?: string;
 
+    @IsOptional()
     @Transform(({ value }: { value: unknown }) =>
         typeof value === "string" ? value.trim().toLowerCase() : value,
     )
     @IsString({ message: "Choose your web address." })
     @MinLength(1, { message: "Choose your web address." })
     @MaxLength(63, { message: "Keep the address to 63 characters or fewer." })
-    address!: string;
+    address?: string;
 
     /**
      * The template the new site starts from, when the sheet's choice was

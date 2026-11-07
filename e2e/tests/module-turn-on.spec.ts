@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/settings/modules app:/services app:/analytics app:/courses app:/class-packs api:capabilities
+// @covers accounts:/login app:/open app:/settings/modules app:/bookings app:/services app:/analytics app:/courses app:/class-packs api:capabilities
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -125,6 +125,68 @@ test.describe(
                         "INSIGHTS",
                         was === "ENABLED" ? "ENABLED" : "DISABLED",
                     );
+                }
+            }
+        });
+
+        // DEC-212: nothing is required first. Northwind has services, so
+        // none is made either way; what is checked is that a blank first
+        // service never stops the sheet.
+        test("Settings › Modules: Bookings turns on with its first service left blank", async ({
+            page,
+        }) => {
+            test.setTimeout(120_000);
+            await signIn(page);
+            // What needs Bookings is turned off first, and put back after.
+            const keys = ["CLASS_PACKS", "COURSES", "APPOINTMENTS"];
+            const was = new Map<string, string | null>();
+            for (const key of keys) {
+                was.set(key, await lifecycleOf(page.request, key));
+            }
+            test.skip(
+                was.get("APPOINTMENTS") === null,
+                "Northwind has no Bookings module.",
+            );
+            try {
+                for (const key of keys) {
+                    if (was.get(key) === "ENABLED") {
+                        await setLifecycle(page.request, key, "DISABLED");
+                    }
+                }
+                await page.goto("/settings/modules");
+                await page
+                    .getByRole("switch", { name: "Bookings" })
+                    .filter({ visible: true })
+                    .click();
+
+                const sheet = await theSheet(page, "Turn on Bookings");
+                const service = sheet
+                    .getByLabel("First service (optional)")
+                    .filter({ visible: true });
+                await expect(sheet).toContainText("Add one now, or later.");
+                await service.fill("");
+                await (await turnOnButton(page, sheet)).click();
+
+                await expect(sheet).toBeHidden();
+                await expect(page).toHaveURL(/\/bookings/);
+                await expect(
+                    page.getByText(/Bookings (is|are) on\./),
+                ).toBeVisible();
+                expect(await lifecycleOf(page.request, "APPOINTMENTS")).toBe(
+                    "ENABLED",
+                );
+            } finally {
+                // Bookings back first, then what needs it.
+                for (const key of [...keys].reverse()) {
+                    const before = was.get(key);
+                    const now = await lifecycleOf(page.request, key);
+                    if (before && now !== before) {
+                        await setLifecycle(
+                            page.request,
+                            key,
+                            before === "ENABLED" ? "ENABLED" : "DISABLED",
+                        );
+                    }
                 }
             }
         });
