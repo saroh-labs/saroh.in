@@ -267,6 +267,12 @@ test.describe("the Global app (DEC-204)", () => {
     test("with none chosen, a person in an India and a Global business sees the Global one's name over its own data @serial", async ({
         page,
     }, testInfo) => {
+        // Not about width, and the desk and phone serial runs share the
+        // signed-in person: a second run would add a second Global business.
+        test.skip(
+            testInfo.project.name.startsWith("phone"),
+            "runs once, at the desk",
+        );
         // Global first and India last, so India is the newest of all her
         // businesses: the one the data layer fell back to before 9d995356c.
         const g = await globalBusiness(page, testInfo, "global-home");
