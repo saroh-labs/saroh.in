@@ -2826,4 +2826,5 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - On in local development and on the development environment (owner, 7 Nov): the team buys, renews and fails payments there with test keys before anyone else can. Production is the only place it starts off.
 - Until then saroh.tech and the Global edition launch Free-only, with Free's limits. Nothing on Global lets a business buy a plan; paid plans may be shown as coming soon, with no price to buy.
 - Merchants' own Stripe (DEC-208, built, on main) is not Saroh billing: it is switched on for Global at launch (owner, 7 Nov). A Global business connects its own keys and its customers pay it directly; Saroh holds no money. saroh.tech's "Stripe coming next" and "Saroh doesn't take payments" words change with that switch.
+- Global is email only (owner, 7 Nov): no phone or WhatsApp sign-in or verification codes, for Saroh accounts or for a Global business's customers. `phoneSignIn` is false in Global's edition profile, and `VerificationService.approved` refuses every Global business whatever its flag.
 - DEC-210's payment-due flow covers both editions and needs no change.
