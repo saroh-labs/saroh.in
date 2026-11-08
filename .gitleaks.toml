@@ -1,0 +1,27 @@
+# Gitleaks config: the default rules, minus build output and dependencies.
+# A scan of the working folder (`gitleaks dir .`, or `detect --no-git`) used
+# to read every file under node_modules, .next, dist and .turbo, pinning
+# every core for minutes (8 Nov 2026). Those are never committed, so they
+# hold nothing to find. The prepush and CI scans read commits only
+# (`gitleaks git . --log-opts=<base>..HEAD`) and are unchanged.
+title = "saroh.in"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build output and installed dependencies"
+paths = [
+    # Commits are scanned by `gitleaks git`; the packed history isn't a file to read.
+    '''(^|/)\.git/''',
+    '''(^|/)node_modules/''',
+    '''(^|/)\.next/''',
+    '''(^|/)\.open-next/''',
+    '''(^|/)\.turbo/''',
+    '''(^|/)\.wrangler/''',
+    '''(^|/)dist/''',
+    '''(^|/)out/''',
+    '''(^|/)coverage/''',
+    '''(^|/)test-results/''',
+    '''(^|/)playwright-report/''',
+]

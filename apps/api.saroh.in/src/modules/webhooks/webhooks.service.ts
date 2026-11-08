@@ -817,10 +817,10 @@ export class WebhooksService {
                 ? open[0]
                 : null;
         }
-        return (await tx.paymentIntent.findFirst({
+        return await tx.paymentIntent.findFirst({
             where: ofOrder,
             orderBy: { createdAt: "desc" },
-        })) as IntentRow | null;
+        });
     }
 
     private async applySuccess(

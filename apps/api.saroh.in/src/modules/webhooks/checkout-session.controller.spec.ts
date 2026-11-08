@@ -74,7 +74,7 @@ describe("CheckoutCancelDto (U7)", () => {
         await expect(
             errors({
                 intent: "0b6f1c4e-6b0e-4a43-9a8e-2f0f7f2b9c11",
-                token: "Q1w2E3-r4_T5",
+                token: "Q1w2E3-r4_T5", // gitleaks:allow (sample cancel token)
             }),
         ).resolves.toEqual([]);
     });

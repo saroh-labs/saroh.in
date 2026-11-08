@@ -68,7 +68,7 @@ describe("the page to come back to", () => {
         const base = {
             lines,
             fulfilment: "PICKUP",
-            key: "key_12345678",
+            key: "key_12345678", // gitleaks:allow (sample idempotency key)
         };
         expect(
             startBody({ ...base, returnPath: "/shop?x=1" })?.returnPath,
