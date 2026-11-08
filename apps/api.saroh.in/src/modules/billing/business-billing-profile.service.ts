@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     HttpException,
     Injectable,
@@ -7,6 +8,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
@@ -247,6 +249,17 @@ export class BusinessBillingProfileService {
     > {
         authorize(ctx, "billing:manage");
         assertSarohBills(ctx.edition);
+        // A payer abroad names their country: India's is the default only
+        // where the business is billed in India (stage 9, KTD7).
+        if (
+            input.country === undefined &&
+            editionProfile(ctx.edition).address !== "indian-state-and-pin"
+        ) {
+            throw new BadRequestException({
+                message: "Choose the country of the billing address.",
+                details: { field: "country" },
+            });
+        }
         let made: { id: string; move: ProfileMove | null };
         try {
             made = await prisma.$transaction(async (tx) => {

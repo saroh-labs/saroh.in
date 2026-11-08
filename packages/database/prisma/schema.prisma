@@ -8645,6 +8645,13 @@ model BillingProfile {
   // a second customer with the same email and phone.
   billingEmail String
   phone        String?
+  // The payer's country, ISO 3166-1 alpha-2 (stage 9, KTD7): India's rules
+  // (GSTIN, GST state, six-digit PIN) apply only to "IN". Every profile
+  // before it is Indian.
+  country      String  @default("IN")
+  // A payer's own tax number outside India (VAT, EIN, ABN), as typed;
+  // printed on Saroh's export invoice. India's is the GSTIN.
+  taxId        String?
 
   provider           String
   // Razorpay's `cust_…`; null until the provider has made it.

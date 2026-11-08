@@ -29,9 +29,9 @@ import {
     socialRowSummary,
 } from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
+import { countryName } from "@saroh/ui/country-select";
 import { Absent, Row } from "@saroh/ui/settings-rows";
 import { KIND_ROW_LABEL, kindChoiceLabel } from "./business-kind-field";
-import { countryName } from "./country-select";
 
 import type { BusinessSheets } from "@/components/organizations/business-settings/use-business-sheets";
 

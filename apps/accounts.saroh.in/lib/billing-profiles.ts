@@ -1,4 +1,7 @@
-import { phoneLabel } from "@saroh/ui/lib/phone";
+import { editionForCountry, editionProfile } from "@saroh/edition";
+import { phoneLabel, phoneNumberProblem } from "@saroh/ui/lib/phone";
+
+import { env } from "../env";
 
 import { day } from "./day";
 import { billingPhoneProblem } from "./indian-phone";
@@ -46,6 +49,10 @@ export interface OwnedBusiness extends ProfileBusiness {
 export interface BillingProfile {
     id: string;
     legalName: string;
+    /** ISO 3166-1 alpha-2; absent from an older API: India. */
+    country?: string;
+    /** A tax number outside India (VAT, EIN, ABN). */
+    taxId?: string | null;
     gstin: string | null;
     gstState: string | null;
     addressLine1: string | null;
@@ -79,6 +86,8 @@ export interface ProfileDetail extends BillingProfile {
 
 /** The fields of the Edit and Add panels, as typed. */
 export interface ProfileValues {
+    /** ISO 3166-1 alpha-2; "" until chosen. */
+    country: string;
     legalName: string;
     registered: "yes" | "no";
     gstin: string;
@@ -88,9 +97,30 @@ export interface ProfileValues {
     postalCode: string;
     billingEmail: string;
     phone: string;
+    taxId: string;
 }
 
 export type ProfileField = keyof ProfileValues;
+
+/**
+ * Whether an address in this country takes India's fields: GST, a state and
+ * a six-digit PIN (stage 9, KTD7). Asked of the country's edition.
+ */
+export function indianAddress(country: string): boolean {
+    return (
+        /^[A-Z]{2}$/.test(country) &&
+        editionProfile(editionForCountry(country)).address ===
+            "indian-state-and-pin"
+    );
+}
+
+/** A new profile's country: India's where this edition is India only. */
+const COUNTRY_NAMES = new Intl.DisplayNames(["en"], { type: "region" });
+
+export const DEFAULT_COUNTRY =
+    editionProfile(env.NEXT_PUBLIC_EDITION).businessCountry === "india-only"
+        ? "IN"
+        : "";
 
 // ── Words ──────────────────────────────────────────────────────────────
 
@@ -127,7 +157,12 @@ export const SYNC_FAILED_SAYS =
 export const SYNC_LINKING_SAYS =
     "Being linked at Razorpay. This takes a minute or two. Nothing for you to do.";
 
-export function gstLine(p: Pick<BillingProfile, "gstin">): string {
+export function gstLine(
+    p: Pick<BillingProfile, "gstin" | "country" | "taxId">,
+): string {
+    if (!indianAddress(p.country ?? "IN")) {
+        return p.taxId ? `Tax number ${p.taxId}` : "No tax number";
+    }
     return p.gstin ? `GSTIN ${p.gstin}` : "Not GST-registered";
 }
 
@@ -215,13 +250,18 @@ export function addressLine(
     p: Pick<
         BillingProfile,
         "addressLine1" | "addressLine2" | "city" | "gstState" | "postalCode"
-    >,
+    > & { country?: string },
 ): string | null {
     const state = [stateName(p.gstState), p.postalCode]
         .map((s) => s?.trim())
         .filter(Boolean)
         .join(" ");
-    const parts = [p.addressLine1, p.addressLine2, p.city, state]
+    // Abroad, the country closes the line (stage 9).
+    const country =
+        p.country && !indianAddress(p.country)
+            ? COUNTRY_NAMES.of(p.country)
+            : null;
+    const parts = [p.addressLine1, p.addressLine2, p.city, state, country]
         .map((s) => s?.trim())
         .filter((s): s is string => Boolean(s));
     return parts.length ? parts.join(", ") : null;
@@ -291,10 +331,14 @@ export function profileProblems(
     >[],
 ): [ProfileField, string][] {
     const out: [ProfileField, string][] = [];
+    const indian = indianAddress(v.country);
+    if (!v.country) {
+        out.push(["country", "Choose the country of the billing address."]);
+    }
     if (!v.legalName.trim()) {
         out.push(["legalName", "Add the legal name Saroh's invoices go to."]);
     }
-    if (v.registered === "yes") {
+    if (indian && v.registered === "yes") {
         const g = v.gstin.trim().toUpperCase();
         if (!g) out.push(["gstin", "Add the GSTIN, or choose Not registered."]);
         else if (!GSTIN_SHAPE.test(g)) {
@@ -308,7 +352,7 @@ export function profileProblems(
         }
     }
     const pin = v.postalCode.replace(/\s+/g, "");
-    if (pin && !/^\d{6}$/.test(pin)) {
+    if (indian && pin && !/^\d{6}$/.test(pin)) {
         out.push(["postalCode", "A PIN code is six digits, like 560038."]);
     }
     const email = v.billingEmail.trim();
@@ -323,7 +367,11 @@ export function profileProblems(
         const taken = emailTakenBy(email, others);
         if (taken) out.push(["billingEmail", taken]);
     }
-    const phone = billingPhoneProblem(v.phone);
+    const phone = indian
+        ? billingPhoneProblem(v.phone)
+        : v.phone.trim()
+          ? phoneNumberProblem(v.phone)
+          : null;
     if (phone) out.push(["phone", phone]);
     return out;
 }
@@ -331,6 +379,7 @@ export function profileProblems(
 /** A profile as the panel's fields hold it. */
 export function valuesOf(p: BillingProfile | null): ProfileValues {
     return {
+        country: p ? (p.country ?? "IN") : DEFAULT_COUNTRY,
         legalName: p?.legalName ?? "",
         registered: p && !p.gstin ? "no" : "yes",
         gstin: p?.gstin ?? "",
@@ -342,6 +391,7 @@ export function valuesOf(p: BillingProfile | null): ProfileValues {
         postalCode: p?.postalCode ?? "",
         billingEmail: p?.billingEmail ?? "",
         phone: p?.phone ?? "",
+        taxId: p?.taxId ?? "",
     };
 }
 
@@ -352,15 +402,23 @@ export function startFrom(p: BillingProfile): ProfileValues {
 
 /** What a save sends: everything for a new profile. */
 export function profileInput(v: ProfileValues): Record<string, string> {
+    const indian = indianAddress(v.country);
     return {
+        country: v.country,
         legalName: v.legalName.trim(),
-        gstin: v.registered === "yes" ? v.gstin.trim().toUpperCase() : "",
-        gstState: v.gstState,
+        gstin:
+            indian && v.registered === "yes"
+                ? v.gstin.trim().toUpperCase()
+                : "",
+        gstState: indian ? v.gstState : "",
         addressLine1: v.addressLine1.trim(),
         city: v.city.trim(),
-        postalCode: v.postalCode.replace(/\s+/g, ""),
+        postalCode: indian
+            ? v.postalCode.replace(/\s+/g, "")
+            : v.postalCode.trim(),
         billingEmail: v.billingEmail.trim(),
         phone: v.phone.trim(),
+        taxId: indian ? "" : v.taxId.trim(),
     };
 }
 
@@ -385,6 +443,8 @@ export function profileEdit(
 /** An API refusal's field, as a field of the panel. */
 export function fieldOf(field: string | undefined): ProfileField | null {
     const known: ProfileField[] = [
+        "country",
+        "taxId",
         "legalName",
         "gstin",
         "addressLine1",

@@ -1,5 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import type { BillingCheckout, Plan, Prisma } from "@saroh/database";
+import { editionForCountry } from "@saroh/edition";
+import { profileIsIndian } from "./billing-details";
 
 import { isOneTime } from "./billing-term";
 import { renewsAtProvider } from "./business-closing";
@@ -140,6 +142,38 @@ export function discountRunningMessage(until: Date): string {
     return `Your discount runs until ${day}. You can move to another billing profile after that.`;
 }
 
+/** The refusal when a profile is of the other edition's country (stage 9). */
+export const PROFILE_OTHER_EDITION = "profile-other-edition";
+
+/**
+ * A business pays through a profile of its own edition (stage 9, KTD7): an
+ * Indian address for an India business, one abroad for a Global business.
+ */
+export async function assertProfileFitsEditionInTx(
+    tx: Pick<Tx, "organization" | "billingProfile">,
+    organizationId: string,
+    profileId: string,
+): Promise<void> {
+    const [org, profile] = await Promise.all([
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { edition: true },
+        }),
+        tx.billingProfile.findUnique({
+            where: { id: profileId },
+            select: { country: true },
+        }),
+    ]);
+    if (!org || !profile) return;
+    if (editionForCountry(profile.country) === org.edition) return;
+    refuse(
+        PROFILE_OTHER_EDITION,
+        profileIsIndian(profile.country)
+            ? "This business is billed outside India: choose a billing profile with an address abroad."
+            : "This business is billed in India: choose a billing profile with an Indian address.",
+    );
+}
+
 function refuse(code: string, message: string): never {
     throw new ConflictException({
         message,
@@ -172,6 +206,7 @@ export async function profileMoveInTx(
     now: Date,
 ): Promise<ProfileMove> {
     await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${organizationId} FOR UPDATE`;
+    await assertProfileFitsEditionInTx(tx, organizationId, to);
     const state = await profileSwitchStateInTx(tx, organizationId);
     const { current, open, scheduled } = state;
     const sub = await tx.subscription.findUnique({
