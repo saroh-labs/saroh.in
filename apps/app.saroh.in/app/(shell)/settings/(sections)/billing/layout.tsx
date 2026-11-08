@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
-import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { plansOpen } from "@/lib/saroh-billing/service";
 
 /**
  * Settings › Plan and billing exists only while plans are shown (DEC-136,
@@ -11,11 +11,11 @@ import { plansShown } from "@/lib/saroh-billing/plans-shown";
  * stays, and the page holds only the Free note (`freeNoteShown`); its
  * Change plan screen is still not-found.
  */
-export default function PlanBillingLayout({
+export default async function PlanBillingLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    if (!plansShown() && !freeNoteShown()) notFound();
+    if (!(await plansOpen()) && !freeNoteShown()) notFound();
     return children;
 }

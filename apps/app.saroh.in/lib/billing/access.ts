@@ -1,6 +1,6 @@
+import { planMoney } from "@/lib/saroh-billing/money";
 import type { LimitNotice } from "@saroh/pricing-catalog";
 import {
-    formatInr,
     limitNotice,
     limitWordsFor,
     MODULE_MAP,
@@ -289,7 +289,7 @@ export function upgradeLine(lock: {
     }
     const up = lock.upgradeTo;
     const price =
-        up.pricePaise > 0 ? `, ${formatInr(up.pricePaise)} a month + GST` : "";
+        up.pricePaise > 0 ? `, ${planMoney(up.pricePaise)} a month + GST` : "";
     return `${lock.name} comes with ${up.name}${price}. You're on ${lock.plan}.`;
 }
 

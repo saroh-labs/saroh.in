@@ -40,6 +40,11 @@ export const BILLING_FIELDS = [
     "billCity",
     "billPin",
     "billState",
+    // A payer abroad (stage 9, KTD7): the address's country, a tax number,
+    // and the phone a card payment from abroad needs.
+    "billCountry",
+    "billTaxId",
+    "billPhone",
 ] as const;
 export type BillingField = (typeof BILLING_FIELDS)[number];
 
@@ -55,6 +60,9 @@ export const NO_BILLING: Record<BillingField, string> = {
     billCity: "",
     billPin: "",
     billState: "",
+    billCountry: "",
+    billTaxId: "",
+    billPhone: "",
 };
 
 /** The API's message for a refused choice, said before it is sent. */
@@ -162,6 +170,9 @@ export interface NewBillingProfileInput {
     addressLine1?: string;
     city?: string;
     postalCode?: string;
+    country?: string;
+    taxId?: string;
+    phone?: string;
 }
 
 /** What the create sends of the step's answers. */
@@ -182,6 +193,9 @@ export function billingSent(
         addressLine1: typed(values.billAddress),
         city: typed(values.billCity),
         postalCode: typed(values.billPin)?.replace(/\s+/g, ""),
+        country: typed(values.billCountry),
+        taxId: typed(values.billTaxId),
+        phone: typed(values.billPhone),
     };
     return {
         newBillingProfile: {
@@ -204,6 +218,9 @@ const FROM_API: Record<string, BillingField> = {
     addressLine2: "billAddress",
     city: "billCity",
     postalCode: "billPin",
+    country: "billCountry",
+    taxId: "billTaxId",
+    phone: "billPhone",
 };
 
 /** The step's field an API refusal of the choice names, or null. */

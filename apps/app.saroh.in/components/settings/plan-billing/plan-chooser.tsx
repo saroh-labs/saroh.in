@@ -1,6 +1,5 @@
 "use client";
 
-import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
@@ -17,6 +16,7 @@ import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { runAction } from "@/lib/api/run-action";
+import { beforeTax, planMoney } from "@/lib/saroh-billing/money";
 import { Segmented } from "@saroh/ui/segmented";
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
@@ -228,13 +228,13 @@ export function PlanChooser({
                                     {coupon}
                                 </span>
                                 {checked
-                                    ? ` · ${formatInr(checked.discountPaise)} off ${
+                                    ? ` · ${planMoney(checked.discountPaise)} off ${
                                           checked.cycle === "year"
                                               ? "the first yearly charge"
                                               : checked.charges === 1
                                                 ? "the first month"
                                                 : `each of the first ${checked.charges} months`
-                                      } of ${checked.planName}, before GST. Used when you start a paid plan above.`
+                                      } of ${checked.planName}${beforeTax()}. Used when you start a paid plan above.`
                                     : " · used with the plan you choose above"}
                             </span>
                             <Button

@@ -1,7 +1,6 @@
-import { formatInr } from "@saroh/pricing-catalog";
-
 import { listWords } from "@/lib/modules/switch-plan";
 
+import { inclTax, planMoney, taxSum } from "@/lib/saroh-billing/money";
 import type { ChangeQuote, Cycle } from "./plan-view";
 
 /**
@@ -49,7 +48,7 @@ export interface QuoteSummary {
 const per = (cycle: Cycle) => (cycle === "year" ? "a year" : "a month");
 
 /** "₹1.18 (incl. GST)". */
-const withGst = (paise: number) => `${formatInr(paise)} (incl. GST)`;
+const withGst = (paise: number) => `${planMoney(paise)}${inclTax()}`;
 
 const REFUNDED =
     "Nothing is owed today. To set up UPI Autopay or a card, Razorpay takes a small amount and refunds it.";
@@ -158,7 +157,7 @@ export function quoteSummary(
     const oneTime = q.payment === "ONE_TIME";
     const recurring: QuoteLine = {
         label: `${plan}, ${q.cycle === "year" ? "yearly" : "monthly"}`,
-        value: `${formatInr(q.pricePaise)} + ${formatInr(q.gstPaise)} GST = ${formatInr(q.totalPaise)} ${per(q.cycle)}`,
+        value: `${taxSum(q.pricePaise, q.gstPaise, q.totalPaise)} ${per(q.cycle)}`,
     };
     const term: QuoteLine = oneTime
         ? {
@@ -173,7 +172,7 @@ export function quoteSummary(
         ? [
               {
                   label: `Coupon ${q.coupon.code}`,
-                  value: `${formatInr(q.coupon.discountPaise)} off ${
+                  value: `${planMoney(q.coupon.discountPaise)} off ${
                       q.cycle === "year"
                           ? "the first yearly charge"
                           : q.coupon.charges === 1
@@ -183,7 +182,7 @@ export function quoteSummary(
               },
               {
                   label: "First charge",
-                  value: `${formatInr(q.firstChargePaise)} + ${formatInr(q.firstChargeGstPaise)} GST = ${formatInr(q.firstChargeTotalPaise)}`,
+                  value: `${taxSum(q.firstChargePaise, q.firstChargeGstPaise, q.firstChargeTotalPaise)}`,
               },
           ]
         : [];
@@ -198,7 +197,7 @@ export function quoteSummary(
     };
     const startsToday: QuoteLine = {
         label: "Starts today",
-        value: `${formatInr(q.payNowTotalPaise)} now (incl. GST)`,
+        value: `${planMoney(q.payNowTotalPaise)} now${inclTax()}`,
     };
 
     switch (q.kind) {
@@ -268,7 +267,7 @@ export function quoteSummary(
                       lines: [
                           {
                               label: "Today, for the rest of your year",
-                              value: `${formatInr(q.chargeNowPaise)} + ${formatInr(q.chargeNowGstPaise)} GST = ${formatInr(q.chargeNowTotalPaise)}`,
+                              value: `${taxSum(q.chargeNowPaise, q.chargeNowGstPaise, q.chargeNowTotalPaise)}`,
                           },
                           {
                               label: "Your year ends",
@@ -285,7 +284,7 @@ export function quoteSummary(
                       lines: [
                           {
                               label: "Today, for the rest of this period",
-                              value: `${formatInr(q.chargeNowPaise)} + ${formatInr(q.chargeNowGstPaise)} GST = ${formatInr(q.chargeNowTotalPaise)}`,
+                              value: `${taxSum(q.chargeNowPaise, q.chargeNowGstPaise, q.chargeNowTotalPaise)}`,
                           },
                           recurring,
                           { label: "Then from", value: "", iso: q.startAt },

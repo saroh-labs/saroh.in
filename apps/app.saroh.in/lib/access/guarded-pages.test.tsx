@@ -59,6 +59,7 @@ vi.mock("@/lib/content/service", () => ({
         Promise.resolve([{ id: "cat_1", name: "News", slug: "news" }]),
 }));
 vi.mock("@/lib/saroh-billing/service", () => ({
+    plansOpen: () => Promise.resolve(true),
     pausedOrNull: () => Promise.resolve(null),
     billingAccessOrNull: () => Promise.resolve(null),
 }));

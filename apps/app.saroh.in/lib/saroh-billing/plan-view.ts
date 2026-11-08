@@ -3,7 +3,6 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import {
     cardLines,
     catalogPlanIdForKey,
-    formatInr,
     offeredPlans,
     planPricePaise,
     trialFirstPaise,
@@ -11,6 +10,7 @@ import {
 
 import type { BillingAccessView } from "@/lib/billing/access";
 
+import { inclTax, planMoney, plusTax } from "@/lib/saroh-billing/money";
 import type { NextCharge, SarohSubscription } from "./plan";
 import type { PlanNote, StatusPart } from "./plan-status";
 import { nextParts } from "./plan-status";
@@ -166,6 +166,8 @@ export interface CheckoutHandoff {
     orderId: string | null;
     amountPaise: number | null;
     currency: string;
+    /** Cards only: a currency other than rupees (stage 9). Absent: false. */
+    cardOnly?: boolean;
     prefill: {
         name: string | null;
         email: string | null;
@@ -237,7 +239,7 @@ export function billedCycle(sub: SarohSubscription | null): Cycle {
 
 /** "₹111 a month", "₹1,110 a year", or "₹0". */
 export function priceWords(pricePaise: number, cycle: Cycle): string {
-    return pricePaise > 0 ? `${formatInr(pricePaise)} ${per(cycle)}` : "₹0";
+    return pricePaise > 0 ? `${planMoney(pricePaise)} ${per(cycle)}` : "₹0";
 }
 
 /** Whether the picker offers yearly, and how many months it gives free. */
@@ -393,7 +395,7 @@ export function yourPlan(input: {
     const paise = yearlyPaise ?? access.pricePaise ?? 0;
     const priceText =
         paise > 0
-            ? `${priceWords(paise, yearlyPaise !== null ? "year" : "month")} + GST`
+            ? `${priceWords(paise, yearlyPaise !== null ? "year" : "month")}${plusTax()}`
             : "₹0";
 
     const versionNote =
@@ -475,7 +477,7 @@ export function yourPlan(input: {
         next = {
             kind: "charge",
             iso: sub.currentPeriodEnd,
-            amount: `${formatInr(paise)} + GST${input.addonsHeld ? " + add-ons" : ""}`,
+            amount: `${planMoney(paise)}${plusTax()}${input.addonsHeld ? " + add-ons" : ""}`,
         };
         if (sub.status === "TRIALING") {
             firstMonth = true;
@@ -507,7 +509,7 @@ export function yourPlan(input: {
         move.pricePaise !== undefined &&
         move.pricePaise > 0 &&
         move.pricePaise !== paise
-            ? `${priceWords(move.pricePaise, yearlyPaise !== null ? "year" : "month")} + GST`
+            ? `${priceWords(move.pricePaise, yearlyPaise !== null ? "year" : "month")}${plusTax()}`
             : null;
     if (move?.waiting === "authorise") {
         // Due, and waiting on the business: the one move that needs a tap.
@@ -853,7 +855,7 @@ export function pickerRows(input: {
             quoted &&
             (quoted.kind === "UPGRADE" || quoted.firstMonth === "NOW") &&
             quoted.payNowTotalPaise > 0
-                ? `Starts today: ${formatInr(quoted.payNowTotalPaise)} now (incl. GST)`
+                ? `Starts today: ${planMoney(quoted.payNowTotalPaise)} now${inclTax()}`
                 : null;
         const timing = awaited
             ? { lead: "From ", iso: awaited.iso, tail: keep, brief: kept }
@@ -919,13 +921,15 @@ export function pickerRows(input: {
         return {
             planId: p.id,
             name: p.name,
-            price: free ? "₹0" : `${priceWords(pricePaise, cycle)} + GST`,
-            amount: free ? "₹0" : formatInr(pricePaise),
-            per: free ? "" : `${per(cycle)} + GST`,
+            price: free
+                ? planMoney(0)
+                : `${priceWords(pricePaise, cycle)}${plusTax()}`,
+            amount: free ? planMoney(0) : planMoney(pricePaise),
+            per: free ? "" : `${per(cycle)}${plusTax()}`,
             what: p.tagline,
             offer:
                 firstPaise > 0
-                    ? `First month ${formatInr(firstPaise)} + GST`
+                    ? `First month ${planMoney(firstPaise)}${plusTax()}`
                     : trialDays
                       ? `${trialDays}-day free trial`
                       : null,
@@ -971,7 +975,7 @@ export function addonRows(view: AddonsView): AddonRow[] {
         .map((a) => {
             const isModule = a.kind === "module";
             const [one, many] = UNIT[a.kind] ?? [a.kind, a.kind];
-            const price = formatInr(a.pricePaise);
+            const price = planMoney(a.pricePaise);
             const max = a.max ?? view.max;
             // Said only where the plan sets its own, below the ceiling.
             const upTo = !isModule && max < view.max ? `, up to ${max}` : "";
@@ -990,7 +994,7 @@ export function addonRows(view: AddonsView): AddonRow[] {
                       : `+${count(a.qty, one, many)} for ${price} a month${upTo}`,
                 total:
                     a.quantity > 0
-                        ? `${isModule ? "Added" : `${a.quantity} ×`} · ${formatInr(a.heldPaise)} a month`
+                        ? `${isModule ? "Added" : `${a.quantity} ×`} · ${planMoney(a.heldPaise)} a month`
                         : "",
             };
         });

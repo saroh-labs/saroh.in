@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { plansShown } from "@/lib/saroh-billing/plans-shown";
-import { getSarohInvoicePdf } from "@/lib/saroh-billing/service";
+import { getSarohInvoicePdf, plansOpen } from "@/lib/saroh-billing/service";
 
 /**
  * "Download PDF" on Settings › Plan and billing (plans catalogue U17): one of
@@ -22,7 +21,7 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ invoiceId: string }> },
 ) {
-    if (!plansShown()) {
+    if (!(await plansOpen())) {
         return new Response(null, {
             status: 404,
             headers: { "cache-control": "no-store" },

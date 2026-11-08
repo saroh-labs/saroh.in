@@ -1,8 +1,8 @@
-import { formatInr } from "@saroh/pricing-catalog";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
+import { planMoney } from "@/lib/saroh-billing/money";
 import type { UpgradeTo } from "./access";
 
 /**
@@ -79,7 +79,7 @@ export function planRefusalOf(
             code: "MODULE_LOCKED",
             title,
             body: upgradeTo
-                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost. It's here when you upgrade.`
+                ? `${upgradeTo.name} is ${planMoney(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost. It's here when you upgrade.`
                 : "Nothing you've made is lost.",
             cta: planLabel(upgradeTo?.name),
             upgradeTo,
