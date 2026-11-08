@@ -49,6 +49,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             contactEmail: string | null;
             taxId: string | null;
             timezone?: string | null;
+            country?: string | null;
         } | null;
         tax?: {
             registered: boolean;
@@ -70,7 +71,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
         state: s.tax?.state
             ? { code: s.tax.state, name: s.tax.stateName }
             : null,
-        address: printedAddress(s.registeredAddress),
+        address: printedAddress(s.registeredAddress, s.profile?.country),
         logo: s.logo?.url ?? null,
         timeZone: s.profile?.timezone ?? null,
     };

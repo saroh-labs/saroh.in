@@ -29,7 +29,10 @@ export function newInvoiceBusiness(
     return {
         seller: {
             name: settings.name,
-            address: printedAddress(settings.registeredAddress),
+            address: printedAddress(
+                settings.registeredAddress,
+                settings.profile?.country,
+            ),
             gstin: registered ? (settings.profile?.taxId ?? null) : null,
             taxId: registered ? null : (settings.profile?.taxId ?? null),
             state: state

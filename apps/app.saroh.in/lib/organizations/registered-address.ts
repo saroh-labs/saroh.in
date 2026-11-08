@@ -1,3 +1,4 @@
+import { listedCountry } from "@saroh/block-contract";
 import { checkPostcode, checkRegion } from "@saroh/edition";
 
 import { PROFILE } from "@/lib/edition";
@@ -19,20 +20,43 @@ export function inIndia(country: string | null | undefined): boolean {
 export const PIN_SHAPE = /^[1-9][0-9]{5}$/;
 
 /**
+ * Where a Global address ends (U4), as the API prints it: the city, then
+ * the region before the postcode ("Austin, TX 78701"), or the city and
+ * postcode with no region ("London SW1A 1AA"); and the country's name.
+ */
+export function addressPlace(
+    a: {
+        city?: string | null;
+        postalCode?: string | null;
+        region?: string | null;
+    },
+    country: string | null | undefined,
+): { place: string[]; countryName: string | null } {
+    const join = (...xs: (string | null | undefined)[]) =>
+        xs.filter((x) => x?.trim()).join(" ");
+    const global = byCountry(country);
+    return {
+        place:
+            global && a.region?.trim()
+                ? [a.city ?? "", join(a.region, a.postalCode)]
+                : [join(a.city, a.postalCode)],
+        countryName: global ? (listedCountry(country)?.name ?? null) : null,
+    };
+}
+
+/**
  * The registered address as one printed line — "3 Hill Road, Indiranagar,
  * Bengaluru 560038, Karnataka" — the same shape the API freezes onto an
- * invoice at issue. Null without a first line.
+ * invoice at issue. A Global one ends "Austin, TX 78701, United States"
+ * (U4). Null without a first line.
  */
 export function printedAddress(
     a: RegisteredAddress | null | undefined,
+    country?: string | null,
 ): string | null {
     if (!a?.line1?.trim()) return null;
-    return [
-        a.line1,
-        a.line2,
-        [a.city, a.postalCode].filter((x) => x?.trim()).join(" "),
-        a.stateName,
-    ]
+    const { place, countryName } = addressPlace(a, country);
+    return [a.line1, a.line2, ...place, a.stateName, countryName]
         .map((x) => x?.trim() ?? "")
         .filter((x) => x !== "")
         .join(", ");

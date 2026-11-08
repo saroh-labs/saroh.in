@@ -344,6 +344,34 @@ describe("the invoice's paper as words", () => {
 });
 
 describe("the PDF", () => {
+    it("a Global invoice carries no GST, HSN, SAC or state words (U4, R13)", async () => {
+        const { text } = await pdfText(
+            row({
+                number: "INV-0007",
+                currency: "USD",
+                subtotal: "100.00",
+                tax: "8.25",
+                total: "108.25",
+                taxLabel: "Sales tax",
+                sellerTaxId: "12-3456789",
+                sellerAddress:
+                    "500 Congress Ave, Austin, TX 78701, United States",
+                lines: [
+                    line({
+                        description: "Sourdough class",
+                        unitPrice: "100.00",
+                        amount: "100.00",
+                    }),
+                ],
+            }),
+        );
+        expect(text).toContain("Austin, TX 78701, United States");
+        expect(text).toContain("Tax ID 12-3456789");
+        expect(text).toContain("Sales tax");
+        // No "State" row of India's GST ("United States" is the country).
+        expect(text).not.toMatch(/GST|HSN|SAC|PIN|\bState\b/);
+    });
+
     it("is named for the invoice's number", () => {
         expect(pdfFileName("RYE/26-27/0012")).toBe("RYE-26-27-0012.pdf");
         expect(pdfFileName("INV-0042")).toBe("INV-0042.pdf");

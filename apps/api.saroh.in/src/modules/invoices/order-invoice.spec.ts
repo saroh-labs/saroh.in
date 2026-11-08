@@ -7,6 +7,7 @@ import {
     buildPaymentSupplementary,
     formatSellerAddress,
     orderBillTo,
+    sellerAddressEnd,
 } from "./order-invoice";
 
 const RYE: TaxProfile = {
@@ -503,6 +504,51 @@ describe("the seller's registered address (CGST rule 46)", () => {
                 stateName: null,
             }),
         ).toBeNull();
+    });
+
+    it("India's line is byte-identical: no region, no country (U4, R-I)", () => {
+        const rye = {
+            addressLine1: "22 Hill Road",
+            addressLine2: "Indiranagar",
+            city: "Bengaluru",
+            postalCode: "560038",
+            stateName: "Karnataka",
+        };
+        // Even with a stray region and country stored, India prints neither.
+        const end = sellerAddressEnd("INDIA", { region: "KA", country: "IN" });
+        expect(end).toEqual({ region: null, countryName: null });
+        expect(formatSellerAddress({ ...rye, ...end })).toBe(
+            "22 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+        );
+        expect(formatSellerAddress({ ...rye, ...end })).toBe(
+            formatSellerAddress(rye),
+        );
+    });
+
+    it("a Global seller prints its region and its country last (owner, 8 Nov)", () => {
+        const us = {
+            addressLine1: "500 Congress Ave",
+            addressLine2: "Suite 200",
+            city: "Austin",
+            postalCode: "78701",
+            stateName: null,
+        };
+        expect(
+            formatSellerAddress({
+                ...us,
+                ...sellerAddressEnd("GLOBAL", { region: "TX", country: "US" }),
+            }),
+        ).toBe("500 Congress Ave, Suite 200, Austin, TX 78701, United States");
+        expect(
+            formatSellerAddress({
+                addressLine1: "10 Downing St",
+                addressLine2: null,
+                city: "London",
+                postalCode: "SW1A 2AA",
+                stateName: null,
+                ...sellerAddressEnd("GLOBAL", { region: null, country: "GB" }),
+            }),
+        ).toBe("10 Downing St, London SW1A 2AA, United Kingdom");
     });
 
     it("is frozen on a tax invoice, a receipt, and the paper that corrects them", () => {

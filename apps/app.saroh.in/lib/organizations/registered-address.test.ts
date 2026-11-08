@@ -176,3 +176,41 @@ describe("a Global address in Settings, by its country (U3)", () => {
         ]);
     });
 });
+
+describe("a Global address as it prints (U4)", () => {
+    const US = {
+        ...RYE,
+        line2: null,
+        city: "Austin",
+        postalCode: "78701",
+        state: null,
+        stateName: null,
+        region: "TX",
+    };
+
+    it("names the region before the ZIP code, and the country last", () => {
+        edition.name = "GLOBAL";
+        expect(printedAddress({ ...US, line1: "500 Congress Ave" }, "US")).toBe(
+            "500 Congress Ave, Austin, TX 78701, United States",
+        );
+        expect(
+            printedAddress(
+                {
+                    ...US,
+                    line1: "10 Downing St",
+                    city: "London",
+                    postalCode: "SW1A 2AA",
+                    region: null,
+                },
+                "GB",
+            ),
+        ).toBe("10 Downing St, London SW1A 2AA, United Kingdom");
+    });
+
+    it("prints India's exactly as before, with or without the country", () => {
+        expect(printedAddress(RYE, "IN")).toBe(printedAddress(RYE));
+        expect(printedAddress({ ...RYE, region: "KA" }, "IN")).toBe(
+            "3 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+        );
+    });
+});

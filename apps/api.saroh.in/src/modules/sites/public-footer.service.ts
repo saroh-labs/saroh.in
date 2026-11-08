@@ -14,7 +14,10 @@ import {
 } from "../billing/catalogue-access.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { stateName } from "../invoices/gst-states";
-import { formatSellerAddress } from "../invoices/order-invoice";
+import {
+    formatSellerAddress,
+    sellerAddressEnd,
+} from "../invoices/order-invoice";
 import { publicPhone } from "../organizations/business-phone";
 import { newRefCode } from "../waitlist/waitlist-keys";
 
@@ -122,6 +125,7 @@ export class PublicFooterService {
                         addressLine2: true,
                         city: true,
                         postalCode: true,
+                        region: true,
                         gstState: true,
                         phone: true,
                     },
@@ -147,6 +151,10 @@ export class PublicFooterService {
                     ? formatSellerAddress({
                           ...profile,
                           stateName: stateName(profile.gstState),
+                          ...sellerAddressEnd(
+                              site.organization.edition,
+                              profile,
+                          ),
                       })
                     : null,
                 phone: publicPhone(profile?.phone),

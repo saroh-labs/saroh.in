@@ -28,7 +28,10 @@ import {
     businessTypeOf,
 } from "@/lib/organizations/business-types";
 import { kindOf, ORGANIZATION_KINDS } from "@/lib/organizations/kind";
-import { addressProblems } from "@/lib/organizations/registered-address";
+import {
+    addressPlace,
+    addressProblems,
+} from "@/lib/organizations/registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
@@ -283,11 +286,14 @@ export function indianState(
 export function addressText(v: FormValues): string {
     // As the API prints it: no first line, no address.
     if (!v.addressLine1.trim()) return "";
+    // A Global address: "Austin, TX 78701" and its country last (U4).
+    const { place, countryName } = addressPlace(v, v.country);
     return [
         v.addressLine1,
         v.addressLine2,
-        [v.city, v.postalCode].filter((x) => x.trim()).join(" "),
+        place.filter((x) => x.trim()).join(", "),
         v.gstRegistered ? gstStateOf(v).name : indianState(v),
+        countryName ?? "",
     ]
         .map((x) => x.trim())
         .filter((x) => x !== "")

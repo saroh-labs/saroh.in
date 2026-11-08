@@ -26,6 +26,7 @@ import {
     formatSellerAddress,
     modeOf,
     orderBillTo,
+    sellerAddressEnd,
 } from "./order-invoice";
 import { fromCents, toCents } from "./totals";
 
@@ -74,6 +75,8 @@ export async function loadTaxProfile(
             addressLine2: true,
             city: true,
             postalCode: true,
+            region: true,
+            country: true,
             legalName: true,
             contactEmail: true,
             invoiceStyle: true,
@@ -98,7 +101,11 @@ export async function loadTaxProfile(
         deliverySac: p?.deliverySacCode ?? null,
         priceMode: businessPriceMode(p?.gstPriceMode),
         address: p
-            ? formatSellerAddress({ ...p, stateName: stateName(p.gstState) })
+            ? formatSellerAddress({
+                  ...p,
+                  stateName: stateName(p.gstState),
+                  ...sellerAddressEnd(org?.edition, p),
+              })
             : null,
         seller: {
             sellerName: org?.name ?? null,
