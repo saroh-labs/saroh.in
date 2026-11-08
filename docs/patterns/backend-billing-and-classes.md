@@ -763,8 +763,9 @@ none), and a publish in another edition's money is refused. Who may buy is
 on autopay (`providers/RAZORPAY_USD.md`), so a plan in a currency outside
 `AUTOPAY_CURRENCIES` is paid one month at a time: a USD order, card only
 (`cardOnly` on the handoff), no first-month offer; each month's order
-carries the add-ons held then, whole, never prorated (one bought
-mid-month starts with the next month, `monthAddonLines`); when
+carries the add-ons held then, whole, never prorated (`monthAddonLines`);
+one bought mid-month is a whole month paid at once on an order of its
+own, held once paid (`onAddonOrder`, invoice source `ADDON`); when
 the month ends the next falls due (`openMonthDueInTx`, DEC-210's 7 days),
 then Free. Its invoice is an export (`taxType` EXPORT): no tax, its own
 series (`SAROH_INVOICE_PREFIX_GLOBAL`), the LUT note from

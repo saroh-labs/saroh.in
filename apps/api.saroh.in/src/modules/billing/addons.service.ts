@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
     BadRequestException,
     ConflictException,
@@ -26,16 +28,23 @@ import {
 } from "../audit/audit.service";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
-import { queueAddonChargesInTx } from "./addon-charges";
-import { autopayTakes } from "./autopay-currency";
-import { assertBillingMayStart } from "./business-closing";
-import { billedByProvider, periodStart } from "./checkout-quote";
 import {
+    holdMonthAddonChargesInTx,
+    queueAddonChargesInTx,
+} from "./addon-charges";
+import { autopayTakes, planTaxOf } from "./autopay-currency";
+import { assertBillingMayStart } from "./business-closing";
+import { billedByProvider, periodEnd, periodStart } from "./checkout-quote";
+import { CheckoutService } from "./checkout.service";
+import type { AddonChargeLine } from "./offers";
+import {
+    addonPeriodLine,
     addonProblem,
     addonProratedLine,
     catalogueOfVersion,
     MAX_ADDON_QUANTITY,
 } from "./offers";
+import type { CheckoutHandoff } from "./providers/billing-provider.port";
 import { assertSarohKeeps, assertSarohSells } from "./saroh-bills";
 
 /** One add-on as Settings › Plan shows it. */
@@ -66,6 +75,19 @@ export interface AddonView {
     why: string | null;
 }
 
+/** A month's add-on bought on a plan paid one month at a time, to pay now. */
+export interface AddonPayment {
+    providerOrderId: string;
+    /** What opens the provider's window; null when it has none. */
+    handoff: CheckoutHandoff | null;
+}
+
+interface MonthPurchase {
+    subscriptionId: string;
+    currency: string;
+    line: AddonChargeLine;
+}
+
 /** `GET …/billing/addons`. */
 export interface AddonsView {
     /** Whether the business can buy add-ons now, and if not why. */
@@ -76,6 +98,11 @@ export interface AddonsView {
     addons: AddonView[];
     /** Every add-on held, a month before GST: the cards' sum (U14). */
     heldPaise: number;
+    /**
+     * After `PUT`: the order to pay for an add-on bought on a plan paid one
+     * month at a time (stage 9); held once it's paid. Absent otherwise.
+     */
+    payment?: AddonPayment | null;
 }
 
 const SUB_SELECT = {
@@ -117,12 +144,16 @@ type Sub = Prisma.SubscriptionGetPayload<{ select: typeof SUB_SELECT }>;
  * period after owes the whole. Removing takes effect at once; what the
  * period already owes stays owed. The client names an add-on and a
  * quantity, nothing else (KTD-18). A plan paid one month at a time (stage
- * 9) pays its add-ons with each month's order instead, whole, from the next
- * month on (`monthAddonLines`).
+ * 9) pays its add-ons with each month's order instead, whole
+ * (`monthAddonLines`); more bought mid-month is a USD order of its own for
+ * one whole month, held once it's paid (owner, 8 Nov 2026).
  */
 @Injectable()
 export class AddonsService {
-    constructor(@Optional() private readonly audit?: AuditService) {}
+    constructor(
+        @Optional() private readonly audit?: AuditService,
+        @Optional() private readonly checkout?: CheckoutService,
+    ) {}
 
     async list(
         ctx: OrganizationContext,
@@ -146,6 +177,7 @@ export class AddonsService {
         authorize(ctx, "billing:manage");
         // Taking one off is upkeep; adding one is a purchase (stage 9).
         await (quantity > 0 ? assertSarohSells : assertSarohKeeps)(ctx, now);
+        const toPay: { buy: MonthPurchase | null } = { buy: null };
         const changed = await prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${ctx.organizationId} FOR UPDATE`;
             const sub = await tx.subscription.findUnique({
@@ -188,6 +220,25 @@ export class AddonsService {
                 });
             }
 
+            // More on a plan paid one month at a time: one whole month of
+            // what is added, paid now on an order of its own, and held
+            // once it's paid (owner, 8 Nov 2026). Nothing changes here yet.
+            if (quantity > held && !autopayTakes(sub.plan.currency)) {
+                const start = now;
+                toPay.buy = {
+                    subscriptionId: sub.id,
+                    currency: sub.plan.currency,
+                    line: addonPeriodLine(
+                        addon,
+                        quantity - held,
+                        "month",
+                        start,
+                        periodEnd(start, "month"),
+                    ),
+                };
+                return null;
+            }
+
             if (quantity === 0) {
                 await tx.subscriptionAddon.deleteMany({
                     where: { subscriptionId: sub.id, addonId },
@@ -211,12 +262,9 @@ export class AddonsService {
             }
 
             // More, part-way through a paid period: what is left of it.
-            // Not on a plan paid one month at a time: its add-ons start
-            // with the next month's payment, unprorated (owner, 8 Nov 2026).
             const end = sub.currentPeriodEnd;
             if (
                 quantity > held &&
-                autopayTakes(sub.plan.currency) &&
                 sub.status === "ACTIVE" &&
                 end &&
                 end > now &&
@@ -257,7 +305,46 @@ export class AddonsService {
                 actorRoleKey: ctx.roleKey,
             });
         }
-        return this.list(ctx, now);
+        const payment = toPay.buy
+            ? await this.startPurchase(ctx, toPay.buy)
+            : null;
+        return { ...(await this.list(ctx, now)), payment };
+    }
+
+    /**
+     * The order for a month's add-on bought on a plan paid one month at a
+     * time, through the same Pay flow as a plan's month: its line kept
+     * against the order (SENT), which the webhook holds and invoices once
+     * paid (`BillingWebhookService.onAddonOrder`). Removing it later drops
+     * it from the next month's order; nothing is refunded.
+     */
+    private async startPurchase(
+        ctx: OrganizationContext,
+        buy: MonthPurchase,
+    ): Promise<AddonPayment> {
+        if (!this.checkout) throw new Error("AddonsService needs checkout");
+        const sum = buy.line.quantity * buy.line.unitPaise;
+        const order = await this.checkout.startOneOff(ctx, {
+            amountPaise: withTaxPaise(planTaxOf(buy.currency), sum),
+            reference: randomUUID(),
+            itemKey: `addon.${buy.line.addonId}`,
+            currency: buy.currency,
+        });
+        // shortcut: an order made but not recorded here lapses unpaid at
+        // the provider; one paid anyway is raised as unmatched (DEC-166).
+        await prisma.$transaction((tx) =>
+            holdMonthAddonChargesInTx(tx, {
+                organizationId: ctx.organizationId,
+                subscriptionId: buy.subscriptionId,
+                provider: order.provider,
+                providerOrderId: order.providerOrderId,
+                lines: [buy.line],
+            }),
+        );
+        return {
+            providerOrderId: order.providerOrderId,
+            handoff: order.handoff,
+        };
     }
 
     private async view(sub: Sub | null, now: Date): Promise<AddonsView> {

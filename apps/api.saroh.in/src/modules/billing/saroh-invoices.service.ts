@@ -180,6 +180,61 @@ export class SarohInvoicesService {
     }
 
     /**
+     * A month's add-on bought on its own order (stage 9, owner 8 Nov 2026):
+     * one line per add-on the order added, a whole month each. Once per
+     * order (`addon-order:<order>`).
+     */
+    async invoiceAddonOrderInTx(
+        tx: Tx,
+        input: {
+            organizationId: string;
+            provider: string;
+            orderId: string;
+            rows: {
+                description: string;
+                quantity: number;
+                unitPaise: number;
+                periodStart: Date;
+                periodEnd: Date;
+            }[];
+            event: ParsedBillingEvent;
+            now: Date;
+        },
+    ): Promise<string | null> {
+        const { event } = input;
+        const sub = await tx.subscription.findUnique({
+            where: { organizationId: input.organizationId },
+            select: { plan: { select: { id: true, name: true } } },
+        });
+        const sac = this.sellerNow().sac;
+        return this.recordInTx(tx, {
+            organizationId: input.organizationId,
+            source: "ADDON",
+            chargeKey: `addon-order:${input.orderId}`,
+            provider: input.provider,
+            providerSubscriptionId: input.orderId,
+            providerEventId: event.providerEventId,
+            providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
+            providerCustomerId: event.providerCustomerId ?? null,
+            planId: sub?.plan.id ?? null,
+            planName: sub?.plan.name ?? "Add-ons",
+            cycle: "month",
+            periodStart: input.rows[0]?.periodStart ?? null,
+            periodEnd: input.rows[0]?.periodEnd ?? null,
+            lines: input.rows.map((r) => ({
+                description: r.description,
+                sac,
+                quantity: r.quantity,
+                unitPaise: r.unitPaise,
+            })),
+            billTo: null,
+            issuedAt: input.now,
+        });
+    }
+
+    /**
      * A checkout's charge: a new plan's first period (NEW), an upgrade's
      * difference for the rest of the period (UPGRADE), or a scheduled
      * change's first period (SCHEDULED). Nothing for a checkout that only

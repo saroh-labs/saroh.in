@@ -537,6 +537,8 @@ describe("sarohInvoicePaper", () => {
     it("reads Due for a source that isn't paid when written", () => {
         expect(sarohPaymentStatus({ source: "RENEWAL" })).toBe("Paid");
         expect(sarohPaymentStatus({ source: "NEW" })).toBe("Paid");
+        // A month's add-on on its own order (stage 9) is written once paid.
+        expect(sarohPaymentStatus({ source: "ADDON" })).toBe("Paid");
         expect(sarohPaymentStatus({ source: "SOMETHING_UNPAID" })).toBe("Due");
     });
 

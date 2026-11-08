@@ -17,6 +17,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AddonsService } from "./addons.service";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutService } from "./checkout.service";
+import { BILLING_REFUND_TYPE } from "./double-charge";
 import { MovesApplyHandler } from "./moves-apply.handler";
 import { closeOverduePayments, PAYMENT_DUE_DAYS } from "./payment-due";
 import { PlansService } from "./plans.service";
@@ -421,7 +422,7 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
         expect(gone.status).toBe("CANCELLED");
     });
 
-    it("carries the add-ons held on each month's order, whole, from the next month (owner, 8 Nov 2026)", async () => {
+    it("charges a whole month for an add-on at purchase, then carries it on each month's order (owner, 8 Nov 2026)", async () => {
         const catalog = usd();
         await install(1, "GLOBAL", catalog);
         await flag(true);
@@ -432,16 +433,47 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
         if (r.kind === "TO_FREE") throw new Error("expected a checkout");
         await paid(r.handoff!.orderId!, price);
 
-        // Bought mid-month: held at once, nothing charged for this month.
-        const addons = new AddonsService();
+        // Bought mid-month: a whole month of both packs, paid now on a USD
+        // order of its own, and held only once it's paid.
+        const addons = new AddonsService(undefined, checkout);
+        const month = 2 * pack.pricePaise;
         const view = await addons.set(ctx, pack.id, 2);
         expect(view.canBuy).toBe(true);
         expect(view.addons.find((a) => a.id === pack.id)).toMatchObject({
-            quantity: 2,
+            quantity: 0,
             gstPaise: 0,
             totalPaise: pack.pricePaise,
         });
-        expect(await prisma.subscriptionAddonCharge.count()).toBe(0);
+        expect(view.payment?.handoff).toMatchObject({
+            currency: "USD",
+            cardOnly: true,
+            amountPaise: month,
+        });
+        expect(fake.orders.created.at(-1)).toMatchObject({
+            currency: "USD",
+            amountPaise: month,
+        });
+        const addonOrder = view.payment!.providerOrderId;
+        await paid(addonOrder, month);
+        await paid(addonOrder, month); // a second event adds nothing more
+        const held = await prisma.subscriptionAddon.findMany({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(held).toEqual([
+            expect.objectContaining({ addonId: pack.id, quantity: 2 }),
+        ]);
+        const bought = await prisma.sarohInvoice.findFirstOrThrow({
+            where: { providerSubscriptionId: addonOrder },
+            include: { lines: true },
+        });
+        expect(bought).toMatchObject({
+            source: "ADDON",
+            taxType: "EXPORT",
+            currency: "USD",
+            totalPaise: month,
+            taxPaise: 0,
+        });
+        expect(bought.lines).toHaveLength(1);
 
         // The month ends: Pay now is the plan and both packs, a whole month.
         await prisma.subscription.update({
@@ -500,7 +532,69 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
             await prisma.subscriptionAddonCharge.findMany({
                 select: { status: true },
             }),
-        ).toEqual([{ status: "INVOICED" }]);
+        ).toEqual([{ status: "INVOICED" }, { status: "INVOICED" }]);
+
+        // Removed before the next payment: off the next order, no refund.
+        await addons.set(ctx, pack.id, 0);
+        await prisma.subscription.update({
+            where: { organizationId: ctx.organizationId },
+            data: { currentPeriodEnd: new Date(Date.now() - DAY) },
+        });
+        expect(await sweep.endPaidYears(new Date())).toBe(1);
+        expect(
+            await checkout.quote(ctx, { plan: "b", cycle: "month" }),
+        ).toMatchObject({ payNowTotalPaise: price, addonsNowPaise: 0 });
+    });
+
+    it("drops an add-on's order that isn't paid, and gives back one paid after its plan ended", async () => {
+        const catalog = usd();
+        await install(1, "GLOBAL", catalog);
+        await flag(true);
+        const ctx = await globalBusiness();
+        const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
+        const pack = catalog.addons.find((a) => a.id === "things-pack")!;
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        await paid(r.handoff!.orderId!, price);
+        const addons = new AddonsService(undefined, checkout);
+
+        const lapsed = (await addons.set(ctx, pack.id, 1)).payment!;
+        await paid(lapsed.providerOrderId, pack.pricePaise, {
+            status: "CANCELLED",
+            phase: "cancelled",
+        });
+        expect(
+            await prisma.subscriptionAddonCharge.findFirst({
+                where: { providerSubscriptionId: lapsed.providerOrderId },
+                select: { status: true },
+            }),
+        ).toEqual({ status: "DROPPED" });
+
+        // Bought, then the business leaves for Free before paying it.
+        const late = (await addons.set(ctx, pack.id, 1)).payment!;
+        await prisma.subscription.update({
+            where: { organizationId: ctx.organizationId },
+            data: { currentPeriodEnd: new Date(Date.now() - DAY) },
+        });
+        await sweep.endPaidYears(new Date());
+        await checkout.changePlan(ctx, { plan: "free", cycle: "month" });
+        await paid(late.providerOrderId, pack.pricePaise);
+        expect(
+            await prisma.subscriptionAddon.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.sarohInvoice.count({
+                where: { providerSubscriptionId: late.providerOrderId },
+            }),
+        ).toBe(0);
+        // Given back in full, as a second payment is (DEC-164).
+        const refund = await prisma.job.findFirst({
+            where: { type: BILLING_REFUND_TYPE },
+            orderBy: { createdAt: "desc" },
+        });
+        expect(JSON.stringify(refund?.payload)).toContain(late.providerOrderId);
     });
 
     it("lets a payer move to Free with the switch turned off", async () => {

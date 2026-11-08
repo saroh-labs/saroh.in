@@ -19,13 +19,17 @@ import { financialYear } from "../invoices/numbering";
  * states it is IGST.
  */
 
-/** What was charged: the checkout kinds, a renewal, and a messaging top-up. */
+/**
+ * What was charged: the checkout kinds, a renewal, a messaging top-up, and a
+ * month's add-on bought on its own order (stage 9).
+ */
 export const SAROH_INVOICE_SOURCES = [
     "NEW",
     "UPGRADE",
     "SCHEDULED",
     "RENEWAL",
     "TOPUP",
+    "ADDON",
 ] as const;
 export type SarohInvoiceSource = (typeof SAROH_INVOICE_SOURCES)[number];
 

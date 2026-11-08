@@ -230,6 +230,21 @@ export class BillingWebhookService {
                           select: { id: true, organizationId: true },
                       })
                     : null;
+            // A month's add-on bought on its own order (stage 9): its lines
+            // name the order, which no checkout or subscription does.
+            const addonOrder =
+                subId && !subscription && !checkout && !topup
+                    ? await tx.subscriptionAddonCharge.findFirst({
+                          where: {
+                              provider: name,
+                              providerSubscriptionId: subId,
+                          },
+                          select: {
+                              subscriptionId: true,
+                              organizationId: true,
+                          },
+                      })
+                    : null;
 
             // Insert-or-nothing: a caught unique violation would abort the
             // transaction, so a duplicate is read from the count.
@@ -243,6 +258,7 @@ export class BillingWebhookService {
                             subscription?.organizationId ??
                             checkout?.organizationId ??
                             topup?.organizationId ??
+                            addonOrder?.organizationId ??
                             null,
                         payload: payload as Prisma.InputJsonValue,
                     },
@@ -267,6 +283,13 @@ export class BillingWebhookService {
                 outcome = await this.onCheckout(tx, checkout, event, now);
             } else if (topup) {
                 outcome = await this.onTopup(tx, topup.id, event, now);
+            } else if (addonOrder && subId) {
+                outcome = await this.onAddonOrder(
+                    tx,
+                    { ...addonOrder, provider: name, orderId: subId },
+                    event,
+                    now,
+                );
             } else {
                 // No business (DEC-166): a refund or dispute is kept; an
                 // unmatched charge is raised and left not applied.
@@ -457,6 +480,102 @@ export class BillingWebhookService {
             await tx.messagingTopup.update({
                 where: { id: topup.id },
                 data: { status: "FAILED" },
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        return ignored;
+    }
+
+    // ── A month's add-on on its own order (stage 9) ────────────────────
+
+    /**
+     * Paid: what the order added is held from now, and Saroh's invoice is
+     * written for it (owner, 8 Nov 2026: a whole month at purchase). Only
+     * SENT lines move, under the subscription's lock, so a second event
+     * for the order adds nothing. Ended: the lines are dropped. Paid after
+     * its lines were dropped (the business left for Free first): given
+     * back, as a second payment is (DEC-164).
+     */
+    private async onAddonOrder(
+        tx: Tx,
+        order: {
+            subscriptionId: string;
+            organizationId: string;
+            provider: string;
+            orderId: string;
+        },
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<Outcome> {
+        const ignored: Outcome = {
+            result: { status: "ignored", changed: false },
+        };
+        await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${order.subscriptionId} FOR UPDATE`;
+        const rows = await tx.subscriptionAddonCharge.findMany({
+            where: {
+                provider: order.provider,
+                providerSubscriptionId: order.orderId,
+            },
+        });
+        const open = rows.filter((r) => r.status === "SENT");
+        const phase = event.phase ?? "other";
+        if (PAID_PHASES.includes(phase)) {
+            if (open.length === 0) {
+                if (rows.some((r) => r.status === "DROPPED")) {
+                    this.logger.error(
+                        `billing_addon_paid_after_dropped org=${order.organizationId} order=${order.orderId}`,
+                    );
+                    await recordDoubleChargeInTx(tx, this.logger, {
+                        organizationId: order.organizationId,
+                        provider: order.provider,
+                        providerSubscriptionId: order.orderId,
+                        providerPaymentId: event.providerPaymentId,
+                        amountPaise: event.paymentAmountPaise,
+                        phase: event.phase,
+                        reason: "paid for an add-on after the plan it was for ended",
+                    });
+                    return { result: { status: "processed", changed: true } };
+                }
+                return ignored;
+            }
+            for (const r of open) {
+                await tx.subscriptionAddon.upsert({
+                    where: {
+                        subscriptionId_addonId: {
+                            subscriptionId: order.subscriptionId,
+                            addonId: r.addonId,
+                        },
+                    },
+                    create: {
+                        organizationId: order.organizationId,
+                        subscriptionId: order.subscriptionId,
+                        addonId: r.addonId,
+                        quantity: r.quantity,
+                    },
+                    update: { quantity: { increment: r.quantity } },
+                });
+            }
+            const invoiceId =
+                (await this.invoices?.invoiceAddonOrderInTx(tx, {
+                    organizationId: order.organizationId,
+                    provider: order.provider,
+                    orderId: order.orderId,
+                    rows: open,
+                    event,
+                    now,
+                })) ?? null;
+            // INVOICED even when no invoice could be written (it raised
+            // Needs action): the add-on is held, and never added twice.
+            await tx.subscriptionAddonCharge.updateMany({
+                where: { id: { in: open.map((r) => r.id) }, status: "SENT" },
+                data: { status: "INVOICED", invoiceId },
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        if (ENDED_PHASES.includes(phase) || phase === "halted") {
+            await tx.subscriptionAddonCharge.updateMany({
+                where: { id: { in: open.map((r) => r.id) }, status: "SENT" },
+                data: { status: "DROPPED" },
             });
             return { result: { status: "processed", changed: true } };
         }

@@ -31,7 +31,8 @@ catalogue.
 1. **Migrations**, with the API's usual `prisma migrate deploy` step:
    `20270130100000_pricing_catalogue_edition`,
    `20270130110000_billing_profile_country`,
-   `20270130120000_saroh_export_invoice`.
+   `20270130120000_saroh_export_invoice`,
+   `20270130130000_saroh_invoice_source_addon`.
 2. **API** deployed from the release's image. Leave `SAROH_BILLING_GLOBAL`
    off in production. The export settings (`SAROH_INVOICE_PREFIX_GLOBAL`,
    `SAROH_EXPORT_LUT`) may stay unset: the API starts without them and refuses

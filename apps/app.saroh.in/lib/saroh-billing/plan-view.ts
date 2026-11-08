@@ -72,6 +72,14 @@ export interface AddonsView {
     max: number;
     addons: AddonView[];
     heldPaise: number;
+    /**
+     * After a change: the order to pay for an add-on bought on a plan paid
+     * one month at a time (stage 9), held once paid. Absent otherwise.
+     */
+    payment?: {
+        providerOrderId: string;
+        handoff: CheckoutHandoff | null;
+    } | null;
 }
 
 export type ChangeKind =

@@ -91,6 +91,7 @@ const PAID_WHEN_WRITTEN = new Set([
     "SCHEDULED",
     "RENEWAL",
     "TOPUP",
+    "ADDON",
 ]);
 
 /** Whether the invoice's payment has been received, from how it was written. */
