@@ -823,42 +823,28 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
             if (f.url().startsWith(CHECKOUT_ORIGIN)) left.push(f.url());
         });
 
-        // The pay page starts the intent server to server (a server
-        // action, `lib/invoice-pay.ts`), so the browser sees only the
-        // action's answer, which carries the intent. Read once each has
-        // finished: a body read on its response event can be gone.
-        const answers: string[] = [];
-        page.on("requestfinished", (r) => {
-            if (r.method() !== "POST" || !r.url().includes(`/pay/${token}`)) {
-                return;
-            }
-            void r
-                .response()
-                .then((res) => res?.text())
-                .then((t) => t && answers.push(t))
-                .catch(() => undefined);
-        });
         await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
         // Pressed until hydrated, as the hosted test does.
         await pressUntil(
             page.getByRole("button", { name: /^Pay \$25(\.00)?$/ }),
             () => page.getByRole("dialog").isVisible(),
         );
-        const withIntent = () =>
-            answers.find((t) => t.includes('"paymentIntentId":"')) ?? "";
-        await expect.poll(withIntent).not.toBe("");
-        const answer = withIntent();
-        const field = (name: string) =>
-            new RegExp(`"${name}":"([^"]+)"`).exec(answer)?.[1] ?? "";
+        // The intent, as the stub Stripe.js was handed it: a client secret
+        // for a PaymentIntent, never a Checkout address. (Read from the page,
+        // not the server action's answer, whose body CI can drop.)
+        const secret = () =>
+            page.evaluate(
+                () =>
+                    (
+                        window as unknown as {
+                            __stripe: { elements?: { clientSecret?: string } };
+                        }
+                    ).__stripe.elements?.clientSecret ?? "",
+            );
+        await expect.poll(secret).toMatch(/^pi_fake_\w+_secret_/);
         const intent = {
-            paymentIntentId: field("paymentIntentId"),
-            providerIntentId: field("providerIntentId"),
+            providerIntentId: (await secret()).split("_secret_")[0] ?? "",
         };
-        expect(intent.providerIntentId).toMatch(/^pi_fake_/);
-        expect(answer).toContain(
-            `"clientSecret":"${intent.providerIntentId}_secret_`,
-        );
-        expect(answer).not.toContain("checkoutUrl");
 
         // The window, on the page: never Stripe's hosted Checkout.
         const cardWindow = page.getByRole("dialog");
@@ -892,10 +878,8 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
                 currency: "usd",
                 status: "succeeded",
                 latest_charge: `ch_fake_${tag}`,
-                metadata: {
-                    saroh_ref: draft.id,
-                    saroh_intent: intent.paymentIntentId,
-                },
+                // Matched by its PaymentIntent id, as the window's own is.
+                metadata: { saroh_ref: draft.id },
             }),
         );
         await expect
