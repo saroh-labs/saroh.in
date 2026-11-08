@@ -6566,3 +6566,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** a Global business's codes go from `codes@saroh.tech`. The dev AWS account's sending user may only send `*@saroh.io` (IAM `ses:FromAddress`), so SES refused with "not authorized to perform ses:SendRawEmail", which the fallback (built for "Email address is not verified") didn't recognise. The dev API also hadn't been redeployed since `EMAIL_FROM_GLOBAL`/`SITE_CODES_EMAIL_FROM_GLOBAL` were set.
 - **Fix:** `isUnverifiedSender` also treats the policy refusal as "this sender can't be used" (nothing was sent, so a retry can't send twice); dev API redeployed to pick up the saroh.io senders.
 - **Rule:** a new sender address needs both an SES identity and the sending IAM user's `ses:FromAddress` condition, in every environment; env changes on Coolify reach the API only on its next deploy.
+
+## Stripe refused a payment on an Indian account: an export needs a description and an address (7 Nov 2026)
+
+- **Symptom:** the first live test of a Global business's Stripe payment, on an Indian Stripe test account, was refused: "As per Indian regulations, export transactions require a description." Saroh's own card window (a PaymentIntent with Stripe's Payment Element) had no way to fix it.
+- **Cause:** an Indian Stripe account charging a customer abroad must send a description, the customer's name and a billing address (and a shipping address for goods). Saroh's window collected none of them; DEC-208 was built and checked against a US-shaped account only.
+- **Fix:** Stripe payments go through Stripe's hosted Checkout (DEC-208, 7 Nov amendment; plan 2026-11-07-002). Every PaymentIntent carries `paymentDescription`, the account's country is read at connect, and an `IN` or unreadable account's sessions send `billing_address_collection=required` (and the order's shipping country for goods). Stripe's page asks for whatever else the account's country needs.
+- **Rule:** a provider fact is checked against the provider's docs for every country the merchant's account can be in, not only the edition's, and recorded with its source in `payments/providers/STRIPE.md` before code is written. An owner test on an account from the strictest country (India for Stripe) comes before the flag goes on.
+- **Category:** payments · providers
