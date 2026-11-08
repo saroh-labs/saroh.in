@@ -750,6 +750,27 @@ checkout, and an add-on is a line on the charge after the period it covers
 invoice's lines are worked out by one rule each, so they agree. Rules in
 `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
 
+**Saroh's plans abroad (stage 9, DEC-211, epic #1306).** Each edition
+has its own catalogue (`PricingCatalogVersion.edition`, one draft per
+edition, `draftIdOf`); version numbers stay one sequence, so a plan row
+and its provider plan are still keyed by the number. Live reads take the
+edition with no default (`liveCatalogueVersion(db, edition)`). A catalogue
+says its money (`currency`, `tax`: India's INR with GST, Global's USD with
+none), and a publish in another edition's money is refused. Who may buy is
+`saroh-bills.ts`: `assertSarohSells` (a purchase) and `assertSarohKeeps`
+(upkeep, open to a business already paying, so turning
+`SAROH_BILLING_GLOBAL` off never traps a payer). Razorpay can't renew USD
+on autopay (`providers/RAZORPAY_USD.md`), so a plan in a currency outside
+`AUTOPAY_CURRENCIES` is paid one month at a time: a USD order, card only
+(`cardOnly` on the handoff), no first-month offer, no add-ons yet; when
+the month ends the next falls due (`openMonthDueInTx`, DEC-210's 7 days),
+then Free. Its invoice is an export (`taxType` EXPORT): no tax, its own
+series (`SAROH_INVOICE_PREFIX_GLOBAL`), the LUT note from
+`SAROH_EXPORT_LUT`, the rupee base stored and not printed. A payment in
+another currency, a Global plan paid with an Indian card, or an export
+without its settings writes no invoice and raises Needs action. Commission
+skips invoices not in rupees.
+
 ## Commission on Saroh's payments — **Current** (DEC-169, admin console U21)
 
 What an account manager earns on the payments of the businesses they look
