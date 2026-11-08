@@ -6590,3 +6590,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** price history takes `MRP_LABEL` (pinned in `mrp-label.test.ts` for both editions); the spec reads the intent from the action's answer; the none-chosen test's business is `global-a-home`.
 - **Rule:** an edition word gets one constant, and every place that says it imports the constant: grep the old literal across the app when you add one. A browser spec on a renderer pay page waits for the page's own POST, not an API path.
 - **Category:** edition · e2e
+
+## Phone booking holds hit the payment limit even with a new address per customer (8 Nov 2026)
+
+- **Symptom:** the full gate failed only the three phone booking-hold tests in `stripe-checkout.spec.ts`, each refused 429 on its first `payment-intent`, after `asNewVisitor` was keyed on the worker index.
+- **Cause:** the booking page starts the payment from the browser straight to the API (`site-blocks/booking-flow/api.ts`), not through the renderer, so `cf-connecting-ip` never mattered. The e2e API ran with `TRUST_PROXY` unset, which under `SKIP_ENV_VALIDATION` trusts nothing, so every browser in the run was one caller (loopback) for the pay limit (10 per 10 minutes). Desk and the 503 Cashfree tests spent it first.
+- **Fix:** the e2e stack's API runs with `TRUST_PROXY=private` (`ci.yml`, `scripts/prepush.sh`), and `asNewVisitor` sends its address as `x-forwarded-for` as well.
+- **Rule:** a public limit a browser spec meets directly on the API is keyed on `@Ip()`; give the customer an address the API reads (`x-forwarded-for` on the trusted e2e stack), not only the renderer's header.
+- **Category:** e2e · rate limits
