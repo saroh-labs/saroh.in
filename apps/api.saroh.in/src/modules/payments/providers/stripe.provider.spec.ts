@@ -712,3 +712,34 @@ describe("StripeProvider.cancelIntent", () => {
         );
     });
 });
+
+describe("StripeProvider.createElementIntent (parked in-page window)", () => {
+    it("form-encodes a cards-only PaymentIntent with Saroh's reference and returns its client secret", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "pi_test_9",
+                client_secret: "pi_test_9_secret_madeup",
+            }),
+        );
+        const result = await new StripeProvider().createElementIntent({
+            amountCents: 2000,
+            currency: "USD",
+            orderId: "cmorder9",
+            credentials: CREDS,
+            description: "Walk Test Co order",
+        });
+        const { url, form } = call();
+        expect(url).toBe("https://api.stripe.com/v1/payment_intents");
+        expect([...form.entries()]).toEqual([
+            ["amount", "2000"],
+            ["currency", "usd"],
+            ["allowed_payment_method_types[]", "card"],
+            ["metadata[saroh_ref]", "cmorder9"],
+            ["description", "Walk Test Co order"],
+        ]);
+        expect(result.clientParams).toEqual({
+            stripePaymentIntentId: "pi_test_9",
+            clientSecret: "pi_test_9_secret_madeup",
+        });
+    });
+});

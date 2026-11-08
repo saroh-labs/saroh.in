@@ -167,6 +167,81 @@ export class StripeProvider implements MerchantProvider {
     }
 
     /**
+     * Parked (owner, 8 Nov 2026): the PaymentIntent Saroh's own in-page card
+     * window confirms with Stripe.js (`site-blocks` `stripe-window.ts`).
+     * Replaced as the live path by hosted Checkout (DEC-208); nothing calls
+     * it, and it keeps its test so the window can be offered again. Cards
+     * only, the merchant's reference in `metadata[saroh_ref]`.
+     */
+    async createElementIntent(
+        input: Pick<
+            CreateOrderIntentInput,
+            | "amountCents"
+            | "currency"
+            | "orderId"
+            | "credentials"
+            | "description"
+        >,
+    ): Promise<CreateOrderIntentResult> {
+        const { amountCents, currency, orderId, credentials } = input;
+        if (!stripeTakesCurrency(currency)) {
+            throw new Error(
+                `Stripe order creation refused: ${currency} is not a currency Saroh charges through Stripe`,
+            );
+        }
+        let res: Response;
+        try {
+            res = await fetch(`${STRIPE_BASE_URL}/payment_intents`, {
+                method: "POST",
+                headers: headers(credentials),
+                body: stripeForm({
+                    amount: amountCents,
+                    currency: currency.trim().toLowerCase(),
+                    // `payment_method_types` is refused on this version.
+                    "allowed_payment_method_types[]": "card",
+                    "metadata[saroh_ref]": orderId,
+                    ...(input.description
+                        ? { description: input.description }
+                        : {}),
+                }),
+                signal: providerCallSignal(),
+            });
+        } catch {
+            throw new Error("Stripe order creation failed: network error");
+        }
+        if (!res.ok) {
+            this.logger.warn(
+                `Stripe order creation failed with HTTP ${res.status}`,
+            );
+            const message = `Stripe order creation failed (HTTP ${res.status})`;
+            if (refusesKeys(res.status)) {
+                throw new ProviderKeysRefusedError(message, res.status);
+            }
+            throw new Error(message);
+        }
+        let body: { id?: string; client_secret?: string };
+        try {
+            body = (await res.json()) as typeof body;
+        } catch {
+            throw new Error(
+                "Stripe order creation failed: unreadable response",
+            );
+        }
+        if (!body.id || !body.client_secret) {
+            throw new Error(
+                "Stripe order creation failed: missing intent id or client secret",
+            );
+        }
+        return {
+            providerIntentId: body.id,
+            clientParams: {
+                stripePaymentIntentId: body.id,
+                clientSecret: body.client_secret,
+            },
+        };
+    }
+
+    /**
      * The payer as a Customer in the business's account: the newest one
      * whose email is the lower-cased, trimmed email (Stripe's filter is
      * case-sensitive and exact), else a new one, made under an
