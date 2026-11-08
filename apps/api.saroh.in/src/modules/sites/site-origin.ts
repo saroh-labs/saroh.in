@@ -39,9 +39,7 @@ export async function siteOriginOf(
         orderBy: { verifiedAt: "asc" },
         select: { hostname: true },
     });
-    const platform = site.subdomain
-        ? `https://${site.subdomain}.${rendererHost()}`
-        : null;
+    const platform = site.subdomain ? platformOrigin(site.subdomain) : null;
     if (!domain) return platform;
     return platform && (await domainPlan.paused(organizationId))
         ? platform
@@ -50,11 +48,14 @@ export async function siteOriginOf(
 
 /**
  * A web address on the renderer's apex, as an origin:
- * `https://<address>.saroh.app` (`.saroh.app.localhost` in dev). Whether
- * anything is served there is the caller's question.
+ * `https://<address>.saroh.app` (`.saroh.app.localhost` in dev), in the
+ * renderer's own scheme, so a plain-http test stack (`http://localhost:3005`)
+ * gets `http://<address>.localhost:3005`. Whether anything is served there
+ * is the caller's question.
  */
 export function platformOrigin(address: string): string {
-    return `https://${address}.${rendererHost()}`;
+    const scheme = rendererBase().startsWith("http://") ? "http" : "https";
+    return `${scheme}://${address}.${rendererHost()}`;
 }
 
 /**
