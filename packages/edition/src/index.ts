@@ -40,6 +40,12 @@ export interface EditionProfile {
     businessCountry: "india-only" | "asked-at-setup";
     /** Whether Saroh bills the business itself, through a billing profile. */
     sarohBilling: boolean;
+    /**
+     * The money Saroh's own plans are priced in (stage 9, KTD2): rupees with
+     * GST, or US dollars with no tax (an export of services). A business's
+     * plan money is in this, never its own currency (KTD6c).
+     */
+    sarohPlanMoney: { currency: "INR" | "USD"; tax: "gst" | "none" };
     /** Whether people can sign in to Saroh with a phone (each code costs money). */
     phoneSignIn: boolean;
     /** The higher, struck-through price: India's printed MRP, or an original price. */
@@ -87,6 +93,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         phoneNumbers: "indian",
         businessCountry: "india-only",
         sarohBilling: true,
+        sarohPlanMoney: { currency: "INR", tax: "gst" },
         phoneSignIn: true,
         struckPrice: "mrp",
         toolPages: "own",
@@ -110,6 +117,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         phoneNumbers: "with-country-code",
         businessCountry: "asked-at-setup",
         sarohBilling: false,
+        sarohPlanMoney: { currency: "USD", tax: "none" },
         phoneSignIn: false,
         struckPrice: "original-price",
         toolPages: "hub",

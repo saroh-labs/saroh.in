@@ -7,6 +7,7 @@ import {
 import { liveCatalogueVersion, prisma } from "@saroh/database";
 import type { AccessState, Catalog } from "@saroh/pricing-catalog";
 import { validateCatalog } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OverrideRow } from "../billing/catalogue-access";
@@ -189,9 +190,14 @@ export function requiredEndDate(
     return at;
 }
 
-/** The live version's snapshot, or null when none is live or it is invalid. */
-export async function liveCatalog(): Promise<Catalog | null> {
-    const row = await liveCatalogueVersion(prisma);
+/** A business's edition's live snapshot, or null when none is live or it is invalid. */
+export async function liveCatalog(
+    organizationId: string,
+): Promise<Catalog | null> {
+    const row = await liveCatalogueVersion(
+        prisma,
+        await editionOf(organizationId),
+    );
     if (!row) return null;
     const r = validateCatalog(row.catalog);
     return r.ok ? r.catalog : null;

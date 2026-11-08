@@ -5,6 +5,8 @@ import {
     prisma,
     startMissingFreeRows,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { repointFreeRowsInTx } from "../pricing/global-free-catalogue";
 
 import { FREE_PLAN_ID } from "./catalogue-access.service";
 
@@ -27,6 +29,8 @@ export const BILLING_FREE_ROWS_TYPE = "billing.free-rows.start";
 export interface FreeRowsPayload {
     /** The version going live; for the logs only. */
     version: number;
+    /** Its edition, whose businesses it starts (stage 9); absent: India's. */
+    edition?: Edition;
 }
 
 type JobTx = Prisma.TransactionClient;
@@ -42,7 +46,8 @@ export async function enqueueFreeRows(
     runAt: Date,
     now: Date,
 ): Promise<boolean> {
-    if (!(await freeRowsMayBeMissing(tx, now))) return false;
+    const edition = payload.edition ?? "INDIA";
+    if (!(await freeRowsMayBeMissing(tx, edition, now))) return false;
     await tx.job.create({
         data: { type: BILLING_FREE_ROWS_TYPE, payload: { ...payload }, runAt },
     });
@@ -53,12 +58,28 @@ export async function enqueueFreeRows(
  * Whether a business may be without its Free row by the go-live: one is
  * already, or no version is live (so every sign-up until then gets none).
  */
-async function freeRowsMayBeMissing(tx: JobTx, now: Date): Promise<boolean> {
+async function freeRowsMayBeMissing(
+    tx: JobTx,
+    edition: Edition,
+    now: Date,
+): Promise<boolean> {
     const missing = await tx.organization.count({
-        where: { subscription: null, deletedRetainedAt: null },
+        where: { edition, subscription: null, deletedRetainedAt: null },
     });
     if (missing > 0) return true;
-    return (await liveCatalogueVersion(tx, now)) === null;
+    // Its businesses still on another edition's Free row (stage 9, KTD3b).
+    const ours = await tx.pricingCatalogVersion.findMany({
+        where: { edition },
+        select: { version: true },
+    });
+    const elsewhere = await tx.subscription.count({
+        where: {
+            organization: { edition },
+            plan: { version: { notIn: ours.map((v) => v.version) } },
+        },
+    });
+    if (elsewhere > 0) return true;
+    return (await liveCatalogueVersion(tx, edition, now)) === null;
 }
 
 @Injectable()
@@ -66,10 +87,20 @@ export class FreeRowsHandler {
     private readonly logger = new Logger(FreeRowsHandler.name);
 
     readonly handle = async (job: Job): Promise<void> => {
-        const version = (job.payload as Partial<FreeRowsPayload> | null)
-            ?.version;
+        const payload = job.payload as Partial<FreeRowsPayload> | null;
+        const version = payload?.version;
+        const edition = payload?.edition ?? "INDIA";
+        const repointed = await prisma.$transaction((tx) =>
+            repointFreeRowsInTx(tx, edition, new Date()),
+        );
+        if (repointed > 0) {
+            this.logger.log(
+                `billing_free_rows_repointed job=${job.id} edition=${edition} moved=${repointed}`,
+            );
+        }
         const report = await startMissingFreeRows(prisma, {
             planId: FREE_PLAN_ID,
+            edition,
         });
         if (!report) {
             // Cancelled, held, or a live version with no Free plan: the next

@@ -33,6 +33,7 @@ const tag = `${process.pid}-${Date.now()}`;
 const MIGRATIONS = [
     "20261021100000_pricing_catalogue",
     "20261021170000_coupon_razorpay_offer",
+    "20270130100000_pricing_catalogue_edition",
 ].map((name) =>
     path.resolve(
         __dirname,
@@ -42,12 +43,20 @@ const MIGRATIONS = [
 
 /** Add each of the migrations' CHECK constraints the database doesn't have. */
 async function ensureMigrationChecks(): Promise<number> {
-    const statements = MIGRATIONS.map((file) => readFileSync(file, "utf8"))
+    const all = MIGRATIONS.map((file) => readFileSync(file, "utf8"))
         .join(";\n")
         .replace(/--[^\n]*/g, "")
         .split(";")
-        .map((s) => s.trim())
-        .filter((s) => /ADD CONSTRAINT "\w+"\s+CHECK/.test(s));
+        .map((s) => s.trim());
+    // A CHECK a later migration drops is not the schema's any more.
+    const dropped = new Set(
+        all.flatMap((s) => /DROP CONSTRAINT "(\w+)"/.exec(s)?.[1] ?? []),
+    );
+    const statements = all.filter(
+        (s) =>
+            /ADD CONSTRAINT "\w+"\s+CHECK/.test(s) &&
+            !dropped.has(/ADD CONSTRAINT "(\w+)"/.exec(s)![1]!),
+    );
     for (const sql of statements) {
         const name = /ADD CONSTRAINT "(\w+)"/.exec(sql)![1]!;
         const [has] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
@@ -154,7 +163,7 @@ describe("pricing catalogue tables (DB, U1)", () => {
             );
             expect(planIds).toHaveLength(4);
 
-            const live = await liveCatalogueVersion(prisma, now);
+            const live = await liveCatalogueVersion(prisma, "INDIA", now);
             expect(live?.version).toBe(1);
             expect(parseCatalog(live?.catalog).plans.map((p) => p.id)).toEqual([
                 "free",
@@ -192,9 +201,11 @@ describe("pricing catalogue tables (DB, U1)", () => {
                 fakeCatalog(12_300),
             );
 
-            expect((await liveCatalogueVersion(prisma, now))?.version).toBe(1);
             expect(
-                (await scheduledCatalogueVersions(prisma, now)).map(
+                (await liveCatalogueVersion(prisma, "INDIA", now))?.version,
+            ).toBe(1);
+            expect(
+                (await scheduledCatalogueVersions(prisma, "INDIA", now)).map(
                     (v) => v.version,
                 ),
             ).toEqual([2]);
@@ -202,6 +213,7 @@ describe("pricing catalogue tables (DB, U1)", () => {
                 (
                     await liveCatalogueVersion(
                         prisma,
+                        "INDIA",
                         new Date(now.getTime() + 2 * DAY),
                     )
                 )?.version,

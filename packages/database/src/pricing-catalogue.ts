@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Edition, Prisma, PrismaClient } from "@prisma/client";
 
 import type { TransactionClient } from "./transaction";
 
@@ -27,6 +27,8 @@ export interface CatalogueVersionPlanRow {
 
 export interface CatalogueVersionInput {
     version: number;
+    /** Whose catalogue it is (stage 9); versions number across editions. India's unless named. */
+    edition?: Edition;
     /** A snapshot already validated by `catalogSchema`. */
     catalog: Prisma.InputJsonValue;
     goLiveAt: Date;
@@ -68,6 +70,7 @@ async function writeVersionRows(
     const v = await tx.pricingCatalogVersion.create({
         data: {
             version: input.version,
+            edition: input.edition ?? "INDIA",
             catalog: input.catalog,
             goLiveAt: input.goLiveAt,
             policy: input.policy,
@@ -129,15 +132,22 @@ export async function unsyncedCatalogueVersions(db: Db): Promise<number[]> {
 }
 
 /**
- * The live version at `now`: the newest whose `goLiveAt` has passed and whose
- * paid plans exist at the billing provider ({@link unsyncedCatalogueVersions}).
- * Later ones are scheduled; a held one waits, and the version before it stays
- * live. Null before any version is installed.
+ * An edition's live version at `now` (stage 9: each edition has its own
+ * catalogue, so the edition is required): the newest whose `goLiveAt` has
+ * passed and whose paid plans exist at the billing provider
+ * ({@link unsyncedCatalogueVersions}). Later ones are scheduled; a held one
+ * waits, and the version before it stays live. Null before any version of
+ * the edition is installed.
  */
-export async function liveCatalogueVersion(db: Db, now: Date = new Date()) {
+export async function liveCatalogueVersion(
+    db: Db,
+    edition: Edition,
+    now: Date = new Date(),
+) {
     const held = await unsyncedCatalogueVersions(db);
     return db.pricingCatalogVersion.findFirst({
         where: {
+            edition,
             goLiveAt: { lte: now },
             ...(held.length ? { version: { notIn: held } } : {}),
         },
@@ -145,26 +155,31 @@ export async function liveCatalogueVersion(db: Db, now: Date = new Date()) {
     });
 }
 
-/** Versions whose `goLiveAt` is still ahead, soonest first. */
-export function scheduledCatalogueVersions(db: Db, now: Date = new Date()) {
+/** An edition's versions whose `goLiveAt` is still ahead, soonest first. */
+export function scheduledCatalogueVersions(
+    db: Db,
+    edition: Edition,
+    now: Date = new Date(),
+) {
     return db.pricingCatalogVersion.findMany({
-        where: { goLiveAt: { gt: now } },
+        where: { edition, goLiveAt: { gt: now } },
         orderBy: { goLiveAt: "asc" },
     });
 }
 
 /**
- * A catalogue plan's billable `Plan` row on the live version, for one cycle
- * (`catalog.<planId>`, KTD-2). Null before any version is live, or when the
- * live version has no such plan.
+ * A catalogue plan's billable `Plan` row on an edition's live version, for
+ * one cycle (`catalog.<planId>`, KTD-2). Null before any version is live, or
+ * when the live version has no such plan.
  */
 export async function liveCataloguePlanRow(
     db: Db,
+    edition: Edition,
     planId: string,
     interval: "month" | "year" = "month",
     now: Date = new Date(),
 ) {
-    const live = await liveCatalogueVersion(db, now);
+    const live = await liveCatalogueVersion(db, edition, now);
     if (!live) return null;
     return db.plan.findUnique({
         where: {
@@ -206,7 +221,18 @@ export async function startOnFreePlan(
         select: { id: true },
     });
     if (existing) return "has-subscription";
-    const row = await liveCataloguePlanRow(db, options.planId, "month", now);
+    // The business's own edition's catalogue (stage 9, KTD3b).
+    const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { edition: true },
+    });
+    const row = await liveCataloguePlanRow(
+        db,
+        org?.edition ?? "INDIA",
+        options.planId,
+        "month",
+        now,
+    );
     if (!row?.active) return "no-plan";
     await db.subscription.create({
         data: {

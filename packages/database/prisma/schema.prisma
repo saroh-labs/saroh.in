@@ -8397,7 +8397,12 @@ model ClassWaitlistEntry {
 // `diff()` against the version before it (the change log).
 model PricingCatalogVersion {
   id      String @id @default(cuid())
+  // One number sequence across editions, so a version, its Plan rows and
+  // their provider plans stay keyed by the number alone (stage 9).
   version Int    @unique
+  // Whose catalogue this is (stage 9, KTD1): each edition has its own
+  // draft, versions and go-live. Every version before it is India's.
+  edition Edition @default(INDIA)
 
   catalog  Json
   goLiveAt DateTime
@@ -8413,9 +8418,11 @@ model PricingCatalogVersion {
   createdAt DateTime @default(now())
 
   @@index([goLiveAt])
+  @@index([edition, goLiveAt])
 }
 
-// PricingCatalogDraft — the one shared draft (KTD-3), a row keyed "shared".
+// PricingCatalogDraft — one shared draft per edition (KTD-3, stage 9): India's
+// is the row keyed "shared", Global's "global" (`draftIdOf`).
 // `revision` goes up on every save; a save naming an older revision is
 // refused (409) with who saved since. Deleted on publish or discard.
 model PricingCatalogDraft {
@@ -8440,6 +8447,10 @@ model PricingCatalogDraft {
 model PricingCoupon {
   id   String @id @default(cuid())
   code String @unique
+  // The catalogue it belongs to (stage 9): redeemed only by a business of
+  // this edition, in that catalogue's currency. Codes stay unique across
+  // editions.
+  edition Edition @default(INDIA)
 
   // Taken off each month for `months` months (monthly), or off the first
   // yearly charge as `months` months' worth, capped at that charge (U16).

@@ -195,6 +195,10 @@ describe("the edition profiles (DEC-204 item 7)", () => {
         phoneNumbers: { INDIA: "indian", GLOBAL: "with-country-code" },
         businessCountry: { INDIA: "india-only", GLOBAL: "asked-at-setup" },
         sarohBilling: { INDIA: true, GLOBAL: false },
+        sarohPlanMoney: {
+            INDIA: { currency: "INR", tax: "gst" },
+            GLOBAL: { currency: "USD", tax: "none" },
+        },
         phoneSignIn: { INDIA: true, GLOBAL: false },
         struckPrice: { INDIA: "mrp", GLOBAL: "original-price" },
         toolPages: { INDIA: "own", GLOBAL: "hub" },

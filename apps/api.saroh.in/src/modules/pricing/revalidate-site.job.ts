@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { env } from "../../env";
 
@@ -44,6 +45,8 @@ const CALL_TIMEOUT_MS = 10_000;
 
 export interface RevalidatePayload {
     version: number;
+    /** Whose catalogue; absent: India's (stage 9). */
+    edition?: Edition;
     /** Why: a publish (or roll back) that is live now, or a go-live. */
     cause: "publish" | "go-live";
 }
@@ -100,6 +103,13 @@ export function requestFor(hook: SiteRefresh): RequestInit {
 }
 
 /**
+ * Which edition's marketing site this hook refreshes (stage 9): saroh.in's.
+ * saroh.tech is a static build that reads Global's catalogue when it is
+ * built, so a Global version reaches it at its next deploy.
+ */
+const SITE_HOOKED: Record<Edition, boolean> = { INDIA: true, GLOBAL: false };
+
+/**
  * Queue a revalidation on the caller's transaction. Writes nothing when the
  * hook isn't configured: a job that could only no-op is never queued
  * (backend-jobs.md), and saroh.in then shows the change at its next deploy.
@@ -109,6 +119,7 @@ export async function enqueueSiteRevalidation(
     payload: RevalidatePayload,
     runAt: Date,
 ): Promise<boolean> {
+    if (!SITE_HOOKED[payload.edition ?? "INDIA"]) return false;
     if (!revalidateHook()) return false;
     await tx.job.create({
         data: {

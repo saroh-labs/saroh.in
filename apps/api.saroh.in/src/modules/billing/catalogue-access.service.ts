@@ -4,6 +4,7 @@ import {
     prisma,
     unsyncedCatalogueVersions,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import type {
     BoughtAddon,
     Catalog,
@@ -21,6 +22,7 @@ import {
     validateCatalog,
     withLiveAdditions,
 } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -392,7 +394,9 @@ export class CatalogueAccessService {
             return legacy("no-plan", { ...FREE_ENTITLEMENTS });
         }
 
-        const snapshot = await this.version(version, now);
+        // The business's own edition's catalogue (stage 9, KTD1).
+        const edition = await editionOf(organizationId);
+        const snapshot = await this.version(version, now, edition);
         if (!snapshot) {
             this.logger.warn(
                 `catalogue_access_unresolved org=${organizationId} reason=no-catalogue version=${version ?? "live"}`,
@@ -400,7 +404,8 @@ export class CatalogueAccessService {
             return legacy("no-catalogue", fallback);
         }
         // Rows its plan has gained since its version are its now (DEC-186).
-        const later = version === null ? null : await this.version(null, now);
+        const later =
+            version === null ? null : await this.version(null, now, edition);
         const catalog =
             later && later.version > snapshot.version
                 ? withLiveAdditions(snapshot.catalog, later.catalog)
@@ -664,8 +669,11 @@ export class CatalogueAccessService {
      * colourways are free (DEC-177). Null with none live, or one that
      * doesn't validate (logged).
      */
-    async liveCatalog(now: Date = new Date()): Promise<Catalog | null> {
-        return (await this.version(null, now))?.catalog ?? null;
+    async liveCatalog(
+        edition: Edition,
+        now: Date = new Date(),
+    ): Promise<Catalog | null> {
+        return (await this.version(null, now, edition))?.catalog ?? null;
     }
 
     /**
@@ -676,10 +684,11 @@ export class CatalogueAccessService {
     private async version(
         version: number | null,
         now: Date,
+        edition: Edition,
     ): Promise<{ version: number; catalog: Catalog } | null> {
         const row =
             version === null
-                ? await liveCatalogueVersion(prisma, now)
+                ? await liveCatalogueVersion(prisma, edition, now)
                 : await prisma.pricingCatalogVersion.findUnique({
                       where: { version },
                   });

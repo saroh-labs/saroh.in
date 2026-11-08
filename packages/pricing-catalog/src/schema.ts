@@ -554,3 +554,35 @@ export function validateCatalog(
         ),
     };
 }
+
+/**
+ * A catalogue with only its free plans, in another currency and tax mode
+ * (stage 9, KTD3b): the Global edition's first version, made from India's
+ * live one so Free's rows and limits match without a number in the repo.
+ * Paid plans, their cells, first-month offers, add-ons, yearly and message
+ * prices go; nothing in it has a price to set.
+ */
+export function freeOnlyCatalog(
+    catalog: Catalog,
+    money: { currency: CatalogCurrency; tax: CatalogTax },
+): Catalog {
+    const plans = catalog.plans
+        .filter((p) => p.pricePaise === 0 && !p.retired)
+        .map(({ trial: _trial, ...p }) => p);
+    const ids = new Set(plans.map((p) => p.id));
+    return parseCatalog({
+        ...catalog,
+        ...money,
+        plans,
+        modules: catalog.modules.map((m) => ({
+            ...m,
+            cells: Object.fromEntries(
+                Object.entries(m.cells).filter(([id]) => ids.has(id)),
+            ),
+        })),
+        yearly: { ...catalog.yearly, on: false },
+        addons: [],
+        messagePrices: undefined,
+        messagePacks: undefined,
+    });
+}

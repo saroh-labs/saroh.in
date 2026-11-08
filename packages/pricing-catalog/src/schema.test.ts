@@ -14,6 +14,7 @@ import {
     catalogMoney,
     catalogSchema,
     cellOf,
+    freeOnlyCatalog,
     freeStylesOf,
     MAX_ADDON_QUANTITY,
     parseCatalog,
@@ -47,6 +48,30 @@ describe("a catalogue's currency and tax (stage 9)", () => {
         expect(
             errorsOf({ ...fixtureInput(), currency: "USD", tax: "gst" }),
         ).toContain("tax: GST applies only to a catalogue in rupees");
+    });
+
+    it("makes a free-only copy in dollars with no tax", () => {
+        const c = freeOnlyCatalog(SEED_CATALOG, {
+            currency: "USD",
+            tax: "none",
+        });
+        expect(c.plans.map((p) => p.id)).toEqual(["free"]);
+        expect(c.plans[0].pricePaise).toBe(0);
+        expect(c.addons).toEqual([]);
+        expect([c.currency, c.tax, c.yearly.on]).toEqual([
+            "USD",
+            "none",
+            false,
+        ]);
+        for (const m of c.modules) {
+            expect(Object.keys(m.cells).every((id) => id === "free")).toBe(
+                true,
+            );
+        }
+        // Free's rows and limits are India's.
+        expect(entitlementsFor(c, "free")).toEqual(
+            entitlementsFor(SEED_CATALOG, "free"),
+        );
     });
 
     it("seeds Global with India's structure and no price", () => {

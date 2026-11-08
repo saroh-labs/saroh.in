@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -395,6 +396,7 @@ export class CheckoutService {
             ctx.organizationId,
             input,
             now,
+            ctx.edition ?? "INDIA",
         );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const details = billingDetailsView(party);
@@ -626,7 +628,12 @@ export class CheckoutService {
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
-            await this.resolve(ctx.organizationId, input, now);
+            await this.resolve(
+                ctx.organizationId,
+                input,
+                now,
+                ctx.edition ?? "INDIA",
+            );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const view = {
             ...this.quoteView(target, quote, coupon, addonsEnding),
@@ -909,8 +916,10 @@ export class CheckoutService {
         organizationId: string,
         input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date,
+        edition: Edition,
     ) {
         let target = await this.plans.resolveCatalogue(
+            edition,
             input.plan,
             input.cycle,
             now,
@@ -918,6 +927,7 @@ export class CheckoutService {
         // Free has no cycle to choose: its monthly row.
         if (target.priceCents === 0 && input.cycle !== "month") {
             target = await this.plans.resolveCatalogue(
+                edition,
                 input.plan,
                 "month",
                 now,
@@ -948,8 +958,14 @@ export class CheckoutService {
         // its plan costs a month (DEC-159).
         const targetMonthlyPaise =
             subscription?.status === "TRIALING" && target.interval === "year"
-                ? (await this.plans.resolveCatalogue(input.plan, "month", now))
-                      .priceCents
+                ? (
+                      await this.plans.resolveCatalogue(
+                          edition,
+                          input.plan,
+                          "month",
+                          now,
+                      )
+                  ).priceCents
                 : undefined;
         const asked = {
             subscription,
@@ -976,6 +992,7 @@ export class CheckoutService {
             coupon = await findUsableCoupon({
                 code,
                 organizationId,
+                edition,
                 planId,
                 planName: target.name,
                 now,

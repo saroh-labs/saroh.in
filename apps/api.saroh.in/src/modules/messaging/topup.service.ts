@@ -64,7 +64,8 @@ export class TopupService {
     ) {}
 
     async packs(): Promise<MessagePackView[]> {
-        const live = await this.catalogue.live(new Date());
+        // Messaging is India's only: Global is email only (DEC-211).
+        const live = await this.catalogue.live("INDIA", new Date());
         return (live?.catalog.messagePacks ?? []).map((p) => ({
             id: p.id,
             amountPaise: p.amountPaise,

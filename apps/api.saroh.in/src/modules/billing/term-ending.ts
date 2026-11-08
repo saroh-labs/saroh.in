@@ -101,6 +101,7 @@ export async function termEndingOf(
             freeChosenAt: true,
             pendingFrom: true,
             pendingPlan: { select: { priceCents: true } },
+            organization: { select: { edition: true } },
             plan: {
                 select: {
                     name: true,
@@ -150,7 +151,7 @@ export async function termEndingOf(
     });
     if (waiting) return null;
 
-    const live = await liveCatalogueVersion(db, now);
+    const live = await liveCatalogueVersion(db, sub.organization.edition, now);
     const next = live
         ? await db.plan.findUnique({
               where: {

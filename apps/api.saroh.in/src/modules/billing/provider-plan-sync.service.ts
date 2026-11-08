@@ -344,10 +344,19 @@ export class ProviderPlanSyncService {
             },
         });
         if (left > 0) return false;
-        const live = await liveCatalogueVersion(tx, now);
+        const row = await tx.pricingCatalogVersion.findUnique({
+            where: { version },
+            select: { edition: true },
+        });
+        if (!row) return false;
+        const live = await liveCatalogueVersion(tx, row.edition, now);
         if (live?.version !== version) return false;
-        await enqueueSiteRevalidation(tx, { version, cause: "go-live" }, now);
-        await enqueueFreeRows(tx, { version }, now, now);
+        await enqueueSiteRevalidation(
+            tx,
+            { version, cause: "go-live", edition: row.edition },
+            now,
+        );
+        await enqueueFreeRows(tx, { version, edition: row.edition }, now, now);
         this.logger.log(`pricing_version_live version=${version} cause=sync`);
         return true;
     }

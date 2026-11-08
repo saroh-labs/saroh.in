@@ -116,7 +116,7 @@ describe("syncing a version's provider plans", () => {
         await liveV1();
         const paid = await publish(2);
         expect(paid).toBe(4); // Plan B and C, monthly and yearly
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(1);
 
         const out = await sync.syncVersion(2, new Date());
         expect(out).toEqual({
@@ -139,10 +139,10 @@ describe("syncing a version's provider plans", () => {
                 .map((r) => [withGstPaise(r.plan.priceCents), r.plan.interval])
                 .sort(),
         );
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(2);
         const reval = await jobsOf(PRICING_REVALIDATE_TYPE);
         expect(reval.map((j) => j.payload)).toEqual([
-            { version: 2, cause: "go-live" },
+            { version: 2, cause: "go-live", edition: "INDIA" },
         ]);
     });
 
@@ -152,7 +152,7 @@ describe("syncing a version's provider plans", () => {
         const out = await sync.syncVersion(2, new Date());
         expect(out).toMatchObject({ synced: 4, wentLive: false });
         expect(await jobsOf(PRICING_REVALIDATE_TYPE)).toHaveLength(0);
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(1);
     });
 
     it("an unanswered create is found next time, never made twice; the job queues its own retry", async () => {
@@ -176,7 +176,7 @@ describe("syncing a version's provider plans", () => {
             expect(r.lastError).toMatch(/network error/);
         }
         // Held while any is PENDING; a later run is queued.
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(1);
         const next = (await jobsOf(PROVIDER_PLAN_SYNC_TYPE)).filter(
             (j) => j.status === "PENDING",
         );
@@ -190,7 +190,7 @@ describe("syncing a version's provider plans", () => {
         expect((await rowsOf(2)).every((r) => r.status === "SYNCED")).toBe(
             true,
         );
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(2);
     });
 
     it("a refusal is FAILED at once; unanswered calls give up after the limit; the console asks again", async () => {
@@ -202,7 +202,7 @@ describe("syncing a version's provider plans", () => {
         const failed = rows.filter((r) => r.status === "FAILED");
         expect(failed).toHaveLength(1);
         expect(failed[0]!.lastError).toMatch(/HTTP 400/);
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(1);
 
         // Another row that never gets an answer.
         await prisma.pricingProviderPlan.update({
@@ -236,7 +236,7 @@ describe("syncing a version's provider plans", () => {
         ).toHaveLength(1);
 
         await sync.syncVersion(2, new Date());
-        expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+        expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(2);
     });
 
     it("queues one sync per version at a time", async () => {

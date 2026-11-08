@@ -24,6 +24,8 @@ jest.mock("@saroh/database", () => {
         // Every version's plans are at the billing provider (U15).
         unsyncedCatalogueVersions: jest.fn(() => []),
         prisma: {
+            // No business row: India's catalogue.
+            organization: { findUnique: jest.fn(() => null) },
             billingCheckout,
             subscription,
             pricingCatalogVersion,

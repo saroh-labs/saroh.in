@@ -8,6 +8,8 @@ import {
     Post,
     Put,
 } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
+import { ServedEdition } from "../admin/admin-edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -55,6 +57,12 @@ import {
  * (a roll back doesn't bypass review), and `coupons:manage` for coupons,
  * which apply at once. Every write is idempotent on its key and audited.
  */
+/**
+ * The catalogue a console reads and writes (stage 9, KTD1): its address's
+ * edition; an address of no edition (local development) is India's.
+ */
+const catalogueOf = (served: Edition | null): Edition => served ?? "INDIA";
+
 @AdminRoutes()
 export class AdminPricingController {
     constructor(
@@ -66,22 +74,31 @@ export class AdminPricingController {
 
     @Get("pricing")
     @RequireAdminPermission(AdminPermission.PricingRead)
-    pricingOverview(): Promise<AdminPricing> {
-        return this.catalogue.adminPricing(new Date());
+    pricingOverview(
+        @ServedEdition() served: Edition | null,
+    ): Promise<AdminPricing> {
+        return this.catalogue.adminPricing(catalogueOf(served), new Date());
     }
 
     @Get("pricing/impact")
     @RequireAdminPermission(AdminPermission.PricingRead)
-    pricingImpact(): Promise<AdminPricingImpact> {
-        return this.catalogue.adminImpact(new Date());
+    pricingImpact(
+        @ServedEdition() served: Edition | null,
+    ): Promise<AdminPricingImpact> {
+        return this.catalogue.adminImpact(catalogueOf(served), new Date());
     }
 
     @Post("pricing/preview-token")
     @RequireAdminPermission(AdminPermission.PricingRead)
     pricingPreviewToken(
+        @ServedEdition() served: Edition | null,
         @Body() dto: PreviewTokenDto,
     ): Promise<PreviewTokenResult> {
-        return this.catalogue.mintPreviewToken(dto.revision, new Date());
+        return this.catalogue.mintPreviewToken(
+            catalogueOf(served),
+            dto.revision,
+            new Date(),
+        );
     }
 
     // ── The shared draft ────────────────────────────────────────────────
@@ -108,6 +125,7 @@ export class AdminPricingController {
             },
             () =>
                 this.writes.saveDraft(
+                    catalogueOf(staff.edition),
                     staff.userId,
                     {
                         catalog: dto.catalog,
@@ -135,7 +153,12 @@ export class AdminPricingController {
                 actorUserId: staff.userId,
             },
             { revision: dto.revision, reason: dto.reason ?? "" },
-            () => this.writes.discardDraft(staff.userId, dto),
+            () =>
+                this.writes.discardDraft(
+                    catalogueOf(staff.edition),
+                    staff.userId,
+                    dto,
+                ),
         );
     }
 
@@ -163,7 +186,13 @@ export class AdminPricingController {
                 note: dto.note ?? "",
                 reason: dto.reason,
             },
-            () => this.writes.publish(staff.userId, dto, new Date()),
+            () =>
+                this.writes.publish(
+                    catalogueOf(staff.edition),
+                    staff.userId,
+                    dto,
+                    new Date(),
+                ),
         );
     }
 
@@ -187,6 +216,7 @@ export class AdminPricingController {
             { version, reason: dto.reason },
             () =>
                 this.writes.cancelVersion(
+                    catalogueOf(staff.edition),
                     staff.userId,
                     version,
                     dto,
@@ -212,7 +242,14 @@ export class AdminPricingController {
                 actorUserId: staff.userId,
             },
             { version, note: dto.note ?? "", reason: dto.reason },
-            () => this.writes.rollback(staff.userId, version, dto, new Date()),
+            () =>
+                this.writes.rollback(
+                    catalogueOf(staff.edition),
+                    staff.userId,
+                    version,
+                    dto,
+                    new Date(),
+                ),
         );
     }
 
@@ -236,6 +273,7 @@ export class AdminPricingController {
             { version, reason: dto.reason },
             () =>
                 this.writes.retryProviderSync(
+                    catalogueOf(staff.edition),
                     staff.userId,
                     version,
                     dto,
@@ -248,8 +286,10 @@ export class AdminPricingController {
 
     @Get("pricing/coupons")
     @RequireAdminPermission(AdminPermission.PricingRead)
-    listCoupons(): Promise<AdminCoupon[]> {
-        return this.coupons.list();
+    listCoupons(
+        @ServedEdition() served: Edition | null,
+    ): Promise<AdminCoupon[]> {
+        return this.coupons.list(catalogueOf(served));
     }
 
     @Post("pricing/coupons")
@@ -280,6 +320,7 @@ export class AdminPricingController {
             { ...fields, reason: dto.reason },
             () =>
                 this.coupons.create(
+                    catalogueOf(staff.edition),
                     staff.userId,
                     {
                         ...fields,
@@ -313,6 +354,7 @@ export class AdminPricingController {
             { couponId, ...dto },
             () =>
                 this.coupons.update(
+                    catalogueOf(staff.edition),
                     staff.userId,
                     couponId,
                     {
@@ -354,7 +396,14 @@ export class AdminPricingController {
                 actorUserId: staff.userId,
             },
             { couponId, reason: dto.reason },
-            () => this.coupons.remove(staff.userId, couponId, dto, new Date()),
+            () =>
+                this.coupons.remove(
+                    catalogueOf(staff.edition),
+                    staff.userId,
+                    couponId,
+                    dto,
+                    new Date(),
+                ),
         );
     }
 }

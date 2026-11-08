@@ -12,6 +12,7 @@ import {
     CATALOG_PLAN_KEY_PREFIX,
     catalogPlanIdForKey,
 } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 
@@ -259,7 +260,7 @@ export class AdminOverridesService {
         const catalog =
             resolved.source === "catalogue"
                 ? resolved.catalog
-                : await liveCatalog();
+                : await liveCatalog(command.organizationId);
         if (!catalog) {
             throw new ConflictException(
                 "No catalogue version is live yet, so there is no plan to put it on.",
@@ -419,7 +420,13 @@ export class AdminOverridesService {
             }
             const planId = catalogPlanIdForKey(sub.plan.key) ?? "";
             const interval = sub.plan.interval === "year" ? "year" : "month";
-            const live = await liveCataloguePlanRow(tx, planId, interval, now);
+            const live = await liveCataloguePlanRow(
+                tx,
+                await editionOf(command.organizationId),
+                planId,
+                interval,
+                now,
+            );
             if (!live) {
                 throw new ConflictException(
                     `The live version doesn't offer ${sub.plan.name}, so there is nothing to move it to.`,

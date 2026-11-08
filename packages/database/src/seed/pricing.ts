@@ -13,7 +13,8 @@
  * demo, a film or a browser spec (the custom roles, the team, the products).
  * This file is the only place in the seed that names the catalogue.
  */
-import { planRows } from "@saroh/pricing-catalog";
+import type { Edition } from "@prisma/client";
+import { freeOnlyCatalog, planRows } from "@saroh/pricing-catalog";
 import { SEED_CATALOG, SEED_NOTE } from "@saroh/pricing-catalog/seed";
 
 import {
@@ -41,24 +42,49 @@ export const SEED_ENTRY_PLAN_ID = "free";
 const SEED_LIVE_FROM = new Date("2020-01-01T00:00:00.000Z");
 
 /**
- * Install the seed catalogue as version 1 if no version exists. Two seeds
- * racing for version 1 meet the unique index; the loser reads it.
+ * The Global edition's seeded catalogue (stage 9, KTD3b): India's sample
+ * Free only, in dollars with no tax, as production's first Global version
+ * is made. Paid plans are priced in the Global admin console.
  */
-async function ensureCatalogue(prisma: Db): Promise<void> {
+const GLOBAL_SEED_VERSION_CATALOG = freeOnlyCatalog(SEED_CATALOG, {
+    currency: "USD",
+    tax: "none",
+});
+
+const SEED_CATALOGUES: Record<Edition, typeof SEED_CATALOG> = {
+    INDIA: SEED_CATALOG,
+    GLOBAL: GLOBAL_SEED_VERSION_CATALOG,
+};
+
+/**
+ * Install the seed catalogue as version 1 (India's) and the Global one as
+ * version 2 where the edition has none. Two seeds racing for a version meet
+ * the unique index; the loser reads it.
+ */
+async function ensureCatalogue(prisma: Db, edition: Edition): Promise<void> {
     const any = await prisma.pricingCatalogVersion.findFirst({
+        where: { edition },
         select: { id: true },
     });
     if (any) return;
+    const newest = await prisma.pricingCatalogVersion.findFirst({
+        orderBy: { version: "desc" },
+        select: { version: true },
+    });
+    // India's is version 1, seeded first; Global's the next.
+    const version = (newest?.version ?? 0) + 1;
+    const catalog = SEED_CATALOGUES[edition];
     try {
         await writeCatalogueVersion(prisma, {
-            version: 1,
-            catalog: SEED_CATALOG,
+            version,
+            edition,
+            catalog,
             goLiveAt: SEED_LIVE_FROM,
             policy: "keep",
             note: SEED_NOTE,
             changes: [],
             publishedByUserId: null,
-            planRows: planRows(SEED_CATALOG, 1),
+            planRows: planRows(catalog, version),
         });
     } catch (e) {
         if ((e as { code?: string }).code !== "P2002") throw e;
@@ -67,16 +93,24 @@ async function ensureCatalogue(prisma: Db): Promise<void> {
 
 /**
  * The `Plan` row the seeded businesses subscribe to: {@link SEED_PLAN_ID},
- * monthly, on the live version. Throws when the live version has no such
- * plan, rather than seeding a business onto nothing.
+ * monthly, on the edition's live version. Throws when the live version has
+ * no such plan, rather than seeding a business onto nothing.
  */
 export async function seedPlanId(
     prisma: Db,
     now: Date,
     planKey: string = SEED_PLAN_ID,
+    edition: Edition = "INDIA",
 ): Promise<string> {
-    await ensureCatalogue(prisma);
-    const row = await liveCataloguePlanRow(prisma, planKey, "month", now);
+    await ensureCatalogue(prisma, "INDIA");
+    await ensureCatalogue(prisma, edition);
+    const row = await liveCataloguePlanRow(
+        prisma,
+        edition,
+        planKey,
+        "month",
+        now,
+    );
     if (!row) {
         throw new Error(
             `The live pricing catalogue has no "${planKey}" plan to seed businesses on.`,

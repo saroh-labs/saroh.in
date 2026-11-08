@@ -378,7 +378,8 @@ async function planOnLiveCatalogue(
     now: Date,
 ): Promise<boolean | null> {
     const live = await db.pricingCatalogVersion.findFirst({
-        where: { goLiveAt: { lte: now } },
+        // The demo businesses are India's.
+        where: { edition: "INDIA", goLiveAt: { lte: now } },
         orderBy: { version: "desc" },
         select: { catalog: true },
     });
