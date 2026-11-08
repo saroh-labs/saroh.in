@@ -2,6 +2,7 @@ import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/list/subscriptions-screen";
 import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
@@ -23,7 +24,7 @@ import { ranLine, screenTabFromQuery } from "@/lib/subscriptions/view";
 
 export const metadata = { title: "Subscriptions" };
 
-const FALLBACK_ZONE = "Asia/Kolkata";
+const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
 /**
  * Payments → Subscriptions (plan 2026-09-23-003, U12), with Plans as its

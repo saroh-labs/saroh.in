@@ -8,7 +8,7 @@ import { isTimeZone } from "./datetime";
  * never reaches the page.
  *
  * No zone, an unreadable business, or a zone this runtime doesn't know
- * reads India's, as the API does.
+ * reads the edition's default (India's own, UTC on Global), as the API does.
  */
 export function businessZone(
     business: { timeZone?: string | null } | null | undefined,

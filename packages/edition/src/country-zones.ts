@@ -171,3 +171,52 @@ export function mainZoneOf(country: string | null | undefined): string | null {
     const code = codeOf(country);
     return oneZone(code) ?? multiZone(code)?.main ?? null;
 }
+
+/**
+ * Old names ICU still answers some zones by (a browser in India reports
+ * "Asia/Calcutta"); each maps to the name the tz database uses now.
+ */
+const RENAMED_ZONES: Readonly<Record<string, string>> = {
+    "Africa/Asmera": "Africa/Asmara",
+    "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+    "America/Catamarca": "America/Argentina/Catamarca",
+    "America/Coral_Harbour": "America/Atikokan",
+    "America/Cordoba": "America/Argentina/Cordoba",
+    "America/Fort_Wayne": "America/Indiana/Indianapolis",
+    "America/Godthab": "America/Nuuk",
+    "America/Indianapolis": "America/Indiana/Indianapolis",
+    "America/Jujuy": "America/Argentina/Jujuy",
+    "America/Louisville": "America/Kentucky/Louisville",
+    "America/Mendoza": "America/Argentina/Mendoza",
+    "Asia/Calcutta": "Asia/Kolkata",
+    "Asia/Katmandu": "Asia/Kathmandu",
+    "Asia/Rangoon": "Asia/Yangon",
+    "Asia/Saigon": "Asia/Ho_Chi_Minh",
+    "Atlantic/Faeroe": "Atlantic/Faroe",
+    "Australia/ACT": "Australia/Sydney",
+    "Australia/Canberra": "Australia/Sydney",
+    "Australia/NSW": "Australia/Sydney",
+    "Europe/Kiev": "Europe/Kyiv",
+    "Pacific/Enderbury": "Pacific/Kanton",
+    "Pacific/Ponape": "Pacific/Pohnpei",
+    "Pacific/Truk": "Pacific/Chuuk",
+};
+
+/** A zone by the name the tz database uses now. */
+export const currentZoneName = (zone: string): string =>
+    RENAMED_ZONES[zone] ?? zone;
+
+/**
+ * The zone a business in this country starts with: its one zone; for a
+ * country that keeps several, the one given when it is one of them (old
+ * names included), else the country's main zone; null for a country not
+ * listed. Never another country's zone.
+ */
+export function zoneInCountry(
+    country: string | null | undefined,
+    given: string | null | undefined,
+): string | null {
+    const zones = zonesOfCountry(country);
+    const zone = given ? currentZoneName(given.trim()) : "";
+    return zones.includes(zone) ? zone : mainZoneOf(country);
+}

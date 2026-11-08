@@ -5,6 +5,7 @@ import { PageContainer } from "@/components/shared/page/page-container";
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { PlanDetail } from "@/components/subscriptions/plan-detail/detail-screen";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
 import { knownRoleName } from "@/lib/organizations/role-name";
@@ -37,7 +38,7 @@ export async function generateMetadata({
     );
 }
 
-const FALLBACK_ZONE = "Asia/Kolkata";
+const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
 /**
  * Payments → Plans → one plan (plan 2026-09-26-004, D4), after "Saroh Plan

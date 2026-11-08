@@ -127,7 +127,7 @@ import type { WorkingHours } from "./working-hours";
  * ## Days
  *
  * Days are local dates in the business's zone — `BusinessProfile.timezone`,
- * else the first active service's, else Asia/Kolkata — and the response
+ * else the first active service's, else its edition's default — and the response
  * names the zone it used. Collections are dated in the subscription's own
  * zone, which is the business's for every subscription it sold.
  */

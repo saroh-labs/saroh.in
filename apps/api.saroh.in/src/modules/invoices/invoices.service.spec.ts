@@ -1298,7 +1298,7 @@ describe("GST (ADR-008)", () => {
         // Read from the organization the caller is acting in, not an id sent.
         expect(tx.organization!.findUnique).toHaveBeenCalledWith({
             where: { id: "org_1" },
-            select: { name: true },
+            select: { name: true, edition: true },
         });
     });
 

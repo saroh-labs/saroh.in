@@ -130,6 +130,7 @@ export const PAYMENT_DUE_MESSAGE =
 export const DISCOUNT_RUNNING = "discount-running";
 /** Said while a coupon still comes off charges to come (owner, 18 Oct 2026). */
 export function discountRunningMessage(until: Date): string {
+    // Saroh's own India billing, not a business's zone: India time on purpose.
     const day = until.toLocaleDateString("en-IN", {
         day: "numeric",
         month: "long",

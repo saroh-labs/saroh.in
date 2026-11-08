@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-/** "Asia/Kolkata" → "Kolkata · Asia", the way a person looks one up. */
+/** "Europe/London" → "London · Europe", the way a person looks one up. */
 export function timezoneLabel(zone: string): string {
     const parts = zone.split("/");
     const city = (parts.at(-1) ?? zone).replace(/_/g, " ");

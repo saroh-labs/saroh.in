@@ -21,7 +21,7 @@ import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { kindWords } from "@/lib/organizations/kind";
-import { browserZone } from "@/lib/organizations/time-zones";
+import { browserZone, zonesOffered } from "@/lib/organizations/time-zones";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { FormValues } from "./business-form";
 
@@ -154,6 +154,7 @@ export function BusinessSheetFields({
                                 <TimeZoneSelect
                                     value={field.value}
                                     onValueChange={field.onChange}
+                                    only={zonesOffered(v.country)}
                                 />
                             </FormControl>
                             <FormDescription>

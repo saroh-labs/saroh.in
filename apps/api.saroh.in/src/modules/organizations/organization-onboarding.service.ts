@@ -209,6 +209,7 @@ export class OrganizationOnboardingService {
                     timezone: startingZone(
                         dto.profile?.timezone,
                         dto.profile?.country,
+                        edition,
                     ),
                 },
             });

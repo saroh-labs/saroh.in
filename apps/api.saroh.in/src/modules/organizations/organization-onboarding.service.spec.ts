@@ -755,12 +755,48 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(zoneOf()).toBe("Asia/Kolkata");
         });
 
-        it("keeps the zone setup sent (the browser's) when no country is said", async () => {
+        it("reads no country said as India's on India, whatever the browser sent", async () => {
             await service.onboard("user_1", {
                 name: "Acme",
                 profile: { timezone: "America/Chicago" },
             });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
+
+        it("never gives a US business its owner's Indian browser zone (KTD-C)", async () => {
+            await service.onboard(
+                "user_1",
+                {
+                    name: "Acme",
+                    profile: { country: "US", timezone: "Asia/Kolkata" },
+                },
+                { email: "owner@example.com", host: "api.saroh.tech" },
+            );
+            expect(zoneOf()).toBe("America/New_York");
+        });
+
+        it("keeps a US business's zone when it is one of the country's", async () => {
+            await service.onboard(
+                "user_1",
+                {
+                    name: "Acme",
+                    profile: { country: "US", timezone: "America/Chicago" },
+                },
+                { email: "owner@example.com", host: "api.saroh.tech" },
+            );
             expect(zoneOf()).toBe("America/Chicago");
+        });
+
+        it("gives a UK business London's zone from an Indian browser", async () => {
+            await service.onboard(
+                "user_1",
+                {
+                    name: "Acme",
+                    profile: { country: "GB", timezone: "Asia/Kolkata" },
+                },
+                { email: "owner@example.com", host: "api.saroh.tech" },
+            );
+            expect(zoneOf()).toBe("Europe/London");
         });
 
         it("gives an Indian business India's zone wherever its owner signs up from", async () => {

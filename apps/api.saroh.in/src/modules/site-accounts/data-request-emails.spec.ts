@@ -1,3 +1,4 @@
+import { noticeDate } from "./data-request-email.handler";
 import { dataRequestEmail, KEPT_BY_LAW } from "./data-request-emails";
 import { siteAccountEmailFooter } from "./sender-name";
 
@@ -84,5 +85,19 @@ describe("every email", () => {
                 siteAccountEmailFooter("Northwind"),
             );
         }
+    });
+});
+
+describe("the done notice's date", () => {
+    const at = new Date("2026-10-27T20:00:00Z");
+
+    it("is the business's own day, in its edition's way", () => {
+        expect(noticeDate(at, "America/Chicago", "GLOBAL")).toBe(
+            "Oct 27, 2026",
+        );
+    });
+
+    it("stays India's for an Indian business", () => {
+        expect(noticeDate(at, "Asia/Kolkata", "INDIA")).toBe("28 Oct 2026");
     });
 });

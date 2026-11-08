@@ -13,6 +13,7 @@ import {
     BusinessTaxRows,
     TAX_TAB,
 } from "@/components/organizations/tax/business-tax-rows";
+import { UNSET_ZONE_WORDS } from "@/lib/invoices/invoice-number";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
@@ -186,7 +187,7 @@ export function BusinessDetailRows({
                 >
                     <Saved
                         text={saved.timezone ? zoneLabel(saved.timezone) : ""}
-                        empty="Not set. Invoice numbers use India time."
+                        empty={UNSET_ZONE_WORDS}
                     />
                 </Row>
                 {/* No web address row: the Web address card under this one

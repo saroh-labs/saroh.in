@@ -5,6 +5,7 @@ import type { ObjectStorage } from "@saroh/object-storage";
 
 import { appBase, editionOf } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
+import { businessTimezone } from "../bookings/staff-availability";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
@@ -230,6 +231,10 @@ export class DataExportHandler {
                     linkExpiresAt: new Date(signed.expiresAt),
                     keptUntil,
                     workspaceUrl: `${appBase(edition)}/settings/data`,
+                    timeZone: await businessTimezone(
+                        prisma,
+                        row.organizationId,
+                    ),
                 },
                 edition,
             );

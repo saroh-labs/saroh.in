@@ -1,9 +1,10 @@
+import { editionProfile } from "@saroh/edition";
 import { GST_PERCENT, gstPaise } from "@saroh/pricing-catalog";
 
 import type { TaxType } from "../invoices/gst";
 import { placeOfSupply, taxTypeFor } from "../invoices/gst";
 import { stateCode } from "../invoices/gst-states";
-import { DEFAULT_TIMEZONE, financialYear } from "../invoices/numbering";
+import { financialYear } from "../invoices/numbering";
 
 /**
  * The pure rules of Saroh's own invoices (pricing catalogue U17): what each
@@ -31,8 +32,11 @@ export type SarohInvoiceSource = (typeof SAROH_INVOICE_SOURCES)[number];
 /** Saroh's GST rate on its plans, in basis points. */
 export const SAROH_GST_RATE_BPS = GST_PERCENT * 100;
 
-/** The zone Saroh's own financial year and paper dates are kept in. */
-export const SAROH_TIMEZONE = DEFAULT_TIMEZONE;
+/**
+ * The zone Saroh's own financial year and paper dates are kept in: Saroh's
+ * India billing, not a business's zone, so India's on purpose.
+ */
+export const SAROH_TIMEZONE = editionProfile("INDIA").defaultZone;
 
 export interface SarohLineInput {
     description: string;

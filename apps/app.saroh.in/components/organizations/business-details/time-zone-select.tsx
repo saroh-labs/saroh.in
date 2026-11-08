@@ -28,6 +28,7 @@ import {
 export function TimeZoneSelect({
     value,
     onValueChange,
+    only,
     id,
     disabled,
     className,
@@ -35,6 +36,8 @@ export function TimeZoneSelect({
 }: {
     value: string;
     onValueChange: (zone: string) => void;
+    /** Offer only these zones (a Global business's country's); else every one. */
+    only?: readonly string[] | null;
     id?: string;
     disabled?: boolean;
     className?: string;
@@ -43,7 +46,10 @@ export function TimeZoneSelect({
     const [open, setOpen] = useState(false);
     // Made when first opened: the list reads the browser's tz data, and
     // today's offsets.
-    const options = useMemo(() => (open ? timeZoneOptions() : []), [open]);
+    const options = useMemo(
+        () => (open ? timeZoneOptions(undefined, only) : []),
+        [open, only],
+    );
     const selected = value ? currentZoneName(value) : "";
     return (
         <Popover open={open} onOpenChange={setOpen}>

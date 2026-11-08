@@ -95,7 +95,8 @@ export function dayRange(
     to: string | undefined,
     zone: string,
 ): { gte?: Date; lt?: Date } {
-    const tz = IANAZone.isValidZone(zone) ? zone : "Asia/Kolkata";
+    // Callers pass `businessTimezone`'s; an unreadable one reads UTC.
+    const tz = IANAZone.isValidZone(zone) ? zone : "UTC";
     const day = (d: string, field: string) => {
         const at = DateTime.fromISO(d, { zone: tz });
         if (!at.isValid) {
@@ -128,7 +129,8 @@ export function presetRange(
     zone: string,
     now: Date,
 ): { gte: Date; lt: Date } {
-    const tz = IANAZone.isValidZone(zone) ? zone : "Asia/Kolkata";
+    // Callers pass `businessTimezone`'s; an unreadable one reads UTC.
+    const tz = IANAZone.isValidZone(zone) ? zone : "UTC";
     const today = DateTime.fromJSDate(now, { zone: tz }).startOf("day");
     const tomorrow = today.plus({ days: 1 });
     const from =

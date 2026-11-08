@@ -6,13 +6,12 @@ import {
     PAY_PUBLIC_SELECT,
     publicPayInstructions,
 } from "../organizations/business-pay-instructions";
+import { zoneOf } from "../organizations/business-zone";
 import { paperView } from "./invoice-paper-view";
 import { pdfFileName, renderInvoicePdf } from "./invoice-pdf";
 import { loadInvoiceLogo } from "./invoice-pdf-logo";
 import type { InvoiceViewModel } from "./serialize";
 import { INVOICE_DETAIL_SELECT, serializeInvoice } from "./serialize";
-
-const DEFAULT_ZONE = "Asia/Kolkata";
 
 /** A drawn paper: its bytes and the name it is saved under. */
 export interface IssuedPdf {
@@ -44,7 +43,7 @@ export async function drawPaperPdf(
     const [organization, profile] = await Promise.all([
         prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         }),
         prisma.businessProfile.findUnique({
             where: { organizationId },
@@ -67,7 +66,7 @@ export async function drawPaperPdf(
             legalName: profile?.legalName ?? null,
             email: profile?.contactEmail ?? null,
         },
-        profile?.timezone ?? DEFAULT_ZONE,
+        zoneOf(profile?.timezone, organization?.edition),
         publicPayInstructions(profile),
     );
     return {

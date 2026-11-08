@@ -54,7 +54,8 @@ vi.mock("@saroh/auth/client", () => ({
     authClient: { signOut: vi.fn(), updateUser: vi.fn() },
 }));
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
-vi.mock("@/lib/organizations/time-zones", () => ({
+vi.mock("@/lib/organizations/time-zones", async (actual) => ({
+    ...(await actual<object>()),
     browserZone: () => "Asia/Kolkata",
 }));
 vi.mock("@/lib/saroh-billing/checkout-actions", () => ({

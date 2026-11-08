@@ -19,7 +19,7 @@ import type {
 import { guarded, isPersonSlotStart, overlaps, widen } from "./availability";
 import type { Staffing } from "./booking-slots";
 import { toAvailabilityService } from "./booking-slots";
-import { loadPeople } from "./staff-availability";
+import { businessTimezone, loadPeople } from "./staff-availability";
 
 /*
  * Changing who a booking is with (#1157): handing it to someone else on
@@ -116,9 +116,14 @@ function spanWords(span: Interval, zone: string): string {
     return `${timeWords(span.startAt, zone)} to ${timeWords(span.endAt, zone)}`;
 }
 
-function zoneOf(staffing: Staffing, booking: { timezone: string }): string {
+/** The booking's zone, else the business's own (never another country's). */
+async function zoneOf(
+    staffing: Staffing,
+    booking: { timezone: string },
+    organizationId: string,
+): Promise<string> {
     const zone = staffing.zone ?? booking.timezone;
-    return isTimeZone(zone) ? zone : "Asia/Kolkata";
+    return isTimeZone(zone) ? zone : businessTimezone(prisma, organizationId);
 }
 
 /**
@@ -152,7 +157,7 @@ export async function refuseIfBusy(
         loaded.gapMinutes ?? 0,
     );
     if (!clash) return;
-    const zone = zoneOf(staffing, booking);
+    const zone = await zoneOf(staffing, booking, service.organizationId);
     throw new ConflictException({
         message: `${person.name} is already booked from ${spanWords(clash, zone)}. Pick someone else or another time.`,
         field: "staffId",
@@ -305,7 +310,9 @@ export async function tellStaffInTx(
     });
     const userOf = (id: string | undefined) =>
         staff.find((s) => s.id === id)?.membership?.userId ?? null;
-    const zone = isTimeZone(input.timeZone) ? input.timeZone : "Asia/Kolkata";
+    const zone = isTimeZone(input.timeZone)
+        ? input.timeZone
+        : await businessTimezone(tx, input.organizationId);
     const when = `${dayWords(input.startAt, zone, { weekday: true })} at ${timeWords(input.startAt, zone)}`;
     const alerts: { userId: string | null; title: string; body: string }[] = [
         {

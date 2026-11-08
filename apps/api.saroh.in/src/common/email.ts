@@ -661,10 +661,12 @@ export interface DataExportReadyMail {
     keptUntil: Date;
     /** Settings › Your data in the workspace. */
     workspaceUrl: string;
+    /** The business's zone: the days are its own. */
+    timeZone: string;
 }
 
-function dayOf(date: Date): string {
-    return dayWords(date, "Asia/Kolkata", { year: true });
+function dayOf(date: Date, zone: string): string {
+    return dayWords(date, zone, { year: true });
 }
 
 /**
@@ -693,7 +695,7 @@ export async function sendDataExportReadyEmail(
   <h2>${esc(subject)}</h2>
   <p>${esc(`Everything ${name} keeps in Saroh is in one zip file: customers, orders, invoices and credit notes, bookings, products and stock, memberships, class packs, courses and enquiries as spreadsheets (CSV), and the photos and videos you uploaded.`)}</p>
   <p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Download your data</a></p>
-  <p>${esc(`This link works until ${dayOf(mail.linkExpiresAt)}. After that, download it from Settings › Your data in Saroh until ${dayOf(mail.keptUntil)}, when the file is deleted.`)}</p>
+  <p>${esc(`This link works until ${dayOf(mail.linkExpiresAt, mail.timeZone)}. After that, download it from Settings › Your data in Saroh until ${dayOf(mail.keptUntil, mail.timeZone)}, when the file is deleted.`)}</p>
   <p><a href="${esc(mail.workspaceUrl)}">Open Settings › Your data</a></p>
   <p style="color:#666;font-size:12px">${esc("You asked for this from your business's Settings in Saroh. The file holds your customers' details, so keep it somewhere safe.")}</p>
 </div>`;
@@ -975,6 +977,7 @@ export function accountPhoneNoticeEmail(notice: PhoneNotice): string {
         removed: `The phone ending in ${four} was removed from your Saroh account. It can't sign you in any more.`,
         "signed-in": `Someone signed in to your Saroh account with your phone ending in ${four}.`,
     };
+    // Phone sign-in is India's only (`phoneSignIn`), so India time.
     const when = `${whenWords(notice.at, "Asia/Kolkata", { year: true })} (India time)`;
     const where = notice.place ? ` Near ${esc(notice.place)}.` : "";
     const ifNot =
@@ -1251,7 +1254,8 @@ export function managerSignalsEmail(
             business.name,
             ...business.signals.map(
                 (signal) =>
-                    `- ${SIGNAL_WORDS[signal.kind]} ${dayOf(signal.since)}`,
+                    // Saroh's own team, in India: India time on purpose.
+                    `- ${SIGNAL_WORDS[signal.kind]} ${dayOf(signal.since, "Asia/Kolkata")}`,
             ),
             ...(base ? [`${base}/businesses/${business.organizationId}`] : []),
             "",

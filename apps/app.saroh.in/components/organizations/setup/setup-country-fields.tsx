@@ -1,6 +1,10 @@
 "use client";
 
-import { currencyForCountry, GLOBAL_CURRENCIES } from "@saroh/edition";
+import {
+    currencyForCountry,
+    GLOBAL_CURRENCIES,
+    zonesOfCountry,
+} from "@saroh/edition";
 import {
     FormControl,
     FormDescription,
@@ -16,10 +20,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 
 import { CountrySelect } from "@/components/organizations/business-details/country-select";
+import { TimeZoneSelect } from "@/components/organizations/business-details/time-zone-select";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
+import { browserZoneIn, zoneAsked } from "@/lib/organizations/time-zones";
 
 /**
  * Where a Global business is, and the one currency it sells in (DEC-204).
@@ -27,6 +33,7 @@ import type { SetupValues } from "@/lib/organizations/setup-steps";
  */
 export function SetupCountryFields() {
     const form = useFormContext<SetupValues>();
+    const country = useWatch({ control: form.control, name: "country" });
     return (
         <>
             <FormField
@@ -40,6 +47,13 @@ export function SetupCountryFields() {
                                 value={field.value}
                                 onValueChange={(code) => {
                                     field.onChange(code);
+                                    // A country that keeps several zones is
+                                    // asked; the browser's is offered only
+                                    // when it is one of them (KTD-C).
+                                    form.setValue(
+                                        "timezone",
+                                        browserZoneIn(code),
+                                    );
                                     // India is refused here, so has none to suggest.
                                     if (
                                         code !== "IN" &&
@@ -60,6 +74,29 @@ export function SetupCountryFields() {
                     </FormItem>
                 )}
             />
+            {zoneAsked(country) ? (
+                <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Time zone</FormLabel>
+                            <FormControl>
+                                <TimeZoneSelect
+                                    value={field.value ?? ""}
+                                    onValueChange={field.onChange}
+                                    only={zonesOfCountry(country)}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Invoice numbers, bookings and the calendar use
+                                this time. You can change it in Settings.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ) : null}
             <FormField
                 control={form.control}
                 name="currency"

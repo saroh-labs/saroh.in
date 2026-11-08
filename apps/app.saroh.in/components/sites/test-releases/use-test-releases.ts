@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
     ReleaseAbilities,
@@ -73,7 +74,7 @@ export function useTestReleases({
 
     const available = read.state !== "off";
     const list = read.state === "on" ? read.list : null;
-    const zone = list?.zone ?? "Asia/Kolkata";
+    const zone = list?.zone ?? DEFAULT_BUSINESS_ZONE;
     const releases = list?.releases ?? [];
 
     return {

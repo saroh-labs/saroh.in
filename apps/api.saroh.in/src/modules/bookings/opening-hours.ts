@@ -72,7 +72,10 @@ export function openingWindows(week: unknown): AvailabilityRuleWindow[] | null {
  * or not — the hours the site header shows (DEC-096).
  */
 export async function loadOpeningHours(
-    db: Pick<Prisma.TransactionClient, "store" | "businessProfile" | "service">,
+    db: Pick<
+        Prisma.TransactionClient,
+        "store" | "businessProfile" | "service" | "organization"
+    >,
     organizationId: string,
 ): Promise<OpeningHours | null> {
     const shops = await db.store.findMany({

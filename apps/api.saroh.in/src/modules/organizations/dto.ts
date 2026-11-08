@@ -103,7 +103,7 @@ export class BusinessProfileDto {
     website?: string;
 
     /**
-     * IANA zone the business keeps time in, e.g. "Asia/Kolkata". New
+     * IANA zone the business keeps time in, e.g. "Europe/London". New
      * subscriptions renew on its midnight (ADR-007). Checked against the tz
      * database in the service.
      */

@@ -34,6 +34,7 @@ import {
 import type { EntitlementService } from "../../billing/entitlement.service";
 import { assertLegacyLocationRoom } from "../../billing/legacy-location-floor";
 import { planMeter } from "../../billing/metering.service";
+import { businessTimezone } from "../../bookings/staff-availability";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
 import { authorize } from "../../organizations/organization-policy";
 import { DEFAULT_STAGES } from "../../pipelines/pipelines.service";
@@ -77,9 +78,6 @@ export const DEFAULT_HOURS = [1, 2, 3, 4, 5, 6].map((weekday) => ({
     open: "10:00",
     close: "19:00",
 }));
-
-/** A business's zone when it hasn't set one (Saroh's market). */
-export const DEFAULT_TIMEZONE = "Asia/Kolkata";
 
 type Entitlements = Pick<EntitlementService, "check" | "getEntitlements">;
 
@@ -337,10 +335,8 @@ async function writeAppointments(
 
     const toWrite = servicesToWrite(setup);
     if (toWrite.length === 0) return {};
-    const profile = await tx.businessProfile.findUnique({
-        where: { organizationId },
-        select: { timezone: true },
-    });
+    // No service exists yet, so this is the business's own zone, else its edition's.
+    const timezone = await businessTimezone(tx, organizationId);
     // A trade's services are samples (DEC-189): hidden from the booking page
     // and every public read until the owner keeps or edits each one.
     const sample = setup.trade !== undefined;
@@ -365,7 +361,7 @@ async function writeAppointments(
                 capacity: each.capacity ?? 1,
                 priceCents: each.priceCents,
                 currency: each.priceCents !== null ? currency : null,
-                timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
+                timezone,
                 status: "ACTIVE",
                 ...(sample ? { isSample: true, showOnBookingPage: false } : {}),
             },

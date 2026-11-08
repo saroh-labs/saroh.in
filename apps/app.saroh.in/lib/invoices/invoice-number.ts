@@ -1,3 +1,4 @@
+import { PROFILE } from "@/lib/edition";
 import { isTimeZone, zoneParts } from "@/lib/format/datetime";
 /**
  * How a business's invoice numbers are built — the app's mirror of the API's
@@ -79,14 +80,19 @@ export function defaultNumberFormat(registered: boolean): NumberFormat {
 }
 
 /**
- * The zone a business with none set is numbered in — the API's
- * `DEFAULT_TIMEZONE`.
+ * The zone a business with none set is numbered in: the edition's default
+ * (India's own, UTC on Global), as the API's `zoneOf` reads it.
  */
-export const DEFAULT_TIMEZONE = "Asia/Kolkata";
+export const DEFAULT_TIMEZONE = PROFILE.defaultZone;
+
+/** What the Time zone row says when none is set: the zone numbers use. */
+export const UNSET_ZONE_WORDS = `Not set. Invoice numbers use ${
+    PROFILE.taxSystem === "gst" ? "India time" : "UTC"
+}.`;
 
 /**
  * The year and month a moment falls in, in the business's zone. No zone, or
- * one this browser does not know, reads India's, as the API does.
+ * one this browser does not know, reads the edition's default, as the API does.
  */
 function localParts(
     now: Date,

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    currentZoneName,
     mainZoneOf,
     MULTI_ZONE_COUNTRIES,
     ONE_ZONE_COUNTRIES,
+    zoneInCountry,
     zonesOfCountry,
 } from "./country-zones";
 
@@ -85,5 +87,35 @@ describe("a country not listed", () => {
         expect(zonesOfCountry("BR")).toEqual([]);
         expect(mainZoneOf("BR")).toBeNull();
         expect(mainZoneOf(null)).toBeNull();
+    });
+});
+
+describe("the zone a business starts with", () => {
+    it("is the given zone only when the country keeps it", () => {
+        expect(zoneInCountry("US", "America/Denver")).toBe("America/Denver");
+        expect(zoneInCountry("US", "Asia/Kolkata")).toBe("America/New_York");
+        expect(zoneInCountry("US", null)).toBe("America/New_York");
+        expect(zoneInCountry("CA", "Europe/London")).toBe("America/Toronto");
+        expect(zoneInCountry("AU", "")).toBe("Australia/Sydney");
+    });
+
+    it("reads a browser's old names as today's", () => {
+        expect(zoneInCountry("US", "America/Indianapolis")).toBe(
+            "America/Indiana/Indianapolis",
+        );
+        expect(zoneInCountry("CA", "America/Coral_Harbour")).toBe(
+            "America/Atikokan",
+        );
+        expect(currentZoneName("Asia/Calcutta")).toBe("Asia/Kolkata");
+    });
+
+    it("gives a one-zone country its zone whatever was given", () => {
+        expect(zoneInCountry("GB", "Asia/Kolkata")).toBe("Europe/London");
+        expect(zoneInCountry("IN", "America/Chicago")).toBe("Asia/Kolkata");
+    });
+
+    it("knows no zone for a country not listed", () => {
+        expect(zoneInCountry("BR", "America/Sao_Paulo")).toBeNull();
+        expect(zoneInCountry(null, "Asia/Kolkata")).toBeNull();
     });
 });

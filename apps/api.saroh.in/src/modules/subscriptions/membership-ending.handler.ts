@@ -3,6 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOn } from "../communications/notice-settings";
 import { BILLING_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import {
@@ -51,9 +52,10 @@ export function endingNoticeDue(input: {
 }): boolean {
     const { endsAt, now } = input;
     if (endsAt.getTime() <= now.getTime()) return false;
+    // The caller resolves the business's zone; an unreadable one reads UTC.
     const zone = DateTime.local().setZone(input.timeZone).isValid
         ? input.timeZone
-        : "Asia/Kolkata";
+        : "UTC";
     const today = DateTime.fromJSDate(now, { zone }).startOf("day");
     const endDay = DateTime.fromJSDate(endsAt, { zone }).startOf("day");
     const daysLeft = Math.round(endDay.diff(today, "days").days);
@@ -244,7 +246,9 @@ export async function queueEndingNotice(
     if (
         !endingNoticeDue({
             endsAt: sub.currentPeriodEnd,
-            timeZone: sub.timezone,
+            timeZone: DateTime.local().setZone(sub.timezone).isValid
+                ? sub.timezone
+                : await businessTimezone(tx, organizationId),
             scheduledAt: cancel?.createdAt ?? null,
             now,
         })

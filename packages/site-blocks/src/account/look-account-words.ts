@@ -1,6 +1,7 @@
 import type { LookId } from "@saroh/block-contract";
 
 import { clockParts } from "../lib/clock";
+import { FALLBACK_TIME_ZONE } from "../lib/opening-hours";
 import { trimTrailingSlashes } from "../url-path";
 import { currentTab } from "./hrefs";
 import type { AccountTab } from "./model";
@@ -28,9 +29,9 @@ export function greetingWords(
 ): string {
     let hour: number;
     try {
-        hour = clockParts(now, timeZone ?? "Asia/Kolkata").hour;
+        hour = clockParts(now, timeZone ?? FALLBACK_TIME_ZONE).hour;
     } catch {
-        hour = clockParts(now, "Asia/Kolkata").hour;
+        hour = clockParts(now, FALLBACK_TIME_ZONE).hour;
     }
     if (hour >= 5 && hour < 12) return "Good morning";
     if (hour >= 12 && hour < 17) return "Good afternoon";

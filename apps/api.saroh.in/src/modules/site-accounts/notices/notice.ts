@@ -150,7 +150,8 @@ export function defineNotice<V extends NoticeVarsBase>(
 
 /** "Tue 6 Oct at 11:00 am", in the business's zone. */
 export function noticeWhen(at: Date, timeZone: string): string {
-    const zone = isTimeZone(timeZone) ? timeZone : "Asia/Kolkata";
+    // The stored zone; an unreadable one reads UTC, never another country's.
+    const zone = isTimeZone(timeZone) ? timeZone : "UTC";
     return `${dayWords(at, zone, { weekday: true })} at ${timeWords(at, zone)}`;
 }
 

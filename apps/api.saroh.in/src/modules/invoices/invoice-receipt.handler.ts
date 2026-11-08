@@ -8,15 +8,13 @@ import { readPackKind } from "../class-packs/pack-kind";
 import type { TransactionalResult } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
 import { renderInvoiceReceipt } from "../communications/transactional";
+import { zoneOf } from "../organizations/business-zone";
 import { isLive } from "./invoice-ledger";
 import { receiptCanGo, receiptPaymentIdOf } from "./invoice-receipt";
 import { firstNameOf, paymentMethodWords } from "./invoice-share-words";
 import { CHEQUE_PAYMENT_METHOD, paidSoFarCents } from "./invoice-state";
 
 type Tx = Prisma.TransactionClient;
-
-/** Home's default zone, for a business that never set one. */
-const DEFAULT_ZONE = "Asia/Kolkata";
 
 /**
  * Queue the receipt for one payment on the caller's transaction, through
@@ -68,7 +66,7 @@ export async function queueReceiptInTx(
     const [org, profile] = await Promise.all([
         tx.organization.findUnique({
             where: { id: input.organizationId },
-            select: { name: true },
+            select: { name: true, edition: true },
         }),
         tx.businessProfile.findUnique({
             where: { organizationId: input.organizationId },
@@ -76,7 +74,7 @@ export async function queueReceiptInTx(
         }),
     ]);
     const invoice = payment.invoice;
-    const zone = profile?.timezone ?? DEFAULT_ZONE;
+    const zone = zoneOf(profile?.timezone, org?.edition);
     const totalCents = toMinor(invoice.total);
     const paidCents = paidSoFarCents(invoice);
     const leftCents = Math.max(0, totalCents - paidCents);

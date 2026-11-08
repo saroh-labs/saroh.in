@@ -12,10 +12,7 @@ import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { howPaid } from "../bookings/booking-calendar";
 import type { PaidWith } from "../bookings/dto";
-import {
-    businessTimezone,
-    FALLBACK_TIMEZONE,
-} from "../bookings/staff-availability";
+import { businessTimezone, fallbackZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { InvoiceStanding } from "../invoices/invoice-state";
@@ -583,8 +580,8 @@ export class CustomerDetailService {
                 organizationActions: ctx.actions,
             }),
             // A failed zone read costs the zone, not the page.
-            businessTimezone(this.db, organizationId).catch(
-                () => FALLBACK_TIMEZONE,
+            businessTimezone(this.db, organizationId).catch(() =>
+                fallbackZone(ctx.edition),
             ),
         ]);
         const on = new Set(

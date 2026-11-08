@@ -42,7 +42,8 @@ export function membershipEndingNoticeKey(
 }
 
 function endsOn(m: MembershipEndingVars): string {
-    const zone = isTimeZone(m.timeZone) ? m.timeZone : "Asia/Kolkata";
+    // The stored zone; an unreadable one reads UTC, never another country's.
+    const zone = isTimeZone(m.timeZone) ? m.timeZone : "UTC";
     return dayWords(m.endsAt, zone, { weekday: true, year: true });
 }
 
