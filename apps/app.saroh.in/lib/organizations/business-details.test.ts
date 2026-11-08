@@ -31,6 +31,7 @@ const filled: BusinessDetailsValues = {
     addressLine2: "",
     city: "Bengaluru",
     postalCode: "560038",
+    region: "",
     gstState: "29",
     gstRegistered: false,
     taxId: "",
@@ -97,6 +98,7 @@ describe("detailsValuesOf", () => {
             addressLine2: "",
             city: "",
             postalCode: "",
+            region: "",
             gstState: "29",
             gstRegistered: true,
             taxId: "29AAGCR4375J1ZU",
@@ -160,6 +162,51 @@ describe("detailsProblems", () => {
     });
 });
 
+describe("detailsProblems: a Global address by its country (U3)", () => {
+    const us: BusinessDetailsValues = {
+        ...filled,
+        city: "New Delhi",
+        postalCode: "110001",
+        gstState: "",
+    };
+
+    it("refuses an Indian PIN and no state for a US business, in US words", () => {
+        edition.name = "GLOBAL";
+        const problems = detailsProblems(us, { inIndia: false, country: "US" });
+        expect(problems.map((p) => p.path)).toEqual(["postalCode", "region"]);
+        expect(problems[0]?.message).toMatch(/^A ZIP code is 5 digits.*94105/);
+        expect(problems[1]?.message).toBe("Choose your state.");
+        expect(
+            detailsProblems(
+                { ...us, city: "Austin", postalCode: "78701", region: "TX" },
+                { inIndia: false, country: "US" },
+            ),
+        ).toEqual([]);
+    });
+
+    it("says the country's word for a missing postcode, never PIN", () => {
+        edition.name = "GLOBAL";
+        expect(
+            detailsProblems(
+                { ...us, postalCode: "", region: "TX" },
+                { inIndia: false, country: "US" },
+            ),
+        ).toEqual([{ path: "postalCode", message: "Add the ZIP code." }]);
+        expect(
+            detailsProblems(
+                { ...us, postalCode: "" },
+                { inIndia: false, country: "AE" },
+            ),
+        ).toEqual([]);
+    });
+
+    it("keeps India's PIN words in India", () => {
+        expect(
+            detailsProblems({ ...filled, postalCode: "" }, { inIndia: true }),
+        ).toEqual([{ path: "postalCode", message: "Add the PIN code." }]);
+    });
+});
+
 describe("detailsInput", () => {
     it("sends the address in full and the state, not an unchanged registration", () => {
         expect(detailsInput(filled, { gstRegistered: false })).toEqual({
@@ -199,6 +246,7 @@ describe("detailsInput", () => {
                 line2: "",
                 city: "Bengaluru",
                 postalCode: "560038",
+                region: "",
             },
         });
         expect(
@@ -284,6 +332,29 @@ describe("missingOnFile: the API's rule, read off the page's read (#838)", () =>
                 ),
             ),
         ).toEqual(["address"]);
+    });
+
+    it("on Global reads the postcode and region by the business's country", () => {
+        edition.name = "GLOBAL";
+        const us = (values: Partial<BusinessDetailsValues>) =>
+            ({
+                ...ready(
+                    {
+                        city: "Austin",
+                        postalCode: "78701",
+                        region: "TX",
+                        gstState: "",
+                        ...values,
+                    },
+                    false,
+                ),
+                country: "US",
+            }) as const;
+        expect(missingOnFile(us({}))).toEqual([]);
+        expect(missingOnFile(us({ region: "" }))).toEqual(["address"]);
+        expect(missingOnFile(us({ postalCode: "110001" }))).toEqual([
+            "address",
+        ]);
     });
 
     it("asks a registered business for its GSTIN, after the address", () => {

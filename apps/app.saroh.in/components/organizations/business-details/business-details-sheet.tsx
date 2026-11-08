@@ -45,6 +45,7 @@ const FIELDS = [
     "addressLine2",
     "city",
     "postalCode",
+    "region",
     "gstState",
     "taxId",
 ] as const;
@@ -139,6 +140,7 @@ function DetailsBody({
             <DetailsForm
                 initial={onFile.values}
                 inIndia={onFile.inIndia}
+                country={onFile.country ?? null}
                 continueLabel={continueLabel}
                 onDone={onDone}
                 save={save}
@@ -162,12 +164,14 @@ function DetailsBody({
 function DetailsForm({
     initial,
     inIndia: indian,
+    country,
     continueLabel,
     onDone,
     save,
 }: {
     initial: BusinessDetailsValues;
     inIndia: boolean;
+    country: string | null;
     continueLabel: string;
     onDone: (saved: boolean) => void;
     save: typeof saveOrganizationSettings;
@@ -183,6 +187,7 @@ function DetailsForm({
         .superRefine((v, ctx) => {
             for (const { path, message } of detailsProblems(v, {
                 inIndia: indian,
+                country,
             })) {
                 ctx.addIssue({ code: "custom", path: [path], message });
             }
@@ -222,6 +227,7 @@ function DetailsForm({
                         registered={registered}
                         gstinState={taxId.trim().slice(0, 2).toUpperCase()}
                         inIndia={indian || registered}
+                        country={country}
                     />
                     {/* GST is India's (DEC-204): a named tax line has
                         only its optional tax ID. */}

@@ -11,6 +11,7 @@ export const registeredAddressShape: Record<
     addressLine2: z.string().trim().max(120),
     city: z.string().trim().max(60),
     postalCode: z.string().trim().max(12),
+    region: z.string().trim().max(60),
 };
 
 export const ADDRESS_KEYS = [
@@ -18,6 +19,7 @@ export const ADDRESS_KEYS = [
     "addressLine2",
     "city",
     "postalCode",
+    "region",
 ] as const;
 
 /** Which key the API's `registeredAddress` names each line by. */
@@ -26,4 +28,5 @@ export const ADDRESS_API_KEY = {
     addressLine2: "line2",
     city: "city",
     postalCode: "postalCode",
+    region: "region",
 } as const;

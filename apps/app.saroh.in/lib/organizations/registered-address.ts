@@ -1,3 +1,5 @@
+import { checkPostcode, checkRegion } from "@saroh/edition";
+
 import { PROFILE } from "@/lib/edition";
 
 import type { RegisteredAddress } from "./settings-service";
@@ -42,6 +44,46 @@ export interface RegisteredAddressValues {
     addressLine2: string;
     city: string;
     postalCode: string;
+    /** Global's state, province or region (DEC-204); unused in India. */
+    region: string;
+}
+
+/**
+ * Whether the address is read by its country's rules (KTD-A): the edition
+ * writes addresses as a country and region, and this one isn't India's.
+ */
+export function byCountry(
+    country: string | null | undefined,
+    gstRegistered = false,
+): boolean {
+    return (
+        PROFILE.address === "country-and-region" &&
+        !gstRegistered &&
+        !inIndia(country)
+    );
+}
+
+/**
+ * A Global address's postcode and region against its country, as the API
+ * checks them: each in its shape, and there where the country needs one.
+ * `required` false asks neither (an address left blank); unset, the
+ * country's rule.
+ */
+export function countryAddressProblems(
+    country: string | null | undefined,
+    v: { postalCode: string; region?: string },
+    required?: boolean,
+): { path: "postalCode" | "region"; message: string }[] {
+    const problems: { path: "postalCode" | "region"; message: string }[] = [];
+    const postcode = checkPostcode(country, v.postalCode, required);
+    if ("problem" in postcode) {
+        problems.push({ path: "postalCode", message: postcode.problem });
+    }
+    const region = checkRegion(country, v.region, required);
+    if ("problem" in region) {
+        problems.push({ path: "region", message: region.problem });
+    }
+    return problems;
 }
 
 /**
@@ -55,11 +97,22 @@ export function addressProblems(v: {
     addressLine1: string;
     city: string;
     postalCode: string;
+    region?: string;
 }): { path: keyof RegisteredAddressValues; message: string }[] {
     const problems: {
         path: keyof RegisteredAddressValues;
         message: string;
     }[] = [];
+    // Global: by the country's rules, once any of the address is typed.
+    if (byCountry(v.country, v.gstRegistered)) {
+        const typed = [
+            v.addressLine1,
+            v.city,
+            v.postalCode,
+            v.region ?? "",
+        ].some((x) => x.trim() !== "");
+        return countryAddressProblems(v.country, v, typed ? undefined : false);
+    }
     const india = v.gstRegistered || (v.country ?? "").toUpperCase() === "IN";
     const pin = v.postalCode.replace(/\s+/g, "");
     if (pin && india && !PIN_SHAPE.test(pin)) {

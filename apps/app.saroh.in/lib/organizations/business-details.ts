@@ -4,7 +4,12 @@ import { gstinProblem } from "@/lib/invoices/gstin";
 import type { OrganizationKind } from "./kind";
 import { kindOf, kindWords } from "./kind";
 import type { RegisteredAddressValues } from "./registered-address";
-import { inIndia, PIN_SHAPE } from "./registered-address";
+import {
+    byCountry,
+    countryAddressProblems,
+    inIndia,
+    PIN_SHAPE,
+} from "./registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
@@ -83,6 +88,7 @@ export function detailsValuesOf(
         addressLine2: a?.line2 ?? "",
         city: a?.city ?? "",
         postalCode: a?.postalCode ?? "",
+        region: a?.region ?? "",
         gstState: settings?.tax?.state ?? a?.state ?? "",
         gstRegistered: settings?.tax?.registered ?? false,
         taxId: settings?.profile?.taxId ?? "",
@@ -99,10 +105,24 @@ export { inIndia } from "./registered-address";
  */
 export function detailsProblems(
     v: BusinessDetailsValues,
-    opts: { inIndia: boolean },
+    opts: { inIndia: boolean; country?: string | null },
 ): { path: keyof BusinessDetailsValues; message: string }[] {
     const problems: { path: keyof BusinessDetailsValues; message: string }[] =
         [];
+    // Global: the postcode and region by the country's rules, in its words
+    // ("Add the ZIP code."); "PIN code" is India's.
+    if (!opts.inIndia && byCountry(opts.country, v.gstRegistered)) {
+        if (!v.addressLine1.trim()) {
+            problems.push({
+                path: "addressLine1",
+                message: "Add the first line of your address.",
+            });
+        }
+        if (!v.city.trim()) {
+            problems.push({ path: "city", message: "Add the city." });
+        }
+        return [...problems, ...countryAddressProblems(opts.country, v)];
+    }
     const needed = [
         ["addressLine1", "Add the first line of your address."],
         ["city", "Add the city."],
@@ -144,6 +164,10 @@ export function detailsInput(
         line2: v.addressLine2.trim(),
         city: v.city.trim(),
         postalCode: v.postalCode.trim(),
+        // Global's region (U3): India's state is its GST state.
+        ...(PROFILE.address === "country-and-region"
+            ? { region: v.region.trim() }
+            : {}),
     };
     // A named tax line (DEC-204) has no GST standing: only its optional
     // tax ID, when it changed.
@@ -194,6 +218,8 @@ export type DetailsOnFile =
           state: "ready";
           values: BusinessDetailsValues;
           inIndia: boolean;
+          /** The business's country, whose rules a Global address follows. */
+          country?: string | null;
           /** Picks the sheet's words (DEC-070); absent from an older API. */
           kind: OrganizationKind | undefined;
       };
@@ -207,6 +233,7 @@ export function detailsOnFileOf(
               state: "ready",
               values: detailsValuesOf(res.data),
               inIndia: inIndia(res.data.profile?.country),
+              country: res.data.profile?.country ?? null,
               kind: res.data.kind,
           }
         : { state: "failed", message: res.error, forbidden: res.forbidden };
@@ -226,6 +253,13 @@ export function missingOnFile(
     if (onFile?.state !== "ready") return [];
     const v = onFile.values;
     const filled = (s: string) => s.trim() !== "";
+    if (!onFile.inIndia && byCountry(onFile.country, v.gstRegistered)) {
+        const whole =
+            filled(v.addressLine1) &&
+            filled(v.city) &&
+            countryAddressProblems(onFile.country, v).length === 0;
+        return whole ? [] : ["address"];
+    }
     const needsState = onFile.inIndia || v.gstRegistered;
     const address =
         filled(v.addressLine1) &&

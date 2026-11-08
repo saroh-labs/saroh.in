@@ -160,6 +160,7 @@ export const FIELD_OF: Record<string, FormField> = {
     addressLine2: "addressLine2",
     city: "city",
     postalCode: "postalCode",
+    region: "region",
     name: "name",
     kind: "kind",
     timezone: "timezone",
@@ -252,6 +253,7 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         addressLine2: settings.registeredAddress?.line2 ?? "",
         city: settings.registeredAddress?.city ?? "",
         postalCode: settings.registeredAddress?.postalCode ?? "",
+        region: settings.registeredAddress?.region ?? "",
     };
 }
 

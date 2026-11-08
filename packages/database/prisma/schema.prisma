@@ -573,6 +573,11 @@ model BusinessProfile {
   addressLine2        String?
   city                String?
   postalCode          String?
+  // Global's only (DEC-204, `address: "country-and-region"`): the address's
+  // state, province or region, by its country's rules
+  // (@saroh/edition/address-rules). A listed one is stored as its code
+  // ("TX", "ON", "NSW"). India's state is `gstState`, so this stays null.
+  region              String?
   // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
   // RC-0001 when not). Null: the legacy INV series.
   invoicePrefix       String?

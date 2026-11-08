@@ -460,7 +460,10 @@ describe("asking up front, from the page's read (#838)", () => {
 });
 
 describe("a Global business is never asked about GST (R1, R5)", () => {
-    const us = (country: string): OrganizationSettings => ({
+    const us = (
+        country: string,
+        region: string | null = null,
+    ): OrganizationSettings => ({
         ...SETTINGS,
         profile: {
             legalName: null,
@@ -485,15 +488,16 @@ describe("a Global business is never asked about GST (R1, R5)", () => {
             postalCode: null,
             state: null,
             stateName: null,
+            region,
         },
     });
 
     it.each([
-        ["US", us("US")],
-        ["blank", us("")],
+        ["US", us("US", "TX"), "ZIP code", "TX"],
+        ["blank", us(""), "Postcode (optional)", ""],
     ])(
         "%s country: no GST switch, GSTIN or Indian state; the Tax ID is optional",
-        async (_, settings) => {
+        async (_, settings, postcode, region) => {
             edition.name = "GLOBAL";
             readBusinessDetails.mockResolvedValue({ ok: true, data: settings });
             action
@@ -503,12 +507,13 @@ describe("a Global business is never asked about GST (R1, R5)", () => {
 
             const t = sheet()?.textContent ?? "";
             expect(t).not.toMatch(/GST|PIN/);
-            expect(t).not.toContain("Choose a state");
+            // India's GST state list isn't offered.
+            expect(t).not.toContain("Karnataka");
             expect(sheet()?.querySelector('[role="switch"]')).toBeNull();
             expect(byLabel("Tax ID (optional)").value).toBe("");
             typeInto(byLabel("Address line 1"), "500 Congress Ave");
             typeInto(byLabel("City"), "Austin");
-            typeInto(byLabel("Postcode"), "78701");
+            typeInto(byLabel(postcode), "78701");
             await press("Save and issue");
 
             expect(saveOrganizationSettings).toHaveBeenCalledWith({
@@ -517,9 +522,28 @@ describe("a Global business is never asked about GST (R1, R5)", () => {
                     line2: "",
                     city: "Austin",
                     postalCode: "78701",
+                    region,
                 },
             });
             expect(result).toEqual({ ok: true, data: { number: "INV-1" } });
         },
     );
+
+    it("asks a US business for its ZIP code and state, in US words", async () => {
+        edition.name = "GLOBAL";
+        readBusinessDetails.mockResolvedValue({ ok: true, data: us("US") });
+        action.mockResolvedValue(REFUSED);
+        await press("Issue it");
+        expect(sheet()?.textContent).toContain("State");
+        typeInto(byLabel("Address line 1"), "1 Main St");
+        typeInto(byLabel("City"), "New Delhi");
+        typeInto(byLabel("ZIP code"), "110001");
+        await press("Save and issue");
+
+        const t = sheet()?.textContent ?? "";
+        expect(t).toMatch(/A ZIP code is 5 digits.*94105/);
+        expect(t).toContain("Choose your state.");
+        expect(t).not.toContain("PIN");
+        expect(saveOrganizationSettings).not.toHaveBeenCalled();
+    });
 });

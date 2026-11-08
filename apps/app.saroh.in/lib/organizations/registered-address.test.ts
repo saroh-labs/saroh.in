@@ -1,10 +1,25 @@
-import { describe, expect, it } from "vitest";
+import type { Edition } from "@saroh/edition";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     addressProblems,
     printedAddress,
     stateProblem,
 } from "./registered-address";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+afterEach(() => {
+    edition.name = "INDIA";
+});
 
 const RYE = {
     line1: "3 Hill Road",
@@ -109,5 +124,55 @@ describe("stateProblem (UX-018)", () => {
                 postalCode: "",
             }),
         ).toBeNull();
+    });
+});
+
+describe("a Global address in Settings, by its country (U3)", () => {
+    const us = {
+        gstRegistered: false,
+        country: "US",
+        addressLine1: "1 Main St",
+        city: "New Delhi",
+        postalCode: "110001",
+        region: "",
+    };
+
+    it("refuses an Indian PIN and no state for a US business", () => {
+        edition.name = "GLOBAL";
+        expect(addressProblems(us).map((p) => p.path)).toEqual([
+            "postalCode",
+            "region",
+        ]);
+        expect(
+            addressProblems({ ...us, postalCode: "78701", region: "TX" }),
+        ).toEqual([]);
+    });
+
+    it("asks nothing of an address left blank", () => {
+        edition.name = "GLOBAL";
+        expect(
+            addressProblems({
+                ...us,
+                addressLine1: "",
+                city: "",
+                postalCode: "",
+            }),
+        ).toEqual([]);
+    });
+
+    it("never asks a Global business with a blank country for an Indian state", () => {
+        edition.name = "GLOBAL";
+        expect(stateProblem({ ...us, country: "", gstState: "" })).toBeNull();
+    });
+
+    it("leaves India's rules as they were", () => {
+        expect(
+            addressProblems({ ...us, country: "IN", postalCode: "78701" }),
+        ).toEqual([
+            {
+                path: "postalCode",
+                message: "A PIN code is six digits, like 560038.",
+            },
+        ]);
     });
 });

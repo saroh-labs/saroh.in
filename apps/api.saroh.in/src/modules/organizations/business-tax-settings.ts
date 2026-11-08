@@ -1,7 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
-import { editionProfile } from "@saroh/edition";
+import { checkPostcode, checkRegion, editionProfile } from "@saroh/edition";
 
 import {
     bpsToRate,
@@ -79,6 +79,8 @@ export interface RegisteredAddressView {
     /** A GST state code and its name: the same as `tax.state`. */
     state: string | null;
     stateName: string | null;
+    /** Global's state, province or region (DEC-204): "TX"; null in India. */
+    region: string | null;
 }
 
 /** The profile columns a tax or address PATCH writes. */
@@ -89,6 +91,7 @@ export type TaxData = Partial<{
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    region: string | null;
     invoicePrefix: string | null;
     invoiceNumberFormat: Prisma.InputJsonObject;
     deliveryGstRate: string;
@@ -117,6 +120,8 @@ export interface TaxProfileColumns {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    /** Global's address region (DEC-204); absent on a read without it. */
+    region?: string | null;
 }
 
 /** What the checks read of the stored profile. */
@@ -132,6 +137,7 @@ export const TAX_CURRENT_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    region: true,
 } as const;
 
 export interface TaxCurrent {
@@ -147,6 +153,7 @@ export interface TaxCurrent {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    region?: string | null;
 }
 
 /**
@@ -239,6 +246,7 @@ export function addressView(
         postalCode: p?.postalCode ?? null,
         state: p?.gstState ?? null,
         stateName: stateName(p?.gstState),
+        region: p?.region ?? null,
     };
 }
 
@@ -248,7 +256,7 @@ const PIN_SHAPE = /^[1-9][0-9]{5}$/;
 type AddressInput = UpdateOrganizationDto["registeredAddress"];
 type AddressData = Pick<
     TaxData,
-    "addressLine1" | "addressLine2" | "city" | "postalCode"
+    "addressLine1" | "addressLine2" | "city" | "postalCode" | "region"
 >;
 
 /** The address lines a PATCH sent, as columns; "" clears one. */
@@ -265,11 +273,46 @@ function reduceAddress(address: AddressInput): AddressData {
     // other postal code is kept as typed.
     const bare = address.postalCode?.replace(/\s+/g, "");
     put("postalCode", bare && /^\d{6}$/.test(bare) ? bare : address.postalCode);
+    put("region", address.region);
     return data;
 }
 
 function taxError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
+}
+
+/**
+ * A Global business's own address against its country's rules (KTD-A): the
+ * postcode's shape, and the region from its list, each required where the
+ * country needs one once any of the address is in (an address being cleared
+ * whole needs nothing). Checked only when the address is sent; what was sent
+ * is written as the rules store it ("k1a0b1" is "K1A 0B1", "Texas" is "TX").
+ */
+function countryAddress(
+    country: string,
+    current: TaxCurrent | null,
+    sent: AddressData,
+): AddressData {
+    if (Object.keys(sent).length === 0) return {};
+    const now = {
+        addressLine1: current?.addressLine1 ?? null,
+        city: current?.city ?? null,
+        postalCode: current?.postalCode ?? null,
+        region: current?.region ?? null,
+        ...sent,
+    };
+    const typed = Object.values(now).some((v) => !!v?.trim());
+    const required = typed ? undefined : false;
+    const postcode = checkPostcode(country, now.postalCode, required);
+    if ("problem" in postcode) taxError(postcode.problem, "postalCode");
+    const region = checkRegion(country, now.region, required);
+    if ("problem" in region) taxError(region.problem, "region");
+    return {
+        ...(sent.postalCode !== undefined
+            ? { postalCode: postcode.value || null }
+            : {}),
+        ...(sent.region !== undefined ? { region: region.value || null } : {}),
+    };
 }
 
 /** What a PATCH sent that the tax checks read. */
@@ -373,6 +416,15 @@ export function taxChanges(
     const india = country === "IN" || country === "INDIA" || registered;
     if (address.postalCode && india && !PIN_SHAPE.test(address.postalCode)) {
         taxError("A PIN code is six digits, like 560038.", "postalCode");
+    }
+    if (editionProfile(edition).address === "country-and-region") {
+        Object.assign(data, countryAddress(country, current, addressData));
+    } else if (addressData.region !== undefined) {
+        // India's state is its GST state: one place for it.
+        if (addressData.region) {
+            taxError("Your state comes from your GST state.", "region");
+        }
+        delete data.region;
     }
     if (registered) {
         const missing = (["addressLine1", "city", "postalCode"] as const).find(

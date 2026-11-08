@@ -94,6 +94,8 @@ export interface RegisteredAddress {
     postalCode: string | null;
     state: string | null;
     stateName: string | null;
+    /** Global's state, province or region (DEC-204); absent from an older API. */
+    region?: string | null;
 }
 
 /** The checklist's facts (`OrganizationSettings.setup`). */
@@ -249,7 +251,7 @@ export interface OrganizationSettingsInput {
     tax?: TaxSettingsInput;
     /** "" clears a line; the state goes as `tax.state`. */
     registeredAddress?: Partial<
-        Record<"line1" | "line2" | "city" | "postalCode", string>
+        Record<"line1" | "line2" | "city" | "postalCode" | "region", string>
     >;
     /** How to pay us (R32): only the fields changed; "" clears one. */
     payInstructions?: Partial<PayValues>;

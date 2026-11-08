@@ -113,6 +113,7 @@ export function BusinessTaxFields({
             // States are India's (GST's list); another country's address
             // has none, and a blank one is the edition's.
             inIndia={registered || inIndia(v.country)}
+            country={v.country}
             withCountry
             at={at}
         />

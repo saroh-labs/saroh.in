@@ -1,5 +1,6 @@
 "use client";
 
+import { addressRulesFor } from "@saroh/edition";
 import {
     FormControl,
     FormDescription,
@@ -63,6 +64,7 @@ export function RegisteredAddressFields<T extends FieldValues>({
     registered,
     gstinState,
     inIndia,
+    country,
     withCountry = false,
     at = fieldWidth,
 }: {
@@ -72,14 +74,29 @@ export function RegisteredAddressFields<T extends FieldValues>({
     gstinState: string;
     /** India's states are the only ones there are to choose. */
     inIndia: boolean;
+    /**
+     * The business's country: outside India its postcode and region are
+     * asked by its rules, in its words ("ZIP code", "State").
+     */
+    country?: string | null;
     withCountry?: boolean;
     at?: FieldWidth;
 }) {
     const name = (key: keyof RegisteredAddressFormValues) =>
         key as unknown as FieldPath<T>;
+    // Global (U3, KTD-A): the country's postcode and region; India keeps
+    // its PIN and GST state list.
+    const rules =
+        PROFILE.address === "country-and-region" && !inIndia
+            ? addressRulesFor(country)
+            : null;
+    const postcode = rules?.postcode;
+    const region = rules?.region;
     return (
         <>
-            {LINES.map(([key, label, basis, grow, auto]) => (
+            {LINES.filter(
+                ([key]) => !(key === "postalCode" && rules && !postcode),
+            ).map(([key, label, basis, grow, auto]) => (
                 <FormField
                     key={key}
                     control={control}
@@ -87,9 +104,10 @@ export function RegisteredAddressFields<T extends FieldValues>({
                     render={({ field }) => (
                         <FormItem {...at(basis, grow)}>
                             <FormLabel>
-                                {key === "postalCode" &&
-                                PROFILE.address === "country-and-region"
-                                    ? "Postcode"
+                                {key === "postalCode" && postcode
+                                    ? postcode.required
+                                        ? postcode.label
+                                        : `${postcode.label} (optional)`
                                     : label}
                             </FormLabel>
                             <FormControl>
@@ -98,8 +116,14 @@ export function RegisteredAddressFields<T extends FieldValues>({
                                     value={field.value ?? ""}
                                     maxLength={key === "postalCode" ? 12 : 120}
                                     inputMode={
-                                        key === "postalCode"
+                                        key === "postalCode" && !rules
                                             ? "numeric"
+                                            : undefined
+                                    }
+                                    placeholder={
+                                        key === "postalCode" &&
+                                        postcode?.example
+                                            ? postcode.example
                                             : undefined
                                     }
                                     autoComplete={auto}
@@ -143,6 +167,57 @@ export function RegisteredAddressFields<T extends FieldValues>({
                                     ? "Set by your GSTIN."
                                     : "Needed: it's printed on your invoices."}
                             </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ) : null}
+            {region?.kind === "list" ? (
+                <FormField
+                    control={control}
+                    name={name("region")}
+                    render={({ field }) => (
+                        <FormItem {...at("240px")}>
+                            <FormLabel>{region.label}</FormLabel>
+                            <FormControl>
+                                <OptionSelect
+                                    value={field.value ?? ""}
+                                    onValueChange={field.onChange}
+                                    options={[
+                                        {
+                                            value: "",
+                                            label: `Choose a ${region.label.toLowerCase()}`,
+                                        },
+                                        ...region.options.map((o) => ({
+                                            value: o.code,
+                                            label: o.name,
+                                        })),
+                                    ]}
+                                    className="w-full"
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Needed: it&apos;s printed on your invoices.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ) : region?.kind === "text" ? (
+                <FormField
+                    control={control}
+                    name={name("region")}
+                    render={({ field }) => (
+                        <FormItem {...at("240px")}>
+                            <FormLabel>{region.label} (optional)</FormLabel>
+                            <FormControl>
+                                <Input
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    maxLength={60}
+                                    autoComplete="address-level1"
+                                />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
