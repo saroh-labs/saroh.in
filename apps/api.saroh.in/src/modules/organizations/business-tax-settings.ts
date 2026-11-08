@@ -371,6 +371,14 @@ export function taxChanges(
     if (editionProfile(edition).taxSystem === "named-line") {
         if (tax?.registered)
             taxError("GST is for businesses in India.", "gstRegistered");
+        // GST's state, delivery rate and SAC are India's too (P2 #10).
+        if (tax?.state) taxError("GST is for businesses in India.", "state");
+        if (tax?.deliveryRate !== undefined) {
+            taxError("GST is for businesses in India.", "deliveryRate");
+        }
+        if (tax?.deliverySac) {
+            taxError("GST is for businesses in India.", "deliverySac");
+        }
         if (tax?.taxName !== undefined) data.taxName = tax.taxName || null;
         if (tax?.taxRate !== undefined) data.taxRate = tax.taxRate || null;
         if (tax?.yearStartMonth !== undefined) {

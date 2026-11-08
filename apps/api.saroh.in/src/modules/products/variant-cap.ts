@@ -43,6 +43,8 @@ export function assertCopyFits(cap: ItemCap | null, variants: number): void {
         cap,
         0,
         variants,
-        `A copy would have ${variants.toLocaleString("en-IN")}, so it can't be made.`,
+        // A variant count is far below a lakh, where India's grouping and
+        // Global's differ, so one locale says it for both editions.
+        `A copy would have ${variants.toLocaleString("en-US")}, so it can't be made.`,
     );
 }

@@ -287,7 +287,8 @@ export class PostMessageDto {
     @IsString()
     @MinLength(1, { message: "Write your message" })
     @MaxLength(MESSAGE_MAX, {
-        message: `Keep it to ${MESSAGE_MAX.toLocaleString("en-IN")} characters`,
+        // 2,000 reads the same in either edition's grouping.
+        message: `Keep it to ${MESSAGE_MAX.toLocaleString("en-US")} characters`,
     })
     text!: string;
 }

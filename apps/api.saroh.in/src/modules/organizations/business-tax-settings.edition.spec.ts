@@ -26,6 +26,39 @@ describe("what each edition may set", () => {
         ).toThrow(/GST/);
     });
 
+    it("refuses GST's state, delivery rate and SAC on Global, naming the field", () => {
+        const field = (tax: object) => {
+            try {
+                taxChanges(null, sent(tax), "GLOBAL");
+            } catch (e) {
+                return (
+                    e as { getResponse(): { details: { field: string } } }
+                ).getResponse().details.field;
+            }
+            return null;
+        };
+        expect(field({ state: "29" })).toBe("state");
+        expect(field({ deliveryRate: "18" })).toBe("deliveryRate");
+        expect(field({ deliverySac: "996812" })).toBe("deliverySac");
+        expect(field({ priceMode: "ADDED" })).toBe("priceMode");
+        // Clearing what was never there is no harm.
+        expect(field({ state: "", deliverySac: "" })).toBeNull();
+    });
+
+    it("still takes GST's state, delivery rate and SAC in India", () => {
+        expect(
+            taxChanges(
+                null,
+                sent({ state: "29", deliveryRate: "5", deliverySac: "996812" }),
+                "INDIA",
+            ),
+        ).toMatchObject({
+            gstState: "29",
+            deliveryGstRate: "5",
+            deliverySacCode: "996812",
+        });
+    });
+
     it("refuses Global's fields on India", () => {
         expect(() =>
             taxChanges(null, sent({ yearStartMonth: 1 }), "INDIA"),

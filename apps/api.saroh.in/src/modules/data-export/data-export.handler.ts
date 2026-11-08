@@ -67,6 +67,8 @@ export class DataExportHandler {
                         slug: true,
                         lifecycleStatus: true,
                         legalHoldAt: true,
+                        edition: true,
+                        currency: true,
                     },
                 },
             },
@@ -105,6 +107,8 @@ export class DataExportHandler {
                 organizationId: row.organizationId,
                 exportId,
                 businessName: row.organization.name,
+                edition: row.organization.edition,
+                currency: row.organization.currency,
                 storage: this.storage,
             });
             unclaimed = built.storageKey;
