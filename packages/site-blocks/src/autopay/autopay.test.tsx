@@ -211,6 +211,7 @@ describe("the join sheet's autopay (D12)", () => {
             "plan_monthly",
             expect.stringMatching(/^join-/),
             "CARD",
+            "/",
         );
         expect(pageWindow.open).toHaveBeenCalledWith(
             expect.objectContaining({ handoff: HANDOFF }),
@@ -256,6 +257,8 @@ describe("the join sheet's autopay (D12)", () => {
         expect(api.join).toHaveBeenCalledWith(
             "plan_monthly",
             expect.stringMatching(/^join-/),
+            undefined,
+            "/",
         );
         await vi.waitFor(() =>
             expect(onJoined).toHaveBeenCalledWith(
@@ -312,6 +315,7 @@ describe("the join sheet's autopay (D12)", () => {
             "plan_monthly",
             expect.stringMatching(/^join-/),
             "EMANDATE",
+            "/",
         );
         await vi.waitFor(() =>
             expect(startAutopay).toHaveBeenCalledWith(

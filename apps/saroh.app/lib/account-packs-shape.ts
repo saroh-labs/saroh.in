@@ -6,6 +6,8 @@ import type {
     PackResult,
 } from "@saroh/site-blocks";
 
+import { checkoutClosed } from "./checkout-closed";
+
 /**
  * Buying a class pack from the account (round-2 plan A, A11): the API's
  * answers narrowed, and every refusal turned into the customer's words.
@@ -120,6 +122,14 @@ export function packCheckoutAnswer(
         return isCheckout(body)
             ? { ok: true, data: body }
             : { ok: false, message: PACK_TROUBLE };
+    }
+    if (checkoutClosed(status, body)) {
+        // The key's Stripe checkout closed (KTD-13): the sheet starts again.
+        return {
+            ok: false,
+            restart: true,
+            message: "That payment closed before it was paid. Try again.",
+        };
     }
     return { ok: false, message: refusal(status, body) };
 }

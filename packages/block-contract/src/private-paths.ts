@@ -19,6 +19,9 @@
  * #1155) is one visitor's watch, and its token is the way to stop it:
  * never kept, never crawled, while `/shop` stays public.
  *
+ * `/paid` is where Stripe's hosted Checkout sends a customer back to: its
+ * address holds the session id or a cancel token.
+ *
  * `/q` is here too: a QR code's short link (`/q/<code>`) is not a page at
  * all. It counts a scan and forwards, so a crawler following it would add
  * scans nobody made, and it must never be kept by the page cache.
@@ -29,6 +32,7 @@ export const PRIVATE_PATH_PREFIXES = [
     "/autopay",
     "/shop/order",
     "/pay",
+    "/paid",
     "/book/claim",
     "/shop/stop-waiting",
     "/q",

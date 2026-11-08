@@ -6,8 +6,13 @@ import type {
     ShopProblem,
     ShopResult,
 } from "@saroh/site-blocks";
-import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
+import {
+    isTestReleaseRefusal,
+    sameSitePath,
+    TEST_RELEASE_MESSAGE,
+} from "@saroh/site-blocks";
 
+import { checkoutClosed } from "./checkout-closed";
 import { qrSourceTag } from "./qr-resolve";
 
 /**
@@ -250,6 +255,8 @@ const WORDS: Record<ShopProblem, string> = {
     invalid: "Check the details and try again.",
     error: SHOP_TROUBLE,
     "test-release": TEST_RELEASE_MESSAGE,
+    "checkout-closed":
+        "That payment closed before it was paid. Place your order again.",
 };
 
 /** The API's error envelope: `{ error: { message, details } }`. */
@@ -304,6 +311,11 @@ export function problemOf(
         return message ? fail("bag-changed", message) : fail("bag-changed");
     }
     if (status === 409 && reason === "bag-changed") return fail("bag-changed");
+    // A Stripe checkout this key started was cancelled or ran out (KTD-13):
+    // the bag starts again under a new key.
+    if (checkoutClosed(status, body)) {
+        return fail("checkout-closed");
+    }
     if (status === 429) {
         // The limits written for the customer: a fourth open checkout, or a
         // fourth order waiting to be paid at the handover.
@@ -404,6 +416,9 @@ export function startBody(v: unknown): Record<string, unknown> | null {
     // The tag of the QR code whose scan opened the page, if it is one.
     const source = qrSourceTag(v.source);
     if (source) body.source = source;
+    // Where Stripe's hosted Checkout comes back to: a same-site path only.
+    const back = sameSitePath(v.returnPath);
+    if (back) body.returnPath = back;
     if (isRecord(v.address)) {
         const a = v.address;
         const address: Record<string, string> = {};

@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { destructiveAlertClasses } from "../alert";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import {
+    leavesForProvider,
+    returnPathHere,
+    TO_PAYMENT_PAGE_WORDS,
+} from "../booking-flow/hosted-checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
 import { gstUnderWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
@@ -155,9 +160,19 @@ function BuyPack({
             key = newKey();
             keys.current.set(chosen.ref, key);
         }
-        const result = await api
-            .buy(chosen.ref, key)
-            .catch(() => ({ ok: false as const, message: PACKS_OFFLINE }));
+        const path = returnPathHere();
+        const ref = chosen.ref;
+        const begin = (k: string) =>
+            api
+                .buy(ref, k, path)
+                .catch(() => ({ ok: false as const, message: PACKS_OFFLINE }));
+        let result = await begin(key);
+        if (!result.ok && "restart" in result && result.restart) {
+            // The key's Stripe checkout closed (KTD-13): once more, anew.
+            key = newKey();
+            keys.current.set(ref, key);
+            result = await begin(key);
+        }
         setBusy(false);
         if (result.ok) launch(result.data, chosen.kind);
         else setProblem(result.message);
@@ -415,7 +430,10 @@ function BuyPack({
                 className={sheetButton(off)}
             >
                 {windowOpen
-                    ? "Payment window open…"
+                    ? phase.kind === "window" &&
+                      leavesForProvider(phase.started.payment)
+                        ? TO_PAYMENT_PAGE_WORDS
+                        : "Payment window open…"
                     : busy
                       ? "Starting…"
                       : total

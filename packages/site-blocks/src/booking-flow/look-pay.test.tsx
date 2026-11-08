@@ -214,7 +214,7 @@ describe("paying now, in a look", () => {
         fireEvent.click(screen.getByRole("radio", { name: /Pay ₹2,500 now/ }));
         expect(action()).toHaveTextContent("Pay ₹2,500 and book");
         expect(
-            screen.getByText(/We hold 8:00 am for you for 15 minutes/),
+            screen.getByText(/We hold 8:00 am for you for a short time/),
         ).toBeVisible();
 
         await act(async () => {

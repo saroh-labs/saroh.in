@@ -10,6 +10,11 @@ import type { AutopayMethod, AutopayStart } from "../autopay/api";
 import { AutopayMethodChoice, landOnBusinessSite } from "../autopay/choice";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import {
+    leavesForProvider,
+    returnPathHere,
+    TO_PAYMENT_PAGE_WORDS,
+} from "../booking-flow/hosted-checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
 import type { GstOnPrice } from "../lib/gst-price";
 import { gstUnderWords, payPriceWords } from "../lib/gst-price";
@@ -191,15 +196,21 @@ function Join({
         if (busy) return;
         setBusy(true);
         setProblem(null);
-        const result = await (
-            chosen
-                ? api.join(plan.id, key.current, chosen)
-                : api.join(plan.id, key.current)
-        ).catch((): JoinResult<PlanJoinStarted> => ({
-            ok: false,
-            reason: "error",
-            message: PRICES_OFFLINE,
-        }));
+        const path = returnPathHere();
+        const begin = () =>
+            api
+                .join(plan.id, key.current, chosen ?? undefined, path)
+                .catch((): JoinResult<PlanJoinStarted> => ({
+                    ok: false,
+                    reason: "error",
+                    message: PRICES_OFFLINE,
+                }));
+        let result = await begin();
+        if (!result.ok && result.reason === "checkout-closed") {
+            // The key's Stripe checkout closed (KTD-13): once more, anew.
+            key.current = priceKey("join");
+            result = await begin();
+        }
         setBusy(false);
         if (result.ok) {
             launch(result.data);
@@ -412,7 +423,9 @@ function Join({
     // The choice is made before the window: a started payment keeps it.
     const choosing = phase.kind === "ready";
     const cta = windowOpen
-        ? "Payment window open…"
+        ? phase.kind === "window" && leavesForProvider(phase.started.payment)
+            ? TO_PAYMENT_PAGE_WORDS
+            : "Payment window open…"
         : busy
           ? "Starting…"
           : chosen === "EMANDATE"

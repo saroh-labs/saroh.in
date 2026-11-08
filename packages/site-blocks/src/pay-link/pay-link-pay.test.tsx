@@ -65,7 +65,7 @@ function setup(
         contact?: { phone: string | null; email: string | null } | null;
     } = {},
 ) {
-    const start = vi.fn((_key: string) =>
+    const start = vi.fn((_key: string, _returnPath?: string) =>
         Promise.resolve<PayLinkStart>(
             over.start ?? { ok: true, intent: INTENT },
         ),
@@ -99,6 +99,33 @@ async function pressPay() {
 }
 
 describe("paying from a pay link", () => {
+    it("sends the page to come back to, and starts again under a new key when the key's Stripe checkout closed", async () => {
+        const stripe: PaymentHandoff = {
+            ...INTENT,
+            provider: "STRIPE",
+            clientParams: {
+                checkoutUrl: "https://checkout.stripe.com/c/pay/cs_1",
+            },
+        };
+        const { start, requests } = setup();
+        start
+            .mockResolvedValueOnce({
+                ok: false,
+                restart: true,
+                message: "That payment closed before it was paid.",
+            })
+            .mockResolvedValueOnce({ ok: true, intent: stripe });
+        await pressPay();
+        await act(() => Promise.resolve());
+        expect(start).toHaveBeenCalledTimes(2);
+        expect(start.mock.calls[0]?.[1]).toBe("/");
+        expect(start.mock.calls[1]?.[0]).not.toBe(start.mock.calls[0]?.[0]);
+        expect(requests).toHaveLength(1);
+        screen.getByRole("button", {
+            name: "Taking you to the secure payment page…",
+        });
+    });
+
     it("offers Pay alone before a payment is started: nothing to check yet", () => {
         setup();
         expect(payButton()).toBeEnabled();

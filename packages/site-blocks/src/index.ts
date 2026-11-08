@@ -573,8 +573,28 @@ export {
     autopayWith,
 } from "./autopay/words";
 export { openProviderCheckout } from "./booking-flow/checkout";
+export {
+    CHECKOUT_CLOSED_REASON,
+    TO_PAYMENT_PAGE_WORDS,
+    leavesForProvider,
+    returnPathHere,
+} from "./booking-flow/hosted-checkout";
+// The business's /paid page after Stripe's hosted Checkout (U8).
 export type { OpenCheckout } from "./booking-flow/checkout";
 export { PayOption } from "./booking-flow/steps/pay-option";
+export { PaymentReturn } from "./payment-return/done";
+export type { PaymentReturnProps } from "./payment-return/done";
+export {
+    backPathOf,
+    paymentReturnOf,
+    paymentReturnWords,
+    sameSitePath,
+} from "./payment-return/words";
+export type {
+    PaymentReturnKind,
+    PaymentReturnStatus,
+    PaymentReturnView,
+} from "./payment-return/words";
 // Paying from a pay link (an invoice's, an order's): the Pay button, the
 // provider's window and where the payment stands.
 export {
