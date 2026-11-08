@@ -1,4 +1,4 @@
-import { formatMinor } from "@saroh/pricing-catalog";
+import { formatMinor, indiaOnlyWord } from "@saroh/pricing-catalog";
 
 import { PROFILE } from "@/lib/edition";
 
@@ -16,3 +16,16 @@ export const planCurrencySign = (): string =>
 
 /** Whether this console's plans carry GST (India's), so its controls show. */
 export const planTaxed = (): boolean => PROFILE.sarohPlanMoney.tax === "gst";
+
+/**
+ * A warning for words only India's catalogue means (owner, 8 Nov 2026:
+ * "filter and flag"), on a console whose plans carry no GST: saroh.tech
+ * leaves such a row or line out, so the draft says so. Never blocks a save
+ * or a publish. Null on India's console, or when there is none.
+ */
+export const indiaOnlyNote = (text: string): string | null => {
+    const word = planTaxed() ? null : indiaOnlyWord(text);
+    return word
+        ? `"${word}" only means something in India. The pricing page leaves this out.`
+        : null;
+};

@@ -40,6 +40,8 @@ export interface ModuleRowProps {
     disabled: boolean;
     /** Validation messages for this cell, by field. */
     errors: { text?: string; card?: string; limit?: string };
+    /** A warning for India-only words on a Global draft (`indiaOnlyNote`). */
+    indiaOnly?: string | null;
     onInclude: (on: boolean) => void;
     onPatch: (patch: CellPatch) => void;
     onLimit: (limit: number | null) => void;
@@ -60,6 +62,7 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
             focused,
             disabled,
             errors,
+            indiaOnly = null,
             onInclude,
             onPatch,
             onLimit,
@@ -111,6 +114,11 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                                 {line}
                             </span>
                         ))}
+                        {indiaOnly && (
+                            <span className="font-medium text-warning">
+                                {indiaOnly}
+                            </span>
+                        )}
                         <span className="text-muted-foreground">{reach}</span>
                         {usage && (
                             <span className="text-muted-foreground">

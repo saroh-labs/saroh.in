@@ -10,7 +10,12 @@ vi.mock("@/lib/edition", async () => {
     return { PROFILE: editionProfile("GLOBAL") };
 });
 
-import { planCurrencySign, planMoney, planTaxed } from "./plan-money";
+import {
+    indiaOnlyNote,
+    planCurrencySign,
+    planMoney,
+    planTaxed,
+} from "./plan-money";
 import { blankCatalog, starterCatalog } from "./pricing-starter";
 
 describe("the Global console's catalogue", () => {
@@ -27,5 +32,11 @@ describe("the Global console's catalogue", () => {
         expect(planMoney(1_950)).toBe("$19.50");
         expect(planCurrencySign()).toBe("$");
         expect(planTaxed()).toBe(false);
+    });
+
+    it("flags India-only words on the draft, and nothing else (owner, 8 Nov 2026)", () => {
+        expect(indiaOnlyNote("Products GST invoices")).toMatch(/^"GST" only/);
+        expect(indiaOnlyNote("Delivery Rates by PIN code")).toMatch(/^"PIN"/);
+        expect(indiaOnlyNote("Products 7 things")).toBeNull();
     });
 });

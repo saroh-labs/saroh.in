@@ -317,6 +317,43 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
         expect(model.tax.toggle).toBe(false);
     });
 
+    it("leaves out rows and words that only mean something in India (owner, 8 Nov 2026)", () => {
+        const input = fakeInput();
+        input.modules.push(
+            {
+                id: "upi-pay",
+                name: "UPI payments",
+                group: "one",
+                cells: { grow: { inc: true, text: "Included", card: "" } },
+            },
+            {
+                id: "zones",
+                name: "Delivery",
+                group: "one",
+                cells: {
+                    grow: {
+                        inc: true,
+                        text: "By PIN code",
+                        card: "Rates by PIN code",
+                    },
+                    pro: { inc: true, text: "Zones", card: "Delivery zones" },
+                },
+            },
+        );
+        const catalog = parseCatalog({
+            ...input,
+            currency: "USD",
+            tax: "none",
+            yearly: { on: false, paid: 10 },
+        });
+        const model = pricingModel(catalog, true);
+        const all = JSON.stringify([model.views["month-excl"], model.rows]);
+        expect(all).not.toMatch(/\bUPI\b|\bPIN\b|\bGST\b/);
+        expect(all).toContain("Delivery");
+        expect(all).toContain("Delivery zones");
+        expect(all).toContain("Products");
+    });
+
     it("keeps today's Free-only page while it isn't offered", () => {
         const view = pricingModel(usd(), false).views["month-excl"];
         expect(JSON.stringify(view)).not.toMatch(/\$|111|222/);

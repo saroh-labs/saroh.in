@@ -8,6 +8,7 @@
 export * from "./access";
 export * from "./card-lines";
 export * from "./diff";
+export * from "./india-only";
 export * from "./limit-notice";
 export * from "./limit-words";
 export * from "./module-map";
