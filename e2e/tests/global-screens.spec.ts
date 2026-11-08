@@ -519,7 +519,10 @@ test.describe("the Global app (DEC-204)", () => {
         );
         // Global first and India last, so India is the newest of all her
         // businesses: the one the data layer fell back to before 9d995356c.
-        const g = await globalBusiness(page, testInfo, "global-home");
+        // With none chosen she gets the first of this edition's by name
+        // (listForUser), and other specs' Global businesses are hers too:
+        // "global-a-…" sorts before every other "global-…" one.
+        const g = await globalBusiness(page, testInfo, "global-a-home");
         const inv = await globalInvoice(page, g, testInfo);
         await makeBusiness(page, testInfo, "india-home");
 
