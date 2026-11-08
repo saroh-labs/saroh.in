@@ -1,5 +1,6 @@
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 /**
  * The business details every invoice needs (DEC-068): the registered
@@ -30,6 +31,8 @@ export const BUSINESS_DETAILS_SELECT = {
     country: true,
     gstRegistered: true,
     taxId: true,
+    // A blank country reads as the business's edition, never India on Global.
+    organization: { select: { edition: true } },
 } as const;
 
 export type BusinessDetailsColumns = Prisma.BusinessProfileGetPayload<{
@@ -38,30 +41,47 @@ export type BusinessDetailsColumns = Prisma.BusinessProfileGetPayload<{
 
 const filled = (v: string | null | undefined) => !!v?.trim();
 
+/** GST is India's: a business on a named tax line is never registered for it. */
+const gstRegistered = (p: BusinessDetailsColumns): boolean =>
+    p.gstRegistered &&
+    editionProfile(p.organization.edition).taxSystem === "gst";
+
+/**
+ * Whether India's address rules apply: the country is India, or unsaid in
+ * India's edition (on Global a blank country is not India), or the business
+ * is GST-registered.
+ */
+function indianAddress(p: BusinessDetailsColumns): boolean {
+    const country = (p.country ?? "").trim().toUpperCase();
+    if (gstRegistered(p) || country === "IN" || country === "INDIA") {
+        return true;
+    }
+    return (
+        country === "" &&
+        editionProfile(p.organization.edition).address ===
+            "indian-state-and-pin"
+    );
+}
+
 /**
  * What is missing, in the order the step asks for it. The address is its
  * first line, city, PIN and state; a business registered outside India has
- * no Indian state, so only an Indian (or unsaid) one needs it. No profile
- * at all is missing the address.
+ * no Indian state, so only an Indian (or, in India's edition, unsaid) one
+ * needs it. No profile at all is missing the address. A business on a named
+ * tax line has no GSTIN to miss.
  */
 export function missingFrom(
     p: BusinessDetailsColumns | null,
 ): BusinessDetail[] {
-    const country = (p?.country ?? "").trim().toUpperCase();
-    const india =
-        country === "" ||
-        country === "IN" ||
-        country === "INDIA" ||
-        !!p?.gstRegistered;
     const address =
         !!p &&
         filled(p.addressLine1) &&
         filled(p.city) &&
         filled(p.postalCode) &&
-        (!india || filled(p.gstState));
+        (!indianAddress(p) || filled(p.gstState));
     const missing: BusinessDetail[] = [];
     if (!address) missing.push("address");
-    if (p?.gstRegistered && !filled(p.taxId)) missing.push("gstin");
+    if (p && gstRegistered(p) && !filled(p.taxId)) missing.push("gstin");
     return missing;
 }
 

@@ -20,6 +20,7 @@ import {
     nextInvoiceNumber,
     prefixOf,
 } from "@/lib/invoices/invoice-number";
+import { inIndia } from "@/lib/organizations/business-details";
 import { phoneSchema } from "@/lib/organizations/business-phone";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import {
@@ -274,7 +275,7 @@ export function gstStateOf(v: Pick<FormValues, "gstState" | "taxId">): {
 export function indianState(
     v: Pick<FormValues, "gstState" | "country">,
 ): string {
-    return ["", "IN"].includes(v.country ?? "") ? stateName(v.gstState) : "";
+    return inIndia(v.country) ? stateName(v.gstState) : "";
 }
 
 export function addressText(v: FormValues): string {

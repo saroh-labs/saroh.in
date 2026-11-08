@@ -17,6 +17,17 @@ const complete: BusinessDetailsColumns = {
     country: "IN",
     gstRegistered: false,
     taxId: null,
+    organization: { edition: "INDIA" },
+};
+
+/** A Global business (DEC-204): a named tax line, its address by country. */
+const global: BusinessDetailsColumns = {
+    ...complete,
+    city: "Austin",
+    postalCode: "78701",
+    gstState: null,
+    country: "US",
+    organization: { edition: "GLOBAL" },
 };
 
 describe("missingFrom (DEC-068)", () => {
@@ -35,6 +46,20 @@ describe("missingFrom (DEC-068)", () => {
         ["state", { gstState: null }],
     ])("misses the address without its %s", (_, change) => {
         expect(missingFrom({ ...complete, ...change })).toEqual(["address"]);
+    });
+
+    it("reads a blank country by the edition: India's asks a state, Global's doesn't (R5)", () => {
+        expect(
+            missingFrom({ ...complete, country: "", gstState: null }),
+        ).toEqual(["address"]);
+        expect(missingFrom({ ...global, country: "" })).toEqual([]);
+        expect(missingFrom({ ...global, country: null })).toEqual([]);
+    });
+
+    it("never misses a GSTIN on a named tax line", () => {
+        expect(
+            missingFrom({ ...global, gstRegistered: true, taxId: null }),
+        ).toEqual([]);
     });
 
     it("asks no Indian state of a business registered abroad", () => {

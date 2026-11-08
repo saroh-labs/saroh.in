@@ -48,13 +48,7 @@ const LINES = [
         "address-line2",
     ],
     ["city", "City", "240px", true, "address-level2"],
-    [
-        "postalCode",
-        PROFILE.address === "country-and-region" ? "Postcode" : "PIN code",
-        "140px",
-        false,
-        "postal-code",
-    ],
+    ["postalCode", "PIN code", "140px", false, "postal-code"],
 ] as const;
 
 /**
@@ -92,7 +86,12 @@ export function RegisteredAddressFields<T extends FieldValues>({
                     name={name(key)}
                     render={({ field }) => (
                         <FormItem {...at(basis, grow)}>
-                            <FormLabel>{label}</FormLabel>
+                            <FormLabel>
+                                {key === "postalCode" &&
+                                PROFILE.address === "country-and-region"
+                                    ? "Postcode"
+                                    : label}
+                            </FormLabel>
                             <FormControl>
                                 <Input
                                     {...field}
@@ -162,9 +161,14 @@ export function RegisteredAddressFields<T extends FieldValues>({
                                     still shows its own. */}
                                 <CountrySelect
                                     value={
-                                        registered || !field.value
+                                        // Blank is the edition's: India
+                                        // in India, unsaid on Global.
+                                        registered ||
+                                        (!field.value &&
+                                            PROFILE.address ===
+                                                "indian-state-and-pin")
                                             ? "IN"
-                                            : field.value
+                                            : (field.value ?? "")
                                     }
                                     onValueChange={field.onChange}
                                     disabled

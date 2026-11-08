@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import type { Edition } from "@saroh/edition";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BusinessDetailsValues } from "./business-details";
 import {
@@ -10,6 +11,20 @@ import {
     missingDetailsOf,
     missingOnFile,
 } from "./business-details";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+afterEach(() => {
+    edition.name = "INDIA";
+});
 
 const filled: BusinessDetailsValues = {
     addressLine1: "3 Hill Road",
@@ -175,6 +190,25 @@ describe("detailsInput", () => {
         });
     });
 
+    it("on a named tax line sends the address and only a changed tax ID, no GST", () => {
+        edition.name = "GLOBAL";
+        const v = { ...filled, gstState: "", taxId: "" };
+        expect(detailsInput(v, { gstRegistered: false, taxId: "" })).toEqual({
+            registeredAddress: {
+                line1: "3 Hill Road",
+                line2: "",
+                city: "Bengaluru",
+                postalCode: "560038",
+            },
+        });
+        expect(
+            detailsInput(
+                { ...v, taxId: " EIN 12-3456789 " },
+                { gstRegistered: false, taxId: "" },
+            ).profile,
+        ).toEqual({ taxId: "EIN 12-3456789" });
+    });
+
     it("turning GST off says so and sends no GSTIN", () => {
         const input = detailsInput(filled, { gstRegistered: true });
         expect(input.tax).toEqual({ registered: false, state: "29" });
@@ -202,6 +236,13 @@ describe("inIndia", () => {
         expect(inIndia("")).toBe(true);
         expect(inIndia("in")).toBe(true);
         expect(inIndia("GB")).toBe(false);
+    });
+
+    it("reads a blank country as the edition's: never India on Global (R5)", () => {
+        edition.name = "GLOBAL";
+        expect(inIndia(null)).toBe(false);
+        expect(inIndia("")).toBe(false);
+        expect(inIndia("IN")).toBe(true);
     });
 });
 

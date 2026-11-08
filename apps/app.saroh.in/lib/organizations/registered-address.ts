@@ -1,4 +1,17 @@
+import { PROFILE } from "@/lib/edition";
+
 import type { RegisteredAddress } from "./settings-service";
+
+/**
+ * Whether India's address rules apply: an address outside India has no
+ * Indian state to choose. A blank country reads as the edition's: India's in
+ * India, never India on Global.
+ */
+export function inIndia(country: string | null | undefined): boolean {
+    const c = (country ?? "").trim().toUpperCase();
+    if (c === "") return PROFILE.address === "indian-state-and-pin";
+    return c === "IN" || c === "INDIA";
+}
 
 /** An Indian PIN code: six digits, never starting with 0. */
 export const PIN_SHAPE = /^[1-9][0-9]{5}$/;
@@ -78,7 +91,7 @@ export function addressProblems(v: {
  * readiness rule (DEC-068) need it, and so does connecting payments, so the
  * address card asks before it saves rather than letting the checklist ask
  * again. Only for an address being filled in (any line typed) and only in
- * India (country unsaid or IN); a GST-registered business's state is its
+ * India (IN, or unsaid in India's edition); a GST-registered business's state is its
  * GSTIN's, set for it. Null when nothing is missing.
  */
 export function stateProblem(v: {
@@ -90,7 +103,7 @@ export function stateProblem(v: {
     postalCode: string;
 }): string | null {
     if (v.gstRegistered) return null;
-    if (!["", "IN"].includes((v.country ?? "").toUpperCase())) return null;
+    if (!inIndia(v.country)) return null;
     const typed = [v.addressLine1, v.city, v.postalCode].some(
         (x) => x.trim() !== "",
     );

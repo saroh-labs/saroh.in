@@ -1,9 +1,10 @@
+import { PROFILE } from "@/lib/edition";
 import { gstinProblem } from "@/lib/invoices/gstin";
 
 import type { OrganizationKind } from "./kind";
 import { kindOf, kindWords } from "./kind";
 import type { RegisteredAddressValues } from "./registered-address";
-import { PIN_SHAPE } from "./registered-address";
+import { inIndia, PIN_SHAPE } from "./registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
@@ -88,10 +89,7 @@ export function detailsValuesOf(
     };
 }
 
-/** An address outside India has no Indian state to choose. */
-export function inIndia(country: string | null | undefined): boolean {
-    return ["", "IN", "INDIA"].includes((country ?? "").trim().toUpperCase());
-}
+export { inIndia } from "./registered-address";
 
 /**
  * What the step must fix before it saves, on the field it is about. Every
@@ -138,16 +136,29 @@ export function detailsProblems(
  */
 export function detailsInput(
     v: BusinessDetailsValues,
-    was: Pick<BusinessDetailsValues, "gstRegistered">,
+    was: Pick<BusinessDetailsValues, "gstRegistered"> &
+        Partial<Pick<BusinessDetailsValues, "taxId">>,
 ): OrganizationSettingsInput {
+    const registeredAddress = {
+        line1: v.addressLine1.trim(),
+        line2: v.addressLine2.trim(),
+        city: v.city.trim(),
+        postalCode: v.postalCode.trim(),
+    };
+    // A named tax line (DEC-204) has no GST standing: only its optional
+    // tax ID, when it changed.
+    if (PROFILE.taxSystem !== "gst") {
+        const taxId = v.taxId.trim();
+        return {
+            registeredAddress,
+            ...(taxId !== (was.taxId ?? "").trim()
+                ? { profile: { taxId } }
+                : {}),
+        };
+    }
     const gstin = v.taxId.trim().toUpperCase();
     return {
-        registeredAddress: {
-            line1: v.addressLine1.trim(),
-            line2: v.addressLine2.trim(),
-            city: v.city.trim(),
-            postalCode: v.postalCode.trim(),
-        },
+        registeredAddress,
         tax: {
             ...(v.gstRegistered !== was.gstRegistered
                 ? { registered: v.gstRegistered }

@@ -13,11 +13,24 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Edition } from "@saroh/edition";
+
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { useBusinessDetailsStep } from "./use-business-details-step";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
 
 const readBusinessDetails = vi.fn();
 const saveOrganizationSettings = vi.fn();
@@ -119,6 +132,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    edition.name = "INDIA";
     act(() => root.unmount());
     host.remove();
     document.body.innerHTML = "";
@@ -443,4 +457,69 @@ describe("asking up front, from the page's read (#838)", () => {
         expect(sheet()).toBeNull();
         expect(ready).toBe(true);
     });
+});
+
+describe("a Global business is never asked about GST (R1, R5)", () => {
+    const us = (country: string): OrganizationSettings => ({
+        ...SETTINGS,
+        profile: {
+            legalName: null,
+            type: null,
+            country,
+            taxId: null,
+            contactEmail: null,
+            website: null,
+        },
+        tax: {
+            registered: false,
+            state: null,
+            stateName: null,
+            invoicePrefix: null,
+            deliveryRate: "18",
+            deliverySac: null,
+        },
+        registeredAddress: {
+            line1: null,
+            line2: null,
+            city: null,
+            postalCode: null,
+            state: null,
+            stateName: null,
+        },
+    });
+
+    it.each([
+        ["US", us("US")],
+        ["blank", us("")],
+    ])(
+        "%s country: no GST switch, GSTIN or Indian state; the Tax ID is optional",
+        async (_, settings) => {
+            edition.name = "GLOBAL";
+            readBusinessDetails.mockResolvedValue({ ok: true, data: settings });
+            action
+                .mockResolvedValueOnce(REFUSED)
+                .mockResolvedValueOnce({ ok: true, data: { number: "INV-1" } });
+            await press("Issue it");
+
+            const t = sheet()?.textContent ?? "";
+            expect(t).not.toMatch(/GST|PIN/);
+            expect(t).not.toContain("Choose a state");
+            expect(sheet()?.querySelector('[role="switch"]')).toBeNull();
+            expect(byLabel("Tax ID (optional)").value).toBe("");
+            typeInto(byLabel("Address line 1"), "500 Congress Ave");
+            typeInto(byLabel("City"), "Austin");
+            typeInto(byLabel("Postcode"), "78701");
+            await press("Save and issue");
+
+            expect(saveOrganizationSettings).toHaveBeenCalledWith({
+                registeredAddress: {
+                    line1: "500 Congress Ave",
+                    line2: "",
+                    city: "Austin",
+                    postalCode: "78701",
+                },
+            });
+            expect(result).toEqual({ ok: true, data: { number: "INV-1" } });
+        },
+    );
 });
