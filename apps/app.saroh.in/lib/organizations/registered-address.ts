@@ -13,8 +13,11 @@ import type { RegisteredAddress } from "./settings-service";
 export function inIndia(country: string | null | undefined): boolean {
     const c = (country ?? "").trim().toUpperCase();
     if (c === "") return PROFILE.address === "indian-state-and-pin";
-    return c === "IN" || c === "INDIA";
+    // A typed country, by its code or its name; not the edition.
+    return INDIA_COUNTRY.has(c);
 }
+
+const INDIA_COUNTRY = new Set(["IN", "INDIA"]);
 
 /** An Indian PIN code: six digits, never starting with 0. */
 export const PIN_SHAPE = /^[1-9][0-9]{5}$/;
