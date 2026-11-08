@@ -6574,3 +6574,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** Stripe payments go through Stripe's hosted Checkout (DEC-208, 7 Nov amendment; plan 2026-11-07-002). Every PaymentIntent carries `paymentDescription`, the account's country is read at connect, and an `IN` or unreadable account's sessions send `billing_address_collection=required` (and the order's shipping country for goods). Stripe's page asks for whatever else the account's country needs.
 - **Rule:** a provider fact is checked against the provider's docs for every country the merchant's account can be in, not only the edition's, and recorded with its source in `payments/providers/STRIPE.md` before code is written. An owner test on an account from the strictest country (India for Stripe) comes before the flag goes on.
 - **Category:** payments · providers
+
+## Stripe's return to a live site timed out in the browser specs (8 Nov 2026)
+
+- **Symptom:** the full gate's `stripe-checkout.spec.ts` booking-hold tests (desk and phone) waited on `/paid` on a blank page after "Pay"; the invoice and order tests, which return to the renderer apex, passed.
+- **Cause:** `platformOrigin` (`sites/site-origin.ts`) wrote `https://` before the renderer's host, so on the plain-http e2e stack (`RENDERER_URL=http://localhost:3005`) a business with a live site was sent to `https://<address>.localhost:3005`, which nothing serves.
+- **Fix:** the address takes the renderer's own scheme; `site-origin.spec.ts` pins production (`https://<address>.saroh.app`, custom domain on https) and the http stack.
+- **Rule:** an origin built from `RENDERER_URL` keeps its scheme; never hard-code `https://` in front of `rendererHost()`.
+- **Category:** sites · e2e
