@@ -55,7 +55,7 @@ export const COUNTRIES = [
     "US",
 ] as const;
 
-const names = new Intl.DisplayNames(["en-IN"], { type: "region" });
+const names = new Intl.DisplayNames(["en"], { type: "region" });
 
 /** "IN" → "India"; an unknown code as it is. */
 export function countryName(code: string): string {

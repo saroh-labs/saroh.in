@@ -50,7 +50,6 @@
     "apps/app.saroh.in/components/organizations/business-settings/business-settings.test-kit.tsx": 1,
     "apps/app.saroh.in/components/settings/plan-billing/current-plan-card.tsx": 1,
     "apps/app.saroh.in/components/settings/plan-billing/plan-chooser.tsx": 1,
-    "apps/app.saroh.in/lib/customer-workspace/details.ts": 1,
     "apps/app.saroh.in/lib/gst/price-mode.ts": 2,
     "apps/app.saroh.in/lib/insights/money.fixture.ts": 1,
     "apps/app.saroh.in/lib/insights/sells.fixture.ts": 1,
