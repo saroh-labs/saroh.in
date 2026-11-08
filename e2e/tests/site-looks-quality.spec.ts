@@ -28,7 +28,8 @@ import { urls } from "../playwright.config";
  *   run to run on a shared machine.
  * - The page asks for at most two font families (the look's display and
  *   body faces; the ₹ face is built from the device's own and loads none).
- * - The document says `lang="en-IN"` (WV2Tech).
+ * - The page says `lang="en-IN"` (WV2Tech): on the site's wrapper, since
+ *   the root layout can't know the business's edition and says only "en".
  *
  * What it owns: `SITE_LOOKS` and `SITE_SHOP` turned on for Northwind alone
  * (per-business overrides) and Northwind's site style, published; all put
@@ -395,8 +396,11 @@ test.describe("the looks' quality gates", { tag: "@serial" }, () => {
                     // The document.
                     await expect(page.locator("html")).toHaveAttribute(
                         "lang",
-                        "en-IN",
+                        "en",
                     );
+                    await expect(
+                        page.locator("[lang='en-IN']").first(),
+                    ).toBeAttached();
                     await expect(
                         page.locator(`[data-site-look="${id}"]`),
                     ).toHaveCount(1);

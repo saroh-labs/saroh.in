@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { readBag } from "../shop/bag-store";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "../site-business";
 import type { ShopListingCard } from "./shop-listing";
 import ShopListing, { categoriesOf, ShopUnavailable } from "./shop-listing";
 
@@ -585,6 +586,38 @@ describe("a card's MRP is compared with the amount to pay", () => {
         expect(struck(oil)).toHaveTextContent("MRP ₹1,475");
         expect(struck(butter)).toHaveTextContent("MRP ₹1,475");
         expect(butter).toHaveTextContent("₹1,000 + GST");
+    });
+
+    it("on a Global business's dollar shop: thousands, the original price, its own tax word", () => {
+        render(
+            <SiteBusinessProvider
+                value={{
+                    ...INDIA_SITE_BUSINESS,
+                    country: "US",
+                    address: "country-and-region",
+                    phoneNumbers: "with-country-code",
+                    taxSystem: "named-line",
+                    struckPrice: "original-price",
+                }}
+            >
+                <ShopListing
+                    products={[
+                        card({
+                            slug: "d",
+                            name: "Desk lamp",
+                            currency: "USD",
+                            price: "100000.00",
+                            gstAdded: true,
+                            saving: { mrp: "120000.00", percent: 16 },
+                        }),
+                    ]}
+                />
+            </SiteBusinessProvider>,
+        );
+        const lamp = screen.getByRole("link", { name: /Desk lamp/ });
+        expect(lamp).toHaveTextContent("$100,000 + tax");
+        expect(struck(lamp)).toHaveTextContent("Original price $120,000");
+        expect(lamp).not.toHaveTextContent("MRP");
     });
 
     it("strikes nothing where the amount to pay is the MRP, or above it", () => {

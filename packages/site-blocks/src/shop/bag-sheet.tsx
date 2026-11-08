@@ -11,7 +11,7 @@ import {
 } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
-import { useSiteBusiness } from "../site-business";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import type {
     CheckoutQuote,
     DeliveryAddress,
@@ -271,7 +271,8 @@ export function BagSheet({
     onPlace: (request: StartCheckout, priced: BagPriced) => void;
     onClose: () => void;
 }) {
-    const { address: addressBy } = useSiteBusiness();
+    const seller = useSiteBusiness();
+    const { address: addressBy } = seller;
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
     const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
@@ -546,7 +547,8 @@ export function BagSheet({
                     data-total-gst=""
                     className="text-site-body text-right text-sm tabular-nums"
                 >
-                    Includes {formatAmount(quote.gst, quote.currency)} GST
+                    Includes {formatAmount(quote.gst, quote.currency)}{" "}
+                    {taxWordOf(seller)}
                 </p>
             ) : null}
             <button

@@ -136,7 +136,7 @@ export function SignInSheet({
     const field = useRef<HTMLInputElement>(null);
     // The whole number, country code and all, so only the hint can start
     // on the business's country.
-    const { phoneNumbers, country } = useSiteBusiness();
+    const { phoneNumbers, country, phoneSignIn = true } = useSiteBusiness();
     const phoneHint =
         phoneNumbers === "indian"
             ? "+91 98450 12345"
@@ -181,10 +181,10 @@ export function SignInSheet({
     // when they say a challenge is likely. Derived, not copied, because the
     // options can land after the sheet opened (`AccountEntry`, #838).
     const [askedKey, setAskedKey] = useState<string | null>(null);
-    // Phone sign-in is India's alone (DEC-211): never offered on Global,
-    // whose `phoneNumbers` stands for its `phoneSignIn` here.
+    // Phone sign-in only where the edition offers it (DEC-211): never on
+    // Global, so its Indian-mobile words can't show there.
     const canPhone =
-        phoneNumbers === "indian" &&
+        phoneSignIn &&
         api.requestPhoneCode !== undefined &&
         api.verifyPhoneCode !== undefined;
     // The business's ways, in its order (DEC-196); Me's errands have one.

@@ -16,7 +16,9 @@ import { moneyLocaleOf, siteMoney } from "./money";
  * - GST is added: "₹1,000 + ₹180 GST (18%)", and ₹1,180 to pay
  *
  * A price with no GST on it (the business isn't registered, or the item is
- * exempt) has no `GstOnPrice` at all, and nothing is said.
+ * exempt) has no `GstOnPrice` at all, and nothing is said. `taxName` is
+ * the word for the tax ("GST" unless the page knows the business names its
+ * own tax line), so a named line reads as its own.
  */
 export interface GstOnPrice {
     mode: "INCLUDED" | "ADDED";
@@ -58,9 +60,10 @@ export function gstPriceWords(
     gst: GstOnPrice,
     currency: string,
     locale = moneyLocaleOf(currency),
+    taxName = "GST",
 ): string {
     const price = money(gst.listCents, currency, locale);
-    return `${price}${gst.mode === "ADDED" ? " " : ", "}${gstNoteWords(gst, currency, locale)}`;
+    return `${price}${gst.mode === "ADDED" ? " " : ", "}${gstNoteWords(gst, currency, locale, taxName)}`;
 }
 
 /**
@@ -72,11 +75,12 @@ export function gstNoteWords(
     gst: GstOnPrice,
     currency: string,
     locale = moneyLocaleOf(currency),
+    taxName = "GST",
 ): string {
     const tax = money(gst.gstCents, currency, locale);
     return gst.mode === "ADDED"
-        ? `+ ${tax} GST (${gst.rate}%)`
-        : `includes ${tax} GST (${gst.rate}%)`;
+        ? `+ ${tax} ${taxName} (${gst.rate}%)`
+        : `includes ${tax} ${taxName} (${gst.rate}%)`;
 }
 
 /** The amount to pay, as money: "₹1,180". */
@@ -93,8 +97,12 @@ export function gstPayWords(
  * price the business typed, with "+ GST" after it when GST comes on top, so
  * the amount to pay is never a surprise. `price` is already formatted.
  */
-export function browsePriceWords(price: string, gstAdded: boolean): string {
-    return gstAdded ? `${price} + GST` : price;
+export function browsePriceWords(
+    price: string,
+    gstAdded: boolean,
+    taxName = "GST",
+): string {
+    return gstAdded ? `${price} + ${taxName}` : price;
 }
 
 /**
@@ -107,10 +115,11 @@ export function gstLineWords(
     gst: GstOnPrice,
     currency: string,
     locale = moneyLocaleOf(currency),
+    taxName = "GST",
 ): string {
     return gst.mode === "ADDED"
-        ? gstPriceWords(gst, currency, locale)
-        : gstNoteWords(gst, currency, locale);
+        ? gstPriceWords(gst, currency, locale, taxName)
+        : gstNoteWords(gst, currency, locale, taxName);
 }
 
 /**
@@ -145,7 +154,10 @@ export function gstUnderWords(
     value: unknown,
     currency: string,
     locale = moneyLocaleOf(currency),
+    taxName = "GST",
 ): string | null {
     const gst = gstOnPriceOf(value);
-    return gst ? startOfLine(gstLineWords(gst, currency, locale)) : null;
+    return gst
+        ? startOfLine(gstLineWords(gst, currency, locale, taxName))
+        : null;
 }

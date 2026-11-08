@@ -165,10 +165,13 @@ export function cancelText(
  * GST at 18%. The receipt shows the exact amount." No paise on the page.
  * Null where the API says none.
  */
-export function lookGstText(service: BookingService | null): string | null {
+export function lookGstText(
+    service: BookingService | null,
+    taxName = "GST",
+): string | null {
     const gst = gstOnPriceOf(service?.gst);
     if (!gst) return null;
-    return `Includes GST at ${gst.rate}%. The receipt shows the exact amount.`;
+    return `Includes ${taxName} at ${gst.rate}%. The receipt shows the exact amount.`;
 }
 
 /**

@@ -9,6 +9,7 @@ import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { useCloseBooking } from "./book-return";
 import type { BookingFlowProps } from "./booking-account";
@@ -76,6 +77,7 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
         reach = null,
     } = props;
     const apiUrl = props.apiUrl ?? DEFAULT_API_URL;
+    const taxName = taxWordOf(useSiteBusiness());
     const ids = useId();
     const rootRef = useRef<HTMLDivElement>(null);
     const headingRef = useRef<HTMLHeadingElement>(null);
@@ -333,7 +335,7 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
                 visits={visitsOf(service)}
                 soldBy={soldBy}
                 email={customer?.email ?? null}
-                gst={lookGstText(service)}
+                gst={lookGstText(service, taxName)}
                 onAgain={pick.again}
             />,
         );

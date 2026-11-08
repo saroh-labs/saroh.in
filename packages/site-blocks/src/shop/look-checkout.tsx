@@ -24,7 +24,7 @@ import { pickupReadyWords } from "../lib/shop-facts";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 import { readQrSource } from "../qr-source";
-import { useSiteBusiness } from "../site-business";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import { SoldByLine } from "../sold-by";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
@@ -268,7 +268,8 @@ export function LookCheckout({
     const router = useRouter();
     const items = useBag(site);
     const testRelease = useTestRelease() !== null;
-    const { address: addressBy, upi } = useSiteBusiness();
+    const seller = useSiteBusiness();
+    const { address: addressBy, upi } = seller;
     const code = useRef<InlineCodeHandle>(null);
     const [customer, setCustomer] = useState(account.customer);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
@@ -1079,7 +1080,7 @@ export function LookCheckout({
                     )}
                     <p className="text-site-body mt-1 text-[13.5px]">
                         {quote?.gst
-                            ? `Includes ${formatAmount(quote.gst, quote.currency)} GST. `
+                            ? `Includes ${formatAmount(quote.gst, quote.currency)} ${taxWordOf(seller)}. `
                             : null}
                         <button
                             type="button"

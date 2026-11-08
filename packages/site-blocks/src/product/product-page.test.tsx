@@ -13,6 +13,7 @@ import type {
     WatchResult,
     WatchTaken,
 } from "../shop/back-in-stock-shape";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "../site-business";
 
 import type { ProductPageData } from "./product-page";
 import ProductPage, {
@@ -962,4 +963,78 @@ describe("Tell me when it's back", () => {
             }
         },
     );
+});
+
+/** A Global business's page (P0 #14, P1 #15 #17): its own words and grouping. */
+describe("a Global business's product page", () => {
+    const global = {
+        ...INDIA_SITE_BUSINESS,
+        country: "US",
+        address: "country-and-region" as const,
+        phoneNumbers: "with-country-code" as const,
+        taxSystem: "named-line" as const,
+        struckPrice: "original-price" as const,
+        phoneSignIn: false,
+    };
+    const big = (currency: string): ProductPageData => ({
+        ...dress,
+        currency,
+        price: "100000.00",
+        mrp: "120000.00",
+        variants: [],
+        gst: null,
+        saving: { mrp: "120000.00", percent: 16 },
+    });
+
+    it("groups dollars in thousands, makes no tax promise and calls the struck price the original", () => {
+        const { container } = render(
+            <SiteBusinessProvider value={global}>
+                <ProductPage product={big("USD")} />
+            </SiteBusinessProvider>,
+        );
+        expect(container.querySelector("[data-price-lead]")).toHaveTextContent(
+            "$100,000",
+        );
+        expect(container.querySelector("[data-price-mrp]")).toHaveTextContent(
+            "Original price $120,000",
+        );
+        expect(container).not.toHaveTextContent("Inclusive of all taxes");
+        expect(container).not.toHaveTextContent("MRP");
+        expect(container).not.toHaveTextContent("1,00,000");
+    });
+
+    it("India unchanged: lakh grouping, MRP and the inclusive line", () => {
+        const { container } = render(<ProductPage product={big("INR")} />);
+        expect(container.querySelector("[data-price-lead]")).toHaveTextContent(
+            "₹1,00,000",
+        );
+        expect(container.querySelector("[data-price-mrp]")).toHaveTextContent(
+            "MRP ₹1,20,000",
+        );
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+    });
+
+    it("names a business's own tax in the GST words when told", () => {
+        const { container } = render(
+            <SiteBusinessProvider value={global}>
+                <ProductPage
+                    product={{
+                        ...big("USD"),
+                        saving: null,
+                        gst: {
+                            mode: "ADDED",
+                            rate: "8",
+                            listCents: 10000000,
+                            gstCents: 800000,
+                            payCents: 10800000,
+                        },
+                    }}
+                />
+            </SiteBusinessProvider>,
+        );
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            "+ $8,000 tax (8%)",
+        );
+        expect(container).not.toHaveTextContent("GST");
+    });
 });

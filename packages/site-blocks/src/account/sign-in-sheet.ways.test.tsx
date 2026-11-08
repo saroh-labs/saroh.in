@@ -110,6 +110,7 @@ describe("the sign-in sheet's ways (DEC-196)", () => {
                 country: "US",
                 address: "country-and-region",
                 phoneNumbers: "with-country-code",
+                phoneSignIn: false,
             },
         );
         expect(screen.getByLabelText("Email")).toBeTruthy();
