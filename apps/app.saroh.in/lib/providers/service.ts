@@ -10,6 +10,13 @@ import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 export type PaymentProviderName = "RAZORPAY" | "CASHFREE" | "STRIPE";
 
 /**
+ * Where a Stripe business's customers pay (owner, 8 Nov 2026, DEC-208):
+ * Stripe's hosted page (the default) or Saroh's card window on the
+ * business's own page.
+ */
+export type StripeCheckoutStyle = "HOSTED" | "WINDOW";
+
+/**
  * Why a connection that is still CONNECTED needs a person (UX-012): its
  * provider refused the keys on a live call (`KEYS_REFUSED`), or (Stripe)
  * its restricted key lacks a permission a payment uses on the side, so
@@ -40,6 +47,8 @@ export interface ConnectedPaymentProvider {
      * many. Absent from an older API: read as none.
      */
     activeMemberships?: number;
+    /** Stripe only: where its customers pay. Absent from an older API, or null: Stripe's page. */
+    checkoutStyle?: StripeCheckoutStyle | null;
     updatedAt: string;
 }
 
@@ -62,6 +71,8 @@ export interface ConnectPaymentInput {
     keySecret: string;
     publicKey?: string;
     webhookSecret?: string;
+    /** Stripe only: where its customers pay. */
+    checkoutStyle?: StripeCheckoutStyle;
 }
 
 export type CommsChannel = "EMAIL" | "WHATSAPP";
@@ -124,6 +135,18 @@ export function connectPaymentProvider(
         "POST",
         input,
         "Couldn't connect the payment provider.",
+    );
+}
+
+/** Where a connected Stripe's customers pay (DEC-208, 8 Nov). */
+export function setStripeCheckoutStyle(
+    checkoutStyle: StripeCheckoutStyle,
+): Promise<CrmResult<ConnectedPaymentProvider>> {
+    return mutate<ConnectedPaymentProvider>(
+        "/payment-providers/STRIPE/checkout-style",
+        "PATCH",
+        { checkoutStyle },
+        "Couldn't save where customers pay.",
     );
 }
 
