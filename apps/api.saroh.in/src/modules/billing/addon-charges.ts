@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Catalog } from "@saroh/pricing-catalog";
 import {
     addonOfferedOn,
     catalogPlanIdForKey,
@@ -183,6 +184,62 @@ export async function rollAddonChargesInTx(
             subscriptionId: sub.id,
         });
     }
+}
+
+/**
+ * A plan paid one month at a time (stage 9, KTD5b; owner, 8 Nov 2026): the
+ * month's USD order carries every add-on the business holds as it pays,
+ * each a whole month, never prorated. Only the ones `planId` is offered
+ * (DEC-157). Pure, so the quote and the order agree.
+ */
+export function monthAddonLines(
+    catalog: Catalog,
+    planId: string,
+    held: readonly HeldAddon[],
+    start: Date,
+    end: Date,
+): AddonChargeLine[] {
+    return held.flatMap((h) => {
+        const addon = catalog.addons.find((a) => a.id === h.addonId);
+        return addon && h.quantity > 0 && addonOfferedOn(addon, planId)
+            ? [addonPeriodLine(addon, h.quantity, "month", start, end)]
+            : [];
+    });
+}
+
+/**
+ * The month's order is made: its add-on lines are kept against it as
+ * already on that charge (SENT; the order's amount carries them, so there
+ * is nothing to sync), for its invoice to take when it is paid. An order
+ * never paid leaves them unused: no invoice names its id.
+ */
+export async function holdMonthAddonChargesInTx(
+    tx: Tx,
+    input: {
+        organizationId: string;
+        subscriptionId: string;
+        provider: string;
+        providerOrderId: string;
+        lines: AddonChargeLine[];
+    },
+): Promise<void> {
+    if (input.lines.length === 0) return;
+    await tx.subscriptionAddonCharge.createMany({
+        data: input.lines.map((l) => ({
+            organizationId: input.organizationId,
+            subscriptionId: input.subscriptionId,
+            addonId: l.addonId,
+            description: l.description,
+            quantity: l.quantity,
+            unitPaise: l.unitPaise,
+            periodStart: l.periodStart,
+            periodEnd: l.periodEnd,
+            chargeAt: l.periodStart,
+            provider: input.provider,
+            providerSubscriptionId: input.providerOrderId,
+            status: "SENT",
+        })),
+    });
 }
 
 /**

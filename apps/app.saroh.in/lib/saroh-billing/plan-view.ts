@@ -110,6 +110,11 @@ export interface ChangeQuote {
     termCharges: number;
     /** Exactly what is taken today, GST included. */
     payNowTotalPaise: number;
+    /**
+     * Of that, before tax, the add-ons a month paid one month at a time
+     * carries (stage 9). Absent from an API before it: none.
+     */
+    addonsNowPaise?: number;
     /** What setting up autopay takes now: a real charge, a refunded check, or none. */
     mandateCheck: "PAID" | "REFUNDED" | "NONE";
     /**

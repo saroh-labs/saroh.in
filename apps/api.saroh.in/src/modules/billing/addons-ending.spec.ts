@@ -6,6 +6,7 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
+import { monthAddonLines } from "./addon-charges";
 import {
     addonsEndingWith,
     addonsNotOffered,
@@ -203,5 +204,38 @@ describe("addonsEndingWith", () => {
         expect(
             addonsEndingWith({ ...base, kind: "UPGRADE", target: null }),
         ).toEqual([]);
+    });
+});
+
+describe("a month paid one at a time carries its add-ons (stage 9, owner 8 Nov 2026)", () => {
+    const start = new Date("2026-11-08T00:00:00Z");
+    const end = new Date("2026-12-08T00:00:00Z");
+
+    it("is each held add-on the plan is offered, a whole month, never prorated", () => {
+        const lines = monthAddonLines(
+            catalog(),
+            "b",
+            [
+                { addonId: "things-pack", quantity: 2 },
+                { addonId: "person-c", quantity: 1 },
+                { addonId: "gone", quantity: 1 },
+                { addonId: "person-b", quantity: 0 },
+            ],
+            start,
+            end,
+        );
+        expect(lines).toEqual([
+            expect.objectContaining({
+                addonId: "things-pack",
+                quantity: 2,
+                unitPaise: 111,
+                periodStart: start,
+                periodEnd: end,
+            }),
+        ]);
+    });
+
+    it("is nothing when nothing is held", () => {
+        expect(monthAddonLines(catalog(), "b", [], start, end)).toEqual([]);
     });
 });

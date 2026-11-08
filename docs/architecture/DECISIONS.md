@@ -2846,6 +2846,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Merchants' own Stripe (DEC-208, built, on main) is not Saroh billing: it is switched on for Global at launch (owner, 7 Nov). A Global business connects its own keys and its customers pay it directly; Saroh holds no money. saroh.tech's "Stripe coming next" and "Saroh doesn't take payments" words change with that switch.
 - Global is email only (owner, 7 Nov): no phone or WhatsApp sign-in or verification codes, for Saroh accounts or for a Global business's customers. `phoneSignIn` is false in Global's edition profile, and `VerificationService.approved` refuses every Global business whatever its flag.
 - DEC-210's payment-due flow covers both editions and needs no change.
+- **Owner's answers (8 Nov 2026), stage 9:**
+    - **Add-ons on Global's pay-each-month route.** Each month's USD order carries the add-ons the business holds as it pays, a whole month each, with no proration. An add-on bought mid-month is held at once and first charged on the next month's payment; nothing is charged for the rest of the month it was bought in (`monthAddonLines`, `addons.service.ts`).
 
 ## DEC-212 Turning a module on needs nothing first
 

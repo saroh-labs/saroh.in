@@ -12,9 +12,10 @@ import {
     addonMaxQuantity,
     addonOfferedOn,
     CATALOG_PLAN_KEY_PREFIX,
+    catalogMoney,
     catalogPlanIdForKey,
-    gstPaise,
-    withGstPaise,
+    taxPaise,
+    withTaxPaise,
 } from "@saroh/pricing-catalog";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -115,7 +116,9 @@ type Sub = Prisma.SubscriptionGetPayload<{ select: typeof SUB_SELECT }>;
  * bought part-way through a period owes what is left of it, prorated; every
  * period after owes the whole. Removing takes effect at once; what the
  * period already owes stays owed. The client names an add-on and a
- * quantity, nothing else (KTD-18).
+ * quantity, nothing else (KTD-18). A plan paid one month at a time (stage
+ * 9) pays its add-ons with each month's order instead, whole, from the next
+ * month on (`monthAddonLines`).
  */
 @Injectable()
 export class AddonsService {
@@ -208,9 +211,12 @@ export class AddonsService {
             }
 
             // More, part-way through a paid period: what is left of it.
+            // Not on a plan paid one month at a time: its add-ons start
+            // with the next month's payment, unprorated (owner, 8 Nov 2026).
             const end = sub.currentPeriodEnd;
             if (
                 quantity > held &&
+                autopayTakes(sub.plan.currency) &&
                 sub.status === "ACTIVE" &&
                 end &&
                 end > now &&
@@ -280,6 +286,7 @@ function addonViews(
     sub: Sub,
     blocked: boolean,
 ): AddonView[] {
+    const { tax } = catalogMoney(catalog);
     // Only what its plan is offered: another plan's add-on is not its to see.
     return catalog.addons
         .filter((a) => addonOfferedOn(a, planId))
@@ -295,8 +302,8 @@ function addonViews(
                 mode: a.mode,
                 qty: a.mode === "unit" ? 1 : a.qty,
                 pricePaise: a.pricePaise,
-                gstPaise: gstPaise(a.pricePaise),
-                totalPaise: withGstPaise(a.pricePaise),
+                gstPaise: taxPaise(tax, a.pricePaise),
+                totalPaise: withTaxPaise(tax, a.pricePaise),
                 quantity,
                 heldPaise: quantity * a.pricePaise,
                 max: addonMaxQuantity(a),
@@ -318,11 +325,6 @@ function cantBuy(sub: Sub | null, now: Date): string | null {
         sub.currentPeriodEnd &&
         sub.currentPeriodEnd > now;
     if (!sub || !paid) return "Add-ons come with a paid plan.";
-    // A plan paid one month at a time has no autopay to add a charge to
-    // (stage 9, KTD5b); its add-ons wait for an owner decision.
-    if (!autopayTakes(sub.plan.currency)) {
-        return "Add-ons aren't available yet for a plan paid one month at a time.";
-    }
     if (sub.status === "PAST_DUE") {
         return "Your plan's last payment didn't go through. Once it's paid, you can add more.";
     }

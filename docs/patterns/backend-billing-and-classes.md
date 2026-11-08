@@ -762,7 +762,9 @@ none), and a publish in another edition's money is refused. Who may buy is
 `SAROH_BILLING_GLOBAL` off never traps a payer). Razorpay can't renew USD
 on autopay (`providers/RAZORPAY_USD.md`), so a plan in a currency outside
 `AUTOPAY_CURRENCIES` is paid one month at a time: a USD order, card only
-(`cardOnly` on the handoff), no first-month offer, no add-ons yet; when
+(`cardOnly` on the handoff), no first-month offer; each month's order
+carries the add-ons held then, whole, never prorated (one bought
+mid-month starts with the next month, `monthAddonLines`); when
 the month ends the next falls due (`openMonthDueInTx`, DEC-210's 7 days),
 then Free. Its invoice is an export (`taxType` EXPORT): no tax, its own
 series (`SAROH_INVOICE_PREFIX_GLOBAL`), the LUT note from

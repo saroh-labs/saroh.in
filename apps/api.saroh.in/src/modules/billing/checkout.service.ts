@@ -40,8 +40,12 @@ import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
-import { clearAddonsInTx } from "./addon-charges";
-import type { EndingAddon } from "./addons-ending";
+import {
+    clearAddonsInTx,
+    holdMonthAddonChargesInTx,
+    monthAddonLines,
+} from "./addon-charges";
+import type { EndingAddon, HeldAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
 import { autopayTakes, planTaxOf } from "./autopay-currency";
 import { BillingCustomers } from "./billing-customer";
@@ -84,7 +88,13 @@ import type {
     MandateCheck,
     PaymentKind,
 } from "./checkout-quote";
-import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
+import {
+    billedByProvider,
+    COUPON_KINDS,
+    periodEnd,
+    quoteChange,
+} from "./checkout-quote";
+import type { AddonChargeLine } from "./offers";
 import {
     catalogueOfVersion,
     hadTrial,
@@ -204,6 +214,12 @@ export interface ChangePlanQuoteView {
     termCharges: number;
     /** Exactly what is taken as it's authorised, GST included. */
     payNowTotalPaise: number;
+    /**
+     * Of `payNowTotalPaise`, before tax, the add-ons held, a whole month
+     * each: a plan paid one month at a time pays them with its month
+     * (stage 9, owner 8 Nov 2026). Zero otherwise.
+     */
+    addonsNowPaise: number;
     /** What setting up autopay takes now, named honestly (DEC-093). */
     mandateCheck: MandateCheck;
     /**
@@ -394,16 +410,17 @@ export class CheckoutService {
         authorize(ctx, "billing:read");
         await assertSarohKeeps(ctx, now);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, coupon, addonsEnding } = await this.resolve(
-            ctx.organizationId,
-            input,
-            now,
-            ctx.edition ?? "INDIA",
-        );
+        const { target, quote, coupon, addonsEnding, monthAddons } =
+            await this.resolve(
+                ctx.organizationId,
+                input,
+                now,
+                ctx.edition ?? "INDIA",
+            );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const details = billingDetailsView(party);
         return {
-            ...this.quoteView(target, quote, coupon, addonsEnding),
+            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
             ...details,
             // A profile is its owner's (R2): only those who change what the
             // business pays are told which one bills it.
@@ -445,7 +462,8 @@ export class CheckoutService {
                       ? await this.handoff(
                             ctx,
                             openRow,
-                            payNowOf(openRow, openRow.plan.currency),
+                            payNowOf(openRow, openRow.plan.currency) +
+                                (await monthAddonsOnOrder(openRow)),
                             openRow.plan.currency,
                         )
                       : null,
@@ -638,16 +656,22 @@ export class CheckoutService {
         await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, subscription, coupon, addonsEnding } =
-            await this.resolve(
-                ctx.organizationId,
-                input,
-                now,
-                ctx.edition ?? "INDIA",
-            );
+        const {
+            target,
+            quote,
+            subscription,
+            coupon,
+            addonsEnding,
+            monthAddons,
+        } = await this.resolve(
+            ctx.organizationId,
+            input,
+            now,
+            ctx.edition ?? "INDIA",
+        );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const view = {
-            ...this.quoteView(target, quote, coupon, addonsEnding),
+            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
             ...billingDetailsView(party),
         };
         if (quote.kind === "NONE") {
@@ -726,6 +750,7 @@ export class CheckoutService {
             now,
             { ...billTo, billingProfileId: profileId },
             coupon,
+            subscription ? { id: subscription.id, lines: monthAddons } : null,
         );
     }
 
@@ -1024,15 +1049,84 @@ export class CheckoutService {
                 now,
             });
         }
-        const quote = quoteChange({ ...asked, coupon });
+        let quote = quoteChange({ ...asked, coupon });
+        const monthAddons = await this.monthAddons(
+            subscription,
+            quote,
+            target,
+            catalog,
+            planId,
+            now,
+        );
+        if (monthAddons.length > 0) {
+            const sum = monthAddons.reduce(
+                (t, l) => t + l.quantity * l.unitPaise,
+                0,
+            );
+            quote = {
+                ...quote,
+                payNowTotalPaise:
+                    quote.payNowTotalPaise +
+                    withTaxPaise(catalogMoney(catalog).tax, sum),
+            };
+        }
         const addonsEnding = await this.addonsEnding(
             subscription,
-            quote.kind,
+            // Paying the month on with its add-ons keeps them, as a
+            // renewal does: only the ones the plan isn't offered end.
+            monthAddons.length > 0 ? "RENEW" : quote.kind,
             subscription?.status === "TRIALING" &&
                 billedByProvider(subscription),
             catalog ? { catalog, planId, paid: target.priceCents > 0 } : null,
         );
-        return { target, quote, subscription, coupon, addonsEnding };
+        return {
+            target,
+            quote,
+            subscription,
+            coupon,
+            addonsEnding,
+            monthAddons,
+        };
+    }
+
+    /**
+     * The add-ons a month's order carries on a plan paid one month at a
+     * time (stage 9, owner 8 Nov 2026): the month paid on (Pay now on a
+     * month due, or the next month paid early) carries each add-on held
+     * then, a whole month, no proration. A new plan, an upgrade's
+     * difference or autopay carries none here.
+     */
+    private async monthAddons(
+        sub: { id: string; status: string } | null,
+        quote: ChangeQuote,
+        target: Plan,
+        catalog: Catalog | null,
+        planId: string,
+        now: Date,
+    ): Promise<AddonChargeLine[]> {
+        if (
+            !sub ||
+            sub.status === "CANCELLED" ||
+            !catalog ||
+            quote.payment !== "ONE_TIME" ||
+            target.interval === "year" ||
+            autopayTakes(target.currency) ||
+            (quote.kind !== "NEW" && quote.kind !== "RENEW")
+        ) {
+            return [];
+        }
+        const held: HeldAddon[] = await prisma.subscriptionAddon.findMany({
+            where: { subscriptionId: sub.id },
+            select: { addonId: true, quantity: true },
+        });
+        const start = quote.startAt ?? now;
+        return monthAddonLines(
+            catalog,
+            planId,
+            held,
+            start,
+            periodEnd(start, "month"),
+        );
     }
 
     /**
@@ -1075,6 +1169,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
+        monthAddons: AddonChargeLine[] = [],
     ): Omit<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
         return {
             plan: {
@@ -1108,6 +1203,10 @@ export class CheckoutService {
             payment: quote.payment,
             termCharges: quote.termCharges,
             payNowTotalPaise: quote.payNowTotalPaise,
+            addonsNowPaise: monthAddons.reduce(
+                (t, l) => t + l.quantity * l.unitPaise,
+                0,
+            ),
             mandateCheck: quote.mandateCheck,
             addonsEnding,
         };
@@ -1262,6 +1361,8 @@ export class CheckoutService {
         now: Date,
         billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
         coupon: PricingCoupon | null = null,
+        /** The month's add-ons its order carries (`monthAddons`). */
+        addons: { id: string; lines: AddonChargeLine[] } | null = null,
     ): Promise<ChangePlanResult> {
         // A closing or deleted business starts nothing that charges (#921);
         // asked again in the transaction that records the checkout.
@@ -1449,6 +1550,15 @@ export class CheckoutService {
                         billTo.billingProfileId,
                     );
                 }
+                if (oneTime && addons) {
+                    await holdMonthAddonChargesInTx(tx, {
+                        organizationId: ctx.organizationId,
+                        subscriptionId: addons.id,
+                        provider: CATALOGUE_BILLING_PROVIDER,
+                        providerOrderId: made.providerSubscriptionId,
+                        lines: addons.lines,
+                    });
+                }
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {
@@ -1569,6 +1679,15 @@ export class CheckoutService {
                 where: { id: c.id },
                 data: { status: "CANCELLED", endedReason: "replaced" },
             });
+            // A month's order given up: its add-on lines go with it.
+            await tx.subscriptionAddonCharge.updateMany({
+                where: {
+                    provider: c.provider,
+                    providerSubscriptionId: c.providerSubscriptionId,
+                    status: "SENT",
+                },
+                data: { status: "DROPPED" },
+            });
             await enqueueProviderCancel(tx, {
                 organizationId,
                 provider: c.provider,
@@ -1687,6 +1806,27 @@ export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
  * year paid once is its first charge (an upgrade, its difference); an
  * autopay checkout its first charge (NEW) or its upfront amount.
  */
+/**
+ * What a month's order carries for add-ons (`holdMonthAddonChargesInTx`),
+ * tax included; zero for every other checkout.
+ */
+async function monthAddonsOnOrder(
+    row: Pick<BillingCheckout, "provider" | "providerSubscriptionId"> & {
+        plan: { currency: string };
+    },
+): Promise<number> {
+    const rows = await prisma.subscriptionAddonCharge.findMany({
+        where: {
+            provider: row.provider,
+            providerSubscriptionId: row.providerSubscriptionId,
+            status: "SENT",
+        },
+        select: { quantity: true, unitPaise: true },
+    });
+    const sum = rows.reduce((t, r) => t + r.quantity * r.unitPaise, 0);
+    return withTaxPaise(planTaxOf(row.plan.currency), sum);
+}
+
 export function payNowOf(
     row: BillingCheckout,
     currency: string | null = "INR",

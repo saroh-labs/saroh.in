@@ -202,6 +202,16 @@ export function quoteSummary(
         confirm: "Continue to payment",
         toPayment: true,
     };
+    // A month paid on carries the add-ons held, a whole month each (stage
+    // 9, owner 8 Nov 2026): part of today's payment, named.
+    const addonsNow: QuoteLine[] = q.addonsNowPaise
+        ? [
+              {
+                  label: "Your add-ons, for the month",
+                  value: planMoney(q.addonsNowPaise),
+              },
+          ]
+        : [];
     const startsToday: QuoteLine = {
         label: "Starts today",
         value: `${planMoney(q.payNowTotalPaise)} now${inclTax()}`,
@@ -348,6 +358,7 @@ export function quoteSummary(
                       lead: `One payment for your next ${span}, at today's price. ${unit === "year" ? "They start" : "It starts"} the day this ${unit} ends.`,
                       lines: [
                           today(`Today, for ${span}`),
+                          ...addonsNow,
                           { label: "From", value: "", iso: q.startAt },
                       ],
                       ...toPayment,
@@ -382,6 +393,7 @@ export function quoteSummary(
                       lead: `One payment for ${span}, no autopay. You're on ${plan} as soon as it goes through. ${stay}`,
                       lines: [
                           today(`Today, for ${span}`),
+                          ...addonsNow,
                           recurring,
                           ...coupon,
                           term,

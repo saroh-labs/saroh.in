@@ -1132,7 +1132,19 @@ export class BillingWebhookService {
         // A new plan starts with no add-ons; a plan taking over billing
         // takes what was owed on the old one's next charge (U16).
         let endedAddons: HeldAddon[] = [];
-        if (checkoutClearsAddons(checkout.kind, continuing)) {
+        // A month paid on with its add-ons (a plan paid one month at a
+        // time, stage 9) keeps them: its order carries them.
+        const paysAddons =
+            checkout.kind === "NEW" &&
+            isOneTime(checkout) &&
+            (await tx.subscriptionAddonCharge.count({
+                where: {
+                    provider: checkout.provider,
+                    providerSubscriptionId: checkout.providerSubscriptionId,
+                    status: "SENT",
+                },
+            })) > 0;
+        if (checkoutClearsAddons(checkout.kind, continuing) && !paysAddons) {
             await clearAddonsInTx(tx, saved.id);
         } else {
             if (oldProvider) {

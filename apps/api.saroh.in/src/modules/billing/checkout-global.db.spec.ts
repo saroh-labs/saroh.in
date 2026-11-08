@@ -14,6 +14,7 @@ import { planRows } from "@saroh/pricing-catalog";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AddonsService } from "./addons.service";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutService } from "./checkout.service";
 import { MovesApplyHandler } from "./moves-apply.handler";
@@ -409,6 +410,88 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
             where: { organizationId: ctx.organizationId },
         });
         expect(gone.status).toBe("CANCELLED");
+    });
+
+    it("carries the add-ons held on each month's order, whole, from the next month (owner, 8 Nov 2026)", async () => {
+        const catalog = usd();
+        await install(1, "GLOBAL", catalog);
+        await flag(true);
+        const ctx = await globalBusiness();
+        const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
+        const pack = catalog.addons.find((a) => a.id === "things-pack")!;
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        await paid(r.handoff!.orderId!, price);
+
+        // Bought mid-month: held at once, nothing charged for this month.
+        const addons = new AddonsService();
+        const view = await addons.set(ctx, pack.id, 2);
+        expect(view.canBuy).toBe(true);
+        expect(view.addons.find((a) => a.id === pack.id)).toMatchObject({
+            quantity: 2,
+            gstPaise: 0,
+            totalPaise: pack.pricePaise,
+        });
+        expect(await prisma.subscriptionAddonCharge.count()).toBe(0);
+
+        // The month ends: Pay now is the plan and both packs, a whole month.
+        await prisma.subscription.update({
+            where: { organizationId: ctx.organizationId },
+            data: { currentPeriodEnd: new Date(Date.now() - DAY) },
+        });
+        expect(await sweep.endPaidYears(new Date())).toBe(1);
+        const total = price + 2 * pack.pricePaise;
+        const quote = await checkout.quote(ctx, { plan: "b", cycle: "month" });
+        expect(quote).toMatchObject({
+            payNowTotalPaise: total,
+            addonsNowPaise: 2 * pack.pricePaise,
+            addonsEnding: [],
+        });
+        const pay = await checkout.changePlan(ctx, {
+            plan: "b",
+            cycle: "month",
+        });
+        if (pay.kind === "TO_FREE") throw new Error("expected a checkout");
+        expect(pay.handoff).toMatchObject({ amountPaise: total });
+        expect(fake.orders.created.at(-1)).toMatchObject({
+            currency: "USD",
+            amountPaise: total,
+        });
+        // Read again while open, the window asks the same.
+        const open = await checkout.current(ctx);
+        expect(open.open?.handoff).toMatchObject({ amountPaise: total });
+
+        await paid(pay.handoff!.orderId!, total);
+        const back = await prisma.subscription.findUniqueOrThrow({
+            where: { organizationId: ctx.organizationId },
+            include: { addons: true },
+        });
+        expect(back.status).toBe("ACTIVE");
+        expect(back.addons).toEqual([
+            expect.objectContaining({ addonId: pack.id, quantity: 2 }),
+        ]);
+        const invoice = await prisma.sarohInvoice.findFirstOrThrow({
+            where: {
+                organizationId: ctx.organizationId,
+                providerSubscriptionId: pay.handoff!.orderId!,
+            },
+            include: { lines: true },
+        });
+        expect(invoice).toMatchObject({ totalPaise: total, taxPaise: 0 });
+        expect(invoice.lines).toHaveLength(2);
+        expect(
+            await prisma.billingAction.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    code: "saroh_invoice_amount_mismatch",
+                },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.subscriptionAddonCharge.findMany({
+                select: { status: true },
+            }),
+        ).toEqual([{ status: "INVOICED" }]);
     });
 
     it("lets a payer move to Free with the switch turned off", async () => {
