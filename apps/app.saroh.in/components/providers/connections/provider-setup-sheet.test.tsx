@@ -409,7 +409,10 @@ describe("Stripe setup (Global)", () => {
         expect(t).toContain("choose API version 2026-10-28.endive");
         expect(byLabel("Webhook URL").value).toBe(URL_STRIPE);
         for (const event of STRIPE_EVENTS) expect(t).toContain(event);
-        expect(t).toContain("Customers pay on Stripe's own checkout page.");
+        expect(t).toContain(
+            "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link.",
+        );
+        expect(t).not.toContain("turn on in Stripe");
         expect(t).toContain("Stripe also emails its own receipt");
         expect(byLabel("Publishable key").type).toBe("text");
         expect(byLabel("Restricted key").type).toBe("password");

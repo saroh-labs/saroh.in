@@ -5,8 +5,8 @@ Checked against Stripe's own documentation on 6 Nov 2026 and again on 8 Nov
 read from. Stripe here is the business's own account and its own keys (not
 Connect). A customer pays on Stripe's hosted Checkout page (a Checkout
 Session, `ui_mode` `hosted_page`) and comes back to the business's site;
-the methods are the merchant's dashboard ones, except that a DRAFT invoice
-(hold, deposit, pack, plan join) is limited to instant ones.
+every session takes card (Apple Pay and Google Pay ride on it) and Link
+only (owner, 8 Nov 2026, DEC-208).
 
 ## Verified facts
 
@@ -70,9 +70,10 @@ the methods are the merchant's dashboard ones, except that a DRAFT invoice
   `payment_intent.*` event finds the row. `payment_intent_data[description]`
   carries the description India exports need. The browser gets only the
   session's `url` and id, never a client secret.
-- Instant only (DRAFT invoices): `allowed_payment_method_types[]=card` and
-  `=link`; wallets ride on `card`. Everything else sends no method
-  parameter, so the merchant's dashboard methods apply.
+- Every session (holds, deposits, packs, plan joins, orders and invoices)
+  sends `allowed_payment_method_types[]=card` and `=link`; wallets ride on
+  `card` (owner, 8 Nov 2026: orders can't yet take a payment that fails
+  days later, so no slow or pay-later method reaches them).
   `payment_method_types` is never sent (a 400 on this version).
 - `billing_address_collection=required` when the account's country is `IN`
   or could not be read (owner, 7 Nov: an unreadable country asks every payer

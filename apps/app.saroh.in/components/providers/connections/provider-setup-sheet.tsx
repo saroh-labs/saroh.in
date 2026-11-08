@@ -959,11 +959,10 @@ function StripeSteps({
                 data-ph-unmask=""
                 className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
             >
-                Customers pay on Stripe&apos;s own checkout page. Bookings,
-                class packs and plans take cards and wallets. Orders and
-                invoices also take the other ways to pay you turn on in Stripe.
-                If receipts are turned on in your Stripe settings, Stripe also
-                emails its own receipt, alongside Saroh&apos;s confirmation.
+                Customers pay on Stripe&apos;s own checkout page, by card (Apple
+                Pay and Google Pay included) or Link. If receipts are turned on
+                in your Stripe settings, Stripe also emails its own receipt,
+                alongside Saroh&apos;s confirmation.
             </p>
         </>
     );
