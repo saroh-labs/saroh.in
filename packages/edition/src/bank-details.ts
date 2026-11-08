@@ -6,6 +6,8 @@ import {
     ValidationErrorsIBAN,
 } from "ibantools";
 
+import type { Checked } from "./address-rules";
+
 /**
  * A business's bank details where its profile pays by bank code ("How to pay
  * us", DEC-204): what its bank calls each number, and the checks each takes,
@@ -22,7 +24,7 @@ import {
  * capitals and digits, the codes with spaces and hyphens, up to 34.
  */
 
-export type Checked = { value: string } | { problem: string };
+export type { Checked };
 
 export interface BankFormat {
     /** The account field's name: "IBAN", "Account number". */

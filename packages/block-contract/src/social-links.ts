@@ -18,7 +18,12 @@
  *   one that no longer passes is dropped, never drawn.
  */
 
-import { E164, normalisePhoneNumber, PHONE_SEPARATORS } from "./phone";
+import {
+    E164,
+    normalisePhoneNumber,
+    PHONE_SEPARATORS,
+    phoneExample,
+} from "./phone";
 
 /** The networks, in the order they are listed and drawn. */
 export const SOCIAL_NETWORKS = [
@@ -414,11 +419,16 @@ export function whatsappLinkFromPhone(phone: string): string | null {
  * typed (DEC-173): `https://wa.me/919845011234?text=Hi%20Vivek`. The number
  * is read as `normalisePhoneNumber` reads one, so a saved E.164 number or one
  * typed the way people say it ("+91 98450 11234", "98450 11234") both work;
- * null when it can't be dialled. Saroh sends nothing: the person presses
+ * null when it can't be dialled. `country` reads a number typed without
+ * its + (`normalisePhoneNumber`). Saroh sends nothing: the person presses
  * Send in WhatsApp, or doesn't.
  */
-export function whatsappChatLink(phone: string, text: string): string | null {
-    const read = normalisePhoneNumber(phone);
+export function whatsappChatLink(
+    phone: string,
+    text: string,
+    country?: string | null,
+): string | null {
+    const read = normalisePhoneNumber(phone, country);
     if (!("phone" in read) || read.phone === null) return null;
     const base = `https://wa.me/${read.phone.slice(1)}`;
     return text.trim() === ""
@@ -426,8 +436,12 @@ export function whatsappChatLink(phone: string, text: string): string | null {
         : `${base}?text=${encodeURIComponent(text)}`;
 }
 
-function whatsapp(raw: string): SocialCheck {
-    const example = "+91 98450 12345";
+/**
+ * A WhatsApp number. Without its +, it is refused on India, as it always
+ * was; a Global business's `country` reads it as that country's.
+ */
+function whatsapp(raw: string, country?: string | null): SocialCheck {
+    const example = phoneExample(country);
     const wrong = `That isn't a WhatsApp number. Use + and the country code, like ${example}.`;
     let number = raw.replace(PHONE_SEPARATORS, "");
     if (!number.startsWith("+")) {
@@ -442,6 +456,14 @@ function whatsapp(raw: string): SocialCheck {
                         : ""
                     : (url.searchParams.get("phone") ?? "");
             number = `+${digits.replace(/^\+/, "")}`;
+        } else if (
+            /^\d{6,15}$/.test(number) &&
+            country &&
+            country.toUpperCase() !== "IN"
+        ) {
+            const read = normalisePhoneNumber(raw, country);
+            if (!("phone" in read)) return refuse(read.problem);
+            number = read.phone ?? "";
         } else if (/^\d{6,15}$/.test(number)) {
             return refuse(
                 `Start with + and the country code, like ${example}.`,
@@ -460,16 +482,19 @@ function whatsapp(raw: string): SocialCheck {
 
 /**
  * What was typed for a network, as the one address it is kept as, or why it
- * can't be. A handle and a pasted link give the same answer. Pure.
+ * can't be. A handle and a pasted link give the same answer. `country` is
+ * the business's home country for a WhatsApp number typed without its +
+ * (`phoneHomeCountry`). Pure.
  */
 export function normaliseSocialLink(
     network: SocialNetwork,
     raw: string,
+    country?: string | null,
 ): SocialCheck {
     const typed = raw.trim();
     if (typed === "") return refuse("Enter a link, or leave it empty.");
     if (typed.length > SOCIAL_INPUT_MAX) return refuse(TOO_LONG);
-    const check = checkFor(network, typed);
+    const check = checkFor(network, typed, country);
     // The kept address is held to the same length, so it passes again when
     // it is re-checked on the way out.
     return check.ok && check.url.length > SOCIAL_INPUT_MAX
@@ -477,7 +502,11 @@ export function normaliseSocialLink(
         : check;
 }
 
-function checkFor(network: SocialNetwork, typed: string): SocialCheck {
+function checkFor(
+    network: SocialNetwork,
+    typed: string,
+    country?: string | null,
+): SocialCheck {
     switch (network) {
         case "facebook":
             return facebook(typed);
@@ -486,7 +515,7 @@ function checkFor(network: SocialNetwork, typed: string): SocialCheck {
         case "linkedin":
             return linkedin(typed);
         case "whatsapp":
-            return whatsapp(typed);
+            return whatsapp(typed, country);
         default:
             return byHandle(HANDLE_RULES[network], typed);
     }

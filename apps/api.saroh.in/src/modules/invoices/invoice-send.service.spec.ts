@@ -56,6 +56,8 @@ jest.mock("@saroh/database", () => {
         paymentIntent: { findMany: jest.fn() },
         customerAccount: { count: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
+        // The business's zone falls back to its first service's (none here).
+        service: { findFirst: jest.fn().mockResolvedValue(null) },
         organization: { findUnique: jest.fn() },
         // Where the pay link lives (DEC-069, L7): the live site, its domain.
         site: { findFirst: jest.fn() },

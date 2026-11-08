@@ -1,4 +1,5 @@
 import { formatMoneyMajor } from "@/lib/format/money";
+import { MRP_LABEL, MRP_WORD } from "@/lib/products/mrp-label";
 
 import type { GstPriceMode } from "./price-mode";
 import {
@@ -134,12 +135,11 @@ export function optionOverMrpNote(
     const mrp = money(capCents, currency);
     return pay.addedRate !== null && pay.listCents <= capCents
         ? `With ${pay.addedRate}% GST added this is ${money(pay.payCents, currency)} to pay, above the MRP of ${mrp}. Lower it, or raise the MRP in Basics.`
-        : `Above the MRP of ${mrp}. Lower it, or raise the MRP in Basics.`;
+        : `Above the ${MRP_WORD} of ${mrp}. Lower it, or raise the ${MRP_WORD} in Basics.`;
 }
 
 /** What a typed price above its MRP has always been told. */
-export const MRP_BELOW_PRICE =
-    "MRP can't be lower than the price it sells for.";
+export const MRP_BELOW_PRICE = `${MRP_LABEL} can't be lower than the price it sells for.`;
 
 /**
  * Why a price can't be saved with this MRP, in the API's own words, or

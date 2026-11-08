@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { checkPostcode, checkRegion } from "@saroh/edition/address-rules";
 
 import { stateCode, stateName } from "../invoices/gst-states";
 
@@ -9,7 +10,10 @@ import { stateCode, stateName } from "../invoices/gst-states";
  *
  * In India the state is one of the GST states (`invoices/gst-states.ts`),
  * stored by its name, and the PIN is six digits not starting with 0
- * (DEC-029's rule for the registered address). Elsewhere both are text.
+ * (DEC-029's rule for the registered address). Elsewhere both are held to
+ * the address's own country's rules (`@saroh/edition/address-rules`), both
+ * optional: a typed postcode must fit, a state from a list (the US, Canada,
+ * Australia) is stored by its code. Never refused for being abroad.
  */
 export const ADDRESS_FIELDS = [
     "addressLine1",
@@ -53,6 +57,7 @@ export function isEmptyAddress(a: ContactAddress): boolean {
  * - A country alone is no address: it is cleared with the rest.
  * - India: the state must be a GST state (a code or a name, stored as the
  *   name) and the PIN six digits ("560 038" is read as 560038).
+ * - Elsewhere: by that country's rules, neither required.
  *
  * Throws a 400 naming the field it is about.
  */
@@ -94,6 +99,13 @@ export function nextAddress(
             }
             next.postalCode = pin;
         }
+    } else if (next.country) {
+        const region = checkRegion(next.country, next.state, false);
+        if ("problem" in region) refuse(region.problem, "state");
+        const postcode = checkPostcode(next.country, next.postalCode, false);
+        if ("problem" in postcode) refuse(postcode.problem, "postalCode");
+        next.state = region.value || null;
+        next.postalCode = postcode.value || null;
     }
     return next;
 }

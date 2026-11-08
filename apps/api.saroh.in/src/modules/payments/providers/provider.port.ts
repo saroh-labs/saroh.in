@@ -532,6 +532,25 @@ export interface MerchantProvider {
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult>;
     /**
+     * Stripe only: a PaymentIntent for Saroh's own card window, for a
+     * connection set to it (DEC-208, 8 Nov), in place of a hosted session.
+     * Its `clientParams` carry the client secret Stripe.js confirms with.
+     */
+    createElementIntent?(
+        input: Pick<
+            CreateOrderIntentInput,
+            | "amountCents"
+            | "currency"
+            | "orderId"
+            | "credentials"
+            | "description"
+        > & {
+            intentId?: string;
+            customerId?: string | null;
+            receiptEmail?: string | null;
+        },
+    ): Promise<CreateOrderIntentResult>;
+    /**
      * Book a refund with the provider (S5-003). Returns the provider refund id;
      * the actual money-state settlement happens asynchronously when the
      * provider's refund webhook is reconciled. Throws {@link RefundCallError}.

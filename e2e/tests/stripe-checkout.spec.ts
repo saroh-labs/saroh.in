@@ -234,6 +234,7 @@ async function stripeBusiness(
         registeredAddress: {
             line1: `${stamp(testInfo)} Main Street`,
             city: "New York",
+            region: "NY",
             postalCode: "10001",
         },
     });
@@ -749,6 +750,149 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
             `${urls.API_URL}/public/services/holds/${payToken}/release`,
         );
         await customer.close();
+    });
+
+    test("a business that chose Pay on our page: a pay link opens Saroh's card window on the business's country, and the PaymentIntent's webhook settles it", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(150_000);
+        const s = stamp(testInfo);
+        const tag = s.replace(/[^A-Za-z0-9]/g, "");
+        const b = await stripeBusiness(page, browser, testInfo, "stripe-w");
+        const api = business(page.request, b.id);
+        const chosen = await api.patch<{ checkoutStyle: string }>(
+            "/payment-providers/STRIPE/checkout-style",
+            { checkoutStyle: "WINDOW" },
+        );
+        expect(chosen.checkoutStyle).toBe("WINDOW");
+
+        const contact = await api.post<{ id: string }>("/contacts", {
+            email: `window-${s}@example.com`.toLowerCase(),
+            firstName: "Jo",
+            lastName: `Window ${s}`,
+        });
+        const draft = await api.post<{ id: string }>("/invoices", {
+            contactId: contact.id,
+            currency: "USD",
+            lines: [
+                {
+                    description: `Consultation (${s})`,
+                    quantity: 1,
+                    unitPrice: "25",
+                },
+            ],
+        });
+        await api.post(`/invoices/${draft.id}/issue`);
+        const { url } = await api.post<{ url: string }>(
+            `/invoices/${draft.id}/pay-link`,
+        );
+        const token = new URL(url).pathname.split("/").pop() ?? "";
+
+        // Stripe.js, stood in for: the Payment Element is a plain box, and
+        // confirming answers a card payment that succeeded. What the window
+        // asked of it is kept on the page.
+        await page.route("https://js.stripe.com/**", (route: Route) =>
+            route.fulfill({
+                contentType: "application/javascript",
+                body: `window.__stripe = { elements: null, element: null, confirms: [] };
+                window.Stripe = function (key) {
+                    return {
+                        elements: function (o) {
+                            window.__stripe.elements = { key: key, clientSecret: o.clientSecret };
+                            return {
+                                create: function (_t, options) {
+                                    window.__stripe.element = options;
+                                    return {
+                                        mount: function (el) { el.textContent = "Card details (stub)"; },
+                                    };
+                                },
+                            };
+                        },
+                        confirmPayment: function (o) {
+                            window.__stripe.confirms.push({ redirect: o.redirect, confirmParams: o.confirmParams || null });
+                            var id = window.__stripe.elements.clientSecret.split("_secret_")[0];
+                            return Promise.resolve({ paymentIntent: { id: id, status: "succeeded" } });
+                        },
+                    };
+                };`,
+            }),
+        );
+        const left: string[] = [];
+        page.on("framenavigated", (f) => {
+            if (f.url().startsWith(CHECKOUT_ORIGIN)) left.push(f.url());
+        });
+
+        await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
+        // Pressed until hydrated, as the hosted test does.
+        await pressUntil(
+            page.getByRole("button", { name: /^Pay \$25(\.00)?$/ }),
+            () => page.getByRole("dialog").isVisible(),
+        );
+        // The intent, as the stub Stripe.js was handed it: a client secret
+        // for a PaymentIntent, never a Checkout address. (Read from the page,
+        // not the server action's answer, whose body CI can drop.)
+        const secret = () =>
+            page.evaluate(
+                () =>
+                    (
+                        window as unknown as {
+                            __stripe: { elements?: { clientSecret?: string } };
+                        }
+                    ).__stripe.elements?.clientSecret ?? "",
+            );
+        await expect.poll(secret).toMatch(/^pi_fake_\w+_secret_/);
+        const intent = {
+            providerIntentId: (await secret()).split("_secret_")[0] ?? "",
+        };
+
+        // The window, on the page: never Stripe's hosted Checkout.
+        const cardWindow = page.getByRole("dialog");
+        await expect(cardWindow).toBeVisible();
+        await expect(cardWindow.getByText("Card details (stub)")).toBeVisible();
+        const asked = await page.evaluate(
+            () =>
+                (window as unknown as { __stripe: Record<string, unknown> })
+                    .__stripe,
+        );
+        expect(asked.elements).toMatchObject({ key: PUBLISHABLE });
+        // The card's country starts on the business's (US), not a guess.
+        expect(asked.element).toMatchObject({
+            defaultValues: { billingDetails: { address: { country: "US" } } },
+        });
+
+        await cardWindow.getByRole("button", { name: /^Pay \$25/ }).click();
+        await expect(cardWindow).toBeHidden({ timeout: 15_000 });
+        expect(left).toEqual([]);
+
+        // The fake finds no payment on the return; the PaymentIntent's own
+        // webhook, with Saroh's references on it, settles the invoice.
+        await sendWebhook(
+            page,
+            b,
+            event("payment_intent.succeeded", tag, {
+                id: intent.providerIntentId,
+                object: "payment_intent",
+                amount: 2500,
+                amount_received: 2500,
+                currency: "usd",
+                status: "succeeded",
+                latest_charge: `ch_fake_${tag}`,
+                // Matched by its PaymentIntent id, as the window's own is.
+                metadata: { saroh_ref: draft.id },
+            }),
+        );
+        await expect
+            .poll(
+                async () => {
+                    const res = await page.request.get(
+                        `${urls.API_URL}/public/invoices/${token}`,
+                    );
+                    return ((await res.json()) as { status: string }).status;
+                },
+                { timeout: 30_000 },
+            )
+            .toBe("PAID");
     });
 
     test("an India business is never offered Stripe in the setup sheet", async ({

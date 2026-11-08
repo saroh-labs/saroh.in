@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     UseGuards,
 } from "@nestjs/common";
@@ -17,7 +18,12 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { toCents } from "../invoices/totals";
-import { ConnectProviderDto, CreateIntentDto, RefundOrderDto } from "./dto";
+import {
+    CheckoutStyleDto,
+    ConnectProviderDto,
+    CreateIntentDto,
+    RefundOrderDto,
+} from "./dto";
 import { PaymentsService } from "./payments.service";
 
 /**
@@ -65,6 +71,17 @@ export class PaymentsController {
     @Get("payment-providers/webhooks")
     webhooks(@OrgContext() ctx: OrganizationContext) {
         return this.payments.webhookSetup(ctx);
+    }
+
+    /** Where a Stripe connection's customers pay (DEC-208, 8 Nov). */
+    @Patch("payment-providers/:provider/checkout-style")
+    @RequireModule("PAYMENTS")
+    setCheckoutStyle(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("provider") provider: string,
+        @Body() dto: CheckoutStyleDto,
+    ) {
+        return this.payments.setCheckoutStyle(ctx, provider, dto.checkoutStyle);
     }
 
     @Delete("payment-providers/:provider")

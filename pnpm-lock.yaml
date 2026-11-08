@@ -1370,6 +1370,9 @@ importers:
 
   packages/block-contract:
     dependencies:
+      '@saroh/edition':
+        specifier: workspace:*
+        version: link:../edition
       zod:
         specifier: 'catalog:'
         version: 4.6.7

@@ -20,6 +20,7 @@ import {
     nextInvoiceNumber,
     prefixOf,
 } from "@/lib/invoices/invoice-number";
+import { inIndia } from "@/lib/organizations/business-details";
 import { phoneSchema } from "@/lib/organizations/business-phone";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import {
@@ -27,7 +28,10 @@ import {
     businessTypeOf,
 } from "@/lib/organizations/business-types";
 import { kindOf, ORGANIZATION_KINDS } from "@/lib/organizations/kind";
-import { addressProblems } from "@/lib/organizations/registered-address";
+import {
+    addressPlace,
+    addressProblems,
+} from "@/lib/organizations/registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
@@ -159,6 +163,7 @@ export const FIELD_OF: Record<string, FormField> = {
     addressLine2: "addressLine2",
     city: "city",
     postalCode: "postalCode",
+    region: "region",
     name: "name",
     kind: "kind",
     timezone: "timezone",
@@ -251,6 +256,7 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         addressLine2: settings.registeredAddress?.line2 ?? "",
         city: settings.registeredAddress?.city ?? "",
         postalCode: settings.registeredAddress?.postalCode ?? "",
+        region: settings.registeredAddress?.region ?? "",
     };
 }
 
@@ -274,17 +280,20 @@ export function gstStateOf(v: Pick<FormValues, "gstState" | "taxId">): {
 export function indianState(
     v: Pick<FormValues, "gstState" | "country">,
 ): string {
-    return ["", "IN"].includes(v.country ?? "") ? stateName(v.gstState) : "";
+    return inIndia(v.country) ? stateName(v.gstState) : "";
 }
 
 export function addressText(v: FormValues): string {
     // As the API prints it: no first line, no address.
     if (!v.addressLine1.trim()) return "";
+    // A Global address: "Austin, TX 78701" and its country last (U4).
+    const { place, countryName } = addressPlace(v, v.country);
     return [
         v.addressLine1,
         v.addressLine2,
-        [v.city, v.postalCode].filter((x) => x.trim()).join(" "),
+        place.filter((x) => x.trim()).join(", "),
         v.gstRegistered ? gstStateOf(v).name : indianState(v),
+        countryName ?? "",
     ]
         .map((x) => x.trim())
         .filter((x) => x !== "")

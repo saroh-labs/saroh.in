@@ -1,7 +1,7 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
-import { bankFormatFor } from "@saroh/edition";
+import { addressRulesFor, bankFormatFor } from "@saroh/edition";
 
 import { PROFILE } from "@/lib/edition";
 import { rolledOut } from "@/lib/modules/rollout";
@@ -13,6 +13,10 @@ import {
     payByBankCode,
     payOffered,
 } from "@/lib/organizations/pay-instructions";
+import {
+    byCountry,
+    countryAddressProblems,
+} from "@/lib/organizations/registered-address";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -388,11 +392,36 @@ function address(
     country: string | null | undefined,
     kind: unknown,
 ): Check {
+    // Global (U3): the postcode and region by the country's rules.
+    const global = byCountry(country);
+    const problems = global
+        ? countryAddressProblems(country, {
+              postalCode: registered.postalCode ?? "",
+              region: registered.region ?? "",
+          })
+        : [];
     const rest =
         filled(registered.line1) &&
         filled(registered.city) &&
-        filled(registered.postalCode);
-    const state = filled(registered.state) || !inIndia(country);
+        (global
+            ? !problems.some((p) => p.path === "postalCode")
+            : filled(registered.postalCode));
+    const state = global
+        ? problems.length === 0
+        : filled(registered.state) || !inIndia(country);
+    if (global && rest && !state) {
+        const rule = addressRulesFor(country).region;
+        const word = rule.kind === "none" ? "region" : rule.label.toLowerCase();
+        return {
+            key: "address",
+            label: `Add the ${word} to your address`,
+            why: "It's printed on your invoices.",
+            cta: `Add ${word}`,
+            href: businessEditHref("address"),
+            broken: false,
+            left: true,
+        };
+    }
     // Saved without its state (UX-018): name the state, so the step doesn't
     // read as if nothing had been saved.
     if (rest && !state) {

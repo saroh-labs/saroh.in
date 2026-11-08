@@ -1,10 +1,13 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import type { CustomerDataRequestStatus, Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import type { EmailOutcome } from "../../common/email";
 import { sendSiteAccountNoticeEmail } from "../../common/email";
 import { structuredLogger } from "../../common/logging/structured-logger";
+import { businessTimezone } from "../bookings/staff-availability";
 import { MessagingService } from "../messaging/messaging.service";
 import type { DataRequestEmailStep } from "./data-request-emails";
 import { dataRequestEmail } from "./data-request-emails";
@@ -116,13 +119,21 @@ export function dataRequestNotSentKey(
     return `${dataRequestEventKey(requestId, step)}:not-sent`;
 }
 
-/** "27 Oct 2026", as the done notice dates the removal (India). */
-const NOTICE_DATE = new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-});
+/**
+ * "27 Oct 2026", as the done notice dates the removal: in the business's
+ * zone and its edition's way of writing a date ("Oct 27, 2026" on Global).
+ */
+export const noticeDate = (
+    at: Date,
+    timeZone: string,
+    edition: Edition | null | undefined,
+): string =>
+    new Intl.DateTimeFormat(editionProfile(edition).numberLocale, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone,
+    }).format(at);
 
 @Injectable()
 export class DataRequestEmailHandler {
@@ -192,6 +203,7 @@ export class DataRequestEmailHandler {
                         "the business",
                     ),
                     edition: org?.edition,
+                    zone: await businessTimezone(tx, organizationId),
                 };
             }),
         );
@@ -253,6 +265,8 @@ export class DataRequestEmailHandler {
             business: string;
             handledAt: Date | null;
             contactId: string | null;
+            zone: string;
+            edition: Edition | null | undefined;
         },
     ): Promise<void> {
         const { requestId, step } = payload;
@@ -270,7 +284,11 @@ export class DataRequestEmailHandler {
                     step === "done"
                         ? [
                               due.business,
-                              NOTICE_DATE.format(due.handledAt ?? new Date()),
+                              noticeDate(
+                                  due.handledAt ?? new Date(),
+                                  due.zone,
+                                  due.edition,
+                              ),
                           ]
                         : [due.business],
             });

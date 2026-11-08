@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { MONEY_LOCALE } from "../../lib/money";
 import { cn } from "../../lib/utils";
 import {
     Select,
@@ -33,7 +34,8 @@ export interface Option<V extends string> {
     count?: number | null;
 }
 
-const figures = new Intl.NumberFormat("en-IN");
+// The deployment's grouping: lakh in India (DEC-079), thousands on Global.
+const figures = new Intl.NumberFormat(MONEY_LOCALE);
 
 /**
  * What Radix is given for `value`.

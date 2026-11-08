@@ -141,6 +141,20 @@ describe("socialLinksWrite", () => {
         });
     });
 
+    it("reads a US business's WhatsApp number without + as +1 (DEC-204)", () => {
+        expect(
+            socialLinksWrite({ whatsapp: "212 555 0123" }, null, "US"),
+        ).toEqual({ socialLinks: { whatsapp: "https://wa.me/12125550123" } });
+        expect(
+            refusal(() =>
+                socialLinksWrite({ whatsapp: "98450 12345" }, null, "IN"),
+            ),
+        ).toEqual({
+            field: "socialLinks.whatsapp",
+            message: "Start with + and the country code, like +91 98450 12345.",
+        });
+    });
+
     it("refuses the whole save when one link is wrong, keeping none of it", () => {
         expect(() =>
             socialLinksWrite(

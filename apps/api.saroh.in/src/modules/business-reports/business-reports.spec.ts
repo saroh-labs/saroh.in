@@ -171,7 +171,7 @@ describe("SubmitBusinessReportDto", () => {
             Object.values(e.constraints ?? {}),
         );
         expect(said).toContain("Enter an email like name@example.com.");
-        expect(said).toContain("Enter a mobile number like +91 98450 12345.");
+        expect(said).toContain("Enter a mobile number we can reach you on.");
     });
 
     it("refuses a field it doesn't know, such as a business id", async () => {

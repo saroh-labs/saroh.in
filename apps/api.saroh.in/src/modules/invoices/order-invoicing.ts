@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { zoneOf } from "../organizations/business-zone";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { businessPriceMode } from "./gst-price";
@@ -25,6 +26,7 @@ import {
     formatSellerAddress,
     modeOf,
     orderBillTo,
+    sellerAddressEnd,
 } from "./order-invoice";
 import { fromCents, toCents } from "./totals";
 
@@ -73,6 +75,8 @@ export async function loadTaxProfile(
             addressLine2: true,
             city: true,
             postalCode: true,
+            region: true,
+            country: true,
             legalName: true,
             contactEmail: true,
             invoiceStyle: true,
@@ -82,14 +86,14 @@ export async function loadTaxProfile(
     // The name the paper prints is the organization's (DEC-082).
     const org = await tx.organization.findUnique({
         where: { id: organizationId },
-        select: { name: true },
+        select: { name: true, edition: true },
     });
     return {
         registered: Boolean(p?.gstRegistered && p.taxId && p.gstState),
         gstin: p?.taxId ? p.taxId.trim().toUpperCase() : null,
         state: p?.gstState ?? null,
         prefix: p?.invoicePrefix ?? null,
-        timezone: p?.timezone ?? null,
+        timezone: zoneOf(p?.timezone, org?.edition),
         yearStartMonth: p?.yearStartMonth ?? null,
         taxLine: taxLineOf(p?.taxName, p?.taxRate),
         numberFormat: p?.invoiceNumberFormat ?? null,
@@ -97,7 +101,11 @@ export async function loadTaxProfile(
         deliverySac: p?.deliverySacCode ?? null,
         priceMode: businessPriceMode(p?.gstPriceMode),
         address: p
-            ? formatSellerAddress({ ...p, stateName: stateName(p.gstState) })
+            ? formatSellerAddress({
+                  ...p,
+                  stateName: stateName(p.gstState),
+                  ...sellerAddressEnd(org?.edition, p),
+              })
             : null,
         seller: {
             sellerName: org?.name ?? null,

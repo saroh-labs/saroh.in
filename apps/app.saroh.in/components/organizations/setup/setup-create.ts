@@ -76,7 +76,10 @@ export async function createFromSetup(
             };
         }
     }
-    const zone = browserZone();
+    // The zone asked of a country that keeps several; else the browser's,
+    // which the API keeps only when it is the country's (KTD-C).
+    const asked = values.timezone ?? "";
+    const zone = asked === "" ? browserZone() : asked;
     const res = await createOrganization({
         name: businessName,
         kind: values.kind,
@@ -91,8 +94,6 @@ export async function createFromSetup(
         ...(values.currency ? { currency: values.currency } : {}),
         profile: {
             country: values.country,
-            // The browser's zone (UX-008): the business's for a country
-            // that keeps several; one that keeps one zone uses that.
             ...(zone ? { timezone: zone } : {}),
         },
     });

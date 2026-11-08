@@ -22,6 +22,12 @@ export interface SiteBusiness {
     phoneNumbers: SitePhoneNumbers;
     /** Its customers pay by UPI, so a page may name a UPI app. Absent: yes. */
     upi?: boolean;
+    /** GST, or a tax line the business names itself. Absent: GST. */
+    taxSystem?: "gst" | "named-line";
+    /** The struck-through price: India's MRP, or an original price. Absent: MRP. */
+    struckPrice?: "mrp" | "original-price";
+    /** Whether customers may sign in with a phone (DEC-211). Absent: yes. */
+    phoneSignIn?: boolean;
 }
 
 export const INDIA_SITE_BUSINESS: SiteBusiness = {
@@ -29,6 +35,19 @@ export const INDIA_SITE_BUSINESS: SiteBusiness = {
     address: "indian-state-and-pin",
     phoneNumbers: "indian",
 };
+
+/** The tax a price carries, as a word: "GST", or "tax" for a named line. */
+export const taxWordOf = (business: SiteBusiness) =>
+    (business.taxSystem ?? "gst") === "gst" ? "GST" : "tax";
+
+/**
+ * What the struck-through price is called: "MRP" in India, else
+ * "Original price", or "Was" where it sits beside the price on a card.
+ */
+export function struckWordOf(business: SiteBusiness, short = false) {
+    if ((business.struckPrice ?? "mrp") === "mrp") return "MRP";
+    return short ? "Was" : "Original price";
+}
 
 const SiteBusinessContext = createContext<SiteBusiness>(INDIA_SITE_BUSINESS);
 

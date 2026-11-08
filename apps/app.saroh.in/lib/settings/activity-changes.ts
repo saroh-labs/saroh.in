@@ -6,6 +6,7 @@
  * `activity-detail.ts` the sheet.
  */
 
+import { PROFILE } from "@/lib/edition";
 import { plural } from "@/lib/format/plural";
 import { isGstPriceMode, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { moduleName as railName } from "@/lib/modules/turn-on";
@@ -67,7 +68,11 @@ export const FIELD_PHRASES: Partial<
         label: "GST registration",
         tab: "tax",
     },
-    taxId: { phrase: "the GSTIN", label: "GSTIN or tax ID", tab: "tax" },
+    // A named tax line (Global) has a tax ID, never a GSTIN (DEC-204).
+    taxId:
+        PROFILE.taxSystem === "gst"
+            ? { phrase: "the GSTIN", label: "GSTIN or tax ID", tab: "tax" }
+            : { phrase: "the tax ID", label: "Tax ID", tab: "tax" },
     invoicePrefix: {
         phrase: "the invoice prefix",
         label: "Invoice prefix",

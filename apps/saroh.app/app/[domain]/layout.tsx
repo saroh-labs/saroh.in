@@ -411,6 +411,9 @@ export default async function SiteLayout({
      * own (`testMode()`). Keyed on the host, not on the release, so a test
      * host is never treated as live whatever the lookup returned.
      */
+    // The facts the blocks read (DEC-204 item 7); India's without a read.
+    const edition = editionProfile(footerFacts?.edition);
+
     const testRelease =
         test.mode === "test"
             ? { name: resolved.release?.name ?? "Test release" }
@@ -421,13 +424,18 @@ export default async function SiteLayout({
             <SiteBusinessProvider
                 value={{
                     country: footerFacts?.country ?? null,
-                    address: editionProfile(footerFacts?.edition).address,
-                    phoneNumbers: editionProfile(footerFacts?.edition)
-                        .phoneNumbers,
-                    upi: editionProfile(footerFacts?.edition).upi,
+                    address: edition.address,
+                    phoneNumbers: edition.phoneNumbers,
+                    upi: edition.upi,
+                    taxSystem: edition.taxSystem,
+                    struckPrice: edition.struckPrice,
+                    phoneSignIn: edition.phoneSignIn,
                 }}
             >
                 <div
+                    // The root layout can't know the business, so the page's
+                    // language is said here: "en-IN" in India, else "en-US".
+                    lang={edition.numberLocale}
                     className="min-h-screen bg-site-bg text-site-body"
                     data-test-release={resolved.release ? "" : undefined}
                     // The look's mark (DEC-172); nothing for Classic.

@@ -1,47 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PaymentHandoff } from "./api";
-import type { CheckoutOutcome, CheckoutRequest, Settle } from "./checkout";
-import { postCheckoutReturn } from "./checkout";
-import { cappedRadius, openStripeWindow, STRIPE_SDK } from "./stripe-window";
+import type { CheckoutRequest } from "./checkout";
+import { openProviderCheckout } from "./checkout";
+import { leavesForProvider } from "./hosted-checkout";
+import { cappedRadius, STRIPE_SDK } from "./stripe-window";
 
 /**
- * The parked Stripe window (owner, 8 Nov 2026), against a stand-in for
- * Stripe.js. `open` wires it the way openProviderCheckout would (its
- * commented STRIPE line): the first answer stands, a paid return goes to
- * the API first, and the page's close removes the window.
+ * Saroh's Stripe card window (owner, 8 Nov 2026, DEC-208), opened the way
+ * the site opens it: through openProviderCheckout, for a Stripe handoff
+ * that carries a client secret, against a stand-in for Stripe.js. The
+ * first answer stands, a paid return goes to the API first, and the page's
+ * close removes the window.
  */
-function open(request: CheckoutRequest) {
-    let resolve: (o: CheckoutOutcome) => void = () => undefined;
-    const outcome = new Promise<CheckoutOutcome>((r) => (resolve = r));
-    let removeStripe: (() => void) | null = null;
-    let closed = false;
-    let settled = false;
-    const once: Settle = (value, returned) => {
-        if (settled || closed) return;
-        settled = true;
-        if (value === "paid" && returned && request.apiUrl) {
-            void postCheckoutReturn(request.apiUrl, returned).then(() => {
-                if (!closed) resolve(value);
-            });
-            return;
-        }
-        resolve(value);
-    };
-    openStripeWindow(request, once, (remove) => {
-        if (closed) return false;
-        removeStripe = remove;
-        return true;
-    });
-    return {
-        outcome,
-        close: () => {
-            if (closed) return;
-            closed = true;
-            removeStripe?.();
-        },
-    };
-}
+const open = openProviderCheckout;
 
 const request = (over: Partial<PaymentHandoff> = {}): CheckoutRequest => ({
     handoff: {
@@ -164,6 +136,60 @@ describe("Stripe's Payment Element, in a window of the site's own (U7)", () => {
         // Only the site's own tokens, never Saroh's.
         expect(d?.style.cssText).toContain("--site-surface");
         expect(d?.outerHTML).not.toMatch(/saroh/i);
+    });
+
+    it("starts the card on the business's country and sends the payer's name and email with the payment", async () => {
+        fakeStripe();
+        const session = open(
+            request({
+                clientParams: {
+                    stripePaymentIntentId: "pi_fake_1",
+                    clientSecret: "pi_fake_1_secret_fake",
+                    country: "us",
+                },
+            }),
+        );
+        await flush();
+        expect(stripe[0]?.paymentOptions).toMatchObject({
+            defaultValues: {
+                billingDetails: {
+                    name: "Asha Rao",
+                    email: "asha@example.in",
+                    address: { country: "US" },
+                },
+            },
+            fields: { billingDetails: { name: "never", email: "never" } },
+        });
+        button("Pay")?.click();
+        await expect(session.outcome).resolves.toBe("paid");
+        expect(stripe[0]?.confirms[0]).toMatchObject({
+            confirmParams: {
+                payment_method_data: {
+                    billing_details: {
+                        name: "Asha Rao",
+                        email: "asha@example.in",
+                    },
+                },
+            },
+        });
+    });
+
+    it("leaves the name and email to the card form when the page lacks one, and no country without the API's", async () => {
+        fakeStripe();
+        const session = open({
+            ...request(),
+            booker: { name: "Asha Rao", email: "" },
+        });
+        await flush();
+        const options = stripe[0]?.paymentOptions ?? {};
+        expect(options).not.toHaveProperty("fields");
+        expect(
+            (options.defaultValues as { billingDetails: object })
+                .billingDetails,
+        ).not.toHaveProperty("address");
+        button("Pay")?.click();
+        await session.outcome;
+        expect(stripe[0]?.confirms[0]).not.toHaveProperty("confirmParams");
     });
 
     it("pays: the intent goes to the API as the return, then the page is told", async () => {
@@ -329,5 +355,27 @@ describe("the payment window's corners", () => {
         expect(cappedRadius("9999px")).toBe("10px");
         expect(cappedRadius("6px")).toBe("6px");
         expect(cappedRadius("")).toBeNull();
+    });
+});
+
+describe("which Stripe page a handoff opens (DEC-208, 8 Nov)", () => {
+    it("stays on the page for a client secret and leaves for a Checkout address", () => {
+        expect(
+            leavesForProvider({
+                provider: "STRIPE",
+                clientParams: { clientSecret: "pi_fake_1_secret_fake" },
+            }),
+        ).toBe(false);
+        expect(
+            leavesForProvider({
+                provider: "STRIPE",
+                clientParams: {
+                    checkoutUrl: "https://checkout.stripe.com/c/pay/cs_1",
+                },
+            }),
+        ).toBe(true);
+        expect(
+            leavesForProvider({ provider: "RAZORPAY", clientParams: {} }),
+        ).toBe(false);
     });
 });

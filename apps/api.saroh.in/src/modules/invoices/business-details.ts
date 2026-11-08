@@ -1,5 +1,11 @@
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import {
+    addressRulesFor,
+    checkPostcode,
+    checkRegion,
+    editionProfile,
+} from "@saroh/edition";
 
 /**
  * The business details every invoice needs (DEC-068): the registered
@@ -26,10 +32,13 @@ export const BUSINESS_DETAILS_SELECT = {
     addressLine1: true,
     city: true,
     postalCode: true,
+    region: true,
     gstState: true,
     country: true,
     gstRegistered: true,
     taxId: true,
+    // A blank country reads as the business's edition, never India on Global.
+    organization: { select: { edition: true } },
 } as const;
 
 export type BusinessDetailsColumns = Prisma.BusinessProfileGetPayload<{
@@ -38,30 +47,67 @@ export type BusinessDetailsColumns = Prisma.BusinessProfileGetPayload<{
 
 const filled = (v: string | null | undefined) => !!v?.trim();
 
+/** GST is India's: a business on a named tax line is never registered for it. */
+const gstRegistered = (p: BusinessDetailsColumns): boolean =>
+    p.gstRegistered &&
+    editionProfile(p.organization.edition).taxSystem === "gst";
+
+/**
+ * Whether India's address rules apply: the country is India, or unsaid in
+ * India's edition (on Global a blank country is not India), or the business
+ * is GST-registered.
+ */
+function indianAddress(p: BusinessDetailsColumns): boolean {
+    const country = (p.country ?? "").trim().toUpperCase();
+    if (gstRegistered(p) || country === "IN" || country === "INDIA") {
+        return true;
+    }
+    return (
+        country === "" &&
+        editionProfile(p.organization.edition).address ===
+            "indian-state-and-pin"
+    );
+}
+
+/**
+ * Whether the address is read by its country's rules (KTD-A): a business
+ * whose edition writes addresses as a country and region, not in India.
+ */
+const byCountry = (p: BusinessDetailsColumns): boolean =>
+    editionProfile(p.organization.edition).address === "country-and-region" &&
+    !indianAddress(p);
+
+/**
+ * The postcode and region by the country's rules: each in its shape, and
+ * there where the country needs one. A US address with no state, or with an
+ * Indian PIN for a ZIP code, isn't whole.
+ */
+const postcodeFits = (p: BusinessDetailsColumns): boolean =>
+    !("problem" in checkPostcode(p.country, p.postalCode));
+const regionFits = (p: BusinessDetailsColumns): boolean =>
+    !("problem" in checkRegion(p.country, p.region));
+
 /**
  * What is missing, in the order the step asks for it. The address is its
  * first line, city, PIN and state; a business registered outside India has
- * no Indian state, so only an Indian (or unsaid) one needs it. No profile
- * at all is missing the address.
+ * no Indian state, so only an Indian (or, in India's edition, unsaid) one
+ * needs it. No profile at all is missing the address. A business on a named
+ * tax line has no GSTIN to miss.
  */
 export function missingFrom(
     p: BusinessDetailsColumns | null,
 ): BusinessDetail[] {
-    const country = (p?.country ?? "").trim().toUpperCase();
-    const india =
-        country === "" ||
-        country === "IN" ||
-        country === "INDIA" ||
-        !!p?.gstRegistered;
     const address =
         !!p &&
         filled(p.addressLine1) &&
         filled(p.city) &&
-        filled(p.postalCode) &&
-        (!india || filled(p.gstState));
+        (byCountry(p)
+            ? postcodeFits(p) && regionFits(p)
+            : filled(p.postalCode) &&
+              (!indianAddress(p) || filled(p.gstState)));
     const missing: BusinessDetail[] = [];
     if (!address) missing.push("address");
-    if (p?.gstRegistered && !filled(p.taxId)) missing.push("gstin");
+    if (p && gstRegistered(p) && !filled(p.taxId)) missing.push("gstin");
     return missing;
 }
 
@@ -72,6 +118,14 @@ export function missingFrom(
  * nothing had been saved.
  */
 export function onlyStateMissing(p: BusinessDetailsColumns | null): boolean {
+    if (p && byCountry(p)) {
+        return (
+            filled(p.addressLine1) &&
+            filled(p.city) &&
+            postcodeFits(p) &&
+            !regionFits(p)
+        );
+    }
     return (
         !!p &&
         filled(p.addressLine1) &&
@@ -80,6 +134,13 @@ export function onlyStateMissing(p: BusinessDetailsColumns | null): boolean {
         !filled(p.gstState) &&
         missingFrom(p).includes("address")
     );
+}
+
+/** A Global address's region word ("state", "province or territory"). */
+function regionWord(p: BusinessDetailsColumns): string | undefined {
+    if (!byCountry(p)) return undefined;
+    const rule = addressRulesFor(p.country).region;
+    return rule.kind === "none" ? undefined : rule.label.toLowerCase();
 }
 
 export async function missingBusinessDetails(
@@ -96,10 +157,14 @@ export async function missingBusinessDetails(
 /** The refusal's words, for a toast where the app has no step to offer. */
 export function businessDetailsMessage(
     missing: BusinessDetail[],
-    opts: { onlyState?: boolean } = {},
+    opts: { onlyState?: boolean; region?: string } = {},
 ): string {
     const address = missing.includes("address");
     const gstin = missing.includes("gstin");
+    // A Global address's region, in its country's word ("province").
+    if (address && opts.onlyState && opts.region) {
+        return `Add your ${opts.region} to your address first. It's printed on every invoice.`;
+    }
     if (address && opts.onlyState) {
         return gstin
             ? "Add your state to your address, and your GSTIN, first. Every invoice prints them."
@@ -116,7 +181,7 @@ export function businessDetailsMessage(
 
 export function businessDetailsMissing(
     missing: BusinessDetail[],
-    opts: { onlyState?: boolean } = {},
+    opts: { onlyState?: boolean; region?: string } = {},
 ): ConflictException {
     return new ConflictException({
         message: businessDetailsMessage(missing, opts),
@@ -146,6 +211,7 @@ export async function assertBusinessDetails(
     if (missing.length > 0) {
         throw businessDetailsMissing(missing, {
             onlyState: onlyStateMissing(p),
+            region: p ? regionWord(p) : undefined,
         });
     }
 }

@@ -1,3 +1,7 @@
+import { NAMED_LINE_BUSINESS_TYPES } from "@saroh/edition";
+
+import { PROFILE } from "@/lib/edition";
+
 /**
  * A business's legal form, in the "Saroh Settings" design's words (F10,
  * default 60): the six the API validates (`business-type.ts` there), or
@@ -11,14 +15,21 @@
  * before the backfill ran still names it; Z4 drops `company`.
  */
 
+/** India's names; a named tax line (Global) names the same six generically. */
+const named = (value: keyof typeof NAMED_LINE_BUSINESS_TYPES, india: string) =>
+    PROFILE.taxSystem === "gst" ? india : NAMED_LINE_BUSINESS_TYPES[value];
+
 export const BUSINESS_TYPE_OPTIONS = [
     { value: "", label: "Not set" },
-    { value: "individual", label: "Individual / sole proprietor" },
-    { value: "partnership", label: "Partnership" },
-    { value: "llp", label: "LLP" },
-    { value: "pvt", label: "Private limited company" },
-    { value: "public", label: "Public limited company" },
-    { value: "trust", label: "Trust or society" },
+    {
+        value: "individual",
+        label: named("individual", "Individual / sole proprietor"),
+    },
+    { value: "partnership", label: named("partnership", "Partnership") },
+    { value: "llp", label: named("llp", "LLP") },
+    { value: "pvt", label: named("pvt", "Private limited company") },
+    { value: "public", label: named("public", "Public limited company") },
+    { value: "trust", label: named("trust", "Trust or society") },
 ] as const;
 
 export type BusinessTypeValue = (typeof BUSINESS_TYPE_OPTIONS)[number]["value"];

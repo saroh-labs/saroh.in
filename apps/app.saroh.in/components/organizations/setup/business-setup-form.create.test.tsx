@@ -53,7 +53,8 @@ vi.mock("@saroh/auth/client", () => ({
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
 // The browser's zone, sent with the business (UX-008).
 const browserZone = vi.fn<() => string | null>(() => "America/Chicago");
-vi.mock("@/lib/organizations/time-zones", () => ({
+vi.mock("@/lib/organizations/time-zones", async (actual) => ({
+    ...(await actual<object>()),
     browserZone: () => browserZone(),
 }));
 const startCheckout = vi.fn();

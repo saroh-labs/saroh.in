@@ -95,8 +95,11 @@ import {
     earlierHoldSession,
     extendHoldToSession,
     prepareStripeCheckout,
+    prepareStripeWindow,
     storeAccountCountry,
 } from "./stripe-checkout";
+import type { StripeCheckoutStyle } from "./stripe-checkout-style";
+import { checkoutStyleOf, paysInWindow } from "./stripe-checkout-style";
 import { belowStripeMinimum } from "./stripe-minimum";
 import type { SealedCredentials } from "./webhook-secret";
 import { webhookSecretFrom } from "./webhook-secret";
@@ -114,6 +117,8 @@ export interface ConnectProviderInput {
      * Razorpay at the HTTP boundary (`ConnectProviderDto`, DEC-063).
      */
     webhookSecret?: string;
+    /** Stripe only: where customers pay (DEC-208, 8 Nov). Absent keeps what is saved. */
+    checkoutStyle?: StripeCheckoutStyle;
 }
 
 /**
@@ -348,6 +353,12 @@ export interface RedactedProvider {
      * as Needs attention until the keys are entered again.
      */
     attention: ProviderAttention | null;
+    /**
+     * Stripe only: where its customers pay (DEC-208, 8 Nov), Stripe's
+     * hosted page (`HOSTED`, the default) or Saroh's card window
+     * (`WINDOW`). Null for other providers.
+     */
+    checkoutStyle: StripeCheckoutStyle | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -450,6 +461,7 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
         publicKey: row.publicKey ?? null,
         webhookSecretMissing: lacksWebhookSecret(row),
         attention: attentionOf(row),
+        checkoutStyle: checkoutStyleOf(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -563,6 +575,11 @@ export class PaymentsService {
         // (DEC-054); Stripe's three values are checked the same way.
         // Throws 400 before any write.
         const publicKey = publicKeyFor({ ...input, provider });
+        // Stripe's choice of page (DEC-208, 8 Nov), kept only when given.
+        const checkoutStyle =
+            provider === "STRIPE" && input.checkoutStyle
+                ? { checkoutStyle: input.checkoutStyle }
+                : {};
 
         // A first connection starts taking money online, which the plan
         // must include (403 MODULE_LOCKED), and connects one of the
@@ -633,6 +650,7 @@ export class PaymentsService {
                         provider,
                         status: "CONNECTED",
                         publicKey,
+                        ...checkoutStyle,
                         encryptedCredentials: sealed.ciphertext,
                         credentialsIv: sealed.iv,
                         credentialsAuthTag: sealed.authTag,
@@ -640,6 +658,7 @@ export class PaymentsService {
                     update: {
                         status: "CONNECTED",
                         publicKey,
+                        ...checkoutStyle,
                         encryptedCredentials: sealed.ciphertext,
                         credentialsIv: sealed.iv,
                         credentialsAuthTag: sealed.authTag,
@@ -732,6 +751,36 @@ export class PaymentsService {
             provider,
         );
         return redact(row);
+    }
+
+    /**
+     * Where a Stripe connection's customers pay (owner, 8 Nov 2026,
+     * DEC-208): Stripe's hosted page or Saroh's card window.
+     * `payment:manage`. Only Stripe has the choice (400 otherwise); a
+     * missing connection is a 404. Payments already started keep the way
+     * they were made.
+     */
+    async setCheckoutStyle(
+        ctx: OrganizationContext,
+        provider: string,
+        checkoutStyle: StripeCheckoutStyle,
+    ): Promise<RedactedProvider> {
+        authorize(ctx, "payment:manage");
+        const row = await this.requireOwnedProvider(
+            ctx.organizationId,
+            provider,
+        );
+        if (row.provider !== "STRIPE") {
+            throw new BadRequestException({
+                message: "Only Stripe lets you choose where customers pay.",
+                field: "checkoutStyle",
+            });
+        }
+        const updated = await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { checkoutStyle },
+        });
+        return redact(updated);
     }
 
     /**
@@ -2208,12 +2257,15 @@ export class PaymentsService {
         }
         // Stripe only: the others take no description.
         const stripe = providerRow.provider === "STRIPE";
+        // Saroh's own card window (DEC-208, 8 Nov): a PaymentIntent the
+        // page confirms, no session, no payer or return pages to prepare.
+        const cardWindow = paysInWindow(providerRow);
         const description = stripe
             ? await paymentDescription(organizationId, target.kind)
             : undefined;
         // A hold already paying through a session gets it back, never a
         // new one that would hold its place longer (U6).
-        if (stripe && target.kind === "invoice") {
+        if (stripe && !cardWindow && target.kind === "invoice") {
             const earlier = await earlierHoldSession(target.id);
             if (earlier === "closed") throw checkoutClosed();
             if (earlier) return this.replay(organizationId, earlier);
@@ -2221,34 +2273,74 @@ export class PaymentsService {
         // Stripe's hosted Checkout (DEC-208, 7 Nov amendment) echoes Saroh's
         // intent id, so the row's id is made before the call.
         const intentId = stripe ? randomUUID() : undefined;
-        const checkout = intentId
-            ? await prepareStripeCheckout({
+        const inWindow = cardWindow
+            ? await prepareStripeWindow({
                   organizationId,
                   target,
                   providerRow,
                   adapter: provider,
                   credentials,
-                  intentId,
-                  returnPath,
               })
             : null;
+        const checkout =
+            intentId && !cardWindow
+                ? await prepareStripeCheckout({
+                      organizationId,
+                      target,
+                      providerRow,
+                      adapter: provider,
+                      credentials,
+                      intentId,
+                      returnPath,
+                  })
+                : null;
         let intent: CreateOrderIntentResult;
         try {
-            intent = await provider.createOrderIntent({
-                amountCents,
-                currency,
-                orderId: target.id,
-                credentials,
-                ...(description ? { description } : {}),
-                ...(checkout ? { hosted: checkout.hosted } : {}),
-            });
+            if (cardWindow) {
+                if (!provider.createElementIntent) {
+                    throw new Error("Stripe's card window isn't available");
+                }
+                intent = await provider.createElementIntent({
+                    amountCents,
+                    currency,
+                    orderId: target.id,
+                    credentials,
+                    ...(description ? { description } : {}),
+                    ...(intentId ? { intentId } : {}),
+                    customerId: inWindow?.customerId,
+                    receiptEmail: inWindow?.receiptEmail,
+                });
+                // The card's billing address starts on the business's
+                // country, never the browser's guess (owner, 8 Nov).
+                if (inWindow?.country) {
+                    intent = {
+                        ...intent,
+                        clientParams: {
+                            ...intent.clientParams,
+                            country: inWindow.country,
+                        },
+                    };
+                }
+            } else {
+                intent = await provider.createOrderIntent({
+                    amountCents,
+                    currency,
+                    orderId: target.id,
+                    credentials,
+                    ...(description ? { description } : {}),
+                    ...(checkout ? { hosted: checkout.hosted } : {}),
+                });
+            }
         } catch (err) {
             // A handled 503 in the customer's words, never an unhandled
             // 500; refused keys also flag the connection and tell the
             // team (UX-012).
             throw await providerOrderFailed(providerRow, err);
         }
-        if (checkout?.permissionMissing) {
+        const customerFound = checkout
+            ? checkout.hosted.customerId
+            : inWindow?.customerId;
+        if (checkout?.permissionMissing || inWindow?.permissionMissing) {
             // The key can't read or make customers: the payment went ahead
             // without one, and the connection names the permission to add
             // (KTD-14). A later payment that makes its customer clears it.
@@ -2268,7 +2360,7 @@ export class PaymentsService {
             // A missing permission is cleared only by a payment that made
             // or found its customer, not one that had no email to try.
             (providerRow.attentionReason !== PERMISSION_MISSING ||
-                checkout?.hosted.customerId)
+                customerFound)
         ) {
             // A provider order made on a connection flagged as refused: it
             // works again, and the team hears so once (#555). Never throws.
@@ -2564,7 +2656,16 @@ export class PaymentsService {
         const open =
             !intent.status ||
             (OPEN_INTENT_STATUSES as readonly string[]).includes(intent.status);
-        const legacy = typeof raw.clientParams?.checkoutUrl !== "string";
+        // A card-window intent (DEC-208, 8 Nov) stays payable in the window
+        // while the connection still pays there; under hosted Checkout it is
+        // closed like one from before it.
+        const legacy =
+            typeof raw.clientParams?.checkoutUrl !== "string" &&
+            !(
+                typeof raw.clientParams?.clientSecret === "string" &&
+                providerRow !== null &&
+                paysInWindow(providerRow)
+            );
         const expired =
             typeof raw.expiresAt === "string" &&
             new Date(raw.expiresAt).getTime() <= Date.now();

@@ -18,6 +18,7 @@ import type { MrpSaving } from "../lib/mrp-saving";
 import { percentOff, shownSaving } from "../lib/mrp-saving";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { struckWordOf, taxWordOf, useSiteBusiness } from "../site-business";
 import { plateTint } from "./name-plate";
 
 /**
@@ -351,7 +352,7 @@ export default function ProductPage({
     product,
     markers: markersAsked = false,
     preview = true,
-    locale = "en-IN",
+    locale,
     action,
     facts = null,
     back = null,
@@ -362,6 +363,7 @@ export default function ProductPage({
     markers?: boolean;
     /** The workspace preview (default); false is the live product page. */
     preview?: boolean;
+    /** Number grouping; absent, the currency's (lakh for rupees only). */
     locale?: string;
     /** The live page's action (G13 fills it); ignored in preview. */
     action?: ReactNode;
@@ -386,6 +388,8 @@ export default function ProductPage({
 }) {
     // The live page never draws staff notes, whatever it is handed.
     const markers = preview && markersAsked;
+    const business = useSiteBusiness();
+    const taxName = taxWordOf(business);
     const firstAvailable =
         product.variants.find((v) => v.stock !== "SOLD_OUT") ??
         product.variants.at(0);
@@ -513,7 +517,9 @@ export default function ProductPage({
                             data-price-mrp=""
                             className="text-site-muted text-[15px] tabular-nums line-through"
                         >
-                            <span className="sr-only">MRP </span>
+                            <span className="sr-only">
+                                {struckWordOf(business)}{" "}
+                            </span>
                             {formatAmount(saving.mrp, product.currency, locale)}
                         </span>
                         {/* Under one whole percent there is no number to
@@ -542,9 +548,14 @@ export default function ProductPage({
                     className="text-site-body mt-2 text-sm tabular-nums"
                 >
                     {leadsWithPay
-                        ? gstPriceWords(gst, product.currency, locale)
+                        ? gstPriceWords(gst, product.currency, locale, taxName)
                         : startOfLine(
-                              gstNoteWords(gst, product.currency, locale),
+                              gstNoteWords(
+                                  gst,
+                                  product.currency,
+                                  locale,
+                                  taxName,
+                              ),
                           )}
                     {gst.mode === "ADDED" && !leadsWithPay ? (
                         <>
@@ -556,11 +567,12 @@ export default function ProductPage({
                         </>
                     ) : null}
                 </p>
-            ) : (
+            ) : (business.taxSystem ?? "gst") === "gst" ? (
+                // India's printed promise; a named tax line makes none.
                 <p className="text-site-body mt-2 text-sm">
                     Inclusive of all taxes
                 </p>
-            )}
+            ) : null}
             {facts ? (
                 <p className="text-site-body mt-1 text-sm [overflow-wrap:anywhere]">
                     {facts}

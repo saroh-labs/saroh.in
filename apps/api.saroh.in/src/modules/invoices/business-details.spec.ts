@@ -13,10 +13,23 @@ const complete: BusinessDetailsColumns = {
     addressLine1: "3 Hill Road",
     city: "Bengaluru",
     postalCode: "560038",
+    region: null,
     gstState: "29",
     country: "IN",
     gstRegistered: false,
     taxId: null,
+    organization: { edition: "INDIA" },
+};
+
+/** A Global business (DEC-204): a named tax line, its address by country. */
+const global: BusinessDetailsColumns = {
+    ...complete,
+    city: "Austin",
+    postalCode: "78701",
+    region: "TX",
+    gstState: null,
+    country: "US",
+    organization: { edition: "GLOBAL" },
 };
 
 describe("missingFrom (DEC-068)", () => {
@@ -35,6 +48,20 @@ describe("missingFrom (DEC-068)", () => {
         ["state", { gstState: null }],
     ])("misses the address without its %s", (_, change) => {
         expect(missingFrom({ ...complete, ...change })).toEqual(["address"]);
+    });
+
+    it("reads a blank country by the edition: India's asks a state, Global's doesn't (R5)", () => {
+        expect(
+            missingFrom({ ...complete, country: "", gstState: null }),
+        ).toEqual(["address"]);
+        expect(missingFrom({ ...global, country: "" })).toEqual([]);
+        expect(missingFrom({ ...global, country: null })).toEqual([]);
+    });
+
+    it("never misses a GSTIN on a named tax line", () => {
+        expect(
+            missingFrom({ ...global, gstRegistered: true, taxId: null }),
+        ).toEqual([]);
     });
 
     it("asks no Indian state of a business registered abroad", () => {
@@ -127,6 +154,62 @@ describe("assertBusinessDetails", () => {
                 reason: BUSINESS_DETAILS_MISSING,
                 missing: ["address"],
                 onlyState: true,
+            },
+        });
+    });
+});
+
+describe("a Global address, by its country (U3)", () => {
+    it("misses the address of a US business with no state, or an Indian PIN", () => {
+        expect(missingFrom(global)).toEqual([]);
+        expect(missingFrom({ ...global, region: null })).toEqual(["address"]);
+        expect(missingFrom({ ...global, postalCode: "110001" })).toEqual([
+            "address",
+        ]);
+        expect(missingFrom({ ...global, postalCode: null })).toEqual([
+            "address",
+        ]);
+    });
+
+    it("asks no postcode where the country has none, nor a region where it is free", () => {
+        expect(
+            missingFrom({
+                ...global,
+                country: "AE",
+                postalCode: null,
+                region: null,
+            }),
+        ).toEqual([]);
+        expect(
+            missingFrom({
+                ...global,
+                country: "GB",
+                postalCode: "SW1A 1AA",
+                region: null,
+            }),
+        ).toEqual([]);
+    });
+
+    it("names the region in the country's word when only it is missing", async () => {
+        const ca = {
+            ...global,
+            country: "CA",
+            postalCode: "K1A 0B1",
+            region: null,
+        };
+        expect(onlyStateMissing(ca)).toBe(true);
+        expect(onlyStateMissing({ ...global, region: null })).toBe(true);
+        expect(onlyStateMissing({ ...global, postalCode: "1" })).toBe(false);
+        const db = {
+            businessProfile: { findUnique: jest.fn().mockResolvedValue(ca) },
+        };
+        await expect(
+            assertBusinessDetails(db as never, "org_1"),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "Add your province or territory to your address first. It's printed on every invoice.",
+                details: { onlyState: true },
             },
         });
     });

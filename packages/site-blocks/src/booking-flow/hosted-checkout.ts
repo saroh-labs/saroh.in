@@ -4,11 +4,21 @@
  * windows in `checkout.ts`, which tests replace whole.
  */
 
-/** Whether a handoff leaves the page for the provider's own (Stripe), rather than opening a window. */
+/**
+ * Whether a handoff leaves the page for the provider's own (Stripe's hosted
+ * Checkout), rather than opening a window. A Stripe handoff with a client
+ * secret opens Saroh's card window instead (DEC-208, 8 Nov).
+ */
 export function leavesForProvider(
-    handoff: { provider: string } | null | undefined,
+    handoff:
+        | { provider: string; clientParams?: Record<string, unknown> }
+        | null
+        | undefined,
 ): boolean {
-    return handoff?.provider === "STRIPE";
+    return (
+        handoff?.provider === "STRIPE" &&
+        typeof handoff.clientParams?.clientSecret !== "string"
+    );
 }
 
 /** Said while the page leaves for the provider's page (Stripe's hosted Checkout): never the provider's name (customer-words.test.tsx). */

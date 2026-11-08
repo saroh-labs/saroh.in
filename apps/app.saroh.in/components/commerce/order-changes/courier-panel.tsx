@@ -18,6 +18,7 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
+import { EXAMPLES } from "@/lib/edition";
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field } from "@saroh/ui/field";
 import {
@@ -165,7 +166,7 @@ function CourierDraft({
                             maxLength={COURIER_FIELD_MAX}
                             autoComplete="off"
                             onChange={(e) => setOtherName(e.target.value)}
-                            placeholder="DTDC, India Post…"
+                            placeholder={EXAMPLES.courier}
                             className="w-full font-mono"
                         />
                     </Field>

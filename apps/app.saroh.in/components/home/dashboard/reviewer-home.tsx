@@ -3,6 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { env } from "@/env";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatList } from "@/lib/home/needs";
 import type { ReviewRow } from "@/lib/home/reviews";
 import { liveSites, reviewRows } from "@/lib/home/reviews";
@@ -24,7 +25,7 @@ const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 export function ReviewerHome({ home }: { home: HomeModel }) {
     const sites = home.reviews ?? [];
     const failed = home.unavailable.length > 0;
-    const zone = home.lastDay?.zone ?? "Asia/Kolkata";
+    const zone = home.lastDay?.zone ?? DEFAULT_BUSINESS_ZONE;
     const rows =
         failed && sites.length === 0
             ? []

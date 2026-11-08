@@ -67,6 +67,14 @@ describe("bookerPhoneE164", () => {
         expect(bookerPhoneE164(undefined)).toBeUndefined();
     });
 
+    it("reads a number without + as the business's home country", () => {
+        expect(bookerPhoneE164("212 555 0123", "US")).toBe("+12125550123");
+        expect(bookerPhoneE164("98450 12345", "IN")).toBe("+919845012345");
+        expect(() => bookerPhoneE164("2125550123", null)).toThrow(
+            BadRequestException,
+        );
+    });
+
     it("refuses on bookerPhone in the rule's own words", () => {
         try {
             bookerPhoneE164("call me");

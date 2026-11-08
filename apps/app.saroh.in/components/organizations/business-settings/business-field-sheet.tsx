@@ -30,7 +30,7 @@ import type {
     OrganizationSettings,
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
-import { browserZone } from "@/lib/organizations/time-zones";
+import { offeredZone } from "@/lib/organizations/time-zones";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import type { FormValues } from "./business-form";
 import {
@@ -119,7 +119,8 @@ export function BusinessFieldSheet({
 
     // No zone saved: the browser's is offered, as a change to save.
     useEffect(() => {
-        const zone = sheet === "timezone" && !zoneSaved && browserZone();
+        const zone =
+            sheet === "timezone" && !zoneSaved && offeredZone(saved.country);
         if (zone) form.setValue("timezone", zone, { shouldDirty: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the sheet opens
     }, []);

@@ -1,6 +1,7 @@
 import { joinFacts } from "@/lib/format/join";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { MRP_LABEL } from "@/lib/products/mrp-label";
 
 import { fieldLabel } from "./labels";
 import type { ImportEntity, ImportPlan, IssueGroup } from "./service";
@@ -134,7 +135,7 @@ export function rowLine(
     return joinFacts(
         values.name,
         money(values.price),
-        values.mrp === undefined ? null : `MRP ${money(values.mrp)}`,
+        values.mrp === undefined ? null : `${MRP_LABEL} ${money(values.mrp)}`,
         values.gstRate === undefined ? null : `GST ${values.gstRate}%`,
         STATUS_WORDS[status] ?? status,
     );

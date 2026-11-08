@@ -286,11 +286,12 @@ export function payMoney(amount: string, currency: string): string {
 export function payLineEachWords(
     line: { quantity: number; unitPrice: string; unitPay?: unknown },
     currency: string,
+    taxName = "GST",
 ): string | null {
     if (line.quantity <= 1) return null;
     const each = `${payMoney(line.unitPrice, currency)} each`;
     return typeof line.unitPay === "string" && line.unitPay !== ""
-        ? `${each}, ${payMoney(line.unitPay, currency)} with GST`
+        ? `${each}, ${payMoney(line.unitPay, currency)} with ${taxName}`
         : each;
 }
 
@@ -301,9 +302,13 @@ export function payLineEachWords(
  * whose amount is the ₹1,000 before it. The API's numbers, only written
  * out; null when it said none.
  */
-export function payLineGstWords(gst: unknown, currency: string): string | null {
+export function payLineGstWords(
+    gst: unknown,
+    currency: string,
+    taxName = "GST",
+): string | null {
     const on = gstOnPriceOf(gst);
-    return on ? gstLineWords(on, currency) : null;
+    return on ? gstLineWords(on, currency, undefined, taxName) : null;
 }
 
 /** "22 September 2026", in the zone the date was written in (UTC). */

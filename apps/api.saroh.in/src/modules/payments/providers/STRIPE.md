@@ -6,7 +6,9 @@ read from. Stripe here is the business's own account and its own keys (not
 Connect). A customer pays on Stripe's hosted Checkout page (a Checkout
 Session, `ui_mode` `hosted_page`) and comes back to the business's site;
 every session takes card (Apple Pay and Google Pay ride on it) and Link
-only (owner, 8 Nov 2026, DEC-208).
+only (owner, 8 Nov 2026, DEC-208). A business may choose Saroh's own card
+window instead (owner, 8 Nov 2026): a PaymentIntent confirmed with Stripe.js
+on its own page (see "The card window" below).
 
 ## Verified facts
 
@@ -106,6 +108,24 @@ only (owner, 8 Nov 2026, DEC-208).
 - `refund.created` may already say `succeeded`, and `refund.updated` says it
   again under another event id: the webhook service settles a refund once
   per provider refund id.
+
+## The card window (a merchant's choice, 8 Nov 2026)
+
+- `POST /v1/payment_intents` with `amount`, `currency`,
+  `allowed_payment_method_types[]=card`, `metadata[saroh_ref]`,
+  `metadata[saroh_intent]`, `description`, `customer` (the payer's `cus_`)
+  and `receipt_email`. The browser gets `clientSecret`, which only Stripe.js
+  reads, and `country`, the business's.
+- Stripe.js (`https://js.stripe.com/endive/stripe.js`) mounts the Payment
+  Element with `defaultValues.billingDetails` (name, email,
+  `address.country`) and, when both are known,
+  `fields.billingDetails.{name,email}: "never"`; those are then passed in
+  `confirmPayment`'s `confirmParams.payment_method_data.billing_details`, as
+  the Payment Element reference requires ("you must pass that same data to
+  stripe.confirmPayment or we'll reject the payment"), read 8 Nov 2026 at
+  https://docs.stripe.com/js/elements_object/create_payment_element.
+- No session: a `pi_` is looked up, cancelled and refunded as a
+  PaymentIntent, and its `payment_intent.*` events find the row by its id.
 
 ## Not verified
 

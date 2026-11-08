@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { MONEY_LOCALE } from "../../lib/money";
 import { cn } from "../../lib/utils";
 
 export interface PageHeaderProps extends Omit<
@@ -300,7 +301,7 @@ export function PageHeader({
 export function countLabel(
     n: number | null | undefined,
     noun: { one: string; other: string },
-    locale = "en-IN",
+    locale: string = MONEY_LOCALE,
 ): string | undefined {
     if (!n || n < 0) return undefined;
     return `${n.toLocaleString(locale)} ${n === 1 ? noun.one : noun.other}`;

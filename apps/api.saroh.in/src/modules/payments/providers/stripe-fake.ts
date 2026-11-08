@@ -22,7 +22,8 @@ import { StripeProvider } from "./stripe.provider";
  * The test-only switch that runs Stripe on a fake (U8's browser spec):
  * `STRIPE_FAKE=1` registers {@link FakeStripeProvider} in place of the
  * real adapter, so the browser-test stack connects Stripe with made-up
- * keys and makes Checkout Sessions without calling Stripe. Webhooks are not
+ * keys and makes Checkout Sessions (or the card window's PaymentIntents)
+ * without calling Stripe. Webhooks are not
  * faked: they are verified with the connection's own signing secret, as
  * in production.
  *
@@ -92,6 +93,29 @@ export class FakeStripeProvider extends StripeProvider {
             clientParams: {
                 checkoutUrl: url.toString(),
                 checkoutSessionId: id,
+            },
+        });
+    }
+    /**
+     * Saroh's card window (DEC-208, 8 Nov): a made-up PaymentIntent and a
+     * client secret only the browser spec's stub Stripe.js reads.
+     */
+    override createElementIntent(
+        input: Parameters<StripeProvider["createElementIntent"]>[0],
+    ): Promise<CreateOrderIntentResult> {
+        if (!stripeTakesCurrency(input.currency)) {
+            return Promise.reject(
+                new Error(
+                    `Stripe order creation refused: ${input.currency} is not a currency Saroh charges through Stripe`,
+                ),
+            );
+        }
+        const id = `pi_fake_${randomUUID().replace(/-/g, "")}`;
+        return Promise.resolve({
+            providerIntentId: id,
+            clientParams: {
+                stripePaymentIntentId: id,
+                clientSecret: `${id}_secret_fake`,
             },
         });
     }

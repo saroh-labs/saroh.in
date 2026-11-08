@@ -11,6 +11,7 @@ import {
 } from "@saroh/ui/select";
 
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
+import { EXAMPLES } from "@/lib/edition";
 import type {
     CtaAction,
     CtaKind,
@@ -192,7 +193,6 @@ export function CtaActionFields({
                         onValueChange={(number) =>
                             onChange({ ...action, number })
                         }
-                        placeholder="98450 12345"
                     />
                 </Field>
             ) : null}
@@ -218,7 +218,7 @@ export function CtaActionFields({
                             onChange={(e) =>
                                 onChange({ ...action, address: e.target.value })
                             }
-                            placeholder="hello@example.in"
+                            placeholder={`hello@${EXAMPLES.domain}`}
                             inputMode="email"
                         />
                     </Field>

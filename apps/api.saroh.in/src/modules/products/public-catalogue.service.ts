@@ -597,7 +597,7 @@ export class PublicCatalogueService {
             const [rows, businessTracks, reviews, terms] = await Promise.all([
                 this.shelves(scope, [p.id]),
                 businessTracksStock(prisma, scope.organizationId),
-                this.reviews(scope, p.id, p.variants),
+                this.reviews(scope, p.id, p.variants, p.currency),
                 loadPriceTerms(prisma, scope.organizationId),
             ]);
             const tracked = p.stockTracked && businessTracks;
@@ -777,6 +777,7 @@ export class PublicCatalogueService {
         scope: ShopScope,
         productId: string,
         variants: readonly { id: string; title: string }[],
+        currency: string,
     ): Promise<Pick<PublicProduct, "rating" | "reviews">> {
         const published = {
             organizationId: scope.organizationId,
@@ -821,7 +822,7 @@ export class PublicCatalogueService {
                         ? (titles.get(variantId) ?? null)
                         : null,
                     reply: r.reply,
-                    dateLabel: reviewDay(r.createdAt),
+                    dateLabel: reviewDay(r.createdAt, currency),
                 };
             }),
         };

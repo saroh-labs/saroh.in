@@ -8,6 +8,7 @@ import {
     onTheShop,
     priceOf,
     publicStock,
+    reviewDay,
     shelfFor,
 } from "./public-catalogue.serialize";
 
@@ -252,5 +253,17 @@ describe("visitorKey", () => {
         expect(visitorKey("10.0.0.1", relay, missing)).toBe(
             hashClientIp("10.0.0.1"),
         );
+    });
+});
+
+describe("reviewDay", () => {
+    const at = new Date("2026-11-08T23:30:00Z");
+
+    it("writes the day as India does for a rupee shop, unchanged", () => {
+        expect(reviewDay(at, "INR")).toBe("8 Nov");
+    });
+
+    it("writes it month first for a dollar shop", () => {
+        expect(reviewDay(at, "USD")).toBe("Nov 8");
     });
 });

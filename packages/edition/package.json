@@ -9,7 +9,19 @@
             "import": "./dist/index.js",
             "require": "./dist/index.cjs"
         },
+        "./address-rules": {
+            "types": "./dist/address-rules.d.ts",
+            "import": "./dist/address-rules.js",
+            "require": "./dist/address-rules.cjs"
+        },
         "./hreflang": "./hreflang.json"
+    },
+    "typesVersions": {
+        "*": {
+            "address-rules": [
+                "./dist/address-rules.d.ts"
+            ]
+        }
     },
     "files": [
         "dist/**",

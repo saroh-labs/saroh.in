@@ -5,6 +5,7 @@ import type { ObjectStorage } from "@saroh/object-storage";
 
 import { appBase, editionOf } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
+import { businessTimezone } from "../bookings/staff-availability";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
@@ -66,6 +67,8 @@ export class DataExportHandler {
                         slug: true,
                         lifecycleStatus: true,
                         legalHoldAt: true,
+                        edition: true,
+                        currency: true,
                     },
                 },
             },
@@ -104,6 +107,8 @@ export class DataExportHandler {
                 organizationId: row.organizationId,
                 exportId,
                 businessName: row.organization.name,
+                edition: row.organization.edition,
+                currency: row.organization.currency,
                 storage: this.storage,
             });
             unclaimed = built.storageKey;
@@ -230,6 +235,10 @@ export class DataExportHandler {
                     linkExpiresAt: new Date(signed.expiresAt),
                     keptUntil,
                     workspaceUrl: `${appBase(edition)}/settings/data`,
+                    timeZone: await businessTimezone(
+                        prisma,
+                        row.organizationId,
+                    ),
                 },
                 edition,
             );

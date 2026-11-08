@@ -22,6 +22,7 @@ import {
 } from "@/lib/class-packs/pack-detail-data";
 import { readFreeCancelHours } from "@/lib/class-packs/packs-page";
 import { getSellingTerms } from "@/lib/class-packs/service";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permits } from "@/lib/organizations/permits";
@@ -47,7 +48,7 @@ export async function generateMetadata({
     );
 }
 
-const FALLBACK_ZONE = "Asia/Kolkata";
+const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
 /**
  * Bookings › Packs › one pack (round-2 E16 and E17), after "Saroh Pack

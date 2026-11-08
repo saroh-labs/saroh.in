@@ -5,7 +5,7 @@
  */
 import { IANAZone } from "luxon";
 
-import { FALLBACK_TIMEZONE } from "../bookings/staff-availability";
+import { fallbackZone } from "../bookings/staff-availability";
 import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
@@ -59,14 +59,15 @@ function byOrganization<T extends { organizationId: string }>(
 
 /**
  * Each business's zone, as `businessTimezone` reads one: its own setting,
- * else its first active service's, else India — for every business at once.
+ * else its first active service's, else its edition's default — for every
+ * business at once.
  */
 async function zonesOf(
     db: MeterAcrossDb,
     organizationIds: readonly string[],
 ): Promise<Map<string, string>> {
     const ids = [...organizationIds];
-    const [profiles, services] = await Promise.all([
+    const [profiles, services, orgs] = await Promise.all([
         db.businessProfile.findMany({
             where: { organizationId: { in: ids } },
             select: { organizationId: true, timezone: true },
@@ -81,7 +82,12 @@ async function zonesOf(
             distinct: ["organizationId"],
             select: { organizationId: true, timezone: true },
         }),
+        db.organization.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, edition: true },
+        }),
     ]);
+    const editionOf = new Map(orgs.map((o) => [o.id, o.edition]));
     const valid = (z: string | null | undefined): z is string =>
         !!z && IANAZone.isValidZone(z);
     const own = new Map<string, string>();
@@ -96,7 +102,7 @@ async function zonesOf(
     return new Map(
         ids.map((id) => [
             id,
-            own.get(id) ?? first.get(id) ?? FALLBACK_TIMEZONE,
+            own.get(id) ?? first.get(id) ?? fallbackZone(editionOf.get(id)),
         ]),
     );
 }

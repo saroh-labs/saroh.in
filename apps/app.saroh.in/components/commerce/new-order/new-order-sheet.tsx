@@ -381,6 +381,9 @@ function request(o: NewOrderState): Parameters<typeof makeNewOrder>[1] {
                       city: o.address.city.trim(),
                       state: o.address.state.trim(),
                       postalCode: o.address.postalCode.trim(),
+                      ...(o.address.country
+                          ? { country: o.address.country }
+                          : {}),
                   },
               }
             : {}),

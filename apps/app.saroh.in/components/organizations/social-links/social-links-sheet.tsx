@@ -3,6 +3,8 @@
 import { Refusal } from "@/components/shared/states/refusal";
 import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
 import {
+    phoneExample,
+    phoneHomeCountry,
     SOCIAL_INPUT_MAX,
     SOCIAL_LABELS,
     SOCIAL_NETWORKS,
@@ -14,7 +16,9 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useState } from "react";
 
+import { useBusinessCountry } from "@/components/shared/fields/business-country";
 import { runAction } from "@/lib/api/run-action";
+import { PROFILE } from "@/lib/edition";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
@@ -83,6 +87,8 @@ export function SocialLinksSheet({
     const [saving, setSaving] = useState(false);
     const words = sheetWords("social", { kind, registered: false });
     const formId = `${BUSINESS_ROW_ID.social}-panel`;
+    // A WhatsApp number typed without its + is the business's country's.
+    const home = phoneHomeCountry(PROFILE.phoneNumbers, useBusinessCountry());
 
     const set = (network: SocialNetwork, value: string) => {
         setDraft((d) => ({ ...d, [network]: value }));
@@ -93,7 +99,7 @@ export function SocialLinksSheet({
         setTouched((t) => new Set(t).add(network));
 
     async function save() {
-        const problems = socialProblems(draft);
+        const problems = socialProblems(draft, home);
         const wrong = SOCIAL_NETWORKS.filter((n) => problems[n]);
         if (wrong.length > 0) {
             // Said on each field, and the first one takes the keyboard.
@@ -101,7 +107,7 @@ export function SocialLinksSheet({
             document.getElementById(`${formId}-${wrong[0]}`)?.focus();
             return;
         }
-        const patch = socialPatch(draft, links);
+        const patch = socialPatch(draft, links, home);
         if (Object.keys(patch).length === 0) {
             onClose();
             return;
@@ -149,7 +155,7 @@ export function SocialLinksSheet({
             <div className="mt-2 grid gap-4">
                 {SOCIAL_NETWORKS.map((network) => {
                     const id = `${formId}-${network}`;
-                    const read = readSocialField(network, draft[network]);
+                    const read = readSocialField(network, draft[network], home);
                     const problem =
                         refused[network] ??
                         (touched.has(network) && read.kind === "problem"
@@ -177,7 +183,11 @@ export function SocialLinksSheet({
                                 value={draft[network]}
                                 onChange={(e) => set(network, e.target.value)}
                                 onBlur={() => touch(network)}
-                                placeholder={SOCIAL_PLACEHOLDERS[network]}
+                                placeholder={
+                                    network === "whatsapp"
+                                        ? phoneExample(home)
+                                        : SOCIAL_PLACEHOLDERS[network]
+                                }
                                 maxLength={SOCIAL_INPUT_MAX}
                                 type={network === "whatsapp" ? "tel" : "text"}
                                 inputMode={

@@ -683,6 +683,7 @@ export class CatalogueWritesService {
             select: { version: true, goLiveAt: true },
         });
         if (scheduled) {
+            // Saroh's own catalogue, published from India: India time on purpose.
             throw new ConflictException(
                 `Version ${scheduled.version} is scheduled for ${dayWords(scheduled.goLiveAt, "Asia/Kolkata", { year: true })}. Cancel it before publishing another.`,
             );

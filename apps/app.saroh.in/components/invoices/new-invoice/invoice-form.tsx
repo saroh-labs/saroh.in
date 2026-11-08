@@ -12,6 +12,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatMoney } from "@/lib/format/money";
 import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
@@ -146,7 +147,7 @@ export function InvoiceForm({
     const onSettings = (next: OrganizationSettings) =>
         setBiz(newInvoiceBusiness(next));
     const currency = draft?.currency ?? defaultCurrency;
-    const zone = biz?.zone ?? "Asia/Kolkata";
+    const zone = biz?.zone ?? DEFAULT_BUSINESS_ZONE;
     const [now] = useState(() => new Date());
 
     const form = useForm<InvoiceFormValues>({

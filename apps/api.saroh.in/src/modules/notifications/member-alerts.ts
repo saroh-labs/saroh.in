@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { dayWords, isTimeZone } from "../../common/words-format";
+import { businessTimezone } from "../bookings/staff-availability";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import { noticeOf } from "./notice-target";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
@@ -54,7 +55,9 @@ export async function wordMember(
     const who = memberName(sub.contact);
     const plan = sub.plan.name;
     const planMail = cleanBusinessName(plan, "A membership");
-    const zone = isTimeZone(sub.timezone) ? sub.timezone : "Asia/Kolkata";
+    const zone = isTimeZone(sub.timezone)
+        ? sub.timezone
+        : await businessTimezone(tx, organizationId);
     const day = (at: Date) => dayWords(at, zone, { year: true });
     const base = {
         event: "member" as const,

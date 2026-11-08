@@ -48,8 +48,8 @@ describe("notice words (A14)", () => {
     it("says when in the business's zone", () => {
         expect(noticeWhen(AT, "Asia/Kolkata")).toBe("Tue 6 Oct at 11:00 am");
         expect(noticeWhen(AT, "Europe/London")).toBe("Tue 6 Oct at 6:30 am");
-        // A zone that doesn't exist falls back to the default, never throws.
-        expect(noticeWhen(AT, "Not/AZone")).toBe("Tue 6 Oct at 11:00 am");
+        // A zone that doesn't exist reads UTC, never another country's, never throws.
+        expect(noticeWhen(AT, "Not/AZone")).toBe("Tue 6 Oct at 5:30 am");
     });
 
     it("tells the customer a booking is confirmed, moved or cancelled", () => {

@@ -480,7 +480,9 @@ describe("the bag's delivery for a Global business", () => {
         const country = await screen.findByLabelText(/^Country \*/);
         expect(country).toHaveValue("GB");
         expect(screen.queryByLabelText(/^PIN code/)).toBeNull();
-        expect(screen.getByLabelText(/^State or region/).tagName).toBe("INPUT");
+        // The UK's words: a typed region and a postcode, both optional.
+        expect(screen.getByLabelText(/^Region/).tagName).toBe("INPUT");
+        expect(screen.getByLabelText(/^Postcode/)).not.toBeRequired();
         expect(screen.getByLabelText(/^Country code/)).toHaveValue("GB");
         for (const [label, value] of [
             ["Phone", "7911 123456"],

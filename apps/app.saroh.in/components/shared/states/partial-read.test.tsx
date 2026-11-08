@@ -140,7 +140,13 @@ describe("call sites", () => {
                 ways={[]}
                 way={null}
                 onWay={() => undefined}
-                address={{ line1: "", city: "", state: "", postalCode: "" }}
+                address={{
+                    line1: "",
+                    city: "",
+                    state: "",
+                    postalCode: "",
+                    country: "",
+                }}
                 onAddress={() => undefined}
                 format={(cents) => String(cents)}
                 failed

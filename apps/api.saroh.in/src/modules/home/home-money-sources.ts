@@ -1,6 +1,8 @@
 import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { fallbackZone } from "../bookings/staff-availability";
+
 import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import {
     heardWords,
@@ -172,7 +174,8 @@ export async function failedRenewals(
     showAmount: boolean,
     readSignals: RenewalSignalReader = readRenewalSignals,
     readCharges: RenewalChargeReader = chargesUnderWay,
-    zone = "Asia/Kolkata",
+    // Home passes the business's zone; unset reads as an unset edition's.
+    zone = fallbackZone(undefined),
 ): Promise<HomeAction | null> {
     const unpaid = await db.invoice.findMany({
         where: {
@@ -317,7 +320,8 @@ export async function overdueInvoices(
     db: Db,
     organizationId: string,
     now: Date,
-    zone = "Asia/Kolkata",
+    // Home passes the business's zone; unset reads as an unset edition's.
+    zone = fallbackZone(undefined),
     // A Home build works the where out once and hands it to Remind all's
     // bills too (review #16).
     overdueWhere?: Promise<Prisma.InvoiceWhereInput>,

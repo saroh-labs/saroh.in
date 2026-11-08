@@ -70,6 +70,12 @@ export interface EditionProfile {
     envSuffix: "" | "_GLOBAL";
     /** Saroh's senders on the edition's own domain, until their env names are set. */
     defaultSenders: { mail: string; codes: string };
+    /**
+     * The zone a business's times are written in when nothing better is
+     * known (no profile, an unreadable zone): India's own, or UTC where the
+     * edition spans many. A business's stored zone always wins.
+     */
+    defaultZone: string;
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -94,6 +100,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
             mail: "Saroh <noreply@saroh.in>",
             codes: "codes@saroh.in",
         },
+        defaultZone: "Asia/Kolkata",
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -116,6 +123,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
             mail: "Saroh <noreply@saroh.tech>",
             codes: "codes@saroh.tech",
         },
+        defaultZone: "UTC",
     },
 };
 
@@ -305,4 +313,7 @@ export function currencyForCountry(country: string): string {
     return COUNTRY_CURRENCY[code] ?? "USD";
 }
 
+export * from "./address-rules";
 export * from "./bank-details";
+export * from "./country-words";
+export * from "./country-zones";

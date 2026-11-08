@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
+import { PROFILE } from "@/lib/edition";
 import type { TurnOnDraft } from "@/lib/modules/turn-on";
 import { tidyAddress } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
@@ -12,6 +13,7 @@ import type {
     Fulfilment,
     WebsiteTemplateChoice,
 } from "@/lib/modules/turn-on-schema";
+import { providerName } from "@/lib/payments/providers";
 import { usesLine } from "@/lib/sites/template-picker";
 
 import { CheckRow } from "@saroh/ui/check-row";
@@ -368,7 +370,10 @@ export function ConnectChoice({
             ...d,
             connect: { ...d.connect, [moduleKey]: value },
         }));
-    const what = moduleKey === "PAYMENTS" ? "Razorpay or Cashfree" : "email";
+    const what =
+        moduleKey === "PAYMENTS"
+            ? PROFILE.paymentProviders.map(providerName).join(" or ")
+            : "email";
     return (
         <RadioCards
             label="Connect a provider"

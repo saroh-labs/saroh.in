@@ -17,7 +17,24 @@ import type {
     CustomerSearchResult,
 } from "@/lib/customers/picker";
 
+import { BusinessCountryProvider } from "@/components/shared/fields/business-country";
+
 import { CustomerStep, useCustomerFinder } from "./customer-step";
+
+const edition = vi.hoisted((): { name: "INDIA" | "GLOBAL" } => ({
+    name: "INDIA",
+}));
+vi.mock("@/lib/edition", async () => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        get EDITION() {
+            return edition.name;
+        },
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
 
 const findCustomers = vi.fn<(q: string) => Promise<CustomerSearch>>();
 const readCustomerAttention = vi.fn();
@@ -72,6 +89,7 @@ beforeEach(() => {
         }),
     );
     readCustomerAttention.mockResolvedValue(null);
+    edition.name = "INDIA";
 });
 
 afterEach(() => {
@@ -117,9 +135,27 @@ async function settle() {
     });
 }
 
-async function draw(props: Parameters<typeof Harness>[0] = {}) {
-    act(() => root.render(<Harness {...props} />));
+async function draw(
+    props: Parameters<typeof Harness>[0] = {},
+    country: string | null = null,
+) {
+    act(() =>
+        root.render(
+            <BusinessCountryProvider country={country}>
+                <Harness {...props} />
+            </BusinessCountryProvider>,
+        ),
+    );
     await settle();
+}
+
+/** A phone typed in the search, then its new customer added by name. */
+async function addTypedPhone(typed: string) {
+    typeInto(search(), typed);
+    await settle();
+    await press(button(/as a new customer/));
+    typeInto(field("Name"), "Sam Lee");
+    await press(button("Add and use"));
 }
 
 function button(name: RegExp | string): HTMLButtonElement {
@@ -204,6 +240,23 @@ describe("the customer step", () => {
             phone: "+91 90000 99999",
             email: "",
         });
+    });
+
+    it("puts India's +91 in front of a phone typed without a code", async () => {
+        await draw();
+        await addTypedPhone("90000 77777");
+        expect(onPick).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: "new", phone: "+91 90000 77777" }),
+        );
+    });
+
+    it("puts a US business's +1 in front on Global, never +91", async () => {
+        edition.name = "GLOBAL";
+        await draw({}, "US");
+        await addTypedPhone("212 555 0123");
+        expect(onPick).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: "new", phone: "+1 212 555 0123" }),
+        );
     });
 
     it("says what is missing, on the field, and adds nobody", async () => {

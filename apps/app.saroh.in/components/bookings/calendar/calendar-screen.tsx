@@ -23,6 +23,7 @@ import { NewBookingFromGap } from "@/components/bookings/free-time/new-booking-f
 import { OpenHoursDialog } from "@/components/bookings/free-time/open-hours-dialog";
 import { useGapTargets } from "@/components/bookings/free-time/use-gap-targets";
 import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
+import { PROFILE } from "@/lib/edition";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { DayByPerson } from "./day-by-person";
@@ -268,7 +269,12 @@ export function CalendarScreen({
                 date={date}
                 today={today}
                 summary={summary}
-                zone={timeZoneName(timezone, "short", new Date(now), "en-IN")}
+                zone={timeZoneName(
+                    timezone,
+                    "short",
+                    new Date(now),
+                    PROFILE.numberLocale,
+                )}
                 choices={choices}
                 picked={person}
                 facts={facts}

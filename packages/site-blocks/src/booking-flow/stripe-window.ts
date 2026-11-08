@@ -1,10 +1,8 @@
 /**
- * Parked (owner, 8 Nov 2026): Saroh's own Stripe card window (Payment
- * Element), replaced as the live path by Stripe's hosted Checkout
- * (DEC-208). Kept compiling and tested so it can be offered again. To use
- * it: in checkout.ts openProviderCheckout, call openStripeWindow for STRIPE
- * (see the commented line there), and have the API return a PaymentIntent
- * client secret instead of a Checkout session for that payment.
+ * Saroh's own Stripe card window (Payment Element), for a business that
+ * chose "Pay on our page" in Settings (owner, 8 Nov 2026, DEC-208); the
+ * default is Stripe's hosted Checkout. `openProviderCheckout` opens it when
+ * the API's handoff carries a PaymentIntent client secret.
  */
 
 import { formatAmount } from "../lib/money";
@@ -13,8 +11,8 @@ import type {
     CheckoutRequest,
     CheckoutReturn,
     Settle,
-} from "./checkout";
-import { loadScript, text } from "./checkout";
+} from "./checkout-shared";
+import { loadScript, text } from "./checkout-shared";
 
 /**
  * Stripe.js on the release the API is pinned to (`2026-10-28.endive`): a
@@ -32,6 +30,11 @@ export const STRIPE_SDK = "https://js.stripe.com/endive/stripe.js";
 //   email } } })` and `.mount(el)`:
 //   https://docs.stripe.com/js/elements_object/create_payment_element
 //   https://docs.stripe.com/payments/accept-a-payment?payment-ui=elements&api-integration=paymentintents
+// - `fields.billingDetails.{name,email}: "never"` hides fields Saroh already
+//   has; then they "must" be passed to confirmPayment's
+//   `confirmParams.payment_method_data.billing_details`, "or we'll reject the
+//   payment". `defaultValues.billingDetails.address.country` pre-fills the
+//   card's country (checked 8 Nov 2026, same page).
 // - `stripe.confirmPayment({ elements, redirect: "if_required" })` resolves
 //   `{ error }`, or `{ paymentIntent }` for a method that needs no redirect
 //   (cards): https://docs.stripe.com/js/payment_intents/confirm_payment
@@ -60,6 +63,7 @@ interface StripeInstance {
     confirmPayment(options: {
         elements: unknown;
         redirect: "if_required";
+        confirmParams?: Record<string, unknown>;
     }): Promise<StripeConfirmResult>;
 }
 type StripeFactory = (publishableKey: string) => StripeInstance;
@@ -129,6 +133,43 @@ const BUTTON =
     "min-height:44px;min-width:44px;padding:0 1rem;font:inherit;cursor:pointer;border-radius:min(var(--site-radius, 0.625rem), 0.625rem);";
 
 let stripeWindows = 0;
+
+/** The payer's name and email, when the page has both: never asked twice. */
+function knownBilling(
+    request: CheckoutRequest,
+): { name: string; email: string } | null {
+    const name = text(request.booker.name);
+    const email = text(request.booker.email);
+    return name && email ? { name, email } : null;
+}
+
+/**
+ * The Payment Element's options (owner, 8 Nov 2026): the payer's name and
+ * email go to Stripe with the payment, not left to a field the card form
+ * may not show, and the card's country starts on the business's own (the
+ * API's `country`), never the browser's guess. The payer can change it.
+ */
+export function stripeElementOptions(
+    request: CheckoutRequest,
+): Record<string, unknown> {
+    const billing = knownBilling(request);
+    const raw = text(request.handoff.clientParams.country)?.toUpperCase();
+    const country = raw && /^[A-Z]{2}$/.test(raw) ? raw : null;
+    return {
+        defaultValues: {
+            billingDetails: {
+                name: request.booker.name,
+                email: request.booker.email,
+                ...(country ? { address: { country } } : {}),
+            },
+        },
+        // Sent in confirmPayment instead (`knownBilling`).
+        ...(billing
+            ? { fields: { billingDetails: { name: "never", email: "never" } } }
+            : {}),
+        business: { name: request.business },
+    };
+}
 
 /**
  * Stripe's Payment Element in a window of the site's own: Stripe has no
@@ -240,15 +281,10 @@ export function openStripeWindow(
                     clientSecret,
                     appearance: stripeAppearance(dialog, pay),
                 });
-                const element = elements.create("payment", {
-                    defaultValues: {
-                        billingDetails: {
-                            name: request.booker.name,
-                            email: request.booker.email,
-                        },
-                    },
-                    business: { name: request.business },
-                });
+                const element = elements.create(
+                    "payment",
+                    stripeElementOptions(request),
+                );
                 element.mount(fields);
                 element.on?.("ready", () => element.focus?.());
 
@@ -276,8 +312,21 @@ export function openStripeWindow(
                             message ??
                             "That didn't go through. Check the details and try again.";
                     };
+                    const billing = knownBilling(request);
                     stripe
-                        .confirmPayment({ elements, redirect: "if_required" })
+                        .confirmPayment({
+                            elements,
+                            redirect: "if_required",
+                            ...(billing
+                                ? {
+                                      confirmParams: {
+                                          payment_method_data: {
+                                              billing_details: billing,
+                                          },
+                                      },
+                                  }
+                                : {}),
+                        })
                         .then(
                             ({ error: refused, paymentIntent }) => {
                                 if (refused) {

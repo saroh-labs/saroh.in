@@ -1,5 +1,5 @@
 import { isTimeZone } from "@/lib/format/datetime";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     currentZoneName,
@@ -55,5 +55,52 @@ describe("timeZoneOptions", () => {
     it("runs west to east", () => {
         const minutes = options.map((o) => o.minutes);
         expect(minutes).toEqual([...minutes].sort((a, b) => a - b));
+    });
+});
+
+describe("the zones a business is offered (KTD-C)", () => {
+    afterEach(() => {
+        vi.resetModules();
+        vi.unstubAllEnvs();
+        vi.restoreAllMocks();
+    });
+
+    const load = async (edition: "INDIA" | "GLOBAL", browser: string) => {
+        vi.stubEnv("NEXT_PUBLIC_EDITION", edition);
+        vi.resetModules();
+        vi.spyOn(
+            Intl.DateTimeFormat.prototype,
+            "resolvedOptions",
+        ).mockReturnValue({
+            timeZone: browser,
+        } as Intl.ResolvedDateTimeFormatOptions);
+        return import("./time-zones");
+    };
+
+    it("on Global, only the country's, and never the browser's from another country", async () => {
+        const tz = await load("GLOBAL", "Asia/Calcutta");
+        expect(tz.zonesOffered("US")).toContain("America/Chicago");
+        expect(tz.zonesOffered("US")).not.toContain("Asia/Kolkata");
+        expect(tz.zonesOffered("GB")).toEqual(["Europe/London"]);
+        expect(tz.zonesOffered("BR")).toBeNull();
+        expect(tz.zoneAsked("US")).toBe(true);
+        expect(tz.zoneAsked("GB")).toBe(false);
+        expect(tz.browserZoneIn("US")).toBe("");
+        expect(tz.offeredZone("US")).toBe("America/New_York");
+        expect(tz.offeredZone("GB")).toBe("Europe/London");
+        expect(tz.DEFAULT_TIMEZONE).toBe("UTC");
+    });
+
+    it("on Global, prefills the browser's zone when it is in the country", async () => {
+        const tz = await load("GLOBAL", "America/Indianapolis");
+        expect(tz.browserZoneIn("US")).toBe("America/Indiana/Indianapolis");
+    });
+
+    it("on India, every zone and the browser's, as before", async () => {
+        const tz = await load("INDIA", "America/Chicago");
+        expect(tz.zonesOffered("IN")).toBeNull();
+        expect(tz.zoneAsked("IN")).toBe(false);
+        expect(tz.offeredZone("IN")).toBe("America/Chicago");
+        expect(tz.DEFAULT_TIMEZONE).toBe("Asia/Kolkata");
     });
 });

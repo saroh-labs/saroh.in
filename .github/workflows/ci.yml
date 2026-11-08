@@ -648,6 +648,10 @@ jobs:
       # Nest binds a random port. It only looks fine locally because
       # `apps/api.saroh.in/.env` sets PORT and a runner has no .env at all.
       PORT: 3333
+      # The browser reaches the API on loopback; trusting it lets a spec give
+      # each customer its own address (x-forwarded-for, `asNewVisitor`), as
+      # Cloudflare does, so one run's customers don't share the rate limits.
+      TRUST_PROXY: private
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted

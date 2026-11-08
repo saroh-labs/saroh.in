@@ -1,9 +1,24 @@
+import type { Edition } from "@saroh/edition";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { OrderReadMoney } from "@/lib/orders/read";
 
 import { MoneyCard } from "./money-card";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
+afterEach(() => {
+    edition.name = "INDIA";
+});
 
 /**
  * The money card after an edit (audit, 6 Oct 2026): an order paid at the
@@ -150,5 +165,46 @@ describe("MoneyCard after part of it was recorded as refunded (#865)", () => {
         );
         expect(out).toContain("₹480.00 · by hand");
         expect(out).not.toContain("Left to refund");
+    });
+});
+
+describe("MoneyCard's tax words by the edition's tax system", () => {
+    const taxed = (invoiceNumber: string | null) =>
+        renderToStaticMarkup(
+            <MoneyCard
+                money={money({ tax: "18.00", paid: "480.00", due: "0.00" })}
+                delivery={false}
+                paymentStatus="PAID"
+                refundStanding="NONE"
+                invoices={
+                    invoiceNumber === null
+                        ? null
+                        : ([
+                              {
+                                  id: "inv_1",
+                                  kind: "INVOICE",
+                                  number: invoiceNumber,
+                              },
+                          ] as never)
+                }
+                payments={null}
+                format={(n) => `USD ${n.toFixed(2)}`}
+            />,
+        );
+
+    it("says GST and Tax invoice in India, as before", () => {
+        expect(taxed(null)).toContain("Includes GST USD 18.00");
+        const out = taxed("INV/2026/001");
+        expect(out).toContain("Tax invoice INV/2026/001");
+        expect(out).toContain("· GST USD 18.00");
+    });
+
+    it("says tax and Invoice on a named tax line, never GST", () => {
+        edition.name = "GLOBAL";
+        expect(taxed(null)).toContain("Includes tax USD 18.00");
+        const out = taxed("INV-001");
+        expect(out).toContain("Invoice INV-001");
+        expect(out).toContain("· Tax USD 18.00");
+        expect(out).not.toMatch(/GST|Tax invoice/);
     });
 });

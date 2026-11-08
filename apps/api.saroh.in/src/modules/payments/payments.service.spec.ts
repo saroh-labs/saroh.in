@@ -29,6 +29,7 @@ jest.mock("./stripe-checkout", () => ({
         "./stripe-checkout",
     ),
     prepareStripeCheckout: jest.fn(),
+    prepareStripeWindow: jest.fn(),
     extendHoldToSession: jest.fn(),
     storeAccountCountry: jest.fn(),
 }));
@@ -118,6 +119,7 @@ import { IN_EDITION } from "./public-key";
 import {
     extendHoldToSession,
     prepareStripeCheckout,
+    prepareStripeWindow,
     storeAccountCountry,
 } from "./stripe-checkout";
 
@@ -224,6 +226,8 @@ describe("PaymentsService.connectProvider", () => {
             webhookSecretMissing: true,
             // Keys that passed the check need no attention (UX-012).
             attention: null,
+            // Only Stripe chooses where its customers pay (DEC-208).
+            checkoutStyle: null,
             createdAt: expect.any(Date),
             updatedAt: expect.any(Date),
         });
@@ -2448,6 +2452,205 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
                     );
                     expect(err).toBeInstanceOf(ConflictException);
                 });
+            });
+        });
+
+        describe("in Saroh's card window (DEC-208, 8 Nov)", () => {
+            const prepareWindow = prepareStripeWindow as jest.Mock;
+            const windowRow = () => ({
+                ...stripeRow(),
+                checkoutStyle: "WINDOW",
+            });
+            function windowService() {
+                const made = stripeService();
+                const createElementIntent = jest.fn(
+                    (input: Record<string, unknown>) => {
+                        made.fake.calls.push(input as never);
+                        return Promise.resolve({
+                            providerIntentId: "pi_test_1",
+                            clientParams: {
+                                stripePaymentIntentId: "pi_test_1",
+                                clientSecret: "pi_test_1_secret_x",
+                            },
+                        });
+                    },
+                );
+                Object.assign(made.fake, { createElementIntent });
+                const createOrderIntent = jest.spyOn(
+                    made.fake,
+                    "createOrderIntent",
+                );
+                return { ...made, createElementIntent, createOrderIntent };
+            }
+
+            beforeEach(() => {
+                orderFindUnique.mockResolvedValue(ORDER);
+                providerFindMany.mockResolvedValue([windowRow()]);
+                intentCreate.mockImplementation(
+                    ({ data }: { data: { id: string } }) =>
+                        Promise.resolve({ id: data.id }),
+                );
+                attemptCreate.mockResolvedValue({ id: "att_1" });
+                prepareWindow.mockResolvedValue({
+                    customerId: "cus_1",
+                    receiptEmail: "asha@example.com",
+                    country: "US",
+                    permissionMissing: false,
+                });
+            });
+
+            it("makes a PaymentIntent under the payer's customer, with no session, and hands the page its client secret and the business's country", async () => {
+                const { service, createElementIntent, createOrderIntent } =
+                    windowService();
+
+                const result = await service.createIntentForOrder(
+                    global(),
+                    "order_1",
+                );
+
+                expect(prepareStripeCheckout).not.toHaveBeenCalled();
+                expect(createOrderIntent).not.toHaveBeenCalled();
+                const asked = createElementIntent.mock.calls[0][0];
+                expect(asked).toMatchObject({
+                    orderId: "order_1",
+                    customerId: "cus_1",
+                    receiptEmail: "asha@example.com",
+                    intentId: result.paymentIntentId,
+                });
+                expect(asked.description).toBeDefined();
+                expect(result.clientParams).toEqual({
+                    stripePaymentIntentId: "pi_test_1",
+                    clientSecret: "pi_test_1_secret_x",
+                    country: "US",
+                });
+                const row = intentCreate.mock.calls[0][0] as {
+                    data: Record<string, unknown>;
+                };
+                expect(row.data.providerIntentId).toBe("pi_test_1");
+                expect(row.data).not.toHaveProperty("providerCheckoutId");
+                expect(extendHoldToSession).not.toHaveBeenCalled();
+            });
+
+            it("flags a key that can't make customers, and still takes the payment", async () => {
+                const { service, createElementIntent } = windowService();
+                prepareWindow.mockResolvedValue({
+                    customerId: null,
+                    receiptEmail: null,
+                    country: null,
+                    permissionMissing: true,
+                });
+                const flagged = prisma.merchantPaymentProvider
+                    .updateMany as jest.Mock;
+                flagged.mockResolvedValue({ count: 1 });
+
+                const result = await service.createIntentForOrder(
+                    global(),
+                    "order_1",
+                );
+
+                expect(createElementIntent).toHaveBeenCalled();
+                expect(result.clientParams).not.toHaveProperty("country");
+                expect(flagged).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            attentionReason: "PERMISSION_MISSING",
+                        }),
+                    }),
+                );
+            });
+
+            it("replays an open window while the business pays there, and closes it once it pays on Stripe's page", async () => {
+                const { service } = windowService();
+                const cancelIntent = jest.fn().mockResolvedValue(true);
+                const fake = (
+                    service as unknown as {
+                        factory: { get: () => object };
+                    }
+                ).factory.get();
+                Object.assign(fake, { cancelIntent });
+                (
+                    prisma.paymentIntent.updateMany as jest.Mock
+                ).mockResolvedValue({ count: 1 });
+                intentFindUnique.mockResolvedValue({
+                    id: "intent_1",
+                    provider: "STRIPE",
+                    providerIntentId: "pi_test_1",
+                    amountCents: 2000,
+                    currency: "USD",
+                    status: "REQUIRES_PAYMENT",
+                });
+                const clientParams = {
+                    stripePaymentIntentId: "pi_test_1",
+                    clientSecret: "pi_test_1_secret_x",
+                };
+                attemptFindFirst.mockResolvedValue({
+                    rawResponse: { clientParams },
+                });
+
+                providerFindUnique.mockResolvedValue(windowRow());
+                const again = await service.createIntentForOrder(
+                    global(),
+                    "order_1",
+                    { idempotencyKey: "k1" },
+                );
+                expect(again.clientParams).toEqual(clientParams);
+                expect(cancelIntent).not.toHaveBeenCalled();
+
+                providerFindUnique.mockResolvedValue(stripeRow());
+                const err = await service
+                    .createIntentForOrder(global(), "order_1", {
+                        idempotencyKey: "k1",
+                    })
+                    .catch((e: unknown) => e);
+                expect(cancelIntent).toHaveBeenCalled();
+                expect(err).toBeInstanceOf(ConflictException);
+            });
+        });
+
+        describe("choosing where Stripe's customers pay", () => {
+            it("saves a Stripe connection's choice and reads it back", async () => {
+                const { service } = stripeService();
+                providerFindUnique.mockResolvedValue(stripeRow());
+                providerUpdate.mockResolvedValue({
+                    ...stripeRow(),
+                    checkoutStyle: "WINDOW",
+                });
+
+                const saved = await service.setCheckoutStyle(
+                    global(),
+                    "stripe",
+                    "WINDOW",
+                );
+
+                expect(providerUpdate).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: { checkoutStyle: "WINDOW" },
+                    }),
+                );
+                expect(saved.checkoutStyle).toBe("WINDOW");
+            });
+
+            it("offers no choice for another provider", async () => {
+                const { service } = makeService();
+                providerFindUnique.mockResolvedValue(connectedRow());
+
+                const said = await refusal(
+                    service.setCheckoutStyle(ctx(), "razorpay", "WINDOW"),
+                );
+                expect(said.field).toBe("checkoutStyle");
+                expect(providerUpdate).not.toHaveBeenCalled();
+            });
+
+            it("needs payment:manage", async () => {
+                const { service } = stripeService();
+                await expect(
+                    service.setCheckoutStyle(
+                        ctx({ role: "MEMBER", edition: "GLOBAL" }),
+                        "stripe",
+                        "WINDOW",
+                    ),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(providerUpdate).not.toHaveBeenCalled();
             });
         });
 

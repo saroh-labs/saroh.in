@@ -66,8 +66,9 @@ export function UserMenu({
     /** For the note that says these settings are not the business's. */
     businessName?: string;
     /**
-     * They own at least one business, so they have billing profiles
-     * (DEC-167 step 2): the menu links to them in their account.
+     * They own at least one business on an edition Saroh bills, so they
+     * have billing profiles (DEC-167 step 2): the menu links to them in
+     * their account. The header leaves it false on Global.
      */
     ownsABusiness?: boolean;
     /**

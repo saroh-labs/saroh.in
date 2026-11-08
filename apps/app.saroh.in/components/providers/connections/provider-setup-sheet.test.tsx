@@ -21,9 +21,12 @@ import type {
 import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 const connectPaymentProvider = vi.fn();
+const setStripeCheckoutStyle = vi.fn();
 vi.mock("@/lib/providers/actions", () => ({
     connectPaymentProvider: (...args: unknown[]) =>
         connectPaymentProvider(...args) as unknown,
+    setStripeCheckoutStyle: (...args: unknown[]) =>
+        setStripeCheckoutStyle(...args) as unknown,
     disconnectPaymentProvider: vi.fn(),
     connectCommsProvider: vi.fn(),
     disconnectCommsProvider: vi.fn(),
@@ -80,6 +83,7 @@ beforeEach(() => {
     edition.name = "INDIA";
     for (const fn of [
         connectPaymentProvider,
+        setStripeCheckoutStyle,
         refresh,
         showSuccess,
         showError,
@@ -501,8 +505,81 @@ describe("Stripe setup (Global)", () => {
             keySecret: "rk_live_example",
             publicKey: "pk_live_example",
             webhookSecret: "whsec_example",
+            checkoutStyle: "HOSTED",
         });
         expect(showSuccess).toHaveBeenCalledWith("Stripe connected.");
+    });
+
+    // Each choice is a row whose label holds its radio.
+    const radio = (name: string): HTMLElement => byLabel(name);
+
+    it("offers Stripe's page by default or our page, each in one line, and sends the choice with the keys", async () => {
+        connectPaymentProvider.mockResolvedValue({ ok: true, data: {} });
+        openStripe();
+        const t = text();
+        expect(t).toContain("Where customers pay");
+        expect(t).toContain(
+            "Recommended. Stripe's checkout page handles each country's payment rules.",
+        );
+        expect(t).toContain(
+            "A card window opens on your site, so customers never leave it.",
+        );
+        expect(radio("Pay on Stripe's page").getAttribute("aria-checked")).toBe(
+            "true",
+        );
+        act(() => radio("Pay on our page").click());
+        expect(text()).toContain(
+            "Customers pay by card in a window on your site.",
+        );
+        // Not connected yet: nothing saved until the keys are.
+        expect(setStripeCheckoutStyle).not.toHaveBeenCalled();
+        fillStripe();
+        await press();
+        expect(connectPaymentProvider).toHaveBeenCalledWith(
+            expect.objectContaining({ checkoutStyle: "WINDOW" }),
+        );
+    });
+
+    const CONNECTED_STRIPE: ConnectedPaymentProvider = {
+        id: "mpp_1",
+        provider: "STRIPE",
+        status: "CONNECTED",
+        publicKey: "pk_test_example",
+        checkoutStyle: "WINDOW",
+        updatedAt: "2026-11-08T00:00:00.000Z",
+    };
+
+    it("saves a connected Stripe's choice at once, without the keys", async () => {
+        setStripeCheckoutStyle.mockResolvedValue({ ok: true, data: {} });
+        openStripe({ connected: [CONNECTED_STRIPE] });
+        expect(radio("Pay on our page").getAttribute("aria-checked")).toBe(
+            "true",
+        );
+        await act(async () => {
+            radio("Pay on Stripe's page").click();
+            await Promise.resolve();
+        });
+        expect(setStripeCheckoutStyle).toHaveBeenCalledWith("HOSTED");
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Customers now pay on Stripe's page.",
+        );
+    });
+
+    it("puts the choice back when it can't be saved", async () => {
+        setStripeCheckoutStyle.mockResolvedValue({
+            ok: false,
+            error: "Couldn't save where customers pay.",
+        });
+        openStripe({ connected: [CONNECTED_STRIPE] });
+        await act(async () => {
+            radio("Pay on Stripe's page").click();
+            await Promise.resolve();
+        });
+        expect(radio("Pay on our page").getAttribute("aria-checked")).toBe(
+            "true",
+        );
+        expect(showSuccess).not.toHaveBeenCalled();
     });
 
     it.each([

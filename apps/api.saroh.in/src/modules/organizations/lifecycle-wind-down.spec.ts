@@ -187,7 +187,8 @@ const CASES = [
         // service refuses and the workspace doesn't offer Refund.
         controller: PaymentsController,
         windDown: ["createIntent", "refund", "refundMismatch", "retryRefund"],
-        refused: ["connect", "disconnect"],
+        // Choosing where Stripe customers pay is setup, like connecting.
+        refused: ["connect", "disconnect", "setCheckoutStyle"],
     },
     {
         controller: InvoicesController,

@@ -1,3 +1,5 @@
+import { moneyLocaleOf } from "@saroh/edition";
+
 import type { GstOnPrice } from "../invoices/gst-price";
 import { stockLine } from "./product-overview";
 
@@ -362,9 +364,12 @@ export function madeByLine(p: {
     return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** A review's day, pinned to UTC so every reader prints the same text. */
-export function reviewDay(at: Date): string {
-    return at.toLocaleDateString("en-IN", {
+/**
+ * A review's day, pinned to UTC so every reader prints the same text, in
+ * the way the shop's currency reads: "8 Nov" for rupees, "Nov 8" otherwise.
+ */
+export function reviewDay(at: Date, currency: string | null = "INR"): string {
+    return at.toLocaleDateString(moneyLocaleOf(currency), {
         day: "numeric",
         month: "short",
         timeZone: "UTC",

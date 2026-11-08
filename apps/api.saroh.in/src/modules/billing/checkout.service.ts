@@ -1102,6 +1102,7 @@ export class CheckoutService {
                 select: { startAt: true, plan: { select: { name: true } } },
             });
             if (paidYear) {
+                // Saroh's own India billing, not a business's zone: India time on purpose.
                 const starts = paidYear.startAt
                     ? ` on ${paidYear.startAt.toLocaleDateString("en-IN", {
                           day: "numeric",

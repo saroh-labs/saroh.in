@@ -34,6 +34,7 @@ export const UI_FILES = [
     "components/ui/textarea.tsx",
     "components/ui/tooltip.tsx",
     "components/ui/wordmark.tsx",
+    "lib/money.ts",
     "lib/utils.ts",
     "lib/wordmark-geometry.ts",
 ];

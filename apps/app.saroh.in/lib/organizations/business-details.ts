@@ -1,9 +1,15 @@
+import { PROFILE } from "@/lib/edition";
 import { gstinProblem } from "@/lib/invoices/gstin";
 
 import type { OrganizationKind } from "./kind";
 import { kindOf, kindWords } from "./kind";
 import type { RegisteredAddressValues } from "./registered-address";
-import { PIN_SHAPE } from "./registered-address";
+import {
+    byCountry,
+    countryAddressProblems,
+    inIndia,
+    PIN_SHAPE,
+} from "./registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
@@ -82,16 +88,14 @@ export function detailsValuesOf(
         addressLine2: a?.line2 ?? "",
         city: a?.city ?? "",
         postalCode: a?.postalCode ?? "",
+        region: a?.region ?? "",
         gstState: settings?.tax?.state ?? a?.state ?? "",
         gstRegistered: settings?.tax?.registered ?? false,
         taxId: settings?.profile?.taxId ?? "",
     };
 }
 
-/** An address outside India has no Indian state to choose. */
-export function inIndia(country: string | null | undefined): boolean {
-    return ["", "IN", "INDIA"].includes((country ?? "").trim().toUpperCase());
-}
+export { inIndia } from "./registered-address";
 
 /**
  * What the step must fix before it saves, on the field it is about. Every
@@ -101,10 +105,24 @@ export function inIndia(country: string | null | undefined): boolean {
  */
 export function detailsProblems(
     v: BusinessDetailsValues,
-    opts: { inIndia: boolean },
+    opts: { inIndia: boolean; country?: string | null },
 ): { path: keyof BusinessDetailsValues; message: string }[] {
     const problems: { path: keyof BusinessDetailsValues; message: string }[] =
         [];
+    // Global: the postcode and region by the country's rules, in its words
+    // ("Add the ZIP code."); "PIN code" is India's.
+    if (!opts.inIndia && byCountry(opts.country, v.gstRegistered)) {
+        if (!v.addressLine1.trim()) {
+            problems.push({
+                path: "addressLine1",
+                message: "Add the first line of your address.",
+            });
+        }
+        if (!v.city.trim()) {
+            problems.push({ path: "city", message: "Add the city." });
+        }
+        return [...problems, ...countryAddressProblems(opts.country, v)];
+    }
     const needed = [
         ["addressLine1", "Add the first line of your address."],
         ["city", "Add the city."],
@@ -138,16 +156,33 @@ export function detailsProblems(
  */
 export function detailsInput(
     v: BusinessDetailsValues,
-    was: Pick<BusinessDetailsValues, "gstRegistered">,
+    was: Pick<BusinessDetailsValues, "gstRegistered"> &
+        Partial<Pick<BusinessDetailsValues, "taxId">>,
 ): OrganizationSettingsInput {
+    const registeredAddress = {
+        line1: v.addressLine1.trim(),
+        line2: v.addressLine2.trim(),
+        city: v.city.trim(),
+        postalCode: v.postalCode.trim(),
+        // Global's region (U3): India's state is its GST state.
+        ...(PROFILE.address === "country-and-region"
+            ? { region: v.region.trim() }
+            : {}),
+    };
+    // A named tax line (DEC-204) has no GST standing: only its optional
+    // tax ID, when it changed.
+    if (PROFILE.taxSystem !== "gst") {
+        const taxId = v.taxId.trim();
+        return {
+            registeredAddress,
+            ...(taxId !== (was.taxId ?? "").trim()
+                ? { profile: { taxId } }
+                : {}),
+        };
+    }
     const gstin = v.taxId.trim().toUpperCase();
     return {
-        registeredAddress: {
-            line1: v.addressLine1.trim(),
-            line2: v.addressLine2.trim(),
-            city: v.city.trim(),
-            postalCode: v.postalCode.trim(),
-        },
+        registeredAddress,
         tax: {
             ...(v.gstRegistered !== was.gstRegistered
                 ? { registered: v.gstRegistered }
@@ -183,6 +218,8 @@ export type DetailsOnFile =
           state: "ready";
           values: BusinessDetailsValues;
           inIndia: boolean;
+          /** The business's country, whose rules a Global address follows. */
+          country?: string | null;
           /** Picks the sheet's words (DEC-070); absent from an older API. */
           kind: OrganizationKind | undefined;
       };
@@ -196,6 +233,7 @@ export function detailsOnFileOf(
               state: "ready",
               values: detailsValuesOf(res.data),
               inIndia: inIndia(res.data.profile?.country),
+              country: res.data.profile?.country ?? null,
               kind: res.data.kind,
           }
         : { state: "failed", message: res.error, forbidden: res.forbidden };
@@ -215,6 +253,13 @@ export function missingOnFile(
     if (onFile?.state !== "ready") return [];
     const v = onFile.values;
     const filled = (s: string) => s.trim() !== "";
+    if (!onFile.inIndia && byCountry(onFile.country, v.gstRegistered)) {
+        const whole =
+            filled(v.addressLine1) &&
+            filled(v.city) &&
+            countryAddressProblems(onFile.country, v).length === 0;
+        return whole ? [] : ["address"];
+    }
     const needsState = onFile.inIndia || v.gstRegistered;
     const address =
         filled(v.addressLine1) &&

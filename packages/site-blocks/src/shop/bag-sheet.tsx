@@ -11,7 +11,7 @@ import {
 } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
-import { useSiteBusiness } from "../site-business";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import type {
     CheckoutQuote,
     DeliveryAddress,
@@ -271,7 +271,8 @@ export function BagSheet({
     onPlace: (request: StartCheckout, priced: BagPriced) => void;
     onClose: () => void;
 }) {
-    const { address: addressBy } = useSiteBusiness();
+    const seller = useSiteBusiness();
+    const { address: addressBy } = seller;
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
     const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
@@ -388,7 +389,8 @@ export function BagSheet({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, addressBy) === null
+                            addressLeft(last, addressBy, seller.country) ===
+                            null
                                 ? "shown"
                                 : "typing",
                     };
@@ -397,7 +399,7 @@ export function BagSheet({
         return () => {
             live = false;
         };
-    }, [askSaved, onDraft, addressBy]);
+    }, [askSaved, onDraft, addressBy, seller.country]);
 
     if (items.length === 0) {
         return (
@@ -424,7 +426,7 @@ export function BagSheet({
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(address, addressBy)
+        ? addressLeft(address, addressBy, seller.country)
         : null;
     const addressOk = addressNote === null;
     const pays = paysOf(quote);
@@ -546,7 +548,8 @@ export function BagSheet({
                     data-total-gst=""
                     className="text-site-body text-right text-sm tabular-nums"
                 >
-                    Includes {formatAmount(quote.gst, quote.currency)} GST
+                    Includes {formatAmount(quote.gst, quote.currency)}{" "}
+                    {taxWordOf(seller)}
                 </p>
             ) : null}
             <button

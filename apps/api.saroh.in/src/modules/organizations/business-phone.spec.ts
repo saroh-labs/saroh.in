@@ -4,6 +4,7 @@ import { joinPhone, PHONE_CASES, splitPhone } from "@saroh/block-contract";
 import {
     INDIAN_PHONE_ONLY,
     normalisePublicPhone,
+    phoneHomeCountryFor,
     phoneWrite,
     publicPhone,
 } from "./business-phone";
@@ -156,6 +157,15 @@ describe("the API's rule and the phone fields agree (#1036)", () => {
             if (stored)
                 expect(normalisePublicPhone(stored)).toEqual({ phone: stored });
         }
+    });
+});
+
+describe("phoneHomeCountryFor", () => {
+    it("is India on India, the business's country on Global", () => {
+        expect(phoneHomeCountryFor(undefined, null)).toBe("IN");
+        expect(phoneHomeCountryFor("INDIA", "US")).toBe("IN");
+        expect(phoneHomeCountryFor("GLOBAL", "US")).toBe("US");
+        expect(phoneHomeCountryFor("GLOBAL", null)).toBeNull();
     });
 });
 

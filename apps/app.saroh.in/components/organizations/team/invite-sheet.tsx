@@ -2,6 +2,7 @@
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useHold } from "@/components/shared/undo/use-hold";
+import { EXAMPLES } from "@/lib/edition";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
 import {
     CALENDAR_ONLY_ROLE,
@@ -208,7 +209,7 @@ export function InviteSheet({
                                 <Input
                                     type="email"
                                     autoComplete="off"
-                                    placeholder="name@example.in"
+                                    placeholder={`name@${EXAMPLES.domain}`}
                                     disabled={sending}
                                     className="aria-[invalid=true]:border-destructive-subtle-foreground"
                                     {...field}

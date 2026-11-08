@@ -33,6 +33,7 @@ import {
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { EXAMPLES } from "@/lib/edition";
 import { QuickSheet } from "../quick-sheet";
 
 const schema = z.intersection(
@@ -339,7 +340,9 @@ export function DetailsSheet({
                                             <FormControl>
                                                 <Input
                                                     {...field}
-                                                    placeholder="Pune, India"
+                                                    placeholder={
+                                                        EXAMPLES.madeIn
+                                                    }
                                                 />
                                             </FormControl>
                                         </FormItem>

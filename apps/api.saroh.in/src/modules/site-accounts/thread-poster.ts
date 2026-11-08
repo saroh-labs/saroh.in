@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { dayWords, moneyWordsMinor } from "../../common/words-format";
+import { businessTimezone } from "../bookings/staff-availability";
 import type {
     AccountThreadPost,
     AccountThreadPoster,
@@ -11,7 +12,6 @@ import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import { appendMessage } from "./thread-store";
 
 /** Home's default zone, for a business that never set one (as D17). */
-const DEFAULT_ZONE = "Asia/Kolkata";
 
 /**
  * Saroh's post into a customer's account thread (round-2 A13, for D17's
@@ -39,7 +39,7 @@ export class AccountThreadPosterService implements AccountThreadPoster {
         input: AccountThreadPost,
     ): Promise<void> {
         const now = new Date();
-        const [invoice, profile, contact] = await Promise.all([
+        const [invoice, zone, contact] = await Promise.all([
             tx.invoice.findFirst({
                 where: {
                     id: input.invoiceId,
@@ -54,10 +54,7 @@ export class AccountThreadPosterService implements AccountThreadPoster {
                     status: true,
                 },
             }),
-            tx.businessProfile.findUnique({
-                where: { organizationId: input.organizationId },
-                select: { timezone: true },
-            }),
+            businessTimezone(tx, input.organizationId),
             // Named by the invoice: a merge since lands it on the survivor.
             resolveContact(tx, input.contactId, input.organizationId),
         ]);
@@ -66,12 +63,7 @@ export class AccountThreadPosterService implements AccountThreadPoster {
             organizationId: input.organizationId,
             contactId: contact.id,
             author: "SYSTEM",
-            body: invoiceSentence(
-                input.kind,
-                invoice,
-                profile?.timezone ?? DEFAULT_ZONE,
-                now,
-            ),
+            body: invoiceSentence(input.kind, invoice, zone, now),
             authorUserId: input.actorUserId,
             event: input.kind,
             invoiceId: input.invoiceId,

@@ -18,6 +18,7 @@ import {
     whenWords,
 } from "../../common/words-format";
 import { isRenewalInvoice } from "../billing/online-payments-plan";
+import { businessTimezone } from "../bookings/staff-availability";
 import type { AccountThreadPoster } from "../communications/account-thread";
 import {
     ACCOUNT_THREAD_POSTER,
@@ -107,8 +108,6 @@ export interface InvoiceSendResult {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Home's default zone (`home-needs.ts`), for a business that never set one. */
-const DEFAULT_ZONE = "Asia/Kolkata";
 const INVOICE_TEMPLATES: InvoiceTemplate[] = [
     "INVOICE_SENT",
     "INVOICE_REMINDER",
@@ -961,11 +960,7 @@ export class InvoiceSendService {
     }
 
     async zone(db: Db, organizationId: string): Promise<string> {
-        const profile = await db.businessProfile.findUnique({
-            where: { organizationId },
-            select: { timezone: true },
-        });
-        return profile?.timezone ?? DEFAULT_ZONE;
+        return businessTimezone(db, organizationId);
     }
 }
 

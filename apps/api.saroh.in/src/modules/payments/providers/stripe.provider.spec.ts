@@ -713,7 +713,7 @@ describe("StripeProvider.cancelIntent", () => {
     });
 });
 
-describe("StripeProvider.createElementIntent (parked in-page window)", () => {
+describe("StripeProvider.createElementIntent (Saroh's card window)", () => {
     it("form-encodes a cards-only PaymentIntent with Saroh's reference and returns its client secret", async () => {
         fetchMock.mockReturnValue(
             answer(200, {
@@ -727,6 +727,9 @@ describe("StripeProvider.createElementIntent (parked in-page window)", () => {
             orderId: "cmorder9",
             credentials: CREDS,
             description: "Walk Test Co order",
+            intentId: "intent-9",
+            customerId: "cus_test_9",
+            receiptEmail: "payer@example.com",
         });
         const { url, form } = call();
         expect(url).toBe("https://api.stripe.com/v1/payment_intents");
@@ -735,7 +738,10 @@ describe("StripeProvider.createElementIntent (parked in-page window)", () => {
             ["currency", "usd"],
             ["allowed_payment_method_types[]", "card"],
             ["metadata[saroh_ref]", "cmorder9"],
+            ["metadata[saroh_intent]", "intent-9"],
             ["description", "Walk Test Co order"],
+            ["customer", "cus_test_9"],
+            ["receipt_email", "payer@example.com"],
         ]);
         expect(result.clientParams).toEqual({
             stripePaymentIntentId: "pi_test_9",

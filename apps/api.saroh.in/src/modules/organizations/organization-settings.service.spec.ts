@@ -958,8 +958,11 @@ describe("OrganizationSettingsService", () => {
                     postalCode: "560038",
                     state: "29",
                     stateName: "Karnataka",
+                    // Global's only (U3): null in India.
+                    region: null,
                 });
                 expect(settings.profile).not.toHaveProperty("addressLine1");
+                expect(settings.profile).not.toHaveProperty("region");
                 expect(settings.tax).toEqual({
                     registered: true,
                     state: "29",

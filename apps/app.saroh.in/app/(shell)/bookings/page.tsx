@@ -20,6 +20,7 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { arrivalContactId } from "@/lib/customers/prefill";
 import { readCustomerPick } from "@/lib/customers/prefill-read";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -128,7 +129,7 @@ export default async function BookingsPage({
         canTakePayment: canTakeDeskPayments(organization),
         onlinePay: online,
     };
-    const timezone = staffList?.timezone ?? "Asia/Kolkata";
+    const timezone = staffList?.timezone ?? DEFAULT_BUSINESS_ZONE;
     const now = readNow();
     const today = localDateOf(new Date(now), timezone);
     // The view the address names; else the person's "Start Bookings on";

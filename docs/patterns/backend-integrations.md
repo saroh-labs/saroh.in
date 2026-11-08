@@ -226,9 +226,10 @@ a note saying so.
   site's server, the window opens on it, and after "paid" the page re-reads
   itself until the server says so. A new page that takes money opens
   `openProviderCheckout`; never a second provider integration, and never
-  the handoff drawn on the page. Stripe has no window: the same helper
-  sends the page to the session's Checkout address (DEC-208, 7 Nov
-  amendment; the hosted Checkout bullet below).
+  the handoff drawn on the page. A Stripe handoff opens Saroh's own card
+  window (`stripe-window.ts`) when it carries a client secret, and
+  otherwise sends the page to the session's Checkout address (DEC-208, 7
+  and 8 Nov amendments; the two Stripe bullets below).
 - **Current** (P1, #710) — **A payment is confirmed by asking the
   provider, with the webhook as backup.** Every merchant-site window posts
   its return (`CheckoutRequest.apiUrl`) to `POST /public/payments/return`:
@@ -340,6 +341,28 @@ t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
       `late-hold:<intentId>`, and enqueues the send and a team alert on the
       same transaction (`payments/late-hold-refund.ts`). Razorpay and
       Cashfree late payments stay owed back by hand on Home.
+- **Current** (DEC-208, 8 Nov amendment) — **Where a Stripe customer pays
+  is the merchant's choice, per connection:** Stripe's hosted page (the
+  default, `MerchantPaymentProvider.checkoutStyle` null or `HOSTED`) or
+  Saroh's card window (`WINDOW`), set in Settings › Payments › Stripe
+  (`PATCH /payment-providers/STRIPE/checkout-style`, or `checkoutStyle` on
+  connect). Read it with `paysInWindow` (`payments/stripe-checkout-style.ts`),
+  never by comparing the column.
+    - _Window._ `createIntentFor` skips the session, return pages and hold
+      reuse, and calls `createElementIntent`: a PaymentIntent, cards only,
+      the description, `metadata[saroh_ref]` and `[saroh_intent]`, and the
+      payer as a Stripe `customer` with `receipt_email`
+      (`prepareStripeWindow`, the same find-or-create as Checkout). Its
+      `clientParams` are `stripePaymentIntentId`, `clientSecret` and
+      `country` (the business profile's, else the Stripe account's), which
+      the window pre-fills as the card's country. The window sends the
+      payer's name and email in `confirmParams` (hidden from the Element).
+    - _Holds, cancel, late payments._ A window hold keeps the 15-minute
+      hold (no session to outlast, `holdMinutesFor`); a lapsed one cancels
+      its `pi_` at Stripe; a payment after the release is refunded as on
+      Checkout. A replay hands the client secret back while the connection
+      still pays in the window, and closes the `pi_` (409
+      `checkout-closed`) once it pays on Stripe's page.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

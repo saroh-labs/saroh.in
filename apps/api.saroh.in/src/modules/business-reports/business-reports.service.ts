@@ -47,7 +47,7 @@ export class BusinessReportsService {
         const phone = input.phone.trim();
         if (!isCustomerPhone(phone)) {
             throw new BadRequestException({
-                message: "Enter a mobile number like +91 98450 12345.",
+                message: "Enter a mobile number we can reach you on.",
                 details: { field: "phone" },
             });
         }

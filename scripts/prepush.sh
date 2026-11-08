@@ -318,6 +318,10 @@ e2e_stack() {
 
     # CI's job env, verbatim: placeholders that no live service accepts.
     export CI=1 SKIP_ENV_VALIDATION=1 PORT=3333
+    # The browser reaches the API on loopback; trusting it lets a spec give
+    # each customer its own address (x-forwarded-for), as Cloudflare does,
+    # so one run's customers don't share the public rate limits.
+    export TRUST_PROXY=private
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
     export BETTER_AUTH_URL=http://localhost:3333

@@ -103,7 +103,7 @@ export class BusinessProfileDto {
     website?: string;
 
     /**
-     * IANA zone the business keeps time in, e.g. "Asia/Kolkata". New
+     * IANA zone the business keeps time in, e.g. "Europe/London". New
      * subscriptions renew on its midnight (ADR-007). Checked against the tz
      * database in the service.
      */
@@ -432,6 +432,17 @@ export class RegisteredAddressDto {
     @IsString()
     @MaxLength(12)
     postalCode?: string;
+
+    /**
+     * A Global business's state, province or region (DEC-204), checked
+     * against its country's rules by the service. India's state is
+     * `tax.state`: an Indian business sending one is refused.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    region?: string;
 }
 
 /**

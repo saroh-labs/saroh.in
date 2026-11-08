@@ -19,6 +19,7 @@ import {
     todayIn,
 } from "@/lib/calendar/service";
 import { clampWeekDay, isDay, weekHref } from "@/lib/calendar/week";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { orderPowers } from "@/lib/orders/access";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -29,7 +30,7 @@ export const metadata = { title: "Calendar" };
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 /** Before the first read names the business's zone, the one it falls back to. */
-const FALLBACK_ZONE = "Asia/Kolkata";
+const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
 // The week's, which also says who may open hours on a closed day (U14).
 type Can = React.ComponentProps<typeof BusinessWeek>["can"];

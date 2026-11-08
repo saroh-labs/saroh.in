@@ -573,6 +573,11 @@ model BusinessProfile {
   addressLine2        String?
   city                String?
   postalCode          String?
+  // Global's only (DEC-204, `address: "country-and-region"`): the address's
+  // state, province or region, by its country's rules
+  // (@saroh/edition/address-rules). A listed one is stored as its code
+  // ("TX", "ON", "NSW"). India's state is `gstState`, so this stays null.
+  region              String?
   // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
   // RC-0001 when not). Null: the legacy INV series.
   invoicePrefix       String?
@@ -5797,7 +5802,10 @@ model MerchantPaymentProvider {
   // The account's country (ISO 3166-1 alpha-2) as the provider reports it;
   // null until read (Stripe: read at connect, else lazily on a checkout).
   accountCountry String?
-
+  // Where a Stripe customer pays (owner, 8 Nov 2026, DEC-208): "WINDOW" is
+  // Saroh's own card window on the business's page; null or "HOSTED" is
+  // Stripe's hosted Checkout, the default. Other providers leave it null.
+  checkoutStyle String?
 
   // AES-256-GCM encrypted secret credentials (JSON blob). Plaintext NEVER
   // stored; the key lives in app env. iv + authTag are needed to decrypt.

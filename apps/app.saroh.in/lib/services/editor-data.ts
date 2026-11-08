@@ -1,4 +1,5 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -132,7 +133,7 @@ export async function loadEditorContext(): Promise<
             timezone:
                 staff?.timezone ??
                 read.services.at(0)?.timezone ??
-                "Asia/Kolkata",
+                DEFAULT_BUSINESS_ZONE,
             currency: read.services.some((s) => s.currency)
                 ? businessCurrencyOf(read.services)
                 : await startingCurrency(),

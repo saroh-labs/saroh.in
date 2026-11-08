@@ -323,6 +323,35 @@ describe("booking a caller with a name and phone (DEC-170)", () => {
         });
     });
 
+    it("a US business on Global keeps ten digits as +1, never +91 (DEC-204)", async () => {
+        const before = await prisma.businessProfile.findUniqueOrThrow({
+            where: { organizationId: orgId },
+            select: { country: true },
+        });
+        await prisma.businessProfile.update({
+            where: { organizationId: orgId },
+            data: { country: "US" },
+        });
+        try {
+            const global = { ...owner, edition: "GLOBAL" as const };
+            const booked = await bookings.bookByHand(global, facialId, {
+                startAt: nextStart(),
+                bookerName: "Sam Lee",
+                bookerPhone: "212 555 0123",
+            });
+            const contact = await prisma.contact.findUniqueOrThrow({
+                where: { id: booked.contactId ?? "" },
+                select: { phone: true },
+            });
+            expect(contact.phone).toBe("+12125550123");
+        } finally {
+            await prisma.businessProfile.update({
+                where: { organizationId: orgId },
+                data: { country: before.country },
+            });
+        }
+    });
+
     it("a walk-in order making the number's customer mid-booking: one customer, the booking on it", async () => {
         const key = "9845012121";
         let booking: Promise<{ contactId: string | null }> | undefined;

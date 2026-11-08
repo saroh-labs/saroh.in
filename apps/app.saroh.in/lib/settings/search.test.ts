@@ -38,7 +38,29 @@ describe("searchSettings", () => {
         edition.name = "GLOBAL";
         expect(pay("how to pay")).toEqual([]);
         expect(pay("bank details")).toEqual([]);
-        expect(searchSettings("gstin", owner)).not.toEqual([]);
+        expect(searchSettings("invoice prefix", owner)).not.toEqual([]);
+    });
+
+    it("offers GST rows only on GST, the named tax line's elsewhere", () => {
+        const labels = (q: string) =>
+            searchSettings(q, owner, { limit: 50 }).map((h) => h.label);
+        expect(labels("gst")).toEqual([
+            "GST registration",
+            "GSTIN or tax ID",
+            "GST on delivery",
+        ]);
+        expect(labels("sac")).toEqual(["Delivery SAC"]);
+        expect(labels("tax id")).toEqual(["GSTIN or tax ID"]);
+        expect(labels("pin code")).toEqual(["PIN code"]);
+        edition.name = "GLOBAL";
+        expect(labels("gst")).toEqual([]);
+        expect(labels("sac")).toEqual([]);
+        expect(labels("pin code")).toEqual([]);
+        expect(labels("tax id")).toEqual(["Tax ID"]);
+        expect(labels("tax")).toContain("Tax name and rate");
+        expect(labels("zip")).toEqual(["Postcode"]);
+        expect(labels("financial year")).toEqual([]);
+        expect(labels("numbering year")).toEqual(["Numbering year"]);
     });
 
     it("finds a Business setting on its tab", () => {

@@ -42,11 +42,12 @@ const home = {
 describe("draftFrom", () => {
     it("starts a new address on the business's country", () => {
         expect(draftFrom(contact({ country: null }), "GB").country).toBe("GB");
-        expect(draftFrom(contact({ country: null })).country).toBe("IN");
+        expect(draftFrom(contact({ country: null }), "US").country).toBe("US");
+        expect(draftFrom(contact({ country: null }), "IN").country).toBe("IN");
     });
 
     it("starts a new address in India, with nothing filled", () => {
-        const d = draftFrom(contact());
+        const d = draftFrom(contact(), "IN");
         expect(d).toMatchObject({
             email: "ananya@example.com",
             addressLine1: "",
@@ -56,19 +57,25 @@ describe("draftFrom", () => {
     });
 
     it("reads an Indian state's name as the select's code", () => {
-        expect(draftFrom(contact(home)).state).toBe("29");
+        expect(draftFrom(contact(home), "IN").state).toBe("29");
     });
 
     it("keeps another country's state as typed", () => {
         expect(
-            draftFrom(contact({ state: "Greater London", country: "GB" }))
+            draftFrom(contact({ state: "Greater London", country: "GB" }), "US")
                 .state,
         ).toBe("Greater London");
+    });
+
+    it("reads a listed region as its code", () => {
+        expect(
+            draftFrom(contact({ state: "Texas", country: "US" }), "US").state,
+        ).toBe("TX");
     });
 });
 
 describe("detailsProblems", () => {
-    const ok = draftFrom(contact());
+    const ok = draftFrom(contact(), "IN");
 
     it("finds nothing wrong with a good draft", () => {
         expect(detailsProblems(ok)).toEqual({});
@@ -100,19 +107,38 @@ describe("detailsProblems", () => {
         });
     });
 
-    it("refuses a four-digit PIN in India, and not elsewhere", () => {
+    it("refuses a four-digit PIN in India, and not in Australia", () => {
         expect(detailsProblems({ ...ok, postalCode: "5600" })).toEqual({
             postalCode: "A PIN code is six digits, like 560038.",
         });
         expect(detailsProblems({ ...ok, postalCode: "560 038" })).toEqual({});
         expect(
-            detailsProblems({ ...ok, postalCode: "5600", country: "AU" }),
+            detailsProblems({
+                ...ok,
+                postalCode: "5600",
+                state: "",
+                country: "AU",
+            }),
         ).toEqual({});
+    });
+
+    it("holds an address abroad to its own country's shape, asking for neither", () => {
+        const ca = { ...ok, state: "", postalCode: "", country: "CA" };
+        expect(detailsProblems(ca)).toEqual({});
+        expect(
+            detailsProblems({ ...ca, state: "ON", postalCode: "K1A 0B1" }),
+        ).toEqual({});
+        expect(
+            detailsProblems({ ...ca, postalCode: "78701" }).postalCode,
+        ).toContain("K1A 0B1");
+        expect(detailsProblems({ ...ca, state: "Texas" }).state).toBe(
+            "Choose a province or territory from the list.",
+        );
     });
 });
 
 describe("detailsPatch", () => {
-    const initial = draftFrom(contact());
+    const initial = draftFrom(contact(), "IN");
 
     it("sends nothing when nothing changed", () => {
         expect(detailsPatch(initial, { ...initial })).toEqual({});

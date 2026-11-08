@@ -1,6 +1,10 @@
 "use client";
 
-import { phoneLabel } from "@saroh/block-contract";
+import {
+    phoneCountry,
+    phoneHomeCountry,
+    phoneLabel,
+} from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
@@ -11,6 +15,7 @@ import { Notice } from "@saroh/ui/notice";
 import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useBusinessCountry } from "@/components/shared/fields/business-country";
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { findCustomers, readCustomerAttention } from "@/lib/customers/actions";
 import type {
@@ -35,6 +40,7 @@ import {
     resultLabel,
     withDialCode,
 } from "@/lib/customers/picker";
+import { PROFILE } from "@/lib/edition";
 import { firstName } from "@/lib/names";
 import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
@@ -56,7 +62,7 @@ export function useCustomerFinder({
     value,
     onPick,
     canSearch = true,
-    dialCode = "+91",
+    dialCode: givenDialCode,
     showAttention = true,
 }: {
     value: CustomerPick | null;
@@ -64,11 +70,18 @@ export function useCustomerFinder({
     onPick: (pick: CustomerPick) => void;
     /** The viewer holds `contact:read`. */
     canSearch?: boolean;
-    /** Put in front of a phone typed without one (the business's). */
+    /**
+     * Put in front of a phone typed without one. Left out, the business's
+     * ("+91" in India); none on Global with no country, so the API asks
+     * for the +.
+     */
     dialCode?: string;
     /** Read the picked customer's Needs attention. */
     showAttention?: boolean;
 }) {
+    const home = phoneHomeCountry(PROFILE.phoneNumbers, useBusinessCountry());
+    const dialCode =
+        givenDialCode ?? (home ? `+${phoneCountry(home).dial}` : "");
     const [query, setQueryState] = useState("");
     const [found, setFound] = useState<{
         query: string;
