@@ -17,6 +17,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@saroh/edition": "workspace:*",
         "zod": "catalog:"
     },
     "devDependencies": {

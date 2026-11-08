@@ -179,7 +179,16 @@ needs it; a fact nobody reads is removed.
 `@saroh/site-blocks` can't import the package (G1, #252), so a merchant
 site's layout passes the facts a block needs (`address`, `phoneNumbers`, `upi`) in
 `SiteBusinessProvider`, and a pay card knows its business pays by bank code
-from the `edition` the API sends only then.
+from the `edition` the API sends only then. The per-country address rules
+(`address-rules.ts`: postcode shape and words, region lists) are the one
+exception: dependency-free, on their own subpath
+(`@saroh/edition/address-rules`), and re-exported by `@saroh/block-contract`.
+
+Some words follow a Global business's country, not its edition: address
+rules, its zones (`country-zones.ts`, a multi-zone country's main zone) and
+the tax-name example and named-line business types (`country-words.ts`). They
+are tables in the package, not edition facts. `defaultZone` is the edition
+fact every time-zone fallback reads (India Asia/Kolkata, Global UTC).
 
 What stays an edition is identity: routing by host (`editionOfHost`), which
 addresses an edition has (`hostsFor`), `editionForCountry`, admin's edition

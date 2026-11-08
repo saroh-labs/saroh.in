@@ -1,3 +1,4 @@
+import { ONE_ZONE_COUNTRIES } from "@saroh/edition";
 import { IANAZone } from "luxon";
 
 /**
@@ -5,31 +6,6 @@ import { IANAZone } from "luxon";
  * Saroh's market, and what every reader already falls back to.
  */
 export const DEFAULT_BUSINESS_ZONE = "Asia/Kolkata";
-
-/**
- * Countries that keep one zone, so the country alone names it. A country
- * with several (the US, Australia…) isn't guessed at: setup sends the
- * browser's zone, and the merchant can change it in Settings.
- */
-const ONE_ZONE_COUNTRIES: Readonly<Record<string, string>> = {
-    IN: "Asia/Kolkata",
-    AE: "Asia/Dubai",
-    BD: "Asia/Dhaka",
-    BH: "Asia/Bahrain",
-    GB: "Europe/London",
-    HK: "Asia/Hong_Kong",
-    IE: "Europe/Dublin",
-    LK: "Asia/Colombo",
-    MY: "Asia/Kuala_Lumpur",
-    NP: "Asia/Kathmandu",
-    NZ: "Pacific/Auckland",
-    OM: "Asia/Muscat",
-    PK: "Asia/Karachi",
-    QA: "Asia/Qatar",
-    SA: "Asia/Riyadh",
-    SG: "Asia/Singapore",
-    KW: "Asia/Kuwait",
-};
 
 /** The zone a country keeps, when it keeps one; null otherwise. */
 export function zoneForCountry(

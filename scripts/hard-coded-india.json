@@ -57,7 +57,7 @@
     "apps/api.saroh.in/src/modules/orders/order-list-filters.ts": 2,
     "apps/api.saroh.in/src/modules/orders/order-list.ts": 1,
     "apps/api.saroh.in/src/modules/organizations/business-phone.ts": 1,
-    "apps/api.saroh.in/src/modules/organizations/business-zone.ts": 2,
+    "apps/api.saroh.in/src/modules/organizations/business-zone.ts": 1,
     "apps/api.saroh.in/src/modules/pricing/catalogue-writes.service.ts": 1,
     "apps/api.saroh.in/src/modules/products/public-catalogue.serialize.ts": 1,
     "apps/api.saroh.in/src/modules/products/variant-cap.ts": 1,

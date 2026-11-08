@@ -7,7 +7,9 @@ export default defineConfig((options) => ({
     // consumers resolving the package to nothing.
     clean: !options.watch,
     dts: true,
-    entry: ["src/index.ts"],
+    // address-rules is its own entry, with no imports: block-contract
+    // re-exports it for site blocks, which mustn't pull in ibantools.
+    entry: ["src/index.ts", "src/address-rules.ts"],
     format: ["cjs", "esm"],
     minify: isProduction,
     sourcemap: true,
