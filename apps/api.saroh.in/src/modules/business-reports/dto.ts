@@ -53,7 +53,7 @@ export class SubmitBusinessReportDto {
     @Transform(trim)
     @IsString()
     @Matches(CUSTOMER_PHONE, {
-        message: "Enter a mobile number like +91 98450 12345.",
+        message: "Enter a mobile number we can reach you on.",
     })
     phone!: string;
 }

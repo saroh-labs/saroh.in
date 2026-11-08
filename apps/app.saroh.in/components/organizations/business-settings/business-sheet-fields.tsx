@@ -206,7 +206,6 @@ export function BusinessSheetFields({
                                     onValueChange={field.onChange}
                                     onBlur={field.onBlur}
                                     disabled={field.disabled}
-                                    placeholder="98450 12345"
                                 />
                             </FormControl>
                             <FormDescription>

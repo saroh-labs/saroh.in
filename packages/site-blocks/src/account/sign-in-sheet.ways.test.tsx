@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { SiteBusiness } from "../site-business";
+import { INDIA_SITE_BUSINESS, SiteBusinessProvider } from "../site-business";
 import type { SignInApi, SignInOptions } from "./api";
 import { sheetWays } from "./api";
 import { SignInSheet } from "./sign-in-sheet";
@@ -35,7 +37,10 @@ const BASE: SignInOptions = {
     challenge: { required: false, siteKey: "site-key" },
 };
 
-function setup(options: Partial<SignInOptions>) {
+function setup(
+    options: Partial<SignInOptions>,
+    business: SiteBusiness = INDIA_SITE_BUSINESS,
+) {
     const requestPhoneCode = vi
         .fn<NonNullable<SignInApi["requestPhoneCode"]>>()
         .mockResolvedValue({ ok: false, reason: "unavailable" });
@@ -46,13 +51,15 @@ function setup(options: Partial<SignInOptions>) {
         verifyPhoneCode: vi.fn(),
     };
     render(
-        <SignInSheet
-            open
-            onClose={vi.fn()}
-            options={{ ...BASE, ...options }}
-            api={api}
-            onSignedIn={vi.fn()}
-        />,
+        <SiteBusinessProvider value={business}>
+            <SignInSheet
+                open
+                onClose={vi.fn()}
+                options={{ ...BASE, ...options }}
+                api={api}
+                onSignedIn={vi.fn()}
+            />
+        </SiteBusinessProvider>,
     );
     return { requestPhoneCode };
 }
@@ -94,6 +101,21 @@ describe("the sign-in sheet's ways (DEC-196)", () => {
         setup({ ways: ["EMAIL", "WHATSAPP"] });
         expect(screen.getByLabelText("Email")).toBeTruthy();
         expect(alternates()).toEqual(["Use WhatsApp instead"]);
+    });
+
+    it("never offers a phone on a Global site, even when WhatsApp is listed (DEC-211)", () => {
+        setup(
+            { ways: ["WHATSAPP", "EMAIL"], phoneOnlySignUp: true },
+            {
+                country: "US",
+                address: "country-and-region",
+                phoneNumbers: "with-country-code",
+            },
+        );
+        expect(screen.getByLabelText("Email")).toBeTruthy();
+        expect(screen.queryByLabelText("Mobile number")).toBeNull();
+        expect(alternates()).toEqual([]);
+        expect(document.body.textContent).not.toContain("+91");
     });
 
     it("offers no other way when email is the only one", () => {

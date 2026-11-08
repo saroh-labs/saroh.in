@@ -28,11 +28,13 @@ export const socialField = (network: SocialNetwork) => `socialLinks.${network}`;
  * The settings save's write: the stored links with what was sent applied.
  * A network left out stays as it is, "" clears it, anything else is
  * rebuilt into its canonical address or refused on its field. Nothing sent:
- * nothing to write.
+ * nothing to write. `country` reads a WhatsApp number typed without its +
+ * (`phoneHomeCountry`).
  */
 export function socialLinksWrite(
     sent: SocialLinksInput | undefined,
     stored: unknown,
+    country?: string | null,
 ): { socialLinks?: SocialLinks } {
     if (!sent) return {};
     const touched = SOCIAL_NETWORKS.filter((n) => sent[n] !== undefined);
@@ -44,7 +46,7 @@ export function socialLinksWrite(
             delete links[network];
             continue;
         }
-        const check = normaliseSocialLink(network, typed);
+        const check = normaliseSocialLink(network, typed, country);
         if (!check.ok) {
             throw new BadRequestException({
                 message: check.problem,

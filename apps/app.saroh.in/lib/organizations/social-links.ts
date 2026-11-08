@@ -57,7 +57,8 @@ export function socialDraftOf(
 /**
  * What a field says under itself: nothing while it is empty, where the
  * link will open while it is one the API takes, and what is wrong with it
- * otherwise.
+ * otherwise. `country` is the business's home country for a WhatsApp
+ * number typed without its + (`phoneHomeCountry`).
  */
 export type SocialFieldRead =
     | { kind: "empty" }
@@ -67,9 +68,10 @@ export type SocialFieldRead =
 export function readSocialField(
     network: SocialNetwork,
     typed: string,
+    country?: string | null,
 ): SocialFieldRead {
     if (typed.trim() === "") return { kind: "empty" };
-    const check = normaliseSocialLink(network, typed);
+    const check = normaliseSocialLink(network, typed, country);
     return check.ok
         ? { kind: "opens", url: check.url, shown: socialLinkShown(check.url) }
         : { kind: "problem", problem: check.problem };
@@ -78,10 +80,11 @@ export function readSocialField(
 /** Each field that Save would be refused for, with why. */
 export function socialProblems(
     draft: SocialDraft,
+    country?: string | null,
 ): Partial<Record<SocialNetwork, string>> {
     const problems: Partial<Record<SocialNetwork, string>> = {};
     for (const network of SOCIAL_NETWORKS) {
-        const read = readSocialField(network, draft[network]);
+        const read = readSocialField(network, draft[network], country);
         if (read.kind === "problem") problems[network] = read.problem;
     }
     return problems;
@@ -94,10 +97,11 @@ export function socialProblems(
 export function socialPatch(
     draft: SocialDraft,
     saved: SocialLinks | null | undefined,
+    country?: string | null,
 ): Partial<Record<SocialNetwork, string>> {
     const patch: Partial<Record<SocialNetwork, string>> = {};
     for (const network of SOCIAL_NETWORKS) {
-        const read = readSocialField(network, draft[network]);
+        const read = readSocialField(network, draft[network], country);
         const before = saved?.[network] ?? null;
         const after = read.kind === "opens" ? read.url : null;
         if (read.kind === "problem" || after !== before) {

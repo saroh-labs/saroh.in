@@ -192,7 +192,6 @@ export function CtaActionFields({
                         onValueChange={(number) =>
                             onChange({ ...action, number })
                         }
-                        placeholder="98450 12345"
                     />
                 </Field>
             ) : null}

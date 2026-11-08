@@ -217,7 +217,7 @@ export class UpdateDetailsDto {
     @Transform(trim)
     @IsString()
     @Matches(/^(\+?[\d\s-]{7,20})?$/, {
-        message: "Enter a phone number, like +91 98765 43210",
+        message: "Enter a phone number the team can reach you on",
     })
     phone?: string;
 }

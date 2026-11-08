@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { normalisePhone } from "../customer-workspace/duplicates";
 import { contactByPhone } from "../orders/walk-in-customer";
+import { phoneHomeCountryOf } from "../organizations/business-phone";
 import { mayTakeDeskPayment } from "./booking-access";
 import type { DeskMethod } from "./desk-take";
 import type { PaidWith } from "./dto";
@@ -79,13 +80,17 @@ export function bookerPhoneKey(phone: string): string {
 
 /**
  * A typed phone as it is kept: E.164 by the one phone rule
- * (`@saroh/block-contract`, #1036), "098450 12345" as "+919845012345",
- * or a 400 naming `bookerPhone` with the rule's own words. Undefined for
- * nothing typed.
+ * (`@saroh/block-contract`, #1036), "098450 12345" as "+919845012345" on
+ * India, "212 555 0123" as "+12125550123" for a US business (`country`,
+ * the business's home country), or a 400 naming `bookerPhone` with the
+ * rule's own words. Undefined for nothing typed.
  */
-export function bookerPhoneE164(phone: string | undefined): string | undefined {
+export function bookerPhoneE164(
+    phone: string | undefined,
+    country?: string | null,
+): string | undefined {
     if (!phone?.trim()) return undefined;
-    const result = normalisePhoneNumber(phone);
+    const result = normalisePhoneNumber(phone, country);
     if ("problem" in result) {
         throw new BadRequestException({
             message: result.problem,
@@ -185,6 +190,10 @@ export async function handBooker(
         return asTheyStand(dto.startAt, contact);
     }
 
+    const home = dto.bookerPhone?.trim()
+        ? await phoneHomeCountryOf(ctx.organizationId, ctx.edition)
+        : null;
+
     if (dto.bookerEmail) {
         // An email that is already someone's picks that someone (E4), as
         // they stand: booking them never renames them or forks a second
@@ -202,11 +211,11 @@ export async function handBooker(
             startAt: dto.startAt,
             bookerEmail: dto.bookerEmail,
             bookerName: given(dto.bookerName),
-            bookerPhone: bookerPhoneE164(dto.bookerPhone),
+            bookerPhone: bookerPhoneE164(dto.bookerPhone, home),
         };
     }
 
-    const phone = bookerPhoneE164(dto.bookerPhone);
+    const phone = bookerPhoneE164(dto.bookerPhone, home);
     if (phone) {
         const key = bookerPhoneKey(phone);
         const name = given(dto.bookerName)?.trim();

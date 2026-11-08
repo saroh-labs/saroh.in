@@ -74,7 +74,6 @@ export function ContactFields({
                 <BusinessPhoneInput
                     value={c.phone ?? ""}
                     onValueChange={(v) => patch({ phone: v || undefined })}
-                    placeholder="98765 43210"
                 />
             </Field>
             <Field label="Email">
@@ -89,7 +88,6 @@ export function ContactFields({
                 <BusinessPhoneInput
                     value={c.whatsapp ?? ""}
                     onValueChange={(v) => patch({ whatsapp: v || undefined })}
-                    placeholder="98765 43210"
                 />
             </Field>
             <Field optional label="Map link">

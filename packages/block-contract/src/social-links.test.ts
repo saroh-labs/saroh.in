@@ -177,6 +177,28 @@ describe("normaliseSocialLink (DEC-128)", () => {
         expect(url("whatsapp", "wa.me/message/ABCDEF")).toBeNull();
     });
 
+    it("reads a Global business's WhatsApp number without + as its country's", () => {
+        expect(url("whatsapp", "+1 212 555 0123")).toBe(
+            "https://wa.me/12125550123",
+        );
+        expect(normaliseSocialLink("whatsapp", "212 555 0123", "US")).toEqual({
+            ok: true,
+            url: "https://wa.me/12125550123",
+        });
+        expect(normaliseSocialLink("whatsapp", "2125550123", null)).toEqual({
+            ok: false,
+            problem: "Start with + and the country code, like +1 202 555 0123.",
+        });
+        // India unchanged: still needs the +.
+        expect(normaliseSocialLink("whatsapp", "98450 12345", "IN")).toEqual({
+            ok: false,
+            problem: "Start with + and the country code, like +91 98450 12345.",
+        });
+        expect(whatsappChatLink("212 555 0123", "Hi", "US")).toBe(
+            "https://wa.me/12125550123?text=Hi",
+        );
+    });
+
     it("says what to type when it refuses", () => {
         expect(
             normaliseSocialLink("instagram", "https://evil.example/rye"),

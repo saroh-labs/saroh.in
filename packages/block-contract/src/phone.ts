@@ -8,9 +8,10 @@
  * - **Kept as E.164**: "+919845012345", a `+`, the country code and the
  *   number, digits only, 8 to 15 of them. What `tel:` and `wa.me` want.
  * - **Typed the way people say it**: spaces, dashes, dots and brackets
- *   between the digits are fine. An Indian number typed without the `+`
- *   (ten digits, a trunk 0, or 91 / 0091 in front) means +91: Saroh's
- *   businesses are in India.
+ *   between the digits are fine. A number typed without the `+` is the
+ *   business's own country's: on India an Indian number (ten digits, a trunk
+ *   0, or 91 / 0091 in front) means +91; on Global it takes the business's
+ *   country's code, or needs the `+` when no country is known (DEC-204).
  * - **Shown grouped**: "+91 98450 12345" wherever a saved number is read.
  */
 
@@ -20,8 +21,27 @@ export const E164 = /^\+[1-9]\d{7,14}$/;
 /** What may sit between a number's digits: spaces, dashes, dots, brackets. */
 export const PHONE_SEPARATORS = /[\s\-.()]/g;
 
-/** The example every phone problem quotes. */
+/** India's example, and every phone problem's when no country is given. */
 export const PHONE_EXAMPLE = "+91 98450 12345";
+
+/** Examples in each country's range kept for fiction, where it has one. */
+const PHONE_EXAMPLES: Readonly<Record<string, string>> = {
+    IN: PHONE_EXAMPLE,
+    US: "+1 202 555 0123",
+    CA: "+1 613 555 0123",
+    GB: "+44 20 7946 0000",
+    AU: "+61 2 5550 1234",
+};
+
+/**
+ * The number a hint or a problem quotes: India's when no country is given
+ * (as every business was), the country's own where one is listed, else a
+ * US one, which shows the shape (a +, the code, the number) anywhere.
+ */
+export function phoneExample(country?: string | null): string {
+    if (country === undefined) return PHONE_EXAMPLE;
+    return PHONE_EXAMPLES[(country ?? "").toUpperCase()] ?? PHONE_EXAMPLES.US;
+}
 
 /**
  * An Indian number typed without the `+`: ten digits ("98450 12345"), a
@@ -43,30 +63,51 @@ export type PhoneResult = { phone: string | null } | { problem: string };
 
 /**
  * A typed number as it is stored, or why it can't be: "" clears it (null),
- * "+91 98450-12345" is kept as "+919845012345", and an Indian number typed
- * without the + ("98450 12345") gets +91. The API's one rule
- * (`normalisePublicPhone` there re-exports it).
+ * "+91 98450-12345" is kept as "+919845012345". A number typed without the
+ * + is read as `country`'s (`phoneHomeCountry`): left out, or "IN", an
+ * Indian one ("98450 12345") gets +91, exactly as before Global; another
+ * country's code goes in front of it ("212 555 0123" in the US is
+ * "+12125550123"); null (a Global business with no country) refuses it.
+ * The API's one rule (`normalisePublicPhone` there re-exports it).
  */
-export function normalisePhoneNumber(raw: string): PhoneResult {
+export function normalisePhoneNumber(
+    raw: string,
+    country?: string | null,
+): PhoneResult {
     const trimmed = raw.trim();
     if (trimmed === "") return { phone: null };
+    const example = phoneExample(country);
+    const home =
+        country === undefined
+            ? INDIA
+            : (BY_CODE.get((country ?? "").toUpperCase()) ?? null);
     let compact = trimmed.replace(PHONE_SEPARATORS, "");
-    const indian = INDIAN_WITHOUT_PLUS.exec(compact);
+    const indian =
+        home?.code === "IN" ? INDIAN_WITHOUT_PLUS.exec(compact) : null;
     if (indian) compact = `+91${indian[1]}`;
     else if (compact.startsWith("00")) compact = `+${compact.slice(2)}`;
+    else if (home && home.code !== "IN" && /^\d+$/.test(compact)) {
+        const local = withHomeCode(home, compact);
+        if (local === null) {
+            return {
+                problem: `That isn't a whole phone number. Check the digits, like ${example}.`,
+            };
+        }
+        compact = local;
+    }
     if (/[^\d+]/.test(compact)) {
         return {
-            problem: `A phone number is only digits, like ${PHONE_EXAMPLE}.`,
+            problem: `A phone number is only digits, like ${example}.`,
         };
     }
     if (!compact.startsWith("+")) {
         return {
-            problem: `Start with + and the country code, like ${PHONE_EXAMPLE}.`,
+            problem: `Start with + and the country code, like ${example}.`,
         };
     }
     if (!E164.test(compact)) {
         return {
-            problem: `That isn't a whole phone number. Check the digits and the country code, like ${PHONE_EXAMPLE}.`,
+            problem: `That isn't a whole phone number. Check the digits and the country code, like ${example}.`,
         };
     }
     // India's numbers are ten digits after +91, mobile and landline alike,
@@ -83,9 +124,43 @@ export function normalisePhoneNumber(raw: string): PhoneResult {
     return { phone: compact };
 }
 
+/**
+ * Digits typed without a + as `home`'s number: its code in front, one trunk
+ * 0 dropped (Italy's kept). The +1 countries take ten digits, or 1 and ten;
+ * other lengths there are null.
+ */
+function withHomeCode(home: PhoneCountry, digits: string): string | null {
+    if (home.dial.startsWith("1")) {
+        const ten = /^1?(\d{10})$/.exec(digits);
+        return ten ? `+1${ten[1]}` : null;
+    }
+    const national = KEEPS_LEADING_ZERO.has(home.code)
+        ? digits
+        : digits.replace(/^0/, "");
+    return `+${home.dial}${national}`;
+}
+
+/**
+ * The country a number typed without a + is read as, from the edition's
+ * `phoneNumbers` and the business's country: India on India (DEC-198);
+ * on Global the business's own, or null when it has none the table knows,
+ * so the number needs its +.
+ */
+export function phoneHomeCountry(
+    phoneNumbers: "indian" | "with-country-code",
+    country: string | null | undefined,
+): string | null {
+    if (phoneNumbers === "indian") return "IN";
+    const code = (country ?? "").toUpperCase();
+    return BY_CODE.has(code) ? code : null;
+}
+
 /** What is wrong with a typed number, or null when it will be kept. */
-export function phoneNumberProblem(typed: string): string | null {
-    const result = normalisePhoneNumber(typed);
+export function phoneNumberProblem(
+    typed: string,
+    country?: string | null,
+): string | null {
+    const result = normalisePhoneNumber(typed, country);
     return "problem" in result ? result.problem : null;
 }
 
@@ -94,8 +169,8 @@ export function phoneNumberProblem(typed: string): string | null {
  * the trimmed text as it was (so a caller that sends it lets the server say
  * why it was refused).
  */
-export function phoneE164(typed: string): string {
-    const result = normalisePhoneNumber(typed);
+export function phoneE164(typed: string, country?: string | null): string {
+    const result = normalisePhoneNumber(typed, country);
     if ("phone" in result) return result.phone ?? "";
     return typed.trim();
 }
