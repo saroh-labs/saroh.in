@@ -6598,3 +6598,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the e2e stack's API runs with `TRUST_PROXY=private` (`ci.yml`, `scripts/prepush.sh`), and `asNewVisitor` sends its address as `x-forwarded-for` as well.
 - **Rule:** a public limit a browser spec meets directly on the API is keyed on `@Ip()`; give the customer an address the API reads (`x-forwarded-for` on the trusted e2e stack), not only the renderer's header.
 - **Category:** e2e · rate limits
+
+## saroh.tech's Tailwind content check failed in CI only (8 Nov 2026)
+
+- **Symptom:** CI's unit job failed `apps/saroh.tech/tailwind-content.test.ts` ("expected [ 'lib/money.ts' ] to deeply equal []") after `option-select.tsx` in `@saroh/ui` began importing `lib/money.ts`; the local gate had passed.
+- **Cause:** the gate runs vitest with `--changed`, which picks tests by their import graph. The check reads `@saroh/ui` files from disk, so no change in `packages/ui` ever selected it.
+- **Fix:** `lib/money.ts` added to `UI_FILES`; saroh.tech's `vitest.config.ts` lists `packages/ui/src/**` in `forceRerunTriggers`, so a `@saroh/ui` change reruns its whole suite under `--changed`.
+- **Rule:** a test that reads another package's files by path, not by import, needs a `forceRerunTriggers` entry for them, or the local gate never runs it.
+- **Category:** tooling · tests
