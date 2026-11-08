@@ -823,8 +823,14 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
             if (f.url().startsWith(CHECKOUT_ORIGIN)) left.push(f.url());
         });
 
-        const intentAnswer = page.waitForResponse(
-            (r) => r.url().includes("/payment-intent") && r.ok(),
+        // The pay page starts the intent server to server (a server
+        // action, `lib/invoice-pay.ts`), so the browser sees only the
+        // action's answer, which carries the intent.
+        const actionAnswer = page.waitForResponse(
+            (r) =>
+                r.request().method() === "POST" &&
+                r.url().includes(`/pay/${token}`) &&
+                r.ok(),
         );
         await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
         // Pressed until hydrated, as the hosted test does.
@@ -832,13 +838,19 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
             page.getByRole("button", { name: /^Pay \$25(\.00)?$/ }),
             () => page.getByRole("dialog").isVisible(),
         );
-        const intent = (await (await intentAnswer).json()) as {
-            paymentIntentId: string;
-            providerIntentId: string;
-            clientParams: Record<string, unknown>;
+        const answer = await (await actionAnswer).text();
+        const field = (name: string) =>
+            new RegExp(`"${name}":"([^"]+)"`).exec(answer)?.[1] ?? "";
+        const intent = {
+            paymentIntentId: field("paymentIntentId"),
+            providerIntentId: field("providerIntentId"),
         };
+        expect(intent.paymentIntentId).toBeTruthy();
         expect(intent.providerIntentId).toMatch(/^pi_fake_/);
-        expect(intent.clientParams).not.toHaveProperty("checkoutUrl");
+        expect(answer).toContain(
+            `"clientSecret":"${intent.providerIntentId}_secret_`,
+        );
+        expect(answer).not.toContain("checkoutUrl");
 
         // The window, on the page: never Stripe's hosted Checkout.
         const cardWindow = page.getByRole("dialog");
