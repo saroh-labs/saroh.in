@@ -90,6 +90,10 @@ describe("the API's environment", () => {
 });
 
 describe("the export series' prefix (stage 9, KTD6)", () => {
+    it("starts without the export settings: an export invoice is refused instead (owner, 8 Nov 2026)", () => {
+        expect(parseEnv(DEPLOYED).success).toBe(true);
+    });
+
     it("refuses India's prefix, the default included, and a long one", () => {
         expect(
             parseEnv({ ...BASE, SAROH_INVOICE_PREFIX_GLOBAL: "SA" }).success,

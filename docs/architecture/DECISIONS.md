@@ -2848,6 +2848,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - DEC-210's payment-due flow covers both editions and needs no change.
 - **Owner's answers (8 Nov 2026), stage 9:**
     - **Add-ons on Global's pay-each-month route.** Each month's USD order carries the add-ons the business holds as it pays, a whole month each, with no proration. An add-on bought mid-month is held at once and first charged on the next month's payment; nothing is charged for the rest of the month it was bought in (`monthAddonLines`, `addons.service.ts`).
+    - **Export invoice settings missing** (`SAROH_INVOICE_PREFIX_GLOBAL` or the `SAROH_EXPORT_LUT` note): the server still starts; that invoice is not written and a Needs action row is raised (`saroh_export_invoice_unset`). Tests: `env.spec.ts` (starts without them) and `checkout-global.db.spec.ts` (each one missing).
 
 ## DEC-212 Turning a module on needs nothing first
 

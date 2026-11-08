@@ -325,30 +325,39 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
         }
     });
 
-    it("issues no export invoice without its prefix and LUT note", async () => {
-        const catalog = usd();
-        await install(1, "GLOBAL", catalog);
-        await flag(true);
-        seller.exportNote = null;
-        const ctx = await globalBusiness();
-        const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
-        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
-        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
-        await paid(r.handoff!.orderId!, price);
-        expect(
-            await prisma.billingAction.count({
-                where: {
-                    organizationId: ctx.organizationId,
-                    code: "saroh_export_invoice_unset",
-                },
-            }),
-        ).toBe(1);
-        expect(
-            await prisma.sarohInvoice.count({
-                where: { organizationId: ctx.organizationId },
-            }),
-        ).toBe(0);
-    });
+    it.each([
+        ["prefix", { exportPrefix: null }],
+        ["LUT note", { exportNote: null }],
+    ] as const)(
+        "issues no export invoice without its %s, and says so",
+        async (_, unset) => {
+            const catalog = usd();
+            await install(1, "GLOBAL", catalog);
+            await flag(true);
+            Object.assign(seller, unset);
+            const ctx = await globalBusiness();
+            const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
+            const r = await checkout.changePlan(ctx, {
+                plan: "b",
+                cycle: "month",
+            });
+            if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+            await paid(r.handoff!.orderId!, price);
+            expect(
+                await prisma.billingAction.count({
+                    where: {
+                        organizationId: ctx.organizationId,
+                        code: "saroh_export_invoice_unset",
+                    },
+                }),
+            ).toBe(1);
+            expect(
+                await prisma.sarohInvoice.count({
+                    where: { organizationId: ctx.organizationId },
+                }),
+            ).toBe(0);
+        },
+    );
 
     it("makes the next month due at the month's end, then Free after 7 days unpaid", async () => {
         const catalog = usd();
