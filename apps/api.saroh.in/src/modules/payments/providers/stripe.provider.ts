@@ -167,11 +167,15 @@ export class StripeProvider implements MerchantProvider {
     }
 
     /**
-     * Parked (owner, 8 Nov 2026): the PaymentIntent Saroh's own in-page card
-     * window confirms with Stripe.js (`site-blocks` `stripe-window.ts`).
-     * Replaced as the live path by hosted Checkout (DEC-208); nothing calls
-     * it, and it keeps its test so the window can be offered again. Cards
-     * only, the merchant's reference in `metadata[saroh_ref]`.
+     * The PaymentIntent Saroh's own card window confirms with Stripe.js
+     * (`site-blocks` `stripe-window.ts`), for a Stripe connection set to
+     * "Pay on our page" (owner, 8 Nov 2026, DEC-208). Cards only, the
+     * description an Indian account needs for a payment from abroad, and
+     * Saroh's references in `metadata[saroh_ref]` (the order or invoice)
+     * and `metadata[saroh_intent]` (Saroh's intent id, when made first), so
+     * its `payment_intent.*` webhooks find the row; the payer's Customer
+     * and `receipt_email`, as hosted Checkout records them. The browser
+     * gets the client secret, which only Stripe.js reads.
      */
     async createElementIntent(
         input: Pick<
@@ -181,7 +185,11 @@ export class StripeProvider implements MerchantProvider {
             | "orderId"
             | "credentials"
             | "description"
-        >,
+        > & {
+            intentId?: string;
+            customerId?: string | null;
+            receiptEmail?: string | null;
+        },
     ): Promise<CreateOrderIntentResult> {
         const { amountCents, currency, orderId, credentials } = input;
         if (!stripeTakesCurrency(currency)) {
@@ -200,8 +208,17 @@ export class StripeProvider implements MerchantProvider {
                     // `payment_method_types` is refused on this version.
                     "allowed_payment_method_types[]": "card",
                     "metadata[saroh_ref]": orderId,
+                    ...(input.intentId
+                        ? { "metadata[saroh_intent]": input.intentId }
+                        : {}),
                     ...(input.description
                         ? { description: input.description }
+                        : {}),
+                    // The payer as hosted Checkout records them: under a
+                    // named Customer, with Stripe's receipt address.
+                    ...(input.customerId ? { customer: input.customerId } : {}),
+                    ...(input.receiptEmail
+                        ? { receipt_email: input.receiptEmail }
                         : {}),
                 }),
                 signal: providerCallSignal(),

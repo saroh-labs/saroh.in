@@ -8,6 +8,7 @@ import { lockBookingInTx } from "../bookings/booking-hold";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { rendererBase, siteOriginOf } from "../sites/site-origin";
 import type {
+    FindOrCreateCustomerResult,
     HostedCheckoutInput,
     MerchantProvider,
     ProviderCredentials,
@@ -268,22 +269,12 @@ export async function prepareStripeCheckout(input: {
     // (owner, 7 Nov: payments never fail for it).
     const indianOrUnknown = country === null || country === "IN";
 
-    const customer = adapter.findOrCreateCustomer
-        ? await adapter.findOrCreateCustomer({
-              email: detail.payerEmail,
-              name: detail.payerName,
-              organizationId,
-              contactRef: detail.contactId,
-              credentials,
-          })
-        : { customerId: null };
-    if (customer.customerId && detail.contactId) {
-        await recordStripeCustomer(
-            organizationId,
-            detail.contactId,
-            customer.customerId,
-        );
-    }
+    const customer = await payerCustomer(
+        organizationId,
+        detail,
+        adapter,
+        credentials,
+    );
 
     // A hold's session ends with its hold: Stripe's shortest life, plus a
     // margin. Anything else keeps Stripe's default day.
@@ -323,6 +314,80 @@ export async function prepareStripeCheckout(input: {
             ).toISOString(),
         },
         holdBookingId: detail.holdBookingId,
+        permissionMissing: Boolean(customer.permissionMissing),
+    };
+}
+
+/**
+ * The payer as a Stripe Customer in the business's account (found by
+ * email, else made), recorded on the business's contact. Never throws.
+ */
+async function payerCustomer(
+    organizationId: string,
+    detail: StripeCheckoutTarget,
+    adapter: MerchantProvider,
+    credentials: ProviderCredentials,
+): Promise<FindOrCreateCustomerResult> {
+    const customer = adapter.findOrCreateCustomer
+        ? await adapter.findOrCreateCustomer({
+              email: detail.payerEmail,
+              name: detail.payerName,
+              organizationId,
+              contactRef: detail.contactId,
+              credentials,
+          })
+        : { customerId: null };
+    if (customer.customerId && detail.contactId) {
+        await recordStripeCustomer(
+            organizationId,
+            detail.contactId,
+            customer.customerId,
+        );
+    }
+    return customer;
+}
+
+/**
+ * What Saroh's card window needs beyond the amount (DEC-208, 8 Nov): the
+ * payer as a Stripe Customer, as hosted Checkout makes one, so the payment
+ * sits under a named customer with a receipt email; and the country the
+ * card's billing address starts on, the business's own (its profile, else
+ * its Stripe account's), never the browser's guess. Never fails the
+ * payment for a customer or country read.
+ */
+export async function prepareStripeWindow(input: {
+    organizationId: string;
+    target: { kind: "order" | "invoice"; id: string };
+    providerRow: MerchantPaymentProvider;
+    adapter: MerchantProvider;
+    credentials: ProviderCredentials;
+}): Promise<{
+    customerId: string | null;
+    receiptEmail: string | null;
+    country: string | null;
+    /** The key can't read or make customers: flag the connection. */
+    permissionMissing: boolean;
+}> {
+    const { organizationId, providerRow, adapter, credentials } = input;
+    const detail = await stripeCheckoutTarget(input.target);
+    const customer = await payerCustomer(
+        organizationId,
+        detail,
+        adapter,
+        credentials,
+    );
+    const profile = await prisma.businessProfile.findUnique({
+        where: { organizationId },
+        select: { country: true },
+    });
+    const own = profile?.country?.trim().toUpperCase() ?? "";
+    const country = /^[A-Z]{2}$/.test(own)
+        ? own
+        : await accountCountryOf(providerRow, adapter, credentials);
+    return {
+        customerId: customer.customerId,
+        receiptEmail: detail.payerEmail,
+        country,
         permissionMissing: Boolean(customer.permissionMissing),
     };
 }

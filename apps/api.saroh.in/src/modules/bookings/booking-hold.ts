@@ -16,6 +16,7 @@ import {
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
 import { businessPayLinkProvider } from "../payments/pay-link-provider";
+import { paysInWindow } from "../payments/stripe-checkout-style";
 import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { seatsHeld } from "./held-seats";
 import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
@@ -121,9 +122,12 @@ export function holdExpiry(now: Date, minutes: number = HOLD_MINUTES): Date {
 
 /**
  * How long a business's pay-now hold lasts: {@link STRIPE_HOLD_MINUTES}
- * when its hold is paid through Stripe (the provider its hold invoice's
- * intent will use, `businessPayLinkProvider`), else {@link HOLD_MINUTES}.
- * No provider ready yet reads as the usual length.
+ * when its hold is paid on Stripe's hosted Checkout (the provider its hold
+ * invoice's intent will use, `businessPayLinkProvider`), else
+ * {@link HOLD_MINUTES}. Saroh's own card window (a Stripe connection set
+ * to it, DEC-208, 8 Nov) has no session to outlast, so it keeps the usual
+ * length, as it did before hosted Checkout. No provider ready yet reads as
+ * the usual length.
  */
 export async function holdMinutesFor(
     db: Parameters<typeof businessPayLinkProvider>[0],
@@ -131,7 +135,9 @@ export async function holdMinutesFor(
 ): Promise<number> {
     try {
         const row = await businessPayLinkProvider(db, organizationId);
-        return row.provider === "STRIPE" ? STRIPE_HOLD_MINUTES : HOLD_MINUTES;
+        return row.provider === "STRIPE" && !paysInWindow(row)
+            ? STRIPE_HOLD_MINUTES
+            : HOLD_MINUTES;
     } catch {
         return HOLD_MINUTES;
     }
