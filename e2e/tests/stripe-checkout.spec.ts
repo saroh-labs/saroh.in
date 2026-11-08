@@ -1,7 +1,7 @@
-// @covers app:/open app:/settings/providers site:/pay/[token] api:payments api:webhooks api:invoices api:organizations api:feature-flags api:admin pkg:site-blocks
+// @covers app:/open app:/settings/providers site:/pay/[token] site:/pay/o/[token] site:/pay/paid site:/paid site:/book api:payments api:webhooks api:invoices api:orders api:stores api:products api:bookings api:site-accounts api:sites api:capabilities api:organizations api:feature-flags api:admin pkg:site-blocks
 import { createHmac } from "node:crypto";
 
-import type { Page } from "@playwright/test";
+import type { Browser, Page, Request, Route, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { rollOut } from "../fixtures/global";
@@ -10,23 +10,29 @@ import { makeBusiness } from "../fixtures/own-business";
 import { business, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { urls } from "../playwright.config";
+import { asNewVisitor, nameThenBook, signInOnSheet } from "./site-codes";
 
 /**
- * Stripe end to end on the business's own keys (DEC-208, U8), without
- * calling Stripe.
+ * Stripe end to end on the business's own keys, through Stripe's hosted
+ * Checkout (DEC-208 and its 7 Nov amendment; plan 2026-11-07-002, U10),
+ * without calling Stripe.
  *
  * The stack's API runs Stripe on its test-only fake (`STRIPE_FAKE=1`,
- * `payments/providers/stripe-fake.ts`): made-up keys connect, an intent
- * is a made-up `pi_fake_…`, and a look-up finds no payment, so only the
- * signed webhook settles one. Stripe.js is stubbed here with a fake
- * `window.Stripe` whose `confirmPayment` succeeds. The webhook is signed
- * as Stripe signs it (`t=…,v1=…`, HMAC-SHA256 over `t.body` with the
+ * `payments/providers/stripe-fake.ts`): made-up keys connect, a payment is
+ * a made-up Checkout Session `cs_fake_…` whose address is on
+ * checkout.stripe.com and carries the session's success and cancel
+ * addresses as query parameters, and a look-up finds no payment, so only
+ * the signed webhook settles one. Stripe's page is stood in for here
+ * (`stubCheckout`): Pay follows the success address, Back the cancel one,
+ * as Stripe's own page would send the customer. Each webhook is signed as
+ * Stripe signs it (`t=…,v1=…`, HMAC-SHA256 over `t.body` with the
  * connection's `whsec_`) and checked by the API's real verifier.
  *
  * Each test sets up a business of its own (`makeBusiness`, as Asha): a
- * Global one (US) with Payments and the `STRIPE_PAYMENTS` release rolled
- * out to it alone by Sam, Saroh staff, or an India one. Nothing another
- * spec reads is changed, so nothing here is `@serial`.
+ * Global one (US) with the releases it needs rolled out to it alone by Sam,
+ * Saroh staff, or an India one. The booking tests publish that business's
+ * own booking page and book on it as a new customer with a stamped email.
+ * Nothing another spec reads is changed, so nothing here is `@serial`.
  *
  * The setup sheet is checked here on India's app (`urls.APP_URL`); the
  * Global app's sheet, Stripe alone and its key checks, is
@@ -42,106 +48,318 @@ const PUBLISHABLE = "pk_test_example";
 const RESTRICTED = "rk_test_example";
 const SIGNING_SECRET = "whsec_example";
 
+const CHECKOUT_ORIGIN = "https://checkout.stripe.com/";
+const CHECKOUT = /^https:\/\/checkout\.stripe\.com\//;
+
 const headers = (b: OwnBusiness) => ({
     origin: urls.APP_URL,
     "x-organization-id": b.id,
 });
 
-/**
- * Stripe.js, faked: `Stripe(key)` keeps the key, the Payment Element is a
- * plain box, and `confirmPayment` answers that the intent (named by its
- * client secret, `<id>_secret_…`) succeeded.
- */
-async function fakeStripeJs(page: Page) {
-    await page.route("https://js.stripe.com/**", (route) =>
-        route.fulfill({
-            contentType: "application/javascript",
-            body: `window.Stripe = function (key) {
-                window.__stripeKey = key;
-                var secret = "";
-                return {
-                    elements: function (options) {
-                        secret = options.clientSecret;
-                        return {
-                            create: function () {
-                                return {
-                                    mount: function (el) { el.textContent = "Card details"; },
-                                    on: function () {},
-                                    focus: function () {},
-                                };
-                            },
-                        };
-                    },
-                    confirmPayment: function () {
-                        return Promise.resolve({
-                            paymentIntent: { id: secret.split("_secret_")[0], status: "succeeded" },
-                        });
-                    },
-                };
-            };`,
-        }),
-    );
+/** What the fake's Checkout address says about its session. */
+interface Session {
+    sessionId: string;
+    /** Saroh's intent id, which the cancel address carries (and Stripe echoes as `client_reference_id`). */
+    intentId: string;
+    successUrl: string;
+    cancelUrl: string;
 }
 
-/** A `payment_intent.succeeded` event, signed as Stripe signs one. */
-function signedSucceeded(
-    intentId: string,
-    invoiceId: string,
-    amountCents: number,
-    tag: string,
-): { body: string; signature: string } {
-    const body = JSON.stringify({
-        id: `evt_fake_${tag}`,
+function sessionOf(checkoutUrl: string): Session {
+    const url = new URL(checkoutUrl);
+    const sessionId = url.pathname.split("/").pop() ?? "";
+    const success = url.searchParams.get("success_url") ?? "";
+    const cancelUrl = url.searchParams.get("cancel_url") ?? "";
+    expect(sessionId).toMatch(/^cs_fake_[0-9a-f]{32}$/);
+    expect(success).toContain("session_id={CHECKOUT_SESSION_ID}");
+    const intentId = new URL(cancelUrl).searchParams.get("intent") ?? "";
+    expect(intentId, "the cancel address names Saroh's intent").toBeTruthy();
+    return {
+        sessionId,
+        intentId,
+        // Stripe fills the session id in on its way back.
+        successUrl: success.replace("{CHECKOUT_SESSION_ID}", sessionId),
+        cancelUrl,
+    };
+}
+
+const attr = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+/**
+ * Stripe's hosted Checkout page, stood in for: a Pay link to the session's
+ * success address and a Back link to its cancel address. Nothing else on
+ * checkout.stripe.com is loaded.
+ */
+async function stubCheckout(page: Page): Promise<void> {
+    await page.route("https://checkout.stripe.com/**", (route: Route) => {
+        const s = sessionOf(route.request().url());
+        return route.fulfill({
+            contentType: "text/html",
+            body: `<!doctype html><html><head><title>Checkout</title></head><body>
+                <h1>Stripe Checkout (stub)</h1>
+                <a href="${attr(s.successUrl)}">Pay</a>
+                <a href="${attr(s.cancelUrl)}">Back</a>
+            </body></html>`,
+        });
+    });
+}
+
+/** Sign a webhook body as Stripe does, with the endpoint's secret. */
+function signed(body: unknown): { body: string; signature: string } {
+    const text = JSON.stringify(body);
+    const t = Math.floor(Date.now() / 1000);
+    const v1 = createHmac("sha256", SIGNING_SECRET)
+        .update(`${t}.${text}`)
+        .digest("hex");
+    return { body: text, signature: `t=${t},v1=${v1}` };
+}
+
+function event(type: string, tag: string, object: Record<string, unknown>) {
+    return {
+        id: `evt_fake_${type.replace(/\W/g, "_")}_${tag}`,
         object: "event",
         api_version: "2026-10-28.endive",
         created: Math.floor(Date.now() / 1000),
-        type: "payment_intent.succeeded",
+        type,
         livemode: false,
-        data: {
-            object: {
-                id: intentId,
-                object: "payment_intent",
-                amount: amountCents,
-                amount_received: amountCents,
-                currency: "usd",
-                status: "succeeded",
-                latest_charge: `ch_fake_${tag}`,
-                metadata: { saroh_ref: invoiceId },
-            },
-        },
-    });
-    const t = Math.floor(Date.now() / 1000);
-    const v1 = createHmac("sha256", SIGNING_SECRET)
-        .update(`${t}.${body}`)
-        .digest("hex");
-    return { body, signature: `t=${t},v1=${v1}` };
+        data: { object },
+    };
 }
 
-test.describe("Stripe on the business's own keys (DEC-208)", () => {
+/** `checkout.session.completed` (paid) or `checkout.session.expired`, as Stripe sends them. */
+function sessionEvent(
+    type: "checkout.session.completed" | "checkout.session.expired",
+    s: Session,
+    amountCents: number,
+    tag: string,
+    ref?: string,
+) {
+    const paid = type === "checkout.session.completed";
+    return event(type, tag, {
+        id: s.sessionId,
+        object: "checkout.session",
+        amount_total: amountCents,
+        currency: "usd",
+        client_reference_id: s.intentId,
+        metadata: {
+            saroh_intent: s.intentId,
+            ...(ref ? { saroh_ref: ref } : {}),
+        },
+        mode: "payment",
+        payment_intent: paid ? `pi_fake_${tag}` : null,
+        payment_status: paid ? "paid" : "unpaid",
+        status: paid ? "complete" : "expired",
+    });
+}
+
+/**
+ * `payment_intent.succeeded` alone, as an endpoint made before hosted
+ * Checkout gets it (no session events, KTD-6): the PaymentIntent carries
+ * Saroh's intent id, so it settles the session's payment by itself.
+ */
+function intentSucceeded(
+    s: Session,
+    ref: string,
+    amountCents: number,
+    tag: string,
+) {
+    return event("payment_intent.succeeded", tag, {
+        id: `pi_fake_${tag}`,
+        object: "payment_intent",
+        amount: amountCents,
+        amount_received: amountCents,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: `ch_fake_${tag}`,
+        metadata: { saroh_ref: ref, saroh_intent: s.intentId },
+    });
+}
+
+async function sendWebhook(page: Page, b: OwnBusiness, body: unknown) {
+    const hook = signed(body);
+    const res = await page.request.post(
+        `${urls.API_URL}/public/webhooks/stripe/${b.id}`,
+        {
+            headers: {
+                "content-type": "application/json",
+                "stripe-signature": hook.signature,
+            },
+            data: hook.body,
+        },
+    );
+    expect(res.status(), await res.text()).toBe(200);
+}
+
+/** The buyer's view of a session, as the `/paid` page reads it. */
+interface SessionView {
+    status: string;
+    kind: string;
+    amountCents: number;
+    booking: { startAt: string } | null;
+}
+
+async function readSession(page: Page, sessionId: string) {
+    const res = await page.request.get(
+        `${urls.API_URL}/public/payments/checkout/${sessionId}`,
+    );
+    expect(res.ok(), await res.text()).toBe(true);
+    return (await res.json()) as SessionView;
+}
+
+/** The page's heading, wherever the business's look puts it. */
+const heading = (page: Page, name: string) =>
+    page.getByRole("heading", { name, level: 1 });
+
+/**
+ * A Global business (US) whose payments go through Stripe: Payments and
+ * `STRIPE_PAYMENTS` rolled out to it alone, its address set (DEC-068), and
+ * Stripe connected with three made-up values. `extra` rolls out more.
+ */
+async function stripeBusiness(
+    page: Page,
+    browser: Browser,
+    testInfo: TestInfo,
+    prefix: string,
+    extra: string[] = [],
+): Promise<OwnBusiness> {
+    const b = await makeBusiness(page, testInfo, prefix, { country: "US" });
+    await rollOut(browser, page, b, testInfo, [
+        "MODULE_PAYMENTS",
+        "STRIPE_PAYMENTS",
+        ...extra,
+    ]);
+    const api = business(page.request, b.id);
+    await api.patch("", {
+        registeredAddress: {
+            line1: `${stamp(testInfo)} Main Street`,
+            city: "New York",
+            postalCode: "10001",
+        },
+    });
+    await api.post("/payment-providers", {
+        provider: "STRIPE",
+        keyId: PUBLISHABLE,
+        publicKey: PUBLISHABLE,
+        keySecret: RESTRICTED,
+        webhookSecret: SIGNING_SECRET,
+    });
+    return b;
+}
+
+/** Turn a module on with its setup, as the Turn on sheet does. */
+async function turnOn(page: Page, b: OwnBusiness, key: string, setup: object) {
+    const res = await page.request.put(
+        `${urls.API_URL}/organizations/${b.id}/modules/${key}`,
+        { headers: headers(b), data: { status: "ENABLED", setup } },
+    );
+    expect(res.ok(), `turn on ${key}: ${await res.text()}`).toBe(true);
+}
+
+/**
+ * A Stripe business with a live booking page (DEC-175) and one $25 service
+ * open every day, so a time is always free: its site's address and the
+ * service's id.
+ */
+async function stripeBookingSite(
+    page: Page,
+    browser: Browser,
+    testInfo: TestInfo,
+    prefix: string,
+): Promise<{ b: OwnBusiness; site: string; serviceId: string }> {
+    const b = await stripeBusiness(page, browser, testInfo, prefix, [
+        "MODULE_CRM",
+        "MODULE_APPOINTMENTS",
+        "MODULE_WEBSITE",
+    ]);
+    await turnOn(page, b, "CRM", {});
+    await turnOn(page, b, "APPOINTMENTS", {
+        hours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+            weekday,
+            open: "00:00",
+            close: "23:30",
+        })),
+        service: {
+            name: `Session ${stamp(testInfo)}`,
+            durationMinutes: 30,
+            price: "25",
+        },
+    });
+    const api = business(page.request, b.id);
+    const services = await api.get<{ id: string }[]>("/services");
+    const serviceId = services.at(0)?.id ?? "";
+    expect(serviceId, "the setup made its service").toBeTruthy();
+    await api.post("/booking-page/publish");
+    const renderer = new URL(urls.RENDERER_URL);
+    const site = `${renderer.protocol}//${b.address}.${renderer.host}`;
+    await expect
+        .poll(async () => (await page.request.get(`${site}/book`)).status(), {
+            timeout: 20_000,
+        })
+        .toBe(200);
+    return { b, site, serviceId };
+}
+
+/**
+ * As a new customer on the business's booking page: the first free time,
+ * Pay now, sign in with a code, and press Pay. The page leaves for Stripe's
+ * (stubbed) Checkout; answers the hold's pay token and the session.
+ */
+async function bookAndLeaveForStripe(
+    customer: Page,
+    site: string,
+    serviceId: string,
+    email: string,
+): Promise<{ payToken: string; session: Session }> {
+    await customer.goto(`${site}/book?service=${serviceId}`);
+    const days = customer.getByRole("radio", { name: /times? free/ });
+    await expect(days.first()).toBeVisible({ timeout: 15_000 });
+    await days.first().click();
+    const times = customer.locator('[role="radiogroup"] button[role="radio"]', {
+        hasText: /^\d{1,2}:\d{2} [ap]m$/,
+    });
+    await expect(times.first()).toBeVisible({ timeout: 15_000 });
+    await times.first().click();
+
+    const payNow = customer.getByRole("radio", { name: /^Pay \$\S+ now/ });
+    await payNow.click();
+    await expect(payNow).toHaveAttribute("aria-checked", "true");
+
+    const intent = customer.waitForRequest((r: Request) =>
+        r.url().includes("/payment-intent"),
+    );
+    await customer
+        .getByRole("button", { name: "Continue to sign in" })
+        .first()
+        .click();
+    await signInOnSheet(customer, email);
+    await nameThenBook(customer, "Jo Rivera");
+    const payToken = new URL((await intent).url()).pathname.split("/")[3] ?? "";
+    expect(payToken).toBeTruthy();
+    await customer.waitForURL(CHECKOUT, { timeout: 30_000 });
+    return { payToken, session: sessionOf(customer.url()) };
+}
+
+test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-208)", () => {
     test.skip(!FAKE, SKIP_WHY);
 
-    test("a Global business is offered Stripe alone, connects it, and a pay link is paid through Stripe's window and its signed webhook", async ({
+    test("a Global business is offered Stripe alone, and a pay link is paid on Stripe's page and settled by the PaymentIntent's webhook alone", async ({
         page,
         browser,
     }, testInfo) => {
         test.setTimeout(150_000);
         const s = stamp(testInfo);
         const tag = s.replace(/[^A-Za-z0-9]/g, "");
-        const b = await makeBusiness(page, testInfo, "stripe", {
-            country: "US",
-        });
-        await rollOut(browser, page, b, testInfo, [
-            "MODULE_PAYMENTS",
-            "STRIPE_PAYMENTS",
-        ]);
+        const b = await stripeBusiness(page, browser, testInfo, "stripe");
         const api = business(page.request, b.id);
 
-        // Offered Stripe alone: the webhook setup lists it only, and
-        // Razorpay is refused in the merchant's words.
-        const setup = await api.get<{ provider: string }[]>(
+        // Offered Stripe alone: the webhook setup lists it only, with the
+        // Checkout events, and Razorpay is refused in the merchant's words.
+        const setup = await api.get<{ provider: string; events: string[] }[]>(
             "/payment-providers/webhooks",
         );
         expect(setup.map((w) => w.provider)).toEqual(["STRIPE"]);
+        expect(setup[0]?.events).toContain("checkout.session.completed");
         const razorpay = await page.request.post(
             `${urls.API_URL}/organizations/${b.id}/payment-providers`,
             {
@@ -159,26 +377,9 @@ test.describe("Stripe on the business's own keys (DEC-208)", () => {
             "Razorpay and Cashfree take payments in India. Connect Stripe instead.",
         );
 
-        // Invoiced payments need the business's address (DEC-068), then
-        // Stripe is connected with its three made-up values.
-        await api.patch("", {
-            registeredAddress: {
-                line1: `${s} Main Street`,
-                city: "New York",
-                postalCode: "10001",
-            },
-        });
-        await api.post("/payment-providers", {
-            provider: "STRIPE",
-            keyId: PUBLISHABLE,
-            publicKey: PUBLISHABLE,
-            keySecret: RESTRICTED,
-            webhookSecret: SIGNING_SECRET,
-        });
-
         // An issued invoice of $25 and its pay link.
         const contact = await api.post<{ id: string }>("/contacts", {
-            email: `u8-${s}@example.com`,
+            email: `u10-${s}@example.com`.toLowerCase(),
             firstName: "Jo",
             lastName: `Stripe ${s}`,
         });
@@ -207,77 +408,347 @@ test.describe("Stripe on the business's own keys (DEC-208)", () => {
         };
         expect(await status()).toBe("ISSUED");
 
-        await fakeStripeJs(page);
+        // Pay leaves for Stripe's page: no Stripe script, no window.
+        const scripts: string[] = [];
+        page.on("request", (r) => {
+            if (r.url().startsWith("https://js.stripe.com/")) {
+                scripts.push(r.url());
+            }
+        });
+        await stubCheckout(page);
         await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
-        const amount = /^Pay \$25(\.00)?$/;
-        const stripeWindow = page.getByRole("dialog", { name: b.name });
-
-        // Pay opens Stripe's window: the business's name, Pay with the
-        // amount, and Close, on the business's publishable key.
         await pressUntil(
-            page.getByRole("button", { name: amount }),
-            stripeWindow,
+            page.getByRole("button", { name: /^Pay \$25(\.00)?$/ }),
+            () => Promise.resolve(page.url().startsWith(CHECKOUT_ORIGIN)),
         );
-        await expect(
-            stripeWindow.getByRole("button", { name: amount }),
-        ).toBeVisible();
-        await expect
-            .poll(() =>
-                page.evaluate(
-                    () =>
-                        (window as unknown as { __stripeKey?: string })
-                            .__stripeKey,
-                ),
-            )
-            .toBe(PUBLISHABLE);
+        await page.waitForURL(CHECKOUT);
+        const session = sessionOf(page.url());
+        expect(scripts).toEqual([]);
 
-        // Close: no payment, the window goes, and Pay is offered again.
-        await stripeWindow.getByRole("button", { name: "Close" }).click();
-        await expect(stripeWindow).toHaveCount(0);
+        // Paid on Stripe's page: back on the business's /paid, confirming
+        // until the webhook lands.
+        await page.getByRole("link", { name: "Pay" }).click();
+        await page.waitForURL(/\/paid\?session_id=cs_fake_/);
+        await expect(heading(page, "Confirming your payment")).toBeVisible();
         expect(await status()).toBe("ISSUED");
 
-        // Paying: confirmPayment succeeds and the page posts the return.
-        await page.getByRole("button", { name: amount }).click();
-        await expect(stripeWindow).toBeVisible();
-        const returned = page.waitForRequest(
-            (r) =>
-                r.url().endsWith("/public/payments/return") &&
-                r.method() === "POST",
+        // An endpoint from before hosted Checkout sends only
+        // payment_intent.succeeded; Saroh's id on it settles the payment.
+        await sendWebhook(
+            page,
+            b,
+            intentSucceeded(session, draft.id, 2500, tag),
         );
-        await stripeWindow.getByRole("button", { name: amount }).click();
-        const back = (await returned).postDataJSON() as {
-            provider: string;
-            providerOrderId: string;
-        };
-        expect(back.provider).toBe("STRIPE");
-        expect(back.providerOrderId).toMatch(/^pi_fake_[0-9a-f]{32}$/);
-        await expect(stripeWindow).toHaveCount(0);
+        await expect.poll(status, { timeout: 30_000 }).toBe("PAID");
+        await expect(heading(page, "Payment received")).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(
+            page.getByText(/has your payment of \$25(\.00)?\./),
+        ).toBeVisible();
+    });
 
-        // Stripe's webhook for that intent, signed with the endpoint's
-        // secret: only it settles the payment on this stack.
-        const event = signedSucceeded(
-            back.providerOrderId,
-            draft.id,
-            2500,
-            tag,
+    test("an order's pay link is paid on Stripe's page, and the session's webhook says Payment received", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(150_000);
+        const s = stamp(testInfo);
+        const tag = s.replace(/[^A-Za-z0-9]/g, "");
+        const b = await stripeBusiness(page, browser, testInfo, "stripe-o", [
+            "MODULE_COMMERCE",
+        ]);
+        await turnOn(page, b, "COMMERCE", {});
+        const api = business(page.request, b.id);
+
+        // The storefront the setup made, a product, and an order for a
+        // new customer, by email.
+        const listed = await page.request.get(`${urls.API_URL}/stores`);
+        expect(listed.ok(), await listed.text()).toBe(true);
+        const stores = (await listed.json()) as {
+            id: string;
+            organizationId: string;
+        }[];
+        const store = stores.find((x) => x.organizationId === b.id);
+        expect(store, "Commerce made the business's storefront").toBeTruthy();
+        const storeId = store?.id ?? "";
+        const product = await api.post<{ id: string }>(
+            `/stores/${storeId}/products`,
+            { name: `Candle ${s}`, price: "25", status: "PUBLISHED" },
         );
-        const hook = await page.request.post(
-            `${urls.API_URL}/public/webhooks/stripe/${b.id}`,
+        const order = await api.post<{ id: string }>(
+            `/stores/${storeId}/orders`,
             {
-                headers: {
-                    "content-type": "application/json",
-                    "stripe-signature": event.signature,
+                customer: {
+                    email: `u10o-${s}@example.com`.toLowerCase(),
+                    name: "Jo Rivera",
                 },
-                data: event.body,
+                items: [{ productId: product.id, quantity: 1 }],
             },
         );
-        expect(hook.status(), await hook.text()).toBe(200);
+        const { url } = await api.post<{ url: string }>(
+            `/orders/${order.id}/pay-link`,
+        );
+        const paymentStatus = async () =>
+            (await api.get<{ paymentStatus: string }>(`/orders/${order.id}`))
+                .paymentStatus;
 
-        await expect.poll(status, { timeout: 30_000 }).toBe("PAID");
-        await page.reload();
+        await stubCheckout(page);
+        await page.goto(
+            new URL(new URL(url).pathname, urls.RENDERER_URL).toString(),
+        );
+        await pressUntil(
+            page.getByRole("button", { name: /^Pay \$25(\.00)?$/ }),
+            () => Promise.resolve(page.url().startsWith(CHECKOUT_ORIGIN)),
+        );
+        await page.waitForURL(CHECKOUT);
+        const session = sessionOf(page.url());
+
+        await page.getByRole("link", { name: "Pay" }).click();
+        await page.waitForURL(/\/paid\?session_id=cs_fake_/);
+        await expect(heading(page, "Confirming your payment")).toBeVisible();
+
+        const read = await readSession(page, session.sessionId);
+        expect(read.kind).toBe("order");
+        await sendWebhook(
+            page,
+            b,
+            sessionEvent(
+                "checkout.session.completed",
+                session,
+                read.amountCents,
+                tag,
+                order.id,
+            ),
+        );
+        await expect(heading(page, "Payment received")).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect.poll(paymentStatus, { timeout: 30_000 }).toBe("PAID");
+    });
+
+    test("a booking hold: held for 30 minutes, paid on Stripe's page, confirming on /paid, then booked once the session's webhook lands", async ({
+        page,
+        browser,
+        context,
+    }, testInfo) => {
+        test.setTimeout(180_000);
+        const s = stamp(testInfo);
+        const tag = s.replace(/[^A-Za-z0-9]/g, "");
+        const { b, site, serviceId } = await stripeBookingSite(
+            page,
+            browser,
+            testInfo,
+            "stripe-bk",
+        );
+
+        const customer = await context.newPage();
+        await asNewVisitor(customer);
+        await stubCheckout(customer);
+        const { payToken, session } = await bookAndLeaveForStripe(
+            customer,
+            site,
+            serviceId,
+            `u10b-${tag}@example.com`.toLowerCase(),
+        );
+
+        // A Stripe hold lasts as long as its session: 30 minutes, not 15.
+        const held = await page.request.get(
+            `${urls.API_URL}/public/services/holds/${payToken}`,
+        );
+        const hold = (await held.json()) as {
+            state: string;
+            holdExpiresAt: string;
+        };
+        expect(hold.state).toBe("HELD");
+        const left = Date.parse(hold.holdExpiresAt) - Date.now();
+        expect(left).toBeGreaterThan(25 * 60_000);
+        expect(left).toBeLessThanOrEqual(32 * 60_000);
+
+        await customer.getByRole("link", { name: "Pay" }).click();
+        await customer.waitForURL(
+            (u) => u.pathname === "/paid" && u.origin === site,
+        );
         await expect(
-            page.getByText("Paid", { exact: true }).first(),
+            heading(customer, "Confirming your payment"),
         ).toBeVisible();
+
+        const read = await readSession(page, session.sessionId);
+        expect(read.kind).toBe("hold");
+        await sendWebhook(
+            page,
+            b,
+            sessionEvent(
+                "checkout.session.completed",
+                session,
+                read.amountCents,
+                tag,
+            ),
+        );
+        await expect(heading(customer, "You're booked")).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(
+            customer.getByText(/You paid \$25(\.00)?\./),
+        ).toBeVisible();
+        await expect(
+            customer.getByRole("link", { name: `Back to ${b.name}` }),
+        ).toBeVisible();
+        await customer.close();
+    });
+
+    test("a booking hold: Back on Stripe's page lets the time go, and a payment that lands after is being refunded", async ({
+        page,
+        browser,
+        context,
+    }, testInfo) => {
+        test.setTimeout(180_000);
+        const s = stamp(testInfo);
+        const tag = s.replace(/[^A-Za-z0-9]/g, "");
+        const { b, site, serviceId } = await stripeBookingSite(
+            page,
+            browser,
+            testInfo,
+            "stripe-bc",
+        );
+
+        const customer = await context.newPage();
+        await asNewVisitor(customer);
+        await stubCheckout(customer);
+        const { payToken, session } = await bookAndLeaveForStripe(
+            customer,
+            site,
+            serviceId,
+            `u10c-${tag}@example.com`.toLowerCase(),
+        );
+        const open = await readSession(page, session.sessionId);
+        expect(open.status).toBe("open");
+        const startAt = open.booking?.startAt ?? "";
+        expect(startAt).toBeTruthy();
+
+        const offered = async () => {
+            const res = await page.request.get(
+                `${urls.API_URL}/public/services/${serviceId}/days`,
+            );
+            return (
+                (await res.json()) as {
+                    days: { starts: { startAt: string }[] }[];
+                }
+            ).days.flatMap((d) => d.starts.map((x) => x.startAt));
+        };
+        expect(await offered()).not.toContain(startAt);
+
+        // Back: the session closes, the hold lets its time go, and the
+        // customer is on the booking page they paid from.
+        await customer.getByRole("link", { name: "Back" }).click();
+        await customer.waitForURL(
+            (u) => u.origin === site && u.pathname === "/book",
+            { timeout: 30_000 },
+        );
+        expect((await readSession(page, session.sessionId)).status).toBe(
+            "closed",
+        );
+        const after = await page.request.get(
+            `${urls.API_URL}/public/services/holds/${payToken}`,
+        );
+        expect(after.status()).toBe(404);
+        expect(await offered()).toContain(startAt);
+
+        // Paid anyway, after the time was let go: refunded on its own.
+        await sendWebhook(
+            page,
+            b,
+            sessionEvent(
+                "checkout.session.completed",
+                session,
+                open.amountCents,
+                tag,
+            ),
+        );
+        await expect
+            .poll(
+                async () => (await readSession(page, session.sessionId)).status,
+                { timeout: 30_000 },
+            )
+            .toBe("refunding");
+        await customer.goto(`${site}/paid?session_id=${session.sessionId}`);
+        await expect(
+            heading(customer, "Your money is on its way back"),
+        ).toBeVisible();
+        await customer.close();
+    });
+
+    test("a booking hold whose session expired can't be paid again: checkout-closed, and /paid sends the customer to pick a time again", async ({
+        page,
+        browser,
+        context,
+    }, testInfo) => {
+        test.setTimeout(180_000);
+        const s = stamp(testInfo);
+        const tag = s.replace(/[^A-Za-z0-9]/g, "");
+        const { b, site, serviceId } = await stripeBookingSite(
+            page,
+            browser,
+            testInfo,
+            "stripe-bx",
+        );
+
+        const customer = await context.newPage();
+        await asNewVisitor(customer);
+        await stubCheckout(customer);
+        const { payToken, session } = await bookAndLeaveForStripe(
+            customer,
+            site,
+            serviceId,
+            `u10x-${tag}@example.com`.toLowerCase(),
+        );
+        const open = await readSession(page, session.sessionId);
+
+        // Stripe expires the session.
+        await sendWebhook(
+            page,
+            b,
+            sessionEvent(
+                "checkout.session.expired",
+                session,
+                open.amountCents,
+                tag,
+            ),
+        );
+
+        // Pressing Pay again, under a new key, gets no new session: the
+        // hold paid through its first one only (KTD-13).
+        await expect
+            .poll(
+                async () => {
+                    const res = await page.request.post(
+                        `${urls.API_URL}/public/invoices/${payToken}/payment-intent`,
+                        {
+                            headers: { "content-type": "application/json" },
+                            data: { idempotencyKey: `again-${tag}` },
+                        },
+                    );
+                    return `${res.status()} ${await res.text()}`;
+                },
+                { timeout: 30_000 },
+            )
+            .toMatch(/^409 .*checkout-closed/);
+
+        await customer.goto(`${site}/paid?session_id=${session.sessionId}`);
+        await expect(
+            heading(customer, "This payment has closed"),
+        ).toBeVisible();
+        await expect(customer.getByText(/Pick a time again/)).toBeVisible();
+        await customer.getByRole("link", { name: "Try again" }).click();
+        await customer.waitForURL(
+            (u) => u.origin === site && u.pathname === "/book",
+        );
+
+        // Nothing was paid: let the hold go.
+        await page.request.post(
+            `${urls.API_URL}/public/services/holds/${payToken}/release`,
+        );
+        await customer.close();
     });
 
     test("an India business is never offered Stripe in the setup sheet", async ({

@@ -161,6 +161,14 @@ test.describe("the Global app (DEC-204)", () => {
             page.getByRole("button", { name: "Connect Stripe" }),
             sheet,
         );
+        // The restricted key's permissions hosted Checkout needs, and how
+        // customers pay (card, with Apple Pay and Google Pay, or Link).
+        await expect(sheet).toContainText(
+            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
+        );
+        await expect(sheet).toContainText(
+            "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link.",
+        );
         // Razorpay's field is not asked for.
         await expect(
             sheet.getByLabel("Key secret", { exact: true }),
