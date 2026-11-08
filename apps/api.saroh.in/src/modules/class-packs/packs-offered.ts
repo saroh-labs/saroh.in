@@ -1,6 +1,6 @@
 import { prisma } from "@saroh/database";
 
-import { MODULE_BY_KEY } from "../capabilities/module-registry";
+import { moduleRolledOut } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 
 /**
@@ -12,15 +12,17 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
  * the desk's sales: a customer is only offered what the business has
  * actually turned on, as the account area reads every module
  * (`account-home.service.ts`).
+ *
+ * Rolled out is `moduleRolledOut`, so a module hidden from every business
+ * (DEC-099) is never offered, whatever its flag says: the site never sells
+ * what the desk can't show.
  */
 export async function packsOffered(
     organizationId: string,
     flags: Pick<FeatureFlagService, "isEnabled"> = new FeatureFlagService(),
 ): Promise<boolean> {
-    const descriptor = MODULE_BY_KEY.get("CLASS_PACKS");
-    if (!descriptor) return false;
     const [rolledOut, installed] = await Promise.all([
-        flags.isEnabled(descriptor.rolloutFlag, organizationId),
+        moduleRolledOut(flags, "CLASS_PACKS", organizationId),
         prisma.organizationModule.findFirst({
             where: {
                 organizationId,

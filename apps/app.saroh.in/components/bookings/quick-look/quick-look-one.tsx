@@ -43,6 +43,7 @@ import {
 } from "@/lib/services/treatment";
 import { FailedRead } from "@saroh/ui/failed-read";
 
+import { contactEmail } from "@/lib/crm/format";
 import type { MoreRow } from "./quick-look-more";
 import { QuickLookMore } from "./quick-look-more";
 import { canBookNext } from "./quick-look-next-visit";
@@ -350,14 +351,15 @@ export function OneLook({
                         icon={<Mail aria-hidden className="size-[18px]" />}
                         label="Email"
                     >
-                        {b.contact?.email ?? b.bookerEmail ?? (
-                            <span
-                                data-ph-unmask=""
-                                className="text-muted-foreground"
-                            >
-                                Not set
-                            </span>
-                        )}
+                        {contactEmail(b.contact?.email) ??
+                            contactEmail(b.bookerEmail) ?? (
+                                <span
+                                    data-ph-unmask=""
+                                    className="text-muted-foreground"
+                                >
+                                    Not set
+                                </span>
+                            )}
                     </Fact>
                 </div>
                 {person.state === "failed" ? (

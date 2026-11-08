@@ -540,7 +540,22 @@ export function DataView<TRow>({
                         <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 py-[11px] pl-[14px]">
                             <div className="min-w-0 space-y-1">
                                 <div className="truncate font-medium">
-                                    {!href && onRowClick ? (
+                                    {href ? (
+                                        // The row's real link, as the
+                                        // table's first cell has: its
+                                        // name and its one keyboard stop.
+                                        // Stretched over the whole row
+                                        // (`after:`), so the row is one
+                                        // tap target with one link, never
+                                        // two links on the same pixels.
+                                        <Link
+                                            href={href}
+                                            data-row-link=""
+                                            className="block min-w-0 truncate rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {primary?.cell(row)}
+                                        </Link>
+                                    ) : onRowClick ? (
                                         // A real button, as in the table:
                                         // the row's name and its one
                                         // keyboard stop.
@@ -592,36 +607,23 @@ export function DataView<TRow>({
                             )}
                         >
                             {/*
-                             * An OVERLAY link, not a wrapper.
+                             * A row with an address is tapped through its
+                             * name's link, stretched over the row (above).
                              *
-                             * Wrapping the row nested the caller's own cell
-                             * anchor inside it — invalid HTML, and React
-                             * reported it as a hydration error on every list
-                             * render. Callers put a link in the primary cell
-                             * because the TABLE needs one there, and a
-                             * primitive that silently forbids that would be
-                             * a trap.
+                             * It was an OVERLAY link beside the cell's own:
+                             * two links on the same pixels, one of them
+                             * `aria-hidden`, so a phone's list had no link a
+                             * screen reader could name. Wrapping the row is
+                             * no answer either: a caller's link in another
+                             * cell would nest inside it, invalid HTML.
                              *
-                             * So the row's tap target is a sibling stretched
-                             * over the row, `aria-hidden` and out of the tab
-                             * order: the cell's real link stays the single
-                             * accessible name and the single focus stop,
-                             * while the whole row remains tappable, which is
-                             * what one-handed and gloved use needs.
+                             * A row that opens in place (a quick look) keeps
+                             * an overlay button: its name's button is in the
+                             * cell, and the overlay makes the whole row
+                             * tappable, which one-handed and gloved use
+                             * needs. Without it a phone could never open one.
                              */}
-                            {href ? (
-                                <Link
-                                    href={href}
-                                    aria-hidden
-                                    tabIndex={-1}
-                                    className="absolute inset-0"
-                                />
-                            ) : onRowClick ? (
-                                // The same overlay for a row that opens
-                                // in place (a quick look) rather than at
-                                // an address. Without it a list row did
-                                // nothing when tapped, so a phone could
-                                // never open one.
+                            {!href && onRowClick ? (
                                 <button
                                     type="button"
                                     aria-hidden
@@ -630,10 +632,22 @@ export function DataView<TRow>({
                                     className="absolute inset-0 cursor-pointer"
                                 />
                             ) : null}
-                            {/* Clicks fall through to the overlay EXCEPT on
-                                    the caller's own interactive elements, which
-                                    keep theirs. */}
-                            <div className="pointer-events-none relative min-w-0 flex-1 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                            {/*
+                             * Clicks fall through to the row's link or
+                             * overlay EXCEPT on the caller's own controls,
+                             * which keep theirs and sit above it. The body
+                             * isn't positioned when the row has an address,
+                             * so its name's stretched link reaches the
+                             * whole row rather than the body alone.
+                             */}
+                            <div
+                                className={cn(
+                                    "pointer-events-none min-w-0 flex-1 [&_a]:pointer-events-auto [&_button]:pointer-events-auto",
+                                    href
+                                        ? "[&_a:not([data-row-link])]:relative [&_button]:relative"
+                                        : "relative",
+                                )}
+                            >
                                 {body}
                             </div>
                             {rowActions ? (

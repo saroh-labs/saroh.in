@@ -95,7 +95,7 @@ describe("the demo businesses (DEC-188)", () => {
                 p.sections.map((s) => s.type),
             );
             expect(types).not.toContain("journal");
-            expect(b.site.navigationExtra).toBeUndefined();
+            expect(b.site.modulePages).toBeUndefined();
         }
     });
 

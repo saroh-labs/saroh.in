@@ -119,7 +119,7 @@ const WHERE: Record<Service["locationType"], string | null> = {
 
 /**
  * A row's "how long · price · who": "45 min · ₹1,200 · Meera"; a class
- * "60 min · group class of 8 · ₹500 or a pack class · Neha"; a treatment
+ * "60 min · group class of 8 · ₹500 · Neha"; a treatment
  * (E10) "4 visits of 60 min · …"; online "30 min · online · …". Who takes
  * it reads "nobody yet" when nobody does, and is left out when it
  * couldn't be read (`takers` null): the page says that once.
@@ -143,7 +143,8 @@ export function serviceLine(
             : `${s.durationMinutes} min`,
         isClass ? `group class of ${s.capacity}` : null,
         WHERE[s.locationType],
-        isClass && s.priceCents ? `${price} or a pack class` : price,
+        // No "or a pack class": packs aren't offered (DEC-099).
+        price,
         takers === null
             ? null
             : takers.length

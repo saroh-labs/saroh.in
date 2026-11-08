@@ -176,7 +176,83 @@ export async function openSlots(
     const instructors = staffId
         ? [staffId]
         : staffing.people.map((person) => person.id);
-    return slots.map((slot) => ({ ...slot, staffIds: instructors }));
+    // A class is booked with the one named, else its first instructor
+    // (`resolvePerson`), and refused when they are busy then with anything
+    // else (`assertPersonFreeInTx`): such a start is never offered.
+    const free = await withoutInstructorClashes(
+        service,
+        staffId ?? instructors[0],
+        slots,
+        availService,
+    );
+    return free.map((slot) => ({ ...slot, staffIds: instructors }));
+}
+
+/** A booking an instructor holds, as a class's clash check reads it. */
+export interface InstructorBooking {
+    serviceId: string;
+    startAt: Date;
+    endAt: Date;
+}
+
+/** What `instructorId` holds over `[from, to)`: bookings taking a place. */
+export async function instructorBookings(
+    service: Pick<Service, "organizationId">,
+    instructorId: string,
+    from: Date,
+    to: Date,
+): Promise<InstructorBooking[]> {
+    return prisma.booking.findMany({
+        where: {
+            organizationId: service.organizationId,
+            staffId: instructorId,
+            ...holdsPlace(new Date()),
+            startAt: { lt: to },
+            endAt: { gt: from },
+        },
+        select: { serviceId: true, startAt: true, endAt: true },
+    });
+}
+
+/**
+ * Whether a class's instructor can't take `slot`: they hold another booking
+ * overlapping its guarded span, as the booking's own clash check counts
+ * them (`assertPersonFreeInTx`) — other places in the same session (same
+ * service, same start) are the class, not a clash.
+ */
+export function instructorBusy(
+    service: Pick<Service, "id">,
+    slot: Interval,
+    span: Interval,
+    theirs: readonly InstructorBooking[],
+): boolean {
+    return theirs.some(
+        (b) =>
+            !(
+                b.serviceId === service.id &&
+                b.startAt.getTime() === slot.startAt.getTime()
+            ) &&
+            b.startAt < span.endAt &&
+            b.endAt > span.startAt,
+    );
+}
+
+/** `slots` of a class, less those its instructor can't take. */
+async function withoutInstructorClashes<T extends Interval>(
+    service: Service,
+    instructorId: string,
+    slots: T[],
+    availService: AvailabilityService,
+): Promise<T[]> {
+    if (slots.length === 0) return slots;
+    const spans = slots.map((slot) => guarded(slot, availService));
+    const from = new Date(Math.min(...spans.map((s) => s.startAt.getTime())));
+    const to = new Date(Math.max(...spans.map((s) => s.endAt.getTime())));
+    const theirs = await instructorBookings(service, instructorId, from, to);
+    if (theirs.length === 0) return slots;
+    return slots.filter(
+        (slot, i) => !instructorBusy(service, slot, spans[i] ?? slot, theirs),
+    );
 }
 
 /** How a service is staffed — see {@link Staffing}. */

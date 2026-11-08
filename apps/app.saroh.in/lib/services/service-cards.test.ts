@@ -137,9 +137,7 @@ describe("serviceLine: how long · price · who", () => {
                 ["Neha"],
                 "INR",
             ),
-        ).toBe(
-            facts("45 min", "group class of 8", "₹500 or a pack class", "Neha"),
-        );
+        ).toBe(facts("45 min", "group class of 8", "₹500", "Neha"));
         expect(
             serviceLine(line({ visits: 4, durationMinutes: 60 }), [], "INR"),
         ).toBe(facts("4 visits of 60 min", "₹1,200", "nobody yet"));

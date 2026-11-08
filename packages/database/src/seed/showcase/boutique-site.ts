@@ -103,11 +103,8 @@ function site(collectionId: Record<string, string>): SeedSite {
         subdomain: LEELA_SITE_SLUG,
         published: true,
         createdDaysAgo: 110,
-        revision: "r1",
-        navigationExtra: [
-            { label: "Shop", href: "/shop" },
-            { label: "Journal", href: "/blog" },
-        ],
+        revision: "r2",
+        modulePages: ["SHOP", "JOURNAL"],
         pages: [
             {
                 path: "/",

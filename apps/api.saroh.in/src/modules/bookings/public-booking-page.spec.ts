@@ -869,6 +869,34 @@ describe("the next two weeks (U19)", () => {
         });
     });
 
+    it("leaves out a class session its instructor is busy elsewhere for", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ capacity: 12, name: "HIIT" }),
+        );
+        db.staffService.findMany.mockResolvedValue([
+            { staff: { id: "staff_neha", name: "Neha" } },
+        ]);
+        // Neha has a one-to-one at 10:30, over the 10:00 class; the 11:00
+        // class has a place taken, which is the class, not a clash.
+        db.booking.findMany.mockResolvedValue([
+            {
+                serviceId: "svc_pt",
+                startAt: new Date("2026-09-18T10:30:00.000Z"),
+                endAt: new Date("2026-09-18T10:45:00.000Z"),
+            },
+            {
+                serviceId: "svc_1",
+                startAt: new Date("2026-09-18T11:00:00.000Z"),
+                endAt: new Date("2026-09-18T12:00:00.000Z"),
+            },
+        ]);
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+
+        expect(out.days[0]!.starts.map((s) => s.startAt)).toEqual([
+            "2026-09-18T11:00:00.000Z",
+        ]);
+    });
+
     it("lists every class session with its places left, full ones too", async () => {
         db.service.findUnique.mockResolvedValue(
             service({ capacity: 12, name: "HIIT" }),
@@ -878,10 +906,12 @@ describe("the next two weeks (U19)", () => {
         ]);
         db.booking.findMany.mockResolvedValue([
             ...Array.from({ length: 12 }, () => ({
+                serviceId: "svc_1",
                 startAt: new Date("2026-09-18T10:00:00.000Z"),
                 endAt: new Date("2026-09-18T11:00:00.000Z"),
             })),
             ...Array.from({ length: 10 }, () => ({
+                serviceId: "svc_1",
                 startAt: new Date("2026-09-18T11:00:00.000Z"),
                 endAt: new Date("2026-09-18T12:00:00.000Z"),
             })),
