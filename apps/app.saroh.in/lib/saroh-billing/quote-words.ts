@@ -155,6 +155,10 @@ export function quoteSummary(
         iso && new Date(iso) > now ? { iso, keep: current } : null;
     const stay = `If it doesn't go through, you stay on ${current}.`;
     const oneTime = q.payment === "ONE_TIME";
+    // A one-off payment covers a year, or, where a plan is paid one month at
+    // a time (Global, stage 9), a month.
+    const unit = q.cycle === "year" ? "year" : "month";
+    const span = q.cycle === "year" ? "12 months" : "one month";
     const recurring: QuoteLine = {
         label: `${plan}, ${q.cycle === "year" ? "yearly" : "monthly"}`,
         value: `${taxSum(q.pricePaise, q.gstPaise, q.totalPaise)} ${per(q.cycle)}`,
@@ -162,7 +166,10 @@ export function quoteSummary(
     const term: QuoteLine = oneTime
         ? {
               label: "Then",
-              value: "Before the year ends, we ask you to pay for the next one",
+              value:
+                  unit === "year"
+                      ? "Before the year ends, we ask you to pay for the next one"
+                      : "When the month ends, we ask you to pay for the next one",
           }
         : {
               label: "Autopay",
@@ -263,14 +270,14 @@ export function quoteSummary(
             return oneTime
                 ? {
                       title: `Upgrade to ${plan}`,
-                      lead: `One payment for the rest of your year. You're on ${plan} as soon as it goes through. ${stay}`,
+                      lead: `One payment for the rest of your ${unit}. You're on ${plan} as soon as it goes through. ${stay}`,
                       lines: [
                           {
-                              label: "Today, for the rest of your year",
+                              label: `Today, for the rest of your ${unit}`,
                               value: `${taxSum(q.chargeNowPaise, q.chargeNowGstPaise, q.chargeNowTotalPaise)}`,
                           },
                           {
-                              label: "Your year ends",
+                              label: `Your ${unit} ends`,
                               value: "",
                               iso: q.startAt,
                           },
@@ -300,9 +307,9 @@ export function quoteSummary(
             return oneTime
                 ? {
                       title: `Move to ${plan}`,
-                      lead: `${firstMonth}You pay for the year today. It starts on the date below, and everything stays as it is until then.`,
+                      lead: `${firstMonth}You pay for the ${unit} today. It starts on the date below, and everything stays as it is until then.`,
                       lines: [
-                          today("Today, for 12 months"),
+                          today(`Today, for ${span}`),
                           { label: "Starts", value: "", iso: q.startAt },
                           term,
                       ],
@@ -337,10 +344,10 @@ export function quoteSummary(
         case "RENEW":
             return oneTime
                 ? {
-                      title: `Renew ${plan} for another year`,
-                      lead: "One payment for your next 12 months, at today's price. They start the day this year ends.",
+                      title: `Renew ${plan} for another ${unit}`,
+                      lead: `One payment for your next ${span}, at today's price. ${unit === "year" ? "They start" : "It starts"} the day this ${unit} ends.`,
                       lines: [
-                          today("Today, for 12 months"),
+                          today(`Today, for ${span}`),
                           { label: "From", value: "", iso: q.startAt },
                       ],
                       ...toPayment,
@@ -363,7 +370,7 @@ export function quoteSummary(
                 return {
                     title: `Upgrade to ${plan}`,
                     lead: oneTime
-                        ? `${ends} One payment for 12 months, no autopay. ${stay}`
+                        ? `${ends} One payment for ${span}, no autopay. ${stay}`
                         : `${ends} You pay ${plan}'s first month today as you set up UPI Autopay or a card for it. ${stay}`,
                     lines: [startsToday, recurring, ...coupon, term],
                     ...toPayment,
@@ -372,9 +379,9 @@ export function quoteSummary(
             return oneTime
                 ? {
                       title: `Start ${plan}`,
-                      lead: `One payment for 12 months, no autopay. You're on ${plan} as soon as it goes through. ${stay}`,
+                      lead: `One payment for ${span}, no autopay. You're on ${plan} as soon as it goes through. ${stay}`,
                       lines: [
-                          today("Today, for 12 months"),
+                          today(`Today, for ${span}`),
                           recurring,
                           ...coupon,
                           term,
