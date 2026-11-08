@@ -208,7 +208,17 @@ export async function settleMismatchRefundInTx(
         where: {
             organizationId,
             provider,
-            providerRef: event.providerPaymentRef,
+            // Stripe's refund names the charge, while a mismatch its session
+            // reported was recorded under the PaymentIntent.
+            providerRef:
+                provider.toUpperCase() === "STRIPE" && event.providerIntentId
+                    ? {
+                          in: [
+                              event.providerPaymentRef,
+                              event.providerIntentId,
+                          ],
+                      }
+                    : event.providerPaymentRef,
             ...MISMATCH_ATTEMPT_WHERE,
         },
         orderBy: { createdAt: "asc" },

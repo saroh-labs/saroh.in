@@ -796,21 +796,31 @@ export class WebhooksService {
             })) as IntentRow | null;
             if (row) return row;
         }
-        if (event.orderRef) {
-            const byOrder = (await tx.paymentIntent.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    OR: [
-                        { orderId: event.orderRef },
-                        { invoiceId: event.orderRef },
-                    ],
-                },
-                orderBy: { createdAt: "desc" },
-            })) as IntentRow | null;
-            return byOrder;
+        if (!event.orderRef) return null;
+        const ofOrder = {
+            organizationId,
+            provider,
+            OR: [{ orderId: event.orderRef }, { invoiceId: event.orderRef }],
+        };
+        if (provider === "STRIPE") {
+            // By the order alone only when it names nothing of its own and
+            // exactly one session is open there, still on its `cs_…`: the
+            // event is then that session's, and swaps it (KTD-2). Anything
+            // else could settle the wrong row; it is left unmatched.
+            if (event.providerCheckoutId || event.sarohIntentId) return null;
+            const open = (await tx.paymentIntent.findMany({
+                where: { ...ofOrder, status: { in: OPEN_STRIPE_STATUSES } },
+                take: 2,
+            })) as IntentRow[];
+            return open.length === 1 &&
+                open[0].providerIntentId?.startsWith("cs_")
+                ? open[0]
+                : null;
         }
-        return null;
+        return (await tx.paymentIntent.findFirst({
+            where: ofOrder,
+            orderBy: { createdAt: "desc" },
+        })) as IntentRow | null;
     }
 
     private async applySuccess(
@@ -1853,12 +1863,15 @@ async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
     );
 }
 
+/** A Stripe row whose session can still take its payment. */
+const OPEN_STRIPE_STATUSES = ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"];
+
 /**
  * Swap a Stripe row's Checkout Session (`cs_…`) for the PaymentIntent
  * (`pi_…`) its payment is on (KTD-2), so refunds, look-ups and
  * `payment_intent.*`/`refund.*` events name it. Only when the event is
- * about this very row (its session or Saroh's id, never a match by the
- * order alone), only from `cs_` to `pi_`, and never over another `pi_`:
+ * about this very row (its session, Saroh's id, or the order's one open
+ * session), only from `cs_` to `pi_`, and never over another `pi_`:
  * the condition is in the UPDATE, which takes the row's lock. Idempotent.
  */
 async function linkProviderIntentInTx(
@@ -1868,10 +1881,13 @@ async function linkProviderIntentInTx(
 ): Promise<{ intent: IntentRow; changed: boolean }> {
     const pi = event.providerIntentId;
     const current = intent.providerIntentId ?? "";
+    // An event naming neither reached a `cs_` row only as its order's one
+    // open session (`findIntent`).
     const own =
         (!!event.providerCheckoutId &&
             event.providerCheckoutId === intent.providerCheckoutId) ||
-        (!!event.sarohIntentId && event.sarohIntentId === intent.id);
+        (!!event.sarohIntentId && event.sarohIntentId === intent.id) ||
+        (!event.providerCheckoutId && !event.sarohIntentId);
     if (
         intent.provider !== "STRIPE" ||
         !pi?.startsWith("pi_") ||

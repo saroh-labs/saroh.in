@@ -636,6 +636,157 @@ describe("Stripe Checkout's events (real verifier, real database)", () => {
             providerIntentId: o.pi,
         });
     });
+
+    it("a mismatch reported by the session and then its PaymentIntent is owed back once, and refunded once", async () => {
+        const h = await heldSession();
+        const ids = {
+            pi: h.pi,
+            intent: h.row.id,
+            amount: h.row.amountCents + 100,
+        };
+        // The session names the payment by its `pi_…`, the PaymentIntent's
+        // own event by its charge (`ch_…`): one capture all the same.
+        await deliver(
+            fixture("checkout.session.completed", {
+                evt: `evt_ce_mm1_${h.cs}`,
+                cs: h.cs,
+                ...ids,
+            }),
+        );
+        await deliver(
+            fixture("payment_intent.succeeded", {
+                evt: `evt_ce_mm2_${h.cs}`,
+                ...ids,
+            }),
+        );
+        const owed = await prisma.paymentAttempt.findMany({
+            where: {
+                paymentIntentId: h.row.id,
+                status: "CAPTURED_NEEDS_REFUND",
+            },
+        });
+        expect(owed).toHaveLength(1);
+
+        // Refund every capture Home lists as owed: one refund goes back.
+        jest.spyOn(stripe, "refund").mockResolvedValue({
+            providerRefundId: `re_ce_mm_${tag}`,
+            status: "pending",
+            failed: false,
+        });
+        for (const attempt of owed) {
+            await payments.refundAmountMismatch(owner, attempt.id);
+        }
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntentId: h.row.id },
+            }),
+        ).toBe(1);
+    });
+
+    it("a dashboard refund of a mismatch the session reported settles on it, by its PaymentIntent", async () => {
+        const h = await heldSession();
+        await deliver(
+            fixture("checkout.session.completed", {
+                evt: `evt_ce_mmd_${h.cs}`,
+                cs: h.cs,
+                pi: h.pi,
+                intent: h.row.id,
+                amount: h.row.amountCents + 100,
+            }),
+        );
+        // Refunded in Stripe's dashboard: it names the charge and the
+        // PaymentIntent, and no Saroh refund.
+        await deliver(
+            fixture("refund.created", {
+                evt: `evt_ce_mmdr_${h.cs}`,
+                pi: h.pi,
+            }),
+        );
+        expect(
+            await prisma.paymentRefund.findMany({
+                where: { paymentIntentId: h.row.id },
+            }),
+        ).toEqual([
+            expect.objectContaining({
+                status: "SUCCEEDED",
+                idempotencyKey: expect.stringMatching(/^amount-mismatch:/),
+            }),
+        ]);
+    });
+
+    it("a PaymentIntent event with no Saroh id settles the order's one open session by its order, and swaps", async () => {
+        const o = await orderSession();
+        await deliver(
+            fixture("payment_intent.succeeded", {
+                evt: `evt_ce_byorder_${o.cs}`,
+                pi: o.pi,
+                ref: o.order.id,
+                amount: 2000,
+            }),
+        );
+        expect(await intentRow(o.row.id)).toMatchObject({
+            status: "SUCCEEDED",
+            providerIntentId: o.pi,
+            providerCheckoutId: o.cs,
+        });
+    });
+
+    it("by its order alone, an event matches nothing when two sessions are open, or the open one names another PaymentIntent", async () => {
+        const o = await orderSession();
+        const second = await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                orderId: o.order.id,
+                provider: "STRIPE",
+                providerIntentId: `${o.cs}_2`,
+                providerCheckoutId: `${o.cs}_2`,
+                amountCents: 2000,
+                currency: "USD",
+                status: "REQUIRES_PAYMENT",
+            },
+        });
+        const two = await deliver(
+            fixture("payment_intent.succeeded", {
+                evt: `evt_ce_twoopen_${o.cs}`,
+                pi: o.pi,
+                ref: o.order.id,
+                amount: 2000,
+            }),
+        );
+        expect(two.changed).toBe(false);
+        for (const id of [o.row.id, second.id]) {
+            expect(await intentRow(id)).toMatchObject({
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: expect.stringMatching(/^cs_/),
+            });
+        }
+
+        const p = await orderSession();
+        await prisma.paymentIntent.update({
+            where: { id: p.row.id },
+            data: { providerIntentId: `pi_other_${p.cs}` },
+        });
+        const other = await deliver(
+            fixture("payment_intent.succeeded", {
+                evt: `evt_ce_otherpi_${p.cs}`,
+                pi: p.pi,
+                ref: p.order.id,
+                amount: 2000,
+            }),
+        );
+        expect(other.changed).toBe(false);
+        expect(await intentRow(p.row.id)).toMatchObject({
+            status: "REQUIRES_PAYMENT",
+            providerIntentId: `pi_other_${p.cs}`,
+        });
+        expect(
+            (
+                await prisma.order.findUniqueOrThrow({
+                    where: { id: p.order.id },
+                })
+            ).paymentStatus,
+        ).toBe("UNPAID");
+    });
 });
 
 describe("a hold pays through one session (U6, real database)", () => {
