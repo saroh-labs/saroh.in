@@ -56,11 +56,10 @@ export default async function ApexPaidPage({
     const view = await readCheckoutSession(read.sessionId);
     if (view === "missing") notFound();
     return (
-        <main className="min-h-screen bg-site-bg text-site-body">
-            <PaymentReturn
-                initial={view ?? provisionalView("the business")}
-                read={readPaid.bind(null, read.sessionId)}
-            />
-        </main>
+        <PaymentReturn
+            initial={view ?? provisionalView("the business")}
+            read={readPaid.bind(null, read.sessionId)}
+            ground
+        />
     );
 }

@@ -18,6 +18,11 @@ export interface PaymentReturnProps {
     read: () => Promise<PaymentReturnView | null>;
     /** The site's Prices page, where a plan join goes back to by default. */
     pricesPath?: string | null;
+    /**
+     * Draw the page ground too: for the renderer's apex `/pay/paid`, which
+     * has no site layout around it to give one.
+     */
+    ground?: boolean;
 }
 
 /**
@@ -33,6 +38,7 @@ export function PaymentReturn({
     initial,
     read,
     pricesPath = null,
+    ground = false,
 }: PaymentReturnProps) {
     const [view, setView] = useState(initial);
     const [tries, setTries] = useState(0);
@@ -67,7 +73,7 @@ export function PaymentReturn({
     }, [words.title]);
 
     const confirming = waiting && !late;
-    return (
+    const page = (
         <section className="mx-auto w-full max-w-xl px-5 py-12 sm:px-8 sm:py-16">
             <p className="text-site-muted text-sm">{view.businessName}</p>
             <div
@@ -97,5 +103,10 @@ export function PaymentReturn({
                 </div>
             )}
         </section>
+    );
+    return ground ? (
+        <main className="bg-site-bg text-site-body min-h-screen">{page}</main>
+    ) : (
+        page
     );
 }
