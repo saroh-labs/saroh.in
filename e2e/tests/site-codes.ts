@@ -57,7 +57,13 @@ export async function asNewVisitor(page: Page): Promise<void> {
     // address a dead worker already spent on the payment limit.
     const w = test.info().workerIndex % 512;
     const address = `198.${18 + (w >> 8)}.${w & 255}.${(visitors % 254) + 1}`;
-    await page.setExtraHTTPHeaders({ "cf-connecting-ip": address });
+    // x-forwarded-for too: the booking page calls the API straight from the
+    // browser (a payment start, 10 per caller per ten minutes), and the API
+    // reads the caller from it behind a trusted local proxy.
+    await page.setExtraHTTPHeaders({
+        "cf-connecting-ip": address,
+        "x-forwarded-for": address,
+    });
 }
 
 /** The code the API just sent to `email`. */
