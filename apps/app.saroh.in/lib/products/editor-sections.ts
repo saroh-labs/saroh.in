@@ -2,7 +2,7 @@ import { formatNumber } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { z } from "zod";
 
-import { overMrpProblem } from "@/lib/gst/mrp";
+import { MRP_BELOW_PRICE, overMrpProblem } from "@/lib/gst/mrp";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import {
     GST_PRICE_MODES,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/gst/price-mode";
 import { isHsnSac, rateOption } from "@/lib/invoices/gst";
 import { inTableOrder } from "@/lib/products/fulfilment-types";
+import { MRP_LABEL } from "@/lib/products/mrp-label";
 import type {
     ProductDetail,
     ProductImage,
@@ -129,7 +130,7 @@ export const basicsSchema = z
             v.mrp === "" || !isMoney(v.price) || paise(v.mrp) >= paise(v.price),
         {
             path: ["mrp"],
-            error: "MRP can't be lower than the price it sells for.",
+            error: MRP_BELOW_PRICE,
         },
     );
 export type BasicsValues = z.infer<typeof basicsSchema>;
@@ -748,9 +749,8 @@ export function basicsProblem(
     if (!v.price.trim()) return "Add a price first.";
     if (!isMoney(v.price)) return "Price: a number with at most two decimals.";
     if (v.mrp.trim() && !isMoney(v.mrp))
-        return "MRP: a number with at most two decimals.";
-    if (v.mrp.trim() && paise(v.mrp) < paise(v.price))
-        return "MRP can't be lower than the price it sells for.";
+        return `${MRP_LABEL}: a number with at most two decimals.`;
+    if (v.mrp.trim() && paise(v.mrp) < paise(v.price)) return MRP_BELOW_PRICE;
     if (v.mrp.trim() && gst) {
         const over = overMrpProblem(
             v.price,

@@ -19,6 +19,7 @@ async function load(edition: Edition) {
         mrp: await import("@/lib/gst/mrp"),
         changes: await import("@/lib/settings/activity-changes"),
         history: await import("@/lib/price-history/words"),
+        imports: await import("@/lib/imports/review"),
     };
 }
 
@@ -75,6 +76,13 @@ describe("struck price words by the edition", () => {
                 { currency: "USD" },
             ),
         ).toBe("Original price set to $100");
+        expect(
+            m.imports.rowLine(
+                "products",
+                { name: "Lamp", price: "80", mrp: "100", status: "DRAFT" },
+                "USD",
+            ),
+        ).toContain("Original price $100");
         expect(m.changes.FIELD_PHRASES.taxId).toEqual({
             phrase: "the tax ID",
             label: "Tax ID",
