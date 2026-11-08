@@ -311,8 +311,8 @@ export const DEMO_GYM: DemoBusinessSpec = {
         slug: "demo-gym",
         subdomain: "demo-gym",
         createdDaysAgo: 30,
-        // Its journal isn't written; no menu link to it.
-        navigationExtra: undefined,
+        // Its journal isn't written; no Journal page for it.
+        modulePages: undefined,
         revision: SITE_REVISION,
     },
     footer: PULSE.footer,

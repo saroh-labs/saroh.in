@@ -540,7 +540,19 @@ export function DataView<TRow>({
                         <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 py-[11px] pl-[14px]">
                             <div className="min-w-0 space-y-1">
                                 <div className="truncate font-medium">
-                                    {!href && onRowClick ? (
+                                    {href ? (
+                                        // The row's real link, as the
+                                        // table's first cell has: its
+                                        // name and its one keyboard stop.
+                                        // The overlay below only widens
+                                        // the tap target.
+                                        <Link
+                                            href={href}
+                                            className="block min-w-0 truncate rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {primary?.cell(row)}
+                                        </Link>
+                                    ) : onRowClick ? (
                                         // A real button, as in the table:
                                         // the row's name and its one
                                         // keyboard stop.
@@ -604,8 +616,9 @@ export function DataView<TRow>({
                              *
                              * So the row's tap target is a sibling stretched
                              * over the row, `aria-hidden` and out of the tab
-                             * order: the cell's real link stays the single
-                             * accessible name and the single focus stop,
+                             * order: the primary cell's real link (drawn
+                             * above, as the table's first cell has it) stays
+                             * the single accessible name and focus stop,
                              * while the whole row remains tappable, which is
                              * what one-handed and gloved use needs.
                              */}

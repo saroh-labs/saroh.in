@@ -29,6 +29,8 @@ import {
 import type { Staffing } from "./booking-slots";
 import {
     busyOverlapping,
+    instructorBookings,
+    instructorBusy,
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
@@ -296,6 +298,20 @@ export async function publicDays(
         staffing.perPerson && staffing.zone
             ? []
             : await busyOverlapping(service.id, reach.startAt, reach.endAt);
+    // A class is booked with its first instructor: a session they are busy
+    // elsewhere for can't be booked, so it isn't listed.
+    const [instructor] = staffing.people as (
+        Staffing["people"][number] | undefined
+    )[];
+    const theirs =
+        ownTimes || !instructor
+            ? []
+            : await instructorBookings(
+                  service,
+                  instructor.id,
+                  reach.startAt,
+                  reach.endAt,
+              );
 
     /** The open-day hours and the starts, kept to `opening` when given. */
     const offer = (
@@ -349,11 +365,17 @@ export async function publicDays(
             ),
             opening,
         );
-        const [instructor] = staffing.people as (
-            Staffing["people"][number] | undefined
-        )[];
         const starts = hours
             .filter((slot) => bookable(slot.startAt))
+            .filter(
+                (slot) =>
+                    !instructorBusy(
+                        service,
+                        slot,
+                        guarded(slot, availService),
+                        theirs,
+                    ),
+            )
             .map((slot) => {
                 const left =
                     service.capacity -

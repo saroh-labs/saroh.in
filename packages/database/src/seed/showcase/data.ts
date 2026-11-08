@@ -1460,9 +1460,9 @@ export const PULSE: ShowcaseBusiness = {
         subdomain: "pulse-fitness",
         published: true,
         createdDaysAgo: 146,
-        // Its journal (`pulse-posts.ts`) in the menu.
-        navigationExtra: [{ label: "Journal", href: "/blog" }],
-        revision: "journal",
+        // Its journal (`pulse-posts.ts`): a Journal page, in the menu.
+        modulePages: ["JOURNAL"],
+        revision: "journal-page",
         pages: [
             {
                 path: "/",
@@ -2267,9 +2267,9 @@ export const CAREPOINT: ShowcaseBusiness = {
         subdomain: "carepoint-clinic",
         published: true,
         createdDaysAgo: 240,
-        // Its journal (`carepoint-posts.ts`) in the menu.
-        navigationExtra: [{ label: "Journal", href: "/blog" }],
-        revision: "journal",
+        // Its journal (`carepoint-posts.ts`): a Journal page, in the menu.
+        modulePages: ["JOURNAL"],
+        revision: "journal-page",
         pages: [
             {
                 path: "/",

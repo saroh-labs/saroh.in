@@ -426,6 +426,23 @@ describe.each([
         ]);
     });
 
+    it("never shows a walk-in's placeholder email", async () => {
+        const placeholder = "phone+3f2a@phone.invalid";
+        await draw(
+            kabir({
+                bookerEmail: placeholder,
+                contact: {
+                    id: "c_kabir",
+                    firstName: "Kabir",
+                    lastName: "Singh",
+                    email: placeholder,
+                },
+            }),
+        );
+        expect(text()).not.toContain("phone.invalid");
+        expect(text()).toContain("Not set");
+    });
+
     it("goes Mark arrived → Take ₹500 → Book their next visit, with Undo", async () => {
         await draw(kabir());
         await press("Mark Kabir arrived");

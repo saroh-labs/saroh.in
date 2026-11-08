@@ -881,6 +881,11 @@ export type SeedSection =
               items: readonly { question: string; answer: string }[];
           };
       }
+    | { type: "journal"; content: { title: string; count: number } }
+    | {
+          type: "productGrid";
+          content: { title: string; source: "newest"; count: number };
+      }
     | {
           type: "servicesList";
           /** Indexes into the business's services, resolved to ids on write. */
@@ -903,10 +908,19 @@ export interface SeedSite {
         path: string;
         title: string;
         isHome?: boolean;
+        /**
+         * A module page (G14): a Journal or Shop page, made as the editor's
+         * Add page makes one ({@link journalPage}, {@link shopPage}), so a
+         * publish from the editor keeps it in the menu. Absent: a free page.
+         */
+        kind?: "JOURNAL" | "SHOP";
         sections: readonly SeedSection[];
     }[];
-    /** Menu links after the pages: the journal (`/blog`), the shop. */
-    navigationExtra?: readonly { label: string; href: string }[];
+    /**
+     * Module pages after the pages (G14): its journal's or its shop's page,
+     * in the menu after the rest, as the editor's Add page makes them.
+     */
+    modulePages?: readonly ("SHOP" | "JOURNAL")[];
     /**
      * Bumped when what the published site shows changes, so a database
      * seeded before gets a new Publication (one is never rewritten).
@@ -1031,6 +1045,36 @@ export const SIDE_BUSINESSES: readonly {
  * written from explicit sections, not from a template, so neither version
  * changes them.
  */
+/**
+ * A site's Journal page (G14), with the section the editor's Add page gives
+ * one (`module-page-sections.ts`): the business's posts, in the menu.
+ */
+export function journalPage(): SeedSite["pages"][number] {
+    return {
+        path: "/journal",
+        title: "Journal",
+        kind: "JOURNAL",
+        sections: [
+            { type: "journal", content: { title: "Journal", count: 6 } },
+        ],
+    };
+}
+
+/** A site's Shop page (G14), as the editor's Add page makes one. */
+export function shopPage(): SeedSite["pages"][number] {
+    return {
+        path: "/shop",
+        title: "Shop",
+        kind: "SHOP",
+        sections: [
+            {
+                type: "productGrid",
+                content: { title: "All products", source: "newest", count: 12 },
+            },
+        ],
+    };
+}
+
 export const SITES: readonly SeedSite[] = [
     {
         slug: "northwind-supply",

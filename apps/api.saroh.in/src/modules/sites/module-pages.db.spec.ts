@@ -21,6 +21,14 @@ import { checkRenderability } from "./publication-renderability";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
+// Class packs are hidden for now (DEC-099); this tests the sale kept for
+// when they return, so the module is rolled out by its flag alone.
+jest.mock("../capabilities/module-registry", () =>
+    jest
+        .requireActual("../../../test/fixtures/class-packs-shown")
+        .registryShowingClassPacks(),
+);
+
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),
     can: jest.fn().mockResolvedValue(true),
