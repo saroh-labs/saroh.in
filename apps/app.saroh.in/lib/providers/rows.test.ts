@@ -571,7 +571,7 @@ describe("stripeKeyProblems", () => {
             stripeKeyProblems({ ...ok, restricted: "sk_live_example" }, false)
                 .restricted,
         ).toBe(
-            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.",
+            "Use a restricted key, not your secret key. In Stripe, create one with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
         );
     });
 

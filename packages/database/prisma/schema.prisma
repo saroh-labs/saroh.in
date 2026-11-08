@@ -5789,7 +5789,7 @@ model MerchantPaymentProvider {
 
   // Needs attention (UX-012): the provider refused these keys on a live
   // call. Null while it works; cleared when the keys are entered again.
-  attentionReason String? // "KEYS_REFUSED"
+  attentionReason String? // "KEYS_REFUSED" | "PERMISSION_MISSING" (Stripe, KTD-14)
   attentionAt     DateTime?
 
   // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.

@@ -11,11 +11,14 @@ export type PaymentProviderName = "RAZORPAY" | "CASHFREE" | "STRIPE";
 
 /**
  * Why a connection that is still CONNECTED needs a person (UX-012): its
- * provider refused the keys on a live call, `since` then. Entering the keys
- * again clears it. Null while it works; absent from an older API.
+ * provider refused the keys on a live call (`KEYS_REFUSED`), or (Stripe)
+ * its restricted key lacks a permission a payment uses on the side, so
+ * payments go through without it (`PERMISSION_MISSING`, KTD-14); `since`
+ * then. Entering the keys again clears it. Null while it works; absent
+ * from an older API.
  */
 export interface ProviderAttention {
-    reason: "KEYS_REFUSED";
+    reason: "KEYS_REFUSED" | "PERMISSION_MISSING";
     since: string;
 }
 

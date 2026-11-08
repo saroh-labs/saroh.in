@@ -1682,9 +1682,17 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
                 "The business can't take payment online right now. Please try again later, or pay them another way.",
             details: { reason: "provider-keys-refused" },
         });
-        // Only a connection not already flagged is marked…
+        // Only a connection not already flagged is marked (a missing
+        // permission gives way to the refusal)…
         expect(updateMany).toHaveBeenCalledWith({
-            where: { id: "mpp_1", organizationId: "org_1", attentionAt: null },
+            where: {
+                id: "mpp_1",
+                organizationId: "org_1",
+                OR: [
+                    { attentionAt: null },
+                    { attentionReason: "PERMISSION_MISSING" },
+                ],
+            },
             data: {
                 attentionReason: "KEYS_REFUSED",
                 attentionAt: expect.any(Date),
@@ -2284,7 +2292,7 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
                 expect(extend).toHaveBeenCalledWith("bk_1", expiresAt);
             });
 
-            it("still makes the session when the key can't make customers, and flags the connection", async () => {
+            it("still makes the session when the key can't make customers, and flags the missing permission, not a refusal", async () => {
                 const { service, fake } = stripeSessionService();
                 prepared({ permissionMissing: true });
                 const flagged = prisma.merchantPaymentProvider
@@ -2298,8 +2306,14 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
                 expect(flagged).toHaveBeenCalledWith(
                     expect.objectContaining({
                         data: expect.objectContaining({
-                            attentionReason: "KEYS_REFUSED",
+                            attentionReason: "PERMISSION_MISSING",
                         }),
+                    }),
+                );
+                // Payments still go through: no "refused" alert to the team.
+                expect(prisma.job.create as jest.Mock).not.toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({ type: "team.alert" }),
                     }),
                 );
             });

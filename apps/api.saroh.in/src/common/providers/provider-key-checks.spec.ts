@@ -227,5 +227,17 @@ describe("attentionOf", () => {
         expect(
             attentionOf({ attentionReason: KEYS_REFUSED, attentionAt: since }),
         ).toEqual({ reason: "KEYS_REFUSED", since });
+        expect(
+            attentionOf({
+                attentionReason: "PERMISSION_MISSING",
+                attentionAt: since,
+            }),
+        ).toEqual({ reason: "PERMISSION_MISSING", since });
+        expect(
+            attentionOf({
+                attentionReason: "SOMETHING_ELSE",
+                attentionAt: since,
+            }),
+        ).toBe(null);
     });
 });

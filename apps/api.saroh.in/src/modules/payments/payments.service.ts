@@ -19,6 +19,7 @@ import type { ProviderAttention } from "../../common/providers/provider-attentio
 import {
     attentionOf,
     NO_ATTENTION,
+    PERMISSION_MISSING,
 } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
@@ -341,8 +342,10 @@ export interface RedactedProvider {
     webhookSecretMissing: boolean;
     /**
      * Null while it works; else the provider refused these keys on a live
-     * call (UX-012) — `{ reason: "KEYS_REFUSED", since }` — and Providers
-     * shows it as Needs attention until the keys are entered again.
+     * call (UX-012) — `{ reason: "KEYS_REFUSED", since }` — or (Stripe)
+     * the key lacks a permission a payment uses on the side, and payments
+     * go on without it (`PERMISSION_MISSING`, KTD-14). Providers shows it
+     * as Needs attention until the keys are entered again.
      */
     attention: ProviderAttention | null;
     createdAt: Date;
@@ -2247,16 +2250,26 @@ export class PaymentsService {
         }
         if (checkout?.permissionMissing) {
             // The key can't read or make customers: the payment went ahead
-            // without one, and the connection asks for its keys again
-            // (KTD-14). Its flag stays until they are re-entered.
+            // without one, and the connection names the permission to add
+            // (KTD-14). A later payment that makes its customer clears it.
             try {
-                await flagPaymentProvider(providerRow);
+                await flagPaymentProvider(
+                    providerRow,
+                    new Date(),
+                    PERMISSION_MISSING,
+                );
             } catch (err) {
                 this.logger.warn(
                     `Could not mark provider ${providerRow.id} as needing attention: ${errorMessage(err)}`,
                 );
             }
-        } else if (providerRow.attentionAt) {
+        } else if (
+            providerRow.attentionAt &&
+            // A missing permission is cleared only by a payment that made
+            // or found its customer, not one that had no email to try.
+            (providerRow.attentionReason !== PERMISSION_MISSING ||
+                checkout?.hosted.customerId)
+        ) {
             // A provider order made on a connection flagged as refused: it
             // works again, and the team hears so once (#555). Never throws.
             await paymentProviderWorks(providerRow);
