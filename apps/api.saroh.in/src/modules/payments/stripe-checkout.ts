@@ -379,6 +379,58 @@ async function recordStripeCustomer(
     }
 }
 
+/** An intent a hold's later Pay hands back instead of a new session. */
+export interface ReusableSession {
+    id: string;
+    provider: string;
+    providerIntentId: string | null;
+    amountCents: number;
+    currency: string;
+    status: string;
+}
+
+/**
+ * A booking hold pays through its first session only (U6). Each new
+ * session moved the hold to its own expiry, so pressing Pay again and
+ * again could keep a place held without end. Now the first session sets
+ * the hold's end (its start + {@link CHECKOUT_MIN_MINUTES} + the margin),
+ * and a later Pay on the same hold gets that session back: Stripe can't
+ * make one shorter than 30 minutes, so there is no shorter one to give.
+ *
+ * Null when the invoice is no Stripe-paid hold or has no session yet (make
+ * one); the latest session that can still take the payment; or `closed`
+ * when none can (the caller answers 409 `checkout-closed`).
+ */
+export async function earlierHoldSession(
+    invoiceId: string,
+): Promise<ReusableSession | "closed" | null> {
+    const sessions = await prisma.paymentIntent.findMany({
+        where: {
+            invoiceId,
+            provider: "STRIPE",
+            providerCheckoutId: { not: null },
+            invoice: { status: "DRAFT", source: "BOOKING" },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            provider: true,
+            providerIntentId: true,
+            amountCents: true,
+            currency: true,
+            status: true,
+        },
+    });
+    if (sessions.length === 0) return null;
+    // A failed card leaves its session open for another try at Stripe.
+    const reusable = sessions.find((s) =>
+        ["CREATED", "REQUIRES_PAYMENT", "PROCESSING", "FAILED"].includes(
+            s.status,
+        ),
+    );
+    return reusable ?? "closed";
+}
+
 /**
  * Move a held booking's expiry to its session's, so the hold and the
  * session end together (KTD-9): under the booking's lock, only while it is

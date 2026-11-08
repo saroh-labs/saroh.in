@@ -100,8 +100,78 @@ describe("StripeWebhookProvider.parseEvent", () => {
             outcome: "SUCCEEDED",
             providerIntentId: "pi_3MtwBwLkdIwHu7ix28a3tqPa",
             providerPaymentRef: "ch_3MtwBwLkdIwHu7ix28a3tqPa",
+            orderRef: "cmorder000000000000000001",
             capturedAmountCents: 2000,
             capturedCurrency: "USD",
+        });
+    });
+
+    it("payment_intent.* reads Saroh's intent id from a Checkout payment's metadata", () => {
+        const body = fixture("payment_intent.succeeded") as {
+            data: { object: { metadata: Record<string, string> } };
+        };
+        body.data.object.metadata.saroh_intent = "cmintent000000000000000001";
+        expect(stripe.parseEvent({ payload: body, headers: {} })).toMatchObject(
+            {
+                outcome: "SUCCEEDED",
+                providerIntentId: "pi_3MtwBwLkdIwHu7ix28a3tqPa",
+                sarohIntentId: "cmintent000000000000000001",
+            },
+        );
+    });
+
+    const SESSION =
+        "cs_test_a1SarohFixtureMadeUp0000000000000000000000000000000001";
+    const session = {
+        providerCheckoutId: SESSION,
+        sarohIntentId: "cmintent000000000000000001",
+        orderRef: "cminvoice00000000000000001",
+    };
+
+    it("checkout.session.completed, paid → SUCCEEDED with the PaymentIntent, amount and session", () => {
+        expect(parse("checkout.session.completed")).toEqual({
+            providerEventId: "evt_1SarohFixtureCompleted",
+            eventType: "checkout.session.completed",
+            outcome: "SUCCEEDED",
+            providerIntentId: "pi_3SarohFixtureMadeUp0001",
+            providerPaymentRef: "pi_3SarohFixtureMadeUp0001",
+            capturedAmountCents: 2000,
+            capturedCurrency: "USD",
+            ...session,
+        });
+    });
+
+    it("checkout.session.completed, unpaid (a slow method) → PROCESSING, nothing captured", () => {
+        expect(parse("checkout.session.completed.unpaid")).toEqual({
+            providerEventId: "evt_1SarohFixtureCompletedUnpaid",
+            eventType: "checkout.session.completed",
+            outcome: "PROCESSING",
+            providerIntentId: "pi_3SarohFixtureMadeUp0001",
+            ...session,
+        });
+    });
+
+    it("async_payment_succeeded → SUCCEEDED; async_payment_failed → FAILED", () => {
+        expect(parse("checkout.session.async_payment_succeeded")).toMatchObject(
+            {
+                outcome: "SUCCEEDED",
+                providerIntentId: "pi_3SarohFixtureMadeUp0001",
+                capturedAmountCents: 2000,
+                capturedCurrency: "USD",
+                ...session,
+            },
+        );
+        const failed = parse("checkout.session.async_payment_failed");
+        expect(failed).toMatchObject({ outcome: "FAILED", ...session });
+        expect(failed.capturedAmountCents).toBeUndefined();
+    });
+
+    it("checkout.session.expired → CLOSED, with no PaymentIntent", () => {
+        expect(parse("checkout.session.expired")).toEqual({
+            providerEventId: "evt_1SarohFixtureExpired",
+            eventType: "checkout.session.expired",
+            outcome: "CLOSED",
+            ...session,
         });
     });
 
@@ -112,6 +182,7 @@ describe("StripeWebhookProvider.parseEvent", () => {
             outcome: "FAILED",
             providerIntentId: "pi_3MtwBwLkdIwHu7ix28a3tqPa",
             providerPaymentRef: "ch_3MtwBwLkdIwHu7ix1declined",
+            orderRef: "cmorder000000000000000001",
             capturedAmountCents: undefined,
             capturedCurrency: undefined,
         });

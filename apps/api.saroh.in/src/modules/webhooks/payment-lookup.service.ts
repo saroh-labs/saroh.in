@@ -135,8 +135,16 @@ export class PaymentLookupService {
         input: CheckoutReturn,
     ): Promise<{ confirmed: boolean }> {
         const provider = input.provider.toUpperCase();
+        // A Stripe hosted checkout returns with its session (`cs_…`), which
+        // the row keeps after its PaymentIntent is known (KTD-1).
         const intent = await prisma.paymentIntent.findFirst({
-            where: { provider, providerIntentId: input.providerOrderId },
+            where: {
+                provider,
+                OR: [
+                    { providerIntentId: input.providerOrderId },
+                    { providerCheckoutId: input.providerOrderId },
+                ],
+            },
             orderBy: { createdAt: "desc" },
             select: INTENT_SELECT,
         });
@@ -313,7 +321,27 @@ export class PaymentLookupService {
                 p.status === "CAPTURED" &&
                 (!opts.paymentRef || p.providerPaymentRef === opts.paymentRef),
         );
-        if (!captured) return this.stamp(intent, "NOT_PAID");
+        if (!captured) {
+            // A hosted checkout finished with a slow method (Stripe: a
+            // complete, unpaid session): processing, as its webhook says.
+            const slow = payments.find(
+                (p) => p.status === "PENDING" && p.providerIntentId,
+            );
+            if (slow && intent.status === "REQUIRES_PAYMENT") {
+                await this.webhooks.settleLookedUp(
+                    intent.provider,
+                    intent.organizationId,
+                    {
+                        providerEventId: `lookup:${slow.providerPaymentRef}`,
+                        eventType: "payment.lookup",
+                        outcome: "PROCESSING",
+                        providerIntentId: slow.providerIntentId,
+                        sarohIntentId: intent.id,
+                    },
+                );
+            }
+            return this.stamp(intent, "NOT_PAID");
+        }
 
         const event = settlementEvent(
             intent.provider,
@@ -427,7 +455,10 @@ function settlementEvent(
         providerEventId: `lookup:${payment.providerPaymentRef}`,
         eventType: "payment.lookup",
         outcome: "SUCCEEDED",
-        providerIntentId,
+        // A session's payment names its PaymentIntent, swapped onto this
+        // very row (KTD-2) before it settles.
+        providerIntentId: payment.providerIntentId ?? providerIntentId,
+        sarohIntentId: intent.id,
         orderRef: intent.orderId ?? intent.invoiceId ?? undefined,
         providerPaymentRef: payment.providerPaymentRef,
         feeCents: payment.feeCents,

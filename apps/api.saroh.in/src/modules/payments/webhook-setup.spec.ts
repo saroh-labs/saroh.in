@@ -199,6 +199,17 @@ describe("the webhook address", () => {
                 lastReceivedAt: null,
             },
         ]);
+        // Hosted Checkout's four events, then the PaymentIntent and refund
+        // events (plan 2026-11-07-002, U6).
+        expect(WEBHOOK_EVENTS.STRIPE).toHaveLength(9);
+        expect(WEBHOOK_EVENTS.STRIPE).toEqual(
+            expect.arrayContaining([
+                "checkout.session.completed",
+                "checkout.session.async_payment_succeeded",
+                "checkout.session.async_payment_failed",
+                "checkout.session.expired",
+            ]),
+        );
         // Unset is India.
         const india = await readWebhookSetup("org_1", undefined, db);
         expect(india.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);

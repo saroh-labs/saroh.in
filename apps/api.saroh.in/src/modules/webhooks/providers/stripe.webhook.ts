@@ -91,6 +91,42 @@ export class StripeWebhookProvider implements WebhookProvider {
         const providerEventId =
             text(body.id) ?? `${eventType}:${objectId ?? "unknown"}`;
 
+        const metadata = object.metadata as
+            Record<string, unknown> | null | undefined;
+
+        if (eventType.startsWith("checkout.session.")) {
+            const outcome = sessionOutcome(
+                eventType,
+                text(object.payment_status),
+            );
+            const paymentIntent = text(object.payment_intent);
+            return {
+                providerEventId,
+                eventType,
+                outcome,
+                providerCheckoutId: objectId,
+                // Null until the customer confirms (STRIPE.md); once there,
+                // the row's `cs_…` is swapped for it (KTD-2).
+                providerIntentId: paymentIntent,
+                sarohIntentId:
+                    text(object.client_reference_id) ??
+                    text(metadata?.saroh_intent),
+                orderRef: text(metadata?.saroh_ref),
+                // A session names no charge: its PaymentIntent is the payment.
+                providerPaymentRef:
+                    outcome === "SUCCEEDED" ? paymentIntent : undefined,
+                // What the session charged, in minor units (PAY-06).
+                capturedAmountCents:
+                    outcome === "SUCCEEDED"
+                        ? whole(object.amount_total)
+                        : undefined,
+                capturedCurrency:
+                    outcome === "SUCCEEDED"
+                        ? text(object.currency)?.toUpperCase()
+                        : undefined,
+            };
+        }
+
         if (eventType.startsWith("payment_intent.")) {
             const outcome: WebhookOutcome =
                 eventType === "payment_intent.succeeded"
@@ -103,6 +139,11 @@ export class StripeWebhookProvider implements WebhookProvider {
                 eventType,
                 outcome,
                 providerIntentId: objectId,
+                // A Checkout payment's PaymentIntent carries Saroh's ids, so
+                // it settles on an endpoint without the session events
+                // (KTD-6).
+                sarohIntentId: text(metadata?.saroh_intent),
+                orderRef: text(metadata?.saroh_ref),
                 // The charge names the payment, as the look-up does
                 // (`stripeOrderPayments`); the intent when there is none.
                 providerPaymentRef: text(object.latest_charge) ?? objectId,
@@ -119,8 +160,6 @@ export class StripeWebhookProvider implements WebhookProvider {
         }
 
         if (eventType.startsWith("refund.")) {
-            const metadata = object.metadata as
-                Record<string, unknown> | null | undefined;
             return {
                 providerEventId,
                 eventType,
@@ -137,6 +176,29 @@ export class StripeWebhookProvider implements WebhookProvider {
         }
 
         return { providerEventId, eventType, outcome: "IGNORED" };
+    }
+}
+
+/**
+ * A Checkout Session event (STRIPE.md): `completed` is paid, or still on
+ * its way for a slow method (`payment_status` unpaid); the async events
+ * settle that one; `expired` can no longer be paid.
+ */
+function sessionOutcome(
+    eventType: string,
+    paymentStatus?: string,
+): WebhookOutcome {
+    switch (eventType) {
+        case "checkout.session.completed":
+            return paymentStatus === "paid" ? "SUCCEEDED" : "PROCESSING";
+        case "checkout.session.async_payment_succeeded":
+            return "SUCCEEDED";
+        case "checkout.session.async_payment_failed":
+            return "FAILED";
+        case "checkout.session.expired":
+            return "CLOSED";
+        default:
+            return "IGNORED";
     }
 }
 

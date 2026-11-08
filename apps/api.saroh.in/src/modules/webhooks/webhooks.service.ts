@@ -136,6 +136,8 @@ interface IntentRow {
     invoiceId?: string | null;
     purpose?: string | null;
     providerIntentId?: string | null;
+    /** A hosted checkout's session (Stripe `cs_…`), kept after the swap. */
+    providerCheckoutId?: string | null;
     status: string;
     amountCents: number;
     currency: string;
@@ -579,13 +581,34 @@ export class WebhooksService {
         );
         if (mismatch.handled) return { applied: mismatch.applied };
 
-        const intent = await this.findIntent(
+        const found = await this.findIntent(
             tx,
             provider,
             organizationId,
             event,
         );
-        if (!intent) return { applied: false };
+        if (!found) return { applied: false };
+        // A hosted checkout's row names its session until the payment is
+        // known; then the PaymentIntent, before anything below reserves a
+        // refund that must name it (KTD-2).
+        const linked = await linkProviderIntentInTx(tx, found, event);
+        const intent = linked.intent;
+
+        // A slow method under way, or a session that can't be paid any
+        // more (KTD-11): the intent only, never an order or invoice. A
+        // cancelled intent (a released hold) is left to its late payment.
+        if (event.outcome === "PROCESSING" || event.outcome === "CLOSED") {
+            const { count } = await tx.paymentIntent.updateMany({
+                where: { id: intent.id, status: "REQUIRES_PAYMENT" },
+                data: {
+                    status:
+                        event.outcome === "PROCESSING"
+                            ? "PROCESSING"
+                            : "CANCELLED",
+                },
+            });
+            return { applied: count > 0 || linked.changed };
+        }
 
         // PAY-06: a capture is compared with what Saroh asked for before
         // anything is marked paid. A signed event that reports no amount
@@ -599,7 +622,7 @@ export class WebhooksService {
 
         const result = await this.applyOutcome(tx, intent, event);
         const feeRecorded = await recordFee(tx, intent, event);
-        return { applied: result.applied || feeRecorded };
+        return { applied: result.applied || feeRecorded || linked.changed };
     }
 
     /**
@@ -745,9 +768,12 @@ export class WebhooksService {
     }
 
     /**
-     * Resolve the PaymentIntent by provider intent id, else by the merchant
-     * reference we submitted at create — an Order's id or, for a pay link,
-     * an Invoice's.
+     * Resolve the PaymentIntent (KTD-3): by provider intent id (a Stripe
+     * row's `cs_…` or `pi_…`), by its hosted-checkout session, by Saroh's
+     * own intent id echoed back, else by the merchant reference we
+     * submitted at create — an Order's id or, for a pay link, an
+     * Invoice's. Every step is scoped to the event's business and
+     * provider.
      */
     private async findIntent(
         tx: Tx,
@@ -755,15 +781,20 @@ export class WebhooksService {
         organizationId: string,
         event: NormalizedWebhookEvent,
     ): Promise<IntentRow | null> {
-        if (event.providerIntentId) {
-            const byIntent = (await tx.paymentIntent.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    providerIntentId: event.providerIntentId,
-                },
+        const exact: Prisma.PaymentIntentWhereInput[] = [
+            ...(event.providerIntentId
+                ? [{ providerIntentId: event.providerIntentId }]
+                : []),
+            ...(event.providerCheckoutId
+                ? [{ providerCheckoutId: event.providerCheckoutId }]
+                : []),
+            ...(event.sarohIntentId ? [{ id: event.sarohIntentId }] : []),
+        ];
+        for (const where of exact) {
+            const row = (await tx.paymentIntent.findFirst({
+                where: { organizationId, provider, ...where },
             })) as IntentRow | null;
-            if (byIntent) return byIntent;
+            if (row) return row;
         }
         if (event.orderRef) {
             const byOrder = (await tx.paymentIntent.findFirst({
@@ -1820,6 +1851,40 @@ async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
         order.status !== "CANCELLED" &&
         dueCentsOf(order) <= 0
     );
+}
+
+/**
+ * Swap a Stripe row's Checkout Session (`cs_…`) for the PaymentIntent
+ * (`pi_…`) its payment is on (KTD-2), so refunds, look-ups and
+ * `payment_intent.*`/`refund.*` events name it. Only when the event is
+ * about this very row (its session or Saroh's id, never a match by the
+ * order alone), only from `cs_` to `pi_`, and never over another `pi_`:
+ * the condition is in the UPDATE, which takes the row's lock. Idempotent.
+ */
+async function linkProviderIntentInTx(
+    tx: Tx,
+    intent: IntentRow,
+    event: NormalizedWebhookEvent,
+): Promise<{ intent: IntentRow; changed: boolean }> {
+    const pi = event.providerIntentId;
+    const current = intent.providerIntentId ?? "";
+    const own =
+        (!!event.providerCheckoutId &&
+            event.providerCheckoutId === intent.providerCheckoutId) ||
+        (!!event.sarohIntentId && event.sarohIntentId === intent.id);
+    if (
+        intent.provider !== "STRIPE" ||
+        !pi?.startsWith("pi_") ||
+        !current.startsWith("cs_") ||
+        !own
+    ) {
+        return { intent, changed: false };
+    }
+    const { count } = await tx.paymentIntent.updateMany({
+        where: { id: intent.id, providerIntentId: current },
+        data: { providerIntentId: pi },
+    });
+    return { intent: { ...intent, providerIntentId: pi }, changed: count > 0 };
 }
 
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {

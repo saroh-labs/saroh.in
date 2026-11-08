@@ -91,6 +91,7 @@ import {
 import { IN_EDITION, needsPublicKey, publicKeyFor } from "./public-key";
 import { enqueueRefundAlert, enqueueRefundSentNotice } from "./refund-notices";
 import {
+    earlierHoldSession,
     extendHoldToSession,
     prepareStripeCheckout,
     storeAccountCountry,
@@ -2207,6 +2208,13 @@ export class PaymentsService {
         const description = stripe
             ? await paymentDescription(organizationId, target.kind)
             : undefined;
+        // A hold already paying through a session gets it back, never a
+        // new one that would hold its place longer (U6).
+        if (stripe && target.kind === "invoice") {
+            const earlier = await earlierHoldSession(target.id);
+            if (earlier === "closed") throw checkoutClosed();
+            if (earlier) return this.replay(organizationId, earlier);
+        }
         // Stripe's hosted Checkout (DEC-208, 7 Nov amendment) echoes Saroh's
         // intent id, so the row's id is made before the call.
         const intentId = stripe ? randomUUID() : undefined;
@@ -2551,12 +2559,7 @@ export class PaymentsService {
         if (open && legacy && intent.providerIntentId && providerRow) {
             await this.closeLegacyStripeIntent(intent, providerRow);
         }
-        if (intent.status === "CANCELLED" || open) {
-            throw new ConflictException({
-                message: "This checkout has closed. Start again.",
-                details: { reason: "checkout-closed" },
-            });
-        }
+        if (intent.status === "CANCELLED" || open) throw checkoutClosed();
     }
 
     /** Cancel an in-page PaymentIntent at Stripe, then the row. Never throws. */
@@ -2857,4 +2860,12 @@ export async function paymentDescription(
     }
     const what = kind === "order" ? "order" : "invoice";
     return (name ? `${name} ${what}` : `Saroh ${what}`).slice(0, 200);
+}
+
+/** A Stripe checkout that can't take the payment any more (KTD-13). */
+function checkoutClosed(): ConflictException {
+    return new ConflictException({
+        message: "This checkout has closed. Start again.",
+        details: { reason: "checkout-closed" },
+    });
 }
