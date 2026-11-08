@@ -4781,6 +4781,11 @@ model Contact {
 
   // Explicit links to commerce Customer records (#120).
   identityLinks CustomerIdentityLink[]
+  // This person as a Customer (`cus_…`) in the business's own Stripe account,
+  // refreshed on each Stripe payment. A record for the merchant, never
+  // searched by.
+  stripeCustomerId String?
+
 
   // What this person holds (ADR-007). Holdings go with the person; invoices
   // keep a bill-to snapshot and only lose the link.
@@ -5789,6 +5794,10 @@ model MerchantPaymentProvider {
 
   // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
   publicKey String?
+  // The account's country (ISO 3166-1 alpha-2) as the provider reports it;
+  // null until read (Stripe: read at connect, else lazily on a checkout).
+  accountCountry String?
+
 
   // AES-256-GCM encrypted secret credentials (JSON blob). Plaintext NEVER
   // stored; the key lives in app env. iv + authTag are needed to decrypt.
@@ -5820,8 +5829,15 @@ model PaymentIntent {
   invoiceId String?
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  provider         String // which MerchantPaymentProvider
-  providerIntentId String? // the provider's order/intent id, set after create
+  provider           String // which MerchantPaymentProvider
+  // The provider's order/intent id, set after create. For Stripe it is the
+  // Checkout Session (`cs_…`) until the customer pays, then the PaymentIntent
+  // (`pi_…`) refunds and webhooks name.
+  providerIntentId   String?
+  // The provider's hosted-checkout session (Stripe `cs_…`), kept after the
+  // PaymentIntent is known, so the return page and `checkout.session.*`
+  // events still find the row. Null for every other provider.
+  providerCheckoutId String? @unique
 
   amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
