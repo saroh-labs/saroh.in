@@ -6582,3 +6582,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the address takes the renderer's own scheme; `site-origin.spec.ts` pins production (`https://<address>.saroh.app`, custom domain on https) and the http stack.
 - **Rule:** an origin built from `RENDERER_URL` keeps its scheme; never hard-code `https://` in front of `rendererHost()`.
 - **Category:** sites · e2e
+
+## Global's price history still said MRP, and the window spec waited on a request the browser never makes (8 Nov 2026)
+
+- **Symptom:** the full gate's new Global words check (`global-screens.spec.ts`, U13) found "MRP set to $150,000" in a US product's Price history; the Stripe card window spec timed out on `waitForResponse(/payment-intent)` with the window open; the `@serial` none-chosen Global test opened another spec's business. Phone booking-hold tests failed beside them on 429s.
+- **Cause:** U10 moved the struck price's word to `MRP_LABEL`, but `lib/price-history/words.ts` kept its own `"MRP"` literal. The invoice pay page starts the intent server to server (`apps/saroh.app/lib/invoice-pay.ts`, a server action), so the browser only sees the action's POST to `/pay/<token>`. With none chosen the app opens the first of this edition's businesses by name (`listForUser`), and U13's `global-details` sorted before `global-home`. The window spec's failures and retries restarted workers, whose `asNewVisitor` counter starts again, so later customers reused an address already at the pay limit (10 per 10 minutes).
+- **Fix:** price history takes `MRP_LABEL` (pinned in `mrp-label.test.ts` for both editions); the spec reads the intent from the action's answer; the none-chosen test's business is `global-a-home`.
+- **Rule:** an edition word gets one constant, and every place that says it imports the constant: grep the old literal across the app when you add one. A browser spec on a renderer pay page waits for the page's own POST, not an API path.
+- **Category:** edition · e2e
