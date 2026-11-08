@@ -115,6 +115,8 @@ const TOKEN_PATHS = [
     /^(\/public\/invoices\/)[^/?#]+/,
     // An order's pay link (B11).
     /^(\/public\/order-pay\/)[^/?#]+/,
+    // A Stripe Checkout session, which reads its payment (U7).
+    /^(\/public\/payments\/checkout\/)cs_[^/?#]+/,
     // A pay-now hold's pay token (U19), read and released by it.
     /^(\/public\/services\/holds\/)[^/?#]+/,
     /^(\/public\/sites\/preview\/)[^/?#]+/,

@@ -10,6 +10,7 @@ import type {
 } from "../account/api";
 import { SignInSheet } from "../account/sign-in-sheet";
 import type { OpenCheckout } from "../booking-flow/checkout";
+import { returnPathHere } from "../booking-flow/hosted-checkout";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { readQrSource } from "../qr-source";
@@ -24,7 +25,7 @@ import type {
     ShopProblem,
     StartCheckout,
 } from "./api";
-import { SHOP_OFFLINE } from "./api";
+import { checkoutKey, SHOP_OFFLINE } from "./api";
 import { readBagDraft, writeBagDraft } from "./bag-draft-store";
 import type { BagDraft, BagPriced } from "./bag-sheet";
 import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
@@ -237,10 +238,19 @@ export function ShopBag({
         };
     }, [pending, paying, customer, api, placed, settled]);
 
-    async function start(request: StartCheckout, who: SignedInCustomer) {
+    async function start(
+        request: StartCheckout,
+        who: SignedInCustomer,
+        again = true,
+    ): Promise<void> {
         setBusy(true);
         setProblem(null);
-        const asked = source ? { ...request, source } : request;
+        const path = returnPathHere();
+        const asked = {
+            ...request,
+            ...(source ? { source } : {}),
+            ...(path ? { returnPath: path } : {}),
+        };
         const result = await api.start(asked).catch(() => ({
             ok: false as const,
             reason: "error" as const,
@@ -269,6 +279,15 @@ export function ShopBag({
                 request,
             });
             return;
+        }
+        if (result.reason === "checkout-closed" && again) {
+            // The Stripe checkout this key started was cancelled or ran
+            // out: the same bag starts once more, under a new key.
+            const key = checkoutKey();
+            setDraft((d) =>
+                d.checkout ? { ...d, checkout: { ...d.checkout, key } } : d,
+            );
+            return start({ ...request, key }, who, false);
         }
         if (result.reason === "signed-out") {
             // The session ended since the page loaded: sign in, then go on.

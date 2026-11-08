@@ -28,6 +28,7 @@ import {
     needsWebhookSecret,
     paymentsConsequence,
     RAZORPAY_KEY_ID,
+    STRIPE_KEY_PERMISSIONS,
     stripeKeyProblems,
 } from "@/lib/providers/rows";
 import type {
@@ -907,7 +908,7 @@ function StripeSteps({
                         Developers › API keys
                     </span>
                     . Copy the publishable key, then create a restricted key
-                    with Payment Intents: Write and Refunds: Write.
+                    with {STRIPE_KEY_PERMISSIONS}.
                 </p>
                 <div className="grid gap-3 min-[420px]:grid-cols-2">
                     <SecretField
@@ -958,9 +959,10 @@ function StripeSteps({
                 data-ph-unmask=""
                 className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
             >
-                Customers pay by card for now. If receipts are turned on in your
-                Stripe settings, Stripe also emails its own receipt, alongside
-                Saroh&apos;s confirmation.
+                Customers pay on Stripe&apos;s own checkout page, by card (Apple
+                Pay and Google Pay included) or Link. If receipts are turned on
+                in your Stripe settings, Stripe also emails its own receipt,
+                alongside Saroh&apos;s confirmation.
             </p>
         </>
     );

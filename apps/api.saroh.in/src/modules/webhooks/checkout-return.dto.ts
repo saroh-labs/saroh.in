@@ -47,3 +47,22 @@ export class CheckoutReturnDto {
     @MaxLength(256)
     signature?: string;
 }
+
+/**
+ * Stripe's Back link from hosted Checkout (U7): Saroh's intent id and the
+ * cancel token the cancel URL carried (`stripe-checkout.ts`). Neither is
+ * an amount or a business.
+ */
+export class CheckoutCancelDto {
+    @Transform(trim)
+    @IsString()
+    @Matches(PROVIDER_ID, { message: "intent is not a payment id" })
+    intent!: string;
+
+    @Transform(trim)
+    @IsString()
+    @Matches(/^[A-Za-z0-9_-]{1,128}$/, {
+        message: "token is not a cancel token",
+    })
+    token!: string;
+}

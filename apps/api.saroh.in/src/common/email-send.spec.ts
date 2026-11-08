@@ -155,6 +155,23 @@ describe("send: the sender by edition", () => {
         });
     });
 
+    it("also retries when the sending user may not send from Global's address (SES policy)", async () => {
+        const { email, sendMail } = load(SMTP);
+        sendMail.mockRejectedValueOnce(
+            Object.assign(new Error("Message failed"), {
+                responseCode: 554,
+                response:
+                    "554 Access denied: User `arn:aws:iam::000000000000:user/sample` is not authorized to perform `ses:SendRawEmail' on resource `arn:aws:ses:ap-south-1:000000000000:identity/codes@saroh.tech'",
+            }),
+        );
+        await email.send(
+            "GLOBAL",
+            { to: "a@example.com", subject: "s", fromName: "Rye via Saroh" },
+            "site-codes",
+        );
+        expect(sendMail).toHaveBeenCalledTimes(2);
+    });
+
     it("falls back on the site-codes stream too, to India's code address", async () => {
         const { email, sendMail } = load(SMTP);
         sendMail.mockRejectedValueOnce(unverified);

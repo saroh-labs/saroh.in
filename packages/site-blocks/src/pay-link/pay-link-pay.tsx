@@ -8,6 +8,11 @@ import { ctaClasses } from "../blocks/cta";
 import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import {
+    leavesForProvider,
+    returnPathHere,
+    TO_PAYMENT_PAGE_WORDS,
+} from "../booking-flow/hosted-checkout";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { STANDING_POLL_MS, STANDING_POLL_TRIES } from "../shop/checkout-sheet";
@@ -34,7 +39,13 @@ import { STANDING_POLL_MS, STANDING_POLL_TRIES } from "../shop/checkout-sheet";
 /** What starting the payment answered, from the site's server. */
 export type PayLinkStart =
     | { ok: true; intent: PaymentHandoff }
-    | { ok: false; message: string; settled?: boolean };
+    | {
+          ok: false;
+          message: string;
+          settled?: boolean;
+          /** The key's Stripe checkout closed: start again with a new key. */
+          restart?: boolean;
+      };
 
 /** The business's phone and email, where the page's data has them. */
 export interface PayLinkContact {
@@ -61,11 +72,19 @@ export interface PayLinkState {
     started: boolean;
     /** Confirming has gone on longer than usual. */
     slow: boolean;
+    /** The payment leaves the page for Stripe's hosted Checkout. */
+    redirect?: boolean;
 }
 
 export interface PayLinkOptions {
-    /** Starts the payment on the site's server, under the visit's key. */
-    start: (idempotencyKey: string) => Promise<PayLinkStart>;
+    /**
+     * Starts the payment on the site's server, under the visit's key, with
+     * the page Stripe's hosted Checkout comes back to.
+     */
+    start: (
+        idempotencyKey: string,
+        returnPath?: string,
+    ) => Promise<PayLinkStart>;
     /** Reads the page again from the server. */
     refresh: () => void;
     businessName: string;
@@ -96,8 +115,10 @@ export function usePayLink({
 }: PayLinkOptions): PayLinkState {
     const [phase, setPhase] = useState<Phase>({ kind: "idle" });
     const [intent, setIntent] = useState<PaymentHandoff | null>(null);
-    // One key per visit, so a double tap can't start two payments.
-    const [key] = useState(newKey);
+    // One key per visit, so a double tap can't start two payments. A new
+    // one only when the key's Stripe checkout closed (KTD-13).
+    const key = useRef<string | null>(null);
+    key.current ??= newKey();
     // Held from the press itself, before React has drawn the button off.
     const held = useRef(false);
     const session = useRef<{ close: () => void } | null>(null);
@@ -140,12 +161,19 @@ export function usePayLink({
             return;
         }
         setPhase({ kind: "starting" });
-        void start(key)
-            .catch((): PayLinkStart => ({
+        const path = returnPathHere();
+        const begin = () =>
+            start(key.current ?? newKey(), path).catch((): PayLinkStart => ({
                 ok: false,
                 message:
                     "We couldn't reach the business. Try again in a moment.",
-            }))
+            }));
+        void begin()
+            .then((first) => {
+                if (first.ok || !first.restart) return first;
+                key.current = newKey();
+                return begin();
+            })
             .then((result) => {
                 if (result.ok) {
                     setIntent(result.intent);
@@ -197,11 +225,15 @@ export function usePayLink({
             (phase.kind === "confirming" && !slow),
         started: intent !== null,
         slow,
+        redirect: leavesForProvider(intent),
     };
 }
 
 /** Why the window stopped without a payment, in the customer's words. */
-export function payLinkStopWords(why: Exclude<CheckoutOutcome, "paid">): {
+export function payLinkStopWords(
+    why: Exclude<CheckoutOutcome, "paid">,
+    redirect = false,
+): {
     text: string;
     /** A refusal is an alert; a window they closed themselves is not. */
     alert: boolean;
@@ -214,24 +246,30 @@ export function payLinkStopWords(why: Exclude<CheckoutOutcome, "paid">): {
     }
     if (why === "unavailable") {
         return {
-            text: "We couldn't open the payment window. Check your connection and try again.",
+            text: redirect
+                ? "We couldn't open the secure payment page. Check your connection and try again."
+                : "We couldn't open the payment window. Check your connection and try again.",
             alert: true,
         };
     }
     return {
-        text: "The payment window closed before you paid.",
+        text: redirect
+            ? "You came back before paying."
+            : "The payment window closed before you paid.",
         alert: false,
     };
 }
 
 /** What the Pay button reads at each point. */
 export function payLinkButtonLabel(
-    state: Pick<PayLinkState, "phase">,
+    state: Pick<PayLinkState, "phase" | "redirect">,
     amount: string,
 ): string {
     const { phase } = state;
     if (phase.kind === "starting") return "Starting payment…";
-    if (phase.kind === "window") return "Payment window open…";
+    if (phase.kind === "window") {
+        return state.redirect ? TO_PAYMENT_PAGE_WORDS : "Payment window open…";
+    }
     if (phase.kind === "stopped" && phase.why !== "closed") {
         return `Try again · ${amount}`;
     }
@@ -258,7 +296,7 @@ export function PayLinkStatus({
         );
     }
     if (phase.kind === "stopped") {
-        const words = payLinkStopWords(phase.why);
+        const words = payLinkStopWords(phase.why, state.redirect);
         return (
             <p
                 role={words.alert ? "alert" : "status"}
@@ -275,7 +313,9 @@ export function PayLinkStatus({
     if (phase.kind === "window") {
         return (
             <p role="status" className="text-site-body text-sm">
-                Finish paying in the secure payment window.
+                {state.redirect
+                    ? "You pay on a secure payment page, then come back here."
+                    : "Finish paying in the secure payment window."}
             </p>
         );
     }

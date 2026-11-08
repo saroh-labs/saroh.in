@@ -56,13 +56,15 @@ async function outcome(p: Promise<unknown>) {
 }
 
 describe("StripeProvider.verifyCredentials", () => {
-    it("reads one PaymentIntent and one refund with the key, on the pinned version", async () => {
+    it("reads one PaymentIntent, refund, session and customer with the key, on the pinned version", async () => {
         fetchMock.mockImplementation(() => answer(200, { data: [] }));
         await expect(
             new StripeProvider().verifyCredentials(CREDS),
         ).resolves.toBe("ACCEPTED");
         const urls = fetchMock.mock.calls.map((c) => c[0] as string).sort();
         expect(urls).toEqual([
+            "https://api.stripe.com/v1/checkout/sessions?limit=1",
+            "https://api.stripe.com/v1/customers?limit=1",
             "https://api.stripe.com/v1/payment_intents?limit=1",
             "https://api.stripe.com/v1/refunds?limit=1",
         ]);
@@ -118,88 +120,268 @@ describe("StripeProvider.verifyCredentials", () => {
     });
 });
 
-describe("StripeProvider.createOrderIntent", () => {
-    it("form-encodes a cards-only PaymentIntent in lowercase currency with Saroh's reference", async () => {
-        fetchMock.mockReturnValue(
-            answer(200, {
-                id: "pi_test_1",
-                client_secret: "pi_test_1_secret_madeup",
-            }),
-        );
-        const result = await new StripeProvider().createOrderIntent({
-            amountCents: 2000,
-            currency: "USD",
-            orderId: "cmorder1",
-            credentials: CREDS,
-        });
+const SESSION = {
+    id: "cs_test_1",
+    url: "https://checkout.stripe.com/c/pay/cs_test_1",
+    status: "open",
+};
+const HOLD = {
+    amountCents: 2000,
+    currency: "USD",
+    orderId: "cminvoice1",
+    credentials: CREDS,
+    description: "Rye & Co. booking",
+    hosted: {
+        successUrl:
+            "https://studio.example.com/paid?session_id={CHECKOUT_SESSION_ID}",
+        cancelUrl: "https://studio.example.com/paid?cancelled=1",
+        expiresAt: new Date("2026-11-08T10:31:00Z"),
+        instantOnly: true,
+        submitType: "book" as const,
+        lineName: "Haircut, 9 Nov 10:00",
+        clientReference: "cmintent1",
+        customerId: "cus_test_1",
+        payerEmail: "asha@example.com",
+        billingAddressRequired: true,
+    },
+};
+const ORDER = {
+    ...HOLD,
+    orderId: "cmorder1",
+    hosted: {
+        ...HOLD.hosted,
+        expiresAt: undefined,
+        instantOnly: false,
+        submitType: "pay" as const,
+        lineName: "Order 1042",
+        customerId: null,
+        billingAddressRequired: false,
+    },
+};
+
+describe("StripeProvider.createOrderIntent (hosted Checkout)", () => {
+    it("a booking hold sends every session field and hands back only the URL and id", async () => {
+        fetchMock.mockReturnValue(answer(200, SESSION));
+        const result = await new StripeProvider().createOrderIntent(HOLD);
         const { url, init, headers, form } = call();
-        expect(url).toBe("https://api.stripe.com/v1/payment_intents");
+        expect(url).toBe("https://api.stripe.com/v1/checkout/sessions");
         expect(init.method).toBe("POST");
         expect(headers["Content-Type"]).toBe(
             "application/x-www-form-urlencoded",
         );
-        expect([...form.entries()]).toEqual([
-            ["amount", "2000"],
-            ["currency", "usd"],
-            ["allowed_payment_method_types[]", "card"],
-            ["metadata[saroh_ref]", "cmorder1"],
-        ]);
+        expect(Object.fromEntries(form.entries())).toEqual({
+            mode: "payment",
+            "line_items[0][quantity]": "1",
+            "line_items[0][price_data][currency]": "usd",
+            "line_items[0][price_data][unit_amount]": "2000",
+            "line_items[0][price_data][product_data][name]":
+                "Haircut, 9 Nov 10:00",
+            client_reference_id: "cmintent1",
+            "metadata[saroh_ref]": "cminvoice1",
+            "metadata[saroh_intent]": "cmintent1",
+            "payment_intent_data[metadata][saroh_ref]": "cminvoice1",
+            "payment_intent_data[metadata][saroh_intent]": "cmintent1",
+            "payment_intent_data[description]": "Rye & Co. booking",
+            success_url:
+                "https://studio.example.com/paid?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "https://studio.example.com/paid?cancelled=1",
+            submit_type: "book",
+            expires_at: String(Date.parse("2026-11-08T10:31:00Z") / 1000),
+            billing_address_collection: "required",
+            "allowed_payment_method_types[0]": "card",
+            "allowed_payment_method_types[1]": "link",
+            customer: "cus_test_1",
+        });
+        expect(form.has("payment_method_types[]")).toBe(false);
         expect(result).toEqual({
-            providerIntentId: "pi_test_1",
+            providerIntentId: "cs_test_1",
+            providerCheckoutId: "cs_test_1",
             clientParams: {
-                stripePaymentIntentId: "pi_test_1",
-                clientSecret: "pi_test_1_secret_madeup",
+                checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_1",
+                checkoutSessionId: "cs_test_1",
             },
         });
+        expect(JSON.stringify(result)).not.toMatch(/secret/i);
     });
 
-    it("sends what the payment is for, which an Indian account needs for a payment from abroad", async () => {
-        fetchMock.mockReturnValue(
-            answer(200, {
-                id: "pi_test_2",
-                client_secret: "pi_test_2_secret_madeup",
-            }),
-        );
+    it("an order is `pay`, with no method restriction, expiry or address requirement, and the email prefilled", async () => {
+        fetchMock.mockReturnValue(answer(200, SESSION));
+        await new StripeProvider().createOrderIntent(ORDER);
+        const { form } = call();
+        expect(form.get("submit_type")).toBe("pay");
+        expect(form.get("customer_email")).toBe("asha@example.com");
+        for (const key of [
+            "expires_at",
+            "billing_address_collection",
+            "allowed_payment_method_types[0]",
+            "customer",
+        ]) {
+            expect(form.has(key)).toBe(false);
+        }
+    });
+
+    it("goods from an Indian account ask for the shipping address in the delivery country", async () => {
+        fetchMock.mockReturnValue(answer(200, SESSION));
         await new StripeProvider().createOrderIntent({
-            amountCents: 12000,
-            currency: "GBP",
-            orderId: "cmorder2",
-            credentials: CREDS,
-            description: "Global Test Ltd order",
+            ...ORDER,
+            hosted: { ...ORDER.hosted, shippingCountries: ["US"] },
         });
-        expect(call().form.get("description")).toBe("Global Test Ltd order");
+        expect(
+            call().form.get(
+                "shipping_address_collection[allowed_countries][0]",
+            ),
+        ).toBe("US");
+    });
+
+    it("no customer and no email sends neither", async () => {
+        fetchMock.mockReturnValue(answer(200, SESSION));
+        await new StripeProvider().createOrderIntent({
+            ...ORDER,
+            hosted: { ...ORDER.hosted, payerEmail: null },
+        });
+        expect(call().form.has("customer")).toBe(false);
+        expect(call().form.has("customer_email")).toBe(false);
     });
 
     it("a refused key is ProviderKeysRefusedError; errors carry only the status", async () => {
         fetchMock.mockReturnValue(
-            answer(401, {
-                error: { message: "Invalid API Key rk_test_madeup" },
+            answer(403, {
+                error: {
+                    message: "rk_test_madeup lacks checkout_session_write",
+                },
             }),
         );
         const err = await new StripeProvider()
-            .createOrderIntent({
-                amountCents: 2000,
-                currency: "USD",
-                orderId: "o",
-                credentials: CREDS,
-            })
+            .createOrderIntent(HOLD)
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(ProviderKeysRefusedError);
         expect((err as Error).message).toBe(
-            "Stripe order creation failed (HTTP 401)",
+            "Stripe order creation failed (HTTP 403)",
         );
     });
 
-    it("a currency outside the two-decimal set is refused before a call", async () => {
+    it("an answer without a session id or URL is an error", async () => {
+        fetchMock.mockReturnValue(answer(200, { id: "cs_test_1", url: null }));
+        await expect(
+            new StripeProvider().createOrderIntent(HOLD),
+        ).rejects.toThrow("missing session id or URL");
+    });
+
+    it("a currency outside the two-decimal set, or no hosted details, is refused before a call", async () => {
         await expect(
             new StripeProvider().createOrderIntent({
+                ...HOLD,
                 amountCents: 500,
                 currency: "JPY",
-                orderId: "o",
-                credentials: CREDS,
             }),
         ).rejects.toThrow(/JPY/);
+        await expect(
+            new StripeProvider().createOrderIntent({
+                ...HOLD,
+                hosted: undefined,
+            }),
+        ).rejects.toThrow(/hosted/);
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("StripeProvider.findOrCreateCustomer", () => {
+    const input = {
+        email: " Asha@Example.com ",
+        name: "Asha Rao",
+        organizationId: "cmorg1",
+        contactRef: "cmcontact1",
+        credentials: CREDS,
+    };
+
+    it("lists by the lower-cased email and returns the one found, making none", async () => {
+        fetchMock.mockReturnValue(answer(200, { data: [{ id: "cus_1" }] }));
+        await expect(
+            new StripeProvider().findOrCreateCustomer(input),
+        ).resolves.toEqual({ customerId: "cus_1" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(call().url).toBe(
+            "https://api.stripe.com/v1/customers?email=asha%40example.com&limit=1",
+        );
+    });
+
+    it("none found makes one under a stable idempotency key", async () => {
+        const make = async () => {
+            fetchMock.mockReset();
+            fetchMock
+                .mockReturnValueOnce(answer(200, { data: [] }))
+                .mockReturnValueOnce(answer(200, { id: "cus_new" }));
+            await expect(
+                new StripeProvider().findOrCreateCustomer(input),
+            ).resolves.toEqual({ customerId: "cus_new" });
+            return call(1);
+        };
+        const first = await make();
+        expect(first.url).toBe("https://api.stripe.com/v1/customers");
+        expect(Object.fromEntries(first.form.entries())).toEqual({
+            email: "asha@example.com",
+            name: "Asha Rao",
+            "metadata[saroh_contact]": "cmcontact1",
+        });
+        const key = first.headers["Idempotency-Key"];
+        expect(key).toMatch(/^saroh-customer-[0-9a-f]{64}$/);
+        expect(key).not.toContain("asha");
+        expect((await make()).headers["Idempotency-Key"]).toBe(key);
+    });
+
+    it("no email: no call", async () => {
+        await expect(
+            new StripeProvider().findOrCreateCustomer({ ...input, email: " " }),
+        ).resolves.toEqual({ customerId: null });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("a 403 is null with the permission missing; a 500 or network error is null", async () => {
+        const p = new StripeProvider();
+        fetchMock.mockReturnValue(answer(403));
+        await expect(p.findOrCreateCustomer(input)).resolves.toEqual({
+            customerId: null,
+            permissionMissing: true,
+        });
+        fetchMock.mockReset();
+        fetchMock
+            .mockReturnValueOnce(answer(200, { data: [] }))
+            .mockReturnValueOnce(answer(500));
+        await expect(p.findOrCreateCustomer(input)).resolves.toEqual({
+            customerId: null,
+        });
+        fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+        await expect(p.findOrCreateCustomer(input)).resolves.toEqual({
+            customerId: null,
+        });
+    });
+});
+
+describe("StripeProvider.accountCountry", () => {
+    it("reads the account's country in upper case", async () => {
+        fetchMock.mockReturnValue(answer(200, { country: "in" }));
+        await expect(new StripeProvider().accountCountry(CREDS)).resolves.toBe(
+            "IN",
+        );
+        expect(call().url).toBe("https://api.stripe.com/v1/account");
+    });
+
+    it.each([403, 500])("HTTP %i is null", async (status) => {
+        fetchMock.mockReturnValue(answer(status));
+        await expect(
+            new StripeProvider().accountCountry(CREDS),
+        ).resolves.toBeNull();
+    });
+
+    it("a network error or an odd country is null", async () => {
+        fetchMock.mockReturnValueOnce(answer(200, { country: "India" }));
+        await expect(
+            new StripeProvider().accountCountry(CREDS),
+        ).resolves.toBeNull();
+        fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+        await expect(
+            new StripeProvider().accountCountry(CREDS),
+        ).resolves.toBeNull();
     });
 });
 
@@ -388,6 +570,83 @@ describe("StripeProvider.findOrderPayments", () => {
         ).toEqual(expected);
     });
 
+    const lookUp = (id: string) =>
+        new StripeProvider().findOrderPayments({
+            providerIntentId: id,
+            merchantRef: "cminvoice1",
+            credentials: CREDS,
+        });
+
+    it("a session is read with its PaymentIntent expanded; paid is CAPTURED on the pi_", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "cs_test_1",
+                status: "complete",
+                payment_status: "paid",
+                payment_intent: {
+                    id: "pi_test_9",
+                    status: "succeeded",
+                    amount_received: 2000,
+                    currency: "usd",
+                    latest_charge: "ch_test_9",
+                },
+            }),
+        );
+        await expect(lookUp("cs_test_1")).resolves.toEqual([
+            {
+                providerPaymentRef: "ch_test_9",
+                status: "CAPTURED",
+                amountCents: 2000,
+                currency: "USD",
+                providerIntentId: "pi_test_9",
+            },
+        ]);
+        expect(call().url).toBe(
+            "https://api.stripe.com/v1/checkout/sessions/cs_test_1?expand[]=payment_intent",
+        );
+    });
+
+    it("a complete but unpaid session (a slow method) is PENDING", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "cs_test_1",
+                status: "complete",
+                payment_status: "unpaid",
+                payment_intent: {
+                    id: "pi_test_9",
+                    status: "processing",
+                    latest_charge: "py_test_9",
+                },
+            }),
+        );
+        const [payment] = await lookUp("cs_test_1");
+        expect(payment).toMatchObject({
+            status: "PENDING",
+            providerIntentId: "pi_test_9",
+        });
+    });
+
+    it.each([
+        ["open", null],
+        ["expired", null],
+    ])("a %s session is no payment", async (status, pi) => {
+        fetchMock.mockReturnValue(
+            answer(200, { id: "cs_test_1", status, payment_intent: pi }),
+        );
+        await expect(lookUp("cs_test_1")).resolves.toEqual([]);
+    });
+
+    it("a complete session whose PaymentIntent didn't come back expanded can't be read", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "cs_test_1",
+                status: "complete",
+                payment_intent: "pi_test_9",
+            }),
+        );
+        await expect(lookUp("cs_test_1")).rejects.toThrow("not expanded");
+    });
+
     it("an error throws with the status only", async () => {
         fetchMock.mockReturnValue(answer(404));
         await expect(
@@ -402,6 +661,31 @@ describe("StripeProvider.findOrderPayments", () => {
 
 describe("StripeProvider.cancelIntent", () => {
     const input = { providerIntentId: "pi_test_1", credentials: CREDS };
+    const session = { providerIntentId: "cs_test_1", credentials: CREDS };
+
+    it("an open session is expired", async () => {
+        fetchMock.mockReturnValue(answer(200, { id: "cs_test_1" }));
+        await expect(new StripeProvider().cancelIntent(session)).resolves.toBe(
+            true,
+        );
+        expect(call().url).toBe(
+            "https://api.stripe.com/v1/checkout/sessions/cs_test_1/expire",
+        );
+        expect(call().init.method).toBe("POST");
+    });
+
+    it("a session already expired or complete (400) is false; 500 throws", async () => {
+        fetchMock.mockReturnValueOnce(
+            answer(400, { error: { type: "invalid_request_error" } }),
+        );
+        await expect(new StripeProvider().cancelIntent(session)).resolves.toBe(
+            false,
+        );
+        fetchMock.mockReturnValue(answer(500));
+        await expect(
+            new StripeProvider().cancelIntent(session),
+        ).rejects.toThrow("HTTP 500");
+    });
 
     it("cancels as abandoned", async () => {
         fetchMock.mockReturnValue(answer(200, { id: "pi_test_1" }));
@@ -426,5 +710,36 @@ describe("StripeProvider.cancelIntent", () => {
         await expect(new StripeProvider().cancelIntent(input)).rejects.toThrow(
             "HTTP 500",
         );
+    });
+});
+
+describe("StripeProvider.createElementIntent (parked in-page window)", () => {
+    it("form-encodes a cards-only PaymentIntent with Saroh's reference and returns its client secret", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "pi_test_9",
+                client_secret: "pi_test_9_secret_madeup",
+            }),
+        );
+        const result = await new StripeProvider().createElementIntent({
+            amountCents: 2000,
+            currency: "USD",
+            orderId: "cmorder9",
+            credentials: CREDS,
+            description: "Walk Test Co order",
+        });
+        const { url, form } = call();
+        expect(url).toBe("https://api.stripe.com/v1/payment_intents");
+        expect([...form.entries()]).toEqual([
+            ["amount", "2000"],
+            ["currency", "usd"],
+            ["allowed_payment_method_types[]", "card"],
+            ["metadata[saroh_ref]", "cmorder9"],
+            ["description", "Walk Test Co order"],
+        ]);
+        expect(result.clientParams).toEqual({
+            stripePaymentIntentId: "pi_test_9",
+            clientSecret: "pi_test_9_secret_madeup",
+        });
     });
 });

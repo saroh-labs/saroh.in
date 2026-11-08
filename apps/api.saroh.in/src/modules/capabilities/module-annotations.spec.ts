@@ -334,6 +334,10 @@ const NEVER: Record<string, string> = {
     // whatever the business has switched off since.
     "webhooks/checkout-return.controller.ts":
         "a buyer's checkout return — settles a payment already taken",
+    // U7: Stripe's hosted Checkout return reads and its Back link, about a
+    // payment already started; never module-gated, as the return above.
+    "webhooks/checkout-session.controller.ts":
+        "a buyer's return from Stripe Checkout — reads or closes a payment already started",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
     "waitlist/public-offer.controller.ts":

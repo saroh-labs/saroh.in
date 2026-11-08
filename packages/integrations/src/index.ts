@@ -58,7 +58,13 @@ export const WEBHOOK_EVENTS: Readonly<
     ],
     // A refund can say `succeeded` already on `refund.created`; Stripe's
     // `charge.refund.updated` covers some payment methods only.
+    // Hosted Checkout's own events settle a session (plan 2026-11-07-002,
+    // U6); an endpoint without them still settles through the PaymentIntent.
     STRIPE: [
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
+        "checkout.session.expired",
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
         "refund.created",

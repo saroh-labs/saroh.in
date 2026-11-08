@@ -58,8 +58,15 @@ export function isStripeSecretKey(key: string): boolean {
 }
 
 /** What a business is told when it pastes its full secret key. */
-export const STRIPE_SECRET_KEY_REFUSED =
-    "That's your Stripe secret key, which can do anything in your account. Make a restricted key instead (it starts rk_live_ or rk_test_) with Payment Intents: Write and Refunds: Write, in Stripe › Developers › API keys.";
+/**
+ * The restricted key's permissions hosted Checkout needs (KTD-14), in the
+ * dashboard's words as far as STRIPE.md could verify them: sessions and
+ * customers are made (Write implies Read), payments read, refunds made.
+ */
+export const STRIPE_KEY_PERMISSIONS =
+    "Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write";
+
+export const STRIPE_SECRET_KEY_REFUSED = `That's your Stripe secret key, which can do anything in your account. Make a restricted key instead (it starts rk_live_ or rk_test_) with ${STRIPE_KEY_PERMISSIONS}, in Stripe › Developers › API keys.`;
 
 /** Stripe's form body: `key=value` pairs, nested keys already in brackets. */
 export function stripeForm(fields: Record<string, string | number>): string {
@@ -68,6 +75,28 @@ export function stripeForm(fields: Record<string, string | number>): string {
         body.append(key, String(value));
     }
     return body.toString();
+}
+
+/**
+ * Instant methods, for a DRAFT invoice (hold, deposit, pack, plan join):
+ * sent as `allowed_payment_method_types[]`, which filters out what the
+ * account can't take instead of refusing (`payment_method_types` is a 400
+ * on this version). Apple Pay and Google Pay ride on `card`.
+ */
+export const STRIPE_INSTANT_METHODS = ["card", "link"] as const;
+
+/** A Checkout Session id (`cs_test_…`, `cs_live_…`), as against a PaymentIntent's `pi_…`. */
+export function isCheckoutSessionId(id: string): boolean {
+    return id.startsWith("cs_");
+}
+
+/** A Checkout Session, as far as Saroh reads it (`payment_intent` expanded or not). */
+export interface StripeCheckoutSession {
+    id?: string;
+    status?: string | null;
+    payment_status?: string | null;
+    url?: string | null;
+    payment_intent?: string | StripePaymentIntent | null;
 }
 
 /** A PaymentIntent, as far as Saroh reads it. */

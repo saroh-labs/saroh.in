@@ -37,6 +37,9 @@ const ALLOWED: Record<string, string> = {
 /** Provider callbacks: no browser origin from a test host ever reaches them. */
 const EXEMPT = [
     "POST public/billing/webhooks/:provider",
+    // Stripe's Back link (U7): a test host never makes a session to cancel,
+    // as its create-intent routes are REFUSED.
+    "POST public/payments/checkout/cancel",
     "POST public/payments/return",
     "POST public/webhooks/:provider/:organizationId",
     "POST public/webhooks/msg91",

@@ -271,13 +271,52 @@ describe("BuyPackSheet", () => {
         expect(dialog.textContent).not.toMatch(/UPI|card/i);
     });
 
+    it("starts again under a new key when the key's Stripe checkout closed, and says where it leaves for", async () => {
+        const stripe = {
+            ...STARTED,
+            payment: {
+                ...STARTED.payment,
+                provider: "STRIPE",
+                clientParams: {
+                    checkoutUrl: "https://checkout.stripe.com/c/pay/cs_1",
+                },
+            },
+        };
+        const buy = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: false,
+                restart: true,
+                message: "That payment closed before it was paid. Try again.",
+            })
+            .mockResolvedValueOnce({ ok: true, data: stripe });
+        const { win } = sheet(
+            { payOnline: true, packs: [TEN] },
+            packsApi({ buy }),
+        );
+        await press(screen.getByRole("button", { name: "Buy · ₹4,500" }));
+        expect(buy).toHaveBeenCalledTimes(2);
+        const [first, second] = buy.mock.calls.map((c) => c[1] as string);
+        expect(second).not.toBe(first);
+        expect(win.requests).toHaveLength(1);
+        expect(
+            screen.getByRole("button", {
+                name: "Taking you to the secure payment page…",
+            }),
+        ).toBeTruthy();
+    });
+
     it("opens the provider window on the server's payment, then waits for the webhook", async () => {
         const api = packsApi();
         const { win, onBought } = sheet({ payOnline: true, packs: [TEN] }, api);
 
         await press(screen.getByRole("button", { name: "Buy · ₹4,500" }));
 
-        expect(api.buy).toHaveBeenCalledWith("pack_10", expect.any(String));
+        expect(api.buy).toHaveBeenCalledWith(
+            "pack_10",
+            expect.any(String),
+            "/",
+        );
         expect(win.requests).toHaveLength(1);
         expect(win.requests[0]).toMatchObject({
             handoff: STARTED.payment,
@@ -369,7 +408,11 @@ describe("BuyPackSheet", () => {
             within(group).getByRole("radio", { name: /10-class pack/ }),
         );
         await press(screen.getByRole("button", { name: "Buy · ₹4,500" }));
-        expect(api.buy).toHaveBeenCalledWith("pack_10", expect.any(String));
+        expect(api.buy).toHaveBeenCalledWith(
+            "pack_10",
+            expect.any(String),
+            "/",
+        );
     });
 
     it("sends the customer to the desk, with no pay button, when the business takes no payment online", () => {

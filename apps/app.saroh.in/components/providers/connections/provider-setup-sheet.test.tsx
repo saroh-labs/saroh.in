@@ -354,6 +354,10 @@ const STRIPE_EVENTS = [
     "refund.created",
     "refund.updated",
     "refund.failed",
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+    "checkout.session.async_payment_failed",
+    "checkout.session.expired",
 ];
 const STRIPE_HOOKS: PaymentWebhookSetup[] = [
     {
@@ -397,12 +401,18 @@ describe("Stripe setup (Global)", () => {
         openStripe();
         const t = text();
         expect(t).toContain("Developers › API keys");
-        expect(t).toContain("Payment Intents: Write and Refunds: Write");
+        expect(t).toContain(
+            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
+        );
+        expect(STRIPE_EVENTS).toHaveLength(9);
         expect(t).toContain("Developers › Webhooks › Add endpoint");
         expect(t).toContain("choose API version 2026-10-28.endive");
         expect(byLabel("Webhook URL").value).toBe(URL_STRIPE);
         for (const event of STRIPE_EVENTS) expect(t).toContain(event);
-        expect(t).toContain("Customers pay by card for now.");
+        expect(t).toContain(
+            "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link.",
+        );
+        expect(t).not.toContain("turn on in Stripe");
         expect(t).toContain("Stripe also emails its own receipt");
         expect(byLabel("Publishable key").type).toBe("text");
         expect(byLabel("Restricted key").type).toBe("password");
@@ -436,7 +446,7 @@ describe("Stripe setup (Global)", () => {
         openStripe();
         fillStripe({ rk: "sk_test_example" });
         expect(said("Restricted key")).toBe(
-            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.",
+            "Use a restricted key, not your secret key. In Stripe, create one with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
         );
         await press();
         expect(connectPaymentProvider).not.toHaveBeenCalled();
@@ -504,7 +514,7 @@ describe("Stripe setup (Global)", () => {
         "puts the API's refusal about %s under %s, and clears it when that key changes",
         async (field, label) => {
             const error =
-                "This key can't see payments or refunds. Give it PaymentIntents: Write and Refunds: Write.";
+                "This key can't make Checkout sessions or customers, or see payments and refunds. Give it Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.";
             connectPaymentProvider.mockResolvedValue({
                 ok: false,
                 error,

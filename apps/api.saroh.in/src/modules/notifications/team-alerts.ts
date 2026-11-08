@@ -106,7 +106,8 @@ export type TeamAlertPayload =
     | {
           event: "refund";
           refundId: string;
-          change: "failed" | "refused";
+          /** `late-hold`: a late Stripe hold payment Saroh refunded itself (U5). */
+          change: "failed" | "refused" | "late-hold";
           actorUserId?: string | null;
       }
     | { event: "team"; userId: string; invitationId: string }

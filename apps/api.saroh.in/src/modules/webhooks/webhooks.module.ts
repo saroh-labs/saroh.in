@@ -7,6 +7,8 @@ import { JobsModule } from "../jobs/jobs.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { providerFactoryProvider } from "../payments/providers/provider.factory";
 import { CheckoutReturnController } from "./checkout-return.controller";
+import { CheckoutSessionController } from "./checkout-session.controller";
+import { CheckoutSessionService } from "./checkout-session.service";
 import { PaymentLookupService } from "./payment-lookup.service";
 import {
     CONFIRM_PENDING_PAYMENTS_TYPE,
@@ -37,12 +39,18 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  */
 @Module({
     imports: [PaymentsModule, JobsModule],
-    controllers: [WebhooksController, CheckoutReturnController],
+    controllers: [
+        WebhooksController,
+        CheckoutReturnController,
+        // The return page of Stripe's hosted Checkout (U7).
+        CheckoutSessionController,
+    ],
     providers: [
         WebhooksService,
         webhookProviderFactoryProvider,
         providerFactoryProvider,
         PaymentLookupService,
+        CheckoutSessionService,
         PendingPaymentsHandler,
     ],
     // Exported for the admin console, which replays failed deliveries, and

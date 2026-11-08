@@ -8,6 +8,10 @@ import { destructiveAlertClasses } from "../alert";
 import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import {
+    leavesForProvider,
+    TO_PAYMENT_PAGE_WORDS,
+} from "../booking-flow/hosted-checkout";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import { SoldByLine } from "../sold-by";
@@ -18,7 +22,7 @@ import type {
     ShopCheckoutApi,
 } from "./api";
 import { orderConfirmationHref, toPayLead } from "./order-confirmation";
-import { SheetFrame, sheetAltButton, sheetButton } from "./sheet-frame";
+import { sheetAltButton, sheetButton, SheetFrame } from "./sheet-frame";
 
 /**
  * Paying for a started checkout (round-2 G13). The order exists, unpaid and
@@ -146,6 +150,7 @@ export function CheckoutPay({
     const total = formatAmount(started.total, started.currency);
 
     const phone = delivery?.phone?.replace(/[\s()-]/g, "") ?? "";
+    const redirect = leavesForProvider(started.payment);
 
     function launch() {
         session.current?.close();
@@ -166,6 +171,9 @@ export function CheckoutPay({
             apiUrl,
         });
         session.current = opened;
+        // Stripe's hosted Checkout leaves the page: the bag remembers the
+        // order first, and asks how it stands on the way back.
+        if (redirect) onConfirming?.(started.orderId);
         void opened.outcome.then((outcome) => {
             if (session.current !== opened) return;
             if (outcome === "paid") onConfirming?.(started.orderId);
@@ -312,14 +320,18 @@ export function CheckoutPay({
         status === "failed"
             ? "The payment didn't go through. Nothing was taken. Try again."
             : status === "unavailable"
-              ? "We couldn't open the payment window. Try again in a moment."
+              ? redirect
+                  ? "We couldn't open the secure payment page. Try again in a moment."
+                  : "We couldn't open the payment window. Try again in a moment."
               : status === "closed"
-                ? "The payment window closed before you paid."
+                ? redirect
+                    ? "You came back before paying."
+                    : "The payment window closed before you paid."
                 : null;
     return (
         <SheetFrame
             title="Pay for your order"
-            lead={`Order ${started.orderNumber} · ${total}. Finish paying in the secure payment window.`}
+            lead={`Order ${started.orderNumber} · ${total}. ${redirect ? "You pay on a secure payment page." : "Finish paying in the secure payment window."}`}
             onClose={onClose}
         >
             {problem ? (
@@ -340,7 +352,11 @@ export function CheckoutPay({
                 disabled={status === "open"}
                 className={sheetButton(status === "open")}
             >
-                {status === "open" ? "Payment window open…" : `Pay · ${total}`}
+                {status === "open"
+                    ? redirect
+                        ? TO_PAYMENT_PAGE_WORDS
+                        : "Payment window open…"
+                    : `Pay · ${total}`}
             </button>
             <button type="button" onClick={onBack} className={sheetAltButton}>
                 Back to your bag

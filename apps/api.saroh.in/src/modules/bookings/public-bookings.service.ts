@@ -31,6 +31,7 @@ import type { HoldState } from "./booking-hold";
 import {
     createHoldInvoiceInTx,
     holdExpiry,
+    holdMinutesFor,
     holdState,
     releaseHoldInTx,
     renewHoldTokenInTx,
@@ -406,7 +407,8 @@ export class PublicBookingsService {
      *
      * Pay now needs a price, Payments on and a connected provider; the amount
      * is the service's price, read here, never the client's. The booking is
-     * PENDING and holds its place for 15 minutes (`HOLD_MINUTES`) with a draft
+     * PENDING and holds its place for 15 minutes (`HOLD_MINUTES`), 30 at
+     * Stripe (`STRIPE_HOLD_MINUTES`), with a draft
      * invoice for it (`booking-hold.ts`); the provider's webhook confirms it.
      * Pay at the desk books it CONFIRMED with nothing charged.
      */
@@ -708,7 +710,12 @@ export class PublicBookingsService {
                 made.payToken = hold.payToken;
             },
         };
-        if (price) person.holdUntil = holdExpiry(now);
+        if (price) {
+            person.holdUntil = holdExpiry(
+                now,
+                await holdMinutesFor(prisma, service.organizationId),
+            );
+        }
         // The QR code whose scan opened the page, if its address still
         // carried the tag: looked up on the customer's own site, outside
         // the reservation, and never a reason to refuse the booking.

@@ -48,6 +48,9 @@ export const NOTICE_KINDS = {
     "refund.failed": "order",
     "refund.failed.booking": "booking",
     "refund.failed.invoice": "invoice",
+    // A Stripe payment that came after its booking's hold ended, refunded
+    // by Saroh on its own (plan 2026-11-07-002, U5).
+    "refund.late-hold.booking": "booking",
     "site.live": "site",
     "site.not_live": "site",
     "site.review.approved": "site",

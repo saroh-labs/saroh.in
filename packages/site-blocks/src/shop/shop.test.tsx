@@ -944,6 +944,22 @@ describe("the header's bag", () => {
         expect(readBag(SITE)).toHaveLength(1);
     });
 
+    it("starts once more under a new key when the key's Stripe checkout closed, with the page to come back to", async () => {
+        const { start, openCheckout } = setup({ signedIn: true });
+        start.mockResolvedValueOnce({
+            ok: false,
+            reason: "checkout-closed",
+            message: "That payment closed before it was paid.",
+        });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(openCheckout).toHaveBeenCalledTimes(1));
+        expect(start).toHaveBeenCalledTimes(2);
+        const [first, second] = start.mock.calls.map((c) => c[0]);
+        expect(first.returnPath).toBe("/");
+        expect(second.key).not.toBe(first.key);
+    });
+
     it("asks for an address for Local delivery before it can be placed", async () => {
         setup({
             signedIn: true,

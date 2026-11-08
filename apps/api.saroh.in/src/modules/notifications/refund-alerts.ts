@@ -1,6 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
-import { moneyWordsMinor } from "../../common/words-format";
+import { moneyWordsMinor, whenWords } from "../../common/words-format";
 import { orderPartyName } from "../orders/walk-in";
 import { refundNoticeKey } from "../site-accounts/customer-notify-queue";
 import { cleanBusinessName } from "../site-accounts/sender-name";
@@ -29,6 +29,8 @@ export const REFUND_REFUSED_BOOKING_NOTIFICATION_TYPE =
 /** Refused, on an invoice's payment: opens the invoice. */
 export const REFUND_REFUSED_INVOICE_NOTIFICATION_TYPE =
     "refund.refused.invoice";
+/** A late Stripe hold payment Saroh refunded on its own: opens the booking. */
+export const REFUND_LATE_HOLD_NOTIFICATION_TYPE = "refund.late-hold.booking";
 /** Taken, then failed at the provider, on an order: opens the order. */
 export const REFUND_FAILED_NOTIFICATION_TYPE = "refund.failed";
 /** Failed later, on a booking's payment: opens the booking. */
@@ -43,6 +45,9 @@ export async function wordRefund(
     organizationId: string,
     p: Extract<TeamAlertPayload, { event: "refund" }>,
 ): Promise<WordedAlert | null> {
+    if (p.change === "late-hold") {
+        return wordLateHoldRefund(tx, organizationId, p.refundId);
+    }
     const row = await tx.paymentRefund.findFirst({
         where: { id: p.refundId, organizationId },
         select: {
@@ -203,6 +208,78 @@ export async function wordRefund(
         },
         path: `/billing/invoices/${invoice.id}`,
         cta: "Open the invoice",
+    };
+}
+
+/**
+ * A Stripe payment for a booking hold came after the hold ended and its
+ * place was let go; Saroh refunded it (plan 2026-11-07-002, U5). Said
+ * while the refund is on its way or done: one the provider refused gets
+ * its own "refused" alert instead.
+ */
+async function wordLateHoldRefund(
+    tx: Tx,
+    organizationId: string,
+    refundId: string,
+): Promise<WordedAlert | null> {
+    const row = await tx.paymentRefund.findFirst({
+        where: { id: refundId, organizationId },
+        select: {
+            id: true,
+            status: true,
+            amountCents: true,
+            currency: true,
+            paymentIntent: {
+                select: {
+                    invoice: {
+                        select: {
+                            booking: {
+                                select: {
+                                    id: true,
+                                    startAt: true,
+                                    timezone: true,
+                                    bookerName: true,
+                                    service: { select: { name: true } },
+                                    contact: {
+                                        select: {
+                                            firstName: true,
+                                            lastName: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (row?.status !== "PENDING" && row?.status !== "SUCCEEDED") return null;
+    const booking = row.paymentIntent.invoice?.booking;
+    if (!booking) return null;
+    const amount = moneyWordsMinor(row.amountCents, row.currency);
+    const what = `${booking.service.name}, ${whenWords(booking.startAt, booking.timezone, { weekday: true })}`;
+    const who =
+        nameOf(booking.contact) ??
+        blankToNull(booking.bookerName) ??
+        "A customer";
+    const heading = "A late payment was refunded";
+    return {
+        event: "failed",
+        eventKey: `team:refund:late-hold:${row.id}`,
+        notificationId: null,
+        skipUserId: null,
+        ...noticeOf(REFUND_LATE_HOLD_NOTIFICATION_TYPE, {
+            bookingId: booking.id,
+        }),
+        title: heading,
+        body: `${who}'s payment of ${amount} for ${what} came after its hold ended. Saroh refunded it.`,
+        mail: {
+            heading,
+            body: `A payment of ${amount} for ${cleanBusinessName(booking.service.name, "a booking")} came after its hold ended, and the time was no longer held. Saroh refunded it. Open the booking to see it.`,
+        },
+        path: `/bookings/${booking.id}`,
+        cta: "Open the booking",
     };
 }
 

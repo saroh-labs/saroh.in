@@ -4,6 +4,7 @@ import { EDITION_PROFILES, EDITIONS } from "@saroh/edition";
 
 import {
     isStripeSecretKey,
+    STRIPE_KEY_PERMISSIONS,
     STRIPE_SECRET_KEY_REFUSED,
 } from "./providers/stripe-payments";
 
@@ -67,7 +68,7 @@ function stripePublicKey(input: {
     const restricted = STRIPE_RESTRICTED_KEY.exec(secret);
     if (!restricted) {
         refuse(
-            "That isn't a Stripe restricted key. It starts rk_live_ or rk_test_. Make one in Stripe › Developers › API keys with Payment Intents: Write and Refunds: Write.",
+            `That isn't a Stripe restricted key. It starts rk_live_ or rk_test_. Make one in Stripe › Developers › API keys with ${STRIPE_KEY_PERMISSIONS}.`,
             "keySecret",
         );
     }

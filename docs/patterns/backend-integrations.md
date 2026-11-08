@@ -226,7 +226,9 @@ a note saying so.
   site's server, the window opens on it, and after "paid" the page re-reads
   itself until the server says so. A new page that takes money opens
   `openProviderCheckout`; never a second provider integration, and never
-  the handoff drawn on the page.
+  the handoff drawn on the page. Stripe has no window: the same helper
+  sends the page to the session's Checkout address (DEC-208, 7 Nov
+  amendment; the hosted Checkout bullet below).
 - **Current** (P1, #710) — **A payment is confirmed by asking the
   provider, with the webhook as backup.** Every merchant-site window posts
   its return (`CheckoutRequest.apiUrl`) to `POST /public/payments/return`:
@@ -256,12 +258,17 @@ a note saying so.
 - **Current** (DEC-208) — **Stripe is the business's own account, checked
   before it is kept.** Connect takes three values, each checked by shape
   before any call (`payments/public-key.ts`): the publishable key
-  (`pk_live_…` / `pk_test_…`, the key id and the connection's `publicKey`,
-  which the Payment Element opens with), a restricted key (`rk_…`, the key
-  secret; a full `sk_…` key is refused and never sent) in the same mode as
-  the publishable key, and the endpoint's signing secret (`whsec_…`). Each
-  refusal is a 400 naming its `field`. Then one read each of PaymentIntents
-  and Refunds (`verifyCredentials`): a 403 says which permission is missing.
+  (`pk_live_…` / `pk_test_…`, the key id and the connection's `publicKey`;
+  hosted Checkout no longer needs it, and dropping the field is its own
+  change), a restricted key (`rk_…`, the key secret; a full `sk_…` key is
+  refused and never sent) in the same mode as the publishable key, and the
+  endpoint's signing secret (`whsec_…`). Each refusal is a 400 naming its
+  `field`. Then one read each of PaymentIntents, Refunds, Checkout Sessions
+  and Customers (`verifyCredentials`): a 403 says which permission is
+  missing, in one sentence (`STRIPE_KEY_PERMISSIONS`: Checkout Sessions:
+  Write, Customers: Write, Payment Intents: Read and Refunds: Write). The
+  account's country is read once at connect (`GET /v1/account`) and kept
+  (`accountCountry`); an older connection reads it on its next checkout.
   Webhooks are signed per endpoint, not with the API key: `Stripe-Signature:
 t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
   `whsec_…` secret, compared in constant time; `v0` and any other scheme is
@@ -273,6 +280,66 @@ t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
   `paymentProviders`, and every provider choice for a payment filters by it
   (`IN_EDITION`, inside `OPENS_CHECKOUT`). Facts and sources:
   `payments/providers/STRIPE.md`.
+- **Current** (DEC-208, 7 Nov amendment, plan 2026-11-07-002) — **A Stripe
+  payment is a hosted Checkout Session on the merchant's account; the
+  customer leaves the site and comes back to `/paid`.**
+    - _Session._ `createIntentFor` makes Saroh's intent id first and sends
+      it as `client_reference_id` and `metadata[saroh_intent]` (on the
+      session and its PaymentIntent), beside `metadata[saroh_ref]` (the Order
+      or Invoice). The line item is the server's amount; the PaymentIntent
+      carries `paymentDescription` (India's export rule).
+      `billing_address_collection=required` when the account's country is
+      `IN` or unread (owner, 7 Nov). Every session is card and Link only
+      (`allowed_payment_method_types[]`; Apple Pay and Google Pay ride on
+      card; owner, 8 Nov, DEC-208). `submit_type=book` for a booking hold.
+      Target details, return addresses and the payer are
+      `payments/stripe-checkout.ts`. The browser gets only `checkoutUrl` and
+      `checkoutSessionId` (`https://checkout.stripe.com/` only, checked in
+      `openProviderCheckout`), never a client secret.
+    - _Customer._ Each payer is found by lower-cased email in the merchant's
+      account, or created, and the `cus_` id is kept on the business's
+      `Contact.stripeCustomerId`. No email, no customer; a failed customer
+      call never blocks the payment. A key that can't make customers flags
+      the connection `PERMISSION_MISSING` (Needs attention, payments still
+      go through, no "down" alert); a payment that makes its customer clears
+      it.
+    - _The `cs_` → `pi_` swap._ `PaymentIntent.providerIntentId` holds the
+      session's `cs_…` until Stripe makes the PaymentIntent, then its `pi_…`,
+      which refunds and `payment_intent.*`/`refund.*` events name;
+      `providerCheckoutId` keeps the `cs_…` for good. The swap happens where
+      a `pi_` is first seen with Saroh's row (a session event, a
+      `payment_intent.*` event, a look-up), under the intent's lock, only
+      from `cs_`, never over a different `pi_` (`linkProviderIntentInTx`).
+      The adapter tells the two apart by prefix (`findOrderPayments`,
+      `cancelIntent`: a `cs_` is read with its PaymentIntent, or expired).
+    - _Matching._ `findIntent` tries `providerIntentId`, then
+      `providerCheckoutId`, then Saroh's intent id (scoped to the business
+      and provider), then `orderRef`. So a `payment_intent.succeeded` alone
+      settles a Checkout payment, and an endpoint made before the four
+      `checkout.session.*` events keeps taking money. A session's
+      `completed`+unpaid is `PROCESSING` and `expired` is `CLOSED`: the
+      intent only, never an order or invoice.
+    - _Return._ `success_url` and `cancel_url` are built by the API on the
+      business's own site (`siteOriginOf`, else the renderer's `/pay/paid`),
+      never taken from the browser; a `returnPath` is kept only as a
+      same-site relative path. The cancel address carries Saroh's intent id
+      and a token whose SHA-256 is kept. `/paid` reads
+      `GET /public/payments/checkout/:sessionId` (asking Stripe at most every
+      10 s) and shows Confirming, booked or received, processing, failed,
+      closed or refunding; Back calls `POST /public/payments/checkout/cancel`,
+      which expires the session (a session Stripe says isn't open is looked
+      up and settled, never cancelled) and lets a booking hold go
+      (`webhooks/checkout-session.service.ts`). A replayed intent whose
+      session has closed answers 409 `checkout-closed`, and a hold pays only
+      through its first session (`earlierHoldSession`).
+    - _Holds._ A Stripe hold lasts 30 minutes (Checkout's shortest expiry),
+      moved forward to its session's `expires_at`; releasing it expires the
+      session. A payment that lands after the hold let its place go is
+      refunded in full on its own: the webhook records the
+      `CAPTURED_NEEDS_REFUND` attempt, reserves a `PaymentRefund` keyed
+      `late-hold:<intentId>`, and enqueues the send and a team alert on the
+      same transaction (`payments/late-hold-refund.ts`). Razorpay and
+      Cashfree late payments stay owed back by hand on Home.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

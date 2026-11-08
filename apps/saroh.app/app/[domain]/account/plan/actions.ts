@@ -25,7 +25,7 @@ import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
 import { joinStandingAnswer, joinStartAnswer } from "@/lib/plan-join-shape";
 import { testMode } from "@/lib/test-release";
-import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
+import { sameSitePath, TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
 /**
  * What a member does to their own plan from the account's Plan tab (round-2
@@ -119,6 +119,7 @@ const KEY = /^[A-Za-z0-9_-]{1,128}$/;
 export async function buyPack(
     ref: string,
     idempotencyKey: string,
+    returnPath?: string,
 ): Promise<PackResult<AccountPackCheckout>> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
     if (await testMode()) return TEST_RELEASE_REFUSAL;
@@ -129,9 +130,11 @@ export async function buyPack(
     if (typeof idempotencyKey !== "string" || !KEY.test(idempotencyKey)) {
         return { ok: false, message: OFFLINE };
     }
+    // Where Stripe's hosted Checkout comes back to: a same-site path only.
+    const back = sameSitePath(returnPath);
     const call = await accountFetch(`me/packs/${ref}/buy`, {
         method: "POST",
-        body: { idempotencyKey },
+        body: back ? { idempotencyKey, returnPath: back } : { idempotencyKey },
     });
     if (!call?.ok) return { ok: false, message: OFFLINE };
     return packCheckoutAnswer(
@@ -181,6 +184,7 @@ export async function joinPlan(
     ref: string,
     idempotencyKey: string,
     autopay?: AutopayMethod,
+    returnPath?: string,
 ): Promise<JoinResult<PlanJoinStarted>> {
     if (!(await siteOrigin())) return OFFLINE_JOIN;
     if (await testMode()) return TEST_RELEASE_REFUSAL;
@@ -195,9 +199,15 @@ export async function joinPlan(
     ) {
         return OFFLINE_JOIN;
     }
+    // Where Stripe's hosted Checkout comes back to: a same-site path only.
+    const back = sameSitePath(returnPath);
     const call = await accountFetch(`me/plans/${ref}/join`, {
         method: "POST",
-        body: autopay ? { idempotencyKey, autopay } : { idempotencyKey },
+        body: {
+            idempotencyKey,
+            ...(autopay ? { autopay } : {}),
+            ...(back ? { returnPath: back } : {}),
+        },
     });
     if (call === null) return SIGNED_OUT;
     if (!call.ok) return OFFLINE_JOIN;

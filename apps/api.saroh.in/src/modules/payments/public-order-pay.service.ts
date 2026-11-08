@@ -256,7 +256,7 @@ export class PublicOrderPayService {
         body: unknown,
         callerHash?: string,
     ): Promise<CreateIntentResult> {
-        const { idempotencyKey } = parseIntentBody(body);
+        const { idempotencyKey, returnPath } = parseIntentBody(body);
         const tokenHash = hashPayToken(token);
         if (!this.payLimiter.take(callerHash ?? tokenHash)) {
             throw tooManyRequests();
@@ -282,7 +282,7 @@ export class PublicOrderPayService {
                     amountCents: dueCentsOf(order),
                     currency: order.currency,
                 },
-                { idempotencyKey },
+                { idempotencyKey, returnPath },
             );
         });
     }

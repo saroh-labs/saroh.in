@@ -104,6 +104,16 @@ export class CreateIntentDto {
     @IsString()
     @MaxLength(255)
     idempotencyKey?: string;
+
+    /**
+     * Where a hosted checkout (Stripe) sends the customer back to. Checked
+     * where it is used (`safeReturnPath`): anything but a same-site path is
+     * ignored.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    returnPath?: string;
 }
 
 /** One line to refund, and how many of it (U6). */

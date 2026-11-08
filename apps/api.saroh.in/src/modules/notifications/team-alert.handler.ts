@@ -794,7 +794,9 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "refund":
             return str("refundId") &&
-                (p.change === "failed" || p.change === "refused")
+                (p.change === "failed" ||
+                    p.change === "refused" ||
+                    p.change === "late-hold")
                 ? (p as TeamAlertPayload)
                 : null;
         case "request":

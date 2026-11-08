@@ -53,6 +53,7 @@ import * as messages from "../app/[domain]/account/messages/actions";
 import * as plan from "../app/[domain]/account/plan/actions";
 import * as autopay from "../app/[domain]/autopay/actions";
 import * as book from "../app/[domain]/book/actions";
+import * as paid from "../app/[domain]/paid/actions";
 import * as shop from "../app/[domain]/shop/actions";
 
 /** Reads: they change nothing, so a test release may make them. */
@@ -69,6 +70,7 @@ const READS = new Set([
     "packPayment",
     "planJoinStanding",
     "readAutopay",
+    "readPaid",
     "backInStockOffer",
 ]);
 
@@ -143,6 +145,7 @@ const MODULES: Record<string, Record<string, unknown>> = {
     "account/messages/actions.ts": messages,
     "account/plan/actions.ts": plan,
     "autopay/actions.ts": autopay,
+    "paid/actions.ts": paid,
 };
 
 function onHost(host: string) {

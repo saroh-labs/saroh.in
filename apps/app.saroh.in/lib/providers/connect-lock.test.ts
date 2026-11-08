@@ -303,4 +303,31 @@ describe("a connection whose provider refused its keys (UX-012, FB-7)", () => {
             expect(entry.note).toMatch(/^Needs attention. .* refused its keys/);
         }
     });
+    it("names the permission a Stripe key lacks, while its payments go through (KTD-14)", () => {
+        const view = buildProvidersView({
+            health,
+            payments: [
+                {
+                    id: "s",
+                    provider: "STRIPE",
+                    status: "CONNECTED",
+                    publicKey: "pk_live_Abc",
+                    attention: {
+                        reason: "PERMISSION_MISSING",
+                        since: "2026-11-08T00:00:00Z",
+                    },
+                    updatedAt: "",
+                },
+            ],
+            messaging: [],
+            domains: [],
+            checkout: [],
+        });
+        const [entry] = view.connected;
+        expect(entry.state).toBe("ATTENTION");
+        expect(entry.fix).toBe("Enter keys again");
+        expect(entry.note).toBe(
+            "Needs attention. Its restricted key can't make customers in Stripe, so payments go through without one. In Stripe, give the key Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write, then enter the keys again.",
+        );
+    });
 });

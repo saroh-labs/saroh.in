@@ -1,3 +1,4 @@
+import { CHECKOUT_CLOSED_REASON } from "./hosted-checkout";
 import type {
     BookingDays,
     BookingWhere,
@@ -315,24 +316,39 @@ function isHandoff(v: unknown): v is PaymentHandoff {
     );
 }
 
+/** Said when the hold's Stripe checkout closed (KTD-13): the place has gone. */
+export const HOLD_CHECKOUT_CLOSED =
+    "This time is no longer held for you. Pick a time again.";
+
 /**
  * Start paying the hold's invoice through the invoice payment path. The
- * body names only an idempotency key; the amount is the invoice's.
+ * body names only an idempotency key and, for a hosted checkout (Stripe),
+ * the page to come back to; the amount is the invoice's.
  */
 export async function startPayment(
     apiUrl: string,
     token: string,
     idempotencyKey: string,
+    returnPath?: string,
 ): Promise<Result<PaymentHandoff>> {
     const result = await call(
         `${apiUrl}/public/invoices/${encodeURIComponent(token)}/payment-intent`,
         {
             method: "POST",
-            body: JSON.stringify({ idempotencyKey }),
+            body: JSON.stringify(
+                returnPath
+                    ? { idempotencyKey, returnPath }
+                    : { idempotencyKey },
+            ),
             referrerPolicy: "no-referrer",
         },
         isHandoff,
     );
+    // A hold whose Stripe checkout closed (cancelled or expired) has let
+    // its place go: a new key can't bring it back, so pick again.
+    if (!result.ok && result.reason === CHECKOUT_CLOSED_REASON) {
+        return { ...result, message: HOLD_CHECKOUT_CLOSED };
+    }
     if (result.ok || result.status === 409 || result.status === 429) {
         return result;
     }

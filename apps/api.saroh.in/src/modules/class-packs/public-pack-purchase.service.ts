@@ -165,6 +165,7 @@ export class PublicPackPurchaseService {
         ref: string,
         idempotencyKey: string | undefined,
         now: Date = new Date(),
+        returnPath?: string,
     ): Promise<AccountPackCheckout> {
         const { organizationId, contactId } = customer;
         if (!this.startLimiter.take(customer.accountId)) {
@@ -303,7 +304,7 @@ export class PublicPackPurchaseService {
                 paidCents: 0,
                 currency: draft.currency,
             },
-            { idempotencyKey, provider: provider.provider },
+            { idempotencyKey, provider: provider.provider, returnPath },
         );
         return packCheckoutView({
             invoiceId: draft.id,

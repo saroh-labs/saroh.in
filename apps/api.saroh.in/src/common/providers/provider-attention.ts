@@ -31,9 +31,16 @@ export type CredentialCheck =
     /** Email only: the keys work, but the sending domain isn't verified. */
     | "DOMAIN_UNVERIFIED";
 
-/** The one reason a connection needs attention today. */
+/** The provider refused the keys on a live call: nothing goes through. */
 export const KEYS_REFUSED = "KEYS_REFUSED";
-export type AttentionReason = typeof KEYS_REFUSED;
+/**
+ * Stripe only (KTD-14): the keys still take payments, but the restricted
+ * key lacks a permission a payment uses on the side (Customers), so those
+ * payments go through without it. Not a refusal: it blocks nothing and
+ * tells no one "down"; the screen names the permission to add.
+ */
+export const PERMISSION_MISSING = "PERMISSION_MISSING";
+export type AttentionReason = typeof KEYS_REFUSED | typeof PERMISSION_MISSING;
 
 /**
  * What a provider row says to the screen about its health, beside its
@@ -49,8 +56,14 @@ export function attentionOf(row: {
     attentionReason?: string | null;
     attentionAt?: Date | null;
 }): ProviderAttention | null {
-    if (row.attentionReason !== KEYS_REFUSED || !row.attentionAt) return null;
-    return { reason: KEYS_REFUSED, since: row.attentionAt };
+    const reason = row.attentionReason;
+    if (
+        (reason !== KEYS_REFUSED && reason !== PERMISSION_MISSING) ||
+        !row.attentionAt
+    ) {
+        return null;
+    }
+    return { reason, since: row.attentionAt };
 }
 
 /** The columns a fresh connection (or re-entered keys) clears. */
