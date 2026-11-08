@@ -29,7 +29,7 @@ import {
     socialRowSummary,
 } from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
-import { countryName } from "@saroh/ui/country-select";
+import { countryName } from "@saroh/ui/lib/countries";
 import { Absent, Row } from "@saroh/ui/settings-rows";
 import { KIND_ROW_LABEL, kindChoiceLabel } from "./business-kind-field";
 

@@ -6,7 +6,8 @@ import {
     startMissingFreeRows,
 } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
-import { repointFreeRowsInTx } from "../pricing/global-free-catalogue";
+
+import { CATALOG_PLAN_KEY_PREFIX } from "@saroh/pricing-catalog";
 
 import { FREE_PLAN_ID } from "./catalogue-access.service";
 
@@ -114,4 +115,49 @@ export class FreeRowsHandler {
             `billing_free_rows job=${job.id} version=${version ?? "?"} started=${report.started} not_grandfathered=${report.notGrandfathered} read=${report.organizations}`,
         );
     };
+}
+
+/**
+ * Move an edition's businesses on Free off another edition's Free row onto
+ * its own live one (stage 9, KTD3b): a Global business started before
+ * Global had a catalogue sits on India's. Only a plain Free row is moved: no
+ * provider, nothing pending, nothing paid. Returns how many moved.
+ */
+export async function repointFreeRowsInTx(
+    tx: Prisma.TransactionClient,
+    edition: Edition,
+    now: Date,
+): Promise<number> {
+    const live = await liveCatalogueVersion(tx, edition, now);
+    if (!live) return 0;
+    const free = await tx.plan.findFirst({
+        where: {
+            key: { startsWith: CATALOG_PLAN_KEY_PREFIX },
+            version: live.version,
+            interval: "month",
+            priceCents: 0,
+            active: true,
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+    });
+    if (!free) return 0;
+    const ours = await tx.pricingCatalogVersion.findMany({
+        where: { edition },
+        select: { version: true },
+    });
+    const moved = await tx.subscription.updateMany({
+        where: {
+            organization: { edition },
+            provider: null,
+            pendingPlanId: null,
+            plan: {
+                key: { startsWith: CATALOG_PLAN_KEY_PREFIX },
+                priceCents: 0,
+                version: { notIn: ours.map((v) => v.version) },
+            },
+        },
+        data: { planId: free.id },
+    });
+    return moved.count;
 }

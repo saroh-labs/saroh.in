@@ -4,9 +4,6 @@ jest.mock("@saroh/database", () => ({
     startMissingFreeRows: jest.fn(),
 }));
 jest.mock("./catalogue-access.service", () => ({ FREE_PLAN_ID: "free" }));
-jest.mock("../pricing/global-free-catalogue", () => ({
-    repointFreeRowsInTx: jest.fn(),
-}));
 
 import type { Job, Prisma } from "@saroh/database";
 import {

@@ -23,13 +23,11 @@ import type { Response } from "express";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import { AdminAuditService } from "../admin/admin-audit.service";
+import { repointFreeRowsInTx } from "../billing/free-rows.job";
 import { CatalogueWritesService } from "./catalogue-writes.service";
 import { CatalogueService } from "./catalogue.service";
 import { findUsableCoupon } from "./coupons.service";
-import {
-    installGlobalFreeCatalogue,
-    repointFreeRowsInTx,
-} from "./global-free-catalogue";
+import { installGlobalFreeCatalogue } from "./global-free-catalogue";
 import { ImpactService } from "./impact.service";
 import { PublicPricingController } from "./public-pricing.controller";
 
