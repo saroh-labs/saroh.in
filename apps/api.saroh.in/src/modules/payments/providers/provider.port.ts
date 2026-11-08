@@ -81,6 +81,11 @@ export interface HostedCheckoutInput {
     payerEmail?: string | null;
     /** Ask for a billing address (an Indian account, or one whose country is unknown). */
     billingAddressRequired: boolean;
+    /**
+     * Ask for a shipping address in these countries (ISO alpha-2): goods
+     * sent from an Indian account need one (India's export rules).
+     */
+    shippingCountries?: string[];
 }
 
 /** The payer found or made at the provider; never throws. */

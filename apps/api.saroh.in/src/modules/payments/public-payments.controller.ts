@@ -92,6 +92,7 @@ export class PublicPaymentsController {
         return this.payments.createIntentForOrderPublic(orderId, {
             idempotencyKey: dto.idempotencyKey,
             provider: dto.provider,
+            returnPath: dto.returnPath,
         });
     }
 

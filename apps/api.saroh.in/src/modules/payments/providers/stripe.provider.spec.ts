@@ -220,6 +220,19 @@ describe("StripeProvider.createOrderIntent (hosted Checkout)", () => {
         }
     });
 
+    it("goods from an Indian account ask for the shipping address in the delivery country", async () => {
+        fetchMock.mockReturnValue(answer(200, SESSION));
+        await new StripeProvider().createOrderIntent({
+            ...ORDER,
+            hosted: { ...ORDER.hosted, shippingCountries: ["US"] },
+        });
+        expect(
+            call().form.get(
+                "shipping_address_collection[allowed_countries][0]",
+            ),
+        ).toBe("US");
+    });
+
     it("no customer and no email sends neither", async () => {
         fetchMock.mockReturnValue(answer(200, SESSION));
         await new StripeProvider().createOrderIntent({

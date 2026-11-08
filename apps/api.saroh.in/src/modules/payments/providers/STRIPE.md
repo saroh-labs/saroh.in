@@ -78,6 +78,17 @@ the methods are the merchant's dashboard ones, except that a DRAFT invoice
   or could not be read (owner, 7 Nov: an unreadable country asks every payer
   for an address; payments never fail for it). Otherwise it is left out
   (`auto`).
+- `shipping_address_collection[allowed_countries][]` = the order's delivery
+  country, for an order sent to an address (shipping or local delivery) at
+  an `IN` or unreadable account: India's export rules need a shipping
+  address for goods. The country list is required by Stripe
+  (https://docs.stripe.com/api/checkout/sessions/create), and the order
+  already says where it goes.
+- Return URLs are on the business's own site (`<origin>/paid`, else the
+  renderer's `/pay/paid`). `success_url` carries `{CHECKOUT_SESSION_ID}`.
+  `cancel_url` can't, so it carries Saroh's intent id (made before the
+  call) and a random token whose SHA-256 is kept on the intent's first
+  attempt (`cancelTokenHash`, `payments/stripe-checkout.ts`).
 - The PaymentIntent is `null` until the customer confirms, so a look-up of a
   `cs_` reads the session with `expand[]=payment_intent`, and cancelling one
   is `expire` (a PaymentIntent of a session can't be cancelled). A `pi_` is

@@ -22,6 +22,17 @@ jest.mock("../invoices/business-details", () => ({
     assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
 }));
 
+// Stripe's hosted Checkout detail (U4) has its own specs
+// (`stripe-checkout.spec.ts`); here it answers with a fixed session.
+jest.mock("./stripe-checkout", () => ({
+    ...jest.requireActual<typeof import("./stripe-checkout")>(
+        "./stripe-checkout",
+    ),
+    prepareStripeCheckout: jest.fn(),
+    extendHoldToSession: jest.fn(),
+    storeAccountCountry: jest.fn(),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -103,6 +114,11 @@ import {
 } from "./providers/fake.provider";
 import { RefundCallError } from "./providers/provider.port";
 import { IN_EDITION } from "./public-key";
+import {
+    extendHoldToSession,
+    prepareStripeCheckout,
+    storeAccountCountry,
+} from "./stripe-checkout";
 
 const providerUpsert = prisma.merchantPaymentProvider.upsert as jest.Mock;
 const providerFindMany = prisma.merchantPaymentProvider.findMany as jest.Mock;
@@ -2066,6 +2082,27 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
         expect(providerUpsert).not.toHaveBeenCalled();
     });
 
+    it("keeps the Stripe account's country on connect, and connects when it can't be read", async () => {
+        const { service, fake } = stripeService();
+        const country = jest
+            .fn()
+            .mockResolvedValueOnce("GB")
+            .mockResolvedValueOnce(null);
+        Object.assign(fake, { accountCountry: country });
+
+        await service.connectProvider(global(), STRIPE_KEYS);
+        expect(storeAccountCountry).toHaveBeenCalledWith(
+            expect.objectContaining({ id: "mpp_1" }),
+            "GB",
+        );
+
+        (storeAccountCountry as jest.Mock).mockClear();
+        await expect(
+            service.connectProvider(global(), STRIPE_KEYS),
+        ).resolves.toMatchObject({ provider: "STRIPE" });
+        expect(storeAccountCountry).not.toHaveBeenCalled();
+    });
+
     it("takes live keys as surely as test ones (no test business yet)", async () => {
         const { service } = stripeService();
         const result = await service.connectProvider(global(), {
@@ -2136,6 +2173,272 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
             expect(fake.calls).toHaveLength(0);
         });
 
+        describe("through hosted Checkout (U4)", () => {
+            const prepare = prepareStripeCheckout as jest.Mock;
+            const extend = extendHoldToSession as jest.Mock;
+            const HOSTED = {
+                successUrl:
+                    "https://shop.example.com/paid?session_id={CHECKOUT_SESSION_ID}",
+                cancelUrl:
+                    "https://shop.example.com/paid?cancelled=1&intent=x&token=y",
+                instantOnly: false,
+                submitType: "pay" as const,
+                lineName: "Order ORD-001",
+                clientReference: "set-below",
+                customerId: "cus_1",
+                payerEmail: "asha@example.com",
+                billingAddressRequired: false,
+            };
+            const STORED = {
+                checkoutKind: "order",
+                returnPath: "/checkout/order_1",
+                cancelTokenHash: "hash",
+                expiresAt: "2099-01-01T00:00:00.000Z",
+            };
+            function prepared(over: Record<string, unknown> = {}) {
+                prepare.mockImplementation(
+                    ({ intentId }: { intentId: string }) =>
+                        Promise.resolve({
+                            hosted: { ...HOSTED, clientReference: intentId },
+                            stored: STORED,
+                            holdBookingId: null,
+                            permissionMissing: false,
+                            ...over,
+                        }),
+                );
+            }
+            function stripeSessionService() {
+                const made = stripeService();
+                jest.spyOn(made.fake, "createOrderIntent").mockImplementation(
+                    (input) => {
+                        made.fake.calls.push(input);
+                        return Promise.resolve({
+                            providerIntentId: "cs_test_1",
+                            providerCheckoutId: "cs_test_1",
+                            clientParams: {
+                                checkoutUrl:
+                                    "https://checkout.stripe.com/c/pay/cs_test_1",
+                                checkoutSessionId: "cs_test_1",
+                            },
+                        });
+                    },
+                );
+                return made;
+            }
+
+            beforeEach(() => {
+                orderFindUnique.mockResolvedValue(ORDER);
+                providerFindMany.mockResolvedValue([stripeRow()]);
+                intentCreate.mockImplementation(
+                    ({ data }: { data: { id: string } }) =>
+                        Promise.resolve({ id: data.id }),
+                );
+                attemptCreate.mockResolvedValue({ id: "att_1" });
+                prepared();
+            });
+
+            it("hands Stripe the session details under Saroh's own intent id, and keeps the session", async () => {
+                const { service, fake } = stripeSessionService();
+
+                const result = await service.createIntentForOrder(
+                    global(),
+                    "order_1",
+                );
+
+                const { intentId } = prepare.mock.calls[0][0] as {
+                    intentId: string;
+                };
+                expect(fake.calls[0].hosted).toEqual({
+                    ...HOSTED,
+                    clientReference: intentId,
+                });
+                expect(fake.calls[0].description).toBeDefined();
+                const row = intentCreate.mock.calls[0][0] as {
+                    data: Record<string, unknown>;
+                };
+                expect(row.data).toMatchObject({
+                    id: intentId,
+                    providerIntentId: "cs_test_1",
+                    providerCheckoutId: "cs_test_1",
+                });
+                const attempt = attemptCreate.mock.calls[0][0] as {
+                    data: { rawResponse: Record<string, unknown> };
+                };
+                expect(attempt.data.rawResponse).toMatchObject(STORED);
+                expect(result.paymentIntentId).toBe(intentId);
+                expect(JSON.stringify(result)).not.toMatch(/secret/i);
+                expect(extend).not.toHaveBeenCalled();
+            });
+
+            it("moves a hold's expiry to its session's", async () => {
+                const { service } = stripeSessionService();
+                const expiresAt = new Date("2099-01-01T00:31:00Z");
+                prepared({
+                    holdBookingId: "bk_1",
+                    hosted: { ...HOSTED, submitType: "book", expiresAt },
+                });
+
+                await service.createIntentForOrder(global(), "order_1");
+
+                expect(extend).toHaveBeenCalledWith("bk_1", expiresAt);
+            });
+
+            it("still makes the session when the key can't make customers, and flags the connection", async () => {
+                const { service, fake } = stripeSessionService();
+                prepared({ permissionMissing: true });
+                const flagged = prisma.merchantPaymentProvider
+                    .updateMany as jest.Mock;
+                flagged.mockResolvedValue({ count: 1 });
+
+                await service.createIntentForOrder(global(), "order_1");
+
+                expect(fake.calls).toHaveLength(1);
+                expect(intentCreate).toHaveBeenCalled();
+                expect(flagged).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            attentionReason: "KEYS_REFUSED",
+                        }),
+                    }),
+                );
+            });
+
+            it("a refused session is the handled 503, as before", async () => {
+                const { service, fake } = stripeService();
+                const { ProviderKeysRefusedError } =
+                    await import("../../common/providers/provider-attention");
+                fake.failNextIntent(
+                    new ProviderKeysRefusedError("HTTP 403", 403),
+                );
+                (
+                    prisma.merchantPaymentProvider.updateMany as jest.Mock
+                ).mockResolvedValue({ count: 1 });
+
+                await expect(
+                    service.createIntentForOrder(global(), "order_1"),
+                ).rejects.toBeInstanceOf(ServiceUnavailableException);
+                expect(intentCreate).not.toHaveBeenCalled();
+            });
+
+            describe("replaying an intent", () => {
+                const EXISTING = {
+                    id: "intent_1",
+                    provider: "STRIPE",
+                    providerIntentId: "cs_test_1",
+                    amountCents: 2000,
+                    currency: "USD",
+                    status: "REQUIRES_PAYMENT",
+                };
+                beforeEach(() => {
+                    providerFindUnique.mockResolvedValue(stripeRow());
+                });
+
+                it("returns an open session's URL again", async () => {
+                    const { service, fake } = stripeSessionService();
+                    intentFindUnique.mockResolvedValue(EXISTING);
+                    attemptFindFirst.mockResolvedValue({
+                        rawResponse: {
+                            clientParams: {
+                                checkoutUrl:
+                                    "https://checkout.stripe.com/c/pay/cs_test_1",
+                            },
+                            expiresAt: "2099-01-01T00:00:00.000Z",
+                        },
+                    });
+
+                    const result = await service.createIntentForOrder(
+                        global(),
+                        "order_1",
+                        { idempotencyKey: "k1" },
+                    );
+
+                    expect(result.clientParams.checkoutUrl).toBe(
+                        "https://checkout.stripe.com/c/pay/cs_test_1",
+                    );
+                    expect(fake.calls).toHaveLength(0);
+                });
+
+                it.each([
+                    [
+                        "a cancelled one",
+                        { status: "CANCELLED" },
+                        { checkoutUrl: "https://checkout.stripe.com/x" },
+                        undefined,
+                    ],
+                    [
+                        "one past its session's expiry",
+                        {},
+                        { checkoutUrl: "https://checkout.stripe.com/x" },
+                        "2020-01-01T00:00:00.000Z",
+                    ],
+                ])(
+                    "answers 409 checkout-closed for %s",
+                    async (_label, over, clientParams, expiresAt) => {
+                        const { service } = stripeSessionService();
+                        intentFindUnique.mockResolvedValue({
+                            ...EXISTING,
+                            ...over,
+                        });
+                        attemptFindFirst.mockResolvedValue({
+                            rawResponse: { clientParams, expiresAt },
+                        });
+
+                        const err = await service
+                            .createIntentForOrder(global(), "order_1", {
+                                idempotencyKey: "k1",
+                            })
+                            .catch((e: unknown) => e);
+
+                        expect(err).toBeInstanceOf(ConflictException);
+                        expect(
+                            (err as ConflictException).getResponse(),
+                        ).toMatchObject({
+                            details: { reason: "checkout-closed" },
+                        });
+                    },
+                );
+
+                it("cancels an in-page PaymentIntent from before hosted Checkout, then answers 409", async () => {
+                    const { service, fake } = stripeSessionService();
+                    const cancelIntent = jest.fn().mockResolvedValue(true);
+                    Object.assign(fake, { cancelIntent });
+                    const intentUpdateMany = jest
+                        .fn()
+                        .mockResolvedValue({ count: 1 });
+                    Object.assign(prisma.paymentIntent, {
+                        updateMany: intentUpdateMany,
+                    });
+                    intentFindUnique.mockResolvedValue({
+                        ...EXISTING,
+                        providerIntentId: "pi_old_1",
+                    });
+                    attemptFindFirst.mockResolvedValue({
+                        rawResponse: {
+                            clientParams: { clientSecret: "pi_old_1_secret_x" },
+                        },
+                    });
+
+                    const err = await service
+                        .createIntentForOrder(global(), "order_1", {
+                            idempotencyKey: "k1",
+                        })
+                        .catch((e: unknown) => e);
+
+                    expect(cancelIntent).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            providerIntentId: "pi_old_1",
+                        }),
+                    );
+                    expect(intentUpdateMany).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            data: { status: "CANCELLED" },
+                        }),
+                    );
+                    expect(err).toBeInstanceOf(ConflictException);
+                });
+            });
+        });
+
         it("leaves Razorpay's small charges as they were", async () => {
             const { service, fake } = makeService();
             orderFindUnique.mockResolvedValue({
@@ -2150,6 +2453,9 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
             await service.createIntentForOrder(ctx(), "order_1");
 
             expect(fake.calls[0].amountCents).toBe(40);
+            // No hosted page and no Stripe detail for Razorpay (U4).
+            expect(fake.calls[0].hosted).toBeUndefined();
+            expect(prepareStripeCheckout).not.toHaveBeenCalled();
             expect(isEnabled).not.toHaveBeenCalledWith(
                 FlagKey.STRIPE_PAYMENTS,
                 expect.anything(),

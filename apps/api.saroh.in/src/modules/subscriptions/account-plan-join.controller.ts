@@ -48,6 +48,16 @@ export class AccountJoinPlanDto {
     @IsOptional()
     @IsIn(MANDATE_METHODS)
     autopay?: MandateMethod;
+
+    /**
+     * Where a hosted checkout (Stripe) sends the customer back to. Checked
+     * where it is used (`safeReturnPath`): anything but a same-site path is
+     * ignored.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    returnPath?: string;
 }
 
 /**
@@ -80,6 +90,7 @@ export class AccountPlanJoinController {
             dto.idempotencyKey,
             new Date(),
             dto.autopay,
+            dto.returnPath,
         );
     }
 

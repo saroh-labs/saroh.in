@@ -561,6 +561,12 @@ function checkoutSessionForm(
         ...(hosted.billingAddressRequired
             ? { billing_address_collection: "required" }
             : {}),
+        ...Object.fromEntries(
+            (hosted.shippingCountries ?? []).map((c, i) => [
+                `shipping_address_collection[allowed_countries][${i}]`,
+                c,
+            ]),
+        ),
         ...(hosted.instantOnly
             ? Object.fromEntries(
                   STRIPE_INSTANT_METHODS.map((m, i) => [

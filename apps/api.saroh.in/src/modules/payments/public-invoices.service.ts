@@ -691,16 +691,27 @@ export function parseAutopayBody(body: unknown): {
     return idempotencyKey ? { method, idempotencyKey } : { method };
 }
 
-/** The two fields the public intent request may carry; the rest is ignored. */
+/** The fields the public intent request may carry; the rest is ignored. */
 export function parseIntentBody(body: unknown): {
     provider?: string;
     idempotencyKey?: string;
+    returnPath?: string;
 } {
     const record =
         typeof body === "object" && body !== null
             ? (body as Record<string, unknown>)
             : {};
-    const out: { provider?: string; idempotencyKey?: string } = {};
+    const out: {
+        provider?: string;
+        idempotencyKey?: string;
+        returnPath?: string;
+    } = {};
+    // Where a hosted checkout (Stripe) sends the customer back to: checked
+    // where it is used (`safeReturnPath`), and ignored when it isn't a
+    // same-site path.
+    if (typeof record.returnPath === "string") {
+        out.returnPath = record.returnPath;
+    }
     if (record.provider !== undefined && record.provider !== null) {
         const provider =
             typeof record.provider === "string"

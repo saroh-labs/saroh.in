@@ -373,7 +373,13 @@ export class PublicCheckoutService {
                 }
                 return existing.payOnHandover
                     ? this.placed(existing.id)
-                    : this.pay(scope, account, existing.id, dto.key);
+                    : this.pay(
+                          scope,
+                          account,
+                          existing.id,
+                          dto.key,
+                          dto.returnPath,
+                      );
             }
 
             const payBy: CheckoutPayment = dto.payment ?? "ONLINE";
@@ -468,7 +474,7 @@ export class PublicCheckoutService {
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)
-                : this.pay(scope, account, orderId, dto.key);
+                : this.pay(scope, account, orderId, dto.key, dto.returnPath);
         });
     }
 
@@ -644,6 +650,7 @@ export class PublicCheckoutService {
         account: SiteAccount,
         orderId: string,
         key: string,
+        returnPath?: string,
     ): Promise<CheckoutStarted> {
         // Matched as the checkout matched it: whatever case staff typed.
         const customers = await prisma.customer.findMany({
@@ -660,6 +667,7 @@ export class PublicCheckoutService {
             },
             orderId,
             `checkout:${key}`,
+            returnPath,
         );
         const order = await prisma.order.findUniqueOrThrow({
             where: { id: orderId },

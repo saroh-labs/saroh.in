@@ -145,6 +145,7 @@ export class PublicPlanJoinService {
         idempotencyKey: string | undefined,
         now: Date = new Date(),
         autopayMethod?: MandateMethod,
+        returnPath?: string,
     ): Promise<AccountPlanJoin> {
         const { organizationId, contactId } = customer;
         if (!this.startLimiter.take(customer.accountId)) {
@@ -345,7 +346,7 @@ export class PublicPlanJoinService {
                 paidCents: 0,
                 currency: draft.currency,
             },
-            { idempotencyKey, provider: provider.provider },
+            { idempotencyKey, provider: provider.provider, returnPath },
         );
         return { ...summary, payment, autopay: null };
     }

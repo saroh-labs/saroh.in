@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
     BadGatewayException,
     BadRequestException,
@@ -67,6 +69,7 @@ import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
 import {
     assertKeysAccepted,
     credentialsUnreadable,
+    flagPaymentProvider,
     paymentProviderWorks,
     PROVIDER_FAILED_MESSAGE,
     providerLabel,
@@ -87,6 +90,11 @@ import {
 } from "./providers/provider.port";
 import { IN_EDITION, needsPublicKey, publicKeyFor } from "./public-key";
 import { enqueueRefundAlert, enqueueRefundSentNotice } from "./refund-notices";
+import {
+    extendHoldToSession,
+    prepareStripeCheckout,
+    storeAccountCountry,
+} from "./stripe-checkout";
 import { belowStripeMinimum } from "./stripe-minimum";
 import type { SealedCredentials } from "./webhook-secret";
 import { webhookSecretFrom } from "./webhook-secret";
@@ -670,6 +678,19 @@ export class PaymentsService {
             ctx.organizationId,
             provider,
         );
+
+        // Stripe: the account's country decides whether its checkouts ask
+        // for a billing address (India's export rules). Read once here; a
+        // key that may not read it leaves it null, asked again on a
+        // checkout, and never refuses the connection.
+        const adapter = this.factory.get(provider);
+        if (adapter.accountCountry) {
+            const country = await adapter.accountCountry({
+                keyId: input.keyId,
+                keySecret: input.keySecret,
+            });
+            if (country) await storeAccountCountry(row, country);
+        }
 
         return redact(row);
     }
@@ -1838,7 +1859,11 @@ export class PaymentsService {
      */
     async createIntentForOrderPublic(
         orderId: string,
-        options: { idempotencyKey?: string; provider?: string } = {},
+        options: {
+            idempotencyKey?: string;
+            provider?: string;
+            returnPath?: string;
+        } = {},
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
         // Paying an order already made is finishing it: open while the
@@ -1863,7 +1888,11 @@ export class PaymentsService {
             total: Prisma.Decimal | string | number;
             currency: string;
         },
-        options: { idempotencyKey?: string; provider?: string },
+        options: {
+            idempotencyKey?: string;
+            provider?: string;
+            returnPath?: string;
+        },
     ): Promise<CreateIntentResult> {
         // Resolve the provider row: the one the caller pinned, else the one
         // the order's storefront chose (Sell → Storefronts), else the single
@@ -1895,6 +1924,7 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             resolveProvider,
+            options.returnPath,
         );
     }
 
@@ -1921,7 +1951,11 @@ export class PaymentsService {
             paidCents: number;
             currency: string;
         },
-        options: { idempotencyKey?: string; provider?: string } = {},
+        options: {
+            idempotencyKey?: string;
+            provider?: string;
+            returnPath?: string;
+        } = {},
     ): Promise<CreateIntentResult> {
         return this.createIntentFor(
             invoice.organizationId,
@@ -1947,6 +1981,7 @@ export class PaymentsService {
                           options.provider,
                       )
                     : businessPayLinkProvider(prisma, invoice.organizationId),
+            options.returnPath,
         );
     }
 
@@ -1968,7 +2003,7 @@ export class PaymentsService {
             amountCents: number;
             currency: string;
         },
-        options: { idempotencyKey?: string } = {},
+        options: { idempotencyKey?: string; returnPath?: string } = {},
     ): Promise<CreateIntentResult> {
         // A pay link that charges is a new online payment (the plan's).
         await assertCustomerCanPayOnline(order.organizationId);
@@ -1982,6 +2017,7 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             () => payLinkProvider(prisma, order.organizationId, order.storeId),
+            options.returnPath,
         );
     }
 
@@ -2003,6 +2039,7 @@ export class PaymentsService {
         customer: { organizationId: string; customerIds: readonly string[] },
         orderId: string,
         idempotencyKey: string,
+        returnPath?: string,
     ): Promise<CreateIntentResult> {
         const order = await prisma.order.findFirst({
             where: {
@@ -2053,6 +2090,7 @@ export class PaymentsService {
             },
             idempotencyKey,
             () => payLinkProvider(prisma, organizationId, order.storeId),
+            returnPath,
         );
     }
 
@@ -2072,6 +2110,8 @@ export class PaymentsService {
         },
         rawIdempotencyKey: string | undefined,
         resolveProvider: () => Promise<MerchantPaymentProvider>,
+        /** Where the customer goes back to from a hosted page (Stripe); checked there. */
+        returnPath?: string,
     ): Promise<CreateIntentResult> {
         const { amountCents, currency } = target;
         const link =
@@ -2163,10 +2203,24 @@ export class PaymentsService {
             throw credentialsUnreadable(providerRow, err);
         }
         // Stripe only: the others take no description.
-        const description =
-            providerRow.provider === "STRIPE"
-                ? await paymentDescription(organizationId, target.kind)
-                : undefined;
+        const stripe = providerRow.provider === "STRIPE";
+        const description = stripe
+            ? await paymentDescription(organizationId, target.kind)
+            : undefined;
+        // Stripe's hosted Checkout (DEC-208, 7 Nov amendment) echoes Saroh's
+        // intent id, so the row's id is made before the call.
+        const intentId = stripe ? randomUUID() : undefined;
+        const checkout = intentId
+            ? await prepareStripeCheckout({
+                  organizationId,
+                  target,
+                  providerRow,
+                  adapter: provider,
+                  credentials,
+                  intentId,
+                  returnPath,
+              })
+            : null;
         let intent: CreateOrderIntentResult;
         try {
             intent = await provider.createOrderIntent({
@@ -2175,6 +2229,7 @@ export class PaymentsService {
                 orderId: target.id,
                 credentials,
                 ...(description ? { description } : {}),
+                ...(checkout ? { hosted: checkout.hosted } : {}),
             });
         } catch (err) {
             // A handled 503 in the customer's words, never an unhandled
@@ -2182,9 +2237,29 @@ export class PaymentsService {
             // team (UX-012).
             throw await providerOrderFailed(providerRow, err);
         }
-        // A provider order made on a connection flagged as refused: it
-        // works again, and the team hears so once (#555). Never throws.
-        if (providerRow.attentionAt) await paymentProviderWorks(providerRow);
+        if (checkout?.permissionMissing) {
+            // The key can't read or make customers: the payment went ahead
+            // without one, and the connection asks for its keys again
+            // (KTD-14). Its flag stays until they are re-entered.
+            try {
+                await flagPaymentProvider(providerRow);
+            } catch (err) {
+                this.logger.warn(
+                    `Could not mark provider ${providerRow.id} as needing attention: ${errorMessage(err)}`,
+                );
+            }
+        } else if (providerRow.attentionAt) {
+            // A provider order made on a connection flagged as refused: it
+            // works again, and the team hears so once (#555). Never throws.
+            await paymentProviderWorks(providerRow);
+        }
+        // The hold lasts as long as the session that pays for it (KTD-9).
+        if (checkout?.holdBookingId && checkout.hosted.expiresAt) {
+            await extendHoldToSession(
+                checkout.holdBookingId,
+                checkout.hosted.expiresAt,
+            );
+        }
 
         // Persist intent + first attempt atomically. rawResponse holds only the
         // non-secret client params — never any credential.
@@ -2192,10 +2267,14 @@ export class PaymentsService {
             const created = await prisma.$transaction(async (tx) => {
                 const paymentIntent = await tx.paymentIntent.create({
                     data: {
+                        ...(intentId ? { id: intentId } : {}),
                         organizationId,
                         ...link,
                         provider: providerRow.provider,
                         providerIntentId: intent.providerIntentId,
+                        ...(intent.providerCheckoutId
+                            ? { providerCheckoutId: intent.providerCheckoutId }
+                            : {}),
                         amountCents,
                         currency,
                         status: "REQUIRES_PAYMENT",
@@ -2212,6 +2291,7 @@ export class PaymentsService {
                         rawResponse: {
                             providerIntentId: intent.providerIntentId,
                             clientParams: intent.clientParams,
+                            ...(checkout ? checkout.stored : {}),
                         } as Prisma.InputJsonValue,
                     },
                 });
@@ -2409,6 +2489,7 @@ export class PaymentsService {
             providerIntentId: string | null;
             amountCents: number;
             currency: string;
+            status?: string;
         },
     ): Promise<CreateIntentResult> {
         const attempt = await prisma.paymentAttempt.findFirst({
@@ -2417,6 +2498,7 @@ export class PaymentsService {
         });
         const raw = (attempt?.rawResponse ?? {}) as {
             clientParams?: Record<string, unknown>;
+            expiresAt?: string;
         };
         const providerRow = await prisma.merchantPaymentProvider.findUnique({
             where: {
@@ -2426,6 +2508,9 @@ export class PaymentsService {
                 },
             },
         });
+        if (intent.provider === "STRIPE") {
+            await this.assertStripeCheckoutOpen(intent, raw, providerRow);
+        }
 
         return {
             paymentIntentId: intent.id,
@@ -2436,6 +2521,68 @@ export class PaymentsService {
             publicKey: providerRow?.publicKey ?? null,
             clientParams: raw.clientParams ?? {},
         };
+    }
+
+    /**
+     * A replayed Stripe intent hands back its Checkout URL only while the
+     * session can still take the payment (KTD-13). Cancelled, past its
+     * expiry, or an in-page PaymentIntent from before hosted Checkout (no
+     * `checkoutUrl`; it is cancelled at Stripe first) answers 409
+     * `checkout-closed`, and the caller starts again with a new key. A
+     * settled one (paid, failed) replays as before.
+     */
+    private async assertStripeCheckoutOpen(
+        intent: {
+            id: string;
+            providerIntentId: string | null;
+            status?: string;
+        },
+        raw: { clientParams?: Record<string, unknown>; expiresAt?: string },
+        providerRow: MerchantPaymentProvider | null,
+    ): Promise<void> {
+        const open =
+            !intent.status ||
+            (OPEN_INTENT_STATUSES as readonly string[]).includes(intent.status);
+        const legacy = typeof raw.clientParams?.checkoutUrl !== "string";
+        const expired =
+            typeof raw.expiresAt === "string" &&
+            new Date(raw.expiresAt).getTime() <= Date.now();
+        if (open && !legacy && !expired) return;
+        if (open && legacy && intent.providerIntentId && providerRow) {
+            await this.closeLegacyStripeIntent(intent, providerRow);
+        }
+        if (intent.status === "CANCELLED" || open) {
+            throw new ConflictException({
+                message: "This checkout has closed. Start again.",
+                details: { reason: "checkout-closed" },
+            });
+        }
+    }
+
+    /** Cancel an in-page PaymentIntent at Stripe, then the row. Never throws. */
+    private async closeLegacyStripeIntent(
+        intent: { id: string; providerIntentId: string | null },
+        providerRow: MerchantPaymentProvider,
+    ): Promise<void> {
+        try {
+            const adapter = this.factory.get(providerRow.provider);
+            const cancelled = await adapter.cancelIntent?.({
+                providerIntentId: intent.providerIntentId ?? "",
+                credentials: this.openCredentials(providerRow),
+            });
+            if (!cancelled) return;
+            await prisma.paymentIntent.updateMany({
+                where: {
+                    id: intent.id,
+                    status: { in: [...OPEN_INTENT_STATUSES] },
+                },
+                data: { status: "CANCELLED" },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Could not close Stripe payment ${intent.id}: ${errorMessage(error)}`,
+            );
+        }
     }
 
     /** Decrypt + parse the sealed `{ keyId, keySecret }`. In-memory only. */

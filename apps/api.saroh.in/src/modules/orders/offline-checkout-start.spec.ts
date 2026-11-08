@@ -550,6 +550,8 @@ describe("a discount code at the checkout (DEC-104)", () => {
             expect.objectContaining({ organizationId: "org_1" }),
             "order_1",
             "checkout:key-12345678",
+            // No return path sent (a hosted checkout's, U4).
+            undefined,
         );
     });
 
