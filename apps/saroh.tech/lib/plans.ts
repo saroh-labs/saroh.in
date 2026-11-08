@@ -3,12 +3,17 @@ import type {
     PricingPageModel,
     PricingView,
 } from "@saroh/marketing/pricing-model";
-import { placeholderPricingModel } from "@saroh/marketing/pricing-view";
+import {
+    placeholderPricingModel,
+    pricingPageModel,
+} from "@saroh/marketing/pricing-view";
 import { sentenceList } from "@saroh/marketing/sentence-list";
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
+    catalogMoney,
     cellOf,
     countedWhat,
+    formatMinor,
     LIMIT_WORDS,
     limitWordsFor,
     parseCatalog,
@@ -32,6 +37,18 @@ export async function readCatalog(
     api = process.env.API_URL?.trim(),
     fetcher: typeof fetch = fetch,
 ): Promise<Catalog | null> {
+    return (await readPricing(api, fetcher))?.catalog ?? null;
+}
+
+/**
+ * The catalogue and whether Saroh sells its paid plans now (stage 9,
+ * DEC-211: the API's `offered`, its switch on and a paid plan published).
+ * Null as {@link readCatalog} is.
+ */
+export async function readPricing(
+    api = process.env.API_URL?.trim(),
+    fetcher: typeof fetch = fetch,
+): Promise<{ catalog: Catalog; offered: boolean } | null> {
     if (!api) return null;
     try {
         const res = await fetcher(`${api}/public/pricing`, {
@@ -41,8 +58,14 @@ export async function readCatalog(
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`GET /public/pricing: ${res.status}`);
-        const body = (await res.json()) as { catalog?: unknown };
-        return parseCatalog(body.catalog);
+        const body = (await res.json()) as {
+            catalog?: unknown;
+            offered?: unknown;
+        };
+        return {
+            catalog: parseCatalog(body.catalog),
+            offered: body.offered === true,
+        };
     } catch (err) {
         console.warn(
             "[pricing] the catalogue could not be read; Free keeps its general lines",
@@ -150,10 +173,29 @@ export function freeUsage(
 }
 
 /**
- * The pricing page's plans. Only Free's limits come from a catalogue. Stage 9:
- * with a USD catalogue, return `pricingPageModel(catalog, { money, count, tax: null })`.
+ * The pricing page's plans. While Saroh doesn't sell its paid plans here
+ * (DEC-211), only Free's limits come from a catalogue and paid plans say
+ * they come later. Once it does (`offered`, stage 9), the whole catalogue
+ * in its own money, dollars with no tax: never an India catalogue, which
+ * is in rupees.
  */
-export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
+export function pricingModel(
+    catalog: Catalog | null = null,
+    offered = false,
+): PricingPageModel {
+    const money = catalog ? catalogMoney(catalog) : null;
+    if (
+        catalog &&
+        offered &&
+        money?.tax === "none" &&
+        catalog.plans.some((p) => p.pricePaise > 0)
+    ) {
+        return pricingPageModel(catalog, {
+            money: (minor) => formatMinor(minor, money.currency),
+            count: (n) => n.toLocaleString("en-US"),
+            tax: null,
+        });
+    }
     const limits = catalog && freeLimitLines(catalog);
     const model = placeholderPricingModel({
         plans: PRICING.plans,

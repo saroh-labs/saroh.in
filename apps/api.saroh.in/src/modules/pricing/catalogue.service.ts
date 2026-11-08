@@ -3,6 +3,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     UnprocessableEntityException,
 } from "@nestjs/common";
 import {
@@ -11,8 +12,11 @@ import {
     unsyncedCatalogueVersions,
 } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planPriceOf, validateCatalog } from "@saroh/pricing-catalog";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import type { FreeStyleChoices } from "./free-style-choices";
 import { freeStyleChoices } from "./free-style-choices";
 
@@ -178,7 +182,11 @@ function nothingPublished(next: Catalog): Catalog {
 export class CatalogueService {
     private readonly logger = new Logger(CatalogueService.name);
 
-    constructor(private readonly impactService: ImpactService) {}
+    constructor(
+        private readonly impactService: ImpactService,
+        @Optional()
+        private readonly flags: FeatureFlagService = new FeatureFlagService(),
+    ) {}
 
     /** A stored snapshot, parsed. One that doesn't is a corrupt row: a 500. */
     private parseStored(version: number, catalog: unknown): Catalog {
@@ -212,11 +220,21 @@ export class CatalogueService {
     async publicPricing(edition: Edition, now: Date): Promise<PublicPricing> {
         const live = await this.live(edition, now);
         if (!live) throw new NotFoundException("No pricing is published yet");
+        const catalog = publicCatalog(live.catalog);
         return {
             version: live.version,
             goLiveAt: live.goLiveAt.toISOString(),
             preview: false,
-            catalog: publicCatalog(live.catalog),
+            catalog,
+            ...(editionProfile(edition).sarohBilling
+                ? {}
+                : {
+                      offered:
+                          catalog.plans.some((p) => p.pricePaise > 0) &&
+                          (await this.flags.isEnabled(
+                              FlagKey.SAROH_BILLING_GLOBAL,
+                          )),
+                  }),
         };
     }
 

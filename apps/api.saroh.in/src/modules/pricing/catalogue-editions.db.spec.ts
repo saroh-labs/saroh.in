@@ -263,3 +263,45 @@ describe("one catalogue per edition (DB, stage 9 U2)", () => {
         expect(await installGlobalFreeCatalogue(writes, new Date())).toBeNull();
     });
 });
+
+describe("whether Global's plans are offered on its pricing (DB, stage 9 U9)", () => {
+    beforeEach(wipe);
+
+    it("says offered only with the switch on and a paid plan", async () => {
+        await install(1, "GLOBAL", usd());
+        await prisma.featureFlag.deleteMany({
+            where: { key: "SAROH_BILLING_GLOBAL" },
+        });
+        const off = await pricing.get(
+            "api.saroh.tech",
+            undefined,
+            undefined,
+            fakeRes(),
+        );
+        expect(off?.offered).toBe(false);
+        await prisma.featureFlag.create({
+            data: { key: "SAROH_BILLING_GLOBAL", enabledByDefault: true },
+        });
+        const on = await pricing.get(
+            "api.saroh.tech",
+            undefined,
+            undefined,
+            fakeRes(),
+        );
+        expect(on?.offered).toBe(true);
+        await prisma.featureFlag.deleteMany({
+            where: { key: "SAROH_BILLING_GLOBAL" },
+        });
+    });
+
+    it("leaves India's answer as it was", async () => {
+        await install(1, "INDIA", fakeCatalog());
+        const india = await pricing.get(
+            "api.saroh.in",
+            undefined,
+            undefined,
+            fakeRes(),
+        );
+        expect(india).not.toHaveProperty("offered");
+    });
+});

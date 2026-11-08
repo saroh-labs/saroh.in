@@ -8,7 +8,7 @@ import { Plans } from "@/components/pricing/plans";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CTA_BAND } from "@/content/home";
 import { PRICING } from "@/content/pricing";
-import { freeUsage, pricingModel, readCatalog } from "@/lib/plans";
+import { freeUsage, pricingModel, readPricing } from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -23,7 +23,8 @@ export const metadata = pageMetadata(page);
  * needs no column to compare, so the words sit in rows that fit a phone.
  */
 export default async function PricingPage() {
-    const catalog = await readCatalog();
+    const read = await readPricing();
+    const catalog = read?.catalog ?? null;
     const usage = freeUsage(catalog);
     return (
         <div data-page-type={page.type}>
@@ -41,7 +42,7 @@ export default async function PricingPage() {
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
-                <Plans model={pricingModel(catalog)} />
+                <Plans model={pricingModel(catalog, read?.offered)} />
             </Container>
             {usage ? (
                 <Section
