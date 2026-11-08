@@ -73,6 +73,8 @@ In this order, any subset as needed:
 
 ## After
 
+- Global's first catalogue (Free only, in dollars) is installed by the release
+  that carries stage 9, not on launch day: `docs/architecture/STAGE_9_ROLLOUT.md`.
 - Saroh's own Global billing (stage 9) stays off in production until the
   owner turns on `SAROH_BILLING_GLOBAL` (DEC-211).
 - Session replay is off on the Global apps until a consent decision.
