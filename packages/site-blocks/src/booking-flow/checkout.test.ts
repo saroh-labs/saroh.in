@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaymentHandoff } from "./api";
 import type { CheckoutRequest } from "./checkout";
 import {
+    cappedRadius,
     openProviderCheckout,
     postCheckoutReturn,
     RAZORPAY_SDK,
@@ -710,5 +711,13 @@ describe("Stripe's Payment Element, in a window of the site's own (U7)", () => {
         await flush();
         expect(stripe).toHaveLength(0);
         expect(dialog()).toBeNull();
+    });
+});
+
+describe("the payment window's corners", () => {
+    it("caps a pill template's radius so card fields stay fields", () => {
+        expect(cappedRadius("9999px")).toBe("10px");
+        expect(cappedRadius("6px")).toBe("6px");
+        expect(cappedRadius("")).toBeNull();
     });
 });

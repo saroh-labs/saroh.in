@@ -4,6 +4,7 @@ import {
     Injectable,
     Optional,
 } from "@nestjs/common";
+import type { Edition } from "@saroh/edition";
 
 import { sendSelfTestEmail } from "../../common/email";
 import type { AuthUser } from "../../common/types/store-context";
@@ -73,6 +74,8 @@ export class SelfTestService {
     async sendSelfTest(
         user: AuthUser,
         template: SelfTestTemplate,
+        /** The edition it was asked through: its sender (KTD6). */
+        edition: Edition = "INDIA",
     ): Promise<{ sentTo: string; template: SelfTestTemplate }> {
         // 1. The recipient can ONLY ever be the session user's own address, and
         //    it must be a verified account email.
@@ -94,7 +97,11 @@ export class SelfTestService {
         // 3. Render a server-owned built-in template and send it, hard-bound to
         //    the user's own email, via Saroh's transporter with the test label.
         const { label, html } = renderSelfTestTemplate(template);
-        await this.sendEmail(user.email, { templateLabel: label, html });
+        await this.sendEmail(
+            user.email,
+            { templateLabel: label, html },
+            edition,
+        );
 
         return { sentTo: redactEmail(user.email), template };
     }

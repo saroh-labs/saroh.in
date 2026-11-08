@@ -438,12 +438,39 @@ function stripeAppearance(
     // so it falls back down the stack; pass `fonts` with a cssSrc if a merchant
     // font must show inside the card fields.
     put("fontFamily", box.fontFamily || null);
-    put("borderRadius", button.borderTopLeftRadius || null);
+    put("borderRadius", cappedRadius(button.borderTopLeftRadius));
     return { variables };
 }
 
+/**
+ * A field's corners, at most 10px: a template whose buttons are pills
+ * (`--site-radius` 999px) would turn Stripe's card fields into ovals.
+ */
+export function cappedRadius(css: string | null | undefined): string | null {
+    const px = Number.parseFloat(css ?? "");
+    if (!Number.isFinite(px)) return null;
+    return `${Math.min(px, 10)}px`;
+}
+
+/**
+ * The payment window's backdrop, once per page: a plain dim over the site,
+ * so the window reads as above it (a `<dialog>`'s backdrop can only be set
+ * from a stylesheet).
+ */
+function ensurePayStyles(): void {
+    if (document.getElementById("site-pay-styles")) return;
+    const style = document.createElement("style");
+    style.id = "site-pay-styles";
+    style.textContent =
+        "dialog[data-site-pay]::backdrop{background:rgb(0 0 0 / 0.55);}" +
+        "dialog[data-site-pay] button:focus-visible{outline:2px solid hsl(var(--site-fg));outline-offset:2px;}";
+    document.head.appendChild(style);
+}
+
+// The payment window looks the same on every look (owner, 7 Nov 2026):
+// Classic's window, with corners that never grow into pills or circles.
 const BUTTON =
-    "min-height:44px;min-width:44px;padding:0 1rem;font:inherit;cursor:pointer;border-radius:var(--site-radius);";
+    "min-height:44px;min-width:44px;padding:0 1rem;font:inherit;cursor:pointer;border-radius:min(var(--site-radius, 0.625rem), 0.625rem);";
 
 let stripeWindows = 0;
 
@@ -477,13 +504,17 @@ function openStripe(
                 settle("unavailable");
                 return;
             }
+            ensurePayStyles();
             const dialog = document.createElement("dialog");
             const titleId = `site-stripe-title-${++stripeWindows}`;
+            dialog.setAttribute("data-site-pay", "");
             dialog.setAttribute("aria-labelledby", titleId);
+            dialog.setAttribute("aria-describedby", `${titleId}-about`);
             dialog.tabIndex = -1;
             dialog.style.cssText =
                 "width:min(28rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);overflow:auto;box-sizing:border-box;padding:1.25rem;" +
-                "border:1px solid hsl(var(--site-border));border-radius:var(--site-radius);" +
+                // A window, never a pill: the site's radius, at most 0.75rem.
+                "border:1px solid hsl(var(--site-border));border-radius:min(var(--site-radius, 0.75rem), 0.75rem);margin:auto;" +
                 "background:hsl(var(--site-surface));color:hsl(var(--site-fg));font-family:var(--site-font-body);";
 
             const title = document.createElement("h2");
@@ -492,6 +523,7 @@ function openStripe(
             title.style.cssText =
                 "margin:0;font-family:var(--site-font-heading);font-size:1.25rem;";
             const about = document.createElement("p");
+            about.id = `${titleId}-about`;
             about.textContent = request.description;
             about.style.cssText =
                 "margin:0.25rem 0 1rem;color:hsl(var(--site-body));";

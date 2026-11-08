@@ -1,3 +1,4 @@
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { OnlineFix } from "@/lib/services/online-booking";
 import { PLAN_FIX } from "@/lib/services/online-booking";
 import type { OnlineBlocker } from "@/lib/staff/types";
@@ -23,10 +24,16 @@ export function offlinePayHint({
     who: string;
 }): { text: string; fix: OnlineFix | null } {
     if (blocker === "PLAN") {
-        return {
-            text: "Online payment comes with a paid plan. Its link shows the invoice and how to pay you, with no Pay button.",
-            fix: PLAN_FIX,
-        };
+        // No plans to buy (Global, DEC-211): the plan's own words, no way to one.
+        return plansShown()
+            ? {
+                  text: "Online payment comes with a paid plan. Its link shows the invoice and how to pay you, with no Pay button.",
+                  fix: PLAN_FIX,
+              }
+            : {
+                  text: "Your plan doesn't take payment online. Its link shows the invoice and how to pay you, with no Pay button.",
+                  fix: null,
+              };
     }
     // Nothing connected at all. A connection that can't open the checkout
     // yet (a Razorpay key missing) is fixed on its own row, not here.

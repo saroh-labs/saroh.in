@@ -3,7 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 
-import { appBaseOf } from "../../common/app-url";
+import { appBase, editionOf } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
@@ -221,13 +221,18 @@ export class DataExportHandler {
                     ),
                 },
             );
-            const outcome = await sendDataExportReadyEmail(user.email, {
-                businessName: row.organization.name,
-                url: signed.url,
-                linkExpiresAt: new Date(signed.expiresAt),
-                keptUntil,
-                workspaceUrl: `${await appBaseOf(row.organizationId)}/settings/data`,
-            });
+            const edition = await editionOf(row.organizationId);
+            const outcome = await sendDataExportReadyEmail(
+                user.email,
+                {
+                    businessName: row.organization.name,
+                    url: signed.url,
+                    linkExpiresAt: new Date(signed.expiresAt),
+                    keptUntil,
+                    workspaceUrl: `${appBase(edition)}/settings/data`,
+                },
+                edition,
+            );
             this.logger.log(
                 `data_export_email org=${row.organizationId} outcome=${outcome}`,
             );

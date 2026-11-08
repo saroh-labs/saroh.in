@@ -13,18 +13,27 @@
  *
  *   node scripts/cf-plan.mjs development            # JSON list to deploy
  *   node scripts/cf-plan.mjs production web,sites   # only these, if changed
+ *   node scripts/cf-plan.mjs production all-global  # Global's four, if changed
  *   FORCE=1 node scripts/cf-plan.mjs development web  # deploy regardless
  *   node scripts/cf-plan.mjs --launch-wait            # seconds to LAUNCH_AT
  *
  * Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to read the live
  * fingerprints; without them, or when a Worker can't be read, the app counts
  * as changed. Prints nothing secret.
+ *
+ * Production also has Global's Workers (stage 10, KTD2): variants of the same
+ * packages, built from scripts/cf-global-prod.mjs's conversion. Each plan entry
+ * is `{ pkg, app, variant, dir, env, fingerprint }`: `pkg` is Turbo's package,
+ * `app` the name a manual run and the job use, `variant` "india" or "global".
+ * Global development deploys on its own (deploy-global-dev.yml).
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { appVars, buildVars, launchInstant, parseJsonc } from "./cf-env.mjs";
+import { converterSource, globalProductionConfig } from "./cf-global-prod.mjs";
 
 /** Turbo package name -> app directory. */
 export const APPS = {
@@ -34,6 +43,55 @@ export const APPS = {
     admin: "apps/admin.saroh.in",
     sites: "apps/saroh.app",
 };
+
+/** Global's production Workers: the name a run uses -> Turbo package and directory. */
+export const GLOBAL_APPS = {
+    tech: { pkg: "tech", dir: "apps/saroh.tech" },
+    "application-global": { pkg: "application", dir: APPS.application },
+    "auth-global": { pkg: "auth", dir: APPS.auth },
+    "admin-global": { pkg: "admin", dir: APPS.admin },
+};
+
+/**
+ * Which apps a run looks at. Nothing named: every app of the environment
+ * (a push). "all" is India's five, "all-global" Global's four.
+ */
+export function selectApps(environment, only = "") {
+    const india = Object.keys(APPS);
+    const global = Object.keys(GLOBAL_APPS);
+    const names = !only
+        ? environment === "production"
+            ? [...india, ...global]
+            : india
+        : only
+              .split(",")
+              .filter(Boolean)
+              .flatMap((name) =>
+                  name === "all"
+                      ? india
+                      : name === "all-global"
+                        ? global
+                        : [name],
+              );
+    for (const name of names) {
+        if (name in GLOBAL_APPS && environment !== "production")
+            throw new Error(
+                `${name} deploys to production only here; Global development is deploy-global-dev.yml`,
+            );
+        if (!(name in APPS) && !(name in GLOBAL_APPS))
+            throw new Error(`unknown app ${name}`);
+    }
+    return names;
+}
+
+/** A Global app's production config as its deploy will write it. */
+export function globalConfig(app, routes = process.env.GLOBAL_ROUTES === "on") {
+    const { dir } = GLOBAL_APPS[app];
+    const config = parseJsonc(
+        readFileSync(join(dir, "wrangler.jsonc"), "utf8"),
+    );
+    return globalProductionConfig(config, dir, { routes });
+}
 
 /** The Worker a deploy of this app and environment updates. */
 export function workerName(dir, environment) {
@@ -53,7 +111,25 @@ export function workerName(dir, environment) {
  * turbo.json's hashed `globalEnv`, which scripts/cf-env.test.mjs checks.
  */
 export function fingerprint(pkg, environment, now = new Date()) {
-    const env = { ...process.env, ...buildVars(APPS[pkg], environment, now) };
+    return `${environment}-${turboHash(pkg, buildVars(APPS[pkg], environment, now))}`;
+}
+
+/**
+ * A Global variant's fingerprint: Turbo's hash with the converted settings,
+ * folded with the converter's text and the whole converted config. Turbo
+ * doesn't see routes, workers.dev or the converter, so a converter change or
+ * `GLOBAL_ROUTES` flipped (the launch) still redeploys exactly Global's.
+ */
+export function globalFingerprint(turbo, converter, converted) {
+    const folded = createHash("sha256")
+        .update(`${turbo}\0${converter}\0${JSON.stringify(converted)}`)
+        .digest("hex")
+        .slice(0, 32);
+    return `production-global-${folded}`;
+}
+
+function turboHash(pkg, vars) {
+    const env = { ...process.env, ...vars };
     const out = execFileSync(
         "pnpm",
         [
@@ -69,9 +145,9 @@ export function fingerprint(pkg, environment, now = new Date()) {
     );
     const task = JSON.parse(out).tasks.find((t) => t.taskId === `${pkg}#build`);
     if (!task) throw new Error(`no ${pkg}#build in turbo's plan`);
-    // The environment is part of the label: the same commit builds differently
-    // for dev and production.
-    return `${environment}-${task.hash}`;
+    // The caller puts the environment in the label: the same commit builds
+    // differently for dev and production.
+    return task.hash;
 }
 
 /** The scheduled launch run sleeps this long at most; further off, it isn't the launch. */
@@ -125,24 +201,39 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         );
         process.exit(2);
     }
-    const pkgs = only ? only.split(",").filter(Boolean) : Object.keys(APPS);
     const plan = [];
-    for (const pkg of pkgs) {
-        if (!(pkg in APPS)) throw new Error(`unknown app ${pkg}`);
-        const hash = fingerprint(pkg, environment);
-        const live = await liveFingerprint(workerName(APPS[pkg], environment));
+    for (const app of selectApps(environment, only)) {
+        let entry;
+        let worker;
+        if (app in GLOBAL_APPS) {
+            const { pkg, dir } = GLOBAL_APPS[app];
+            const converted = globalConfig(app);
+            const production = converted.env.production;
+            const hash = globalFingerprint(
+                turboHash(pkg, production.vars ?? {}),
+                converterSource(),
+                converted,
+            );
+            entry = { pkg, app, variant: "global", dir, fingerprint: hash };
+            worker = production.name;
+        } else {
+            entry = {
+                pkg: app,
+                app,
+                variant: "india",
+                dir: APPS[app],
+                fingerprint: fingerprint(app, environment),
+            };
+            worker = workerName(APPS[app], environment);
+        }
+        const hash = entry.fingerprint;
+        const live = await liveFingerprint(worker);
         const deploy = process.env.FORCE === "1" || live !== hash;
         console.error(
-            `${pkg} (${environment}): ${deploy ? "deploy" : "unchanged"}` +
+            `${app} (${environment}): ${deploy ? "deploy" : "unchanged"}` +
                 `${live === hash ? "" : live ? " (live build differs)" : " (no live fingerprint)"}`,
         );
-        if (deploy)
-            plan.push({
-                pkg,
-                dir: APPS[pkg],
-                env: environment,
-                fingerprint: hash,
-            });
+        if (deploy) plan.push({ ...entry, env: environment });
     }
     console.log(JSON.stringify(plan));
 }

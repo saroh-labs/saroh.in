@@ -76,6 +76,17 @@ export function isToolGateSource(source: string | null | undefined): boolean {
 }
 
 /**
+ * The `source` of "Tell me when" (Global launch plan KTD8): someone who
+ * asked to hear when paid plans open. A quiet list: they get a sales lead
+ * labelled {@link PAID_PLANS_LEAD_NOTE}, but no invite and no opening-day
+ * mail, and the public reply never says whether they were already on it.
+ */
+export const PAID_PLANS_SOURCE = "paid-plans";
+
+/** The note a "Tell me when" puts on its sales lead. */
+export const PAID_PLANS_LEAD_NOTE = "Paid plans interest";
+
+/**
  * An entry any free tool's email gate made, the link preview's included:
  * not someone waiting for Saroh, so it makes no lead, isn't counted as
  * waiting and is never in a batch invite.

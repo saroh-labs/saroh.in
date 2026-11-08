@@ -153,6 +153,23 @@ describe("StripeProvider.createOrderIntent", () => {
         });
     });
 
+    it("sends what the payment is for, which an Indian account needs for a payment from abroad", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, {
+                id: "pi_test_2",
+                client_secret: "pi_test_2_secret_madeup",
+            }),
+        );
+        await new StripeProvider().createOrderIntent({
+            amountCents: 12000,
+            currency: "GBP",
+            orderId: "cmorder2",
+            credentials: CREDS,
+            description: "Global Test Ltd order",
+        });
+        expect(call().form.get("description")).toBe("Global Test Ltd order");
+    });
+
     it("a refused key is ProviderKeysRefusedError; errors carry only the status", async () => {
         fetchMock.mockReturnValue(
             answer(401, {

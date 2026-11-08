@@ -569,12 +569,13 @@ export function planDiaryShop(
             return null;
         };
         const spanDays = sc.spanDays ?? 3;
-        // A future scene that lands on a closure (Diwali) or a stretch its
-        // staff don't work at this seed clock moves to the next week's
-        // first slot, so the seed holds at any `--now`.
+        // A scene from today on that lands on a closure (Diwali), a stretch
+        // its staff don't work, or a day already past its last slot (a seed
+        // run late in the IST evening) moves to the next week's first slot,
+        // so the seed holds at any `--now`.
         const found: { s: number; span: Span } | null =
             slotWithin(spanDays) ??
-            (sc.day > 0 ? slotWithin(spanDays + 7) : null);
+            (sc.day >= 0 ? slotWithin(spanDays + 7) : null);
         if (!found) {
             throw new Error(
                 `${biz.name}: no time for the scene "${sc.key}" (${sc.service}, day ${sc.day})`,

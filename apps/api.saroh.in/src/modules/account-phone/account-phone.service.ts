@@ -11,6 +11,7 @@ import {
 import { startPhoneSession } from "@saroh/auth";
 import type { AccountPhoneEventKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { auth } from "../../common/auth/auth";
 import { hashClientIp } from "../../common/client-ip";
@@ -303,6 +304,8 @@ export class AccountPhoneService {
         userId: string;
         ip?: string;
         place?: string | null;
+        /** The edition it was asked through: the notice's sender (KTD6). */
+        edition?: Edition;
     }): Promise<void> {
         const before = await prisma.user.findUnique({
             where: { id: input.userId },
@@ -321,6 +324,7 @@ export class AccountPhoneService {
             "removed",
             before.phoneE164,
             input.place,
+            input.edition,
         );
     }
 
@@ -334,18 +338,24 @@ export class AccountPhoneService {
         kind: PhoneNoticeKind,
         phoneE164: string,
         place: string | null | undefined,
+        // Phone sign-in and adding a phone are India's (DEC-204); removing isn't.
+        edition: Edition = "INDIA",
     ): Promise<void> {
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { email: true },
         });
         if (!user) return;
-        const outcome = await sendAccountPhoneNotice(user.email, {
-            kind,
-            lastFour: phoneE164.slice(-4),
-            at: new Date(),
-            place: place ?? null,
-        }).catch(() => "failed" as const);
+        const outcome = await sendAccountPhoneNotice(
+            user.email,
+            {
+                kind,
+                lastFour: phoneE164.slice(-4),
+                at: new Date(),
+                place: place ?? null,
+            },
+            edition,
+        ).catch(() => "failed" as const);
         if (outcome !== "sent") {
             this.logger.error(
                 `account_phone_notice_${outcome} kind=${kind} user=${userId}`,

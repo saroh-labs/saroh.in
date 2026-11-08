@@ -304,6 +304,24 @@ describe("inviting", () => {
         expect(written.create.tokenHash).not.toContain(token);
     });
 
+    it("comes from Global's sender for a Global business (KTD6)", async () => {
+        db.organization.findUnique.mockResolvedValue({
+            name: "Northwind Supply",
+            edition: "GLOBAL",
+        });
+        await service.invite(ctx(), {
+            email: "reviewer@example.test",
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+        expect(sendOrganizationInvitationEmail).toHaveBeenCalledWith(
+            "reviewer@example.test",
+            expect.stringContaining("/join/"),
+            "Northwind Supply",
+            "GLOBAL",
+        );
+    });
+
     // Team → People's Resend is this: inviting an address that already has
     // an invitation. It must be a fresh link and a fresh week, with the old
     // link dead, not a second row.

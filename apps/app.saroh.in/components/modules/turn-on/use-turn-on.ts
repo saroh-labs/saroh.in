@@ -5,6 +5,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useStartingCurrency } from "@/components/shared/fields/business-country";
 import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -20,6 +21,7 @@ import {
     problemsOf,
     sellsOnline,
     setupFor,
+    stillWrong,
     turnedOnToast,
     turnOnPlan,
 } from "@/lib/modules/turn-on";
@@ -52,14 +54,18 @@ export function useTurnOn({
     modules,
     onClose,
     firstRun = false,
+    nothingRequired = false,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
     /** A first run (Home, the module picker): land on the thing itself. */
     firstRun?: boolean;
+    /** Settings › Modules (DEC-212): no field blocks turning on. */
+    nothingRequired?: boolean;
 }) {
     const router = useRouter();
+    const currency = useStartingCurrency();
     const [loaded, setLoaded] = useState<SetupDefaults[] | null>(null);
     const [draft, setDraft] = useState<TurnOnDraft | null>(null);
     const [errors, setErrors] = useState<Partial<Record<string, FieldErrors>>>(
@@ -133,7 +139,16 @@ export function useTurnOn({
     );
 
     const update = (change: (d: TurnOnDraft) => TurnOnDraft) => {
-        setDraft((d) => (d ? change(d) : d));
+        if (!draft) return;
+        const next = change(draft);
+        setDraft(next);
+        // A shown message goes as soon as its field is fixed.
+        setErrors((shown) =>
+            stillWrong(
+                shown,
+                problemsOf(next, plan.order, currency, !nothingRequired),
+            ),
+        );
         setFailure(null);
     };
 
@@ -152,9 +167,21 @@ export function useTurnOn({
                           Array.from(CONNECT_KEYS).map((k) => [k, connect]),
                       ),
                   };
+        // From Settings › Modules the web address as offered, untouched,
+        // isn't sent: the API takes a free one then, so one taken since
+        // never stops it (DEC-212).
+        const offered = (loaded ?? []).find((d) => d.key === "WEBSITE")
+            ?.defaults as { address?: string } | null | undefined;
+        const untouched =
+            nothingRequired &&
+            !!offered?.address &&
+            asked.WEBSITE.address.trim() === offered.address;
         // Never sent to connect what the plan won't let it (UX-006).
         const sent: TurnOnDraft = {
             ...asked,
+            WEBSITE: untouched
+                ? { ...asked.WEBSITE, address: "" }
+                : asked.WEBSITE,
             connect: Object.fromEntries(
                 Object.entries(asked.connect).map(([k, v]) => [
                     k,
@@ -162,7 +189,12 @@ export function useTurnOn({
                 ]),
             ),
         };
-        const problems = problemsOf(sent, plan.order);
+        const problems = problemsOf(
+            sent,
+            plan.order,
+            currency,
+            !nothingRequired,
+        );
         setErrors(problems);
         if (problems.WEBSITE?.address) setAddressUnlocked(true);
         setFailure(null);

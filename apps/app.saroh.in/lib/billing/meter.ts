@@ -1,6 +1,8 @@
 import { limitWordsFor } from "@saroh/pricing-catalog";
 
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { BillingAccessView } from "./access";
+
 import { accessRow, upgradeHref } from "./access";
 
 /**
@@ -92,4 +94,17 @@ export function importRoom(
                 ? `Your plan holds ${meter.limit} ${what}, and you have ${meter.used}, so none of these ${rows} can come in.`
                 : `Your plan holds ${meter.limit} ${what}. You have ${meter.used}, so ${fits} of these ${rows} can come in.`,
     };
+}
+
+/**
+ * What an import over the limit says to do, after {@link importRoom}'s
+ * words. Upgrade only while plans are shown: an edition with no plans to
+ * buy (Global, DEC-211) keeps to the limit's own words. Null when there is
+ * nothing more to say.
+ */
+export function importNext(fits: number): string | null {
+    if (!plansShown()) return fits > 0 ? `Import the first ${fits}.` : null;
+    return fits > 0
+        ? `Import the first ${fits}, or upgrade for more.`
+        : "Upgrade to bring them in.";
 }

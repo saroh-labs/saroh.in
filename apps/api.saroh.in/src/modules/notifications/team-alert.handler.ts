@@ -4,7 +4,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import type { Edition } from "@saroh/edition";
 
-import { appBase } from "../../common/app-url";
+import { appBase, editionOf } from "../../common/app-url";
 import type { TeamAlertMail } from "../../common/email";
 import { sendTeamAlertEmail } from "../../common/email";
 import { moneyWords, moneyWordsMinor } from "../../common/words-format";
@@ -176,8 +176,11 @@ export class TeamAlertHandler {
                 return tellTeam(tx, organizationId, payload, now);
             }),
         );
+        const edition = out.emails.length
+            ? await editionOf(organizationId)
+            : "INDIA";
         for (const email of out.emails) {
-            await sendTeamAlertEmail(email.to, email.mail);
+            await sendTeamAlertEmail(email.to, email.mail, edition);
         }
     };
 }

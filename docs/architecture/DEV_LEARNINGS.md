@@ -6545,3 +6545,17 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the spec now expects the payment due for 7 days, then Free from the sweep. All nine specs that deliver `halted` pass.
 - **Rule:** before changing what an event does, grep every spec that sends it (`rg -l '"halted"' --glob '*.db.spec.ts'`) and run them all, not only the ones being edited.
 - **Category:** tests · billing
+
+## A new export the code called wasn't in a spec's mock (7 Nov 2026)
+
+- **Symptom:** `admin-people.db.spec.ts` failed in the full gate: staff couldn't send a sign-in code ("couldn't be sent"). Separately, `product-milestones.spec.ts` failed only when run after another file.
+- **Cause:** `SignInCodeSender` began calling `authOfEdition()` from `common/auth/auth`, and the spec's `jest.mock` of that module exported only `auth`, so the call threw. The unit run never loaded that spec: it's a `.db.spec`. The analytics spec shared the 10-minute workspace facts cache between tests, so its result hung on run order.
+- **Fix:** the mock exports `authOfEdition` returning the same stub; the analytics spec calls `forgetWorkspaceFacts()` before each test.
+- **Rule:** when a module gains an export its callers now use, grep the specs that `jest.mock` that module (`grep -rn 'jest.mock(".*<module>"'`) and run them, `.db.spec` included, before calling the change done. A module-level cache needs its test seam called in `beforeEach`.
+
+## The showcase seed stopped late in the IST evening (7 Nov 2026)
+
+- **Symptom:** the full gate's browser run failed before any test: `db:seed:showcase` threw "Gulmohar Salon & Bridal: no time for the scene farida_pedicure (day 0)" when run at 20:00 IST.
+- **Cause:** a day-0 scene starts at least 3 hours after the seed clock, so after the salon's last slot there is no room today, and only scenes from day 1 on fell back to next week.
+- **Fix:** scenes from day 0 on fall back to the next week's first slot (`diary-shop-plan.ts`); checked with `--now=2026-11-07T20:00:00+05:30`.
+- **Rule:** a seed that plans around "now" is run at a late-evening `--now` before it's called clock-proof. Also, a spec that counts telemetry sends filters to the events it means: a milestone can also be a workspace event that reads the real database under the integration runner.

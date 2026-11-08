@@ -77,6 +77,8 @@ export function ModuleList({
             <TurnOnSheet
                 picked={turningOn}
                 modules={all}
+                // Nothing blocks turning on from here (DEC-212).
+                nothingRequired
                 onOpenChange={(open) => {
                     if (!open) setTurningOn(null);
                 }}

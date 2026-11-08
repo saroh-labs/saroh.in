@@ -2,6 +2,8 @@ import { Logger } from "@nestjs/common";
 import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import { env } from "../../env";
 import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-freshness";
@@ -14,7 +16,12 @@ import {
     sendPasswordResetEmail,
 } from "../email";
 import { trustedProxyRanges } from "../trust-proxy";
-import { otherAuthAddress } from "./auth-address";
+import {
+    authEditionOf,
+    authHostOf,
+    githubKeysOf,
+    otherAuthAddress,
+} from "./auth-address";
 import { claimCodeMail } from "./code-mail-limits";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
@@ -29,11 +36,6 @@ import { deliverVerificationOtp } from "./verification-otp";
 const deletionLogger = new Logger("AccountDeletion");
 
 const authServices: Parameters<typeof createAuth>[0] = {
-    // Email verification is code-based (see the emailOTP plugin in @saroh/auth):
-    // no verification LINK is sent, so there is no link sender to inject.
-    // A held address gets none (admin console U9, `verification-otp.ts`).
-    sendVerificationOTP: (args) =>
-        deliverVerificationOtp(args, VERIFICATION_OTP_EXPIRY_SECONDS),
     // The same hold, for every way in: no session for a held person.
     mayStartSession: ({ id }) => mayStartSession(id),
     // A code proves the mailbox: a verification staff marked becomes the
@@ -43,15 +45,6 @@ const authServices: Parameters<typeof createAuth>[0] = {
         await clearStaffVerification(id);
         await renewPhoneOnEmailSignIn(id);
     },
-    sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
-    // A sign-up for an address that already has an account: the screen says
-    // "Check your email" either way, and this is what arrives.
-    sendExistingAccountNotice: ({ to, origin }) =>
-        sendExistingAccountEmail(to, origin),
-    sendChangeEmailConfirmation: ({ to, newEmail, url }) =>
-        sendChangeEmailConfirmationEmail(to, url, newEmail),
-    sendDeleteAccountVerification: ({ to, url }) =>
-        sendDeleteAccountEmail(to, url),
     // The `signed_up` product milestone (DEC-125): the user's id and, from
     // the request's cookies, where they came from (DEC-187). A no-op unless
     // PostHog is on.
@@ -75,7 +68,64 @@ const authServices: Parameters<typeof createAuth>[0] = {
         claimCodeMail(email, turnstileToken),
 };
 
-export const auth: Auth = createAuth(authServices);
+const githubWarned = new Set<Edition>();
+
+/**
+ * An edition's GitHub app for its instance (KTD5). India keeps reading
+ * `AUTH_GITHUB_ID`/`_SECRET` as it always has. Global has its own pair, and
+ * without both GitHub is off there (its button hides, `sign-in-options`);
+ * half a pair WARNs once, naming the missing one.
+ */
+function githubOf(edition: Edition): Parameters<typeof createAuth>[0] {
+    // India keeps reading the original names inside createAuth.
+    if (!editionProfile(edition).envSuffix) return {};
+    const { pair, half } = githubKeysOf(edition, env);
+    if (half && !githubWarned.has(edition)) {
+        githubWarned.add(edition);
+        new Logger("Auth").warn(
+            `github_sign_in_off edition=${edition}: ${half} is not set, so GitHub sign-in is off.`,
+        );
+    }
+    return { github: pair };
+}
+
+/**
+ * The services for one edition's instance: its account mail comes from that
+ * edition's sender (KTD6), and it has that edition's GitHub app.
+ */
+function servicesFor(edition: Edition): Parameters<typeof createAuth>[0] {
+    return {
+        ...authServices,
+        ...githubOf(edition),
+        // Email verification is code-based (see the emailOTP plugin in
+        // @saroh/auth): no verification LINK is sent, so there is no link
+        // sender to inject. A held address gets none (admin console U9,
+        // `verification-otp.ts`).
+        sendVerificationOTP: (args) =>
+            deliverVerificationOtp(
+                args,
+                VERIFICATION_OTP_EXPIRY_SECONDS,
+                edition,
+            ),
+        sendResetPassword: ({ to, url }) =>
+            sendPasswordResetEmail(to, url, edition),
+        // A sign-up for an address that already has an account: the screen
+        // says "Check your email" either way, and this is what arrives.
+        sendExistingAccountNotice: ({ to, origin }) =>
+            sendExistingAccountEmail(to, origin, edition),
+        sendChangeEmailConfirmation: ({ to, newEmail, url }) =>
+            sendChangeEmailConfirmationEmail(to, url, newEmail, edition),
+        sendDeleteAccountVerification: ({ to, url }) =>
+            sendDeleteAccountEmail(to, url, edition),
+    };
+}
+
+export const auth: Auth = createAuth(
+    servicesFor(authEditionOf(null, env.BETTER_AUTH_URL)),
+);
+
+// Said at boot, not on Global's first sign-in: half a pair is a typo to fix.
+githubOf("GLOBAL");
 
 const instanceByAddress = new Map<string, Auth>();
 
@@ -90,10 +140,18 @@ export function authFor(host: string | null | undefined): Auth {
     if (!address) return auth;
     let instance = instanceByAddress.get(address);
     if (!instance) {
-        instance = createAuth({ ...authServices, baseURL: address });
+        instance = createAuth({
+            ...servicesFor(authEditionOf(host, env.BETTER_AUTH_URL)),
+            baseURL: address,
+        });
         instanceByAddress.set(address, instance);
     }
     return instance;
+}
+
+/** The instance that runs an edition's sign-in (a code staff send, KTD6). */
+export function authOfEdition(edition: Edition | null | undefined): Auth {
+    return edition ? authFor(authHostOf(edition, env.BETTER_AUTH_URL)) : auth;
 }
 
 /** What `/api/auth/*` is mounted on: `auth`, answering by address. */

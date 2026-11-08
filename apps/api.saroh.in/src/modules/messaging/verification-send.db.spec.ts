@@ -100,6 +100,27 @@ describe("VerificationSendService.sendCode", () => {
         await prisma.$disconnect();
     });
 
+    it("refuses a Global business, even approved: Global is email only", async () => {
+        const orgId = await business();
+        await prisma.organization.update({
+            where: { id: orgId },
+            data: { edition: "GLOBAL" },
+        });
+        const sends = transport.sends.length;
+        await expect(
+            send.sendCode({
+                organizationId: orgId,
+                module: "ACCOUNT",
+                phoneE164: nextPhone(),
+            }),
+        ).rejects.toMatchObject({
+            status: 403,
+            response: { details: { code: "PHONE_CODES_NOT_APPROVED" } },
+        });
+        expect(transport.sends.length).toBe(sends);
+        expect(await send.canSend(orgId, "ACCOUNT")).toBe(false);
+    });
+
     it("refuses a business the owner hasn't approved, whatever its switch and balance", async () => {
         const orgId = await business();
         await prisma.featureFlagOverride.create({

@@ -217,7 +217,7 @@ export class ModuleReadinessRegistry {
                 if (services === 0)
                     return setup(
                         "APPOINTMENTS_NO_SERVICE",
-                        "Add a bookable service.",
+                        "Add a service to open your booking page.",
                         "/services/new",
                     );
                 if (rules === 0)

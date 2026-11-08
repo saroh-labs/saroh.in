@@ -194,8 +194,12 @@ describe.each([
         flag.edition = edition;
     });
 
-    it("leaves Plan and billing out of the Settings sections, for the owner too", () => {
+    it("leaves Plan and billing out of the Settings sections, for the owner too (Global keeps it for the Free note)", () => {
         const hrefs = settingsPagesFor(owner).map((p) => p.href);
+        if (edition === "GLOBAL") {
+            expect(hrefs).toContain("/settings/billing");
+            return;
+        }
         expect(hrefs).not.toContain("/settings/billing");
         // Nothing else leaves with it.
         expect(hrefs).toEqual([
@@ -210,9 +214,17 @@ describe.each([
         ]);
     });
 
-    it("has no entry for it in Settings search", () => {
+    it("has no entry for it in Settings search (Global: only Plan and billing itself)", () => {
         const all = searchSettings("", owner, { limit: 500 });
         expect(all.length).toBeGreaterThan(10);
+        if (edition === "GLOBAL") {
+            expect(
+                all
+                    .filter((h) => h.href.startsWith("/settings/billing"))
+                    .map((h) => h.label),
+            ).toEqual(["Plan and billing"]);
+            return;
+        }
         expect(all.some((h) => h.href.startsWith("/settings/billing"))).toBe(
             false,
         );
@@ -225,7 +237,13 @@ describe.each([
         }
     });
 
-    it("answers /settings/billing with the app's not-found", () => {
+    it("answers /settings/billing with the app's not-found (Global: the Free note's page opens)", () => {
+        if (edition === "GLOBAL") {
+            expect(PlanBillingLayout({ children: "the page" })).toBe(
+                "the page",
+            );
+            return;
+        }
         expect(() => PlanBillingLayout({ children: "the page" })).toThrow(
             "NOT_FOUND",
         );

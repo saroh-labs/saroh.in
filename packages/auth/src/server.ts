@@ -211,6 +211,14 @@ export interface CreateAuthOptions {
         email: string,
         challenge: { turnstileToken: string | null },
     ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
+    /**
+     * This instance's GitHub OAuth app. GitHub allows one callback address
+     * per app, so each edition's API address needs its own pair (KTD5).
+     * Unset: `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`, as before. Null: no
+     * GitHub on this instance, and a GitHub sign-in is refused as an unknown
+     * provider.
+     */
+    github?: { clientId: string; clientSecret: string } | null;
 }
 
 /**
@@ -709,10 +717,14 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             },
         },
         socialProviders: {
-            github: {
-                clientId: process.env.AUTH_GITHUB_ID ?? "",
-                clientSecret: process.env.AUTH_GITHUB_SECRET ?? "",
-            },
+            ...(opts.github === null
+                ? {}
+                : {
+                      github: opts.github ?? {
+                          clientId: process.env.AUTH_GITHUB_ID ?? "",
+                          clientSecret: process.env.AUTH_GITHUB_SECRET ?? "",
+                      },
+                  }),
             google: {
                 clientId: process.env.AUTH_GOOGLE_ID ?? "",
                 clientSecret: process.env.AUTH_GOOGLE_SECRET ?? "",

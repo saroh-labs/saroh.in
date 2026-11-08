@@ -105,10 +105,29 @@ describe("EnquiryNotifyHandler", () => {
                 formName: "Contact us",
                 leadUrl: expect.stringContaining("/leads/lead_1"),
             }),
+            "INDIA",
         );
         expect(sendEmail).toHaveBeenCalledWith(
             "admin@example.com",
             expect.any(Object),
+            "INDIA",
+        );
+    });
+
+    it("comes from Global's sender, linking Global's app, for a Global business (KTD6)", async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValueOnce({
+            edition: "GLOBAL",
+        });
+        notificationCreate.mockResolvedValue({ id: "notif_1" });
+
+        await new EnquiryNotifyHandler().handle(job());
+
+        expect(sendEmail).toHaveBeenCalledWith(
+            "owner@example.com",
+            expect.objectContaining({
+                leadUrl: "https://app.saroh.tech/leads/lead_1",
+            }),
+            "GLOBAL",
         );
     });
 
@@ -143,6 +162,7 @@ describe("EnquiryNotifyHandler", () => {
         expect(sendEmail).toHaveBeenCalledWith(
             "owner@example.com",
             expect.objectContaining({ message: "Do you open on Sundays?" }),
+            "INDIA",
         );
     });
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * What saroh.tech may not say. The product has no quotes to accept, no client
- * approvals, and no online payment or plan on sale yet (the private ledger,
- * DEC-203). Runs over the built HTML as `postbuild`, because that's what a
+ * approvals, and no plan on sale yet (the private ledger, DEC-203). Online
+ * payment is the business's own Stripe, named only where it may be. Runs over the built HTML as `postbuild`, because that's what a
  * visitor reads, whichever file the words came from, so a hit fails the build.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -18,9 +18,13 @@ const ABOUT_TAX =
 /** The free tools and guides make the paper itself: a quote is a document there. */
 const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
 
-/** A receipt says how it was paid; the one list of what's coming says "Not available yet". */
+/**
+ * A receipt says how it was paid; the one list of what's coming says "Not
+ * available yet"; Features says card payments go through your own Stripe
+ * (Global launch plan KTD9).
+ */
 const NAMES_A_PROVIDER =
-    /^\/(tools\/receipt-maker|changelog|integrations)(\/|$)/;
+    /^\/(tools\/receipt-maker|changelog|integrations|features)(\/|$)/;
 
 /** Advice and paper for anyone's trade, or the law's words: not what the product does for you. */
 const NOT_THE_PRODUCT =
@@ -80,7 +84,7 @@ export const BANNED = [
     { phrase: /\btake a cut\b/i },
     { phrase: /\bmerchant of record\b/i },
     { phrase: /\b(stripe|paypal)\b/i, except: NAMES_A_PROVIDER },
-    { phrase: /\byour own (stripe|paypal)\b/i },
+    { phrase: /\byour own paypal\b/i },
     { phrase: /\bstripe, paypal\b/i },
     { phrase: /\bpay link\b/i },
     { phrase: /\bpayable link\b/i },
@@ -131,19 +135,21 @@ export function findClaims(path, text) {
 export function checkSite(out) {
     if (!existsSync(out))
         throw new Error(`${out} is missing: build the site first`);
-    return readdirSync(out, { recursive: true })
+    const pages = readdirSync(out, { recursive: true })
         .map(String)
-        .filter((f) => f.endsWith(".html"))
-        .flatMap((f) => {
-            const path = `/${relative(".", f).replace(/\.html$/, "")}`.replace(
-                /^\/index$/,
-                "/",
-            );
-            return findClaims(
-                path,
-                visibleText(readFileSync(join(out, f), "utf8")),
-            );
-        });
+        .filter((f) => f.endsWith(".html"));
+    // A build that wrote no page would pass with nothing checked, and deploy.
+    if (pages.length === 0) throw new Error(`${out} has no HTML pages`);
+    return pages.flatMap((f) => {
+        const path = `/${relative(".", f).replace(/\.html$/, "")}`.replace(
+            /^\/index$/,
+            "/",
+        );
+        return findClaims(
+            path,
+            visibleText(readFileSync(join(out, f), "utf8")),
+        );
+    });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

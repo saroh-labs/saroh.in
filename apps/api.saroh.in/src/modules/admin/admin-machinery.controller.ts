@@ -55,8 +55,11 @@ export class AdminMachineryController {
     /** What a retry would do, changing nothing. */
     @Post("jobs/retry/plan")
     @RequireAdminPermission(AdminPermission.JobsRetry)
-    planRetry(@Body() dto: OperationTargetsDto) {
-        return this.operations.plan("jobs.retry", dto.ids);
+    planRetry(
+        @Body() dto: OperationTargetsDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.operations.plan("jobs.retry", dto.ids, edition);
     }
 
     @Post("jobs/retry")
@@ -81,8 +84,11 @@ export class AdminMachineryController {
      */
     @Post("jobs/cancel/plan")
     @RequireAdminPermission(AdminPermission.JobsRetry)
-    planCancel(@Body() dto: OperationTargetsDto) {
-        return this.operations.plan("jobs.cancel", dto.ids);
+    planCancel(
+        @Body() dto: OperationTargetsDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.operations.plan("jobs.cancel", dto.ids, edition);
     }
 
     @Post("jobs/cancel")
@@ -118,8 +124,11 @@ export class AdminMachineryController {
     /** What a replay would do, changing nothing. */
     @Post("webhooks/replay/plan")
     @RequireAdminPermission(AdminPermission.WebhooksReplay)
-    planReplay(@Body() dto: OperationTargetsDto) {
-        return this.operations.plan("webhooks.replay", dto.ids);
+    planReplay(
+        @Body() dto: OperationTargetsDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.operations.plan("webhooks.replay", dto.ids, edition);
     }
 
     @Post("webhooks/replay")
@@ -139,14 +148,17 @@ export class AdminMachineryController {
 
     @Get("operations")
     @RequireAdminPermission(AdminPermission.PlatformRead)
-    listOperations() {
-        return this.operations.list();
+    listOperations(@ServedEdition() edition: Edition | null) {
+        return this.operations.list(undefined, edition);
     }
 
     @Get("operations/:operationId")
     @RequireAdminPermission(AdminPermission.PlatformRead)
-    operation(@Param("operationId") operationId: string) {
-        return this.operations.get(operationId);
+    operation(
+        @Param("operationId") operationId: string,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        return this.operations.get(operationId, edition);
     }
 
     /**

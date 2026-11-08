@@ -207,6 +207,7 @@ export class MembersService {
             email,
             `${appUrl}/invitations/${token}`,
             store?.name ?? "a location",
+            store?.organization.edition ?? "INDIA",
         );
 
         return {

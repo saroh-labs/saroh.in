@@ -19,6 +19,8 @@ export interface WebsiteLeadInput {
     city?: string | null;
     /** The website's edition, from the address it wrote through. */
     edition?: Edition;
+    /** A label for staff, added to the lead's notes once ("Paid plans interest"). */
+    note?: string;
     now?: Date;
 }
 
@@ -57,15 +59,24 @@ export async function recordWebsiteLead(
                     edition,
                     OR: [{ emailKey: key }, { signUpEmailKey: key }],
                 },
-                select: { id: true, kind: true, city: true },
+                select: { id: true, kind: true, city: true, notes: true },
             });
             if (existing) {
+                const note =
+                    input.note && !existing.notes?.includes(input.note)
+                        ? {
+                              notes: existing.notes
+                                  ? `${existing.notes}\n${input.note}`
+                                  : input.note,
+                          }
+                        : {};
                 await db.sarohLead.update({
                     where: { id: existing.id },
                     data: {
                         websiteSeenAt: now,
                         ...(existing.kind ? {} : { kind: fill.kind }),
                         ...(existing.city ? {} : { city: fill.city }),
+                        ...note,
                     },
                     select: { id: true },
                 });
@@ -83,6 +94,7 @@ export async function recordWebsiteLead(
                         stagedAt: now,
                         websiteSeenAt: now,
                         edition,
+                        notes: input.note ?? null,
                         ...fill,
                     },
                     select: { id: true },
