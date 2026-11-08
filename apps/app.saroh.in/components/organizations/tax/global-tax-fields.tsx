@@ -1,5 +1,6 @@
 "use client";
 
+import { taxExampleFor } from "@saroh/edition";
 import {
     FormControl,
     FormDescription,
@@ -21,14 +22,22 @@ import type { Control } from "react-hook-form";
 
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
 
-/** A Global business's tax line and numbering year (DEC-204). */
+/**
+ * A Global business's tax line and numbering year (DEC-204). The empty
+ * fields show its country's tax ("Sales tax" in the US, "VAT" and 20 in the
+ * UK); the business still names its own.
+ */
 export function GlobalTaxFields({
     control,
     taxId,
+    country,
 }: {
     control: Control<FormValues>;
     taxId: ReactNode;
+    /** The business's ISO country. */
+    country: string | null | undefined;
 }) {
+    const example = taxExampleFor(country);
     return (
         <>
             <FormField
@@ -38,7 +47,7 @@ export function GlobalTaxFields({
                     <FormItem>
                         <FormLabel>What it&apos;s called</FormLabel>
                         <FormControl>
-                            <Input placeholder="VAT" {...field} />
+                            <Input placeholder={example.name} {...field} />
                         </FormControl>
                         <FormDescription>
                             Printed on your invoices. Leave it empty if you
@@ -57,7 +66,11 @@ export function GlobalTaxFields({
                         <FormControl>
                             <Input
                                 inputMode="decimal"
-                                placeholder="20"
+                                placeholder={
+                                    example.rate === null
+                                        ? undefined
+                                        : String(example.rate)
+                                }
                                 {...field}
                             />
                         </FormControl>

@@ -12,6 +12,7 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { PROFILE } from "@/lib/edition";
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
 import { mayNavigate } from "@saroh/ui/lib/leave-request";
@@ -135,7 +136,11 @@ export function SettingsSearch({
                             setQuery(e.target.value);
                             setActive(0);
                         }}
-                        placeholder="Find a setting: GSTIN, invoice prefix…"
+                        placeholder={
+                            PROFILE.taxSystem === "gst"
+                                ? "Find a setting: GSTIN, invoice prefix…"
+                                : "Find a setting: tax ID, invoice prefix…"
+                        }
                         aria-label="Find a setting"
                         role="combobox"
                         aria-expanded

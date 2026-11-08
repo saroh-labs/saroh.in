@@ -4,6 +4,7 @@ import { ITEM_MODE_LABEL } from "@/lib/gst/price-mode";
 import type { PriceChange, PriceField } from "@/lib/price-history/words";
 import { isPriceField } from "@/lib/price-history/words";
 import { productHref } from "@/lib/products/links";
+import { MRP_LABEL, MRP_WORD } from "@/lib/products/mrp-label";
 
 import { record, text } from "./activity-changes";
 
@@ -53,7 +54,7 @@ function itemSaid(meta: Record<string, unknown>): string {
 /** A field as the tail of a sentence names it: "and its MRP and GST rate". */
 const ALSO: Record<PriceField, string> = {
     price: "price",
-    mrp: "MRP",
+    mrp: MRP_WORD,
     gstRate: "GST rate",
     gstPriceMode: "GST on its price",
 };
@@ -76,7 +77,7 @@ function changeSaid(
     switch (change.field) {
         case "price":
         case "mrp": {
-            const what = change.field === "price" ? "price" : "MRP";
+            const what = change.field === "price" ? "price" : MRP_WORD;
             if (after === null) {
                 return option
                     ? `set ${item} back to the product's ${what}`
@@ -149,7 +150,7 @@ const KIND_LABEL: Partial<Record<string, string>> = {
 
 const FIELD_LABEL: Record<PriceField, string> = {
     price: "Price",
-    mrp: "MRP",
+    mrp: MRP_LABEL,
     gstRate: "GST rate",
     gstPriceMode: ITEM_MODE_LABEL,
 };

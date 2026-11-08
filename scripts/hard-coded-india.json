@@ -48,7 +48,6 @@
     "apps/api.saroh.in/src/modules/self-test/self-test.templates.ts": 1,
     "apps/api.saroh.in/src/modules/site-accounts/dto.ts": 1,
     "apps/app.saroh.in/components/bookings/availability/hours.test-kit.tsx": 1,
-    "apps/app.saroh.in/components/bookings/calendar/calendar-screen.tsx": 1,
     "apps/app.saroh.in/components/contacts/contacts-view.tsx": 1,
     "apps/app.saroh.in/components/organizations/business-settings/business-settings.test-kit.tsx": 1,
     "apps/app.saroh.in/components/settings/plan-billing/current-plan-card.tsx": 1,
@@ -112,8 +111,5 @@
     "packages/site-blocks/src/booking-flow/model.ts": 1,
     "packages/site-blocks/src/lib/money.ts": 1,
     "packages/site-blocks/src/showcase/fixtures.ts": 1,
-    "packages/templates/src/templates/developer.ts": 3,
-    "packages/ui/src/components/ui/list-toolbar.tsx": 1,
-    "packages/ui/src/components/ui/option-select.tsx": 1,
-    "packages/ui/src/components/ui/page-header.tsx": 1
+    "packages/templates/src/templates/developer.ts": 3
 }

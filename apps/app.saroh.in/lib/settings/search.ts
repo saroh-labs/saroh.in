@@ -1,3 +1,5 @@
+import type { EditionProfile } from "@saroh/edition";
+
 import type { NavRole } from "@/components/shared/navigation/nav-items";
 import {
     SETTINGS_PAGES,
@@ -69,6 +71,11 @@ export interface SettingsEntry {
     module?: string;
     /** About Saroh's plans themselves: offered only while they're shown. */
     plans?: true;
+    /**
+     * Offered only on the edition that taxes this way: India's GST (and PIN
+     * code) rows, Global's named tax line (DEC-204).
+     */
+    tax?: EditionProfile["taxSystem"];
 }
 
 const business = (label: string, value: string): SettingsEntry => ({
@@ -132,13 +139,20 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
             "Telegram",
         ],
     },
-    business("GST registration", "tax"),
-    business("GSTIN or tax ID", "tax"),
+    { ...business("GST registration", "tax"), tax: "gst" },
+    { ...business("GSTIN or tax ID", "tax"), tax: "gst" },
+    { ...business("Tax ID", "tax"), tax: "named-line" },
+    {
+        ...business("Tax name and rate", "tax"),
+        words: ["Sales tax", "VAT"],
+        tax: "named-line",
+    },
     business("Invoice prefix and numbers", "tax"),
     business("Invoice number format", "tax"),
-    business("Financial year", "tax"),
-    business("GST on delivery", "tax"),
-    business("Delivery SAC", "tax"),
+    { ...business("Financial year", "tax"), tax: "gst" },
+    { ...business("Numbering year", "tax"), tax: "named-line" },
+    { ...business("GST on delivery", "tax"), tax: "gst" },
+    { ...business("Delivery SAC", "tax"), tax: "gst" },
     business("Opening hours", "hours"),
     {
         ...business("How to pay us", "pay"),
@@ -174,7 +188,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         // invoices print.
         words: ["Address on invoices"],
     },
-    business("PIN code", "address"),
+    { ...business("PIN code", "address"), tax: "gst" },
+    {
+        ...business("Postcode", "address"),
+        words: ["ZIP code", "Postal code"],
+        tax: "named-line",
+    },
     business("State", "address"),
     business("Country", "address"),
     team("Roles and what they open", "roles"),
@@ -303,6 +322,7 @@ export function searchSettings(
         if (entry.unless && holds(actor, entry.unless)) continue;
         // Plan and billing holds only the Free note while plans are hidden.
         if (entry.plans && !plansShown()) continue;
+        if (entry.tax && entry.tax !== PROFILE.taxSystem) continue;
         // How to pay us is off where the edition doesn't offer it (DEC-208).
         if (entry.tab?.value === "pay" && !PROFILE.payInstructionsOffered) {
             continue;

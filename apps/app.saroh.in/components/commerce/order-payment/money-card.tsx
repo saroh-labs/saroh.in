@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PROFILE } from "@/lib/edition";
 import type { CounterPayment } from "@/lib/orders/kitchen-service";
 import { paidByHandWords } from "@/lib/orders/paid-how";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
@@ -100,9 +101,16 @@ export function MoneyCard({
     const taxed = n(money.tax) > 0;
     // The API names the paper (D15): a registered clinic's exempt
     // treatment is a "Bill of supply". An older API sends no title.
+    // A named tax line (Global) is the business's own word, not GST.
+    const gst = PROFILE.taxSystem === "gst";
     const invoiceLabel =
         invoice?.title ??
-        (invoice?.number?.includes("/") || taxed ? "Tax invoice" : "Receipt");
+        (!gst
+            ? "Invoice"
+            : invoice?.number?.includes("/") || taxed
+              ? "Tax invoice"
+              : "Receipt");
+    const taxWord = gst ? "GST" : "tax";
 
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
@@ -239,7 +247,7 @@ export function MoneyCard({
             ))}
             {!invoice && taxed ? (
                 <div className="pt-[3px] text-[12.5px] text-muted-foreground">
-                    Includes GST {format(n(money.tax))}
+                    Includes {taxWord} {format(n(money.tax))}
                 </div>
             ) : null}
             <div aria-hidden className="mb-2 mt-2.5 h-px bg-foreground/10" />
@@ -247,7 +255,11 @@ export function MoneyCard({
                 <InvoiceLink
                     id={invoice.id}
                     label={`${invoiceLabel} ${invoice.number ?? ""}`.trim()}
-                    sub={taxed ? `· GST ${format(n(money.tax))}` : null}
+                    sub={
+                        taxed
+                            ? `· ${gst ? "GST" : "Tax"} ${format(n(money.tax))}`
+                            : null
+                    }
                 />
             ) : null}
             {corrections.map((c) => (

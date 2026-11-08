@@ -141,7 +141,13 @@ export function BusinessTaxFields({
     switch (sheet) {
         case "gst":
             if (PROFILE.taxSystem === "named-line") {
-                return <GlobalTaxFields control={control} taxId={taxId} />;
+                return (
+                    <GlobalTaxFields
+                        control={control}
+                        taxId={taxId}
+                        country={v.country}
+                    />
+                );
             }
             return (
                 <>

@@ -1,5 +1,6 @@
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { count } from "@/lib/format/plural";
+import { MRP_LABEL, MRP_WORD } from "@/lib/products/mrp-label";
 /**
  * The product page's Overview in words (#522), after "Saroh Product Detail":
  * the stock card and what is out, the Variants and Website cards, the
@@ -419,7 +420,7 @@ export function customerPriceNote(
 ): string {
     const struck = p.mrp !== null && p.savingPercent !== null;
     if (p.variantPrices.length === 0) {
-        return `${money(p.price)}${struck && p.mrp ? `, with MRP ${money(p.mrp)} struck through` : ""}.`;
+        return `${money(p.price)}${struck && p.mrp ? `, with ${MRP_WORD} ${money(p.mrp)} struck through` : ""}.`;
     }
     const nums = p.variantPrices.map(Number);
     const lo = Math.min(...nums);
@@ -430,7 +431,7 @@ export function customerPriceNote(
             ? `${money(at(lo))} for every ${optionNoun(p.optionName)}.`
             : `${money(at(lo))} to ${money(at(hi))} across ${p.variantPrices.length} ${optionNoun(p.optionName, p.variantPrices.length)}.`;
     return struck && p.mrp
-        ? `${base} MRP ${money(p.mrp)} is shown struck through.`
+        ? `${base} ${MRP_LABEL} ${money(p.mrp)} is shown struck through.`
         : base;
 }
 

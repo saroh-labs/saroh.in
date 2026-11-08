@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     BUSINESS_TYPE_OPTIONS,
@@ -39,5 +39,29 @@ describe("business types (F10, F10b)", () => {
         );
         expect(values).toContain("pvt");
         expect(values).not.toContain("company");
+    });
+});
+
+describe("business types on a named tax line (Global)", () => {
+    it("names the six generically, keeping their codes", async () => {
+        vi.resetModules();
+        vi.doMock("@/lib/edition", async () => {
+            const { editionProfile } = await import("@saroh/edition");
+            return { PROFILE: editionProfile("GLOBAL") };
+        });
+        const global = await import("./business-types");
+        expect(global.BUSINESS_TYPE_OPTIONS.map((o) => o.label)).toEqual([
+            "Not set",
+            "Sole proprietor",
+            "Partnership",
+            "LLP",
+            "Private company (LLC, Ltd)",
+            "Public company",
+            "Non-profit or trust",
+        ]);
+        expect(global.businessTypeLabel("pvt")).toBe(
+            "Private company (LLC, Ltd)",
+        );
+        vi.doUnmock("@/lib/edition");
     });
 });
