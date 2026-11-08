@@ -1,4 +1,5 @@
 import type { PaymentHandoff } from "./api";
+// Parked alternative: import { openStripeWindow } from "./stripe-window";
 
 /**
  * The business's own provider checkout, opened in the booker's browser (E11).
@@ -153,6 +154,8 @@ type CashfreeFactory = (options: { mode: "production" | "sandbox" }) => {
 type SdkWindow = Window & {
     Razorpay?: RazorpayConstructor;
     Cashfree?: CashfreeFactory;
+    /** Typed where it is used: the parked window (stripe-window.ts). */
+    Stripe?: unknown;
 };
 
 const loading = new Map<string, Promise<void>>();
@@ -161,9 +164,9 @@ const loading = new Map<string, Promise<void>>();
  * Load a provider SDK once per page; a failed load may be tried again. One
  * the page already has (its global is set) is used as it is.
  */
-function loadScript(
+export function loadScript(
     src: string,
-    global: "Razorpay" | "Cashfree",
+    global: "Razorpay" | "Cashfree" | "Stripe",
 ): Promise<void> {
     if ((window as SdkWindow)[global]) return Promise.resolve();
     const known = loading.get(src);
@@ -184,7 +187,7 @@ function loadScript(
     return promise;
 }
 
-const text = (v: unknown): string | null =>
+export const text = (v: unknown): string | null =>
     typeof v === "string" && v.trim() ? v.trim() : null;
 
 /** The API's `recurring: true` (or Razorpay's own `"1"`). */
@@ -202,7 +205,7 @@ function httpsUrl(v: unknown): string | null {
 }
 
 /** An answer from the window, with its return when it is a payment. */
-type Settle = (
+export type Settle = (
     outcome: CheckoutOutcome,
     returned?: CheckoutReturn | null,
 ) => void;
@@ -399,6 +402,7 @@ export const openProviderCheckout: OpenCheckout = (request) => {
         settle = resolve;
     });
     let razorpay: RazorpayCheckout | null = null;
+    // Parked alternative (stripe-window.ts): let removeStripe: (() => void) | null = null;
     let closed = false;
     // The first answer stands; a close from the page answers nothing.
     let settled = false;
@@ -429,6 +433,12 @@ export const openProviderCheckout: OpenCheckout = (request) => {
     } else if (request.handoff.provider === "CASHFREE") {
         openCashfree(request, once);
     } else if (request.handoff.provider === "STRIPE") {
+        // Parked alternative (stripe-window.ts): openStripeWindow(request, once, (remove) => {
+        //     // Closed before Stripe.js had loaded: never open it.
+        //     if (closed) return false;
+        //     removeStripe = remove;
+        //     return true;
+        // });
         openStripeCheckout(request, once);
     } else {
         once("unavailable");
@@ -441,6 +451,7 @@ export const openProviderCheckout: OpenCheckout = (request) => {
             closed = true;
             try {
                 razorpay?.close();
+                // Parked alternative (stripe-window.ts): removeStripe?.();
             } catch {
                 // Already gone.
             }
