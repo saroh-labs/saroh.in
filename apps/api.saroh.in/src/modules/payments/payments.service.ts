@@ -2619,9 +2619,11 @@ export class PaymentsService {
      * go or lapsed (DEC-208), so a customer's page still holding one can't
      * pay for a place that's gone. Only an adapter with `cancelIntent`
      * (Stripe) is asked; Razorpay and Cashfree orders have nothing to close.
-     * Called after the release commits, outside its transaction. Never
-     * throws: a failure is logged by provider and intent, never a value,
-     * and a payment that lands anyway is recorded as owed back.
+     * Called after the release commits, outside its transaction. An intent
+     * the provider closed is marked CANCELLED. Never throws: a failure is
+     * logged by provider and intent, never a value, and a payment that
+     * lands anyway is recorded as owed back (at Stripe, refunded on its
+     * own, `late-hold-refund.ts`).
      */
     async cancelHoldIntents(bookingId: string): Promise<void> {
         let intents: {
@@ -2663,10 +2665,22 @@ export class PaymentsService {
                     },
                 });
                 if (!row) continue;
-                await adapter.cancelIntent({
+                const closed = await adapter.cancelIntent({
                     providerIntentId: intent.providerIntentId,
                     credentials: this.openCredentials(row),
                 });
+                // Closed at the provider: nothing can pay it now (a Stripe
+                // session expired, U5). One past closing (paid as it was
+                // let go) stays open for its webhook to settle.
+                if (closed) {
+                    await prisma.paymentIntent.updateMany({
+                        where: {
+                            id: intent.id,
+                            status: { in: [...OPEN_INTENT_STATUSES] },
+                        },
+                        data: { status: "CANCELLED" },
+                    });
+                }
             } catch (error) {
                 // The adapter's message keeps only the HTTP status.
                 this.logger.warn(

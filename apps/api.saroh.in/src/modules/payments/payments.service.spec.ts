@@ -55,6 +55,7 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             findMany: jest.fn(),
             create: jest.fn(),
+            updateMany: jest.fn(),
         },
         paymentAttempt: {
             create: jest.fn(),
@@ -2402,12 +2403,9 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
                     const { service, fake } = stripeSessionService();
                     const cancelIntent = jest.fn().mockResolvedValue(true);
                     Object.assign(fake, { cancelIntent });
-                    const intentUpdateMany = jest
-                        .fn()
-                        .mockResolvedValue({ count: 1 });
-                    Object.assign(prisma.paymentIntent, {
-                        updateMany: intentUpdateMany,
-                    });
+                    const intentUpdateMany = (
+                        prisma.paymentIntent.updateMany as jest.Mock
+                    ).mockResolvedValue({ count: 1 });
                     intentFindUnique.mockResolvedValue({
                         ...EXISTING,
                         providerIntentId: "pi_old_1",
@@ -2496,6 +2494,30 @@ describe("PaymentsService — Stripe on a Global business (DEC-208)", () => {
                     keySecret: "rk_test_Madeup1",
                 },
             });
+            // Closed at Stripe: the intent can't be paid, so it is CANCELLED
+            // (U5).
+            expect(prisma.paymentIntent.updateMany).toHaveBeenCalledWith({
+                where: {
+                    id: "pi_1",
+                    status: {
+                        in: ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"],
+                    },
+                },
+                data: { status: "CANCELLED" },
+            });
+        });
+
+        it("leaves an intent Stripe couldn't close open, for its webhook", async () => {
+            const { service, fake } = stripeService();
+            Object.assign(fake, {
+                cancelIntent: jest.fn().mockResolvedValue(false),
+            });
+            intentFindMany.mockResolvedValue([OPEN]);
+            providerFindUnique.mockResolvedValue(stripeRow());
+
+            await service.cancelHoldIntents("bk_1");
+
+            expect(prisma.paymentIntent.updateMany).not.toHaveBeenCalled();
         });
 
         it("logs a failure, without the key, and never throws", async () => {

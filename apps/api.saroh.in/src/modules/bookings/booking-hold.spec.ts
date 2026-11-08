@@ -15,6 +15,7 @@ import {
     isExpiredHold,
     releaseHoldInTx,
     renewHoldTokenInTx,
+    STRIPE_HOLD_MINUTES,
 } from "./booking-hold";
 
 // The ledger write itself is the db specs' (`invoice-payments.db.spec.ts`,
@@ -94,6 +95,13 @@ describe("what a hold is", () => {
     it("runs out fifteen minutes after it was made", () => {
         expect(HOLD_MINUTES).toBe(15);
         expect(holdExpiry(NOW).toISOString()).toBe("2026-09-18T09:45:00.000Z");
+    });
+
+    it("runs out thirty minutes after it was made at Stripe, as long as its session", () => {
+        expect(STRIPE_HOLD_MINUTES).toBe(30);
+        expect(holdExpiry(NOW, STRIPE_HOLD_MINUTES).toISOString()).toBe(
+            "2026-09-18T10:00:00.000Z",
+        );
     });
 
     it("reads HELD, then RELEASED once its time is up", () => {

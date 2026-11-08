@@ -34,6 +34,18 @@ const logger = new Logger("MismatchRefund");
 /** Every mismatch refund's key starts with this. */
 export const MISMATCH_REFUND_PREFIX = "amount-mismatch:";
 
+/**
+ * A late Stripe hold payment's automatic refund (plan 2026-11-07-002, U5):
+ * one per intent, `late-hold:<intentId>` (`late-hold-refund.ts`). Kept here
+ * so its refund events settle on their own row, as a mismatch's do.
+ */
+export const LATE_HOLD_REFUND_PREFIX = "late-hold:";
+
+/** The key of a late hold payment's refund. */
+export function lateHoldRefundKey(intentId: string): string {
+    return `${LATE_HOLD_REFUND_PREFIX}${intentId}`;
+}
+
 /** The reason a mismatch refund carries, as the payments list shows it. */
 export const MISMATCH_REFUND_REASON = "Paid at a different amount than asked";
 
@@ -158,6 +170,8 @@ export function refundsOfAttemptInTx(
  *   in the provider's dashboard): recorded as that mismatch's refund, at
  *   the provider's amount, so Home stops asking for it.
  *
+ * - A row keyed to a late hold payment (`late-hold:…`): the same.
+ *
  * `handled: false` leaves the event to the order or invoice's own refund
  * path, unchanged. Runs inside the webhook's transaction.
  */
@@ -173,7 +187,14 @@ export async function settleMismatchRefundInTx(
     }
     const row = await matchedRow(tx, organizationId, event);
     if (row) {
-        if (!attemptOfRefundKey(row.idempotencyKey)) return no;
+        // A late hold payment's refund is settled the same way: its invoice
+        // was voided, so no credit note follows.
+        if (
+            !attemptOfRefundKey(row.idempotencyKey) &&
+            !row.idempotencyKey?.startsWith(LATE_HOLD_REFUND_PREFIX)
+        ) {
+            return no;
+        }
         return { handled: true, applied: await settleRow(tx, row.id, event) };
     }
     if (

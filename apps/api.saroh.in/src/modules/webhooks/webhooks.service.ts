@@ -63,6 +63,10 @@ import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import {
+    isLateStripeHoldInTx,
+    refundLateHoldInTx,
+} from "../payments/late-hold-refund";
 import type { ChargeFailure } from "../payments/mandate-charge-outcome";
 import { recordChargeEventInTx } from "../payments/mandate-charge-outcome";
 import {
@@ -1700,8 +1704,16 @@ export class WebhooksService {
             return { applied: true };
         }
 
+        // A Stripe hold paid after it was let go: released as the payment
+        // was under way, or by the sweep before it landed (U5).
+        const lateHold = await isLateStripeHoldInTx(
+            tx,
+            intent.provider,
+            invoice,
+            held,
+        );
         const found =
-            held === "released"
+            held === "released" || lateHold
                 ? "RELEASED_HOLD"
                 : bought === "gone"
                   ? "PACK_NOT_BOUGHT"
@@ -1722,6 +1734,14 @@ export class WebhooksService {
                 rawResponse: { invoiceStatus: found },
             },
         });
+        // Its money goes back on its own and the team is told (U5). Other
+        // providers' late payments stay owed back by hand on Home.
+        if (lateHold && (await refundLateHoldInTx(tx, intent))) {
+            this.logger.warn(
+                `Payment captured for invoice ${invoiceId} after its hold was released; refunding it`,
+            );
+            return { applied: true };
+        }
         this.logger.warn(
             `Payment captured for invoice ${invoiceId} while it was ${found}; recorded as needing a refund`,
         );
