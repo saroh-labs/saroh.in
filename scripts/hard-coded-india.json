@@ -1,6 +1,6 @@
 {
     "apps/accounts.saroh.in/lib/billing-profiles.ts": 1,
-    "apps/accounts.saroh.in/lib/indian-phone.ts": 1,
+    "apps/accounts.saroh.in/lib/indian-phone.ts": 2,
     "apps/admin.saroh.in/app/billing/invoices/page.tsx": 1,
     "apps/admin.saroh.in/components/billing/billing-tabs.tsx": 1,
     "apps/admin.saroh.in/components/billing/invoice-table.tsx": 1,

@@ -234,6 +234,7 @@ async function stripeBusiness(
         registeredAddress: {
             line1: `${stamp(testInfo)} Main Street`,
             city: "New York",
+            region: "NY",
             postalCode: "10001",
         },
     });

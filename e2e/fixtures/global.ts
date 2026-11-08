@@ -25,7 +25,8 @@ export const GLOBAL_SKIP_WHY =
 
 /**
  * A Global business of Asha's own (US, dollars), with the registered
- * address an issued invoice needs (DEC-068). She stays signed in.
+ * address an issued invoice needs (DEC-068): a US one needs its state
+ * (U3). She stays signed in.
  */
 export async function globalBusiness(
     page: Page,
@@ -37,6 +38,7 @@ export async function globalBusiness(
         registeredAddress: {
             line1: `${stamp(testInfo)} Main Street`,
             city: "New York",
+            region: "NY",
             postalCode: "10001",
         },
     });
@@ -120,4 +122,56 @@ export async function rollOut(
         },
     );
     expect(on.ok(), `turn on Payments: ${await on.text()}`).toBe(true);
+}
+
+/** Turn a module on for the business, with what its setup asks. */
+export async function turnOn(
+    page: Page,
+    b: OwnBusiness,
+    key: string,
+    setup: object = {},
+) {
+    const res = await page.request.put(
+        `${urls.API_URL}/organizations/${b.id}/modules/${key}`,
+        {
+            headers: { origin: urls.APP_URL, "x-organization-id": b.id },
+            data: { status: "ENABLED", setup },
+        },
+    );
+    expect(res.ok(), `turn on ${key}: ${await res.text()}`).toBe(true);
+}
+
+/**
+ * A published product priced 100,000 with a higher struck price (MRP in
+ * India, the original price on Global), at the storefront Commerce made:
+ * a figure that would show lakh grouping (1,00,000) if anything used it.
+ * Answers its id and its address on the shop.
+ */
+export async function bigProduct(
+    page: Page,
+    b: OwnBusiness,
+    testInfo: TestInfo,
+): Promise<{ id: string; name: string; slug: string }> {
+    const listed = await page.request.get(`${urls.API_URL}/stores`);
+    expect(listed.ok(), await listed.text()).toBe(true);
+    const store = (
+        (await listed.json()) as {
+            id: string;
+            organizationId: string;
+        }[]
+    ).find((x) => x.organizationId === b.id);
+    expect(store, "Commerce made the business's storefront").toBeTruthy();
+    const api = business(page.request, b.id);
+    const name = `Grand piano ${stamp(testInfo)}`;
+    const made = await api.post<{ id: string }>(
+        `/stores/${store?.id ?? ""}/products`,
+        { name, price: "100000", mrp: "150000", status: "PUBLISHED" },
+    );
+    const read = await api.get<{
+        slug?: string;
+        product?: { slug: string };
+    } | null>(`/stores/${store?.id ?? ""}/products/${made.id}`);
+    const slug = read?.slug ?? read?.product?.slug ?? "";
+    expect(slug, "the product has an address on the shop").not.toBe("");
+    return { id: made.id, name, slug };
 }
