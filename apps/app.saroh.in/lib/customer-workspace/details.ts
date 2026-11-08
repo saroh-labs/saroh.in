@@ -6,6 +6,8 @@
  * The API is the authority (`contacts/contact-address.ts`,
  * `contact-edit.ts`); these checks say the same thing sooner.
  */
+import { checkPostcode, checkRegion } from "@saroh/edition/address-rules";
+
 import { GST_STATES } from "@/lib/invoices/gst";
 import { phoneProblem } from "@/lib/organizations/business-phone";
 import { PIN_SHAPE } from "@/lib/organizations/registered-address";
@@ -28,7 +30,8 @@ export type DetailsKey =
 
 /**
  * What the sheet holds, every field as text. In India `state` is the GST
- * state's code (the select's value); elsewhere it is what was typed.
+ * state's code (the select's value); where the country's region is a list
+ * (the US, Canada, Australia) it is that list's code; elsewhere as typed.
  */
 export type DetailsDraft = Record<DetailsKey, string>;
 
@@ -82,10 +85,19 @@ function stateCodeOf(name: string | null | undefined): string {
     );
 }
 
-/** The draft the sheet opens with. A new address starts on the business's country. */
+/** A held region as the list's code where there is a list, else as held. */
+function regionOf(country: string, held: string | null | undefined): string {
+    const r = checkRegion(country, held, false);
+    return "value" in r && r.value ? r.value : (held ?? "");
+}
+
+/**
+ * The draft the sheet opens with. A new address starts on the business's
+ * country, which the sheet gives: never India for a Global business.
+ */
 export function draftFrom(
     c: CustomerDetail["contact"],
-    businessCountry = "IN",
+    businessCountry: string,
 ): DetailsDraft {
     const country = c.country ?? businessCountry;
     return {
@@ -97,7 +109,10 @@ export function draftFrom(
         addressLine1: c.addressLine1 ?? "",
         addressLine2: c.addressLine2 ?? "",
         city: c.city ?? "",
-        state: country === "IN" ? stateCodeOf(c.state) : (c.state ?? ""),
+        state:
+            country === "IN"
+                ? stateCodeOf(c.state)
+                : regionOf(country, c.state),
         postalCode: c.postalCode ?? "",
         country,
     };
@@ -124,9 +139,17 @@ export function detailsProblems(
     const phone = d.phone !== initial?.phone ? phoneProblem(d.phone) : null;
     if (phone) out.phone = phone;
     const pin = d.postalCode.replace(/\s+/g, "");
-    if (d.country === "IN" && pin && !PIN_SHAPE.test(pin)) {
-        out.postalCode = "A PIN code is six digits, like 560038.";
+    if (d.country === "IN") {
+        if (pin && !PIN_SHAPE.test(pin)) {
+            out.postalCode = "A PIN code is six digits, like 560038.";
+        }
+        return out;
     }
+    // By the address's own country, as the API holds it; neither required.
+    const region = checkRegion(d.country, d.state, false);
+    if ("problem" in region) out.state = region.problem;
+    const postcode = checkPostcode(d.country, d.postalCode, false);
+    if ("problem" in postcode) out.postalCode = postcode.problem;
     return out;
 }
 

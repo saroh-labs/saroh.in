@@ -155,6 +155,47 @@ describe("a Global business's delivery", () => {
         ).toBe("Add the address to deliver to.");
     });
 
+    // Owner, 8 Nov: the US, Canada and Australia need the state and code.
+    it("asks a US delivery for its state and ZIP code, by the business's country when none is chosen", () => {
+        expect(addressLeft(ABROAD, "country-and-region", "US")).toBe(
+            "Choose the state.",
+        );
+        expect(
+            addressLeft({ ...ABROAD, state: "TX" }, "country-and-region", "US"),
+        ).toBe("Add the ZIP code.");
+        expect(
+            addressLeft(
+                { ...ABROAD, state: "TX", postalCode: "78701" },
+                "country-and-region",
+                "US",
+            ),
+        ).toBeNull();
+    });
+
+    it("holds a customer abroad to their own country, never refusing them for it", () => {
+        const uk = { ...ABROAD, country: "GB" };
+        expect(addressLeft(uk, "country-and-region", "US")).toBeNull();
+        expect(
+            addressLeft(
+                { ...uk, postalCode: "78701" },
+                "country-and-region",
+                "US",
+            ),
+        ).toMatch(/SW1A 1AA/);
+        expect(
+            addressLeft(
+                {
+                    ...ABROAD,
+                    state: "ON",
+                    postalCode: "K1A 0B1",
+                    country: "CA",
+                },
+                "country-and-region",
+                "US",
+            ),
+        ).toBeNull();
+    });
+
     it("sends a free-text region and its country as typed", () => {
         expect(
             trimmed(

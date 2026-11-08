@@ -63,7 +63,7 @@ export function EditSheet({
     const india = useIndiaAddress();
     const country = useBusinessCountry();
     const [initial] = useState(() =>
-        draftFrom(contact, india ? "IN" : (country ?? "IN")),
+        draftFrom(contact, india ? "IN" : (country ?? "")),
     );
     const [draft, setDraft] = useState(initial);
     const [refusal, setRefusal] = useState<Refusal | null>(null);

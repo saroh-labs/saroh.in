@@ -1,6 +1,8 @@
 "use client";
 
 import {
+    addressRulesFor,
+    checkDeliveryPlace,
     listedCountry,
     PHONE_COUNTRIES,
     phoneNumberProblem,
@@ -27,9 +29,11 @@ import { INDIA_STATES, stateIn } from "./india-states";
  * it decides the order's GST. The API checks the same.
  *
  * A Global business's delivery asks for a country instead (starting on the
- * business's own), and its region and postcode are optional free text: no
- * tax reads them. The API decides by the business's edition, not by this; `address` is
- * its profile's fact.
+ * business's own), and its region and postcode in that country's words, held
+ * to its own rules (`checkDeliveryPlace`): the US, Canada and Australia need
+ * the state from the list and the code; elsewhere both are optional, but a
+ * typed postcode must fit. No tax reads them. The API decides by the
+ * business's edition, not by this; `address` is its profile's fact.
  */
 
 export const needsAddress = (way: ShopWay | null) =>
@@ -60,6 +64,8 @@ export function addressBlank(a: DeliveryAddress): boolean {
 export function addressLeft(
     a: DeliveryAddress,
     address: SiteAddress = "indian-state-and-pin",
+    /** The business's country, where a Global delivery starts. */
+    home: string | null = null,
 ): string | null {
     if (
         a.line1.trim() === "" ||
@@ -68,6 +74,14 @@ export function addressLeft(
             (stateIn(a.state) === "" || a.postalCode.trim() === ""))
     ) {
         return "Add the address to deliver to.";
+    }
+    if (address === "country-and-region") {
+        const place = checkDeliveryPlace(
+            a.country ?? home,
+            a.state,
+            a.postalCode,
+        );
+        if ("problem" in place) return place.problem;
     }
     const phone = a.phone?.trim() ?? "";
     if (phone === "") return "Add a phone number for the delivery.";
@@ -88,8 +102,9 @@ export function deliveryPhoneOk(phone: string): boolean {
 export function addressReady(
     a: DeliveryAddress,
     address: SiteAddress = "indian-state-and-pin",
+    home: string | null = null,
 ): boolean {
-    return addressLeft(a, address) === null;
+    return addressLeft(a, address, home) === null;
 }
 
 export function trimmed(
@@ -186,6 +201,10 @@ export function AddressFields({
 }) {
     const business = useSiteBusiness();
     const global = business.address === "country-and-region";
+    const country = address.country ?? business.country ?? "";
+    const rules = addressRulesFor(country);
+    // The US, Canada and Australia: a courier needs both (checkDeliveryPlace).
+    const placeRequired = rules.region.kind === "list";
     const phone = address.phone?.trim() ?? "";
     // Only once something is typed: an empty required field is said beside
     // the button, never as an error before the customer has started.
@@ -261,8 +280,12 @@ export function AddressFields({
                     <select
                         autoComplete="country"
                         required
-                        value={address.country ?? business.country ?? ""}
-                        onChange={(e) => onChange("country")(e.target.value)}
+                        value={country}
+                        onChange={(e) => {
+                            onChange("country")(e.target.value);
+                            // A region belongs to its country.
+                            onChange("state")("");
+                        }}
                         className={cn(field, "cursor-pointer")}
                     >
                         {PHONE_COUNTRIES.map((c) => (
@@ -283,8 +306,38 @@ export function AddressFields({
                 <>
                     {input("city", "Town or city", "address-level2", true)}
                     <div className="grid grid-cols-2 gap-2.5">
-                        {input("state", "State or region", "address-level1")}
-                        {input("postalCode", "Postcode", "postal-code")}
+                        {rules.region.kind === "list" ? (
+                            <label className="block text-[13.5px] font-medium">
+                                {rules.region.label}
+                                <span aria-hidden="true"> *</span>
+                                <select
+                                    autoComplete="address-level1"
+                                    required
+                                    value={address.state}
+                                    onChange={(e) =>
+                                        onChange("state")(e.target.value)
+                                    }
+                                    className={cn(field, "cursor-pointer")}
+                                >
+                                    <option value="">Choose</option>
+                                    {rules.region.options.map((o) => (
+                                        <option key={o.code} value={o.code}>
+                                            {o.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        ) : rules.region.kind === "text" ? (
+                            input("state", rules.region.label, "address-level1")
+                        ) : null}
+                        {rules.postcode
+                            ? input(
+                                  "postalCode",
+                                  rules.postcode.label,
+                                  "postal-code",
+                                  placeRequired,
+                              )
+                            : null}
                     </div>
                 </>
             ) : (

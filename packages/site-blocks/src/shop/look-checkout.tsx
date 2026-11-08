@@ -368,7 +368,8 @@ export function LookCheckout({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, addressBy) === null
+                            addressLeft(last, addressBy, seller.country) ===
+                            null
                                 ? "shown"
                                 : "typing",
                     };
@@ -377,7 +378,7 @@ export function LookCheckout({
         return () => {
             live = false;
         };
-    }, [askSaved, addressBy]);
+    }, [askSaved, addressBy, seller.country]);
 
     // Paid in the window: ask the server until it has placed the order.
     const confirmTries = paying.kind === "confirming" ? paying.tries : null;
@@ -444,7 +445,7 @@ export function LookCheckout({
     const quote = load.kind === "ready" ? load.quote : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(draft.address, addressBy)
+        ? addressLeft(draft.address, addressBy, seller.country)
         : null;
     const pays =
         quote?.payments ??

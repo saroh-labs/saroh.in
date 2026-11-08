@@ -1,3 +1,4 @@
+import { addressRulesFor } from "@saroh/edition/address-rules";
 import { plainToInstance } from "class-transformer";
 import type { ValidationError } from "class-validator";
 import { validateSync } from "class-validator";
@@ -357,6 +358,7 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             postcode: "zipCode",
             postalcode: "zipCode",
             zip: "zipCode",
+            eircode: "zipCode",
         },
         keyLabel: "email",
         // Uniqueness is @@unique([storeId, email]); the DTO lowercases on
@@ -387,3 +389,39 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
         ],
     },
 };
+
+/**
+ * A Global business's customer file (R4): never "PIN", its country's word
+ * for the postcode ("ZIP code", "Postcode"), and customers anywhere. Every
+ * heading still maps (entities.spec). India's file and words are unchanged.
+ */
+export function globalCustomerWords(
+    country: string | null,
+): Pick<EntityDescriptor, "fieldLabels" | "sample"> {
+    const word = addressRulesFor(country).postcode?.label ?? "Postcode";
+    return {
+        fieldLabels: {
+            ...ENTITY_DESCRIPTORS.customers.fieldLabels,
+            zipCode: word,
+        },
+        sample: [
+            ["Email", "Full name", "Phone", "Country", "City", word],
+            [
+                "alex.morgan@example.com",
+                "Alex Morgan",
+                "+1 415 555 0132",
+                "US",
+                "San Francisco",
+                "94105",
+            ],
+            [
+                "sam.lee@example.com",
+                "Sam Lee",
+                "+44 20 7946 0958",
+                "GB",
+                "London",
+                "SW1A 1AA",
+            ],
+        ],
+    };
+}

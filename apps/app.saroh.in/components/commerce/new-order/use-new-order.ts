@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { useIndiaAddress } from "@/components/shared/fields/business-country";
+import {
+    useBusinessCountry,
+    useIndiaAddress,
+} from "@/components/shared/fields/business-country";
 import { readCustomerAttention } from "@/lib/customers/actions";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { isOpeningPick } from "@/lib/customers/prefill";
@@ -85,7 +88,13 @@ export function useNewOrder({
         read: NewOrderLines | null;
     } | null>(null);
     const [chosenWay, setWay] = useState<NewOrderWay["type"] | null>(null);
-    const [address, setAddress] = useState<AddressDraft>(EMPTY_ADDRESS);
+    const india = useIndiaAddress();
+    const home = useBusinessCountry();
+    // A Global delivery starts on the business's country; India's sends none.
+    const [address, setAddress] = useState<AddressDraft>(() => ({
+        ...EMPTY_ADDRESS,
+        country: india ? "" : (home ?? ""),
+    }));
     const [chosenPay, setPay] = useState<NewOrderPay>("CASH");
     const [given, setGiven] = useState("");
     const [discount, setDiscount] = useState("");
@@ -201,7 +210,6 @@ export function useNewOrder({
     const change = cashChange(given, total);
     // Null where it doesn't apply: a delivery, a link, pay later.
     const handedOver = canHandOver(pay, way) ? handedOverChoice : null;
-    const india = useIndiaAddress();
     const problem = sheetProblem({
         looseAddress: !india,
         lines: lines.length,

@@ -1,4 +1,61 @@
-import type { FulfilmentType, OrderRead } from "./read";
+import { checkDeliveryPlace, splitDeliveryPlace } from "@saroh/block-contract";
+
+import type { DeliveryAddress, FulfilmentType, OrderRead } from "./read";
+
+/** A delivery as the order's edit sheets hold it, every field as text. */
+export interface DeliveryDraft {
+    line1: string;
+    city: string;
+    /** India's state, or a Global delivery's region alone. */
+    state: string;
+    postalCode: string;
+    /** A Global delivery's ISO country; "" for India's, which sends none. */
+    country: string;
+}
+
+/**
+ * The draft an edit sheet opens with. `home` is a Global business's country
+ * (null for India): its delivery keeps region and country apart (DEC-207),
+ * an older "Texas, United States" line read apart, and starts on `home`.
+ */
+export function deliveryDraftOf(
+    a: DeliveryAddress | null,
+    home: string | null,
+): DeliveryDraft {
+    const place =
+        home && !a?.country
+            ? splitDeliveryPlace(a?.state)
+            : { region: a?.state ?? "", country: a?.country ?? null };
+    return {
+        line1: a?.line1 ?? "",
+        city: a?.city ?? "",
+        state: place.region,
+        postalCode: a?.postalCode ?? "",
+        country: home ? (place.country ?? home) : "",
+    };
+}
+
+/**
+ * What stops a delivery saving, in a sentence; null when nothing does.
+ * India: every field. Global: the first line and town, then the region and
+ * postcode by the address's own country (`checkDeliveryPlace`).
+ */
+export function deliveryDraftProblem(
+    d: DeliveryDraft,
+    india: boolean,
+    noun: "A delivery" | "An address",
+): string | null {
+    if (india) {
+        return [d.line1, d.city, d.state, d.postalCode].some((v) => !v.trim())
+            ? `${noun} needs its first line, town, state and PIN code.`
+            : null;
+    }
+    if (!d.line1.trim() || !d.city.trim()) {
+        return `${noun} needs its first line and town.`;
+    }
+    const place = checkDeliveryPlace(d.country, d.state, d.postalCode);
+    return "problem" in place ? place.problem : null;
+}
 
 /**
  * Whether "Change how it's fulfilled…" and "Cancel order…" can open, for

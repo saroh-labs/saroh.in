@@ -10,6 +10,7 @@ import type { CustomerPick } from "@/lib/customers/picker";
 import { count } from "@/lib/format/plural";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { METHOD_WORD, offered } from "@/lib/payments/method-words";
+import { checkDeliveryPlace } from "@saroh/block-contract";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How it is paid, as the API takes it. */
@@ -229,8 +230,11 @@ export function createLabel(
 export interface AddressDraft {
     line1: string;
     city: string;
+    /** India's state, or a Global delivery's region alone. */
     state: string;
     postalCode: string;
+    /** A Global delivery's ISO country; "" for India's, which sends none. */
+    country: string;
 }
 
 export const EMPTY_ADDRESS: AddressDraft = {
@@ -238,6 +242,7 @@ export const EMPTY_ADDRESS: AddressDraft = {
     city: "",
     state: "",
     postalCode: "",
+    country: "",
 };
 
 /**
@@ -253,7 +258,10 @@ export function sheetProblem(input: {
     payOff: string | null;
     cash: CashChange;
     format: (cents: number) => string;
-    /** A Global business's delivery needs no state or PIN code. */
+    /**
+     * A Global business's delivery: held to its own country's rules
+     * (`checkDeliveryPlace`), not India's state and PIN code.
+     */
     looseAddress?: boolean;
 }): string | null {
     if (input.lines === 0) return "Add at least one item.";
@@ -264,6 +272,8 @@ export function sheetProblem(input: {
         if (!a.line1.trim()) return "Add the delivery address.";
         if (input.looseAddress) {
             if (!a.city.trim()) return "Add the town or city.";
+            const place = checkDeliveryPlace(a.country, a.state, a.postalCode);
+            if ("problem" in place) return place.problem;
         } else if (!a.city.trim() || !a.state.trim() || !a.postalCode.trim()) {
             return "Add the town, state and PIN code.";
         }

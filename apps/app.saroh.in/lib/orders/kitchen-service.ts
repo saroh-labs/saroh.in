@@ -183,6 +183,8 @@ export interface EditOrderInput {
         city: string;
         state: string;
         postalCode: string;
+        /** A Global delivery's ISO country (DEC-207); India sends none. */
+        country?: string;
         name?: string | null;
         phone?: string | null;
     };

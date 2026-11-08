@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => ({
         // What the MRP rule reads of the business (`product-mrp.ts`).
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         storeSettings: { findUnique: jest.fn().mockResolvedValue(null) },
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
         $transaction: jest.fn(),
     },
 }));
@@ -144,5 +145,22 @@ describe("ImportsService.describe — the mapping schema needs write access", ()
             "customers",
         );
         expect(d.entity).toBe("customers");
+        // India's file, as it was.
+        expect(d.sample[0]).toContain("PIN code");
+    });
+
+    it("gives a Global business its country's postcode word, never PIN", async () => {
+        jest.mocked(prisma.organization.findUnique).mockResolvedValueOnce({
+            edition: "GLOBAL",
+            businessProfile: { country: "US" },
+        } as never);
+        const d = await makeService().describe(
+            "store_1",
+            "user_owner",
+            "customers",
+        );
+        expect(d.fieldLabels.zipCode).toBe("ZIP code");
+        expect(d.sample[0]).toContain("ZIP code");
+        expect(JSON.stringify(d)).not.toMatch(/PIN/);
     });
 });

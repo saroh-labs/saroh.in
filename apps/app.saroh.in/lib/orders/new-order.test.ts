@@ -138,6 +138,7 @@ describe("what stops the button", () => {
             city: "",
             state: "",
             postalCode: "",
+            country: "GB",
         };
         const abroad = {
             ...base,
@@ -153,6 +154,41 @@ describe("what stops the button", () => {
                 address: { ...address, city: "Austin" },
             }),
         ).not.toMatch(/town|state|PIN/);
+        // A typed postcode must fit the address's own country.
+        expect(
+            sheetProblem({
+                ...abroad,
+                address: { ...address, city: "London", postalCode: "78701" },
+            }),
+        ).toMatch(/SW1A 1AA/);
+    });
+
+    it("asks a US delivery for its state and ZIP code, and a Canadian one for its own", () => {
+        const abroad = {
+            ...base,
+            way: "LOCAL_DELIVERY" as const,
+            looseAddress: true,
+            pick: known,
+        };
+        const us = {
+            line1: "1 Main St",
+            city: "Austin",
+            state: "",
+            postalCode: "78701",
+            country: "US",
+        };
+        expect(sheetProblem({ ...abroad, address: us })).toBe(
+            "Choose the state.",
+        );
+        expect(
+            sheetProblem({ ...abroad, address: { ...us, state: "TX" } }),
+        ).toBeNull();
+        expect(
+            sheetProblem({
+                ...abroad,
+                address: { ...us, state: "ON", country: "CA" },
+            }),
+        ).toMatch(/K1A 0B1/);
     });
 
     it("needs the whole address and someone to reach for a delivery", () => {
@@ -164,6 +200,7 @@ describe("what stops the button", () => {
             city: "Bengaluru",
             state: "Karnataka",
             postalCode: "560001",
+            country: "",
         };
         expect(sheetProblem({ ...base, way: "LOCAL_DELIVERY", address })).toBe(
             "Deliveries need a customer to send the tracking to.",

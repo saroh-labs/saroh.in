@@ -389,7 +389,8 @@ export function BagSheet({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, addressBy) === null
+                            addressLeft(last, addressBy, seller.country) ===
+                            null
                                 ? "shown"
                                 : "typing",
                     };
@@ -398,7 +399,7 @@ export function BagSheet({
         return () => {
             live = false;
         };
-    }, [askSaved, onDraft, addressBy]);
+    }, [askSaved, onDraft, addressBy, seller.country]);
 
     if (items.length === 0) {
         return (
@@ -425,7 +426,7 @@ export function BagSheet({
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(address, addressBy)
+        ? addressLeft(address, addressBy, seller.country)
         : null;
     const addressOk = addressNote === null;
     const pays = paysOf(quote);

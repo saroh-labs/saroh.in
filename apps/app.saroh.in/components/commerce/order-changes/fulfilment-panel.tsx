@@ -4,9 +4,18 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { useIndiaAddress } from "@/components/shared/fields/business-country";
-import type { PaidHow } from "@/lib/orders/fulfilment-change";
 import {
+    useBusinessCountry,
+    useIndiaAddress,
+} from "@/components/shared/fields/business-country";
+import { DeliveryPlaceFields } from "@/components/shared/fields/delivery-place-fields";
+import type {
+    DeliveryDraft as AddressDraft,
+    PaidHow,
+} from "@/lib/orders/fulfilment-change";
+import {
+    deliveryDraftOf,
+    deliveryDraftProblem,
     differenceNote,
     isDeliveryType,
     parseCharge,
@@ -15,7 +24,6 @@ import {
 } from "@/lib/orders/fulfilment-change";
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
-import { deliveryPlace } from "@/lib/orders/read";
 
 import { CheckRow } from "@saroh/ui/check-row";
 import { ChipGroup } from "@saroh/ui/choice-group";
@@ -27,12 +35,6 @@ import {
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-interface AddressDraft {
-    line1: string;
-    city: string;
-    state: string;
-    postalCode: string;
-}
 
 /**
  * "Change how it's fulfilled" (round-2 B9, the design's option B): a chip
@@ -110,14 +112,12 @@ function FulfilmentDraft({
 }: FulfilmentProps) {
     const ids = useId();
     const india = useIndiaAddress();
+    const country = useBusinessCountry();
     const [pick, setPick] = useState<FulfilmentType>(current);
     const [charge, setCharge] = useState("");
-    const [addr, setAddr] = useState<AddressDraft>({
-        line1: address?.line1 ?? "",
-        city: address?.city ?? "",
-        state: address ? (deliveryPlace(address) ?? "") : "",
-        postalCode: address?.postalCode ?? "",
-    });
+    const [addr, setAddr] = useState<AddressDraft>(() =>
+        deliveryDraftOf(address, india ? null : country),
+    );
     const [tell, setTell] = useState(canTell);
     useOrderSheetDraft([pick, charge, addr, tell]);
 
@@ -130,13 +130,10 @@ function FulfilmentDraft({
     const typed = parseCharge(charge);
     const cents = typed.kind === "ok" ? typed.cents : null;
     const difference = cents === null ? 0 : cents - Math.round(shipping * 100);
-    const addressMissing =
-        delivery &&
-        (india
-            ? (Object.keys(addr) as (keyof AddressDraft)[]).some(
-                  (k) => !addr[k].trim(),
-              )
-            : !addr.line1.trim() || !addr.city.trim());
+    const addressProblem = delivery
+        ? deliveryDraftProblem(addr, india, "A delivery")
+        : null;
+    const addressMissing = addressProblem !== null;
     const off =
         !moved || busy || cents === null || (delivery && addressMissing);
     const money = format ?? ((c: number) => (c / 100).toFixed(2));
@@ -146,18 +143,15 @@ function FulfilmentDraft({
           ? typed.error
           : typed.kind === "empty"
             ? "Type the delivery charge, or 0 for none."
-            : delivery && addressMissing
-              ? india
-                  ? "A delivery needs its first line, town, state and PIN code."
-                  : "A delivery needs its first line and town."
-              : `${differenceNote({
-                    differenceCents: difference,
-                    paid,
-                    first,
-                    refundTo,
-                    linkable,
-                    format: money,
-                })} The steps already done stay done.`;
+            : (addressProblem ??
+              `${differenceNote({
+                  differenceCents: difference,
+                  paid,
+                  first,
+                  refundTo,
+                  linkable,
+                  format: money,
+              })} The steps already done stay done.`);
     const warn = moved && (typed.kind === "bad" || addressMissing);
 
     return (
@@ -192,7 +186,14 @@ function FulfilmentDraft({
                             }
                             className="mt-1 w-full"
                         />
-                        <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
+                        <div
+                            className={cn(
+                                "mt-1.5 grid gap-1.5",
+                                india
+                                    ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px]"
+                                    : "grid-cols-2",
+                            )}
+                        >
                             <Input
                                 dense
                                 aria-label="Town or city"
@@ -206,37 +207,45 @@ function FulfilmentDraft({
                                 }
                                 className="w-full"
                             />
-                            <Input
-                                dense
-                                aria-label={
-                                    india ? "State" : "Region and country"
-                                }
-                                placeholder={
-                                    india ? "State" : "Region, country"
-                                }
-                                value={addr.state}
-                                onChange={(e) =>
-                                    setAddr((a) => ({
-                                        ...a,
-                                        state: e.target.value,
-                                    }))
-                                }
-                                className="w-full"
-                            />
-                            <Input
-                                dense
-                                aria-label={india ? "PIN code" : "Postcode"}
-                                placeholder={india ? "PIN" : "Postcode"}
-                                inputMode={india ? "numeric" : undefined}
-                                value={addr.postalCode}
-                                onChange={(e) =>
-                                    setAddr((a) => ({
-                                        ...a,
-                                        postalCode: e.target.value,
-                                    }))
-                                }
-                                className="w-full"
-                            />
+                            {india ? (
+                                <>
+                                    <Input
+                                        dense
+                                        aria-label="State"
+                                        placeholder="State"
+                                        value={addr.state}
+                                        onChange={(e) =>
+                                            setAddr((a) => ({
+                                                ...a,
+                                                state: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full"
+                                    />
+                                    <Input
+                                        dense
+                                        aria-label="PIN code"
+                                        placeholder="PIN"
+                                        inputMode="numeric"
+                                        value={addr.postalCode}
+                                        onChange={(e) =>
+                                            setAddr((a) => ({
+                                                ...a,
+                                                postalCode: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full"
+                                    />
+                                </>
+                            ) : (
+                                <DeliveryPlaceFields
+                                    place={addr}
+                                    onChange={(next) =>
+                                        setAddr((a) => ({ ...a, ...next }))
+                                    }
+                                    dense
+                                />
+                            )}
                         </div>
                     </fieldset>
                 ) : null}
@@ -294,6 +303,9 @@ function FulfilmentDraft({
                                       city: addr.city.trim(),
                                       state: addr.state.trim(),
                                       postalCode: addr.postalCode.trim(),
+                                      ...(addr.country
+                                          ? { country: addr.country }
+                                          : {}),
                                       line2: address?.line2 ?? null,
                                       name: address?.name ?? null,
                                       phone: address?.phone ?? null,

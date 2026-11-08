@@ -5,6 +5,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 import { ActivationEvents } from "../analytics/activation-events";
 import type { PriceFacts } from "../audit/price-history";
@@ -22,7 +23,11 @@ import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
 import type { ImportEntity } from "./entities";
-import { ENTITY_DESCRIPTORS, splitFullName } from "./entities";
+import {
+    ENTITY_DESCRIPTORS,
+    globalCustomerWords,
+    splitFullName,
+} from "./entities";
 import type { ImportPlan, WritableRow } from "./import-plan";
 import {
     buildImportPlan,
@@ -239,8 +244,13 @@ export class ImportsService {
     async describe(storeId: string, userId: string, entity: ImportEntity) {
         // Importing is a write action; the mapping step is only reached by a
         // writer. Without this a non-member could read a store's import schema.
-        await this.requireWrite(storeId, userId);
-        const d = ENTITY_DESCRIPTORS[entity];
+        const organizationId = await this.requireWrite(storeId, userId);
+        const d = {
+            ...ENTITY_DESCRIPTORS[entity],
+            ...(entity === "customers" && organizationId
+                ? await this.customerWords(organizationId)
+                : {}),
+        };
         const currency =
             entity === "products"
                 ? await storefrontCurrency(prisma, storeId)
@@ -254,6 +264,21 @@ export class ImportsService {
             sample: d.sample,
             currency,
         };
+    }
+
+    /** A Global business's words for its customer file; India's as they are. */
+    private async customerWords(organizationId: string) {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                edition: true,
+                businessProfile: { select: { country: true } },
+            },
+        });
+        return org &&
+            editionProfile(org.edition).address !== "indian-state-and-pin"
+            ? globalCustomerWords(org.businessProfile?.country ?? null)
+            : {};
     }
 
     // ------------------------------------------------------------------

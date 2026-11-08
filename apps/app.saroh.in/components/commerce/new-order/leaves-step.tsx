@@ -4,6 +4,7 @@ import { FailedRead } from "@saroh/ui/failed-read";
 import { Input } from "@saroh/ui/input";
 
 import { useIndiaAddress } from "@/components/shared/fields/business-country";
+import { DeliveryPlaceFields } from "@/components/shared/fields/delivery-place-fields";
 import { Chip } from "@/components/shared/lists/chip";
 import type { AddressDraft, NewOrderWay } from "@/lib/orders/new-order";
 import { goesToAddress } from "@/lib/orders/new-order";
@@ -91,33 +92,55 @@ export function LeavesStep({
                         autoComplete="street-address"
                         className={FIELD}
                     />
-                    <div className="grid grid-cols-[1fr_1fr_110px] gap-2 max-sm:grid-cols-2">
-                        <Input
-                            value={address.city}
-                            onChange={(e) => set("city")(e.target.value)}
-                            aria-label="Town or city"
-                            placeholder="Town or city"
-                            autoComplete="address-level2"
-                            className={FIELD}
-                        />
-                        <Input
-                            value={address.state}
-                            onChange={(e) => set("state")(e.target.value)}
-                            aria-label={india ? "State" : "Region and country"}
-                            placeholder={india ? "State" : "Region, country"}
-                            autoComplete="address-level1"
-                            className={FIELD}
-                        />
-                        <Input
-                            value={address.postalCode}
-                            onChange={(e) => set("postalCode")(e.target.value)}
-                            aria-label={india ? "PIN code" : "Postcode"}
-                            placeholder={india ? "PIN" : "Postcode"}
-                            inputMode={india ? "numeric" : undefined}
-                            autoComplete="postal-code"
-                            className={FIELD}
-                        />
-                    </div>
+                    {india ? (
+                        <div className="grid grid-cols-[1fr_1fr_110px] gap-2 max-sm:grid-cols-2">
+                            <Input
+                                value={address.city}
+                                onChange={(e) => set("city")(e.target.value)}
+                                aria-label="Town or city"
+                                placeholder="Town or city"
+                                autoComplete="address-level2"
+                                className={FIELD}
+                            />
+                            <Input
+                                value={address.state}
+                                onChange={(e) => set("state")(e.target.value)}
+                                aria-label="State"
+                                placeholder="State"
+                                autoComplete="address-level1"
+                                className={FIELD}
+                            />
+                            <Input
+                                value={address.postalCode}
+                                onChange={(e) =>
+                                    set("postalCode")(e.target.value)
+                                }
+                                aria-label="PIN code"
+                                placeholder="PIN"
+                                inputMode="numeric"
+                                autoComplete="postal-code"
+                                className={FIELD}
+                            />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                value={address.city}
+                                onChange={(e) => set("city")(e.target.value)}
+                                aria-label="Town or city"
+                                placeholder="Town or city"
+                                autoComplete="address-level2"
+                                className={FIELD}
+                            />
+                            <DeliveryPlaceFields
+                                place={address}
+                                onChange={(next) =>
+                                    onAddress({ ...address, ...next })
+                                }
+                                className={FIELD}
+                            />
+                        </div>
+                    )}
                 </div>
             ) : null}
         </StepCard>

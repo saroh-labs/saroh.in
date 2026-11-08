@@ -105,10 +105,56 @@ describe("nextAddress", () => {
         ).toMatchObject({ state: "Greater London", postalCode: "NW1 6XE" });
     });
 
+    it("holds another country's postcode to its own shape, never to the business's", () => {
+        expect(
+            nextAddress(NONE, {
+                addressLine1: "24 Sussex Drive",
+                city: "Ottawa",
+                state: "on",
+                postalCode: "k1a0b1",
+                country: "CA",
+            }),
+        ).toMatchObject({ state: "ON", postalCode: "K1A 0B1", country: "CA" });
+        expect(
+            refusal(() =>
+                nextAddress(NONE, {
+                    addressLine1: "24 Sussex Drive",
+                    postalCode: "78701",
+                    country: "CA",
+                }),
+            ),
+        ).toEqual({
+            message: expect.stringContaining("K1A 0B1"),
+            field: "postalCode",
+        });
+    });
+
+    it("asks a customer for neither state nor postcode, but takes a state only from the list", () => {
+        expect(
+            nextAddress(NONE, { addressLine1: "1 Main St", country: "US" }),
+        ).toMatchObject({ state: null, postalCode: null, country: "US" });
+        expect(
+            nextAddress(NONE, {
+                addressLine1: "1 Main St",
+                state: "Texas",
+                country: "US",
+            }).state,
+        ).toBe("TX");
+        expect(
+            refusal(() =>
+                nextAddress(NONE, {
+                    addressLine1: "1 Main St",
+                    state: "Atlantis",
+                    country: "US",
+                }),
+            ).field,
+        ).toBe("state");
+    });
+
     it("re-checks the PIN already held when the country becomes India", () => {
         const abroad = nextAddress(NONE, {
             addressLine1: "1 Main St",
-            postalCode: "1234",
+            postalCode: "12345",
             country: "US",
         });
         expect(

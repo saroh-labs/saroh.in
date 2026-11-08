@@ -110,6 +110,8 @@ export interface NewOrderInput {
         city: string;
         state: string;
         postalCode: string;
+        /** A Global delivery's ISO country (DEC-207); India sends none. */
+        country?: string;
     };
     tax?: string;
     shipping?: string;
