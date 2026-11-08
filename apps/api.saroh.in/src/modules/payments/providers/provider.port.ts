@@ -48,11 +48,64 @@ export interface CreateOrderIntentInput {
      * payment from abroad without one (an export); others may ignore it.
      */
     description?: string;
+    /**
+     * A provider-hosted checkout page (Stripe Checkout, DEC-208 amendment):
+     * only Stripe reads it, and Stripe needs it. Razorpay and Cashfree
+     * ignore it.
+     */
+    hosted?: HostedCheckoutInput;
+}
+
+/** What a hosted checkout page needs beyond the amount (Stripe Checkout). */
+export interface HostedCheckoutInput {
+    /**
+     * Where the provider sends the customer once paid, on the business's own
+     * site, built by the API. May carry `{CHECKOUT_SESSION_ID}`.
+     */
+    successUrl: string;
+    /** Where the provider's back button goes, built by the API. */
+    cancelUrl: string;
+    /** When the page stops taking payment; absent: the provider's default. */
+    expiresAt?: Date;
+    /** Instant methods only (a DRAFT invoice: hold, deposit, pack, join). */
+    instantOnly: boolean;
+    /** The submit button's word: `book` for a booking hold, else `pay`. */
+    submitType: "book" | "pay";
+    /** What is paid for, as the customer reads it. Never customer details. */
+    lineName: string;
+    /** Saroh's PaymentIntent id, echoed back on the session and its events. */
+    clientReference: string;
+    /** The payer's Customer at the provider (`cus_…`), when found or made. */
+    customerId?: string | null;
+    /** The payer's email, prefilled when there is no `customerId`. */
+    payerEmail?: string | null;
+    /** Ask for a billing address (an Indian account, or one whose country is unknown). */
+    billingAddressRequired: boolean;
+}
+
+/** The payer found or made at the provider; never throws. */
+export interface FindOrCreateCustomerInput {
+    email: string | null | undefined;
+    name?: string | null;
+    /** The business, so one payer is made once per business account. */
+    organizationId: string;
+    /** Saroh's Contact id, kept on the customer's metadata when known. */
+    contactRef?: string | null;
+    credentials: ProviderCredentials;
+}
+
+export interface FindOrCreateCustomerResult {
+    /** The provider's customer id, or null when there is none (no email, or the call failed). */
+    customerId: string | null;
+    /** The key can't read or make customers (a 403): flag the connection. */
+    permissionMissing?: boolean;
 }
 
 export interface CreateOrderIntentResult {
     /** The provider's order/intent id (e.g. Razorpay order_id, Cashfree cf id). */
     providerIntentId: string;
+    /** The provider's hosted-checkout session (Stripe `cs_…`), kept for good. */
+    providerCheckoutId?: string;
     /**
      * Non-secret parameters the client SDK needs to render checkout. MUST NOT
      * contain the key secret.
@@ -505,14 +558,26 @@ export interface MerchantProvider {
     /**
      * Close an open intent nobody paid (a lapsed booking hold or checkout),
      * so the provider takes no payment on it later. Only a provider whose
-     * intent stays payable needs it (Stripe: a PaymentIntent the customer's
-     * page still holds); Razorpay and Cashfree orders have none. Call it
+     * intent stays payable needs it (Stripe: an open Checkout Session, which
+     * it expires, or an older PaymentIntent); Razorpay and Cashfree orders have none. Call it
      * after the intent's payments were asked about and none was taken.
      * True when the provider cancelled it; false when it was past
      * cancelling (already cancelled, paid or processing). Throws a plain
      * error when the provider could not say.
      */
     cancelIntent?(input: CancelIntentInput): Promise<boolean>;
+    /**
+     * Stripe only: the payer as a Customer in the business's own account,
+     * found by lower-cased email or made. Never throws.
+     */
+    findOrCreateCustomer?(
+        input: FindOrCreateCustomerInput,
+    ): Promise<FindOrCreateCustomerResult>;
+    /**
+     * Stripe only: the account's country (ISO alpha-2, upper case), or null
+     * when it could not be read. Never throws.
+     */
+    accountCountry?(credentials: ProviderCredentials): Promise<string | null>;
 }
 
 /** Close one open intent at the provider. */
@@ -549,6 +614,11 @@ export interface OrderPayment {
     currency: string | null;
     /** What the provider kept, in minor units, when it reports it. */
     feeCents?: number;
+    /**
+     * The provider's payment intent this payment is on, when the look-up was
+     * by a hosted-checkout session (Stripe: the `pi_…` of a `cs_…`).
+     */
+    providerIntentId?: string;
     /**
      * An authorisation's payment names the recurring token it made (D19):
      * the fields a webhook's mandate link is read from.
