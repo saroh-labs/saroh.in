@@ -400,3 +400,22 @@ const input: CatalogInput = {
 
 /** Version 1, validated. */
 export const SEED_CATALOG: Catalog = parseCatalog(input);
+
+/**
+ * The Global edition's starting catalogue (stage 9, KTD3b): India's sample
+ * plans, rows and limits in US dollars with no tax, every price empty, so
+ * the repo never holds one (R7). The owner sets the prices in the Global
+ * admin console and publishes. Monthly only; no first-month offer, which a
+ * plan with no price can't have.
+ */
+export const GLOBAL_SEED_CATALOG: Catalog = parseCatalog({
+    ...input,
+    currency: "USD",
+    tax: "none",
+    yearly: { ...input.yearly, on: false },
+    plans: input.plans.map(({ trial: _trial, ...p }) => ({
+        ...p,
+        pricePaise: 0,
+    })),
+    addons: (input.addons ?? []).map((a) => ({ ...a, pricePaise: 0 })),
+});

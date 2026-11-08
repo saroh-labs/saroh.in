@@ -1,4 +1,4 @@
-import type { Catalog, Plan } from "./schema";
+import type { Catalog, CatalogTax, Plan } from "./schema";
 
 /**
  * Money for the catalogue: integer paise in, integer paise out (KTD-18).
@@ -33,6 +33,20 @@ export function gstPaise(linePaise: number): number {
 /** One line with its GST added. */
 export function withGstPaise(linePaise: number): number {
     return linePaise + gstPaise(linePaise);
+}
+
+/**
+ * The tax on one line in a catalogue's tax mode (stage 9, KTD2): GST on
+ * India's, none on an export catalogue. Minor units in, minor units out.
+ */
+export function taxPaise(tax: CatalogTax, lineMinor: number): number {
+    assertPaise(lineMinor);
+    return tax === "gst" ? gstPaise(lineMinor) : 0;
+}
+
+/** One line with its tax added, in a catalogue's tax mode. */
+export function withTaxPaise(tax: CatalogTax, lineMinor: number): number {
+    return lineMinor + taxPaise(tax, lineMinor);
 }
 
 /** A yearly charge: "pay for N months, get 12". */
@@ -83,6 +97,26 @@ export function formatInr(amountPaise: number): string {
     return amountPaise % 100 === 0
         ? whole.format(amountPaise / 100)
         : exact.format(amountPaise / 100);
+}
+
+/**
+ * Money in a catalogue's currency for people (KTD6c: Saroh's plan money is
+ * in the catalogue's currency, never the business's own): rupees as
+ * {@link formatInr}; other currencies with `en-US` grouping, whole units
+ * without decimals and two only when there are cents.
+ */
+export function formatMinor(amountMinor: number, currency: string): string {
+    if (currency === "INR") return formatInr(amountMinor);
+    if (!Number.isSafeInteger(amountMinor)) {
+        throw new RangeError(`Expected whole minor units, got ${amountMinor}`);
+    }
+    const cents = amountMinor % 100 !== 0;
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: cents ? 2 : 0,
+        maximumFractionDigits: cents ? 2 : 0,
+    }).format(amountMinor / 100);
 }
 
 /** A count for people, `en-IN` grouping. */

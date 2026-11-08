@@ -58,6 +58,8 @@ export function blankCatalog(): Catalog {
         modules: [],
         yearly: { on: false, paid: 10 },
         gst: { show: "excl" },
+        currency: "INR",
+        tax: "gst",
         autopay: { charges: AUTOPAY_CHARGES_DEFAULT },
         addons: [],
     };

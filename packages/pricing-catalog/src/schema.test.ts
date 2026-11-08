@@ -11,6 +11,7 @@ import {
     AUTOPAY_CHARGES_DEFAULT,
     AUTOPAY_CHARGES_MAX,
     autopayCharges,
+    catalogMoney,
     catalogSchema,
     cellOf,
     freeStylesOf,
@@ -19,12 +20,51 @@ import {
     trialFirstPaise,
     validateCatalog,
 } from "./schema";
-import { SEED_CATALOG } from "./seed";
+import { GLOBAL_SEED_CATALOG, SEED_CATALOG } from "./seed";
 
 const errorsOf = (input: unknown) => {
     const r = validateCatalog(input);
     return r.ok ? [] : r.errors;
 };
+
+describe("a catalogue's currency and tax (stage 9)", () => {
+    it("reads one saved before stage 9 as rupees and GST", () => {
+        const c = fixture();
+        expect([c.currency, c.tax]).toEqual(["INR", "gst"]);
+        expect(catalogMoney({})).toEqual({ currency: "INR", tax: "gst" });
+    });
+
+    it("takes dollars with no tax", () => {
+        const r = validateCatalog({
+            ...fixtureInput(),
+            currency: "USD",
+            tax: "none",
+        });
+        expect(r.ok).toBe(true);
+    });
+
+    it("refuses GST on a catalogue that isn't in rupees", () => {
+        expect(
+            errorsOf({ ...fixtureInput(), currency: "USD", tax: "gst" }),
+        ).toContain("tax: GST applies only to a catalogue in rupees");
+    });
+
+    it("seeds Global with India's structure and no price", () => {
+        expect(GLOBAL_SEED_CATALOG.currency).toBe("USD");
+        expect(GLOBAL_SEED_CATALOG.tax).toBe("none");
+        expect(GLOBAL_SEED_CATALOG.plans.map((p) => p.id)).toEqual(
+            SEED_CATALOG.plans.map((p) => p.id),
+        );
+        expect(GLOBAL_SEED_CATALOG.modules).toEqual(SEED_CATALOG.modules);
+        expect(
+            [
+                ...GLOBAL_SEED_CATALOG.plans.map((p) => p.pricePaise),
+                ...GLOBAL_SEED_CATALOG.addons.map((a) => a.pricePaise),
+            ].every((n) => n === 0),
+        ).toBe(true);
+        expect(GLOBAL_SEED_CATALOG.yearly.on).toBe(false);
+    });
+});
 
 describe("the catalogue schema", () => {
     it("accepts a whole catalogue and fills the defaults", () => {

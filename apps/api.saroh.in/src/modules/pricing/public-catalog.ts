@@ -59,6 +59,8 @@ export function publicCatalog(c: Catalog): Catalog {
         modules,
         yearly: c.yearly,
         gst: c.gst,
+        currency: c.currency,
+        tax: c.tax,
         autopay: c.autopay,
         addons,
     };
