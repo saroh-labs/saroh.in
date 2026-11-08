@@ -18,6 +18,7 @@ async function load(edition: Edition) {
         sheet: await import("./stock-sheet"),
         mrp: await import("@/lib/gst/mrp"),
         changes: await import("@/lib/settings/activity-changes"),
+        history: await import("@/lib/price-history/words"),
     };
 }
 
@@ -45,6 +46,12 @@ describe("struck price words by the edition", () => {
             "MRP can't be lower than the price it sells for.",
         );
         expect(m.changes.FIELD_PHRASES.taxId?.label).toBe("GSTIN or tax ID");
+        expect(
+            m.history.changeLine(
+                { field: "mrp", before: null, after: "100" },
+                { currency: "INR" },
+            ),
+        ).toBe("MRP set to ₹100");
     });
 
     it("Global says original price and tax ID, never MRP or GSTIN", async () => {
@@ -62,6 +69,12 @@ describe("struck price words by the edition", () => {
         expect(m.mrp.MRP_BELOW_PRICE).toBe(
             "Original price can't be lower than the price it sells for.",
         );
+        expect(
+            m.history.changeLine(
+                { field: "mrp", before: null, after: "100" },
+                { currency: "USD" },
+            ),
+        ).toBe("Original price set to $100");
         expect(m.changes.FIELD_PHRASES.taxId).toEqual({
             phrase: "the tax ID",
             label: "Tax ID",
