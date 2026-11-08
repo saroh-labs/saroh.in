@@ -109,7 +109,14 @@ export function isUnverifiedSender(error: unknown): boolean {
         message?: unknown;
     };
     const text = typeof response === "string" ? response : message;
-    return typeof text === "string" && /\bnot verified\b/i.test(text);
+    // Also SES refusing the address under the sending user's policy (a
+    // FromAddress condition): "not authorized to perform ses:SendRawEmail".
+    // Nothing was sent either way, so a second try can't send twice.
+    return (
+        typeof text === "string" &&
+        (/\bnot verified\b/i.test(text) ||
+            /not authorized to perform\W+ses:Send/i.test(text))
+    );
 }
 
 /**

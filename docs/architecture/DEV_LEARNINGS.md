@@ -6559,3 +6559,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** a day-0 scene starts at least 3 hours after the seed clock, so after the salon's last slot there is no room today, and only scenes from day 1 on fell back to next week.
 - **Fix:** scenes from day 0 on fall back to the next week's first slot (`diary-shop-plan.ts`); checked with `--now=2026-11-07T20:00:00+05:30`.
 - **Rule:** a seed that plans around "now" is run at a late-evening `--now` before it's called clock-proof. Also, a spec that counts telemetry sends filters to the events it means: a milestone can also be a workspace event that reads the real database under the integration runner.
+
+## Global codes failed on dev: the fallback didn't know SES's policy refusal (8 Nov 2026)
+
+- **Symptom:** on the Global dev site a customer's sign-in code never came (`site_code_send_failed`, 3 attempts, 503).
+- **Cause:** a Global business's codes go from `codes@saroh.tech`. The dev AWS account's sending user may only send `*@saroh.io` (IAM `ses:FromAddress`), so SES refused with "not authorized to perform ses:SendRawEmail", which the fallback (built for "Email address is not verified") didn't recognise. The dev API also hadn't been redeployed since `EMAIL_FROM_GLOBAL`/`SITE_CODES_EMAIL_FROM_GLOBAL` were set.
+- **Fix:** `isUnverifiedSender` also treats the policy refusal as "this sender can't be used" (nothing was sent, so a retry can't send twice); dev API redeployed to pick up the saroh.io senders.
+- **Rule:** a new sender address needs both an SES identity and the sending IAM user's `ses:FromAddress` condition, in every environment; env changes on Coolify reach the API only on its next deploy.
