@@ -1,6 +1,5 @@
 "use client";
 
-import { formatInr } from "@saroh/pricing-catalog";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -8,6 +7,7 @@ import { Skeleton } from "@saroh/ui/skeleton";
 
 import type { Impact, ImpactItem, ImpactTone } from "@/lib/pricing-types";
 
+import { planMoney } from "@/lib/plan-money";
 import { businessesWord, reachCounts } from "./reach";
 
 const TONE_BADGE: Record<ImpactTone, "error" | "warning" | "success" | "info"> =
@@ -159,13 +159,13 @@ function ImpactBody({
                     value={
                         d === 0
                             ? "No change"
-                            : `${d > 0 ? "+" : "−"}${formatInr(Math.abs(d))}`
+                            : `${d > 0 ? "+" : "−"}${planMoney(Math.abs(d))}`
                     }
                     tone={d > 0 ? "up" : d < 0 ? "down" : undefined}
                     note={
                         d === 0
-                            ? `${formatInr(impact.revenue.nowPaise)} today`
-                            : `${formatInr(impact.revenue.nowPaise)} → ${formatInr(impact.revenue.nextPaise)} if everyone moves`
+                            ? `${planMoney(impact.revenue.nowPaise)} today`
+                            : `${planMoney(impact.revenue.nowPaise)} → ${planMoney(impact.revenue.nextPaise)} if everyone moves`
                     }
                 />
             </div>

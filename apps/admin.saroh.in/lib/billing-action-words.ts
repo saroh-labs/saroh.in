@@ -143,6 +143,9 @@ export const BILLING_ACTION_CODES = [
     "billing_payment_notes_given_up",
     "billing_profile_owner_left",
     "billing_profile_gone",
+    "billing_payment_currency_mismatch",
+    "billing_export_domestic_card",
+    "saroh_export_invoice_unset",
     "commission_line_failed",
     "commission_refund_after_payout",
     "merchant_webhook_failed",
@@ -280,6 +283,31 @@ const ACTION_WORDS: Record<BillingActionCode, ActionWords> = {
         what: "The billing profile a plan change needed was removed before the change ran.",
         tone: "warning",
         fix: OPEN_SUBSCRIPTION,
+    },
+    billing_payment_currency_mismatch: {
+        label: "Paid in another currency",
+        what: "A payment was taken in a different currency from its plan's, so no invoice was written.",
+        tone: "warning",
+        fix: {
+            kind: "razorpay",
+            label: "Check it in Razorpay",
+            ref: "payment",
+        },
+    },
+    billing_export_domestic_card: {
+        label: "Global plan paid with an Indian card",
+        what: "A Global business paid with a card issued in India, so it isn't an export and no invoice was written.",
+        tone: "warning",
+        fix: { kind: "resolve", label: "Ask the CA, then mark resolved" },
+    },
+    saroh_export_invoice_unset: {
+        label: "Export invoice not written",
+        what: "A Global payment was taken, but its invoice wasn't written: the export series' prefix or the LUT note isn't set on the API.",
+        tone: "warning",
+        fix: {
+            kind: "resolve",
+            label: "Set them, issue it, then mark resolved",
+        },
     },
     commission_line_failed: {
         label: "Commission not worked out",

@@ -1,5 +1,6 @@
 "use client";
 
+import { planTaxed } from "@/lib/plan-money";
 import { AddonsPanel } from "./addons-panel";
 import { CouponsPanel } from "./coupons-panel";
 import { OfferAutopay } from "./offer-autopay";
@@ -24,7 +25,8 @@ export function TabOffers() {
             </p>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5">
                 <OfferYearly />
-                <OfferGst />
+                {/* No tax on an export catalogue (Global, stage 9). */}
+                {planTaxed() ? <OfferGst /> : null}
                 <OfferTrials />
                 <OfferAutopay />
             </div>

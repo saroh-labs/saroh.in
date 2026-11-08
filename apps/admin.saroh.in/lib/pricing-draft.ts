@@ -1,6 +1,7 @@
 import type { Catalog } from "@saroh/pricing-catalog";
-import { diff, formatInr, validateCatalog } from "@saroh/pricing-catalog";
+import { diff, validateCatalog } from "@saroh/pricing-catalog";
 
+import { planMoney } from "@/lib/plan-money";
 import type {
     AdminPricing,
     AdminVersion,
@@ -165,7 +166,7 @@ export function draftSummary(input: {
         const d = impact.revenue.nextPaise - impact.revenue.nowPaise;
         if (d !== 0) {
             parts.push(
-                `${d > 0 ? "+" : "−"}${formatInr(Math.abs(d))} a month if everyone moves`,
+                `${d > 0 ? "+" : "−"}${planMoney(Math.abs(d))} a month if everyone moves`,
             );
         }
     }

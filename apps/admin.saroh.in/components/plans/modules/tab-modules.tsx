@@ -1,7 +1,6 @@
 "use client";
 
 import type { Catalog, CatalogModule } from "@saroh/pricing-catalog";
-import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ScrollX } from "@saroh/ui/scroll-x";
@@ -9,6 +8,7 @@ import { Fragment, useMemo, useState } from "react";
 
 import { addKnownRow, knownRowsMissing } from "@/lib/pricing-starter";
 
+import { planMoney } from "@/lib/plan-money";
 import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
@@ -267,7 +267,7 @@ export function TabModules() {
                                     >
                                         {p.name}
                                         <div className="font-medium tabular-nums text-muted-foreground">
-                                            {formatInr(p.pricePaise)} · {n}{" "}
+                                            {planMoney(p.pricePaise)} · {n}{" "}
                                             {n === 1
                                                 ? "business"
                                                 : "businesses"}
