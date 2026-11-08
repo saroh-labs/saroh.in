@@ -156,7 +156,7 @@ describe("prepareStripeCheckout", () => {
         expect(JSON.stringify(out.stored)).not.toContain(token);
     });
 
-    it("an issued invoice with no live site: pay, any method, the renderer's apex, Stripe's default day", async () => {
+    it("an issued invoice with no live site: pay, card and Link, the renderer's apex, Stripe's default day", async () => {
         origin.mockResolvedValue(null);
         invoiceFind.mockResolvedValue({
             ...HOLD,
@@ -169,7 +169,8 @@ describe("prepareStripeCheckout", () => {
         const out = await prepare({ kind: "invoice", id: "inv_1" });
 
         expect(out.hosted).toMatchObject({
-            instantOnly: false,
+            // Card and Link for every Stripe payment (owner, 8 Nov 2026).
+            instantOnly: true,
             submitType: "pay",
             lineName: "Invoice INV-0007",
             successUrl:
@@ -216,7 +217,7 @@ describe("prepareStripeCheckout", () => {
             const out = await prepare({ kind: "order", id: "order_1" });
 
             expect(out.hosted).toMatchObject({
-                instantOnly: false,
+                instantOnly: true,
                 submitType: "pay",
                 lineName: "Order ORD-001",
                 payerEmail: "bo@example.com",

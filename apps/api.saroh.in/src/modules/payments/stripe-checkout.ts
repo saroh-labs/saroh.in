@@ -35,7 +35,11 @@ export type CheckoutKind = "hold" | "pack" | "join" | "invoice" | "order";
 /** The stored row's facts a session needs. */
 export interface StripeCheckoutTarget {
     kind: CheckoutKind;
-    /** A DRAFT invoice starts something on payment: instant methods only. */
+    /**
+     * Card and Link only (Apple Pay and Google Pay ride on card). Every
+     * Stripe payment is instant for now (owner, 8 Nov 2026): orders can't
+     * yet take a payment that fails days after it seemed to go through.
+     */
     instantOnly: boolean;
     lineName: string;
     payerEmail: string | null;
@@ -92,7 +96,7 @@ export async function stripeCheckoutTarget(target: {
                   : "invoice";
         return {
             kind,
-            instantOnly: draft,
+            instantOnly: true,
             lineName: lineName(
                 draft
                     ? invoice.lines[0]?.description
@@ -136,7 +140,7 @@ export async function stripeCheckoutTarget(target: {
     const country = order.deliveryCountry?.trim().toUpperCase() ?? "";
     return {
         kind: "order",
-        instantOnly: false,
+        instantOnly: true,
         lineName: lineName(`Order ${order.orderId}`, "Order"),
         payerEmail: payerEmail(order.customer?.email),
         payerName: name || null,

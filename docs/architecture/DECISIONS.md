@@ -2804,6 +2804,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Each payer is found or created as a Stripe customer in the merchant's account, by email, and the id is kept on the business's contact, so the merchant can follow who paid.
     - The session carries Saroh's reference and a description, so the existing webhook settles it; it expires with the booking's hold. Saroh's own card window goes.
     - Facts to verify against Stripe's docs before building, recorded in `payments/providers/STRIPE.md`.
+    - **Payment methods (owner, 8 Nov 2026): card and Link on every Stripe payment** (Apple Pay and Google Pay come with card). This replaces "the merchant's dashboard methods" for orders and invoices: orders can't yet take a payment that fails days after it seemed to go through (SEPA, ACH), and other methods' refunds are untested. Instant local methods (iDEAL, Bancontact, BLIK) come on a merchant's request; slow ones and pay-later only once orders handle a late failure.
 
 ## DEC-209 Clicks on saroh.in, and what a business does in the workspace, every time
 
