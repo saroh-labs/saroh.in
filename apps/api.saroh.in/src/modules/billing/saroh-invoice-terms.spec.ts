@@ -227,8 +227,37 @@ describe("sarohSeller", () => {
             email: "billing@example.test",
             sac: "999999",
             prefix: "TST",
+            exportPrefix: null,
+            exportNote: null,
         });
         expect(sellerGaps(s)).toEqual([]);
+    });
+
+    it("reads the export series and its LUT note, never India's prefix (stage 9)", () => {
+        const s = sarohSeller({
+            SAROH_INVOICE_PREFIX: "TST",
+            SAROH_INVOICE_PREFIX_GLOBAL: "TX",
+            SAROH_EXPORT_LUT: "Made-up LUT note for a test",
+        });
+        expect([s.exportPrefix, s.exportNote]).toEqual([
+            "TX",
+            "Made-up LUT note for a test",
+        ]);
+        expect(
+            sarohSeller({
+                SAROH_INVOICE_PREFIX: "TST",
+                SAROH_INVOICE_PREFIX_GLOBAL: "TST",
+            }).exportPrefix,
+        ).toBeNull();
+    });
+
+    it("taxes an export at nothing", () => {
+        const { lines, totals } = taxSarohLines(
+            [{ description: "Plan B", sac: "998314", unitPaise: 1_900 }],
+            "EXPORT",
+        );
+        expect(lines[0]).toMatchObject({ gstRateBps: 0, taxPaise: 0 });
+        expect(totals).toMatchObject({ taxPaise: 0, totalPaise: 1_900 });
     });
 
     it("falls back to the default prefix and names what is missing", () => {

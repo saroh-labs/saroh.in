@@ -24,6 +24,8 @@ import {
     FakeBillingProviderFactory,
 } from "./providers/fake.provider";
 import { SAROH_BILLS_ONLY_IN_INDIA } from "./saroh-bills";
+import { SarohInvoicesService } from "./saroh-invoices.service";
+import type { SarohSeller } from "./saroh-seller";
 
 const SECRET = "whsec_fake_platform_secret";
 const DAY = 24 * 60 * 60 * 1000;
@@ -33,6 +35,21 @@ const quiet = { error: () => undefined, log: () => undefined };
 let fake: FakeBillingProvider;
 let checkout: CheckoutService;
 let webhooks: BillingWebhookService;
+let seller: SarohSeller;
+
+/** Made up, like every value here. */
+const SELLER: SarohSeller = {
+    name: "Saroh",
+    legalName: "Example Labs Pvt Ltd",
+    gstin: "29AAAAA0000A1ZY",
+    state: "29",
+    address: "1 Test Road, Testville",
+    email: "billing@example.test",
+    sac: "999999",
+    prefix: "TST",
+    exportPrefix: "TX",
+    exportNote: "Made-up LUT note for a test",
+};
 const sweep = new MovesApplyHandler();
 
 /** A made-up catalogue in dollars with no tax, monthly only. */
@@ -47,6 +64,7 @@ const usd = (): Catalog =>
 async function wipe() {
     await prisma.job.deleteMany({});
     await prisma.billingWebhookEvent.deleteMany({});
+    await prisma.billingAction.deleteMany({});
     await prisma.sarohInvoice.deleteMany({});
     await prisma.billingCheckout.deleteMany({});
     await prisma.subscription.deleteMany({});
@@ -63,7 +81,12 @@ beforeEach(async () => {
     fake.publicKeyValue = "rzp_test_fake";
     const factory = new FakeBillingProviderFactory(fake);
     checkout = new CheckoutService(new PlansService(), factory);
-    webhooks = new BillingWebhookService(factory);
+    seller = { ...SELLER };
+    webhooks = new BillingWebhookService(
+        factory,
+        undefined,
+        new SarohInvoicesService(seller),
+    );
     await wipe();
 });
 
@@ -251,6 +274,79 @@ describe("a Global business buys a plan in US dollars (DB, stage 9 U5)", () => {
         expect(sub.currentPeriodEnd!.getTime()).toBeGreaterThan(
             Date.now() + 27 * DAY,
         );
+
+        // An export invoice (U6): dollars, no tax, its own series, the LUT
+        // note, the buyer's country and the rupee base kept, not printed.
+        const invoice = await prisma.sarohInvoice.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(invoice).toMatchObject({
+            currency: "USD",
+            taxType: "EXPORT",
+            taxPaise: 0,
+            totalPaise: price,
+            billToGstin: null,
+            billToState: null,
+            billToCountry: "GB",
+            exportNote: "Made-up LUT note for a test",
+            providerBaseAmount: price * 84,
+            providerBaseCurrency: "INR",
+        });
+        expect(invoice.number).toMatch(/^TX\/\d{2}-\d{2}\/0001$/);
+    });
+
+    it("writes no invoice for a payment in another currency, or by an Indian card, and says so", async () => {
+        const catalog = usd();
+        await install(1, "GLOBAL", catalog);
+        await flag(true);
+        const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
+        for (const [over, code] of [
+            [{ paymentCurrency: "INR" }, "billing_payment_currency_mismatch"],
+            [{ paymentInternational: false }, "billing_export_domestic_card"],
+        ] as const) {
+            const ctx = await globalBusiness();
+            const r = await checkout.changePlan(ctx, {
+                plan: "b",
+                cycle: "month",
+            });
+            if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+            await paid(r.handoff!.orderId!, price, over);
+            expect(
+                await prisma.sarohInvoice.count({
+                    where: { organizationId: ctx.organizationId },
+                }),
+            ).toBe(0);
+            expect(
+                await prisma.billingAction.count({
+                    where: { organizationId: ctx.organizationId, code },
+                }),
+            ).toBe(1);
+        }
+    });
+
+    it("issues no export invoice without its prefix and LUT note", async () => {
+        const catalog = usd();
+        await install(1, "GLOBAL", catalog);
+        await flag(true);
+        seller.exportNote = null;
+        const ctx = await globalBusiness();
+        const price = catalog.plans.find((p) => p.id === "b")!.pricePaise;
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        await paid(r.handoff!.orderId!, price);
+        expect(
+            await prisma.billingAction.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    code: "saroh_export_invoice_unset",
+                },
+            }),
+        ).toBe(1);
+        expect(
+            await prisma.sarohInvoice.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
     });
 
     it("makes the next month due at the month's end, then Free after 7 days unpaid", async () => {

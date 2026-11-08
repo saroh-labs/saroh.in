@@ -70,6 +70,8 @@ const SELLER: SarohSeller = {
     email: "billing@example.test",
     sac: "999999",
     prefix: "TST",
+    exportPrefix: null,
+    exportNote: null,
 };
 
 /** A GSTIN that checks out, in `state`. */

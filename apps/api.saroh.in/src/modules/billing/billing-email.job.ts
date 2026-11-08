@@ -225,7 +225,7 @@ export class BillingEmailHandler {
             businessName: org?.name ?? "your business",
             number: invoice.number,
             planName: invoice.planName,
-            total: money(invoice.totalPaise),
+            total: moneyWordsMinor(invoice.totalPaise, invoice.currency),
             period:
                 invoice.periodStart && invoice.periodEnd
                     ? periodWords(invoice.periodStart, invoice.periodEnd)
@@ -440,8 +440,16 @@ export class BillingEmailHandler {
                 businessName: org?.name ?? "your business",
                 planName: change.planName,
                 changesOn: day(change.pendingFrom),
-                now: priceWords(change.fromPaise, change.interval),
-                next: priceWords(change.toPaise, change.interval),
+                now: priceWords(
+                    change.fromPaise,
+                    change.interval,
+                    change.currency,
+                ),
+                next: priceWords(
+                    change.toPaise,
+                    change.interval,
+                    change.currency,
+                ),
                 url: `${await appBaseOf(p.organizationId)}/settings/billing`,
             });
         });

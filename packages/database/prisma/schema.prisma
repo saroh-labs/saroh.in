@@ -8870,6 +8870,15 @@ model SarohInvoice {
 
   issuedAt DateTime
   currency String   @default("INR")
+  // An export invoice (stage 9, KTD6): the payment's value in rupees as the
+  // provider settles it (Razorpay's base_amount and base_currency), for
+  // Saroh's books, FIRC and export reporting. Stored, not printed, until
+  // the CA names the rate. Null on India's invoices.
+  providerBaseAmount   Int?
+  providerBaseCurrency String?
+  // The LUT note an export invoice carries, frozen as issued (from the
+  // API's SAROH_EXPORT_LUT). Null on India's invoices.
+  exportNote           String?
 
   sellerName      String
   sellerLegalName String?
@@ -8885,6 +8894,10 @@ model SarohInvoice {
   billToAddress String?
   billToState   String?
   billToGstin   String?
+  // A buyer abroad (stage 9): its country (ISO 3166-1 alpha-2) and own tax
+  // number, as on its billing profile at issue.
+  billToCountry String?
+  billToTaxId   String?
 
   // GST state code; INTRA (CGST + SGST) or INTER (IGST).
   placeOfSupply String?

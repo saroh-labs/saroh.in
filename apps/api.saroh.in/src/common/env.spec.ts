@@ -88,3 +88,25 @@ describe("the API's environment", () => {
         );
     });
 });
+
+describe("the export series' prefix (stage 9, KTD6)", () => {
+    it("refuses India's prefix, the default included, and a long one", () => {
+        expect(
+            parseEnv({ ...BASE, SAROH_INVOICE_PREFIX_GLOBAL: "SA" }).success,
+        ).toBe(false);
+        expect(
+            parseEnv({
+                ...BASE,
+                SAROH_INVOICE_PREFIX: "TX",
+                SAROH_INVOICE_PREFIX_GLOBAL: "TX",
+            }).success,
+        ).toBe(false);
+        expect(
+            parseEnv({ ...BASE, SAROH_INVOICE_PREFIX_GLOBAL: "TOOLONG" })
+                .success,
+        ).toBe(false);
+        expect(
+            parseEnv({ ...BASE, SAROH_INVOICE_PREFIX_GLOBAL: "GX" }).success,
+        ).toBe(true);
+    });
+});

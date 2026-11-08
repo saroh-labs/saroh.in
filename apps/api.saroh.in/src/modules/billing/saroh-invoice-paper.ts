@@ -23,15 +23,17 @@ function stateLabel(code: string | null): string | null {
     return name ? `${name} (${code})` : `State ${code}`;
 }
 
-/** "₹1.00": Saroh's paper always shows the paise. */
+/** "₹1.00" or "$1.00": Saroh's paper always shows the paise or cents. */
 function money2(paise: number, currency: string): string {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
         style: "currency",
         currency,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(Number(paiseToRupees(paise)));
 }
+
+const COUNTRY_NAMES = new Intl.DisplayNames(["en"], { type: "region" });
 
 /** 1800 bps → "18%", 900 → "9%", 250 → "2.5%". */
 function percent(bps: number): string {
@@ -116,8 +118,14 @@ export function sarohInvoicePaper(
 ): PaperView {
     const money = (paise: number) => money2(paise, invoice.currency);
     const day = (d: Date) => paperDay(d.toISOString(), SAROH_TIMEZONE);
-    const taxInvoice = Boolean(invoice.sellerGstin);
+    // An export of services (stage 9, KTD6): no GST, the LUT note, the
+    // buyer's country and tax number; never a tax invoice under the CGST Act.
+    const exported = invoice.taxType === "EXPORT";
+    const taxInvoice = Boolean(invoice.sellerGstin) && !exported;
     const intra = invoice.taxType === "INTRA";
+    const country = invoice.billToCountry
+        ? (COUNTRY_NAMES.of(invoice.billToCountry) ?? invoice.billToCountry)
+        : null;
     const pos = stateLabel(invoice.placeOfSupply);
     const legal = invoice.sellerLegalName;
     const lines = [...invoice.lines].sort((a, b) => a.position - b.position);
@@ -160,18 +168,22 @@ export function sarohInvoicePaper(
                     invoice.billToAddress,
                     invoice.billToEmail,
                     invoice.billToPhone,
+                    exported ? country : null,
+                    exported && invoice.billToTaxId
+                        ? `Tax number: ${invoice.billToTaxId}`
+                        : null,
                     pos ? `State: ${pos}` : null,
                 ]
                     .filter((x): x is string => Boolean(x))
                     .join("\n") || null,
             gstin: invoice.billToGstin,
         },
-        placeOfSupply: pos ?? "—",
+        placeOfSupply: exported ? (country ?? "Outside India") : (pos ?? "—"),
         hsnColumn: true,
         table: { code: "SAC", rate: true, amount: "TAXABLE VALUE" },
         lines: lines.map((l) => {
             const sub = [
-                `GST @ ${percent(l.gstRateBps)}`,
+                exported ? null : `GST @ ${percent(l.gstRateBps)}`,
                 l.discountPaise > 0
                     ? `less ${money(l.discountPaise)} discount`
                     : null,
@@ -193,9 +205,11 @@ export function sarohInvoicePaper(
                   ] as [string, string][])
                 : []),
             ["Taxable value", money(invoice.taxablePaise)],
-            ...sarohTaxRows(lines, intra).map(
-                ([k, v]) => [k, money(v)] as [string, string],
-            ),
+            ...(exported
+                ? []
+                : sarohTaxRows(lines, intra).map(
+                      ([k, v]) => [k, money(v)] as [string, string],
+                  )),
         ],
         totalLabel: "Total",
         total: money(invoice.totalPaise),
@@ -211,7 +225,8 @@ export function sarohInvoicePaper(
             taxInvoice
                 ? "Tax invoice issued under Section 31 of the CGST Act."
                 : null,
-            `Reverse charge: ${REVERSE_CHARGE}`,
+            exported ? invoice.exportNote : null,
+            exported ? null : `Reverse charge: ${REVERSE_CHARGE}`,
             status,
         ]
             .filter(Boolean)
