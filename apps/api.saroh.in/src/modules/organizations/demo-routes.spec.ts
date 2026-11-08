@@ -117,6 +117,9 @@ const ASKS: Record<string, How> = {
     // Provider callbacks: a demo connects no provider.
     "POST public/billing/webhooks/:provider": { exempt: "Saroh's billing" },
     "POST public/payments/return": { exempt: "a provider's redirect" },
+    "POST public/payments/checkout/cancel": {
+        exempt: "Stripe's Back link; a demo never starts a session to close",
+    },
     "POST public/webhooks/:provider/:organizationId": {
         exempt: "a provider's callback",
     },
