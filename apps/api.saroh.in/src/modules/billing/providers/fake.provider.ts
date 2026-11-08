@@ -550,6 +550,10 @@ export class FakeBillingProvider implements BillingProvider {
             currentPeriodEnd?: string | null;
             providerPaymentId?: string;
             paymentAmountPaise?: number;
+            paymentCurrency?: string;
+            paymentInternational?: boolean;
+            paymentBaseAmount?: number;
+            paymentBaseCurrency?: string;
             providerCustomerId?: string;
             refund?: ProviderRefundEvent;
             dispute?: ProviderDisputeEvent;
@@ -573,6 +577,18 @@ export class FakeBillingProvider implements BillingProvider {
                 : {}),
             ...(typeof body.paymentAmountPaise === "number"
                 ? { paymentAmountPaise: body.paymentAmountPaise }
+                : {}),
+            ...(body.paymentCurrency
+                ? { paymentCurrency: body.paymentCurrency }
+                : {}),
+            ...(typeof body.paymentInternational === "boolean"
+                ? { paymentInternational: body.paymentInternational }
+                : {}),
+            ...(typeof body.paymentBaseAmount === "number"
+                ? { paymentBaseAmount: body.paymentBaseAmount }
+                : {}),
+            ...(body.paymentBaseCurrency
+                ? { paymentBaseCurrency: body.paymentBaseCurrency }
                 : {}),
             ...(body.providerCustomerId
                 ? { providerCustomerId: body.providerCustomerId }

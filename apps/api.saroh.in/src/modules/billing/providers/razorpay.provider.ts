@@ -473,6 +473,10 @@ export class RazorpayBillingProvider implements BillingProvider {
                     entity?: {
                         id?: string;
                         amount?: number;
+                        currency?: string;
+                        international?: boolean;
+                        base_amount?: number;
+                        base_currency?: string;
                         customer_id?: string | null;
                     };
                 };
@@ -511,6 +515,7 @@ export class RazorpayBillingProvider implements BillingProvider {
             ...(typeof body.payload?.payment?.entity?.amount === "number"
                 ? { paymentAmountPaise: body.payload.payment.entity.amount }
                 : {}),
+            ...paymentFacts(body.payload?.payment?.entity),
             ...(customerId ? { providerCustomerId: customerId } : {}),
             // A refund or a dispute on a payment (DEC-166).
             ...razorpayRefundOrDispute(type, payload),
@@ -1228,4 +1233,41 @@ function safeEqualHex(a: string, b: string): boolean {
     } catch {
         return false;
     }
+}
+
+/**
+ * A payment's currency, card origin and rupee value (stage 9, KTD5), as
+ * Razorpay's payment entity carries them; only what it sent.
+ */
+export function paymentFacts(
+    payment:
+        | {
+              currency?: string;
+              international?: boolean;
+              base_amount?: number;
+              base_currency?: string;
+          }
+        | undefined,
+): Pick<
+    ParsedBillingEvent,
+    | "paymentCurrency"
+    | "paymentInternational"
+    | "paymentBaseAmount"
+    | "paymentBaseCurrency"
+> {
+    if (!payment) return {};
+    return {
+        ...(typeof payment.currency === "string"
+            ? { paymentCurrency: payment.currency.toUpperCase() }
+            : {}),
+        ...(typeof payment.international === "boolean"
+            ? { paymentInternational: payment.international }
+            : {}),
+        ...(typeof payment.base_amount === "number"
+            ? { paymentBaseAmount: payment.base_amount }
+            : {}),
+        ...(typeof payment.base_currency === "string"
+            ? { paymentBaseCurrency: payment.base_currency.toUpperCase() }
+            : {}),
+    };
 }

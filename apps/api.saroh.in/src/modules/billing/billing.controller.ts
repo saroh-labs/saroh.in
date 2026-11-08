@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import { sarohSells } from "./saroh-bills";
 
 import { hashClientIp } from "../../common/client-ip";
 import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
@@ -187,6 +188,19 @@ export class BillingController {
         @OrgContext() ctx: OrganizationContext,
     ): Promise<ConfirmView> {
         return this.confirmer.confirm(ctx);
+    }
+
+    /**
+     * Whether Saroh sells this business its plans now (stage 9, KTD3):
+     * always in India; abroad with `SAROH_BILLING_GLOBAL` on and a live paid
+     * catalogue. The workspace asks before it shows paid plans; the
+     * refusals on every write are the guard.
+     */
+    @Get("offered")
+    async offered(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<{ offered: boolean }> {
+        return { offered: await sarohSells(ctx, new Date()) };
     }
 
     /** What the business's plan gives it, row by row (plans catalogue U12). */

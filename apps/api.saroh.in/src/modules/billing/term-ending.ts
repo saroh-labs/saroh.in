@@ -132,6 +132,9 @@ export async function termEndingOf(
     });
     const term = termOf(sub, await termCheckoutOf(db, checkout), now);
     if (!term?.renewOpen) return null;
+    // A month paid once is told when the next month falls due
+    // (`openMonthDueInTx`, stage 9), never asked to renew a term.
+    if (term.payment === "ONE_TIME" && checkout?.cycle === "month") return null;
     const stage = termEndingStage(term.endsAt, now);
     if (!stage) return null;
     // Arranged already: a move to Free that takes over first, or a renewal

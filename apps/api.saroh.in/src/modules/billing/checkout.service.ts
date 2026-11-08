@@ -22,9 +22,10 @@ import { prisma } from "@saroh/database";
 import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
     autopayCharges,
+    catalogMoney,
     catalogPlanIdForKey,
-    gstPaise,
-    withGstPaise,
+    taxPaise,
+    withTaxPaise,
 } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -42,6 +43,7 @@ import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
+import { autopayTakes, planTaxOf } from "./autopay-currency";
 import { BillingCustomers } from "./billing-customer";
 import type {
     BillingDetail,
@@ -104,7 +106,7 @@ import {
     BillingProviderError,
 } from "./providers/billing-provider.port";
 import { billingNotes } from "./providers/razorpay.provider";
-import { assertSarohBills } from "./saroh-bills";
+import { assertSarohKeeps, assertSarohSells } from "./saroh-bills";
 
 /**
  * The quote's word on who is billed: the billing profile (its id and legal
@@ -390,7 +392,7 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, coupon, addonsEnding } = await this.resolve(
             ctx.organizationId,
@@ -440,7 +442,12 @@ export class CheckoutService {
             ? {
                   ...checkoutView(openRow, openRow.plan),
                   handoff: allows(ctx, "billing:manage")
-                      ? await this.handoff(ctx, openRow, payNowOf(openRow))
+                      ? await this.handoff(
+                            ctx,
+                            openRow,
+                            payNowOf(openRow, openRow.plan.currency),
+                            openRow.plan.currency,
+                        )
                       : null,
               }
             : null;
@@ -511,6 +518,7 @@ export class CheckoutService {
             | "billToPhone"
         >,
         amountPaise: number,
+        currency: string,
     ): Promise<CheckoutHandoff | null> {
         let provider: BillingProvider;
         try {
@@ -537,7 +545,10 @@ export class CheckoutService {
             subscriptionId: oneTime ? null : row.providerSubscriptionId,
             orderId: oneTime ? row.providerSubscriptionId : null,
             amountPaise: oneTime ? amountPaise : null,
-            currency: "INR",
+            currency,
+            // Only cards take a currency other than rupees (Razorpay): the
+            // API says so, the browser never infers it (KTD4).
+            cardOnly: currency !== "INR",
             prefill: {
                 name: customer.name,
                 email: theirs ? null : customer.email,
@@ -624,7 +635,7 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
@@ -641,6 +652,14 @@ export class CheckoutService {
         };
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
+        }
+        // Leaving or paying less is upkeep; anything else is a purchase,
+        // which Saroh must sell this business (stage 9, KTD3).
+        if (
+            quote.kind !== "TO_FREE" &&
+            !(quote.kind === "SCHEDULED" && lowersCharge(subscription, target))
+        ) {
+            await assertSarohSells(ctx, now);
         }
         if (quote.kind === "TO_FREE") {
             const at = await this.toFree(ctx, target, now);
@@ -743,7 +762,7 @@ export class CheckoutService {
         now: Date = new Date(),
     ): Promise<Extract<ChangePlanResult, { checkout: CheckoutView }>> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         const { plan, startAt } = input;
         const party = await readBillingParty(
             prisma,
@@ -758,15 +777,17 @@ export class CheckoutService {
             });
         }
         const price = plan.priceCents;
-        const oneTime = plan.interval === "year";
-        const total = withGstPaise(price);
+        const oneTime =
+            plan.interval === "year" || !autopayTakes(plan.currency);
         const catalog = await catalogueOfVersion(prisma, plan.version);
+        const { tax } = catalogMoney(catalog);
+        const total = withTaxPaise(tax, price);
         // The plan's next charge, as it is today, from the date: nothing
         // is taken now but autopay's refundable check.
         const quote: ChangeQuote = {
             kind: "SCHEDULED",
             pricePaise: price,
-            gstPaise: gstPaise(price),
+            gstPaise: taxPaise(tax, price),
             totalPaise: total,
             chargeNowPaise: 0,
             chargeNowGstPaise: 0,
@@ -778,7 +799,7 @@ export class CheckoutService {
             discountPaise: 0,
             discountCharges: 0,
             firstChargePaise: price,
-            firstChargeGstPaise: gstPaise(price),
+            firstChargeGstPaise: taxPaise(tax, price),
             firstChargeTotalPaise: total,
             discountTotalPaise: 0,
             payment: oneTime ? "ONE_TIME" : "AUTOPAY",
@@ -946,12 +967,16 @@ export class CheckoutService {
         // The live version's offers: the plan's trial, while the business
         // may still have one (U16).
         const catalog = await catalogueOfVersion(prisma, target.version);
+        // A first-month offer rides on autopay: none for a plan paid one
+        // month at a time (stage 9, KTD5b).
+        const autopay = autopayTakes(target.currency);
         const trialDays =
-            catalog && !(await hadTrial(prisma, organizationId))
+            autopay && catalog && !(await hadTrial(prisma, organizationId))
                 ? planTrialDays(catalog, planId)
                 : null;
         // DEC-093's nominal first month, from the same version's offer.
-        const trialFirstPaise = catalog ? planFirstPaise(catalog, planId) : 0;
+        const trialFirstPaise =
+            autopay && catalog ? planFirstPaise(catalog, planId) : 0;
         const term = await this.termOfSubscription(subscription, now);
         const termEndsAt = term?.endsAt ?? null;
         // A year chosen during the first month is a move up or not by what
@@ -971,6 +996,7 @@ export class CheckoutService {
             subscription,
             target,
             now,
+            tax: catalogMoney(catalog).tax,
             trialDays,
             trialFirstPaise,
             termEndsAt,
@@ -1448,7 +1474,12 @@ export class CheckoutService {
             quote: view,
             checkout: checkoutView(row, target),
             authorisationUrl: made.authorisationUrl ?? null,
-            handoff: await this.handoff(ctx, row, quote.payNowTotalPaise),
+            handoff: await this.handoff(
+                ctx,
+                row,
+                quote.payNowTotalPaise,
+                target.currency,
+            ),
         };
     }
 
@@ -1461,14 +1492,20 @@ export class CheckoutService {
      */
     async startOneOff(
         ctx: OrganizationContext,
-        input: { amountPaise: number; reference: string; itemKey: string },
+        input: {
+            amountPaise: number;
+            reference: string;
+            itemKey: string;
+            /** The charge's currency; absent: rupees. */
+            currency?: string;
+        },
     ): Promise<{
         provider: string;
         providerOrderId: string;
         handoff: CheckoutHandoff | null;
     }> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohSells(ctx, new Date());
         await assertWorkspaceWrite(ctx.organizationId, "new");
         await assertBillingMayStart(prisma, ctx.organizationId);
         const party = await readBillingParty(prisma, ctx.organizationId);
@@ -1485,7 +1522,7 @@ export class CheckoutService {
             customerId = await this.customers.idFor(billingProfileId);
             ({ providerOrderId } = await provider.orders.createOrder({
                 amountPaise: input.amountPaise,
-                currency: "INR",
+                currency: input.currency ?? "INR",
                 reference: input.reference,
                 organizationId: ctx.organizationId,
                 planKey: input.itemKey,
@@ -1513,6 +1550,7 @@ export class CheckoutService {
                 billToPhone: null,
             },
             input.amountPaise,
+            input.currency ?? "INR",
         );
         return {
             provider: CATALOGUE_BILLING_PROVIDER,
@@ -1649,8 +1687,12 @@ export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
  * year paid once is its first charge (an upgrade, its difference); an
  * autopay checkout its first charge (NEW) or its upfront amount.
  */
-export function payNowOf(row: BillingCheckout): number {
-    const first = withGstPaise(
+export function payNowOf(
+    row: BillingCheckout,
+    currency: string | null = "INR",
+): number {
+    const first = withTaxPaise(
+        planTaxOf(currency),
         row.pricePaise - (row.discountCharges > 0 ? row.discountPaise : 0),
     );
     const upfront = row.chargeNowPaise + row.chargeNowGstPaise;

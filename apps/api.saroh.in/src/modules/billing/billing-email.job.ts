@@ -315,6 +315,7 @@ export class BillingEmailHandler {
                     businessName,
                     planName: sub.plan.name,
                     final: p.final,
+                    monthDue: p.monthDue === true,
                     dueBy: sub.paymentDueUntil
                         ? day(sub.paymentDueUntil)
                         : null,

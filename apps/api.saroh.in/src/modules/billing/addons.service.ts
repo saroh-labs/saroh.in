@@ -26,6 +26,7 @@ import {
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { queueAddonChargesInTx } from "./addon-charges";
+import { autopayTakes } from "./autopay-currency";
 import { assertBillingMayStart } from "./business-closing";
 import { billedByProvider, periodStart } from "./checkout-quote";
 import {
@@ -34,7 +35,7 @@ import {
     catalogueOfVersion,
     MAX_ADDON_QUANTITY,
 } from "./offers";
-import { assertSarohBills } from "./saroh-bills";
+import { assertSarohKeeps, assertSarohSells } from "./saroh-bills";
 
 /** One add-on as Settings › Plan shows it. */
 export interface AddonView {
@@ -93,6 +94,7 @@ const SUB_SELECT = {
             version: true,
             interval: true,
             priceCents: true,
+            currency: true,
         },
     },
     addons: { select: { addonId: true, quantity: true } },
@@ -139,7 +141,8 @@ export class AddonsService {
         now: Date = new Date(),
     ): Promise<AddonsView> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        // Taking one off is upkeep; adding one is a purchase (stage 9).
+        await (quantity > 0 ? assertSarohSells : assertSarohKeeps)(ctx, now);
         const changed = await prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${ctx.organizationId} FOR UPDATE`;
             const sub = await tx.subscription.findUnique({
@@ -315,6 +318,11 @@ function cantBuy(sub: Sub | null, now: Date): string | null {
         sub.currentPeriodEnd &&
         sub.currentPeriodEnd > now;
     if (!sub || !paid) return "Add-ons come with a paid plan.";
+    // A plan paid one month at a time has no autopay to add a charge to
+    // (stage 9, KTD5b); its add-ons wait for an owner decision.
+    if (!autopayTakes(sub.plan.currency)) {
+        return "Add-ons aren't available yet for a plan paid one month at a time.";
+    }
     if (sub.status === "PAST_DUE") {
         return "Your plan's last payment didn't go through. Once it's paid, you can add more.";
     }

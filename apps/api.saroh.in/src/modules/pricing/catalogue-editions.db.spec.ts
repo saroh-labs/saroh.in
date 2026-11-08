@@ -114,7 +114,6 @@ describe("one catalogue per edition (DB, stage 9 U2)", () => {
         ).id;
     });
     beforeEach(wipe);
-    afterAll(wipe);
 
     it("publishes Global's draft as its own version and leaves India's live one", async () => {
         await install(1, "INDIA", fakeCatalog());

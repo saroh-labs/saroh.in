@@ -258,6 +258,24 @@ export async function seed(): Promise<void> {
         },
     });
 
+    /*
+     * Saroh's own plans abroad (stage 9, DEC-211): on in local development,
+     * as on the development environment (set in its admin), so the team
+     * buys, renews and fails payments with test keys. Production has no row
+     * until the owner opens it.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SAROH_BILLING_GLOBAL" },
+        update: {},
+        create: {
+            id: "flag_SAROH_BILLING_GLOBAL",
+            key: "SAROH_BILLING_GLOBAL",
+            description:
+                "Saroh's own plans for Global businesses, in US dollars (DEC-211). On in development, off in production until the owner opens it.",
+            enabledByDefault: true,
+        },
+    });
+
     await prisma.featureFlag.upsert({
         where: { key: "WEB_ADDRESS_CHANGE" },
         update: {},
