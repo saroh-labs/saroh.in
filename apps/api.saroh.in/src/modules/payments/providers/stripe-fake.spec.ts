@@ -110,3 +110,21 @@ describe("FakeStripeProvider", () => {
         ).resolves.toBe("IN");
     });
 });
+
+describe("FakeStripeProvider refunds", () => {
+    it("refunds without the network, with an id stable for Saroh's reference", async () => {
+        const fake = new FakeStripeProvider();
+        const input = {
+            providerPaymentId: "pi_fake_1",
+            amountCents: 2500,
+            currency: "USD",
+            reference: "ref_1",
+            credentials: { keyId: "pk_test_x", keySecret: "sk_test_x" },
+        } as unknown as Parameters<FakeStripeProvider["refund"]>[0];
+        const one = await fake.refund(input);
+        const two = await fake.refund(input);
+        expect(one.failed).toBe(false);
+        expect(one.providerRefundId).toMatch(/^re_fake_/);
+        expect(two.providerRefundId).toBe(one.providerRefundId);
+    });
+});

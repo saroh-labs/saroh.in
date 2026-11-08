@@ -9,8 +9,11 @@ import type {
     CreateOrderIntentResult,
     FindOrCreateCustomerInput,
     FindOrCreateCustomerResult,
+    FindRefundInput,
     OrderPayment,
     ProviderCredentials,
+    RefundInput,
+    RefundResult,
 } from "./provider.port";
 import { isStripeSecretKey, stripeTakesCurrency } from "./stripe-payments";
 import { StripeProvider } from "./stripe.provider";
@@ -120,4 +123,29 @@ export class FakeStripeProvider extends StripeProvider {
     override cancelIntent(): Promise<boolean> {
         return Promise.resolve(true);
     }
+
+    /**
+     * Refunds without the network: a test run (a late hold's refund, a
+     * mismatch) must never reach real Stripe with a made-up key. Stripe's
+     * refund id is stable for Saroh's reference, as its Idempotency-Key is.
+     */
+    override refund(input: RefundInput): Promise<RefundResult> {
+        return Promise.resolve({
+            providerRefundId: `re_fake_${fakeRefundTail(input.reference)}`,
+            status: "PENDING",
+            failed: false,
+        });
+    }
+
+    override findRefund(input: FindRefundInput): Promise<RefundResult | null> {
+        return Promise.resolve({
+            providerRefundId: `re_fake_${fakeRefundTail(input.reference)}`,
+            status: "PENDING",
+            failed: false,
+        });
+    }
+}
+
+function fakeRefundTail(reference: string): string {
+    return createHash("sha256").update(reference).digest("hex").slice(0, 16);
 }
