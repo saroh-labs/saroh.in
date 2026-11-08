@@ -48,6 +48,7 @@ import { PausedState } from "@saroh/ui/data-state";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 import { JoinedNotice } from "./joined-notice";
+import { SetupFirst } from "./setup-first";
 import { TabBar } from "./tab-bar";
 import { recordingSwitchedOn, UsageRecording } from "./usage-recording";
 
@@ -71,12 +72,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const organizations = await organizationsOnce();
 
     // Zero-org onboarding: no sidebar yet — just a slim top bar (brand +
-    // sign-out) so the funnel stays uncluttered.
+    // sign-out) so the funnel stays uncluttered. A business page sends them
+    // to setup (`SetupFirst`); the list holds only this edition's (B5).
     if (organizations.length === 0) {
         return (
             <div className="flex min-h-screen flex-col">
                 <AppHeader onboarding user={session.user} />
-                {children}
+                <SetupFirst>{children}</SetupFirst>
             </div>
         );
     }
