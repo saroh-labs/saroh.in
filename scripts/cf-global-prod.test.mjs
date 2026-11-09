@@ -27,7 +27,7 @@ for (const dir of [
         assert.equal(out.name, `${india.name}-global`);
         assert.equal(out.workers_dev, false);
         assert.equal(out.preview_urls, false);
-        assert.equal(out.routes, undefined);
+        assert.deepEqual(out.routes, []);
         assert.equal(out.vars.NEXT_PUBLIC_EDITION, "GLOBAL");
         assert.equal(out.vars.NEXT_PUBLIC_POSTHOG_REPLAY, "off");
         for (const key of Object.keys(out.vars))
@@ -68,7 +68,7 @@ test("saroh.tech keeps its name and gets no workers.dev address", () => {
     assert.equal(out.name, "saroh-tech");
     assert.equal(out.workers_dev, false);
     assert.equal(out.preview_urls, false);
-    assert.equal(out.routes, undefined);
+    assert.deepEqual(out.routes, []);
     assert.equal(out.vars.GLOBAL_PRODUCTION_HOSTS, "on");
 });
 
@@ -113,7 +113,7 @@ test("routes only with GLOBAL_ROUTES on, and exactly each Worker's saroh.tech on
     };
     assert.deepEqual(Object.keys(expected).sort(), [...GLOBAL_DIRS].sort());
     for (const [dir, pattern] of Object.entries(expected)) {
-        assert.equal(convert(dir, false).routes, undefined, dir);
+        assert.deepEqual(convert(dir, false).routes, [], dir);
         assert.deepEqual(convert(dir, true).routes, [
             { pattern, zone_name: "saroh.tech" },
         ]);

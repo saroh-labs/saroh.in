@@ -6614,3 +6614,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a scene with `day < 0` looks only for a slot that has already ended, on its day or the days before it, before the forward search; `diary-shop-plan.test.ts` plans at CI's exact `now` and asserts a past unmarked visit at every `now`.
 - **Rule:** a seeded scene that means "in the past" must never be moved forward to find a slot; test a planner at the time of day CI seeds, not only noon.
 - **Category:** seed · e2e
+
+## The dark Global Workers failed their first production deploy: "routes assigned to another worker" (9 Nov 2026)
+
+- **Symptom:** release #1337's frontend deploy failed `Deploy application-global`, `admin-global` and `auth-global` (production): wrangler refused routes held by `saroh-app-dev`, `saroh-admin-dev` and `saroh-accounts-dev` on the dev zone. India's Workers and saroh.tech deployed.
+- **Cause:** with `GLOBAL_ROUTES` off, `scripts/cf-global-prod.mjs` left `routes` out of `env.production`. Wrangler fills a missing env key from the top level, which in the India apps holds the dev Worker's routes, so each Global Worker asked for the dev hosts. saroh.tech has no top-level routes, so it passed.
+- **Fix:** a dark Global Worker gets `routes: []`, which overrides the top level; the tests assert the empty list.
+- **Rule:** to switch off an inheritable wrangler key in an env (routes, vars-like lists), set it empty, never omit it.
+- **Category:** deploy · edition
