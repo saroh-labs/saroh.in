@@ -237,6 +237,8 @@ export async function holdMonthAddonChargesInTx(
             chargeAt: l.periodStart,
             provider: input.provider,
             providerSubscriptionId: input.providerOrderId,
+            // The order is the charge it rides on; SENT needs one (_sent_shape).
+            providerChargeId: input.providerOrderId,
             status: "SENT",
         })),
     });
