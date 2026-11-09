@@ -1,4 +1,5 @@
 import { formatMinor, indiaOnlyWord } from "@saroh/pricing-catalog";
+import { moneySign } from "@saroh/ui/lib/money";
 
 import { PROFILE } from "@/lib/edition";
 
@@ -10,9 +11,9 @@ import { PROFILE } from "@/lib/edition";
 export const planMoney = (minor: number): string =>
     formatMinor(minor, PROFILE.sarohPlanMoney.currency);
 
-/** The sign inside a price box: "₹" or "$". */
+/** The sign inside a price box, from the catalogue's currency. */
 export const planCurrencySign = (): string =>
-    PROFILE.sarohPlanMoney.currency === "INR" ? "₹" : "$";
+    moneySign(PROFILE.sarohPlanMoney.currency);
 
 /** Whether this console's plans carry GST (India's), so its controls show. */
 export const planTaxed = (): boolean => PROFILE.sarohPlanMoney.tax === "gst";
