@@ -1,7 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
-import { sendWaitlistLaunchInviteEmail } from "../../common/email";
+import {
+    accountsBaseFor,
+    sendWaitlistLaunchInviteEmail,
+} from "../../common/email";
 import { env } from "../../env";
 import type { LaunchOffer } from "./invite-token";
 import {
@@ -199,7 +203,7 @@ export class WaitlistInvitesService {
         }
         const row = await prisma.waitlistSignup.findUnique({
             where: { id },
-            select: { email: true, businessName: true },
+            select: { email: true, businessName: true, edition: true },
         });
         if (!row)
             return {
@@ -208,7 +212,11 @@ export class WaitlistInvitesService {
             };
 
         const outcome = await sendWaitlistLaunchInviteEmail(row.email, {
-            url: inviteUrl(readiness.signupBase, token, row.email),
+            url: inviteUrl(
+                signupUrl(row.edition) ?? readiness.signupBase,
+                token,
+                row.email,
+            ),
             businessName: row.businessName,
             validDays: INVITE_VALID_DAYS,
         });
@@ -243,9 +251,14 @@ function isStale(invitedAt: Date, now: Date): boolean {
     return invitedAt.getTime() < now.getTime() - STALE_CLAIM_MS;
 }
 
-/** Where an invitee creates their account, or null when this instance cannot say. */
-export function signupUrl(): string | null {
+/**
+ * Where an invitee creates their account, or null when this instance cannot
+ * say. With the entry's edition, that edition's accounts (DEC-204), so a
+ * Global entry signs up on Global.
+ */
+export function signupUrl(edition?: Edition): string | null {
     const base =
+        (edition ? accountsBaseFor(edition) : null) ??
         env.ACCOUNTS_URL ??
         (env.NODE_ENV === "development"
             ? "https://accounts.saroh.localhost"
