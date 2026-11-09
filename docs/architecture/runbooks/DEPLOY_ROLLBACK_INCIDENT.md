@@ -129,7 +129,7 @@ Know before you roll back the API:
   (`RESTORE_DRILL.md` shows how a restore runs).
 - A backfill the release ran is not undone by an older image.
 - **Never roll the API back past stage 9** (Global's catalogue,
-  migration `20270130100000_pricing_catalogue_edition`). An older image
+  migration `20270201100000_pricing_catalogue_edition`). An older image
   reads Global's Free-only catalogue as India's, so every India business
   would see Global's plans. Fix forward instead; `STAGE_9_ROLLOUT.md` →
   Undoing it says what a forced rollback needs first. The host's rollout

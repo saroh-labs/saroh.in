@@ -33,7 +33,7 @@ const tag = `${process.pid}-${Date.now()}`;
 const MIGRATIONS = [
     "20261021100000_pricing_catalogue",
     "20261021170000_coupon_razorpay_offer",
-    "20270130100000_pricing_catalogue_edition",
+    "20270201100000_pricing_catalogue_edition",
 ].map((name) =>
     path.resolve(
         __dirname,
