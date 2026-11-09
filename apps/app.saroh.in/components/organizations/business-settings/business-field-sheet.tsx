@@ -23,6 +23,7 @@ import {
 import { businessTypeOf } from "@/lib/organizations/business-types";
 import {
     addressProblems,
+    byCountry,
     stateProblem,
 } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
@@ -202,10 +203,19 @@ export function BusinessFieldSheet({
                 pending={isSubmitting}
                 onClose={onClose}
                 onSubmit={(e) => {
-                    // Nothing changed: there is nothing to check or send.
+                    // Nothing changed: there is nothing to send. A Global
+                    // address is still checked, so one stored before its
+                    // country's rules says what it lacks instead of closing.
                     if (!isDirty) {
                         e.preventDefault();
-                        onClose();
+                        if (
+                            sheet === "address" &&
+                            byCountry(saved.country, saved.gstRegistered)
+                        ) {
+                            void form.trigger().then((ok) => {
+                                if (ok) onClose();
+                            });
+                        } else onClose();
                         return;
                     }
                     void form.handleSubmit(onSubmit)(e);
