@@ -163,7 +163,7 @@ function render(
     initial: PlanEditorRecord | null,
     over: {
         withClasses?: boolean;
-        takenNames?: string[];
+        takenPlans?: { id: string; name: string }[];
         autopayOffered?: boolean;
         gst?: { asked: boolean; priceMode: "INCLUDED" | "ADDED" | null };
     } = {},
@@ -173,7 +173,7 @@ function render(
             <PlanEditor
                 initial={initial}
                 figures={initial ? figures : null}
-                takenNames={over.takenNames ?? []}
+                takenPlans={over.takenPlans ?? []}
                 withClasses={over.withClasses ?? true}
                 currency="INR"
                 canEdit
@@ -377,6 +377,28 @@ describe("the Plan Editor", () => {
         );
     });
 
+    it("a new plan's own draft, back in the page's list after its first save, is not a clash", async () => {
+        const draft = record({
+            id: "plan_new",
+            status: "DRAFT",
+            revision: 1,
+            values: { ...values, name: "Personal training" },
+            published: null,
+            canDelete: true,
+        });
+        actions.createPlanDraft.mockResolvedValue({ ok: true, data: draft });
+        render(null);
+        type(field("Name"), "Personal training");
+        await wait(800);
+        expect(actions.createPlanDraft).toHaveBeenCalled();
+        // The page re-reads the plans once the draft exists: it is one now.
+        render(null, {
+            takenPlans: [{ id: "plan_new", name: "Personal training" }],
+        });
+        expect(field("Name").getAttribute("aria-invalid")).not.toBe("true");
+        expect(text()).not.toContain("already a plan called");
+    });
+
     it("a duplicate name shows beside the field and stops Publish, with the reason", async () => {
         actions.savePlanDraft.mockResolvedValue({
             ok: true,
@@ -386,7 +408,7 @@ describe("the Plan Editor", () => {
                 values: { ...values, name: "Drop-in" },
             }),
         });
-        render(record(), { takenNames: ["Drop-in"] });
+        render(record(), { takenPlans: [{ id: "plan_2", name: "Drop-in" }] });
         type(field("Name"), "Drop-in");
         await wait(800);
         const alert = host.querySelector("[role=alert]");

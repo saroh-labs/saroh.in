@@ -201,6 +201,24 @@ function same(a: string, b: string): boolean {
     return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+/** A plan that isn't archived, by id, so a plan never clashes with itself. */
+export interface TakenPlan {
+    id: string;
+    name: string;
+}
+
+/**
+ * The names this plan can't take: every other plan's. Its own draft is in
+ * the list once the page re-reads it after the first save, and must not
+ * count against it ("There's already a plan called" its own name).
+ */
+export function namesBesides(
+    taken: readonly TakenPlan[],
+    ownId: string | null | undefined,
+): string[] {
+    return taken.filter((t) => t.id !== ownId).map((t) => t.name);
+}
+
 export interface ProblemContext {
     /** The business sells classes (Appointments on). */
     withClasses: boolean;

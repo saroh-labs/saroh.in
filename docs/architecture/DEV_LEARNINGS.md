@@ -6614,3 +6614,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a scene with `day < 0` looks only for a slot that has already ended, on its day or the days before it, before the forward search; `diary-shop-plan.test.ts` plans at CI's exact `now` and asserts a past unmarked visit at every `now`.
 - **Rule:** a seeded scene that means "in the past" must never be moved forward to find a slot; test a planner at the time of day CI seeds, not only noon.
 - **Category:** seed · e2e
+
+## A new plan said its own name was taken (9 Nov 2026)
+
+- **Symptom:** on Payments → Plans → New plan, typing a name and moving on showed "There's already a plan called Personal training" under the name, for the plan being made, and Publish counted it as a problem. Caught on film in the gym demo, on both laptop and phone takes.
+- **Cause:** the new-plan page passes the other plans' names to the editor, read with `planEditorContext(null)`, so nothing is left out. The first autosave makes the draft, and the page is read again with the draft in the list. A list of bare names can't tell this plan's draft from another plan with the same name.
+- **Fix:** the page passes `takenPlans` (id and name), and the editor leaves out the record's own id (`namesBesides`) when it checks the name. Tests: `plan-editor.test.tsx` (a new plan's own draft is not a clash) and `plan-editor.test.ts`.
+- **Rule:** a "name already taken" list for an editor that creates its record on the first save carries ids, and the check leaves out the record's own id. A list keyed on names alone breaks the moment the record exists.
+- **Category:** app · editors

@@ -8,7 +8,11 @@ import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
 import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
 import type { PlanEditorRecord } from "@/lib/subscriptions/plan-drafts";
-import type { NameClash, PlanFigures } from "@/lib/subscriptions/plan-editor";
+import type {
+    NameClash,
+    PlanFigures,
+    TakenPlan,
+} from "@/lib/subscriptions/plan-editor";
 import {
     changesNote,
     clashOf,
@@ -17,6 +21,7 @@ import {
     editorRecordOf,
     EMPTY_PLAN,
     glance,
+    namesBesides,
     PLAN_COPY,
     PLAN_FIELD_LABELS,
     planBlocker,
@@ -65,7 +70,7 @@ import { PriceSection } from "./price-section";
 export function PlanEditor({
     initial,
     figures,
-    takenNames,
+    takenPlans,
     withClasses,
     currency,
     canEdit,
@@ -82,8 +87,11 @@ export function PlanEditor({
     initial: PlanEditorRecord | null;
     /** Who is on it and what it brings in; null for a plan not saved yet. */
     figures: PlanFigures | null;
-    /** Every other plan's name that isn't archived. */
-    takenNames: readonly string[];
+    /**
+     * Every other plan that isn't archived. On a new plan the page re-reads
+     * it after the first save, and then it holds this plan's own draft too.
+     */
+    takenPlans: readonly TakenPlan[];
     /** The business sells classes (Appointments on, default 31). */
     withClasses: boolean;
     /** The plan's currency, or the business's for a new plan. */
@@ -132,7 +140,6 @@ export function PlanEditor({
     const ctx = {
         withClasses,
         otherClasses: other,
-        takenNames,
         clash,
         gstAsked: gst.asked,
     };
@@ -154,7 +161,12 @@ export function PlanEditor({
                 first ? planTitle(first.values, true) : "New plan",
             ]}
             titleOf={(v, r) => planTitle(v, r !== null)}
-            problemsOf={(v) => planProblems(v, ctx)}
+            problemsOf={(v, r) =>
+                planProblems(v, {
+                    ...ctx,
+                    takenNames: namesBesides(takenPlans, r?.id),
+                })
+            }
             blockerOf={(v) => planBlocker(v, ctx)}
             changesOf={(p, v) => planChanges(p, v, withClasses)}
             changesNote={(r) =>
