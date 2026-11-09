@@ -12,6 +12,7 @@ import {
     listMyBillingProfiles,
     profileOptions,
 } from "@/lib/billing-profiles/service";
+import { PROFILE } from "@/lib/edition";
 import {
     ACTIVE_ORG_NAME_COOKIE,
     ACTIVE_ORG_USER_COOKIE,
@@ -67,6 +68,8 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  *
  * While plans aren't shown (DEC-136) neither is read: no plan is named
  * under the heading, nothing goes on to a checkout, and no offer is taken.
+ * On Global (Free only, DEC-211) the invite is still read: it names the
+ * business and marks the waitlist entry joined, with no offer promised.
  *
  * An owner who has a billing profile already (DEC-167, R7) is asked who
  * Saroh bills for the new business, between its name and what to do
@@ -88,9 +91,11 @@ export default async function OnboardingPage({
     const hasOrgs = organizations.length > 0;
     const asksBilling = billingProfiles.length > 0;
     const plans = plansShown();
-    const invite = plans
-        ? await readInviteIntent(query)
-        : ({ kind: "none" } as const);
+    // Global's invites carry no offer (DEC-211) but are still marked joined.
+    const invite =
+        plans || !PROFILE.sarohBilling
+            ? await readInviteIntent(query)
+            : ({ kind: "none" } as const);
     if (hasOrgs && query.plan !== undefined && invite.kind === "none") {
         redirect("/");
     }
@@ -161,7 +166,7 @@ export default async function OnboardingPage({
                     checkout={checkoutIntent(intent)}
                     invite={inviteToTake(invite)}
                     defaultName={
-                        invite.kind === "ready"
+                        invite.kind === "ready" || invite.kind === "free"
                             ? (invite.businessName ?? undefined)
                             : undefined
                     }

@@ -1,6 +1,7 @@
 import { authClient } from "@saroh/auth/client";
 import { showError, showInfo } from "@saroh/ui/toast";
 
+import { PROFILE } from "@/lib/edition";
 import { startWithGoalAction } from "@/lib/modules/first-goal-actions";
 import { GOAL_LATER } from "@/lib/modules/goals";
 import { createOrganization } from "@/lib/organizations/actions";
@@ -126,7 +127,8 @@ export async function createFromSetup(
         // Where the waitlist entry is marked joined and the offer starts;
         // the API checks the invite against this account.
         const taken = await takeLaunchOfferAfterOnboarding(invite);
-        if (!taken.ok) {
+        // Global's invite carries no offer (DEC-211): nothing to say.
+        if (!taken.ok && PROFILE.sarohBilling) {
             showError(
                 `${businessName} is set up, but the launch offer isn't applied yet.`,
                 taken.error,

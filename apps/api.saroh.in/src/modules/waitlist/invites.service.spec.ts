@@ -60,6 +60,7 @@ const waiting = {
     id: "w1",
     email: "asha@example.test",
     businessName: "Asha Salon",
+    edition: "INDIA",
     invitedAt: null,
     inviteSentAt: null,
     joinedAt: null,
@@ -199,6 +200,22 @@ describe("WaitlistInvitesService.sendOne", () => {
         });
         expect(send).not.toHaveBeenCalled();
     });
+
+    it("invites a Global entry without an offer length: it gets Free, and its email names no offer (owner, 9 Nov 2026)", async () => {
+        (env as { LAUNCH_OFFER_DAYS?: number }).LAUNCH_OFFER_DAYS = undefined;
+        const global = { ...waiting, edition: "GLOBAL" };
+        signups.findMany!.mockResolvedValue([global]);
+        signups.findUnique!.mockResolvedValue(global);
+        signups.updateMany!.mockResolvedValue({ count: 1 });
+        send.mockResolvedValue("sent");
+
+        await expect(invites.sendOne("w1", NOW)).resolves.toMatchObject({
+            status: "DONE",
+        });
+        expect(send.mock.calls[0]![2]).toBe("GLOBAL");
+        expect(invites.readiness("GLOBAL")).toMatchObject({ ready: true });
+        expect(invites.readiness("INDIA")).toMatchObject({ ready: false });
+    });
 });
 
 describe("LaunchOfferService", () => {
@@ -313,6 +330,59 @@ describe("LaunchOfferService", () => {
         ).rejects.toBeInstanceOf(GoneException);
         expect(overrides.create).not.toHaveBeenCalled();
     });
+
+    it("answers a valid Global invite as Free, with no offer, whatever the offer length", async () => {
+        (env as { LAUNCH_OFFER_DAYS?: number }).LAUNCH_OFFER_DAYS = undefined;
+        signups.findUnique!.mockResolvedValue({
+            ...invited,
+            edition: "GLOBAL",
+        });
+        await expect(offers.check(hari, token, NOW)).resolves.toEqual({
+            status: "free",
+            businessName: "Hari Store",
+        });
+        // Still refused the same way when it can't be used.
+        await expect(
+            offers.check({ ...hari, emailVerified: false }, token, NOW),
+        ).resolves.toMatchObject({ status: "unverified" });
+    });
+
+    it.each([
+        ["a Global entry", { edition: "GLOBAL" }, {}],
+        ["an entry made into a Global business", {}, { edition: "GLOBAL" }],
+    ])(
+        "marks %s joined on Free, writing no plan override",
+        async (_, entry, business) => {
+            signups.findUnique!.mockResolvedValue({ ...invited, ...entry });
+            signups.updateMany!.mockResolvedValue({ count: 1 });
+
+            await expect(
+                offers.redeem({ ...ctx, ...business }, hari, token, NOW),
+            ).resolves.toEqual({ planKey: null, until: null });
+            expect(signups.updateMany).toHaveBeenCalledWith({
+                where: {
+                    id: "w1",
+                    joinedAt: null,
+                    inviteExpiresAt: { gt: NOW },
+                },
+                data: { joinedAt: NOW, joinedOrganizationId: "org1" },
+            });
+            expect(overrides.create).not.toHaveBeenCalled();
+            expect(prisma.auditEvent.create).not.toHaveBeenCalled();
+
+            // A double submit answers the same.
+            signups.findUnique!.mockResolvedValue({
+                ...invited,
+                ...entry,
+                joinedAt: NOW,
+                joinedOrganizationId: "org1",
+            });
+            overrides.findFirst!.mockResolvedValue(null);
+            await expect(
+                offers.redeem({ ...ctx, ...business }, hari, token, NOW),
+            ).resolves.toEqual({ planKey: null, until: null });
+        },
+    );
 
     it("needs billing:manage on the business", async () => {
         await expect(

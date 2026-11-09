@@ -8,12 +8,13 @@ import {
     ServiceUnavailableException,
 } from "@nestjs/common";
 import { liveCatalogueVersion, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import { catalogPlanIdForKey, validateCatalog } from "@saroh/pricing-catalog";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { env } from "../../env";
-import { assertSarohBills } from "../billing/saroh-bills";
 import { authorize } from "../organizations/organization-policy";
 import type { PublicLaunchOffer } from "./invite-token";
 import {
@@ -44,6 +45,8 @@ export type InviteCheck =
           planKey: string;
           days: number;
       }
+    /** A valid invite that carries no offer: Global's, Free only (owner, 9 Nov 2026). */
+    | { status: "free"; businessName: string | null }
     | {
           status:
               | "invalid"
@@ -55,9 +58,17 @@ export type InviteCheck =
           message: string;
       };
 
-export interface LaunchOfferGranted {
-    planKey: string;
-    until: string;
+/** The offer taken, or both null when the invite joined on Free (Global). */
+export type LaunchOfferGranted =
+    { planKey: string; until: string } | { planKey: null; until: null };
+
+/**
+ * Whether an invite carries the launch offer: India's alone (KTD3c). Global
+ * opens Free-only (DEC-211), so a Global entry, or an entry made into a
+ * Global business, joins on Free (owner, 9 Nov 2026). Unset is India.
+ */
+function carriesOffer(...editions: (Edition | null | undefined)[]): boolean {
+    return editions.every((edition) => editionProfile(edition).sarohBilling);
 }
 
 /** Who wrote a launch offer's override and audit row: the invitee. */
@@ -84,7 +95,11 @@ export class LaunchOfferService {
      * or the live catalogue has no such plan. A stored snapshot that doesn't
      * validate is logged and read as no offer, never a 500 on a public page.
      */
-    async publicOffer(now = new Date()): Promise<PublicLaunchOffer | null> {
+    async publicOffer(
+        now = new Date(),
+        edition?: Edition,
+    ): Promise<PublicLaunchOffer | null> {
+        if (!carriesOffer(edition)) return null;
         const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
         if (!offer) return null;
         // saroh.in's waitlist: India's catalogue (KTD3c, India-only offer).
@@ -110,6 +125,9 @@ export class LaunchOfferService {
         const row = await findByToken(token);
         const refusal = refusalFor(row, user, now);
         if (refusal) return refusal;
+        if (row && !carriesOffer(row.edition)) {
+            return { status: "free", businessName: row.businessName };
+        }
         if (!offer || !row) {
             return {
                 status: "unavailable",
@@ -127,7 +145,8 @@ export class LaunchOfferService {
     /**
      * Take the offer for the business just made. Needs `billing:manage`.
      * Repeating it for the same business answers the same (a double submit);
-     * any other use of a taken token is refused.
+     * any other use of a taken token is refused. An invite that carries no
+     * offer (a Global entry or business) only marks the entry joined.
      */
     async redeem(
         ctx: OrganizationContext,
@@ -136,22 +155,24 @@ export class LaunchOfferService {
         now = new Date(),
     ): Promise<LaunchOfferGranted> {
         authorize(ctx, "billing:manage");
-        // It grants a plan, which Saroh only bills in India for now.
-        assertSarohBills(ctx.edition);
         const row = await findByToken(token);
         if (row?.joinedOrganizationId === ctx.organizationId) {
             return this.granted(ctx.organizationId);
         }
         const refusal = refusalFor(row, user, now);
         if (refusal) throw refusalError(refusal);
-        const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
-        if (!offer || !row) {
+        // It grants a plan, which Saroh only bills in India for now.
+        const offers = carriesOffer(ctx.edition, row?.edition);
+        const offer = offers ? launchOffer(env.LAUNCH_OFFER_DAYS) : null;
+        if (!row || (offers && !offer)) {
             throw new ServiceUnavailableException(INVITE_REFUSALS.unavailable);
         }
 
-        const until = offerEnds(offer, now);
+        const plan = offer
+            ? { planKey: offer.planKey, until: offerEnds(offer, now) }
+            : null;
         try {
-            await this.write(ctx, user, row.id, offer.planKey, until, now);
+            await this.write(ctx, user, row.id, plan, now);
         } catch (error) {
             // A double submit that lost the race to its twin: same business,
             // same answer.
@@ -162,25 +183,34 @@ export class LaunchOfferService {
             throw error;
         }
         this.logger.log(
-            `waitlist: ${maskEmail(user.email)} joined with an invite; launch offer applied`,
+            `waitlist: ${maskEmail(user.email)} joined with an invite; ${plan ? "launch offer applied" : "on Free"}`,
         );
-        return { planKey: offer.planKey, until: until.toISOString() };
+        return plan
+            ? { planKey: plan.planKey, until: plan.until.toISOString() }
+            : { planKey: null, until: null };
     }
 
-    /** Claim the entry and write the override and its audit row, together. */
+    /**
+     * Claim the entry and, with an offer, write the override and its audit
+     * row, together. Without one (Global) only the claim is written.
+     */
     private async write(
         ctx: OrganizationContext,
         user: AuthUser,
         signupId: string,
-        planKey: string,
-        until: Date,
+        plan: { planKey: string; until: Date } | null,
         now: Date,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
-            const subscription = await tx.subscription.findUnique({
-                where: { organizationId: ctx.organizationId },
-                select: { status: true, plan: { select: { key: true } } },
-            });
+            const subscription = plan
+                ? await tx.subscription.findUnique({
+                      where: { organizationId: ctx.organizationId },
+                      select: {
+                          status: true,
+                          plan: { select: { key: true } },
+                      },
+                  })
+                : null;
             if (
                 subscription &&
                 subscription.status !== "CANCELLED" &&
@@ -204,6 +234,8 @@ export class LaunchOfferService {
             });
             if (claimed.count === 0)
                 throw new GoneException(INVITE_REFUSALS.used);
+            if (!plan) return;
+            const { planKey, until } = plan;
             const override = await tx.entitlementOverride.create({
                 data: {
                     organizationId: ctx.organizationId,
@@ -241,9 +273,9 @@ export class LaunchOfferService {
             select: { planKey: true, expiresAt: true },
             orderBy: { createdAt: "desc" },
         });
-        if (!row?.planKey || !row.expiresAt) {
-            throw new GoneException(INVITE_REFUSALS.used);
-        }
+        // Joined on Free (Global): no override was written.
+        if (!row?.planKey || !row.expiresAt)
+            return { planKey: null, until: null };
         return { planKey: row.planKey, until: row.expiresAt.toISOString() };
     }
 }
@@ -252,6 +284,7 @@ interface InviteRow {
     id: string;
     emailKey: string;
     businessName: string | null;
+    edition: Edition;
     inviteExpiresAt: Date | null;
     joinedAt: Date | null;
     joinedOrganizationId: string | null;
@@ -268,11 +301,12 @@ async function findByToken(token: string): Promise<InviteRow | null> {
             inviteExpiresAt: true,
             joinedAt: true,
             joinedOrganizationId: true,
+            edition: true,
         },
     });
 }
 
-type Refusal = Exclude<InviteCheck, { status: "ready" }>;
+type Refusal = Exclude<InviteCheck, { status: "ready" | "free" }>;
 
 /**
  * Why this account can't use this invite now, or null when it can. Order

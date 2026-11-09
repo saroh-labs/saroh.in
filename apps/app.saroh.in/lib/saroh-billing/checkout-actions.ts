@@ -65,7 +65,7 @@ export async function startCheckoutAfterOnboarding(
  */
 export async function takeLaunchOfferAfterOnboarding(
     token: unknown,
-): Promise<{ ok: true; until: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; until: string | null } | { ok: false; error: string }> {
     if (typeof token !== "string" || !INVITE_TOKEN.test(token)) {
         return { ok: false, error: LAUNCH_OFFER_FAILED };
     }
@@ -76,12 +76,14 @@ export async function takeLaunchOfferAfterOnboarding(
         body: JSON.stringify({ token }),
     });
     const data = (await res.json().catch(() => null)) as {
-        until?: string;
+        until?: string | null;
         message?: string;
     } | null;
     if (res.ok && typeof data?.until === "string") {
         return { ok: true, until: data.until };
     }
+    // Joined on Free (Global): no offer, so no end.
+    if (res.ok && data?.until === null) return { ok: true, until: null };
     return {
         ok: false,
         error:
