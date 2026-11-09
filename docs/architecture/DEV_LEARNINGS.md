@@ -6622,3 +6622,18 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the page passes `takenPlans` (id and name), and the editor leaves out the record's own id (`namesBesides`) when it checks the name. Tests: `plan-editor.test.tsx` (a new plan's own draft is not a clash) and `plan-editor.test.ts`.
 - **Rule:** a "name already taken" list for an editor that creates its record on the first save carries ids, and the check leaves out the record's own id. A list keyed on names alone breaks the moment the record exists.
 - **Category:** app · editors
+## The dark Global Workers failed their first production deploy: "routes assigned to another worker" (9 Nov 2026)
+
+- **Symptom:** release #1337's frontend deploy failed `Deploy application-global`, `admin-global` and `auth-global` (production): wrangler refused routes held by `saroh-app-dev`, `saroh-admin-dev` and `saroh-accounts-dev` on the dev zone. India's Workers and saroh.tech deployed.
+- **Cause:** with `GLOBAL_ROUTES` off, `scripts/cf-global-prod.mjs` left `routes` out of `env.production`. Wrangler fills a missing env key from the top level, which in the India apps holds the dev Worker's routes, so each Global Worker asked for the dev hosts. saroh.tech has no top-level routes, so it passed.
+- **Fix:** a dark Global Worker gets `routes: []`, which overrides the top level; the tests assert the empty list.
+- **Rule:** to switch off an inheritable wrangler key in an env (routes, vars-like lists), set it empty, never omit it.
+- **Category:** deploy · edition
+
+## CI's seed sweeps failed on a scripts-only PR: "Failed to resolve entry for package" (9 Nov 2026)
+
+- **Symptom:** PR #1338 (only `scripts/` and docs) failed CI's Unit tests at "Seed sweeps", twice: `Failed to resolve entry for package "@saroh/pricing-catalog"` and `"@saroh/block-contract"`. The local gate passed.
+- **Cause:** the sweeps step runs on every PR, but the packages the seed imports are built only by the step before it, which runs `turbo run test` for the affected packages. A PR touching no package builds none, so the sweeps found no `dist`. Locally the packages are always built.
+- **Fix:** the step builds `@saroh/database`'s dependencies first (`turbo run build --filter=@saroh/database^...`, cached when already built).
+- **Rule:** a CI step that runs outside turbo's affected filter builds what it imports itself.
+- **Category:** CI
