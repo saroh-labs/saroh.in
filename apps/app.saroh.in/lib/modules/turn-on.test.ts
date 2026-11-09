@@ -13,6 +13,7 @@ import {
     PROVIDERS_HREF,
     sellsOnline,
     setupFor,
+    stillWrong,
     tidyAddress,
     turnedOnToast,
     turnOnPlan,
@@ -316,6 +317,22 @@ describe("the draft and what it sends", () => {
         }
     });
 
+    it("sends nothing for what was left empty (DEC-212)", () => {
+        const draft = draftFrom(defaults);
+        draft.COMMERCE.storefrontName = " ";
+        draft.COMMERCE.fulfilment = [];
+        draft.APPOINTMENTS.name = "";
+        draft.APPOINTMENTS.days = draft.APPOINTMENTS.days.map((x) => ({
+            ...x,
+            on: false,
+        }));
+        draft.WEBSITE.siteName = "";
+        draft.WEBSITE.address = "";
+        expect(setupFor("COMMERCE", draft)).toEqual({});
+        expect(setupFor("APPOINTMENTS", draft)).toEqual({});
+        expect(setupFor("WEBSITE", draft)).toEqual({});
+    });
+
     it("knows delivery and shipping are selling online", () => {
         const draft = draftFrom(defaults);
         expect(sellsOnline(draft)).toBe(false);
@@ -355,6 +372,32 @@ describe("problems found before sending", () => {
             "siteName",
             "address",
         ]);
+    });
+
+    it("names the business's currency in the price's message", () => {
+        const d = draft();
+        d.APPOINTMENTS.price = "5,00";
+        expect(
+            problemsOf(d, ["APPOINTMENTS"]).APPOINTMENTS?.["service.price"],
+        ).toBe("Write the price in rupees, like 500 or 499.50.");
+        expect(
+            problemsOf(d, ["APPOINTMENTS"], "GBP").APPOINTMENTS?.[
+                "service.price"
+            ],
+        ).toBe("Write the price in GBP, like 500 or 499.50.");
+    });
+
+    it("takes a shown message away as its field is fixed, and adds none before the next try", () => {
+        const d = draft();
+        const shown = problemsOf(d, ["APPOINTMENTS"]);
+        expect(shown.APPOINTMENTS?.["service.name"]).toBeTruthy();
+        d.APPOINTMENTS.name = "Booking Test";
+        d.APPOINTMENTS.price = "abc";
+        const now = stillWrong(shown, problemsOf(d, ["APPOINTMENTS"]));
+        expect(now.APPOINTMENTS?.["service.name"]).toBeUndefined();
+        // Price was already wrong and still is, so it stays.
+        expect(now.APPOINTMENTS?.["service.price"]).toBeTruthy();
+        expect(stillWrong({}, problemsOf(d, ["APPOINTMENTS"]))).toEqual({});
     });
 
     it("refuses a web address the API would: two hyphens, or past 57 (DEC-071)", () => {
@@ -398,6 +441,54 @@ describe("problems found before sending", () => {
         expect(problemsOf(d, ["APPOINTMENTS"]).APPOINTMENTS?.hours).toBe(
             "Open on at least one day.",
         );
+    });
+});
+
+describe("problems from Settings › Modules: nothing required (DEC-212)", () => {
+    const draft = () => draftFrom([]);
+    const ALL = ["COMMERCE", "APPOINTMENTS", "WEBSITE"];
+
+    it("every empty field takes its default or waits", () => {
+        const d = draft();
+        d.COMMERCE.storefrontName = "";
+        d.COMMERCE.fulfilment = [];
+        d.APPOINTMENTS.days = d.APPOINTMENTS.days.map((x) => ({
+            ...x,
+            on: false,
+        }));
+        d.APPOINTMENTS.name = " ";
+        // Unnamed, its length and price aren't judged.
+        d.APPOINTMENTS.duration = "0";
+        d.APPOINTMENTS.price = "5,00";
+        d.WEBSITE.siteName = "";
+        d.WEBSITE.address = "";
+        expect(problemsOf(d, ALL, "INR", false)).toEqual({});
+        // Anywhere else, DEC-068's minimum is still asked.
+        expect(Object.keys(problemsOf(d, ALL))).toEqual(ALL);
+    });
+
+    it("still refuses what was typed wrong, on its field", () => {
+        const d = draft();
+        d.APPOINTMENTS.name = "Cut";
+        d.APPOINTMENTS.duration = "0";
+        d.APPOINTMENTS.price = "5,00";
+        d.WEBSITE.address = "my--shop";
+        const problems = problemsOf(d, ALL, "INR", false);
+        expect(problems.COMMERCE).toBeUndefined();
+        expect(Object.keys(problems.APPOINTMENTS ?? {})).toEqual([
+            "service.durationMinutes",
+            "service.price",
+        ]);
+        expect(problems.WEBSITE).toEqual({
+            address: "An address can't have two hyphens in a row.",
+        });
+    });
+
+    it("a named service with no price is a service without one", () => {
+        const d = draft();
+        d.APPOINTMENTS.name = "Cut";
+        d.APPOINTMENTS.price = "";
+        expect(problemsOf(d, ["APPOINTMENTS"], "INR", false)).toEqual({});
     });
 });
 

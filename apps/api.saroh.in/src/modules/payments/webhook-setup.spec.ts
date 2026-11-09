@@ -11,6 +11,7 @@ jest.mock("../../env", () => ({
     },
 }));
 
+import { env } from "../../env";
 import { encryptSecret } from "./crypto";
 import {
     needsWebhookSecret,
@@ -127,6 +128,29 @@ describe("the webhook address", () => {
         );
     });
 
+    it("is the business's edition's API, in the configured API's environment (Global launch R5)", async () => {
+        const configured = env.API_PUBLIC_URL;
+        (env as { API_PUBLIC_URL?: string }).API_PUBLIC_URL =
+            "https://api.saroh.in";
+        try {
+            const db = {
+                webhookEvent: {
+                    findFirst: jest.fn(() => Promise.resolve(null)),
+                },
+            } as never;
+            const [stripe] = await readWebhookSetup("org_1", "GLOBAL", db);
+            expect(stripe?.url).toBe(
+                "https://api.saroh.tech/public/webhooks/stripe/org_1",
+            );
+            const [razorpay] = await readWebhookSetup("org_1", "INDIA", db);
+            expect(razorpay?.url).toBe(
+                "https://api.saroh.in/public/webhooks/razorpay/org_1",
+            );
+        } finally {
+            (env as { API_PUBLIC_URL?: string }).API_PUBLIC_URL = configured;
+        }
+    });
+
     it("reads each provider's setup for the one business, with its last update", async () => {
         const at = new Date("2026-09-29T10:00:00Z");
         const findFirst = jest.fn(
@@ -175,6 +199,17 @@ describe("the webhook address", () => {
                 lastReceivedAt: null,
             },
         ]);
+        // Hosted Checkout's four events, then the PaymentIntent and refund
+        // events (plan 2026-11-07-002, U6).
+        expect(WEBHOOK_EVENTS.STRIPE).toHaveLength(9);
+        expect(WEBHOOK_EVENTS.STRIPE).toEqual(
+            expect.arrayContaining([
+                "checkout.session.completed",
+                "checkout.session.async_payment_succeeded",
+                "checkout.session.async_payment_failed",
+                "checkout.session.expired",
+            ]),
+        );
         // Unset is India.
         const india = await readWebhookSetup("org_1", undefined, db);
         expect(india.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);

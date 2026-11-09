@@ -34,11 +34,13 @@ import {
 import type { EntitlementService } from "../../billing/entitlement.service";
 import { assertLegacyLocationRoom } from "../../billing/legacy-location-floor";
 import { planMeter } from "../../billing/metering.service";
+import { businessTimezone } from "../../bookings/staff-availability";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
 import { authorize } from "../../organizations/organization-policy";
 import { DEFAULT_STAGES } from "../../pipelines/pipelines.service";
 import { addModulePageIfMissing } from "../../sites/module-page-create";
 import { anyListed, effectiveStorefront } from "../../sites/sells-from";
+import { siteDefaults } from "../../sites/site-address";
 import type { SitePlan } from "../../sites/site-create";
 import {
     planSiteFromTemplate,
@@ -54,6 +56,7 @@ import type {
     WebsiteSetupDto,
 } from "./module-setup.dto";
 import type { ModuleSetups } from "./module-setup.parse";
+import { setupRefusal } from "./module-setup.parse";
 import { TRADE_PRESETS } from "./trade-presets";
 
 /** What a setup made or reused, so the app can land on it. */
@@ -69,8 +72,12 @@ export interface SetupCreated {
 /** The currency a business prices in when it has chosen none yet. */
 const DEFAULT_CURRENCY = "INR";
 
-/** A business's zone when it hasn't set one (Saroh's market). */
-export const DEFAULT_TIMEZONE = "Asia/Kolkata";
+/** Mon–Sat, 10 to 7 (DEC-068): a first service's hours when none are sent. */
+export const DEFAULT_HOURS = [1, 2, 3, 4, 5, 6].map((weekday) => ({
+    weekday,
+    open: "10:00",
+    close: "19:00",
+}));
 
 type Entitlements = Pick<EntitlementService, "check" | "getEntitlements">;
 
@@ -177,17 +184,19 @@ async function writeCommerce(
     const currency =
         (await businessCurrency(tx, ctx.organizationId)) ?? DEFAULT_CURRENCY;
 
+    // Nothing is required (DEC-212): no way chosen is Pick-up.
+    const fulfilment = setup.fulfilment ?? ["PICKUP"];
     const existing = await firstStorefront(tx, ctx.organizationId);
     if (existing) {
         // Its kind stays as it is; Pick-up only if customers visit it.
-        const ways = waysFor(
-            setup.fulfilment,
-            existing.settings?.kind === "SHOP",
-        );
-        await tx.store.update({
-            where: { id: existing.id },
-            data: { name: setup.storefrontName },
-        });
+        const ways = waysFor(fulfilment, existing.settings?.kind === "SHOP");
+        // No name sent: it keeps its own.
+        if (setup.storefrontName) {
+            await tx.store.update({
+                where: { id: existing.id },
+                data: { name: setup.storefrontName },
+            });
+        }
         await tx.storeSettings.upsert({
             where: { storeId: existing.id },
             create: { storeId: existing.id, currency, ...ways },
@@ -201,14 +210,23 @@ async function writeCommerce(
     // a business that gave its registered address starts from it. Without
     // one (or with no room on the plan) it starts with no counter, and so
     // without Pick-up, rather than with a Pick-up nobody can use.
-    const place = setup.fulfilment.includes("PICKUP")
+    const place = fulfilment.includes("PICKUP")
         ? await seededPlace(tx, ctx.organizationId, entitlements)
         : null;
-    const ways = waysFor(setup.fulfilment, place !== null);
+    const ways = waysFor(fulfilment, place !== null);
     const fulfilmentTypes = ways.fulfilmentTypes;
+    // No name sent: the business's (DEC-068's default).
+    const name =
+        setup.storefrontName ??
+        (
+            await tx.organization.findUniqueOrThrow({
+                where: { id: ctx.organizationId },
+                select: { name: true },
+            })
+        ).name.slice(0, 80);
     const store = await tx.store.create({
         data: {
-            name: setup.storefrontName,
+            name,
             organization: { connect: { id: ctx.organizationId } },
             owners: { create: { userId: ctx.userId, role: "OWNER" } },
             settings: {
@@ -284,14 +302,14 @@ interface ServiceToWrite {
 }
 
 /**
- * What Bookings' setup writes: the typed first service, or — for a trade
- * (DEC-189) — the preset's sample services.
+ * What Bookings' setup writes: the typed first service, or (for a trade,
+ * DEC-189) the preset's sample services. Neither: nothing (DEC-212), and
+ * "Add a service to open your booking page" is left for Finish setup.
  */
 function servicesToWrite(setup: AppointmentsSetupDto): ServiceToWrite[] {
     if (setup.trade) return [...TRADE_PRESETS[setup.trade].services];
     const typed = setup.service;
-    // Without a trade parseModuleSetup requires the service.
-    if (!typed) throw new Error("Bookings' setup has no trade or service");
+    if (!typed) return [];
     return [
         {
             name: typed.name,
@@ -315,17 +333,17 @@ async function writeAppointments(
     });
     if (existing) return { serviceId: existing.id };
 
-    const profile = await tx.businessProfile.findUnique({
-        where: { organizationId },
-        select: { timezone: true },
-    });
     const toWrite = servicesToWrite(setup);
+    if (toWrite.length === 0) return {};
+    // No service exists yet, so this is the business's own zone, else its edition's.
+    const timezone = await businessTimezone(tx, organizationId);
     // A trade's services are samples (DEC-189): hidden from the booking page
     // and every public read until the owner keeps or edits each one.
     const sample = setup.trade !== undefined;
     // The merchant's own hours win; a trade's fill in when none are sent.
     const hours =
-        setup.hours ?? (setup.trade ? TRADE_PRESETS[setup.trade].hours : []);
+        setup.hours ??
+        (setup.trade ? TRADE_PRESETS[setup.trade].hours : DEFAULT_HOURS);
     // Priced in the business's currency, as Sell's storefront is: a
     // business that sells in pounds takes bookings in pounds.
     const currency = toWrite.some((s) => s.priceCents !== null)
@@ -343,7 +361,7 @@ async function writeAppointments(
                 capacity: each.capacity ?? 1,
                 priceCents: each.priceCents,
                 currency: each.priceCents !== null ? currency : null,
-                timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
+                timezone,
                 status: "ACTIVE",
                 ...(sample ? { isSample: true, showOnBookingPage: false } : {}),
             },
@@ -446,11 +464,26 @@ async function prepareWebsite(
             return { siteId: site.id, siteAddress: site.subdomain };
         };
     }
+    // Nothing is required (DEC-212): a blank name or address is the one
+    // `/sites/new` starts with, the business's name at a free address.
+    const start =
+        setup.siteName && setup.address
+            ? null
+            : await siteDefaults(prisma, ctx.organizationId);
+    const siteName = setup.siteName ?? start?.siteName ?? "";
+    const address = setup.address ?? start?.address ?? "";
+    if (!address) {
+        // Every address like the business's is taken: the one thing left
+        // to ask.
+        throw setupRefusal([
+            { field: "setup.address", message: "Choose your web address." },
+        ]);
+    }
     // The `/sites/new` flow and its template, caps included.
     const plan: SitePlan = await planSiteFromTemplate(
         ctx,
         {
-            name: setup.siteName,
+            name: siteName,
             // The sheet's choice; absent, the kind's (planSiteFromTemplate).
             ...(setup.templateId ? { templateId: setup.templateId } : {}),
         },
@@ -458,11 +491,11 @@ async function prepareWebsite(
     );
     return async (tx) => {
         const created = await writeSiteFromTemplate(tx, ctx, plan, {
-            subdomain: setup.address,
+            subdomain: address,
             addressField: "setup.address",
         });
         await shopForWebsite(tx, ctx, created.siteId);
-        return { siteId: created.siteId, siteAddress: setup.address };
+        return { siteId: created.siteId, siteAddress: address };
     };
 }
 

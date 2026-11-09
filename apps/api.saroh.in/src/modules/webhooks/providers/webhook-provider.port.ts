@@ -21,6 +21,10 @@ export type WebhookHeaders = Record<string, string | string[] | undefined>;
  * The normalized money-effect of a verified webhook. `REFUNDED` is money the
  * provider has handed back; `REFUND_FAILED` is a refund it definitely did
  * not make (Razorpay `refund.failed`, Cashfree CANCELLED/FAILED/REJECTED).
+ * `PROCESSING` is a hosted checkout finished with a slow method still on its
+ * way (Stripe `checkout.session.completed`, unpaid); `CLOSED` is a hosted
+ * checkout that can no longer be paid (Stripe `checkout.session.expired`).
+ * Neither touches an order or invoice.
  */
 export type WebhookOutcome =
     | "SUCCEEDED"
@@ -29,6 +33,8 @@ export type WebhookOutcome =
     | "REFUND_FAILED"
     | "MANDATE"
     | "PRE_DEBIT"
+    | "PROCESSING"
+    | "CLOSED"
     | "IGNORED";
 
 /**
@@ -56,6 +62,17 @@ export interface NormalizedWebhookEvent {
     providerIntentId?: string;
     /** The merchant order id we submitted at create time (fallback intent match). */
     orderRef?: string;
+    /**
+     * The hosted-checkout session the event is about (Stripe `cs_…`),
+     * matched against `PaymentIntent.providerCheckoutId`.
+     */
+    providerCheckoutId?: string;
+    /**
+     * Saroh's own PaymentIntent id, echoed back by the provider (Stripe's
+     * `client_reference_id`, or `metadata[saroh_intent]` on a PaymentIntent).
+     * Matched only within the event's business and provider.
+     */
+    sarohIntentId?: string;
     /** The provider payment id (stored so a later refund can reference it). */
     providerPaymentRef?: string;
     /**

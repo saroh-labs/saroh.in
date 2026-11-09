@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -21,9 +22,10 @@ import { prisma } from "@saroh/database";
 import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
     autopayCharges,
+    catalogMoney,
     catalogPlanIdForKey,
-    gstPaise,
-    withGstPaise,
+    taxPaise,
+    withTaxPaise,
 } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -38,9 +40,14 @@ import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
-import { clearAddonsInTx } from "./addon-charges";
-import type { EndingAddon } from "./addons-ending";
+import {
+    clearAddonsInTx,
+    holdMonthAddonChargesInTx,
+    monthAddonLines,
+} from "./addon-charges";
+import type { EndingAddon, HeldAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
+import { autopayTakes, planTaxOf } from "./autopay-currency";
 import { BillingCustomers } from "./billing-customer";
 import type {
     BillingDetail,
@@ -81,7 +88,13 @@ import type {
     MandateCheck,
     PaymentKind,
 } from "./checkout-quote";
-import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
+import {
+    billedByProvider,
+    COUPON_KINDS,
+    periodEnd,
+    quoteChange,
+} from "./checkout-quote";
+import type { AddonChargeLine } from "./offers";
 import {
     catalogueOfVersion,
     hadTrial,
@@ -103,7 +116,7 @@ import {
     BillingProviderError,
 } from "./providers/billing-provider.port";
 import { billingNotes } from "./providers/razorpay.provider";
-import { assertSarohBills } from "./saroh-bills";
+import { assertSarohKeeps, assertSarohSells } from "./saroh-bills";
 
 /**
  * The quote's word on who is billed: the billing profile (its id and legal
@@ -201,6 +214,12 @@ export interface ChangePlanQuoteView {
     termCharges: number;
     /** Exactly what is taken as it's authorised, GST included. */
     payNowTotalPaise: number;
+    /**
+     * Of `payNowTotalPaise`, before tax, the add-ons held, a whole month
+     * each: a plan paid one month at a time pays them with its month
+     * (stage 9, owner 8 Nov 2026). Zero otherwise.
+     */
+    addonsNowPaise: number;
     /** What setting up autopay takes now, named honestly (DEC-093). */
     mandateCheck: MandateCheck;
     /**
@@ -389,17 +408,19 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, coupon, addonsEnding } = await this.resolve(
-            ctx.organizationId,
-            input,
-            now,
-        );
+        const { target, quote, coupon, addonsEnding, monthAddons } =
+            await this.resolve(
+                ctx.organizationId,
+                input,
+                now,
+                ctx.edition ?? "INDIA",
+            );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const details = billingDetailsView(party);
         return {
-            ...this.quoteView(target, quote, coupon, addonsEnding),
+            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
             ...details,
             // A profile is its owner's (R2): only those who change what the
             // business pays are told which one bills it.
@@ -438,7 +459,13 @@ export class CheckoutService {
             ? {
                   ...checkoutView(openRow, openRow.plan),
                   handoff: allows(ctx, "billing:manage")
-                      ? await this.handoff(ctx, openRow, payNowOf(openRow))
+                      ? await this.handoff(
+                            ctx,
+                            openRow,
+                            payNowOf(openRow, openRow.plan.currency) +
+                                (await monthAddonsOnOrder(openRow)),
+                            openRow.plan.currency,
+                        )
                       : null,
               }
             : null;
@@ -509,6 +536,7 @@ export class CheckoutService {
             | "billToPhone"
         >,
         amountPaise: number,
+        currency: string,
     ): Promise<CheckoutHandoff | null> {
         let provider: BillingProvider;
         try {
@@ -535,7 +563,10 @@ export class CheckoutService {
             subscriptionId: oneTime ? null : row.providerSubscriptionId,
             orderId: oneTime ? row.providerSubscriptionId : null,
             amountPaise: oneTime ? amountPaise : null,
-            currency: "INR",
+            currency,
+            // Only cards take a currency other than rupees (Razorpay): the
+            // API says so, the browser never infers it (KTD4).
+            cardOnly: currency !== "INR",
             prefill: {
                 name: customer.name,
                 email: theirs ? null : customer.email,
@@ -622,18 +653,37 @@ export class CheckoutService {
         client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, subscription, coupon, addonsEnding } =
-            await this.resolve(ctx.organizationId, input, now);
+        const {
+            target,
+            quote,
+            subscription,
+            coupon,
+            addonsEnding,
+            monthAddons,
+        } = await this.resolve(
+            ctx.organizationId,
+            input,
+            now,
+            ctx.edition ?? "INDIA",
+        );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const view = {
-            ...this.quoteView(target, quote, coupon, addonsEnding),
+            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
             ...billingDetailsView(party),
         };
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
+        }
+        // Leaving or paying less is upkeep; anything else is a purchase,
+        // which Saroh must sell this business (stage 9, KTD3).
+        if (
+            quote.kind !== "TO_FREE" &&
+            !(quote.kind === "SCHEDULED" && lowersCharge(subscription, target))
+        ) {
+            await assertSarohSells(ctx, now);
         }
         if (quote.kind === "TO_FREE") {
             const at = await this.toFree(ctx, target, now);
@@ -700,6 +750,7 @@ export class CheckoutService {
             now,
             { ...billTo, billingProfileId: profileId },
             coupon,
+            subscription ? { id: subscription.id, lines: monthAddons } : null,
         );
     }
 
@@ -736,7 +787,7 @@ export class CheckoutService {
         now: Date = new Date(),
     ): Promise<Extract<ChangePlanResult, { checkout: CheckoutView }>> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         const { plan, startAt } = input;
         const party = await readBillingParty(
             prisma,
@@ -751,15 +802,17 @@ export class CheckoutService {
             });
         }
         const price = plan.priceCents;
-        const oneTime = plan.interval === "year";
-        const total = withGstPaise(price);
+        const oneTime =
+            plan.interval === "year" || !autopayTakes(plan.currency);
         const catalog = await catalogueOfVersion(prisma, plan.version);
+        const { tax } = catalogMoney(catalog);
+        const total = withTaxPaise(tax, price);
         // The plan's next charge, as it is today, from the date: nothing
         // is taken now but autopay's refundable check.
         const quote: ChangeQuote = {
             kind: "SCHEDULED",
             pricePaise: price,
-            gstPaise: gstPaise(price),
+            gstPaise: taxPaise(tax, price),
             totalPaise: total,
             chargeNowPaise: 0,
             chargeNowGstPaise: 0,
@@ -771,7 +824,7 @@ export class CheckoutService {
             discountPaise: 0,
             discountCharges: 0,
             firstChargePaise: price,
-            firstChargeGstPaise: gstPaise(price),
+            firstChargeGstPaise: taxPaise(tax, price),
             firstChargeTotalPaise: total,
             discountTotalPaise: 0,
             payment: oneTime ? "ONE_TIME" : "AUTOPAY",
@@ -909,8 +962,10 @@ export class CheckoutService {
         organizationId: string,
         input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date,
+        edition: Edition,
     ) {
         let target = await this.plans.resolveCatalogue(
+            edition,
             input.plan,
             input.cycle,
             now,
@@ -918,6 +973,7 @@ export class CheckoutService {
         // Free has no cycle to choose: its monthly row.
         if (target.priceCents === 0 && input.cycle !== "month") {
             target = await this.plans.resolveCatalogue(
+                edition,
                 input.plan,
                 "month",
                 now,
@@ -936,25 +992,36 @@ export class CheckoutService {
         // The live version's offers: the plan's trial, while the business
         // may still have one (U16).
         const catalog = await catalogueOfVersion(prisma, target.version);
+        // A first-month offer rides on autopay: none for a plan paid one
+        // month at a time (stage 9, KTD5b).
+        const autopay = autopayTakes(target.currency);
         const trialDays =
-            catalog && !(await hadTrial(prisma, organizationId))
+            autopay && catalog && !(await hadTrial(prisma, organizationId))
                 ? planTrialDays(catalog, planId)
                 : null;
         // DEC-093's nominal first month, from the same version's offer.
-        const trialFirstPaise = catalog ? planFirstPaise(catalog, planId) : 0;
+        const trialFirstPaise =
+            autopay && catalog ? planFirstPaise(catalog, planId) : 0;
         const term = await this.termOfSubscription(subscription, now);
         const termEndsAt = term?.endsAt ?? null;
         // A year chosen during the first month is a move up or not by what
         // its plan costs a month (DEC-159).
         const targetMonthlyPaise =
             subscription?.status === "TRIALING" && target.interval === "year"
-                ? (await this.plans.resolveCatalogue(input.plan, "month", now))
-                      .priceCents
+                ? (
+                      await this.plans.resolveCatalogue(
+                          edition,
+                          input.plan,
+                          "month",
+                          now,
+                      )
+                  ).priceCents
                 : undefined;
         const asked = {
             subscription,
             target,
             now,
+            tax: catalogMoney(catalog).tax,
             trialDays,
             trialFirstPaise,
             termEndsAt,
@@ -976,20 +1043,90 @@ export class CheckoutService {
             coupon = await findUsableCoupon({
                 code,
                 organizationId,
+                edition,
                 planId,
                 planName: target.name,
                 now,
             });
         }
-        const quote = quoteChange({ ...asked, coupon });
+        let quote = quoteChange({ ...asked, coupon });
+        const monthAddons = await this.monthAddons(
+            subscription,
+            quote,
+            target,
+            catalog,
+            planId,
+            now,
+        );
+        if (monthAddons.length > 0) {
+            const sum = monthAddons.reduce(
+                (t, l) => t + l.quantity * l.unitPaise,
+                0,
+            );
+            quote = {
+                ...quote,
+                payNowTotalPaise:
+                    quote.payNowTotalPaise +
+                    withTaxPaise(catalogMoney(catalog).tax, sum),
+            };
+        }
         const addonsEnding = await this.addonsEnding(
             subscription,
-            quote.kind,
+            // Paying the month on with its add-ons keeps them, as a
+            // renewal does: only the ones the plan isn't offered end.
+            monthAddons.length > 0 ? "RENEW" : quote.kind,
             subscription?.status === "TRIALING" &&
                 billedByProvider(subscription),
             catalog ? { catalog, planId, paid: target.priceCents > 0 } : null,
         );
-        return { target, quote, subscription, coupon, addonsEnding };
+        return {
+            target,
+            quote,
+            subscription,
+            coupon,
+            addonsEnding,
+            monthAddons,
+        };
+    }
+
+    /**
+     * The add-ons a month's order carries on a plan paid one month at a
+     * time (stage 9, owner 8 Nov 2026): the month paid on (Pay now on a
+     * month due, or the next month paid early) carries each add-on held
+     * then, a whole month, no proration. A new plan, an upgrade's
+     * difference or autopay carries none here.
+     */
+    private async monthAddons(
+        sub: { id: string; status: string } | null,
+        quote: ChangeQuote,
+        target: Plan,
+        catalog: Catalog | null,
+        planId: string,
+        now: Date,
+    ): Promise<AddonChargeLine[]> {
+        if (
+            !sub ||
+            sub.status === "CANCELLED" ||
+            !catalog ||
+            quote.payment !== "ONE_TIME" ||
+            target.interval === "year" ||
+            autopayTakes(target.currency) ||
+            (quote.kind !== "NEW" && quote.kind !== "RENEW")
+        ) {
+            return [];
+        }
+        const held: HeldAddon[] = await prisma.subscriptionAddon.findMany({
+            where: { subscriptionId: sub.id },
+            select: { addonId: true, quantity: true },
+        });
+        const start = quote.startAt ?? now;
+        return monthAddonLines(
+            catalog,
+            planId,
+            held,
+            start,
+            periodEnd(start, "month"),
+        );
     }
 
     /**
@@ -1032,6 +1169,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
+        monthAddons: AddonChargeLine[] = [],
     ): Omit<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
         return {
             plan: {
@@ -1065,6 +1203,10 @@ export class CheckoutService {
             payment: quote.payment,
             termCharges: quote.termCharges,
             payNowTotalPaise: quote.payNowTotalPaise,
+            addonsNowPaise: monthAddons.reduce(
+                (t, l) => t + l.quantity * l.unitPaise,
+                0,
+            ),
             mandateCheck: quote.mandateCheck,
             addonsEnding,
         };
@@ -1102,6 +1244,7 @@ export class CheckoutService {
                 select: { startAt: true, plan: { select: { name: true } } },
             });
             if (paidYear) {
+                // Saroh's own India billing, not a business's zone: India time on purpose.
                 const starts = paidYear.startAt
                     ? ` on ${paidYear.startAt.toLocaleDateString("en-IN", {
                           day: "numeric",
@@ -1218,6 +1361,8 @@ export class CheckoutService {
         now: Date,
         billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
         coupon: PricingCoupon | null = null,
+        /** The month's add-ons its order carries (`monthAddons`). */
+        addons: { id: string; lines: AddonChargeLine[] } | null = null,
     ): Promise<ChangePlanResult> {
         // A closing or deleted business starts nothing that charges (#921);
         // asked again in the transaction that records the checkout.
@@ -1405,6 +1550,15 @@ export class CheckoutService {
                         billTo.billingProfileId,
                     );
                 }
+                if (oneTime && addons) {
+                    await holdMonthAddonChargesInTx(tx, {
+                        organizationId: ctx.organizationId,
+                        subscriptionId: addons.id,
+                        provider: CATALOGUE_BILLING_PROVIDER,
+                        providerOrderId: made.providerSubscriptionId,
+                        lines: addons.lines,
+                    });
+                }
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {
@@ -1430,7 +1584,12 @@ export class CheckoutService {
             quote: view,
             checkout: checkoutView(row, target),
             authorisationUrl: made.authorisationUrl ?? null,
-            handoff: await this.handoff(ctx, row, quote.payNowTotalPaise),
+            handoff: await this.handoff(
+                ctx,
+                row,
+                quote.payNowTotalPaise,
+                target.currency,
+            ),
         };
     }
 
@@ -1443,14 +1602,20 @@ export class CheckoutService {
      */
     async startOneOff(
         ctx: OrganizationContext,
-        input: { amountPaise: number; reference: string; itemKey: string },
+        input: {
+            amountPaise: number;
+            reference: string;
+            itemKey: string;
+            /** The charge's currency; absent: rupees. */
+            currency?: string;
+        },
     ): Promise<{
         provider: string;
         providerOrderId: string;
         handoff: CheckoutHandoff | null;
     }> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohSells(ctx, new Date());
         await assertWorkspaceWrite(ctx.organizationId, "new");
         await assertBillingMayStart(prisma, ctx.organizationId);
         const party = await readBillingParty(prisma, ctx.organizationId);
@@ -1467,7 +1632,7 @@ export class CheckoutService {
             customerId = await this.customers.idFor(billingProfileId);
             ({ providerOrderId } = await provider.orders.createOrder({
                 amountPaise: input.amountPaise,
-                currency: "INR",
+                currency: input.currency ?? "INR",
                 reference: input.reference,
                 organizationId: ctx.organizationId,
                 planKey: input.itemKey,
@@ -1495,6 +1660,7 @@ export class CheckoutService {
                 billToPhone: null,
             },
             input.amountPaise,
+            input.currency ?? "INR",
         );
         return {
             provider: CATALOGUE_BILLING_PROVIDER,
@@ -1512,6 +1678,15 @@ export class CheckoutService {
             await tx.billingCheckout.update({
                 where: { id: c.id },
                 data: { status: "CANCELLED", endedReason: "replaced" },
+            });
+            // A month's order given up: its add-on lines go with it.
+            await tx.subscriptionAddonCharge.updateMany({
+                where: {
+                    provider: c.provider,
+                    providerSubscriptionId: c.providerSubscriptionId,
+                    status: "SENT",
+                },
+                data: { status: "DROPPED" },
             });
             await enqueueProviderCancel(tx, {
                 organizationId,
@@ -1631,8 +1806,33 @@ export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
  * year paid once is its first charge (an upgrade, its difference); an
  * autopay checkout its first charge (NEW) or its upfront amount.
  */
-export function payNowOf(row: BillingCheckout): number {
-    const first = withGstPaise(
+/**
+ * What a month's order carries for add-ons (`holdMonthAddonChargesInTx`),
+ * tax included; zero for every other checkout.
+ */
+async function monthAddonsOnOrder(
+    row: Pick<BillingCheckout, "provider" | "providerSubscriptionId"> & {
+        plan: { currency: string };
+    },
+): Promise<number> {
+    const rows = await prisma.subscriptionAddonCharge.findMany({
+        where: {
+            provider: row.provider,
+            providerSubscriptionId: row.providerSubscriptionId,
+            status: "SENT",
+        },
+        select: { quantity: true, unitPaise: true },
+    });
+    const sum = rows.reduce((t, r) => t + r.quantity * r.unitPaise, 0);
+    return withTaxPaise(planTaxOf(row.plan.currency), sum);
+}
+
+export function payNowOf(
+    row: BillingCheckout,
+    currency: string | null = "INR",
+): number {
+    const first = withTaxPaise(
+        planTaxOf(currency),
         row.pricePaise - (row.discountCharges > 0 ? row.discountPaise : 0),
     );
     const upfront = row.chargeNowPaise + row.chargeNowGstPaise;

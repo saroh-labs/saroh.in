@@ -22,7 +22,8 @@ export const LOOKUP_WINDOW_MS = 3 * 24 * 60 * 60_000;
 
 /** By age: an intent younger than `under` is asked again after `every`. */
 export const LOOKUP_TIERS: readonly { under: number; every: number }[] = [
-    // A booking hold lasts 15 minutes: ask every few minutes while young.
+    // A booking hold lasts 15 minutes (30 at Stripe): ask every few minutes
+    // while young.
     { under: 30 * 60_000, every: 3 * 60_000 },
     { under: 6 * 60 * 60_000, every: 30 * 60_000 },
     { under: LOOKUP_WINDOW_MS, every: 6 * 60 * 60_000 },

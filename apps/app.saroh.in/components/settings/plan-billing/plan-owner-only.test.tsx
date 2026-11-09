@@ -65,6 +65,7 @@ const SUBSCRIPTION = {
 /** Who Saroh bills (DEC-167, U5): the owner's alone. */
 const getBillingProfileView = vi.fn();
 vi.mock("@/lib/saroh-billing/service", () => ({
+    plansOpen: () => Promise.resolve(true),
     getBillingProfileView: () => getBillingProfileView() as unknown,
     getSarohSubscription: () =>
         Promise.resolve({ status: "ok", subscription: SUBSCRIPTION }),

@@ -1,4 +1,5 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import type { BookingRules } from "@/lib/staff/types";
 import type { Plan } from "@/lib/subscriptions/service";
 import { listPlansOptional } from "@/lib/subscriptions/service";
@@ -69,7 +70,7 @@ export async function readMembershipPlans(): Promise<MembershipPlan[] | null> {
 }
 
 /** Dates on the cards read in India's zone when the business's is unread. */
-export const FALLBACK_ZONE = "Asia/Kolkata";
+export const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
 /**
  * The business's time zone, for the cards' "runs out 25 Sep". An extra: a

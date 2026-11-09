@@ -326,13 +326,13 @@ describe("Sell (COMMERCE)", () => {
         const ctx = await business();
         const r = await refusal(
             setup.enable(ctx, "COMMERCE", {
+                // Blank is no answer, not a wrong one (DEC-212).
                 storefrontName: "",
                 fulfilment: ["DIGITAL"],
             }),
             BadRequestException,
         );
         expect(r.details?.fields?.map((f) => f.field)).toEqual([
-            "setup.storefrontName",
             "setup.fulfilment",
         ]);
         expect(await status(ctx, "COMMERCE")).toBeNull();
@@ -970,6 +970,129 @@ describe("modules that ask nothing", () => {
         );
         expect(r.details?.field).toBe("setup.provider");
         expect(await status(ctx, "INSIGHTS")).toBeNull();
+    });
+});
+
+describe("turning on needs nothing first (DEC-212)", () => {
+    it("Sell with nothing sent: a location named after the business, asked for Pick-up", async () => {
+        const ctx = await business("Rye Corner");
+        const out = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: " ",
+            fulfilment: [],
+        });
+        const store = await prisma.store.findUniqueOrThrow({
+            where: { id: out.created.storefrontId },
+            include: { settings: true },
+        });
+        expect(store.name).toBe("Rye Corner");
+        // Pick-up, without a counter to collect from (UX-025), as before.
+        expect(store.settings?.fulfilmentTypes).toEqual([]);
+        expect(await status(ctx, "COMMERCE")).toBe("ENABLED");
+    });
+
+    it("Sell with no name keeps the name of a location there already", async () => {
+        const ctx = await business();
+        await prisma.store.create({
+            data: { name: "Old Shop", organizationId: ctx.organizationId },
+        });
+        await setup.enable(ctx, "COMMERCE", {});
+        const stores = await prisma.store.findMany({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(stores.map((x) => x.name)).toEqual(["Old Shop"]);
+    });
+
+    it("Bookings with no first service makes none: Add a service to open your booking page is left", async () => {
+        const ctx = await business();
+        await setup.enable(ctx, "CRM", {});
+        const out = await setup.enable(ctx, "APPOINTMENTS", {
+            hours: HOURS,
+            service: { name: "", durationMinutes: 60, price: "" },
+        });
+        expect(out.alreadyEnabled).toBe(false);
+        expect(out.created.serviceId).toBeUndefined();
+        expect(await status(ctx, "APPOINTMENTS")).toBe("ENABLED");
+        expect(
+            await prisma.service.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+        const v = await view(ctx, "APPOINTMENTS");
+        expect(v.blockers.map((b) => b.code)).toContain(
+            "APPOINTMENTS_NO_SERVICE",
+        );
+        // An empty setup does the same.
+        const other = await business();
+        await setup.enable(other, "CRM", {});
+        await expect(
+            setup.enable(other, "APPOINTMENTS", {}),
+        ).resolves.toMatchObject({ alreadyEnabled: false, created: {} });
+    });
+
+    it("a first service with no hours sent gets Mon–Sat 10 to 7", async () => {
+        const ctx = await business();
+        await setup.enable(ctx, "CRM", {});
+        const out = await setup.enable(ctx, "APPOINTMENTS", {
+            hours: [],
+            service: { name: "Haircut", durationMinutes: 45, price: "" },
+        });
+        const rules = await prisma.availabilityRule.findMany({
+            where: { serviceId: out.created.serviceId },
+            orderBy: { dayOfWeek: "asc" },
+        });
+        expect(
+            rules.map((r) => [r.dayOfWeek, r.startMinute, r.endMinute]),
+        ).toEqual(HOURS.map((h) => [h.weekday, 600, 1140]));
+    });
+
+    it("still refuses a first service typed wrong", async () => {
+        const ctx = await business();
+        await setup.enable(ctx, "CRM", {});
+        const r = await refusal(
+            setup.enable(ctx, "APPOINTMENTS", {
+                service: { name: "Cut", durationMinutes: 45, price: "5,00" },
+            }),
+            BadRequestException,
+        );
+        expect(r.details?.field).toBe("setup.service.price");
+        expect(await status(ctx, "APPOINTMENTS")).toBeNull();
+    });
+
+    it("Website with nothing sent: the business's name, at its own address", async () => {
+        const ctx = await business("Pulse Corner");
+        const { slug } = await prisma.organization.findUniqueOrThrow({
+            where: { id: ctx.organizationId },
+            select: { slug: true },
+        });
+        const out = await setup.enable(ctx, "WEBSITE", {
+            siteName: "",
+            address: "",
+        });
+        expect(out.created.siteAddress).toBe(slug);
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: out.created.siteId },
+        });
+        expect(site).toMatchObject({ name: "Pulse Corner", subdomain: slug });
+    });
+
+    it("Website with no address, its own taken since: a free one like it, never a refusal", async () => {
+        const ctx = await business();
+        const { slug } = await prisma.organization.findUniqueOrThrow({
+            where: { id: ctx.organizationId },
+            select: { slug: true },
+        });
+        const other = await business("Other");
+        await prisma.site.create({
+            data: {
+                organizationId: other.organizationId,
+                name: "Other",
+                slug: "other",
+                subdomain: slug,
+            },
+        });
+        const out = await setup.enable(ctx, "WEBSITE", { siteName: "Rye" });
+        expect(out.created.siteAddress).toBe(`${slug}-2`);
+        expect(await status(ctx, "WEBSITE")).toBe("ENABLED");
     });
 });
 

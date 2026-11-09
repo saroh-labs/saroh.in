@@ -418,6 +418,8 @@ describe("what each person sees of the inbox (F14)", () => {
                 "refund.failed",
                 "refund.failed.booking",
                 "refund.failed.invoice",
+                // A late Stripe hold payment Saroh refunded (U5).
+                "refund.late-hold.booking",
                 // A provider's event Saroh couldn't apply.
                 "payment.event_unapplied",
                 "site.live",

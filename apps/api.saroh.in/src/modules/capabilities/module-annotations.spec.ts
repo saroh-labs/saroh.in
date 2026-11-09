@@ -178,6 +178,8 @@ const NEVER: Record<string, string> = {
         "who Saroh bills for the business: billing, not a capability module",
     "waitlist/launch-offer.controller.ts":
         "taking an opening-day invite's plan offer at onboarding — billing, not a capability module",
+    "waitlist/paid-plans.controller.ts":
+        "Tell me when paid plans open, on an edition with no Saroh billing — billing, not a capability module",
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
     "admin/admin-machinery.controller.ts":
         "staff control plane, not a tenant surface",
@@ -332,6 +334,10 @@ const NEVER: Record<string, string> = {
     // whatever the business has switched off since.
     "webhooks/checkout-return.controller.ts":
         "a buyer's checkout return — settles a payment already taken",
+    // U7: Stripe's hosted Checkout return reads and its Back link, about a
+    // payment already started; never module-gated, as the return above.
+    "webhooks/checkout-session.controller.ts":
+        "a buyer's return from Stripe Checkout — reads or closes a payment already started",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
     "waitlist/public-offer.controller.ts":

@@ -143,6 +143,16 @@ export class CheckoutStartDto {
     key!: string;
 
     /**
+     * Where a hosted checkout (Stripe) sends the customer back to. Checked
+     * where it is used (`safeReturnPath`): anything but a same-site path is
+     * ignored.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    returnPath?: string;
+
+    /**
      * The tag the page's address carried when a QR code's scan opened it,
      * `qr-<code>`. Never refuses an order: anything that isn't a
      * well-formed tag is dropped before validation (`qrSourceTagOf`), and

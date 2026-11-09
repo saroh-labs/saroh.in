@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 import { DateTime } from "luxon";
 
 type Sequencer = Pick<Prisma.TransactionClient, "invoiceSequence" | "invoice">;
@@ -9,7 +10,11 @@ export type InvoiceKind = "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
 /** GST's limit on an invoice number (CGST Rules, rule 46). */
 export const MAX_NUMBER_LENGTH = 16;
 
-/** The business's zone, or India's when it has none ("" included, as older rows stored it). */
+/**
+ * The zone given, or the unset edition's (India's) when none is ("" included,
+ * as older rows stored it). Callers pass the business's zone, its edition's
+ * default already applied (`zoneOf`), so a Global business never reads this.
+ */
 function zoneOrDefault(zone: string | null | undefined): string {
     return zone?.trim() ? zone : DEFAULT_TIMEZONE;
 }
@@ -17,8 +22,8 @@ function zoneOrDefault(zone: string | null | undefined): string {
 /** What rule 46 lets an invoice number carry: capitals, digits, "-" and "/". */
 const NUMBER_CHARS = /^[A-Z0-9/-]+$/;
 
-/** The zone a business without one keeps its financial year in. */
-export const DEFAULT_TIMEZONE = "Asia/Kolkata";
+/** The zone GST's April-to-March year is read in when no zone is given. */
+export const DEFAULT_TIMEZONE = editionProfile("INDIA").defaultZone;
 
 const PREFIX_RE = /^[A-Z0-9]{1,3}$/;
 

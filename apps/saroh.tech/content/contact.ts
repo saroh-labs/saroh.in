@@ -103,7 +103,7 @@ export const CONTACT = {
         items: [
             {
                 q: "A customer paid me. Where's the money?",
-                a: "With you. Customers pay you directly, in cash, by card machine or by bank transfer, and you record it in Saroh. Saroh never holds your money, and paying online isn't available yet.",
+                a: "With you. Customers pay you directly, in cash, by card machine or by bank transfer, and you record it in Saroh. They can also pay by card online, into your own account. Saroh never holds your money.",
             },
         ],
     },

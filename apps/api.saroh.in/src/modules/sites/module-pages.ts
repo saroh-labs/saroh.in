@@ -3,7 +3,10 @@ import { prisma } from "@saroh/database";
 
 import { appointmentsOpen } from "../bookings/appointments-open";
 import type { ModuleKey } from "../capabilities/module-registry";
-import { MODULE_BY_KEY } from "../capabilities/module-registry";
+import {
+    MODULE_BY_KEY,
+    moduleRolledOut,
+} from "../capabilities/module-registry";
 import { classPacksOn } from "../class-packs/class-packs-on";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { paymentsOn } from "../invoices/payments-on";
@@ -40,10 +43,9 @@ async function rolledOut(
     key: ModuleKey,
     organizationId: string,
 ): Promise<boolean> {
-    const descriptor = MODULE_BY_KEY.get(key);
-    return descriptor
-        ? flags.isEnabled(descriptor.rolloutFlag, organizationId)
-        : false;
+    // `moduleRolledOut`, so a module hidden from every business (DEC-068,
+    // DEC-099) is never offered on a site, whatever its flag says.
+    return moduleRolledOut(flags, key, organizationId);
 }
 
 function label(key: ModuleKey): string {

@@ -20,6 +20,7 @@ import {
     shopLink,
     shopOutline,
 } from "../shop/look-shop";
+import { struckWordOf, taxWordOf, useSiteBusiness } from "../site-business";
 import { NamePlate } from "./name-plate";
 import { chooseLabel } from "./option-summary";
 import { formatAmount } from "./product-page";
@@ -151,7 +152,7 @@ export function LookShopListing({
     cutOff = null,
     products,
     basePath = "/shop",
-    locale = "en-IN",
+    locale,
     bagSite = null,
     business = null,
     reach = null,
@@ -178,6 +179,7 @@ export function LookShopListing({
     /** The public API, for Live's "N left" in the browser; null: none. */
     apiUrl?: string | null;
 }) {
+    const site = useSiteBusiness();
     const categories = categoriesOf(products);
     const [category, setCategory] = useState<string | null>(null);
     const picked = categories.includes(category ?? "") ? category : null;
@@ -354,6 +356,7 @@ export function LookShopListing({
                         const amount = browsePriceWords(
                             formatAmount(p.price, p.currency, locale),
                             p.gstAdded === true,
+                            taxWordOf(site),
                         );
                         const price = p.priceFrom ? `From ${amount}` : amount;
                         const saving = cardSaving(p);
@@ -573,7 +576,7 @@ export function LookShopListing({
     );
 }
 
-/** "MRP ₹720 · you save ₹70", the MRP struck through. */
+/** "MRP ₹720 · 10% off" ("Was $720" on Global), the price struck through. */
 function MrpLine({
     saving,
     currency,
@@ -581,11 +584,12 @@ function MrpLine({
 }: {
     saving: NonNullable<ReturnType<typeof cardSaving>>;
     currency: string;
-    locale: string;
+    locale?: string;
 }) {
+    const word = struckWordOf(useSiteBusiness(), true);
     return (
         <span data-card-mrp="" className="text-site-body text-[13.5px]">
-            MRP{" "}
+            {word}{" "}
             <span className="line-through">
                 {formatAmount(saving.mrp, currency, locale)}
             </span>

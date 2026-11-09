@@ -94,7 +94,9 @@ describe("catalogue import (DB)", () => {
         expect(result.settledLocally).toBe(result.providerPlans);
         expect(result.changes.length).toBeGreaterThan(0);
 
-        expect((await liveCatalogueVersion(prisma, now))?.version).toBe(2);
+        expect(
+            (await liveCatalogueVersion(prisma, "INDIA", now))?.version,
+        ).toBe(2);
         const stored = await prisma.pricingCatalogVersion.findUniqueOrThrow({
             where: { version: 2 },
         });
@@ -136,7 +138,9 @@ describe("catalogue import (DB)", () => {
         );
         expect(result).toMatchObject({ version: 2, status: "waiting" });
         expect(result.settledLocally).toBe(0);
-        expect((await liveCatalogueVersion(prisma, now))?.version).toBe(1);
+        expect(
+            (await liveCatalogueVersion(prisma, "INDIA", now))?.version,
+        ).toBe(1);
         expect(
             (await providerRows(2)).every((r) => r.status === "PENDING"),
         ).toBe(true);

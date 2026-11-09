@@ -5,12 +5,14 @@ import type {
     ConnectCommsInput,
     ConnectPaymentInput,
     PaymentProviderName,
+    StripeCheckoutStyle,
 } from "./service";
 import {
     connectCommsProvider as connectCommsApi,
     connectPaymentProvider as connectPaymentApi,
     disconnectCommsProvider as disconnectCommsApi,
     disconnectPaymentProvider as disconnectPaymentApi,
+    setStripeCheckoutStyle as setStripeCheckoutStyleApi,
 } from "./service";
 
 /**
@@ -23,6 +25,12 @@ export async function connectPaymentProvider(input: ConnectPaymentInput) {
 
 export async function disconnectPaymentProvider(provider: PaymentProviderName) {
     return disconnectPaymentApi(provider);
+}
+
+export async function setStripeCheckoutStyle(
+    checkoutStyle: StripeCheckoutStyle,
+) {
+    return setStripeCheckoutStyleApi(checkoutStyle);
 }
 
 export async function connectCommsProvider(input: ConnectCommsInput) {

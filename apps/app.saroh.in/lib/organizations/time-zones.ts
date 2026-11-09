@@ -4,6 +4,9 @@
  * The API stores the IANA name and checks it against the tz database.
  */
 
+import { currentZoneName, zoneInCountry, zonesOfCountry } from "@saroh/edition";
+
+import { PROFILE } from "@/lib/edition";
 import {
     isTimeZone,
     timeZoneName,
@@ -16,32 +19,9 @@ export { DEFAULT_TIMEZONE };
 /**
  * ICU still answers some zones by their old names — a browser in India
  * reports "Asia/Calcutta". Each is shown and saved as the name the tz
- * database uses now, which the API knows too.
+ * database uses now, which the API knows too (`@saroh/edition`).
  */
-const RENAMED: Record<string, string> = {
-    "Africa/Asmera": "Africa/Asmara",
-    "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
-    "America/Catamarca": "America/Argentina/Catamarca",
-    "America/Coral_Harbour": "America/Atikokan",
-    "America/Cordoba": "America/Argentina/Cordoba",
-    "America/Godthab": "America/Nuuk",
-    "America/Indianapolis": "America/Indiana/Indianapolis",
-    "America/Jujuy": "America/Argentina/Jujuy",
-    "America/Louisville": "America/Kentucky/Louisville",
-    "America/Mendoza": "America/Argentina/Mendoza",
-    "Asia/Calcutta": "Asia/Kolkata",
-    "Asia/Katmandu": "Asia/Kathmandu",
-    "Asia/Rangoon": "Asia/Yangon",
-    "Asia/Saigon": "Asia/Ho_Chi_Minh",
-    "Atlantic/Faeroe": "Atlantic/Faroe",
-    "Europe/Kiev": "Europe/Kyiv",
-    "Pacific/Enderbury": "Pacific/Kanton",
-    "Pacific/Ponape": "Pacific/Pohnpei",
-    "Pacific/Truk": "Pacific/Chuuk",
-};
-
-/** A zone by the name the tz database uses now. */
-export const currentZoneName = (zone: string) => RENAMED[zone] ?? zone;
+export { currentZoneName };
 
 /**
  * The zone this browser is in, by its current name, or null when it cannot
@@ -54,6 +34,42 @@ export function browserZone(): string | null {
     } catch {
         return null;
     }
+}
+
+/** Where the business's country is asked (Global), its zone follows it. */
+const zoneByCountry = PROFILE.businessCountry === "asked-at-setup";
+
+/**
+ * The zones a business may keep (KTD-C): on Global, its country's, when the
+ * country is listed; null where any zone is offered (India, and a country
+ * not listed).
+ */
+export function zonesOffered(
+    country: string | null | undefined,
+): readonly string[] | null {
+    if (!zoneByCountry) return null;
+    const zones = zonesOfCountry(country);
+    return zones.length > 0 ? zones : null;
+}
+
+/** Whether setup asks the zone: a Global country that keeps several. */
+export const zoneAsked = (country: string | null | undefined): boolean =>
+    zoneByCountry && zonesOfCountry(country).length > 1;
+
+/**
+ * The zone offered before one is chosen: the browser's, except that on
+ * Global it must be in the business's country (else the country's main
+ * zone; none for a country not listed). Never another country's.
+ */
+export function offeredZone(country: string | null | undefined): string | null {
+    const browser = browserZone();
+    return zoneByCountry ? zoneInCountry(country, browser) : browser;
+}
+
+/** The browser's zone when it is one of the country's, for setup's question. */
+export function browserZoneIn(country: string | null | undefined): string {
+    const browser = browserZone();
+    return browser && zonesOfCountry(country).includes(browser) ? browser : "";
 }
 
 function zoneName(
@@ -129,7 +145,18 @@ export const zoneLabel = (zone: string, at?: Date) =>
  * Every zone this browser knows, by current name and once each, plus UTC,
  * west to east and then by city — so a zone sits beside its neighbours.
  */
-export function timeZoneOptions(at: Date = new Date()): ZoneOption[] {
+export function timeZoneOptions(
+    at: Date = new Date(),
+    only?: readonly string[] | null,
+): ZoneOption[] {
+    if (only) {
+        return only
+            .map((zone) => zoneOption(zone, at))
+            .sort(
+                (a, b) =>
+                    a.minutes - b.minutes || a.city.localeCompare(b.city, "en"),
+            );
+    }
     let zones: string[];
     try {
         zones = Intl.supportedValuesOf("timeZone");

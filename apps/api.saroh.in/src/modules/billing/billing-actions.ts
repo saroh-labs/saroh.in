@@ -24,6 +24,12 @@ export const BILLING_ACTION_CODES = [
     "billing_payment_notes_given_up",
     "billing_profile_owner_left",
     "billing_profile_gone",
+    // Saroh's export invoices (stage 9, KTD5, KTD6): a payment in another
+    // currency than its plan's, a Global plan paid with a card issued in
+    // India, and an export invoice the API's settings can't issue yet.
+    "billing_payment_currency_mismatch",
+    "billing_export_domestic_card",
+    "saroh_export_invoice_unset",
     // Commission (DEC-169, admin console U21): a payment's line the job
     // couldn't write after its tries, and a refund after the line was paid.
     "commission_line_failed",

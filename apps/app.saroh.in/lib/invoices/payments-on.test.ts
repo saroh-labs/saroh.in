@@ -19,6 +19,7 @@ const reads = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/saroh-billing/service", () => ({
+    plansOpen: () => Promise.resolve(true),
     billingAccessOrNull: () => Promise.resolve(reads.access),
 }));
 vi.mock("./tax", () => ({

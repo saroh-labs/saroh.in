@@ -3,7 +3,11 @@
 // order row, never for an order paid, handed over or cancelled since, and
 // never a cancel.
 jest.mock("@saroh/database", () => ({
-    prisma: { $transaction: jest.fn() },
+    prisma: {
+        $transaction: jest.fn(),
+        // The sender's edition (KTD6): India's when there's no row.
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
+    },
     runInOrgContext: jest.fn((_org: string, fn: () => unknown) => fn()),
 }));
 jest.mock("../../env", () => ({

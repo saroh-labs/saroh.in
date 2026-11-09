@@ -15,7 +15,7 @@ import {
     BILLING_PROVIDER_FACTORY,
     BillingProviderError,
 } from "./providers/billing-provider.port";
-import { assertSarohBills } from "./saroh-bills";
+import { assertSarohKeeps } from "./saroh-bills";
 
 /**
  * `POST …/billing/checkout/confirm`: where the business's checkout stands.
@@ -68,7 +68,7 @@ export class CheckoutConfirmService {
         now: Date = new Date(),
     ): Promise<ConfirmView> {
         authorize(ctx, "billing:manage");
-        assertSarohBills(ctx.edition);
+        await assertSarohKeeps(ctx, now);
         const open = await prisma.billingCheckout.findFirst({
             where: { organizationId: ctx.organizationId, status: "OPEN" },
             include: { plan: { select: { key: true, name: true } } },

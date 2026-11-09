@@ -57,7 +57,8 @@ export function OrderPay({
 }) {
     const router = useRouter();
     const start = useCallback(
-        (idempotencyKey: string) => startPayment(token, idempotencyKey),
+        (idempotencyKey: string, returnPath?: string) =>
+            startPayment(token, idempotencyKey, returnPath),
         [token],
     );
     const refresh = useCallback(() => router.refresh(), [router]);

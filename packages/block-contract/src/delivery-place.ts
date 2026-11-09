@@ -1,3 +1,9 @@
+import {
+    addressRulesFor,
+    checkPostcode,
+    checkRegion,
+} from "@saroh/edition/address-rules";
+
 import { PHONE_COUNTRIES } from "./phone";
 
 /**
@@ -45,4 +51,33 @@ export function splitDeliveryPlace(stored: string | null | undefined): {
               country: country.code,
           }
         : { region: line, country: null };
+}
+
+/**
+ * A Global delivery's region and postcode, held to the address's own country
+ * and never refused for being abroad (owner, 8 Nov). Where the region is a
+ * list (the US, Canada, Australia) a courier needs both, so both are asked;
+ * elsewhere both are optional, but a typed postcode must fit its country.
+ * The API holds an order to this; the app and the site say it sooner.
+ */
+export function checkDeliveryPlace(
+    country: string | null | undefined,
+    region: string | null | undefined,
+    postcode: string | null | undefined,
+):
+    | { region: string; postcode: string }
+    | { problem: string; field: "state" | "postalCode" } {
+    const rule = addressRulesFor(country).region;
+    const required = rule.kind === "list";
+    if (required && !region?.trim()) {
+        return {
+            problem: `Choose the ${rule.label.toLowerCase()}.`,
+            field: "state",
+        };
+    }
+    const r = checkRegion(country, region, required);
+    if ("problem" in r) return { problem: r.problem, field: "state" };
+    const p = checkPostcode(country, postcode, required);
+    if ("problem" in p) return { problem: p.problem, field: "postalCode" };
+    return { region: r.value, postcode: p.value };
 }

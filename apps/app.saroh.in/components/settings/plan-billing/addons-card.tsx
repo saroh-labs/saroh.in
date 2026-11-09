@@ -9,6 +9,7 @@ import { useState, useTransition } from "react";
 
 import { setAddonAction } from "@/lib/saroh-billing/billing-actions";
 import type { AddonRow } from "@/lib/saroh-billing/plan-view";
+import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
 import { runAction } from "@/lib/api/run-action";
 import { card } from "./styles";
@@ -44,6 +45,24 @@ export function AddonsCard({
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
+                return;
+            }
+            // A plan paid one month at a time (stage 9): a whole month of
+            // it is paid now, and it's held once the payment lands.
+            const handoff = res.data.payment?.handoff;
+            if (handoff) {
+                const outcome = await openRazorpayWindow(handoff, row.name);
+                if (outcome === "paid") {
+                    showSuccess(
+                        `${row.name}: paid for this month. It's yours as soon as the payment is confirmed.`,
+                    );
+                } else if (outcome === "unavailable") {
+                    showError(
+                        "Razorpay's payment window couldn't open.",
+                        "Nothing was charged. Check your connection and try again.",
+                    );
+                }
+                router.refresh();
                 return;
             }
             if (row.isModule) {

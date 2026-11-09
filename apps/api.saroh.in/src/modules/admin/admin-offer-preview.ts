@@ -131,7 +131,7 @@ export async function previewOffer(
                 const catalog =
                     before.source === "catalogue"
                         ? before.catalog
-                        : await liveCatalog();
+                        : await liveCatalog(organizationId);
                 if (!catalog) {
                     throw new ConflictException(
                         "No catalogue version is live yet, so there is no plan to put it on.",

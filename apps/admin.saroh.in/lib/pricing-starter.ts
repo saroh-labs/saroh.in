@@ -2,6 +2,9 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import { AUTOPAY_CHARGES_DEFAULT, limitWithin } from "@saroh/pricing-catalog";
 import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
 
+import { PROFILE } from "@/lib/edition";
+import { planTaxed } from "@/lib/plan-money";
+
 /**
  * The two ways to start pricing on an instance that has none (the Plans
  * console audit, 6 Oct 2026): the first draft has to come from somewhere,
@@ -19,6 +22,10 @@ import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
  */
 export function starterCatalog(): Catalog {
     const c = structuredClone(SEED_CATALOG);
+    // This console's plan money (stage 9): dollars and no tax, no yearly, on
+    // Global's.
+    Object.assign(c, PROFILE.sarohPlanMoney);
+    if (!planTaxed()) c.yearly.on = false;
     for (const p of c.plans) {
         p.pricePaise = 0;
         delete p.trial;
@@ -58,6 +65,7 @@ export function blankCatalog(): Catalog {
         modules: [],
         yearly: { on: false, paid: 10 },
         gst: { show: "excl" },
+        ...PROFILE.sarohPlanMoney,
         autopay: { charges: AUTOPAY_CHARGES_DEFAULT },
         addons: [],
     };

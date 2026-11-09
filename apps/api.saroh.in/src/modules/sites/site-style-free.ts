@@ -13,6 +13,7 @@ import { prisma } from "@saroh/database";
 import type { FreeStyles } from "@saroh/pricing-catalog";
 import { freeStylesOf } from "@saroh/pricing-catalog";
 import type { LookId, TemplateManifest } from "@saroh/templates";
+import { editionOf } from "../../common/app-url";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { planMeter } from "../billing/metering.service";
@@ -97,10 +98,13 @@ export function paidStyleParts(
  * plan can't be read either).
  */
 export async function liveFreeStyles(
+    organizationId: string,
     now: Date = new Date(),
 ): Promise<FreeStyles> {
     try {
-        return freeStylesOf(await catalogue.liveCatalog(now));
+        return freeStylesOf(
+            await catalogue.liveCatalog(await editionOf(organizationId), now),
+        );
     } catch (err) {
         logger.warn(
             `free_styles_unresolved error=${err instanceof Error ? err.name : "unknown"}`,
@@ -171,7 +175,8 @@ export async function assertStyleChoicesAllowed(
     });
     const liveLook = snapshotLook(live?.currentPublication?.snapshot);
     if (parts(NONE_FREE, liveLook).length === 0) return;
-    if (parts(await liveFreeStyles(now), liveLook).length === 0) return;
+    if (parts(await liveFreeStyles(organizationId, now), liveLook).length === 0)
+        return;
     await planMeter.assertIncluded(organizationId, "themes", now);
 }
 
@@ -182,7 +187,7 @@ export async function siteStyleAccess(
     now: Date = new Date(),
 ): Promise<SiteStyleAccess> {
     const [lists, paidIncluded] = await Promise.all([
-        liveFreeStyles(now),
+        liveFreeStyles(organizationId, now),
         planMeter.isIncluded(organizationId, "themes", now),
     ]);
     return {

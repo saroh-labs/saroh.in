@@ -34,6 +34,7 @@ export const UI_FILES = [
     "components/ui/textarea.tsx",
     "components/ui/tooltip.tsx",
     "components/ui/wordmark.tsx",
+    "lib/money.ts",
     "lib/utils.ts",
     "lib/wordmark-geometry.ts",
 ];
@@ -46,6 +47,8 @@ const config: Config = {
         ),
         ...UI_FILES.map((file) => `../../packages/ui/src/${file}`),
         ...marketingContent,
+        // "Tell me when"'s Turnstile box (`@saroh/site-blocks/challenge`).
+        "../../packages/site-blocks/src/account/challenge.tsx",
     ],
     theme: {
         ...sharedConfig.theme,

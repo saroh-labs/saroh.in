@@ -268,8 +268,7 @@ export function stripeKeyProblems(
             : "Enter the publishable key. It starts pk_live_ or pk_test_.";
     }
     if (rk.startsWith("sk_")) {
-        out.restricted =
-            "Use a restricted key, not your secret key. In Stripe, create one with Payment Intents and Refunds set to Write.";
+        out.restricted = `Use a restricted key, not your secret key. In Stripe, create one with ${STRIPE_KEY_PERMISSIONS}.`;
     } else if (rk ? !STRIPE_RESTRICTED_KEY.test(rk) : tried) {
         out.restricted = rk
             ? "That isn't a restricted key. It starts rk_live_ or rk_test_."
@@ -307,6 +306,29 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
  * paid stays "Awaiting payment". Setup requires it since then; one saved
  * before needs its keys entered again with the secret.
  */
+/**
+ * The restricted key's permissions Stripe payments need (plan
+ * 2026-11-07-002, KTD-14), as the API's words say them
+ * (`stripe-payments.ts` `STRIPE_KEY_PERMISSIONS`).
+ */
+export const STRIPE_KEY_PERMISSIONS =
+    "Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write";
+
+/**
+ * A Stripe connection that still takes payments, but whose restricted key
+ * lacks a permission a payment uses on the side: Customers (KTD-14), so a
+ * payment goes without its Stripe customer, or Payment Intents: Write, so
+ * a card-window payment goes to Stripe's page instead (owner, 8 Nov 2026).
+ */
+export function permissionMissing(p: {
+    status: string;
+    attention?: { reason: string } | null;
+}): boolean {
+    return (
+        p.status === "CONNECTED" && p.attention?.reason === "PERMISSION_MISSING"
+    );
+}
+
 /**
  * A connection still CONNECTED whose provider refused its keys on a live
  * call (UX-012): nothing goes through it until they are entered again.
@@ -408,7 +430,8 @@ function paymentEntry(
     const refused = keysRefused(p);
     const noKey = needsPublicKey(p);
     const noSecret = needsWebhookSecret(p);
-    const attention = refused || noKey || noSecret;
+    const lacking = permissionMissing(p);
+    const attention = refused || noKey || noSecret || lacking;
     // The storefronts whose checkout really charges through it.
     const stores = input.checkout
         .filter((s) => s.provider === p.provider)
@@ -426,16 +449,20 @@ function paymentEntry(
                 ? `Needs its ${keyName(p.provider)}. Checkout can't open the payment window, so no one can pay online through it until you enter the keys again.`
                 : noSecret
                   ? "Needs its webhook signing secret. Payments can't be confirmed until you add it."
-                  : stores.length > 0
-                    ? sentence(`Takes online payments at ${words(stores)}`)
-                    : "Ready to take online payments. No location's checkout uses it yet.",
+                  : lacking
+                    ? `Needs attention. Its restricted key is missing a permission, so payments go through without a Stripe customer, or on Stripe's page instead of yours. In Stripe, give the key ${STRIPE_KEY_PERMISSIONS}, then enter the keys again.`
+                    : stores.length > 0
+                      ? sentence(`Takes online payments at ${words(stores)}`)
+                      : "Ready to take online payments. No location's checkout uses it yet.",
         fix: refused
             ? "Enter keys again"
             : noKey
               ? `Add ${keyName(p.provider)}`
               : noSecret
                 ? "Add webhook secret"
-                : null,
+                : lacking
+                  ? "Enter keys again"
+                  : null,
         update: live
             ? lastUpdateLine(
                   webhookFor(input.webhooks, p.provider),

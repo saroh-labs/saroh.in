@@ -1,5 +1,7 @@
 "use client";
 
+import { PROFILE } from "@/lib/edition";
+import { CountrySelect } from "@saroh/ui/country-select";
 import {
     FormControl,
     FormDescription,
@@ -174,6 +176,9 @@ export function SetupBillingStep({
  * fields, by the same names, to make or edit a profile (U5).
  */
 export function NewProfileFields() {
+    // A payer abroad (stage 9, KTD7): the country first, a tax number and a
+    // phone, and none of India's GST fields.
+    if (PROFILE.address !== "indian-state-and-pin") return <AbroadFields />;
     return (
         <div
             role="group"
@@ -233,6 +238,95 @@ export function NewProfileFields() {
     );
 }
 
+function AbroadFields() {
+    return (
+        <div
+            role="group"
+            aria-label="New billing profile"
+            className="grid gap-4"
+        >
+            <CountryField />
+            <TextField
+                name="billLegalName"
+                label="Legal name"
+                hint="As Saroh's invoices should name it."
+                autoComplete="organization"
+                maxLength={200}
+            />
+            <TextField
+                name="billEmail"
+                label="Billing email"
+                hint="Saroh's invoices and receipts go here. Use one your other profiles don't."
+                autoComplete="email"
+                type="email"
+                maxLength={254}
+            />
+            <TextField
+                name="billTaxId"
+                label="Tax number"
+                optional
+                hint="Your VAT, GST or other tax number, if you have one."
+                maxLength={40}
+            />
+            <TextField
+                name="billAddress"
+                label="Billing address"
+                optional
+                hint="Saroh asks for it before the first payment if it isn't here."
+                autoComplete="address-line1"
+                maxLength={120}
+            />
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                <TextField
+                    name="billCity"
+                    label="City"
+                    optional
+                    autoComplete="address-level2"
+                    maxLength={60}
+                />
+                <TextField
+                    name="billPin"
+                    label="Postcode"
+                    optional
+                    autoComplete="postal-code"
+                    maxLength={20}
+                />
+            </div>
+            <TextField
+                name="billPhone"
+                label="Phone"
+                optional
+                hint="With + and the country code. Card payments from abroad need one."
+                autoComplete="tel"
+                type="tel"
+                maxLength={32}
+            />
+        </div>
+    );
+}
+
+function CountryField() {
+    const form = useFormContext<SetupValues>();
+    return (
+        <FormField
+            control={form.control}
+            name="billCountry"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                        <CountrySelect
+                            value={field.value ?? ""}
+                            onValueChange={(v) => field.onChange(v)}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+    );
+}
+
 function Optional({ label, optional }: { label: string; optional?: boolean }) {
     return (
         <>
@@ -258,7 +352,7 @@ function TextField({
     className,
     ...input
 }: {
-    name: Exclude<BillingField, "billingChoice" | "billState">;
+    name: Exclude<BillingField, "billingChoice" | "billState" | "billCountry">;
     label: string;
     hint?: string;
     optional?: boolean;

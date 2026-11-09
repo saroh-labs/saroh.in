@@ -7,6 +7,11 @@
 export const EDITIONS = ["INDIA", "GLOBAL"] as const;
 export type Edition = (typeof EDITIONS)[number];
 
+/** Whether a stored value names an edition. */
+export function isEdition(value: unknown): value is Edition {
+    return (EDITIONS as readonly unknown[]).includes(value);
+}
+
 export type DeployEnvironment = "production" | "development";
 
 /**
@@ -35,6 +40,12 @@ export interface EditionProfile {
     businessCountry: "india-only" | "asked-at-setup";
     /** Whether Saroh bills the business itself, through a billing profile. */
     sarohBilling: boolean;
+    /**
+     * The money Saroh's own plans are priced in (stage 9, KTD2): rupees with
+     * GST, or US dollars with no tax (an export of services). A business's
+     * plan money is in this, never its own currency (KTD6c).
+     */
+    sarohPlanMoney: { currency: "INR" | "USD"; tax: "gst" | "none" };
     /** Whether people can sign in to Saroh with a phone (each code costs money). */
     phoneSignIn: boolean;
     /** The higher, struck-through price: India's printed MRP, or an original price. */
@@ -57,6 +68,20 @@ export interface EditionProfile {
      * plan's to say.
      */
     onlinePaymentsOnEveryPlan: boolean;
+    /**
+     * The suffix on the env names an edition sets for itself (its GitHub
+     * sign-in app, its senders): India's are the original names, Global's
+     * end in `_GLOBAL` (stage 10, KTD5 and KTD6).
+     */
+    envSuffix: "" | "_GLOBAL";
+    /** Saroh's senders on the edition's own domain, until their env names are set. */
+    defaultSenders: { mail: string; codes: string };
+    /**
+     * The zone a business's times are written in when nothing better is
+     * known (no profile, an unreadable zone): India's own, or UTC where the
+     * edition spans many. A business's stored zone always wins.
+     */
+    defaultZone: string;
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -68,6 +93,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         phoneNumbers: "indian",
         businessCountry: "india-only",
         sarohBilling: true,
+        sarohPlanMoney: { currency: "INR", tax: "gst" },
         phoneSignIn: true,
         struckPrice: "mrp",
         toolPages: "own",
@@ -76,6 +102,12 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         upi: true,
         paymentProviders: ["RAZORPAY", "CASHFREE"],
         onlinePaymentsOnEveryPlan: false,
+        envSuffix: "",
+        defaultSenders: {
+            mail: "Saroh <noreply@saroh.in>",
+            codes: "codes@saroh.in",
+        },
+        defaultZone: "Asia/Kolkata",
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -85,6 +117,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         phoneNumbers: "with-country-code",
         businessCountry: "asked-at-setup",
         sarohBilling: false,
+        sarohPlanMoney: { currency: "USD", tax: "none" },
         phoneSignIn: false,
         struckPrice: "original-price",
         toolPages: "hub",
@@ -93,6 +126,12 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         upi: false,
         paymentProviders: ["STRIPE"],
         onlinePaymentsOnEveryPlan: true,
+        envSuffix: "_GLOBAL",
+        defaultSenders: {
+            mail: "Saroh <noreply@saroh.tech>",
+            codes: "codes@saroh.tech",
+        },
+        defaultZone: "UTC",
     },
 };
 
@@ -282,4 +321,16 @@ export function currencyForCountry(country: string): string {
     return COUNTRY_CURRENCY[code] ?? "USD";
 }
 
+export * from "./address-rules";
 export * from "./bank-details";
+export * from "./country-words";
+export * from "./country-zones";
+
+/**
+ * Where a Stripe business's customers pay (owner, 8 Nov 2026, DEC-208):
+ * Stripe's hosted Checkout page (the default) or Saroh's own card window on
+ * the business's page. Kept per Stripe connection; null reads as hosted.
+ * Shared by the API's DTO and the workspace.
+ */
+export const STRIPE_CHECKOUT_STYLES = ["HOSTED", "WINDOW"] as const;
+export type StripeCheckoutStyle = (typeof STRIPE_CHECKOUT_STYLES)[number];

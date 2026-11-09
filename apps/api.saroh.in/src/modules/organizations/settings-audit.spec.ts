@@ -114,6 +114,36 @@ describe("settingsChanges", () => {
         ]);
     });
 
+    it("counts a Global region as part of the one address (U4)", () => {
+        const changes = settingsChanges(
+            ["region"],
+            settingsSnapshot(
+                row({
+                    addressLine1: "500 Congress Ave",
+                    city: "Austin",
+                    postalCode: "78701",
+                }),
+                AT,
+            ),
+            settingsSnapshot(
+                row({
+                    addressLine1: "500 Congress Ave",
+                    city: "Austin",
+                    postalCode: "78701",
+                    region: "TX",
+                }),
+                AT,
+            ),
+        );
+        expect(changes).toEqual([
+            {
+                field: "registeredAddress",
+                before: "500 Congress Ave, Austin 78701",
+                after: "500 Congress Ave, Austin TX 78701",
+            },
+        ]);
+    });
+
     it("gives the contact email and the website no value, even when sent", () => {
         const changes = settingsChanges(
             ["contactEmail", "website", "legalName"],

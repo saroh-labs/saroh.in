@@ -1,6 +1,7 @@
 "use client";
 
 import { ChipGroup } from "@saroh/ui/choice-group";
+import { CountrySelect } from "@saroh/ui/country-select";
 import { Field, focusFirstError } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
@@ -27,6 +28,7 @@ import {
     billNowOption,
     editSays,
     fieldOf,
+    indianAddress,
     profileEdit,
     profileInput,
     profileProblems,
@@ -75,10 +77,22 @@ function ProfileFields({
     set: (field: ProfileField) => (value: string) => void;
     emailHint: string;
 }) {
+    // India's fields (GST, state, PIN) only for an address in India (stage 9).
+    const indian = indianAddress(values.country);
     return (
         <>
+            <Field label="Country" error={errors.country}>
+                <CountrySelect
+                    value={values.country}
+                    onValueChange={set("country")}
+                />
+            </Field>
             <Field
-                label="Legal name, as on your GST registration"
+                label={
+                    indian
+                        ? "Legal name, as on your GST registration"
+                        : "Legal name"
+                }
                 error={errors.legalName}
             >
                 <Input
@@ -87,26 +101,41 @@ function ProfileFields({
                     autoComplete="organization"
                 />
             </Field>
-            <Field label="GST" group>
-                <ChipGroup
-                    label="GST"
-                    value={values.registered}
-                    onChange={(v) => set("registered")(v)}
-                    choices={[
-                        {
-                            value: "yes",
-                            label: "Registered",
-                            data: { "data-value": "yes" },
-                        },
-                        {
-                            value: "no",
-                            label: "Not registered",
-                            data: { "data-value": "no" },
-                        },
-                    ]}
-                />
-            </Field>
-            {values.registered === "yes" ? (
+            {indian ? (
+                <Field label="GST" group>
+                    <ChipGroup
+                        label="GST"
+                        value={values.registered}
+                        onChange={(v) => set("registered")(v)}
+                        choices={[
+                            {
+                                value: "yes",
+                                label: "Registered",
+                                data: { "data-value": "yes" },
+                            },
+                            {
+                                value: "no",
+                                label: "Not registered",
+                                data: { "data-value": "no" },
+                            },
+                        ]}
+                    />
+                </Field>
+            ) : (
+                <Field
+                    label="Tax number"
+                    optional
+                    hint="Your VAT, GST or other tax number, if you have one."
+                    error={errors.taxId}
+                >
+                    <Input
+                        value={values.taxId}
+                        onChange={(e) => set("taxId")(e.target.value)}
+                        maxLength={40}
+                    />
+                </Field>
+            )}
+            {indian && values.registered === "yes" ? (
                 <Field
                     label="GSTIN"
                     hint="Its first two digits must match the state."
@@ -130,7 +159,13 @@ function ProfileFields({
                     autoComplete="street-address"
                 />
             </Field>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div
+                className={
+                    indian
+                        ? "grid grid-cols-1 gap-2.5 sm:grid-cols-3"
+                        : "grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+                }
+            >
                 <Field label="City" error={errors.city}>
                     <Input
                         value={values.city}
@@ -138,19 +173,24 @@ function ProfileFields({
                         autoComplete="address-level2"
                     />
                 </Field>
-                <Field label="State" error={errors.gstState}>
-                    <OptionSelect
-                        value={values.gstState}
-                        onValueChange={set("gstState")}
-                        options={STATE_OPTIONS}
-                        placeholder="Choose"
-                    />
-                </Field>
-                <Field label="PIN code" error={errors.postalCode}>
+                {indian ? (
+                    <Field label="State" error={errors.gstState}>
+                        <OptionSelect
+                            value={values.gstState}
+                            onValueChange={set("gstState")}
+                            options={STATE_OPTIONS}
+                            placeholder="Choose"
+                        />
+                    </Field>
+                ) : null}
+                <Field
+                    label={indian ? "PIN code" : "Postcode"}
+                    error={errors.postalCode}
+                >
                     <Input
                         value={values.postalCode}
                         onChange={(e) => set("postalCode")(e.target.value)}
-                        inputMode="numeric"
+                        inputMode={indian ? "numeric" : undefined}
                         autoComplete="postal-code"
                     />
                 </Field>
@@ -169,12 +209,16 @@ function ProfileFields({
             </Field>
             <Field
                 label="Phone"
-                optional
-                hint="An Indian number."
+                optional={indian}
+                hint={
+                    indian
+                        ? "An Indian number."
+                        : "With its country code. Card payments from abroad need one."
+                }
                 error={errors.phone}
             >
                 <PhoneInput
-                    lockCountry="IN"
+                    lockCountry={indian ? "IN" : undefined}
                     value={values.phone}
                     onValueChange={set("phone")}
                 />

@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { liveCatalogueVersion, prisma } from "@saroh/database";
 import { catalogPlanIdForKey } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -106,7 +107,7 @@ export class AdminBillingControlsService {
                 "This business has no autopay to end: it pays nothing through the billing provider.",
             );
         }
-        const free = await this.freeCatalogueId(now);
+        const free = await this.freeCatalogueId(sub.organizationId, now);
         const result = await this.checkout.changePlan(
             operatorBillingContext(staff, sub.organizationId),
             { plan: free, cycle: "month" },
@@ -382,9 +383,16 @@ export class AdminBillingControlsService {
         });
     }
 
-    /** The live catalogue's Free plan, by its catalogue id ("free"). */
-    private async freeCatalogueId(now: Date): Promise<string> {
-        const live = await liveCatalogueVersion(prisma, now);
+    /** The business's edition's live Free plan, by its catalogue id ("free"). */
+    private async freeCatalogueId(
+        organizationId: string,
+        now: Date,
+    ): Promise<string> {
+        const live = await liveCatalogueVersion(
+            prisma,
+            await editionOf(organizationId),
+            now,
+        );
         const row = live ? await freePlanRowInTx(prisma, live.version) : null;
         const plan = row
             ? await prisma.plan.findUnique({

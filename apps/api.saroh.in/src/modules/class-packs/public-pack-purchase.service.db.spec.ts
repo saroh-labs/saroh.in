@@ -67,6 +67,14 @@ import {
     TOO_MANY_OPEN_PACKS,
 } from "./public-pack-purchase.service";
 
+// Class packs are hidden for now (DEC-099); this tests the sale kept for
+// when they return, so the module is rolled out by its flag alone.
+jest.mock("../capabilities/module-registry", () =>
+    jest
+        .requireActual("../../../test/fixtures/class-packs-shown")
+        .registryShowingClassPacks(),
+);
+
 const WEBHOOK_SECRET = "whsec_a11_packs";
 const tag = `${process.pid}-${Date.now()}`;
 let seq = 0;

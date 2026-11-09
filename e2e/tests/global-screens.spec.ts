@@ -1,20 +1,23 @@
-// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/[invoiceId] app:/settings/organization app:/settings/providers app:/settings/billing site:/pay/[token] api:organizations api:invoices api:payments pkg:edition pkg:ui pkg:site-blocks
-import type { Page } from "@playwright/test";
+// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/new app:/billing/invoices/[invoiceId] app:/customers app:/bookings app:/commerce/products app:/settings/organization app:/settings/providers app:/settings/billing app:/settings/billing/plans site:/pay/[token] site:/shop site:/shop/[productSlug] api:organizations api:invoices api:payments api:waitlist api:contacts api:bookings api:products api:stores api:sites api:capabilities api:feature-flags api:admin pkg:edition pkg:ui pkg:site-blocks
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import {
+    bigProduct,
     GLOBAL_SKIP_WHY,
     globalBusiness,
     globalInvoice,
     globalStack,
     openGlobal,
     rollOut,
+    turnOn,
 } from "../fixtures/global";
+import { pressInvoiceAction } from "../fixtures/invoice-actions";
 import { makeBusiness } from "../fixtures/own-business";
-import { business } from "../fixtures/own-data";
+import { business, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
-import { people } from "../fixtures/sessions";
-import { urls } from "../playwright.config";
+import { people, useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
  * The Global edition's screens (DEC-204), on the Global builds of the
@@ -30,6 +33,15 @@ import { urls } from "../playwright.config";
  * which business opens with none chosen is `@serial`, since it depends on
  * which of her businesses is newest.
  *
+ * India-only words (plan 2026-11-08-001, U13): Home, every Settings ›
+ * Business tab, the details sheet Issue opens, New invoice, an invoice, a
+ * customer, New booking's customer step, a product with a struck price and
+ * the merchant site's shop and product page say no GST, GSTIN, ₹, +91,
+ * MRP, PIN code, "Indian" or "Inclusive of all taxes", and group no figure
+ * in lakhs (1,00,000). As a US business: Australia, New Zealand, Singapore
+ * and Canada rightly say "GST". One India business shows its GST, ₹ and MRP
+ * still, so the check can't pass by hiding them everywhere.
+ *
  * Not here: delivery abroad at a Global merchant site's checkout. The
  * renderer is one build for both editions, and the site shop's browser
  * specs need a stack with Northwind's shop switched on (`E2E_SITE_SHOP`),
@@ -39,10 +51,31 @@ import { urls } from "../playwright.config";
 
 const app = (path: string) => `${urls.GLOBAL_APP_URL}${path}`;
 
-/** Nothing priced in rupees anywhere on the page. */
-async function noRupee(page: Page) {
+/**
+ * India's law, money, phone and words (DEC-204 item 7), and its people as
+ * a word: "Indian Ocean" and the Indian/… time zones aside.
+ */
+const INDIA_ONLY =
+    /\bGST\b|GSTIN|₹|\+91|\bMRP\b|PIN code|Inclusive of all taxes|\blakh|\bIndian\b(?![ /]Ocean|\/)/;
+/** A figure grouped in lakhs: 1,00,000. */
+const LAKH_GROUPED = /\d,\d\d,\d{3}\b/;
+
+/**
+ * Nothing on the page (or in `scope`) is India's: no rupee, no GST, no +91
+ * and no lakh grouping, in what is shown or in a field's example. Wait for
+ * the page's own content first (`ready`): a page still loading says nothing.
+ */
+async function noIndia(page: Page, ready?: Locator, scope?: Locator) {
     await expect(page.locator("main").first()).toBeVisible();
-    await expect(page.locator("body")).not.toContainText("₹");
+    if (ready) await expect(ready).toBeVisible({ timeout: 30_000 });
+    const where = scope ?? page.locator("body");
+    await expect(where).not.toContainText(INDIA_ONLY, { useInnerText: true });
+    await expect(where).not.toContainText(LAKH_GROUPED, {
+        useInnerText: true,
+    });
+    await expect(
+        where.locator('[placeholder*="98450"], [placeholder*="+91"]'),
+    ).toHaveCount(0);
 }
 
 test.describe("the Global app (DEC-204)", () => {
@@ -161,6 +194,14 @@ test.describe("the Global app (DEC-204)", () => {
             page.getByRole("button", { name: "Connect Stripe" }),
             sheet,
         );
+        // The restricted key's permissions hosted Checkout needs, and how
+        // customers pay (card, with Apple Pay and Google Pay, or Link).
+        await expect(sheet).toContainText(
+            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write.",
+        );
+        await expect(sheet).toContainText(
+            "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link.",
+        );
         // Razorpay's field is not asked for.
         await expect(
             sheet.getByLabel("Key secret", { exact: true }),
@@ -195,43 +236,293 @@ test.describe("the Global app (DEC-204)", () => {
         await expect(sheet).toBeVisible();
     });
 
-    test("no Plan and billing, and no rupee on Home, invoices or settings", async ({
+    test("Free-only: no rupee and no way to a plan on Home, invoices or settings, at the desk and on a phone", async ({
         page,
     }, testInfo) => {
         const b = await globalBusiness(page, testInfo, "global-money");
         const inv = await globalInvoice(page, b, testInfo);
         await openGlobal(page, b);
 
-        await page.goto(app("/"));
-        await noRupee(page);
+        /** No plan to buy (KTD7): no link to the plans, and no buy button. */
+        async function noPlanToBuy() {
+            await expect(
+                page.locator('a[href^="/settings/billing/plans"]'),
+            ).toHaveCount(0);
+            await expect(
+                page.getByRole("button", { name: /upgrade|change plan/i }),
+            ).toHaveCount(0);
+        }
 
-        await page.goto(app("/billing/invoices"));
-        await expect(page.getByText(inv.billedTo).first()).toBeVisible();
-        await expect(page.locator("body")).toContainText("$25");
-        await noRupee(page);
+        for (const size of [
+            { width: 1440, height: 900 },
+            { width: 390, height: 844 },
+        ]) {
+            await page.setViewportSize(size);
+
+            await page.goto(app("/"));
+            await noIndia(page);
+            await noPlanToBuy();
+
+            await page.goto(app("/billing/invoices"));
+            await expect(page.getByText(inv.billedTo).first()).toBeVisible();
+            await expect(page.locator("body")).toContainText("$25");
+            await noIndia(page);
+            await noPlanToBuy();
+
+            await page.goto(app(`/billing/invoices/${inv.id}`));
+            await expect(page.locator("body")).toContainText("$25");
+            await noIndia(page);
+            await noPlanToBuy();
+
+            await page.goto(app("/settings/organization"));
+            await noIndia(page);
+            await noPlanToBuy();
+
+            await page.goto(app("/settings/billing"));
+            await expect(page.getByText("You're on Free")).toBeVisible();
+            await expect(
+                page.getByText("Paid plans aren't available yet."),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("region", { name: "Your plan" }),
+            ).toHaveCount(0);
+            await noIndia(page);
+            await noPlanToBuy();
+
+            // The Change plan screen isn't there. Plan and billing streams
+            // (its loading screen) before the child answers, so the status is
+            // 200 and the page is the app's not-found.
+            await page.goto(app("/settings/billing/plans"));
+            await expect(
+                page.getByRole("heading", { name: "Page not found" }),
+            ).toBeVisible();
+        }
+
+        // Tell me when takes the signed-in person's address, and says so once.
+        await page.goto(app("/settings/billing"));
+        await page.getByRole("button", { name: "Tell me when" }).click();
+        await expect(
+            page.getByRole("button", { name: "We'll tell you" }),
+        ).toBeDisabled();
+        await expect(
+            page.getByText("We'll email you when paid plans are available."),
+        ).toBeVisible();
+    });
+
+    test("a US business's workspace says nothing India's: Home, every Business tab, invoices, a customer, New booking and a product", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(240_000);
+        const b = await globalBusiness(page, testInfo, "global-words");
+        await rollOut(browser, page, b, testInfo, [
+            "MODULE_PAYMENTS",
+            "MODULE_CRM",
+            "MODULE_APPOINTMENTS",
+            "MODULE_COMMERCE",
+        ]);
+        await turnOn(page, b, "CRM");
+        await turnOn(page, b, "APPOINTMENTS", {
+            hours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+                weekday,
+                open: "00:00",
+                close: "23:30",
+            })),
+            service: {
+                name: `Session ${stamp(testInfo)}`,
+                durationMinutes: 30,
+                price: "25",
+            },
+        });
+        await turnOn(page, b, "COMMERCE");
+        const inv = await globalInvoice(page, b, testInfo);
+        const product = await bigProduct(page, b, testInfo);
+        const s = stamp(testInfo);
+        const customer = await business(page.request, b.id).post<{
+            id: string;
+        }>("/contacts", {
+            email: `words-${s}@example.com`.toLowerCase(),
+            firstName: "Sam",
+            lastName: `Words ${s}`,
+        });
+        await openGlobal(page, b);
+
+        await page.goto(app("/"));
+        await noIndia(page, page.getByRole("heading", { level: 1 }).first());
+
+        // Settings › Business, every tab Global draws (no How to pay us).
+        for (const [section, tab] of [
+            ["identity", "Identity"],
+            ["contact", "Contact"],
+            ["tax", "Tax and invoices"],
+            ["hours", "Hours"],
+            ["address", "Registered address"],
+        ] as const) {
+            await page.goto(app(`/settings/organization?section=${section}`));
+            await expect(
+                page.getByRole("tab", { name: tab, exact: true }),
+            ).toHaveAttribute("aria-selected", "true");
+            await noIndia(page, page.getByRole("tabpanel").first());
+        }
+        // The address in its country's words: its state and ZIP code.
+        await expect(page.getByRole("tabpanel").first()).toContainText(
+            "NY 10001",
+        );
+
+        await page.goto(app("/billing/invoices/new"));
+        await noIndia(page, page.getByLabel("Line 1: what it's for"));
 
         await page.goto(app(`/billing/invoices/${inv.id}`));
         await expect(page.locator("body")).toContainText("$25");
-        await noRupee(page);
+        await noIndia(
+            page,
+            page.locator("[data-money-card]").filter({ visible: true }).first(),
+        );
 
-        await page.goto(app("/settings/organization"));
-        await noRupee(page);
-        await expect(
-            page.getByRole("link", { name: "Plan and billing" }),
-        ).toHaveCount(0);
+        await page.goto(app(`/customers/${customer.id}`));
+        await noIndia(page, page.getByText(`Sam Words ${s}`).first());
 
-        await page.goto(app("/settings/billing"));
+        // A product with a struck price: thousands, never lakhs.
+        await page.goto(app(`/commerce/products/${product.id}`));
+        await noIndia(page, page.getByText(product.name).first());
+        await expect(page.locator("main").first()).toContainText(/\$100,000/);
+        await page.goto(app(`/commerce/products/${product.id}/edit`));
+        await expect(page.locator("#pe-name")).toHaveValue(product.name);
+        await noIndia(page);
+
+        // New booking's customer step, with a new caller's phone asked.
+        await page.goto(app("/bookings?new=1"));
+        const sheet = page.getByRole("dialog", { name: "New booking" });
+        await expect(sheet).toBeVisible();
+        const caller = `Zara ${s}`;
+        await sheet.getByLabel("Find the customer").fill(caller);
+        await sheet
+            .getByRole("button", { name: new RegExp(`Add “${caller}”`) })
+            .click();
+        await noIndia(page, sheet.getByLabel("Phone"), sheet);
+    });
+
+    test("Issue's business details sheet asks a US business for its state and ZIP code, never GST", async ({
+        page,
+    }, testInfo) => {
+        // No registered address yet, so Issue asks for it (DEC-068).
+        const b = await makeBusiness(page, testInfo, "global-details", {
+            country: "US",
+        });
+        const s = stamp(testInfo);
+        const api = business(page.request, b.id);
+        const contact = await api.post<{ id: string }>("/contacts", {
+            email: `details-${s}@example.com`.toLowerCase(),
+            firstName: "Jo",
+            lastName: `Details ${s}`,
+        });
+        const draft = await api.post<{ id: string }>("/invoices", {
+            contactId: contact.id,
+            currency: "USD",
+            lines: [
+                {
+                    description: `Consultation (${s})`,
+                    quantity: 1,
+                    unitPrice: "25",
+                },
+            ],
+        });
+        await openGlobal(page, b);
+        await page.goto(app(`/billing/invoices/${draft.id}`));
+        await pressInvoiceAction(page, "Issue it");
+        await page
+            .getByRole("alertdialog")
+            .getByRole("button", { name: "Issue invoice" })
+            .click();
+
+        const sheet = page.getByRole("dialog", {
+            name: "Add your business details",
+        });
+        await noIndia(page, sheet, sheet);
+        await expect(sheet.getByLabel("Tax ID (optional)")).toBeVisible();
         await expect(
-            page.getByRole("region", { name: "Your plan" }),
+            sheet.getByText("ZIP code", { exact: true }).first(),
+        ).toBeVisible();
+        await expect(
+            sheet.getByText("State", { exact: true }).first(),
+        ).toBeVisible();
+        await expect(
+            sheet.getByRole("switch", { name: "GST-registered" }),
         ).toHaveCount(0);
+    });
+
+    test("a US business's site: its shop and a product page group thousands and say no MRP or 'Inclusive of all taxes'", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(180_000);
+        const b = await globalBusiness(page, testInfo, "global-site");
+        await rollOut(browser, page, b, testInfo, [
+            "MODULE_PAYMENTS",
+            "MODULE_COMMERCE",
+            "MODULE_WEBSITE",
+            "SITE_SHOP",
+        ]);
+        // Commerce first: the website, turned on second, sells from the
+        // location Commerce made.
+        await turnOn(page, b, "COMMERCE");
+        await turnOn(page, b, "WEBSITE");
+        const product = await bigProduct(page, b, testInfo);
+        const api = business(page.request, b.id);
+        const sites =
+            await api.get<{ id: string; subdomain: string | null }[]>("/sites");
+        const site = sites.at(0);
+        expect(
+            site?.subdomain,
+            "Website made the business's site",
+        ).toBeTruthy();
+        await api.post(`/sites/${site?.id ?? ""}/publish`);
+        const renderer = new URL(urls.RENDERER_URL);
+        const origin = `${renderer.protocol}//${site?.subdomain ?? ""}.${renderer.host}`;
+        await expect
+            .poll(
+                async () => (await page.request.get(`${origin}/shop`)).status(),
+                { timeout: 30_000 },
+            )
+            .toBe(200);
+
+        const visitor = await browser.newContext({ ignoreHTTPSErrors });
+        try {
+            const shop = await visitor.newPage();
+            await shop.goto(`${origin}/shop`);
+            const card = shop.getByRole("link", {
+                name: new RegExp(product.name),
+            });
+            await noIndia(shop, card.first());
+            await expect(card.first()).toContainText("$100,000");
+
+            await shop.goto(`${origin}/shop/${product.slug}`);
+            const lead = shop.locator("[data-price-lead]").first();
+            await noIndia(shop, lead);
+            await expect(lead).toContainText("$100,000");
+            await expect(
+                shop.locator("[data-price-mrp]").first(),
+            ).toContainText("Original price");
+        } finally {
+            await visitor.close();
+        }
     });
 
     test("with none chosen, a person in an India and a Global business sees the Global one's name over its own data @serial", async ({
         page,
     }, testInfo) => {
+        // Not about width, and the desk and phone serial runs share the
+        // signed-in person: a second run would add a second Global business.
+        test.skip(
+            testInfo.project.name.startsWith("phone"),
+            "runs once, at the desk",
+        );
         // Global first and India last, so India is the newest of all her
         // businesses: the one the data layer fell back to before 9d995356c.
-        const g = await globalBusiness(page, testInfo, "global-home");
+        // With none chosen she gets the first of this edition's by name
+        // (listForUser), and other specs' Global businesses are hers too:
+        // "global-a-…" sorts before every other "global-…" one.
+        const g = await globalBusiness(page, testInfo, "global-a-home");
         const inv = await globalInvoice(page, g, testInfo);
         await makeBusiness(page, testInfo, "india-home");
 
@@ -239,5 +530,55 @@ test.describe("the Global app (DEC-204)", () => {
         await page.goto(app("/billing/invoices"));
         await expect.poll(() => page.title()).toContain(g.name);
         await expect(page.getByText(inv.billedTo).first()).toBeVisible();
+    });
+});
+
+test.describe("India keeps its own words (plan 2026-11-08-001, R-I)", () => {
+    test("an India business still shows GST, ₹ and MRP, with lakh grouping", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(150_000);
+        const b = await makeBusiness(page, testInfo, "india-words");
+        await rollOut(browser, page, b, testInfo, [
+            "MODULE_PAYMENTS",
+            "MODULE_COMMERCE",
+        ]);
+        await turnOn(page, b, "COMMERCE");
+        const product = await bigProduct(page, b, testInfo);
+        const s = stamp(testInfo);
+        const api = business(page.request, b.id);
+        const contact = await api.post<{ id: string }>("/contacts", {
+            email: `india-words-${s}@example.com`.toLowerCase(),
+            firstName: "Asha",
+            lastName: `Words ${s}`,
+        });
+        const draft = await api.post<{ id: string }>("/invoices", {
+            contactId: contact.id,
+            currency: "INR",
+            lines: [
+                {
+                    description: `Birthday cake (${s})`,
+                    quantity: 1,
+                    unitPrice: "900",
+                },
+            ],
+        });
+        await useSession(page, "founder");
+        await page.goto(`/open/${b.id}`);
+
+        await page.goto("/settings/organization?section=tax");
+        await expect(page.getByRole("tabpanel").first()).toContainText("GST");
+
+        await page.goto(`/billing/invoices/${draft.id}`);
+        await expect(
+            page.locator("[data-money-card]").filter({ visible: true }).first(),
+        ).toContainText("₹");
+
+        await page.goto(`/commerce/products/${product.id}`);
+        const main = page.locator("main").first();
+        await expect(main).toContainText(product.name);
+        await expect(main).toContainText("MRP");
+        await expect(main).toContainText("₹1,00,000");
     });
 });

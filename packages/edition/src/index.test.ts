@@ -84,6 +84,29 @@ describe("the package's entry points", () => {
         expect(pkg.exports["."].import).toBe("./dist/index.js");
         expect(pkg.exports["."].require).toBe("./dist/index.cjs");
     });
+
+    it("give the address rules their own entry, for block-contract", () => {
+        // The API's tsc resolves the old way, so typesVersions names it too.
+        const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+            exports: Record<string, { import: string; require: string }>;
+            typesVersions: { "*": Record<string, string[]> };
+        };
+        expect(pkg.exports["./address-rules"].import).toBe(
+            "./dist/address-rules.js",
+        );
+        expect(pkg.exports["./address-rules"].require).toBe(
+            "./dist/address-rules.cjs",
+        );
+        expect(pkg.typesVersions["*"]["address-rules"]).toEqual([
+            "./dist/address-rules.d.ts",
+        ]);
+    });
+
+    it("keep the address rules free of imports, so site blocks can read them", () => {
+        const source = readFileSync("src/address-rules.ts", "utf8");
+        expect(source).not.toMatch(/^\s*(import|export .* from)\b/m);
+        expect(source).not.toMatch(/process\.env/);
+    });
 });
 
 describe("Global's development addresses", () => {
@@ -172,6 +195,10 @@ describe("the edition profiles (DEC-204 item 7)", () => {
         phoneNumbers: { INDIA: "indian", GLOBAL: "with-country-code" },
         businessCountry: { INDIA: "india-only", GLOBAL: "asked-at-setup" },
         sarohBilling: { INDIA: true, GLOBAL: false },
+        sarohPlanMoney: {
+            INDIA: { currency: "INR", tax: "gst" },
+            GLOBAL: { currency: "USD", tax: "none" },
+        },
         phoneSignIn: { INDIA: true, GLOBAL: false },
         struckPrice: { INDIA: "mrp", GLOBAL: "original-price" },
         toolPages: { INDIA: "own", GLOBAL: "hub" },
@@ -183,6 +210,18 @@ describe("the edition profiles (DEC-204 item 7)", () => {
             GLOBAL: ["STRIPE"],
         },
         onlinePaymentsOnEveryPlan: { INDIA: false, GLOBAL: true },
+        envSuffix: { INDIA: "", GLOBAL: "_GLOBAL" },
+        defaultSenders: {
+            INDIA: {
+                mail: "Saroh <noreply@saroh.in>",
+                codes: "codes@saroh.in",
+            },
+            GLOBAL: {
+                mail: "Saroh <noreply@saroh.tech>",
+                codes: "codes@saroh.tech",
+            },
+        },
+        defaultZone: { INDIA: "Asia/Kolkata", GLOBAL: "UTC" },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {

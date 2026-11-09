@@ -180,7 +180,7 @@ export class CreateServiceDto {
     })
     gstPriceMode?: GstPriceMode | null;
 
-    /** IANA timezone, e.g. "Asia/Kolkata". Validated against the tz database in the service. */
+    /** IANA timezone, e.g. "Europe/London". Validated against the tz database in the service. */
     @IsString()
     @MinLength(1)
     @MaxLength(64)

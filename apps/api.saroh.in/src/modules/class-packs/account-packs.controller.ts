@@ -34,6 +34,16 @@ export class AccountBuyPackDto {
     @MinLength(1)
     @MaxLength(255)
     idempotencyKey?: string;
+
+    /**
+     * Where a hosted checkout (Stripe) sends the customer back to. Checked
+     * where it is used (`safeReturnPath`): anything but a same-site path is
+     * ignored.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    returnPath?: string;
 }
 
 /**
@@ -68,7 +78,13 @@ export class AccountPacksController {
         @Param("ref") ref: string,
         @Body() dto: AccountBuyPackDto,
     ): Promise<AccountPackCheckout> {
-        return this.packs.start(customer, ref, dto.idempotencyKey);
+        return this.packs.start(
+            customer,
+            ref,
+            dto.idempotencyKey,
+            new Date(),
+            dto.returnPath,
+        );
     }
 
     /** How a started payment stands: paying, bought or closed. */

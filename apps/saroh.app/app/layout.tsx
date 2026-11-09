@@ -28,7 +28,9 @@ export default function RootLayout({
         // merchant's `--site-font-body`, which falls back to a neutral system
         // stack where no SiteTheme is mounted. Gate G7 fails the build if a
         // Saroh face comes back.
-        <html lang="en-IN" data-skin="mono">
+        // `lang` is only "en" here: the business, and so "en-IN" or "en-US",
+        // is known in `[domain]/layout.tsx`, which says it on its wrapper.
+        <html lang="en" data-skin="mono">
             <body className="font-site-body">{children}</body>
         </html>
     );

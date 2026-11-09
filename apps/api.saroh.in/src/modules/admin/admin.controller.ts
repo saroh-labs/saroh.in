@@ -20,7 +20,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
-import { ServedEdition } from "./admin-edition";
+import { assertBusinessInEdition, ServedEdition } from "./admin-edition";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminPermission } from "./admin-permissions";
@@ -108,7 +108,12 @@ export class AdminController {
      */
     @Get("flags/:flagKey/explain")
     @RequireAdminPermission(AdminPermission.FlagsRead)
-    explain(@Param("flagKey") flagKey: string, @Query() query: ExplainFlagDto) {
+    async explain(
+        @Param("flagKey") flagKey: string,
+        @Query() query: ExplainFlagDto,
+        @ServedEdition() edition: Edition | null,
+    ) {
+        await assertBusinessInEdition(query.organizationId, edition);
         return this.flags.explain(
             assertKnownFlag(flagKey),
             query.organizationId,

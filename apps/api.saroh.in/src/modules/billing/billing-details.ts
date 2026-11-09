@@ -1,5 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
+import { normalisePhoneNumber } from "@saroh/block-contract";
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionForCountry, editionProfile } from "@saroh/edition";
 
 import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { normaliseIndianPhone } from "../organizations/business-phone";
@@ -35,7 +38,8 @@ import { normaliseIndianPhone } from "../organizations/business-phone";
  * `billing.profile.sync` job the save queues (`billing-customer.ts`).
  */
 
-export type BillingDetail = "profile" | "name" | "email" | "address" | "state";
+export type BillingDetail =
+    "profile" | "name" | "email" | "address" | "state" | "phone";
 
 /** The billing profile columns the check and the bill read. */
 export const BILLING_PROFILE_SELECT = {
@@ -49,6 +53,8 @@ export const BILLING_PROFILE_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    country: true,
+    taxId: true,
     providerCustomerId: true,
 } as const;
 
@@ -64,6 +70,8 @@ export interface BillingParty {
     orgName: string | null;
     /** The business's Saroh address, for the provider's notes. */
     orgSlug: string | null;
+    /** The business's edition: it pays through a profile of its own (stage 9). */
+    edition: Edition;
 }
 
 type Db = Pick<Prisma.TransactionClient, "billingProfile" | "organization">;
@@ -79,7 +87,12 @@ export async function readBillingParty(
 ): Promise<BillingParty> {
     const org = await db.organization.findUnique({
         where: { id: organizationId },
-        select: { name: true, slug: true, billingProfileId: true },
+        select: {
+            name: true,
+            slug: true,
+            billingProfileId: true,
+            edition: true,
+        },
     });
     const id = profileId ?? org?.billingProfileId ?? null;
     const profile = id
@@ -92,6 +105,7 @@ export async function readBillingParty(
         profile,
         orgName: nonEmpty(org?.name),
         orgSlug: nonEmpty(org?.slug),
+        edition: org?.edition ?? "INDIA",
     };
 }
 
@@ -99,6 +113,18 @@ export async function readBillingParty(
 export function nonEmpty(value: string | null | undefined): string | null {
     const t = value?.trim();
     return t === undefined || t === "" ? null : t;
+}
+
+/**
+ * Whether a payer's country takes India's rules: a GSTIN of the address's
+ * state, the state required, a six-digit PIN (stage 9, KTD7). Asked of the
+ * edition the country belongs to, never "is this India?".
+ */
+export function profileIsIndian(country: string | null | undefined): boolean {
+    return (
+        editionProfile(editionForCountry(country?.trim() ? country : "IN"))
+            .address === "indian-state-and-pin"
+    );
 }
 
 /** An Indian PIN code: six digits, never starting with 0. */
@@ -114,16 +140,22 @@ export function billingEmail(p: BillingParty): string | null {
     return nonEmpty(p.profile?.billingEmail);
 }
 
-/** First line, city and a six-digit PIN. */
+/**
+ * First line, city and a postcode: a six-digit PIN in India; any postcode
+ * elsewhere, where some places have none (stage 9, KTD7).
+ */
 export function addressComplete(
-    profile: Pick<BilledProfile, "addressLine1" | "city" | "postalCode"> | null,
+    profile:
+        | (Pick<BilledProfile, "addressLine1" | "city" | "postalCode"> & {
+              country?: string;
+          })
+        | null,
 ): boolean {
     const pin = profile?.postalCode?.replace(/\s+/g, "") ?? "";
-    return (
+    const lines =
         Boolean(nonEmpty(profile?.addressLine1)) &&
-        Boolean(nonEmpty(profile?.city)) &&
-        PIN.test(pin)
-    );
+        Boolean(nonEmpty(profile?.city));
+    return profileIsIndian(profile?.country) ? lines && PIN.test(pin) : lines;
 }
 
 /**
@@ -137,7 +169,13 @@ export function missingBillingDetails(p: BillingParty): BillingDetail[] {
     if (!billingName(p)) missing.push("name");
     if (!billingEmail(p)) missing.push("email");
     if (!addressComplete(p.profile)) missing.push("address");
-    if (!stateCode(p.profile.gstState)) missing.push("state");
+    if (profileIsIndian(p.profile.country)) {
+        if (!stateCode(p.profile.gstState)) missing.push("state");
+    } else if (!nonEmpty(p.profile.phone)) {
+        // A payment from abroad fails on a missing phone (Razorpay), so it
+        // is asked first (KTD4); in India it is "if available".
+        missing.push("phone");
+    }
     return missing;
 }
 
@@ -179,6 +217,8 @@ export function checkoutAddress(
     sent: AddressSent | null | undefined,
     required: boolean,
     missing: BillingDetail[] = [],
+    /** India's six-digit PIN; elsewhere any postcode, or none. */
+    indian = true,
 ): CheckoutAddress | null {
     const line1 = nonEmpty(sent?.line1);
     const line2 = nonEmpty(sent?.line2);
@@ -197,6 +237,17 @@ export function checkoutAddress(
     if (!line1)
         refuse("Add the address's first line.", "addressLine1", missing);
     if (!city) refuse("Add the city.", "city", missing);
+    if (!indian) {
+        if (pin && pin.length > 20) {
+            refuse("Keep the postcode under 20 characters.", "postalCode");
+        }
+        return {
+            addressLine1: line1,
+            addressLine2: line2,
+            city,
+            postalCode: nonEmpty(sent?.postalCode) ?? "",
+        };
+    }
     if (!pin) refuse("Add the PIN code.", "postalCode", missing);
     if (!PIN.test(pin)) {
         refuse("A PIN code is six digits, like 560038.", "postalCode", missing);
@@ -252,6 +303,16 @@ export function checkoutDetails(
     if (!profile) {
         refuse(CHOOSE_BILLING_PROFILE, "billing-profile", missing);
     }
+    // A business pays through a profile of its own edition (stage 9, KTD7).
+    if (editionForCountry(profile.country) !== party.edition) {
+        refuse(
+            profileIsIndian(profile.country)
+                ? "This business is billed outside India: choose a billing profile with an address abroad."
+                : "This business is billed in India: choose a billing profile with an Indian address.",
+            "billing-profile",
+        );
+    }
+    const indian = profileIsIndian(profile.country);
     const out: CheckoutDetails = { profile: {} };
 
     if (missing.includes("name")) {
@@ -282,8 +343,34 @@ export function checkoutDetails(
     }
 
     if (missing.includes("address")) {
-        const address = checkoutAddress(sent.registeredAddress, true, missing);
+        const address = checkoutAddress(
+            sent.registeredAddress,
+            true,
+            missing,
+            indian,
+        );
         if (address) Object.assign(out.profile, address);
+    }
+
+    if (!indian) {
+        // Abroad: no GSTIN or state; a phone with its country code, required.
+        if (missing.includes("phone")) {
+            const raw = nonEmpty(sent.phone);
+            if (!raw) {
+                refuse(
+                    "Add a phone for Saroh's billing: card payments from abroad need one.",
+                    "phone",
+                    missing,
+                );
+            }
+            if (!raw.startsWith("+")) {
+                refuse("Start with + and the country code.", "phone", missing);
+            }
+            const result = normalisePhoneNumber(raw);
+            if ("problem" in result) refuse(result.problem, "phone", missing);
+            if (result.phone) out.profile.phone = result.phone;
+        }
+        return out;
     }
 
     // A GSTIN given is the one to bill: it replaces the profile's, and

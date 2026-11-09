@@ -115,7 +115,7 @@ function zoneParts(at: Date, timeZone: string): ZoneParts {
     };
 }
 
-/** Whether this runtime knows the zone ("Asia/Kolkata"). */
+/** Whether this runtime knows the zone ("Europe/London"). */
 export function isTimeZone(timeZone: string): boolean {
     try {
         new Intl.DateTimeFormat("en-GB", { timeZone });

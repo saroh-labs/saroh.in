@@ -1,11 +1,12 @@
 "use client";
 
-import { phoneNumberProblem } from "@saroh/block-contract";
+import { phoneHomeCountry, phoneNumberProblem } from "@saroh/block-contract";
 import { useId, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
+import { useSiteBusiness } from "../site-business";
 import type { DetailsResult, MeApi, NoteResult } from "./me-api";
 import type { AccountNote, AccountView } from "./model";
 import { Sheet, sheetButton, sheetInput } from "./sheet";
@@ -36,12 +37,19 @@ export function DetailsSheet({
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const off = busy || name.trim() === "";
+    const { phoneNumbers, country } = useSiteBusiness();
+    const indian = phoneNumbers === "indian";
 
     async function submit() {
         if (off) return;
         // A number saved before numbers were checked is kept as it is.
         const wrong =
-            phone !== (account.phone ?? "") ? phoneNumberProblem(phone) : null;
+            phone !== (account.phone ?? "")
+                ? phoneNumberProblem(
+                      phone,
+                      phoneHomeCountry(phoneNumbers, country),
+                  )
+                : null;
         setPhoneError(wrong);
         if (wrong) return;
         setBusy(true);
@@ -97,7 +105,7 @@ export function DetailsSheet({
                         setPhone(v);
                         setPhoneError(null);
                     }}
-                    placeholder="98765 43210"
+                    placeholder={indian ? "98765 43210" : undefined}
                     invalid={Boolean(phoneError)}
                     describedBy={phoneError ? `${ids}-phone-error` : undefined}
                 />

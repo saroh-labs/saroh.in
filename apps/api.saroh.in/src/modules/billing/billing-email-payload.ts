@@ -14,6 +14,11 @@ export type BillingEmailPayload =
           eventKey: string;
           /** The provider gave up and the business is on Free. */
           final: boolean;
+          /**
+           * A month paid once is over and the next is due (stage 9, KTD5b):
+           * nothing failed. Absent: a charge that failed.
+           */
+          monthDue?: boolean;
       }
     | {
           /** A double charge given back in full (DEC-164). */
@@ -177,7 +182,11 @@ export function parseBillingEmailPayload(
         typeof p.subscriptionId === "string" &&
         typeof p.eventKey === "string"
     ) {
-        return { ...(p as object), final: p.final === true } as never;
+        return {
+            ...(p as object),
+            final: p.final === true,
+            monthDue: p.monthDue === true,
+        } as never;
     }
     if (
         p.kind === "DOUBLE_CHARGE_REFUNDED" &&

@@ -39,8 +39,11 @@ export async function siteOriginOf(
         orderBy: { verifiedAt: "asc" },
         select: { hostname: true },
     });
+    // In the renderer's own scheme: a customer is sent here (Stripe's return),
+    // so a plain-http test stack must get an address it serves.
+    const scheme = rendererBase().startsWith("http://") ? "http" : "https";
     const platform = site.subdomain
-        ? `https://${site.subdomain}.${rendererHost()}`
+        ? `${scheme}://${site.subdomain}.${rendererHost()}`
         : null;
     if (!domain) return platform;
     return platform && (await domainPlan.paused(organizationId))

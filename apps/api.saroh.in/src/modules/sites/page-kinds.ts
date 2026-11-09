@@ -137,6 +137,11 @@ export const RESERVED_PAGE_PATHS: readonly {
         purpose: "where your customers pay a link you sent",
     },
     {
+        root: "/paid",
+        kind: null,
+        purpose: "where your customers come back to after paying online",
+    },
+    {
         root: "/account",
         kind: null,
         purpose: "where your customers see their account",

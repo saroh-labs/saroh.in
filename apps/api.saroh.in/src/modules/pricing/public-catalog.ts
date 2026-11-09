@@ -23,6 +23,13 @@ export interface PublicPricing {
     goLiveAt: string | null;
     preview: boolean;
     catalog: Catalog;
+    /**
+     * Whether Saroh sells these plans now, on an edition it doesn't bill from
+     * the start (Global, stage 9): `SAROH_BILLING_GLOBAL` on for everyone and
+     * a paid plan in the catalogue. Absent on India's, which always sells.
+     * saroh.tech shows prices only when true (DEC-211).
+     */
+    offered?: boolean;
 }
 
 /** The visitor's view of a snapshot. */
@@ -59,6 +66,8 @@ export function publicCatalog(c: Catalog): Catalog {
         modules,
         yearly: c.yearly,
         gst: c.gst,
+        currency: c.currency,
+        tax: c.tax,
         autopay: c.autopay,
         addons,
     };

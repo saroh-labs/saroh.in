@@ -318,6 +318,10 @@ e2e_stack() {
 
     # CI's job env, verbatim: placeholders that no live service accepts.
     export CI=1 SKIP_ENV_VALIDATION=1 PORT=3333
+    # The browser reaches the API on loopback; trusting it lets a spec give
+    # each customer its own address (x-forwarded-for), as Cloudflare does,
+    # so one run's customers don't share the public rate limits.
+    export TRUST_PROXY=private
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
     export BETTER_AUTH_URL=http://localhost:3333
@@ -363,7 +367,7 @@ e2e_stack() {
     # runs, as CI does on every shard. Unset, those specs skip themselves.
     local global=""
     # shellcheck disable=SC2086,SC2116
-    case " $(echo $specs) " in *global-screens.spec.ts*) global=1 ;; esac
+    case " $(echo $specs) " in *global-screens.spec.ts* | *global-plan-billing.spec.ts*) global=1 ;; esac
     if [ -n "$global" ]; then
         export E2E_GLOBAL_APP_URL=http://localhost:3007
         export E2E_GLOBAL_ACCOUNTS_URL=http://localhost:3008

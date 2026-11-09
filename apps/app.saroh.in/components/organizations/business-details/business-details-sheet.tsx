@@ -18,6 +18,7 @@ import { z } from "zod";
 
 import { GstinGuide } from "@/components/organizations/tax/gstin-guide";
 import { Refusal } from "@/components/shared/states/refusal";
+import { PROFILE } from "@/lib/edition";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
     BusinessDetail,
@@ -44,6 +45,7 @@ const FIELDS = [
     "addressLine2",
     "city",
     "postalCode",
+    "region",
     "gstState",
     "taxId",
 ] as const;
@@ -138,6 +140,7 @@ function DetailsBody({
             <DetailsForm
                 initial={onFile.values}
                 inIndia={onFile.inIndia}
+                country={onFile.country ?? null}
                 continueLabel={continueLabel}
                 onDone={onDone}
                 save={save}
@@ -161,12 +164,14 @@ function DetailsBody({
 function DetailsForm({
     initial,
     inIndia: indian,
+    country,
     continueLabel,
     onDone,
     save,
 }: {
     initial: BusinessDetailsValues;
     inIndia: boolean;
+    country: string | null;
     continueLabel: string;
     onDone: (saved: boolean) => void;
     save: typeof saveOrganizationSettings;
@@ -182,6 +187,7 @@ function DetailsForm({
         .superRefine((v, ctx) => {
             for (const { path, message } of detailsProblems(v, {
                 inIndia: indian,
+                country,
             })) {
                 ctx.addIssue({ code: "custom", path: [path], message });
             }
@@ -221,39 +227,79 @@ function DetailsForm({
                         registered={registered}
                         gstinState={taxId.trim().slice(0, 2).toUpperCase()}
                         inIndia={indian || registered}
+                        country={country}
                     />
-                    <FormField
-                        control={form.control}
-                        name="gstRegistered"
-                        render={({ field }) => (
-                            <FormItem className="w-full">
-                                <div className="flex items-center gap-3">
-                                    <FormControl>
-                                        <Switch
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                            aria-label="GST-registered"
-                                        />
-                                    </FormControl>
-                                    <FormLabel className="!mt-0">
-                                        GST-registered
-                                    </FormLabel>
-                                </div>
-                                <FormDescription>
-                                    {field.value
-                                        ? "Your invoices become tax invoices with your GSTIN."
-                                        : "Your invoices are receipts, with no GST on them."}
-                                </FormDescription>
-                            </FormItem>
-                        )}
-                    />
-                    {registered ? (
+                    {/* GST is India's (DEC-204): a named tax line has
+                        only its optional tax ID. */}
+                    {PROFILE.taxSystem === "gst" ? (
+                        <>
+                            <FormField
+                                control={form.control}
+                                name="gstRegistered"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <div className="flex items-center gap-3">
+                                            <FormControl>
+                                                <Switch
+                                                    checked={field.value}
+                                                    onCheckedChange={
+                                                        field.onChange
+                                                    }
+                                                    aria-label="GST-registered"
+                                                />
+                                            </FormControl>
+                                            <FormLabel className="!mt-0">
+                                                GST-registered
+                                            </FormLabel>
+                                        </div>
+                                        <FormDescription>
+                                            {field.value
+                                                ? "Your invoices become tax invoices with your GSTIN."
+                                                : "Your invoices are receipts, with no GST on them."}
+                                        </FormDescription>
+                                    </FormItem>
+                                )}
+                            />
+                            {registered ? (
+                                <FormField
+                                    control={form.control}
+                                    name="taxId"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full">
+                                            <FormLabel>GSTIN</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    {...field}
+                                                    onChange={(e) =>
+                                                        field.onChange(
+                                                            e.target.value.toUpperCase(),
+                                                        )
+                                                    }
+                                                    placeholder={GSTIN_EXAMPLE}
+                                                    maxLength={20}
+                                                    autoComplete="off"
+                                                    spellCheck={false}
+                                                    className="font-mono tracking-[0.04em]"
+                                                />
+                                            </FormControl>
+                                            <GstinGuide value={field.value} />
+                                            <FormDescription>
+                                                15 characters. Its first two
+                                                digits set your state.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            ) : null}
+                        </>
+                    ) : (
                         <FormField
                             control={form.control}
                             name="taxId"
                             render={({ field }) => (
                                 <FormItem className="w-full">
-                                    <FormLabel>GSTIN</FormLabel>
+                                    <FormLabel>Tax ID (optional)</FormLabel>
                                     <FormControl>
                                         <Input
                                             {...field}
@@ -262,23 +308,20 @@ function DetailsForm({
                                                     e.target.value.toUpperCase(),
                                                 )
                                             }
-                                            placeholder={GSTIN_EXAMPLE}
-                                            maxLength={20}
                                             autoComplete="off"
                                             spellCheck={false}
                                             className="font-mono tracking-[0.04em]"
                                         />
                                     </FormControl>
-                                    <GstinGuide value={field.value} />
                                     <FormDescription>
-                                        15 characters. Its first two digits set
-                                        your state.
+                                        If you have one, it&apos;s printed on
+                                        your invoices.
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                    ) : null}
+                    )}
                 </FormSheetBody>
                 <FormSheetFoot
                     saveLabel={continueLabel}

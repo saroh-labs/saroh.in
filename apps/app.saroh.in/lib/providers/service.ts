@@ -1,3 +1,5 @@
+import type { StripeCheckoutStyle } from "@saroh/edition";
+
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
@@ -9,13 +11,19 @@ import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 export type PaymentProviderName = "RAZORPAY" | "CASHFREE" | "STRIPE";
 
+/** Where a Stripe business's customers pay (DEC-208), as the API takes it. */
+export type { StripeCheckoutStyle };
+
 /**
  * Why a connection that is still CONNECTED needs a person (UX-012): its
- * provider refused the keys on a live call, `since` then. Entering the keys
- * again clears it. Null while it works; absent from an older API.
+ * provider refused the keys on a live call (`KEYS_REFUSED`), or (Stripe)
+ * its restricted key lacks a permission a payment uses on the side, so
+ * payments go through without it (`PERMISSION_MISSING`, KTD-14); `since`
+ * then. Entering the keys again clears it. Null while it works; absent
+ * from an older API.
  */
 export interface ProviderAttention {
-    reason: "KEYS_REFUSED";
+    reason: "KEYS_REFUSED" | "PERMISSION_MISSING";
     since: string;
 }
 
@@ -37,6 +45,8 @@ export interface ConnectedPaymentProvider {
      * many. Absent from an older API: read as none.
      */
     activeMemberships?: number;
+    /** Stripe only: where its customers pay. Absent from an older API, or null: Stripe's page. */
+    checkoutStyle?: StripeCheckoutStyle | null;
     updatedAt: string;
 }
 
@@ -59,6 +69,8 @@ export interface ConnectPaymentInput {
     keySecret: string;
     publicKey?: string;
     webhookSecret?: string;
+    /** Stripe only: where its customers pay. */
+    checkoutStyle?: StripeCheckoutStyle;
 }
 
 export type CommsChannel = "EMAIL" | "WHATSAPP";
@@ -121,6 +133,18 @@ export function connectPaymentProvider(
         "POST",
         input,
         "Couldn't connect the payment provider.",
+    );
+}
+
+/** Where a connected Stripe's customers pay (DEC-208, 8 Nov). */
+export function setStripeCheckoutStyle(
+    checkoutStyle: StripeCheckoutStyle,
+): Promise<CrmResult<ConnectedPaymentProvider>> {
+    return mutate<ConnectedPaymentProvider>(
+        "/payment-providers/STRIPE/checkout-style",
+        "PATCH",
+        { checkoutStyle },
+        "Couldn't save where customers pay.",
     );
 }
 

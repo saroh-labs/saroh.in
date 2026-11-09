@@ -101,9 +101,9 @@ describe("coupons (DB, U4)", () => {
             reason: "fake coupon",
             targetId: c.id,
         });
-        expect((await controller.listCoupons()).map((x) => x.code)).toEqual([
-            "FAKE-111",
-        ]);
+        expect((await controller.listCoupons(null)).map((x) => x.code)).toEqual(
+            ["FAKE-111"],
+        );
     });
 
     it("refuses a code that exists, whatever its case", async () => {
@@ -192,7 +192,7 @@ describe("coupons (DB, U4)", () => {
                 razorpayOfferId: "offer_ABCDEFGHIJKLMN",
             }),
         });
-        expect((await controller.listCoupons())[0]).toMatchObject({
+        expect((await controller.listCoupons(null))[0]).toMatchObject({
             razorpayOfferId: "offer_ABCDEFGHIJKLMN",
         });
 
@@ -302,7 +302,9 @@ describe("coupons (DB, U4)", () => {
             }),
         ).toBe(1);
         // Gone from the list, and its code stays taken.
-        expect((await controller.listCoupons()).map((x) => x.code)).toEqual([]);
+        expect((await controller.listCoupons(null)).map((x) => x.code)).toEqual(
+            [],
+        );
         await expect(create({ code: "used-1" })).rejects.toMatchObject({
             status: 409,
         });

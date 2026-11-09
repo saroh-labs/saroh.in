@@ -481,3 +481,37 @@ describe("cancelWords: Cancel plan's confirm (17 Oct 2026)", () => {
         );
     });
 });
+
+describe("a plan paid one month at a time (Global, stage 9)", () => {
+    it("says a month, never a year", () => {
+        const words = quoteSummary(
+            quote({ kind: "NEW", cycle: "month", payment: "ONE_TIME" }),
+            { currentPlan: "Free" },
+        );
+        const all = JSON.stringify(words);
+        expect(all).toContain("One payment for one month");
+        expect(all).not.toMatch(/12 months|year/);
+    });
+
+    it("names the add-ons a month paid on carries, and none otherwise", () => {
+        const withAddons = quoteSummary(
+            quote({
+                kind: "NEW",
+                cycle: "month",
+                payment: "ONE_TIME",
+                addonsNowPaise: 500,
+            }),
+            { currentPlan: "Grow" },
+        );
+        expect(
+            withAddons.lines.find(
+                (l) => l.label === "Your add-ons, for the month",
+            ),
+        ).toBeTruthy();
+        const without = quoteSummary(
+            quote({ kind: "NEW", cycle: "month", payment: "ONE_TIME" }),
+            { currentPlan: "Free" },
+        );
+        expect(JSON.stringify(without)).not.toContain("add-ons, for");
+    });
+});

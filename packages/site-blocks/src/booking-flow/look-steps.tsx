@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { InitialsPlate } from "../blocks/no-photo";
 import { LookIcon } from "../look-icons";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import { LOOK_CHOICE, lookLink } from "./look-styles";
 import { holdBeforeText, lookGstText } from "./look-words";
 import type {
@@ -262,8 +263,9 @@ export function LookPay({
     /** The business's rules, as the summary says them. */
     rules: string;
 }) {
+    const taxName = taxWordOf(useSiteBusiness());
     const gst = choices.some((c) => c.pay !== "CREDIT")
-        ? lookGstText(service)
+        ? lookGstText(service, taxName)
         : null;
     const holds = choices.some((c) => c.pay === "NOW" || c.pay === "DEPOSIT");
     const style = LOOK_CHOICE[look];

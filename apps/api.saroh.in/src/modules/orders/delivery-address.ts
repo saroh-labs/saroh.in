@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import {
+    checkDeliveryPlace,
     listedCountry,
     POSTCODE_MAX,
     REGION_MAX,
@@ -17,11 +18,14 @@ import type { DeliveryAddressInput } from "./dto";
  *
  * - **India**: a state, read later as the GST place of supply, and a PIN
  *   code. Refused in the words and shape the DTO's validators used.
- * - **Global**: region and postcode are optional and free text, and no tax
- *   reads them: a Global business can't register for GST. The country is one
- *   from the list, else the one already on the line (an edit sends back what
- *   it read), else the business's own. The region goes in `state` and the
- *   country's ISO code in `country`, each to its own column (DEC-207).
+ * - **Global**: no tax reads the region or postcode (a Global business can't
+ *   register for GST); they're held to the address's own country, never to
+ *   the business's (`checkDeliveryPlace`): the US, Canada and Australia need
+ *   the state from the list and the code, elsewhere both are optional but a
+ *   typed postcode must fit. The country is one from the list, else the one
+ *   already on the line (an edit sends back what it read), else the
+ *   business's own. The region goes in `state` and the country's ISO code in
+ *   `country`, each to its own column (DEC-207).
  */
 export function deliveryAddressFor<A extends DeliveryAddressInput>(
     address: A,
@@ -60,13 +64,20 @@ export function deliveryAddressFor<A extends DeliveryAddressInput>(
             field: "address.postalCode",
         });
     }
+    const country =
+        listedCountry(sent ?? place.country ?? business.country)?.code ?? null;
+    const checked = checkDeliveryPlace(country, place.region, postcode);
+    if ("problem" in checked) {
+        throw new BadRequestException({
+            message: checked.problem,
+            field: `address.${checked.field}`,
+        });
+    }
     return {
         ...rest,
-        state: place.region.trim() || null,
-        postalCode: postcode || null,
-        country:
-            listedCountry(sent ?? place.country ?? business.country)?.code ??
-            null,
+        state: checked.region || null,
+        postalCode: checked.postcode || null,
+        country,
     } as A;
 }
 

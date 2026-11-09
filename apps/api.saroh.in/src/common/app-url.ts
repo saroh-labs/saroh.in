@@ -29,9 +29,14 @@ export function appBase(edition?: Edition): string {
 
 /** {@link appBase} for a business, when the caller hasn't read its edition. */
 export async function appBaseOf(organizationId: string): Promise<string> {
+    return appBase(await editionOf(organizationId));
+}
+
+/** A business's edition: its links' app and its mail's sender (KTD6). Gone: India's. */
+export async function editionOf(organizationId: string): Promise<Edition> {
     const organization = await prisma.organization.findUnique({
         where: { id: organizationId },
         select: { edition: true },
     });
-    return appBase(organization?.edition);
+    return organization?.edition ?? "INDIA";
 }

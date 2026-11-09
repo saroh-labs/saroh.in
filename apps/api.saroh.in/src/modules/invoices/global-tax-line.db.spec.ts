@@ -41,6 +41,10 @@ beforeAll(async () => {
         data: {
             country: "GB",
             gstState: null,
+            // A UK address: a Global address is read by its country (U3).
+            addressLine1: "10 Downing St",
+            city: "London",
+            postalCode: "SW1A 2AA",
             taxId: "GB123456789",
             taxName: "VAT",
             taxRate: "20",
@@ -76,6 +80,27 @@ describe("a manual invoice", () => {
         expect(row.taxLabel).toBe("VAT 20%");
         expect(row.sellerTaxId).toBe("GB123456789");
         expect(row.sellerGstin).toBeNull();
+    });
+
+    it("freezes the seller's address with its country last, as it was at issue (U4)", async () => {
+        const draft = await invoices.createDraft(owner, {
+            contactId,
+            currency: "GBP",
+            tax: "0",
+            lines: LINES,
+        });
+        const issued = await invoices.issue(owner, draft.id);
+        await prisma.businessProfile.update({
+            where: { organizationId: owner.organizationId },
+            data: { city: "Westminster" },
+        });
+        expect((await stored(issued.id)).sellerAddress).toBe(
+            "10 Downing St, London SW1A 2AA, United Kingdom",
+        );
+        await prisma.businessProfile.update({
+            where: { organizationId: owner.organizationId },
+            data: { city: "London" },
+        });
     });
 
     it("keeps them when it's written again", async () => {

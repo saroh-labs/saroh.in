@@ -3,6 +3,7 @@ import { timeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
 import type { CheckoutRequest } from "../checkout";
 import type { Phase } from "../flow-state";
+import { leavesForProvider, TO_PAYMENT_PAGE_WORDS } from "../hosted-checkout";
 import { card, focusRing, quietFill } from "../styles";
 import { useCheckout } from "../use-checkout";
 
@@ -80,11 +81,15 @@ export function PayingCard({
             ? Math.max(0, Math.ceil((Date.parse(until) - now) / 60_000))
             : null;
     const paying = checkout.status === "paid";
+    // Stripe's hosted Checkout: the page leaves rather than opening a window.
+    const redirect = leavesForProvider(phase.handoff);
     const refused =
         checkout.status === "failed"
             ? "The payment didn't go through. Try again."
             : checkout.status === "unavailable"
-              ? "We couldn't open the payment window. Check your connection and try again."
+              ? redirect
+                  ? "We couldn't open the secure payment page. Check your connection and try again."
+                  : "We couldn't open the payment window. Check your connection and try again."
               : null;
 
     return (
@@ -178,8 +183,12 @@ export function PayingCard({
                             : paying
                               ? "Paying…"
                               : checkout.status === "closed"
-                                ? "The payment window was closed before you paid"
-                                : "Pay online in the payment window"}
+                                ? redirect
+                                    ? "You came back before paying"
+                                    : "The payment window was closed before you paid"
+                                : redirect
+                                  ? TO_PAYMENT_PAGE_WORDS
+                                  : "Pay online in the payment window"}
                     </p>
                     <p className="text-site-muted mt-1 text-[12.5px]">
                         {paying

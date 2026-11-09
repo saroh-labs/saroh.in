@@ -1,4 +1,6 @@
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import { IANAZone } from "luxon";
 
 import type { Interval, StaffAvailabilityInput } from "./availability";
@@ -23,8 +25,12 @@ type Db = Pick<
     | "bookingRules"
 >;
 
-/** Where no business has said otherwise (the product is India-first). */
-export const FALLBACK_TIMEZONE = "Asia/Kolkata";
+/**
+ * Where no business has said otherwise: its edition's default zone (India's
+ * own, UTC on Global), never India's for a Global business.
+ */
+export const fallbackZone = (edition: Edition | null | undefined): string =>
+    editionProfile(edition).defaultZone;
 
 const DAY = 86_400_000;
 
@@ -33,11 +39,14 @@ export type ZoneSource = "business" | "service" | "fallback";
 
 /**
  * The zone a business keeps its hours in: its own setting, else the zone of
- * its first active service, else India. Staff hours are wall-clock times in
+ * its first active service, else its edition's default. Staff hours are wall-clock times in
  * this zone, and the calendars (U4) bucket days in it.
  */
 export async function businessZone(
-    db: Pick<Db, "businessProfile" | "service">,
+    db: Pick<
+        Prisma.TransactionClient,
+        "businessProfile" | "service" | "organization"
+    >,
     organizationId: string,
 ): Promise<{ zone: string; source: ZoneSource }> {
     const profile = await db.businessProfile.findUnique({
@@ -55,12 +64,19 @@ export async function businessZone(
     if (first?.timezone && IANAZone.isValidZone(first.timezone)) {
         return { zone: first.timezone, source: "service" };
     }
-    return { zone: FALLBACK_TIMEZONE, source: "fallback" };
+    const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { edition: true },
+    });
+    return { zone: fallbackZone(org?.edition), source: "fallback" };
 }
 
 /** {@link businessZone}, the zone alone. */
 export async function businessTimezone(
-    db: Pick<Db, "businessProfile" | "service">,
+    db: Pick<
+        Prisma.TransactionClient,
+        "businessProfile" | "service" | "organization"
+    >,
     organizationId: string,
 ): Promise<string> {
     return (await businessZone(db, organizationId)).zone;

@@ -3,10 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { unpaidBillsOnce } from "../analytics/owed-by-age";
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
-import {
-    businessTimezone,
-    FALLBACK_TIMEZONE,
-} from "../bookings/staff-availability";
+import { businessTimezone, fallbackZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import {
@@ -313,7 +310,7 @@ export class HomeService {
         // below ask for the action rather than the module.
         const canReadLeads = holds(input, "lead:read");
         // The business's days: "Due today" on an order, "was due 14 Sep".
-        const zone = await this.businessZone(input.organizationId);
+        const zone = await this.businessZone(input);
 
         /*
          * Every source below is independent of the others, so they are read
@@ -885,7 +882,7 @@ export class HomeService {
      */
     private async buildReviewer(input: HomeInput): Promise<HomeModel> {
         const now = new Date();
-        const zone = await this.businessZone(input.organizationId);
+        const zone = await this.businessZone(input);
         const unavailable: HomeUnavailable[] = [];
         const userId = input.userId;
         const reviews = userId
@@ -917,11 +914,14 @@ export class HomeService {
     /**
      * The zone the business keeps its days in: `businessTimezone`, the one
      * reader every surface uses (its own setting, else its first service's,
-     * else India's). Not a source of its own: when it can't be read, the
+     * else its edition's default). Not a source of its own: when it can't be read, the
      * fallback only moves "Due today" by the zones' difference, and saying
      * Home is missing a part would be untrue.
      */
-    private async businessZone(organizationId: string): Promise<string> {
+    private async businessZone({
+        organizationId,
+        edition,
+    }: HomeInput): Promise<string> {
         try {
             return await businessTimezone(this.db, organizationId);
         } catch (error) {
@@ -930,7 +930,7 @@ export class HomeService {
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
-            return FALLBACK_TIMEZONE;
+            return fallbackZone(edition);
         }
     }
 

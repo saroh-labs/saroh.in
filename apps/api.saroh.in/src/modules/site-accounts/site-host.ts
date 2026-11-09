@@ -1,6 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { businessPublicPhoneOf } from "../organizations/business-phone";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
@@ -25,6 +26,8 @@ export interface SiteHost {
     businessName: string;
     /** When the business was created: a new business gets lower ceilings. */
     businessCreatedAt: Date;
+    /** The business's edition: whose sender its codes go from (KTD6). */
+    edition: Edition;
 }
 
 function subdomainOf(host: string): string | null {
@@ -67,7 +70,9 @@ export async function resolveSiteHost(rawHost: string): Promise<SiteHost> {
         select: {
             id: true,
             organizationId: true,
-            organization: { select: { name: true, createdAt: true } },
+            organization: {
+                select: { name: true, createdAt: true, edition: true },
+            },
         },
     });
     if (!site) notFound();
@@ -77,6 +82,7 @@ export async function resolveSiteHost(rawHost: string): Promise<SiteHost> {
         host,
         businessName: site.organization.name,
         businessCreatedAt: site.organization.createdAt,
+        edition: site.organization.edition,
     };
 }
 

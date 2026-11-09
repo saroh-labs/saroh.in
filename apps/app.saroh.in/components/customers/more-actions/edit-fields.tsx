@@ -1,5 +1,6 @@
 "use client";
 
+import { addressRulesFor } from "@saroh/edition/address-rules";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -95,7 +96,8 @@ export function PhoneField({
 /**
  * The delivery address (C8): two lines, city, state, PIN and country. In
  * India the state is chosen from the GST list and the PIN is six digits;
- * elsewhere both are typed.
+ * elsewhere by the address's own country (`@saroh/edition/address-rules`):
+ * its words, a region from its list or typed, no postcode where it has none.
  */
 export function AddressFields({
     id,
@@ -109,6 +111,8 @@ export function AddressFields({
     errors: Partial<Record<DetailsKey, string>>;
 }) {
     const india = draft.country === "IN";
+    const rules = addressRulesFor(draft.country);
+    const region = rules.region;
     const common = { id, draft, set };
     return (
         <fieldset className="grid gap-3 border-t border-border pt-3.5">
@@ -151,14 +155,20 @@ export function AddressFields({
                     autoComplete="off"
                     error={errors.city}
                 />
-                <TextField
-                    {...common}
-                    k="postalCode"
-                    label={india ? "PIN code" : "Postcode"}
-                    maxLength={12}
-                    autoComplete="off"
-                    error={errors.postalCode}
-                />
+                {india || rules.postcode ? (
+                    <TextField
+                        {...common}
+                        k="postalCode"
+                        label={
+                            india
+                                ? "PIN code"
+                                : (rules.postcode?.label ?? "Postcode")
+                        }
+                        maxLength={12}
+                        autoComplete="off"
+                        error={errors.postalCode}
+                    />
+                ) : null}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
                 {india ? (
@@ -177,16 +187,35 @@ export function AddressFields({
                             className={cn("w-full")}
                         />
                     </Field>
-                ) : (
+                ) : region.kind === "list" ? (
+                    <Field
+                        htmlFor={`${id}-state`}
+                        label={region.label}
+                        error={errors.state}
+                    >
+                        <OptionSelect
+                            id={`${id}-state`}
+                            value={draft.state}
+                            onValueChange={(v) => set("state", v)}
+                            options={region.options.map((o) => ({
+                                value: o.code,
+                                label: o.name,
+                            }))}
+                            placeholder={`Choose a ${region.label.toLowerCase()}`}
+                            aria-invalid={errors.state ? true : undefined}
+                            className={cn("w-full")}
+                        />
+                    </Field>
+                ) : region.kind === "text" ? (
                     <TextField
                         {...common}
                         k="state"
-                        label="State or region"
+                        label={region.label}
                         maxLength={60}
                         autoComplete="off"
                         error={errors.state}
                     />
-                )}
+                ) : null}
                 <Field
                     htmlFor={`${id}-country`}
                     label="Country"

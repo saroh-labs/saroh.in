@@ -126,6 +126,15 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides a Stripe Checkout session id, not the cancel route (U7)", () => {
+        expect(redactUrl("/public/payments/checkout/cs_test_a1B2")).toBe(
+            "/public/payments/checkout/[token]",
+        );
+        expect(redactUrl("/public/payments/checkout/cancel")).toBe(
+            "/public/payments/checkout/cancel",
+        );
+    });
+
     it("hides an order pay link's token (B11)", () => {
         expect(redactUrl("/public/order-pay/tok_ABC-123/payment-intent")).toBe(
             "/public/order-pay/[token]/payment-intent",

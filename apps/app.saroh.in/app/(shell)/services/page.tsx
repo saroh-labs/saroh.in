@@ -6,6 +6,7 @@ import { ServicesScreen } from "@/components/services/list/services-screen";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { canWriteCourses } from "@/lib/courses/access";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { rolledOut } from "@/lib/modules/rollout";
@@ -108,7 +109,9 @@ export default async function ServicesPage() {
 
     const services = read.services;
     const timezone =
-        staffList?.timezone ?? services.at(0)?.timezone ?? "Asia/Kolkata";
+        staffList?.timezone ??
+        services.at(0)?.timezone ??
+        DEFAULT_BUSINESS_ZONE;
     const usage = await readServiceUsage(
         services.map((s) => s.id),
         timezone,

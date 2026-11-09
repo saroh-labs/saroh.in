@@ -64,13 +64,24 @@ export interface AccountPackAttempt {
 }
 
 export type PackResult<T> =
-    { ok: true; data: T } | { ok: false; message: string } | TestReleaseRefusal;
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          message: string;
+          /** The key's Stripe checkout closed: start again with a new key. */
+          restart?: boolean;
+      }
+    | TestReleaseRefusal;
 
 export interface PacksApi {
-    /** Start paying for a pack; the same key replays the same payment. */
+    /**
+     * Start paying for a pack; the same key replays the same payment.
+     * `returnPath`: the page Stripe's hosted Checkout comes back to.
+     */
     buy: (
         ref: string,
         idempotencyKey: string,
+        returnPath?: string,
     ) => Promise<PackResult<AccountPackCheckout>>;
     /** How a started payment stands. */
     standing: (ref: string) => Promise<PackResult<AccountPackAttempt>>;

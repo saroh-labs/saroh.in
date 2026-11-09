@@ -3,6 +3,7 @@ import { payInstructionsOf } from "@saroh/site-blocks";
 import { serverApiUrl, serverReadSignal } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
+import { checkoutClosedOf, intentBody } from "./invoice-pay";
 import { payContactOf, payOnlineOf, payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
 import { isPayOrder } from "./order-pay-shape";
@@ -73,6 +74,7 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
 export async function startOrderPayment(
     token: string,
     idempotencyKey: string,
+    returnPath?: string,
 ): Promise<StartResult> {
     let res: Response;
     try {
@@ -85,7 +87,7 @@ export async function startOrderPayment(
                     accept: "application/json",
                     "content-type": "application/json",
                 },
-                body: JSON.stringify({ idempotencyKey }),
+                body: intentBody(idempotencyKey, returnPath),
             },
         );
     } catch {
@@ -103,6 +105,8 @@ export async function startOrderPayment(
                   message: "We couldn't start the payment. Please try again.",
               };
     }
+    const closed = checkoutClosedOf(res.status, body);
+    if (closed) return closed;
     switch (res.status) {
         case 404:
             return {

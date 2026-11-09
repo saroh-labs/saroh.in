@@ -6545,3 +6545,72 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the spec now expects the payment due for 7 days, then Free from the sweep. All nine specs that deliver `halted` pass.
 - **Rule:** before changing what an event does, grep every spec that sends it (`rg -l '"halted"' --glob '*.db.spec.ts'`) and run them all, not only the ones being edited.
 - **Category:** tests · billing
+
+## A new export the code called wasn't in a spec's mock (7 Nov 2026)
+
+- **Symptom:** `admin-people.db.spec.ts` failed in the full gate: staff couldn't send a sign-in code ("couldn't be sent"). Separately, `product-milestones.spec.ts` failed only when run after another file.
+- **Cause:** `SignInCodeSender` began calling `authOfEdition()` from `common/auth/auth`, and the spec's `jest.mock` of that module exported only `auth`, so the call threw. The unit run never loaded that spec: it's a `.db.spec`. The analytics spec shared the 10-minute workspace facts cache between tests, so its result hung on run order.
+- **Fix:** the mock exports `authOfEdition` returning the same stub; the analytics spec calls `forgetWorkspaceFacts()` before each test.
+- **Rule:** when a module gains an export its callers now use, grep the specs that `jest.mock` that module (`grep -rn 'jest.mock(".*<module>"'`) and run them, `.db.spec` included, before calling the change done. A module-level cache needs its test seam called in `beforeEach`.
+
+## The showcase seed stopped late in the IST evening (7 Nov 2026)
+
+- **Symptom:** the full gate's browser run failed before any test: `db:seed:showcase` threw "Gulmohar Salon & Bridal: no time for the scene farida_pedicure (day 0)" when run at 20:00 IST.
+- **Cause:** a day-0 scene starts at least 3 hours after the seed clock, so after the salon's last slot there is no room today, and only scenes from day 1 on fell back to next week.
+- **Fix:** scenes from day 0 on fall back to the next week's first slot (`diary-shop-plan.ts`); checked with `--now=2026-11-07T20:00:00+05:30`.
+- **Rule:** a seed that plans around "now" is run at a late-evening `--now` before it's called clock-proof. Also, a spec that counts telemetry sends filters to the events it means: a milestone can also be a workspace event that reads the real database under the integration runner.
+
+## Global codes failed on dev: the fallback didn't know SES's policy refusal (8 Nov 2026)
+
+- **Symptom:** on the Global dev site a customer's sign-in code never came (`site_code_send_failed`, 3 attempts, 503).
+- **Cause:** a Global business's codes go from `codes@saroh.tech`. The dev AWS account's sending user may only send `*@saroh.io` (IAM `ses:FromAddress`), so SES refused with "not authorized to perform ses:SendRawEmail", which the fallback (built for "Email address is not verified") didn't recognise. The dev API also hadn't been redeployed since `EMAIL_FROM_GLOBAL`/`SITE_CODES_EMAIL_FROM_GLOBAL` were set.
+- **Fix:** `isUnverifiedSender` also treats the policy refusal as "this sender can't be used" (nothing was sent, so a retry can't send twice); dev API redeployed to pick up the saroh.io senders.
+- **Rule:** a new sender address needs both an SES identity and the sending IAM user's `ses:FromAddress` condition, in every environment; env changes on Coolify reach the API only on its next deploy.
+
+## Stripe refused a payment on an Indian account: an export needs a description and an address (7 Nov 2026)
+
+- **Symptom:** the first live test of a Global business's Stripe payment, on an Indian Stripe test account, was refused: "As per Indian regulations, export transactions require a description." Saroh's own card window (a PaymentIntent with Stripe's Payment Element) had no way to fix it.
+- **Cause:** an Indian Stripe account charging a customer abroad must send a description, the customer's name and a billing address (and a shipping address for goods). Saroh's window collected none of them; DEC-208 was built and checked against a US-shaped account only.
+- **Fix:** Stripe payments go through Stripe's hosted Checkout (DEC-208, 7 Nov amendment; plan 2026-11-07-002). Every PaymentIntent carries `paymentDescription`, the account's country is read at connect, and an `IN` or unreadable account's sessions send `billing_address_collection=required` (and the order's shipping country for goods). Stripe's page asks for whatever else the account's country needs.
+- **Rule:** a provider fact is checked against the provider's docs for every country the merchant's account can be in, not only the edition's, and recorded with its source in `payments/providers/STRIPE.md` before code is written. An owner test on an account from the strictest country (India for Stripe) comes before the flag goes on.
+- **Category:** payments · providers
+
+## Stripe's return to a live site timed out in the browser specs (8 Nov 2026)
+
+- **Symptom:** the full gate's `stripe-checkout.spec.ts` booking-hold tests (desk and phone) waited on `/paid` on a blank page after "Pay"; the invoice and order tests, which return to the renderer apex, passed.
+- **Cause:** `platformOrigin` (`sites/site-origin.ts`) wrote `https://` before the renderer's host, so on the plain-http e2e stack (`RENDERER_URL=http://localhost:3005`) a business with a live site was sent to `https://<address>.localhost:3005`, which nothing serves.
+- **Fix:** the address takes the renderer's own scheme; `site-origin.spec.ts` pins production (`https://<address>.saroh.app`, custom domain on https) and the http stack.
+- **Rule:** an origin built from `RENDERER_URL` keeps its scheme; never hard-code `https://` in front of `rendererHost()`.
+- **Category:** sites · e2e
+
+## Global's price history still said MRP, and the window spec waited on a request the browser never makes (8 Nov 2026)
+
+- **Symptom:** the full gate's new Global words check (`global-screens.spec.ts`, U13) found "MRP set to $150,000" in a US product's Price history; the Stripe card window spec timed out on `waitForResponse(/payment-intent)` with the window open; the `@serial` none-chosen Global test opened another spec's business. Phone booking-hold tests failed beside them on 429s.
+- **Cause:** U10 moved the struck price's word to `MRP_LABEL`, but `lib/price-history/words.ts` kept its own `"MRP"` literal. The invoice pay page starts the intent server to server (`apps/saroh.app/lib/invoice-pay.ts`, a server action), so the browser only sees the action's POST to `/pay/<token>`. With none chosen the app opens the first of this edition's businesses by name (`listForUser`), and U13's `global-details` sorted before `global-home`. The window spec's failures and retries restarted workers, whose `asNewVisitor` counter starts again, so later customers reused an address already at the pay limit (10 per 10 minutes).
+- **Fix:** price history takes `MRP_LABEL` (pinned in `mrp-label.test.ts` for both editions); the spec reads the intent from the action's answer; the none-chosen test's business is `global-a-home`.
+- **Rule:** an edition word gets one constant, and every place that says it imports the constant: grep the old literal across the app when you add one. A browser spec on a renderer pay page waits for the page's own POST, not an API path.
+- **Category:** edition · e2e
+
+## Phone booking holds hit the payment limit even with a new address per customer (8 Nov 2026)
+
+- **Symptom:** the full gate failed only the three phone booking-hold tests in `stripe-checkout.spec.ts`, each refused 429 on its first `payment-intent`, after `asNewVisitor` was keyed on the worker index.
+- **Cause:** the booking page starts the payment from the browser straight to the API (`site-blocks/booking-flow/api.ts`), not through the renderer, so `cf-connecting-ip` never mattered. The e2e API ran with `TRUST_PROXY` unset, which under `SKIP_ENV_VALIDATION` trusts nothing, so every browser in the run was one caller (loopback) for the pay limit (10 per 10 minutes). Desk and the 503 Cashfree tests spent it first.
+- **Fix:** the e2e stack's API runs with `TRUST_PROXY=private` (`ci.yml`, `scripts/prepush.sh`), and `asNewVisitor` sends its address as `x-forwarded-for` as well.
+- **Rule:** a public limit a browser spec meets directly on the API is keyed on `@Ip()`; give the customer an address the API reads (`x-forwarded-for` on the trusted e2e stack), not only the renderer's header.
+- **Category:** e2e · rate limits
+
+## saroh.tech's Tailwind content check failed in CI only (8 Nov 2026)
+
+- **Symptom:** CI's unit job failed `apps/saroh.tech/tailwind-content.test.ts` ("expected [ 'lib/money.ts' ] to deeply equal []") after `option-select.tsx` in `@saroh/ui` began importing `lib/money.ts`; the local gate had passed.
+- **Cause:** the gate runs vitest with `--changed`, which picks tests by their import graph. The check reads `@saroh/ui` files from disk, so no change in `packages/ui` ever selected it.
+- **Fix:** `lib/money.ts` added to `UI_FILES`; saroh.tech's `vitest.config.ts` lists `packages/ui/src/**` in `forceRerunTriggers`, so a `@saroh/ui` change reruns its whole suite under `--changed`.
+- **Rule:** a test that reads another package's files by path, not by import, needs a `forceRerunTriggers` entry for them, or the local gate never runs it.
+- **Category:** tooling · tests
+
+## The showcase seed failed on a Monday morning: "a past visit nobody has marked" (9 Nov 2026)
+
+- **Symptom:** every Browser E2E shard on PR #1332 failed at `db:seed:showcase`: "Gulmohar Salon & Bridal is missing what its demos need: a past visit nobody has marked". The run seeded at 04:30 UTC on Monday 9 Nov (10:00 Kolkata); nothing in the PR touched the seed.
+- **Cause:** the salon's `priyanka_blowdry` scene is `day: -1, outcome: "UNMARKED"`, but the scene search (`diary-shop-plan.ts`) looks from that day _forward_ three days for a free slot. With the salon shut on Sunday, it found Monday's or Tuesday's slot, so the "past, unmarked" visit was upcoming and the seed's own check refused the run.
+- **Fix:** a scene with `day < 0` looks only for a slot that has already ended, on its day or the days before it, before the forward search; `diary-shop-plan.test.ts` plans at CI's exact `now` and asserts a past unmarked visit at every `now`.
+- **Rule:** a seeded scene that means "in the past" must never be moved forward to find a slot; test a planner at the time of day CI seeds, not only noon.
+- **Category:** seed · e2e

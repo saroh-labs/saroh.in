@@ -20,6 +20,7 @@ import {
     connectPaymentProvider,
     disconnectCommsProvider,
     disconnectPaymentProvider,
+    setStripeCheckoutStyle,
 } from "@/lib/providers/actions";
 import type { StripeKeys } from "@/lib/providers/rows";
 import {
@@ -28,6 +29,7 @@ import {
     needsWebhookSecret,
     paymentsConsequence,
     RAZORPAY_KEY_ID,
+    STRIPE_KEY_PERMISSIONS,
     stripeKeyProblems,
 } from "@/lib/providers/rows";
 import type {
@@ -36,8 +38,10 @@ import type {
     ConnectedPaymentProvider,
     PaymentProviderName,
     PaymentWebhookSetup,
+    StripeCheckoutStyle,
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+import { RadioCards } from "@saroh/ui/choice-group";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -265,6 +269,32 @@ function PaymentsForm({
         error: string;
     } | null>(null);
     const stripeKeys = { publishable, restricted, webhookSecret };
+    // Where Stripe's customers pay (owner, 8 Nov 2026, DEC-208): saved at
+    // once on a connected Stripe, else sent with the keys.
+    const [checkoutStyle, setCheckoutStyle] = useState<StripeCheckoutStyle>(
+        current?.checkoutStyle ?? "HOSTED",
+    );
+    const [savingStyle, setSavingStyle] = useState(false);
+    async function pickCheckoutStyle(next: StripeCheckoutStyle) {
+        if (next === checkoutStyle) return;
+        const before = checkoutStyle;
+        setCheckoutStyle(next);
+        if (!current) return;
+        const res = await runAction(() => setStripeCheckoutStyle(next), {
+            setBusy: setSavingStyle,
+        });
+        if (!res?.ok) {
+            setCheckoutStyle(before);
+            if (res) reportFailure(res);
+            return;
+        }
+        showSuccess(
+            next === "WINDOW"
+                ? "Customers now pay on your page."
+                : "Customers now pay on Stripe's page.",
+        );
+        router.refresh();
+    }
     const stripeErrors = stripe ? stripeKeyProblems(stripeKeys, tried) : {};
     const stripeError = (field: keyof StripeKeys) =>
         stripeErrors[field] ??
@@ -316,6 +346,7 @@ function PaymentsForm({
                                   keySecret: restricted.trim(),
                                   publicKey: publishable.trim(),
                                   webhookSecret: webhookSecret.trim(),
+                                  checkoutStyle,
                               }
                             : {
                                   provider,
@@ -422,6 +453,9 @@ function PaymentsForm({
                             setWebhookSecret,
                         )}
                         hook={hook}
+                        checkoutStyle={checkoutStyle}
+                        onCheckoutStyle={pickCheckoutStyle}
+                        savingStyle={savingStyle}
                     />
                 ) : (
                     <>
@@ -883,6 +917,9 @@ function StripeSteps({
     onRestricted,
     onWebhookSecret,
     hook,
+    checkoutStyle,
+    onCheckoutStyle,
+    savingStyle,
 }: {
     ids: { keys: string; keyId: string; secret: string; public: string };
     keys: StripeKeys;
@@ -891,7 +928,11 @@ function StripeSteps({
     onRestricted: (value: string) => void;
     onWebhookSecret: (value: string) => void;
     hook: PaymentWebhookSetup | null;
+    checkoutStyle: StripeCheckoutStyle;
+    onCheckoutStyle: (style: StripeCheckoutStyle) => void;
+    savingStyle: boolean;
 }) {
+    const styleHeading = `${ids.public}-style`;
     return (
         <>
             <section aria-labelledby={ids.keys} className="grid gap-2.5">
@@ -907,7 +948,7 @@ function StripeSteps({
                         Developers › API keys
                     </span>
                     . Copy the publishable key, then create a restricted key
-                    with Payment Intents: Write and Refunds: Write.
+                    with {STRIPE_KEY_PERMISSIONS}.
                 </p>
                 <div className="grid gap-3 min-[420px]:grid-cols-2">
                     <SecretField
@@ -954,13 +995,39 @@ function StripeSteps({
                 />
             </section>
 
+            <section aria-labelledby={styleHeading} className="grid gap-2.5">
+                <StepHeading n={4} id={styleHeading}>
+                    Where customers pay
+                </StepHeading>
+                <RadioCards
+                    labelledBy={styleHeading}
+                    value={checkoutStyle}
+                    onChange={onCheckoutStyle}
+                    disabled={savingStyle}
+                    options={[
+                        {
+                            value: "HOSTED",
+                            label: "Pay on Stripe's page",
+                            note: "Recommended. Stripe's checkout page handles each country's payment rules.",
+                        },
+                        {
+                            value: "WINDOW",
+                            label: "Pay on our page",
+                            note: "A card window opens on your site, so customers never leave it.",
+                        },
+                    ]}
+                />
+            </section>
+
             <p
                 data-ph-unmask=""
                 className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
             >
-                Customers pay by card for now. If receipts are turned on in your
-                Stripe settings, Stripe also emails its own receipt, alongside
-                Saroh&apos;s confirmation.
+                {checkoutStyle === "WINDOW"
+                    ? "Customers pay by card in a window on your site."
+                    : "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link."}{" "}
+                If receipts are turned on in your Stripe settings, Stripe also
+                emails its own receipt, alongside Saroh&apos;s confirmation.
             </p>
         </>
     );

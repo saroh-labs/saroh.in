@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/http";
+import { PROFILE } from "@/lib/edition";
 
 import type { InviteCheckAnswer, InviteIntent } from "./launch-offer";
 import { INVITE_TOKEN, inviteIntentFrom } from "./launch-offer";
@@ -33,6 +34,7 @@ export async function readInviteIntent(query: {
         return inviteIntentFrom(
             token,
             (await res.json()) as InviteCheckAnswer | null,
+            PROFILE.sarohBilling,
         );
     } catch {
         return inviteIntentFrom(token, null);

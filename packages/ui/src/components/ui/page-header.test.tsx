@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { countLabel, PageHeader } from "./page-header";
 
@@ -364,5 +364,18 @@ describe("countLabel", () => {
 
     it("groups thousands the Indian way", () => {
         expect(countLabel(123456, noun)).toBe("1,23,456 bookings");
+    });
+
+    it("groups by thousands on a Global deployment", async () => {
+        vi.resetModules();
+        vi.stubEnv("NEXT_PUBLIC_EDITION", "GLOBAL");
+        try {
+            const global = await import("./page-header");
+            expect(global.countLabel(123456, noun)).toBe("123,456 bookings");
+            expect(global.countLabel(12345, noun)).toBe("12,345 bookings");
+        } finally {
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        }
     });
 });

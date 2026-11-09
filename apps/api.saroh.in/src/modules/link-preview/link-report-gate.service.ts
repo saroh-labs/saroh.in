@@ -113,6 +113,7 @@ export class LinkReportGateService {
                 email,
                 REPORT_SUBJECT,
                 reportText(check.report, link),
+                input.edition ?? "INDIA",
             );
             emailed = outcome === "sent" ? "sent" : "not-sent";
             if (outcome !== "sent") {

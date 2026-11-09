@@ -11,8 +11,15 @@ import {
     prisma,
     writeCatalogueVersionInTx,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile, EDITIONS } from "@saroh/edition";
 import type { Catalog } from "@saroh/pricing-catalog";
-import { diff, planRows, validateCatalog } from "@saroh/pricing-catalog";
+import {
+    catalogMoney,
+    diff,
+    planRows,
+    validateCatalog,
+} from "@saroh/pricing-catalog";
 import { unknownFreeStyles } from "./free-style-choices";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -34,7 +41,7 @@ import {
     settleProviderPlansLocallyInTx,
 } from "../billing/provider-plan-sync.service";
 import type { StaffName } from "./catalogue.service";
-import { DRAFT_SAVE_ACTION, SHARED_DRAFT_ID } from "./catalogue.service";
+import { DRAFT_SAVE_ACTION, draftIdOf } from "./catalogue.service";
 import type { PublishPolicy } from "./dto";
 import type { ScheduledMoves } from "./moves.service";
 import { cancelMovesTo, scheduleMoves } from "./moves.service";
@@ -158,6 +165,7 @@ export class CatalogueWritesService {
      * published, and its copy would undo it.
      */
     async saveDraft(
+        edition: Edition,
         actorUserId: string,
         input: {
             catalog: Record<string, unknown>;
@@ -176,12 +184,12 @@ export class CatalogueWritesService {
         return prisma.$transaction(async (tx) => {
             if (input.revision === 0) {
                 const existing = await tx.pricingCatalogDraft.findUnique({
-                    where: { id: SHARED_DRAFT_ID },
+                    where: { id: draftIdOf(edition) },
                     select: { id: true },
                 });
                 // Someone's draft is there already: theirs is the news.
-                if (existing) throw await this.staleDraft(tx);
-                const newest = await this.newestPublished(tx, now);
+                if (existing) throw await this.staleDraft(tx, edition);
+                const newest = await this.newestPublished(tx, edition, now);
                 if (
                     input.baseVersion === undefined ||
                     input.baseVersion !== newest
@@ -193,7 +201,7 @@ export class CatalogueWritesService {
                 const made = await tx.pricingCatalogDraft.createMany({
                     data: [
                         {
-                            id: SHARED_DRAFT_ID,
+                            id: draftIdOf(edition),
                             catalog,
                             revision: 1,
                             baseVersion: newest,
@@ -202,34 +210,34 @@ export class CatalogueWritesService {
                     ],
                     skipDuplicates: true,
                 });
-                if (made.count === 0) throw await this.staleDraft(tx);
+                if (made.count === 0) throw await this.staleDraft(tx, edition);
             } else {
                 const saved = await tx.pricingCatalogDraft.updateMany({
-                    where: { id: SHARED_DRAFT_ID, revision: input.revision },
+                    where: { id: draftIdOf(edition), revision: input.revision },
                     data: {
                         catalog,
                         revision: { increment: 1 },
                         updatedByUserId: actorUserId,
                     },
                 });
-                if (saved.count === 0) throw await this.staleDraft(tx);
+                if (saved.count === 0) throw await this.staleDraft(tx, edition);
             }
             const row = await tx.pricingCatalogDraft.findUniqueOrThrow({
-                where: { id: SHARED_DRAFT_ID },
+                where: { id: draftIdOf(edition) },
             });
             await this.audit.write(tx, {
                 actorUserId,
                 permission: AdminPermission.PricingEdit,
                 action: DRAFT_SAVE_ACTION,
                 targetType: "pricing_draft",
-                targetId: SHARED_DRAFT_ID,
+                targetId: draftIdOf(edition),
                 outcome: AdminAuditOutcome.Success,
                 metadata: { revision: row.revision },
             });
             const check = validateCatalog(row.catalog);
             let changes: string[] = [];
             if (check.ok) {
-                const live = await this.liveCatalog(tx, now);
+                const live = await this.liveCatalog(tx, edition, now);
                 changes = live ? diff(live.catalog, check.catalog) : [];
             }
             return {
@@ -246,27 +254,28 @@ export class CatalogueWritesService {
 
     /** Throw the draft away, if it is still the revision the person saw. */
     async discardDraft(
+        edition: Edition,
         actorUserId: string,
         input: { revision: number; reason?: string; idempotencyKey: string },
     ): Promise<{ discarded: true }> {
         return prisma.$transaction(async (tx) => {
             const gone = await tx.pricingCatalogDraft.deleteMany({
-                where: { id: SHARED_DRAFT_ID, revision: input.revision },
+                where: { id: draftIdOf(edition), revision: input.revision },
             });
             if (gone.count === 0) {
                 const now = await tx.pricingCatalogDraft.findUnique({
-                    where: { id: SHARED_DRAFT_ID },
+                    where: { id: draftIdOf(edition) },
                     select: { id: true },
                 });
                 if (!now) throw new NotFoundException("There's no draft.");
-                throw await this.staleDraft(tx);
+                throw await this.staleDraft(tx, edition);
             }
             await this.audit.write(tx, {
                 actorUserId,
                 permission: AdminPermission.PricingEdit,
                 action: "pricing.draft.discard",
                 targetType: "pricing_draft",
-                targetId: SHARED_DRAFT_ID,
+                targetId: draftIdOf(edition),
                 reason: input.reason === "" ? undefined : input.reason,
                 outcome: AdminAuditOutcome.Success,
                 idempotencyKey: this.auditKey(
@@ -289,6 +298,7 @@ export class CatalogueWritesService {
      * deleted in the same transaction.
      */
     async publish(
+        edition: Edition,
         actorUserId: string,
         input: {
             revision: number;
@@ -303,19 +313,19 @@ export class CatalogueWritesService {
         const goLiveAt = this.goLiveAt(input.goLiveAt, now);
         return this.versionTx(async (tx) => {
             // The draft row is the lock between a publish and a save.
-            await tx.$queryRaw`SELECT "id" FROM "PricingCatalogDraft" WHERE "id" = ${SHARED_DRAFT_ID} FOR UPDATE`;
+            await tx.$queryRaw`SELECT "id" FROM "PricingCatalogDraft" WHERE "id" = ${draftIdOf(edition)} FOR UPDATE`;
             const draft = await tx.pricingCatalogDraft.findUnique({
-                where: { id: SHARED_DRAFT_ID },
+                where: { id: draftIdOf(edition) },
             });
             if (!draft)
                 throw new NotFoundException("There's no draft to publish.");
             if (draft.revision !== input.revision) {
-                throw await this.staleDraft(tx);
+                throw await this.staleDraft(tx, edition);
             }
             // A version went live after the draft was started (a scheduled
             // one reaching its go-live): the draft is a copy of the one
             // before, and publishing it would undo the newer one.
-            const newest = await this.newestPublished(tx, now);
+            const newest = await this.newestPublished(tx, edition, now);
             if (draft.baseVersion !== newest) {
                 throw this.staleBase(
                     "publish",
@@ -346,6 +356,7 @@ export class CatalogueWritesService {
                 });
             }
             const result = await this.writeVersion(tx, {
+                edition,
                 actorUserId,
                 catalog: check.catalog,
                 goLiveAt,
@@ -356,7 +367,7 @@ export class CatalogueWritesService {
                     `The draft is the same as version ${live}, which is live. There's nothing to publish.`,
             });
             await tx.pricingCatalogDraft.delete({
-                where: { id: SHARED_DRAFT_ID },
+                where: { id: draftIdOf(edition) },
             });
             await this.audit.write(tx, {
                 actorUserId,
@@ -391,6 +402,7 @@ export class CatalogueWritesService {
      * and the version itself go. The next publish takes its number.
      */
     async cancelVersion(
+        edition: Edition,
         actorUserId: string,
         version: number,
         input: { reason: string; idempotencyKey: string },
@@ -398,8 +410,9 @@ export class CatalogueWritesService {
     ): Promise<CancelResult> {
         return this.versionTx(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "PricingCatalogVersion" WHERE "version" = ${version} FOR UPDATE`;
-            const row = await tx.pricingCatalogVersion.findUnique({
-                where: { version },
+            const row = await tx.pricingCatalogVersion.findFirst({
+                // Another edition's version is no version here.
+                where: { version, edition },
                 select: { goLiveAt: true },
             });
             if (!row)
@@ -455,6 +468,7 @@ export class CatalogueWritesService {
      * version that is scheduled, or whose pricing is already live.
      */
     async rollback(
+        edition: Edition,
         actorUserId: string,
         version: number,
         input: { note?: string; reason: string; idempotencyKey: string },
@@ -462,7 +476,7 @@ export class CatalogueWritesService {
     ): Promise<PublishResult> {
         return this.versionTx(async (tx) => {
             const draft = await tx.pricingCatalogDraft.findUnique({
-                where: { id: SHARED_DRAFT_ID },
+                where: { id: draftIdOf(edition) },
                 select: { id: true },
             });
             if (draft) {
@@ -470,8 +484,9 @@ export class CatalogueWritesService {
                     "There's a draft. Publish or discard it before rolling back.",
                 );
             }
-            const target = await tx.pricingCatalogVersion.findUnique({
-                where: { version },
+            const target = await tx.pricingCatalogVersion.findFirst({
+                // Another edition's version is no version here.
+                where: { version, edition },
             });
             if (!target)
                 throw new NotFoundException(`There's no version ${version}.`);
@@ -487,6 +502,7 @@ export class CatalogueWritesService {
                 );
             }
             const result = await this.writeVersion(tx, {
+                edition,
                 actorUserId,
                 catalog: check.catalog,
                 goLiveAt: now,
@@ -528,14 +544,16 @@ export class CatalogueWritesService {
      * Nothing else changes; the version goes live when they are SYNCED.
      */
     async retryProviderSync(
+        edition: Edition,
         actorUserId: string,
         version: number,
         input: { reason: string; idempotencyKey: string },
         now: Date,
     ): Promise<{ version: number; retried: number }> {
         return prisma.$transaction(async (tx) => {
-            const row = await tx.pricingCatalogVersion.findUnique({
-                where: { version },
+            const row = await tx.pricingCatalogVersion.findFirst({
+                // Another edition's version is no version here.
+                where: { version, edition },
                 select: { id: true },
             });
             if (!row)
@@ -603,8 +621,15 @@ export class CatalogueWritesService {
                 details: { errors: check.errors },
             });
         }
+        // The edition whose plans are in the snapshot's money (stage 9).
+        const { currency } = catalogMoney(check.catalog);
+        const edition =
+            EDITIONS.find(
+                (e) => editionProfile(e).sarohPlanMoney.currency === currency,
+            ) ?? "INDIA";
         return this.versionTx(async (tx) => {
             const result = await this.writeVersion(tx, {
+                edition,
                 actorUserId: null,
                 catalog: check.catalog,
                 goLiveAt: now,
@@ -627,12 +652,12 @@ export class CatalogueWritesService {
                 status = "live";
                 await enqueueSiteRevalidation(
                     tx,
-                    { version: result.version, cause: "publish" },
+                    { version: result.version, cause: "publish", edition },
                     now,
                 );
                 await enqueueFreeRows(
                     tx,
-                    { version: result.version },
+                    { version: result.version, edition },
                     now,
                     now,
                 );
@@ -666,6 +691,7 @@ export class CatalogueWritesService {
     private async writeVersion(
         tx: Tx,
         input: {
+            edition: Edition;
             /** Null for a version no member of staff published (an import). */
             actorUserId: string | null;
             catalog: Catalog;
@@ -677,17 +703,31 @@ export class CatalogueWritesService {
             same: (liveVersion: number) => string;
         },
     ): Promise<PublishResult> {
+        // A catalogue in another edition's money is refused (stage 9).
+        const money = editionProfile(input.edition).sarohPlanMoney;
+        const { currency, tax } = catalogMoney(input.catalog);
+        if (currency !== money.currency || tax !== money.tax) {
+            throw new BadRequestException({
+                message: "Fix the draft before publishing it.",
+                details: {
+                    errors: [
+                        `currency: this edition's plans are in ${money.currency} with ${money.tax === "gst" ? "GST" : "no tax"}`,
+                    ],
+                },
+            });
+        }
         const scheduled = await tx.pricingCatalogVersion.findFirst({
-            where: { goLiveAt: { gt: input.now } },
+            where: { edition: input.edition, goLiveAt: { gt: input.now } },
             orderBy: { goLiveAt: "asc" },
             select: { version: true, goLiveAt: true },
         });
         if (scheduled) {
+            // Saroh's own catalogue, published from India: India time on purpose.
             throw new ConflictException(
                 `Version ${scheduled.version} is scheduled for ${dayWords(scheduled.goLiveAt, "Asia/Kolkata", { year: true })}. Cancel it before publishing another.`,
             );
         }
-        const live = await this.liveCatalog(tx, input.now);
+        const live = await this.liveCatalog(tx, input.edition, input.now);
         if (live && canonical(live.catalog) === canonical(input.catalog)) {
             throw new ConflictException(input.same(live.version));
         }
@@ -701,6 +741,7 @@ export class CatalogueWritesService {
 
         const { planIds } = await writeCatalogueVersionInTx(tx, {
             version,
+            edition: input.edition,
             catalog: input.catalog,
             goLiveAt: input.goLiveAt,
             policy: input.policy,
@@ -735,6 +776,7 @@ export class CatalogueWritesService {
                 ? await scheduleMoves(tx, {
                       version,
                       goLiveAt: input.goLiveAt,
+                      edition: input.edition,
                   })
                 : { moved: 0, notices: 0 };
 
@@ -750,13 +792,13 @@ export class CatalogueWritesService {
         if (status === "live") {
             await enqueueSiteRevalidation(
                 tx,
-                { version, cause: "publish" },
+                { version, cause: "publish", edition: input.edition },
                 input.now,
             );
         } else if (status === "scheduled") {
             await enqueueSiteRevalidation(
                 tx,
-                { version, cause: "go-live" },
+                { version, cause: "go-live", edition: input.edition },
                 input.goLiveAt,
             );
         }
@@ -764,7 +806,12 @@ export class CatalogueWritesService {
         // row (#839): give it one at go-live. Waiting: the provider sync
         // queues it when the version goes live.
         if (status !== "waiting") {
-            await enqueueFreeRows(tx, { version }, input.goLiveAt, input.now);
+            await enqueueFreeRows(
+                tx,
+                { version, edition: input.edition },
+                input.goLiveAt,
+                input.now,
+            );
         }
 
         return {
@@ -811,9 +858,10 @@ export class CatalogueWritesService {
 
     private async liveCatalog(
         tx: Tx,
+        edition: Edition,
         now: Date,
     ): Promise<{ version: number; catalog: Catalog } | null> {
-        const row = await liveCatalogueVersion(tx, now);
+        const row = await liveCatalogueVersion(tx, edition, now);
         if (!row) return null;
         const check = validateCatalog(row.catalog);
         if (!check.ok) {
@@ -830,9 +878,13 @@ export class CatalogueWritesService {
      * as soon as its plans are there, so the next version builds on it).
      * Null before anything is published.
      */
-    private async newestPublished(tx: Tx, now: Date): Promise<number | null> {
+    private async newestPublished(
+        tx: Tx,
+        edition: Edition,
+        now: Date,
+    ): Promise<number | null> {
         const row = await tx.pricingCatalogVersion.findFirst({
-            where: { goLiveAt: { lte: now } },
+            where: { edition, goLiveAt: { lte: now } },
             orderBy: { version: "desc" },
             select: { version: true },
         });
@@ -869,9 +921,12 @@ export class CatalogueWritesService {
     }
 
     /** The 409 for a save or publish against a draft that has moved on. */
-    private async staleDraft(tx: Tx): Promise<ConflictException> {
+    private async staleDraft(
+        tx: Tx,
+        edition: Edition,
+    ): Promise<ConflictException> {
         const draft = await tx.pricingCatalogDraft.findUnique({
-            where: { id: SHARED_DRAFT_ID },
+            where: { id: draftIdOf(edition) },
             select: { revision: true, updatedAt: true, updatedByUserId: true },
         });
         if (!draft) {

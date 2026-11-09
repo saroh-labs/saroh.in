@@ -1,4 +1,5 @@
 import { Controller, Get, Headers, Query, Res } from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 import type { Response } from "express";
 
 import { CatalogueService } from "./catalogue.service";
@@ -28,19 +29,23 @@ export class PublicPricingController {
 
     @Get()
     async get(
+        @Headers("host") host: string | undefined,
         @Query("preview") preview: string | undefined,
         @Headers("if-none-match") ifNoneMatch: string | undefined,
         @Res({ passthrough: true }) res: Response,
     ): Promise<PublicPricing | undefined> {
         const now = new Date();
+        // The catalogue of the address asked (stage 9): api.saroh.tech is
+        // Global's; any other address India's, as before.
+        const edition = editionOfHost(host ?? "") ?? "INDIA";
         if (preview !== undefined) {
             // Set before the read, so a refusal is not cacheable either.
             res.setHeader("Cache-Control", "no-store");
             res.setHeader("X-Robots-Tag", "noindex, nofollow");
             res.setHeader("Referrer-Policy", "no-referrer");
-            return this.catalogue.previewPricing(preview, now);
+            return this.catalogue.previewPricing(edition, preview, now);
         }
-        const body = await this.catalogue.publicPricing(now);
+        const body = await this.catalogue.publicPricing(edition, now);
         const etag = pricingEtag(body);
         res.setHeader("Cache-Control", PUBLIC_PRICING_CACHE);
         res.setHeader("ETag", etag);

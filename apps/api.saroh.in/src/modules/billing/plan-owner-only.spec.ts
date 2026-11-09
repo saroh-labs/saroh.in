@@ -14,13 +14,27 @@ jest.mock("@saroh/database", () => {
     const reached = () => {
         throw new Error("reached the database");
     };
-    // Callable too, for `prisma.$transaction(…)`.
-    const delegate = new Proxy(reached, { get: () => reached });
+    // Callable too, for `prisma.$transaction(…)`. The one read the guard
+    // makes for a Global business is whether it already pays (stage 9:
+    // upkeep stays open to a payer): none here.
+    const delegate = new Proxy(reached, {
+        get: (_t, key) =>
+            key === "count" ? () => Promise.resolve(0) : reached,
+    });
     return {
         ...jest.requireActual("@saroh/database"),
         prisma: new Proxy({}, { get: () => delegate }),
     };
 });
+
+// Saroh's plans abroad are off (stage 9, DEC-211), as in production.
+jest.mock("../feature-flags/feature-flags.service", () => ({
+    FeatureFlagService: class {
+        isEnabled() {
+            return Promise.resolve(false);
+        }
+    },
+}));
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -191,7 +205,13 @@ const SAROH_BILLED: Record<
     ...Object.fromEntries(
         Object.entries(WRITES).filter(
             ([route]) =>
-                !["POST cancel", "PATCH profile/:profileId"].includes(route),
+                ![
+                    "POST cancel",
+                    "PATCH profile/:profileId",
+                    // A Global invite joins on Free instead (owner, 9 Nov
+                    // 2026): invites.service.spec.ts, invites.db.spec.ts.
+                    "POST launch-offer",
+                ].includes(route),
         ),
     ),
     "GET change-plan": (ctx) =>

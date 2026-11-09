@@ -82,7 +82,8 @@ export function formatDuration(minutes: number): string {
  * instead showed a ¥1,500 service as ¥150,000 (review of #255). Intl still
  * chooses the decimals to DISPLAY, so yen shows none.
  *
- * `locale` defaults to the visitor's; tests pin one.
+ * `locale` defaults to the business's currency's (`moneyLocaleOf`), never
+ * the visitor's; tests pin one.
  */
 export function formatPrice(
     priceCents: number | null,

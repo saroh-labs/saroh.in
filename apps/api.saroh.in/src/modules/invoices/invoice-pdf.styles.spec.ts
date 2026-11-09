@@ -282,6 +282,10 @@ const SIGNATURE = {
     note: "This is a computer-generated invoice.",
 };
 
+// Each case renders real PDFs (with an embedded logo); under a full gate's
+// load they pass 5s, so they get 20s.
+jest.setTimeout(20_000);
+
 describe.each(PAPER_STYLES)("%s", (style) => {
     it("draws every Rule 46 particular of a tax invoice", async () => {
         const { flat, squashed, pages } = await read(

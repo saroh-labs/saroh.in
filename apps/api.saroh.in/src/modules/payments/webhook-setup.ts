@@ -1,7 +1,12 @@
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
-import { editionProfile } from "@saroh/edition";
+import {
+    editionProfile,
+    environmentOfHost,
+    hostsFor,
+    urlOf,
+} from "@saroh/edition";
 import { webhookPath } from "@saroh/integrations";
 
 import { env } from "../../env";
@@ -55,11 +60,20 @@ export function lacksWebhookSecret(row: SealedRow): boolean {
 /**
  * The API's own public address, which providers POST webhooks to: always
  * `API_PUBLIC_URL`, never a guess. Null while it isn't set.
+ *
+ * Given an edition, that edition's API in the same environment (Global
+ * launch plan R5): a Global business's provider calls api.saroh.tech. A
+ * local stack has one API, so it stays on it.
  */
-function apiBase(): string | null {
+function apiBase(edition?: Edition | null): string | null {
     const base = env.API_PUBLIC_URL;
     if (!base) return null;
-    return base.endsWith("/") ? base.slice(0, -1) : base;
+    const environment = edition ? environmentOfHost(new URL(base).host) : null;
+    return (
+        edition && environment
+            ? urlOf(hostsFor(edition, environment).api)
+            : base
+    ).replace(/\/$/, "");
 }
 
 /**
@@ -71,8 +85,9 @@ function apiBase(): string | null {
 export function webhookUrl(
     organizationId: string,
     provider: string,
+    edition?: Edition | null,
 ): string | null {
-    const base = apiBase();
+    const base = apiBase(edition);
     if (!base) return null;
     return `${base}${webhookPath(provider, organizationId)}`;
 }
@@ -117,7 +132,7 @@ export function readWebhookSetup(
             });
             return {
                 provider,
-                url: webhookUrl(organizationId, provider),
+                url: webhookUrl(organizationId, provider, edition),
                 events: [...WEBHOOK_EVENTS[provider]],
                 secretRequired: needsWebhookSecret(provider),
                 lastReceivedAt: last?.createdAt ?? null,

@@ -70,7 +70,6 @@ describe("what saroh.tech may not say", () => {
         "Texts by SMS.",
         "0% fees.",
         "We never touch your money.",
-        "Add your Stripe account.",
         "The merchant of record charges you.",
     ])("catches what was removed: %s", (line) => {
         expect(findClaims("/features/billing", line)).not.toEqual([]);
@@ -103,6 +102,19 @@ describe("what saroh.tech may not say", () => {
         expect(
             findClaims("/solutions/gyms", "For personal trainers too."),
         ).toEqual([]);
+    });
+
+    it("lets Features say payments go through your own Stripe, and no other page name it (KTD9)", () => {
+        const line =
+            "Customers can pay by card online, through your own Stripe.";
+        expect(findClaims("/features/billing", line)).toEqual([]);
+        expect(findClaims("/features/orders", line)).toEqual([]);
+        expect(findClaims("/pricing", line)).not.toEqual([]);
+        expect(findClaims("/", "Add your Stripe account.")).not.toEqual([]);
+        // PayPal isn't built: "your own PayPal" stays banned even on Features.
+        expect(
+            findClaims("/features/billing", "Take it through your own PayPal."),
+        ).not.toEqual([]);
     });
 
     it("lets the coming list name a provider, and the tools talk about documents", () => {
@@ -151,6 +163,13 @@ describe("what saroh.tech may not say", () => {
 
         it("fails rather than passes when nothing was built", () => {
             expect(() => checkSite(join(dir, "nope"))).toThrow(/missing/);
+        });
+
+        it("fails on an out/ with no HTML in it", () => {
+            const empty = join(dir, "empty");
+            mkdirSync(empty);
+            writeFileSync(join(empty, "robots.txt"), "User-agent: *");
+            expect(() => checkSite(empty)).toThrow(/no HTML/);
         });
     });
 });

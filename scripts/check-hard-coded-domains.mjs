@@ -15,8 +15,10 @@ const SKIP_FILE =
     /\.(spec|test|db\.spec)\.|\/(e2e|prisma|seed[^/]*)\/|\/seed[^/]*$|^packages\/edition\//;
 
 // What only India reads. Formatters take these from the edition or the
-// currency; the count here is what's left for stages 4 and 5.
-const INDIA_ONLY = /en-IN|Asia\/Kolkata|₹|\+91/;
+// currency; the count here is what's left for stages 4 and 5. 98450 is
+// India's example phone ("+91 98450 12345"): examples come from
+// `phoneExample(country)` (plan 2026-11-08-001, U13).
+const INDIA_ONLY = /en-IN|Asia\/Kolkata|₹|\+91|98450/;
 
 export function codeLines(text, pattern) {
     return text.split("\n").filter((line) => {
@@ -49,6 +51,12 @@ function scan(pattern) {
     }
     return counts;
 }
+
+// Self-check: India's example phone counts, written without its +91 too.
+console.assert(
+    codeLines('placeholder="98450 12345"\n// +91 98450 12345', INDIA_ONLY) ===
+        1,
+);
 
 // Self-check: a comment doesn't count, a link does, a file path doesn't.
 console.assert(

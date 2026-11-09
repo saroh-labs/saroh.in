@@ -36,7 +36,7 @@ export interface AvailabilityService {
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     capacity: number;
-    /** IANA timezone the rules are authored in, e.g. "Asia/Kolkata". */
+    /** IANA timezone the rules are authored in, e.g. "Europe/London". */
     timezone: string;
 }
 

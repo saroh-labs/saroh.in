@@ -39,7 +39,7 @@ export function whenIn(
     return `${formatDate(date, zone, { now, weekday: "short" })}, ${clock}`;
 }
 
-/** The zone as people read it: "Asia/Kolkata" → "Kolkata time". */
+/** The zone as people read it: "Europe/London" → "London time". */
 export function zoneName(zone: string): string {
     const city = zone.split("/").pop() ?? zone;
     return `${city.replace(/_/g, " ")} time`;

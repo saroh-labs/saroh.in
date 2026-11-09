@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Contact, Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { appBaseOf } from "../../common/app-url";
+import { appBase, editionOf } from "../../common/app-url";
 import { sendEnquiryNotificationEmail } from "../../common/email";
 import {
     emailFieldNames,
@@ -108,14 +108,19 @@ export class EnquiryNotifyHandler {
         // the worker retry the whole job; the unique above keeps that retry from
         // duplicating the Notification.
         const recipients = await this.ownerAdminEmails(lead.organizationId);
-        const leadUrl = `${await appBaseOf(lead.organizationId)}/leads/${lead.id}`;
+        const edition = await editionOf(lead.organizationId);
+        const leadUrl = `${appBase(edition)}/leads/${lead.id}`;
         for (const to of recipients) {
-            await sendEnquiryNotificationEmail(to, {
-                contactName,
-                formName,
-                leadUrl,
-                message,
-            });
+            await sendEnquiryNotificationEmail(
+                to,
+                {
+                    contactName,
+                    formName,
+                    leadUrl,
+                    message,
+                },
+                edition,
+            );
         }
     };
 

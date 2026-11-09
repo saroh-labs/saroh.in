@@ -225,7 +225,7 @@ export class BillingEmailHandler {
             businessName: org?.name ?? "your business",
             number: invoice.number,
             planName: invoice.planName,
-            total: money(invoice.totalPaise),
+            total: moneyWordsMinor(invoice.totalPaise, invoice.currency),
             period:
                 invoice.periodStart && invoice.periodEnd
                     ? periodWords(invoice.periodStart, invoice.periodEnd)
@@ -315,6 +315,7 @@ export class BillingEmailHandler {
                     businessName,
                     planName: sub.plan.name,
                     final: p.final,
+                    monthDue: p.monthDue === true,
                     dueBy: sub.paymentDueUntil
                         ? day(sub.paymentDueUntil)
                         : null,
@@ -439,8 +440,16 @@ export class BillingEmailHandler {
                 businessName: org?.name ?? "your business",
                 planName: change.planName,
                 changesOn: day(change.pendingFrom),
-                now: priceWords(change.fromPaise, change.interval),
-                next: priceWords(change.toPaise, change.interval),
+                now: priceWords(
+                    change.fromPaise,
+                    change.interval,
+                    change.currency,
+                ),
+                next: priceWords(
+                    change.toPaise,
+                    change.interval,
+                    change.currency,
+                ),
                 url: `${await appBaseOf(p.organizationId)}/settings/billing`,
             });
         });
@@ -580,7 +589,13 @@ export class BillingEmailHandler {
         attachments?: SarohBillingEmail["attachments"],
         also?: string | null,
     ): Promise<boolean> {
-        const people = await billingRecipients(organizationId);
+        const [people, business] = await Promise.all([
+            billingRecipients(organizationId),
+            prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: { edition: true },
+            }),
+        ]);
         const extra = also?.trim().toLowerCase();
         const to =
             extra && !people.some((e) => e.toLowerCase() === extra)
@@ -596,6 +611,8 @@ export class BillingEmailHandler {
             html: words.html,
             replyTo: sarohSeller().email,
             ...(attachments ? { attachments } : {}),
+            // From the business's edition's sender (KTD6).
+            ...(business ? { edition: business.edition } : {}),
         });
         if (outcome === "failed") {
             throw new Error(`billing_email_send_failed job=${job.id}`);

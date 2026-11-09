@@ -157,6 +157,12 @@ export interface StartCheckout {
      * else; it never refuses an order over it.
      */
     source?: string;
+    /**
+     * The page the checkout started on, where Stripe's hosted Checkout
+     * sends the customer back to (`returnPathHere`). The API keeps it only
+     * when it is a same-site path.
+     */
+    returnPath?: string;
 }
 
 /**
@@ -206,7 +212,9 @@ export type ShopProblem =
     | "payments-down"
     | "invalid"
     | "error"
-    | "test-release";
+    | "test-release"
+    /** The Stripe checkout this key started can't be paid any more: start again (KTD-13). */
+    | "checkout-closed";
 
 export type ShopResult<T> =
     { ok: true; data: T } | { ok: false; reason: ShopProblem; message: string };

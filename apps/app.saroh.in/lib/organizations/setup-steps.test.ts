@@ -372,4 +372,22 @@ describe("Global's setup", () => {
         await expect(country("IN")).resolves.toBe(false);
         await expect(country("")).resolves.toBe(false);
     });
+
+    const zoned = async (code: string, timezone?: string) => {
+        vi.stubEnv("NEXT_PUBLIC_EDITION", "GLOBAL");
+        vi.resetModules();
+        const { setupSchema: schema } = await import("./setup-steps");
+        return schema(false).safeParse({ ...ANSWERED, country: code, timezone })
+            .success;
+    };
+
+    it("asks a US business its zone, from the country's own (KTD-C)", async () => {
+        await expect(zoned("US")).resolves.toBe(false);
+        await expect(zoned("US", "Asia/Kolkata")).resolves.toBe(false);
+        await expect(zoned("US", "America/Chicago")).resolves.toBe(true);
+    });
+
+    it("asks a one-zone country nothing", async () => {
+        await expect(zoned("GB")).resolves.toBe(true);
+    });
 });

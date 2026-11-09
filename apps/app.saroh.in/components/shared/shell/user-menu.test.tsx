@@ -20,10 +20,21 @@ import { billingProfilesUrl } from "@/lib/accounts";
 import en from "@/lib/language/en.json";
 import type { AccountManager, Organization } from "@/lib/organizations/service";
 
+import type * as EditionModule from "@/lib/edition";
 import { AppHeader } from "./app-header";
 import type * as UserMenuModule from "./user-menu";
 import { UserMenu } from "./user-menu";
 
+const sarohBilling = vi.hoisted(() => ({ on: true }));
+vi.mock("@/lib/edition", async (actual) => {
+    const real = await actual<typeof EditionModule>();
+    return {
+        ...real,
+        get PROFILE() {
+            return { ...real.PROFILE, sarohBilling: sarohBilling.on };
+        },
+    };
+});
 vi.mock("@saroh/auth/client", () => ({ authClient: { signOut: vi.fn() } }));
 vi.mock("next-themes", () => ({
     useTheme: () => ({ theme: "system", setTheme: vi.fn() }),
@@ -145,6 +156,29 @@ describe("the header decides it from the roles", () => {
         expect(draw([org("a", "ADMIN"), org("b", "OWNER")])).toBe(true);
         expect(draw([org("a", "ADMIN")])).toBe(false);
         expect(draw([org("a", "MEMBER")])).toBe(false);
+    });
+
+    it("never on an edition Saroh doesn't bill (Global, P0 #31)", () => {
+        sarohBilling.on = false;
+        try {
+            menuProps.mockReset();
+            renderToStaticMarkup(
+                <IntlProvider locale="en" messages={en}>
+                    <AppHeader
+                        user={{ name: "Asha", email: "asha.verma@example.com" }}
+                        organizations={[org("b", "OWNER")]}
+                        activeOrg={org("b", "OWNER")}
+                        unread={null}
+                    />
+                </IntlProvider>,
+            );
+            expect(
+                (menuProps.mock.calls[0]?.[0] as { ownsABusiness?: boolean })
+                    .ownsABusiness,
+            ).toBe(false);
+        } finally {
+            sarohBilling.on = true;
+        }
     });
 });
 

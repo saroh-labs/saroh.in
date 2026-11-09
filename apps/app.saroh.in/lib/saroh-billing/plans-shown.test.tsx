@@ -36,6 +36,13 @@ vi.mock("@/lib/api/http", () => ({
     apiFetch,
     orgBase: () => Promise.resolve("/organizations/org_1"),
 }));
+// Whether the API sells Global its plans (stage 9) is `plansOpen`'s own test;
+// here it follows the switch, as before.
+vi.mock("@/lib/saroh-billing/service", async (actual) => ({
+    ...(await actual<object>()),
+    plansOpen: async () =>
+        (await import("@/lib/saroh-billing/plans-shown")).plansShown(),
+}));
 vi.mock("next/navigation", () => ({
     notFound: () => {
         throw new Error("NOT_FOUND");
@@ -194,8 +201,12 @@ describe.each([
         flag.edition = edition;
     });
 
-    it("leaves Plan and billing out of the Settings sections, for the owner too", () => {
+    it("leaves Plan and billing out of the Settings sections, for the owner too (Global keeps it for the Free note)", () => {
         const hrefs = settingsPagesFor(owner).map((p) => p.href);
+        if (edition === "GLOBAL") {
+            expect(hrefs).toContain("/settings/billing");
+            return;
+        }
         expect(hrefs).not.toContain("/settings/billing");
         // Nothing else leaves with it.
         expect(hrefs).toEqual([
@@ -210,9 +221,17 @@ describe.each([
         ]);
     });
 
-    it("has no entry for it in Settings search", () => {
+    it("has no entry for it in Settings search (Global: only Plan and billing itself)", () => {
         const all = searchSettings("", owner, { limit: 500 });
         expect(all.length).toBeGreaterThan(10);
+        if (edition === "GLOBAL") {
+            expect(
+                all
+                    .filter((h) => h.href.startsWith("/settings/billing"))
+                    .map((h) => h.label),
+            ).toEqual(["Plan and billing"]);
+            return;
+        }
         expect(all.some((h) => h.href.startsWith("/settings/billing"))).toBe(
             false,
         );
@@ -225,10 +244,16 @@ describe.each([
         }
     });
 
-    it("answers /settings/billing with the app's not-found", () => {
-        expect(() => PlanBillingLayout({ children: "the page" })).toThrow(
-            "NOT_FOUND",
-        );
+    it("answers /settings/billing with the app's not-found (Global: the Free note's page opens)", async () => {
+        if (edition === "GLOBAL") {
+            await expect(
+                PlanBillingLayout({ children: "the page" }),
+            ).resolves.toBe("the page");
+            return;
+        }
+        await expect(
+            PlanBillingLayout({ children: "the page" }),
+        ).rejects.toThrow("NOT_FOUND");
     });
 
     it("answers its Change plan screen the same, before any plan is read", async () => {
@@ -325,7 +350,9 @@ describe("with plans shown (the switch on)", () => {
     });
 
     it("opens /settings/billing and asks the API for the invoice", async () => {
-        expect(PlanBillingLayout({ children: "the page" })).toBe("the page");
+        await expect(PlanBillingLayout({ children: "the page" })).resolves.toBe(
+            "the page",
+        );
         apiFetch.mockResolvedValue({ ok: false, status: 404, body: null });
         const res = await invoicePdf(new Request("https://app.example.com/"), {
             params: Promise.resolve({ invoiceId: "inv_1" }),

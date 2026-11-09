@@ -1,6 +1,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { PERMISSION_MISSING } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 
@@ -57,7 +58,11 @@ export class ProviderHealthService {
         const [payments, comms, domains] = await Promise.all([
             this.db.merchantPaymentProvider.findMany({
                 where,
-                select: { status: true, attentionAt: true },
+                select: {
+                    status: true,
+                    attentionAt: true,
+                    attentionReason: true,
+                },
             }),
             this.db.communicationProvider.findMany({
                 where,
@@ -91,7 +96,11 @@ export class ProviderHealthService {
  * there as on the business's own Providers screen.
  */
 export function paymentsHealth(
-    payments: { status: string; attentionAt?: Date | null }[],
+    payments: {
+        status: string;
+        attentionAt?: Date | null;
+        attentionReason?: string | null;
+    }[],
 ): ProviderHealth {
     return connectedHealth({
         key: "PAYMENTS",
@@ -109,10 +118,18 @@ export function paymentsHealth(
 
 /**
  * A connection's state for health: CONNECTED, DISABLED, or REFUSED — a
- * connected provider that refused its keys on a live call (UX-012).
+ * connected provider that refused its keys on a live call (UX-012). A
+ * Stripe key missing a side permission (`PERMISSION_MISSING`, KTD-14)
+ * still takes payments: CONNECTED.
  */
-function statusOf(row: { status: string; attentionAt?: Date | null }): string {
-    return row.status === "CONNECTED" && row.attentionAt
+function statusOf(row: {
+    status: string;
+    attentionAt?: Date | null;
+    attentionReason?: string | null;
+}): string {
+    return row.status === "CONNECTED" &&
+        row.attentionAt &&
+        row.attentionReason !== PERMISSION_MISSING
         ? "REFUSED"
         : row.status;
 }

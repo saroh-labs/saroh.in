@@ -1,3 +1,4 @@
+import type { Edition } from "@saroh/edition";
 import type { OrgRole } from "../../common/types/organization-context";
 import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
@@ -203,7 +204,7 @@ export interface HomeTodayItem {
 }
 
 export interface HomeToday {
-    /** The zone the day is kept in, e.g. `Asia/Kolkata`. */
+    /** The zone the day is kept in, e.g. `Europe/London`. */
     zone: string;
     /** The business's date, `2026-09-27`. */
     date: string;
@@ -238,7 +239,7 @@ export interface HomeSinceItem {
  * (DEC-033), as F5's Today is.
  */
 export interface HomeLastDay {
-    /** The zone the day is kept in, e.g. `Asia/Kolkata`. */
+    /** The zone the day is kept in, e.g. `Europe/London`. */
     zone: string;
     /** The business's date, `2026-09-18`. */
     date: string;
@@ -481,6 +482,8 @@ export interface HomeInput {
     /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
     organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;
+    /** The business's edition: the zone Home falls back to when its own can't be read. */
+    edition?: Edition;
 }
 
 /** Whether the caller holds `action`: their resolved set, else their role's. */

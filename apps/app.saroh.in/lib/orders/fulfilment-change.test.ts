@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
     changeAccess,
+    deliveryDraftOf,
+    deliveryDraftProblem,
     differenceNote,
     moneyText,
     parseCharge,
@@ -218,5 +220,61 @@ describe("moneyText", () => {
     it("drops empty paise", () => {
         expect(moneyText(4000)).toBe("40");
         expect(moneyText(4005)).toBe("40.05");
+    });
+});
+
+describe("a delivery in the order's edit sheets", () => {
+    const at = (over: object) => ({
+        name: null,
+        phone: null,
+        line1: "1 Main St",
+        line2: null,
+        city: "Austin",
+        state: null,
+        postalCode: null,
+        country: null,
+        ...over,
+    });
+
+    it("keeps India's state as it was and sends no country", () => {
+        const d = deliveryDraftOf(
+            at({ state: "Karnataka", postalCode: "560001" }),
+            null,
+        );
+        expect(d).toMatchObject({ state: "Karnataka", country: "" });
+        expect(deliveryDraftProblem(d, true, "A delivery")).toBeNull();
+        expect(
+            deliveryDraftProblem({ ...d, postalCode: "" }, true, "A delivery"),
+        ).toBe("A delivery needs its first line, town, state and PIN code.");
+    });
+
+    it("reads a Global delivery's region and country apart, an older line included", () => {
+        expect(
+            deliveryDraftOf(at({ state: "TX", country: "US" }), "GB"),
+        ).toMatchObject({ state: "TX", country: "US" });
+        expect(
+            deliveryDraftOf(at({ state: "Texas, United States" }), "GB"),
+        ).toMatchObject({ state: "Texas", country: "US" });
+        expect(deliveryDraftOf(null, "US").country).toBe("US");
+    });
+
+    it("holds a Global delivery to its own country's rules", () => {
+        const us = deliveryDraftOf(
+            at({ state: "", postalCode: "78701", country: "US" }),
+            "US",
+        );
+        expect(deliveryDraftProblem(us, false, "An address")).toBe(
+            "Choose the state.",
+        );
+        expect(
+            deliveryDraftProblem({ ...us, state: "TX" }, false, "An address"),
+        ).toBeNull();
+        expect(
+            deliveryDraftProblem(
+                { ...us, state: "", postalCode: "", country: "GB" },
+                false,
+                "An address",
+            ),
+        ).toBeNull();
     });
 });

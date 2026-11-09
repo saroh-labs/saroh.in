@@ -14,6 +14,7 @@ import { ReachLinks } from "../reach-links";
 import { ADDED_SHOWN_MS, allInBagWords, roomInBag } from "../shop/add-to-bag";
 import { addToBag, onBagShown, openBag, useBag } from "../shop/bag-store";
 import { SitePageState } from "../shop/page-state";
+import { struckWordOf, taxWordOf, useSiteBusiness } from "../site-business";
 import { NamePlate } from "./name-plate";
 import { chooseLabel, optionSummary } from "./option-summary";
 import { formatAmount } from "./product-page";
@@ -158,7 +159,7 @@ export default function ShopListing({
     lead = null,
     products,
     basePath = "/shop",
-    locale = "en-IN",
+    locale,
     bagSite = null,
     business = null,
     reach = null,
@@ -183,6 +184,7 @@ export default function ShopListing({
     /** A call and a message, offered where there is nothing to buy. */
     reach?: BusinessReach | null;
 }) {
+    const site = useSiteBusiness();
     const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
     const [notice, setNotice] = useState<string | null>(null);
     // The shop's chips: the categories its products are filed under, in
@@ -307,6 +309,7 @@ export default function ShopListing({
                         const amount = browsePriceWords(
                             formatAmount(p.price, p.currency, locale),
                             p.gstAdded === true,
+                            taxWordOf(site),
                         );
                         const saving = cardSaving(p);
                         const canAdd = Boolean(bagSite && p.listingId);
@@ -430,7 +433,9 @@ export default function ShopListing({
                                                     className="text-site-muted text-sm font-normal line-through"
                                                 >
                                                     <span className="sr-only">
-                                                        MRP{" "}
+                                                        {struckWordOf(
+                                                            site,
+                                                        )}{" "}
                                                     </span>
                                                     {formatAmount(
                                                         saving.mrp,

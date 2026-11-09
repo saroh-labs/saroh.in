@@ -156,6 +156,7 @@ export type MeterDb = Pick<
     | "merchantPaymentProvider"
     | "communicationProvider"
     | "businessProfile"
+    | "organization"
     | "service"
     | "store"
     | "site"

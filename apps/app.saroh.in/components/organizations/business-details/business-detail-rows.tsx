@@ -13,6 +13,7 @@ import {
     BusinessTaxRows,
     TAX_TAB,
 } from "@/components/organizations/tax/business-tax-rows";
+import { UNSET_ZONE_WORDS } from "@/lib/invoices/invoice-number";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
@@ -21,15 +22,16 @@ import {
     businessTypeOf,
 } from "@/lib/organizations/business-types";
 import { kindWords } from "@/lib/organizations/kind";
+import { addressPlace } from "@/lib/organizations/registered-address";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import {
     NO_SOCIAL_LINKS,
     socialRowSummary,
 } from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
+import { countryName } from "@saroh/ui/lib/countries";
 import { Absent, Row } from "@saroh/ui/settings-rows";
 import { KIND_ROW_LABEL, kindChoiceLabel } from "./business-kind-field";
-import { countryName } from "./country-select";
 
 import type { BusinessSheets } from "@/components/organizations/business-settings/use-business-sheets";
 
@@ -186,7 +188,7 @@ export function BusinessDetailRows({
                 >
                     <Saved
                         text={saved.timezone ? zoneLabel(saved.timezone) : ""}
-                        empty="Not set. Invoice numbers use India time."
+                        empty={UNSET_ZONE_WORDS}
                     />
                 </Row>
                 {/* No web address row: the Web address card under this one
@@ -310,7 +312,9 @@ export function BusinessDetailRows({
                 ) : (
                     <Absent>No registered address yet</Absent>
                 )}
-                {saved.country ? (
+                {/* A Global address already ends with its country (U4). */}
+                {saved.country &&
+                !(address && addressPlace(saved, saved.country).countryName) ? (
                     <Follows>{countryName(saved.country)}</Follows>
                 ) : null}
             </Row>

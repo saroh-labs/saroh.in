@@ -3,6 +3,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     UnprocessableEntityException,
 } from "@nestjs/common";
 import {
@@ -10,8 +11,12 @@ import {
     prisma,
     unsyncedCatalogueVersions,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planPriceOf, validateCatalog } from "@saroh/pricing-catalog";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import type { FreeStyleChoices } from "./free-style-choices";
 import { freeStyleChoices } from "./free-style-choices";
 
@@ -26,8 +31,20 @@ import {
 import type { PublicPricing } from "./public-catalog";
 import { publicCatalog } from "./public-catalog";
 
-/** The one shared draft's row id (KTD-3). */
+/** India's shared draft's row id (KTD-3). */
 export const SHARED_DRAFT_ID = "shared";
+
+/**
+ * Each edition's one shared draft (stage 9, KTD1): India keeps the row it
+ * always had; Global has its own.
+ */
+const DRAFT_IDS: Record<Edition, string> = {
+    INDIA: SHARED_DRAFT_ID,
+    GLOBAL: "global",
+};
+
+/** An edition's draft row id. */
+export const draftIdOf = (edition: Edition): string => DRAFT_IDS[edition];
 
 /** The audit action of a draft save; its rows name the draft's editors. */
 export const DRAFT_SAVE_ACTION = "pricing.draft.save";
@@ -145,6 +162,8 @@ function nothingPublished(next: Catalog): Catalog {
         modules: [],
         yearly: { on: false, paid: next.yearly.paid },
         gst: next.gst,
+        currency: next.currency,
+        tax: next.tax,
         autopay: next.autopay,
         addons: [],
     };
@@ -163,7 +182,11 @@ function nothingPublished(next: Catalog): Catalog {
 export class CatalogueService {
     private readonly logger = new Logger(CatalogueService.name);
 
-    constructor(private readonly impactService: ImpactService) {}
+    constructor(
+        private readonly impactService: ImpactService,
+        @Optional()
+        private readonly flags: FeatureFlagService = new FeatureFlagService(),
+    ) {}
 
     /** A stored snapshot, parsed. One that doesn't is a corrupt row: a 500. */
     private parseStored(version: number, catalog: unknown): Catalog {
@@ -176,12 +199,15 @@ export class CatalogueService {
     }
 
     /** The live version and its snapshot, or null before any is installed. */
-    async live(now: Date): Promise<{
+    async live(
+        edition: Edition,
+        now: Date,
+    ): Promise<{
         version: number;
         goLiveAt: Date;
         catalog: Catalog;
     } | null> {
-        const row = await liveCatalogueVersion(prisma, now);
+        const row = await liveCatalogueVersion(prisma, edition, now);
         if (!row) return null;
         return {
             version: row.version,
@@ -191,14 +217,24 @@ export class CatalogueService {
     }
 
     /** `GET /public/pricing`: the live catalogue as a visitor sees it. */
-    async publicPricing(now: Date): Promise<PublicPricing> {
-        const live = await this.live(now);
+    async publicPricing(edition: Edition, now: Date): Promise<PublicPricing> {
+        const live = await this.live(edition, now);
         if (!live) throw new NotFoundException("No pricing is published yet");
+        const catalog = publicCatalog(live.catalog);
         return {
             version: live.version,
             goLiveAt: live.goLiveAt.toISOString(),
             preview: false,
-            catalog: publicCatalog(live.catalog),
+            catalog,
+            ...(editionProfile(edition).sarohBilling
+                ? {}
+                : {
+                      offered:
+                          catalog.plans.some((p) => p.pricePaise > 0) &&
+                          (await this.flags.isEnabled(
+                              FlagKey.SAROH_BILLING_GLOBAL,
+                          )),
+                  }),
         };
     }
 
@@ -209,7 +245,11 @@ export class CatalogueService {
      * a draft that was published or discarded — is the same 404, so a caller
      * learns nothing about the draft.
      */
-    async previewPricing(token: string, now: Date): Promise<PublicPricing> {
+    async previewPricing(
+        edition: Edition,
+        token: string,
+        now: Date,
+    ): Promise<PublicPricing> {
         const gone = () => new NotFoundException("Nothing to preview");
         const secret = pricingPreviewSecretOrNull();
         if (!secret) {
@@ -219,7 +259,7 @@ export class CatalogueService {
         const claim = verifyPreviewToken(secret, token, now);
         if (!claim) throw gone();
         const draft = await prisma.pricingCatalogDraft.findUnique({
-            where: { id: SHARED_DRAFT_ID },
+            where: { id: draftIdOf(edition) },
         });
         if (
             draft?.revision !== claim.revision ||
@@ -243,11 +283,12 @@ export class CatalogueService {
      * naming the revision now saved) or doesn't validate (422, with why).
      */
     async mintPreviewToken(
+        edition: Edition,
         revision: number,
         now: Date,
     ): Promise<PreviewTokenResult> {
         const draft = await prisma.pricingCatalogDraft.findUnique({
-            where: { id: SHARED_DRAFT_ID },
+            where: { id: draftIdOf(edition) },
         });
         if (!draft) throw new NotFoundException("There's no draft to preview");
         if (draft.revision !== revision) {
@@ -277,13 +318,14 @@ export class CatalogueService {
     }
 
     /** `GET /admin/pricing`: live, draft, versions, counts and usage. */
-    async adminPricing(now: Date): Promise<AdminPricing> {
+    async adminPricing(edition: Edition, now: Date): Promise<AdminPricing> {
         const [rows, draftRow, held, providerRows] = await Promise.all([
             prisma.pricingCatalogVersion.findMany({
+                where: { edition },
                 orderBy: { version: "desc" },
             }),
             prisma.pricingCatalogDraft.findUnique({
-                where: { id: SHARED_DRAFT_ID },
+                where: { id: draftIdOf(edition) },
             }),
             unsyncedCatalogueVersions(prisma),
             prisma.pricingProviderPlan.findMany({
@@ -327,6 +369,7 @@ export class CatalogueService {
         for (const p of draftCatalog?.plans ?? []) known.add(p.id);
         const { businesses, measured, movingTo } =
             await this.impactService.read(
+                edition,
                 known,
                 now,
                 editingCatalog ? planPriceOf(editingCatalog) : undefined,
@@ -338,7 +381,7 @@ export class CatalogueService {
         }
         if (draftRow?.updatedByUserId) staffIds.add(draftRow.updatedByUserId);
         const editorIds = draftRow
-            ? await this.draftEditorIds(draftRow.createdAt)
+            ? await this.draftEditorIds(draftIdOf(edition), draftRow.createdAt)
             : [];
         for (const id of editorIds) staffIds.add(id);
         const staff = await this.staffNames([...staffIds]);
@@ -452,9 +495,12 @@ export class CatalogueService {
     }
 
     /** `GET /admin/pricing/impact`: what publishing the draft would do. */
-    async adminImpact(now: Date): Promise<AdminPricingImpact> {
+    async adminImpact(
+        edition: Edition,
+        now: Date,
+    ): Promise<AdminPricingImpact> {
         const draft = await prisma.pricingCatalogDraft.findUnique({
-            where: { id: SHARED_DRAFT_ID },
+            where: { id: draftIdOf(edition) },
         });
         if (!draft) throw new NotFoundException("There's no draft to check");
         const r = validateCatalog(draft.catalog);
@@ -464,8 +510,9 @@ export class CatalogueService {
                 details: { errors: r.errors },
             });
         }
-        const live = await this.live(now);
+        const live = await this.live(edition, now);
         const impact = await this.impactService.impactOf(
+            edition,
             live?.catalog ?? nothingPublished(r.catalog),
             r.catalog,
             now,
@@ -481,10 +528,14 @@ export class CatalogueService {
      * Who has saved the current draft, in the order they first did: the
      * audit rows of draft saves since it was started (`createdAt`).
      */
-    private async draftEditorIds(since: Date): Promise<string[]> {
+    private async draftEditorIds(
+        draftId: string,
+        since: Date,
+    ): Promise<string[]> {
         const rows = await prisma.adminAuditEvent.findMany({
             where: {
                 action: DRAFT_SAVE_ACTION,
+                targetId: draftId,
                 outcome: "SUCCESS",
                 createdAt: { gte: since },
             },

@@ -11,6 +11,7 @@
 import { absentText } from "@saroh/ui/lib/absent";
 import type { ProductStock } from "../stock/product-stock";
 import { isCount, isMoney, paise, trimMoney } from "./editor-sections";
+import { MRP_LABEL, MRP_WORD } from "./mrp-label";
 import type { ProductDetail } from "./service";
 
 export interface SheetShelf {
@@ -118,9 +119,9 @@ export function sheetProblem(v: SheetValues): string | null {
     if (!isMoney(v.price))
         return "The price: a number with at most two decimal places.";
     if (v.mrp.trim() !== "" && !isMoney(v.mrp))
-        return "The MRP: a number with at most two decimal places.";
+        return `The ${MRP_WORD}: a number with at most two decimal places.`;
     if (v.mrp.trim() !== "" && paise(v.mrp) < paise(v.price)) {
-        return "MRP can't be lower than the price it sells for.";
+        return `${MRP_LABEL} can't be lower than the price it sells for.`;
     }
     const kept = v.sizes.filter((s) => !s.removed);
     if (kept.length === 0)

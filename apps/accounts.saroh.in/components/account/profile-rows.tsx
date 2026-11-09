@@ -64,6 +64,8 @@ export function ProfileRows({
     const [has, setHas] = useState<boolean | null>(null);
     const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
     const [sessionsFailed, setSessionsFailed] = useState(false);
+    // Better Auth lists devices only for a recent sign-in (SESSION_NOT_FRESH).
+    const [sessionsStale, setSessionsStale] = useState(false);
     const [deleteSent, setDeleteSent] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     const close = () => setOpen(null);
@@ -76,7 +78,9 @@ export function ProfileRows({
         let live = true;
         void settle(() => authClient.listSessions()).then(({ data, error }) => {
             if (!live) return;
-            setSessionsFailed(Boolean(error));
+            const stale = error?.code === "SESSION_NOT_FRESH";
+            setSessionsStale(stale);
+            setSessionsFailed(Boolean(error) && !stale);
             if (!error) setSessions(data);
         });
         return () => {
@@ -135,6 +139,20 @@ export function ProfileRows({
         return null;
     }
 
+    /** Signs out, to the sign-in page; back to `returnTo` once signed in. */
+    function signOut(returnTo?: string) {
+        setSigningOut(true);
+        void authClient
+            .signOut()
+            .then(() =>
+                router.push(
+                    returnTo
+                        ? `/login?${new URLSearchParams({ redirect: returnTo }).toString()}`
+                        : "/login",
+                ),
+            );
+    }
+
     return (
         <div className="max-w-[760px]">
             <PageHeader
@@ -146,12 +164,7 @@ export function ProfileRows({
                         variant="outline"
                         busy={signingOut}
                         busyLabel="Signing out…"
-                        onClick={() => {
-                            setSigningOut(true);
-                            void authClient
-                                .signOut()
-                                .then(() => router.push("/login"));
-                        }}
+                        onClick={() => signOut()}
                     >
                         Sign out
                     </Button>
@@ -214,8 +227,31 @@ export function ProfileRows({
                             "Set"
                         )}
                     </Row>
-                    <Row label="Devices" action={change("devices", "Manage")}>
-                        {sessions ? (
+                    <Row
+                        label="Devices"
+                        action={
+                            sessionsStale ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    busy={signingOut}
+                                    busyLabel="Signing out…"
+                                    onClick={() => signOut("/account")}
+                                >
+                                    Sign in again
+                                </Button>
+                            ) : (
+                                change("devices", "Manage")
+                            )
+                        }
+                    >
+                        {sessionsStale ? (
+                            <Absent>
+                                Sign in again to see where you&apos;re signed
+                                in.
+                            </Absent>
+                        ) : sessions ? (
                             devicesLine(sessions, currentToken)
                         ) : sessionsFailed ? (
                             <Absent>Couldn&apos;t load</Absent>

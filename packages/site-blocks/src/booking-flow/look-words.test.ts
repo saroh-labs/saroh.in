@@ -5,7 +5,6 @@ import {
     cancelDeadline,
     cancelText,
     finalLabel,
-    HOLD_MINUTES,
     holdBeforeText,
     lookGstText,
     lookSteps,
@@ -132,10 +131,9 @@ describe("money until the receipt", () => {
         expect(lookGstText({ ...SERVICE, gst: null })).toBeNull();
     });
 
-    it("holds a pay-now time for 15 minutes from the press", () => {
-        expect(HOLD_MINUTES).toBe(15);
+    it("holds a pay-now time from the press, without naming a length", () => {
         expect(holdBeforeText("8 am")).toBe(
-            "Paying now? We hold 8 am for you for 15 minutes from when you press Pay.",
+            "Paying now? We hold 8 am for you for a short time from when you press Pay.",
         );
     });
 });

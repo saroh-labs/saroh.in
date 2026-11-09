@@ -61,7 +61,8 @@ export interface BookInput {
     staffId?: string;
     /**
      * How the booking page's booker pays (U19): NOW holds the place for
-     * 15 minutes (`HOLD_MINUTES`) while they pay online, DEPOSIT does the
+     * 15 minutes (`HOLD_MINUTES`; 30 at Stripe, `STRIPE_HOLD_MINUTES`)
+     * while they pay online, DEPOSIT does the
      * same for the service's deposit only (E8), DESK books it to pay on the
      * day. Absent — the one-service booking block — books as before.
      * CREDIT (A10, signed in only) spends one class of the pack or

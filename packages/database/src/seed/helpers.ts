@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { parseSectionContentOrThrow } from "@saroh/block-contract";
 import {
@@ -10,7 +10,12 @@ import {
     normaliseBackfillEmail,
 } from "../backfill/paying-customer-contacts";
 import type { SeedSection, SeedSite } from "./data";
-import { SEED_PREFIX, SEEDED_STYLE_VARIABLES } from "./data";
+import {
+    journalPage,
+    SEED_PREFIX,
+    SEEDED_STYLE_VARIABLES,
+    shopPage,
+} from "./data";
 
 /**
  * Small pieces both seeds share: the base Northwind seed (`run.ts`) and the
@@ -192,18 +197,28 @@ export async function writeSite(
         }[];
     }[] = [];
 
-    for (let p = 0; p < fixture.pages.length; p++) {
-        const pageFixture = fixture.pages[p];
+    // Its module pages follow its own, as the editor's Add page adds them.
+    const pages = [
+        ...fixture.pages,
+        ...(fixture.modulePages ?? []).map((kind) =>
+            kind === "JOURNAL" ? journalPage() : shopPage(),
+        ),
+    ];
+    const pageIds: string[] = [];
+
+    for (let p = 0; p < pages.length; p++) {
+        const pageFixture = pages[p];
 
         const page = await prisma.page.upsert({
             where: { siteId_path: { siteId: site.id, path: pageFixture.path } },
-            update: { title: pageFixture.title },
+            update: { title: pageFixture.title, kind: pageFixture.kind },
             create: {
                 id: ids.page(p),
                 siteId: site.id,
                 organizationId: orgId,
                 path: pageFixture.path,
                 title: pageFixture.title,
+                kind: pageFixture.kind,
                 isHome: pageFixture.isHome ?? false,
                 createdAt,
             },
@@ -288,6 +303,7 @@ export async function writeSite(
             });
         }
 
+        pageIds.push(page.id);
         snapshotPages.push({
             path: pageFixture.path,
             title: pageFixture.title,
@@ -295,6 +311,23 @@ export async function writeSite(
             sections: snapshotSections,
         });
     }
+
+    /*
+     * The draft's menu and footer, as the editor keeps them: the same menu
+     * and footer the publication below carries, so a publish from the
+     * editor keeps both rather than dropping them (a seed that wrote them
+     * only into the snapshot lost them on the first real publish).
+     */
+    await prisma.site.update({
+        where: { id: site.id },
+        data: {
+            navigation:
+                pageIds.length > 1
+                    ? { items: pageIds.map((pageId) => ({ pageId })) }
+                    : Prisma.DbNull,
+            footer: { format: "markdown", value: options.footer.value },
+        },
+    });
 
     if (!fixture.published) return site.id;
 
@@ -350,18 +383,18 @@ export async function writeSite(
                      * not built one — and what `SiteHeader` is designed
                      * around: with no menu it centres the site name.
                      */
-                    // Links beyond the pages (the journal, the shop) follow
-                    // them, as a merchant adds them in the menu editor.
+                    // A module page carries its kind, as publish resolves
+                    // it (`resolveSiteNavigation`).
                     navigation:
-                        snapshotPages.length > 1 ||
-                        (fixture.navigationExtra ?? []).length > 0
-                            ? [
-                                  ...snapshotPages.map((page) => ({
+                        snapshotPages.length > 1
+                            ? snapshotPages.map((page, i) => {
+                                  const kind = pages[i]?.kind;
+                                  return {
                                       label: page.title,
                                       href: page.path,
-                                  })),
-                                  ...(fixture.navigationExtra ?? []),
-                              ]
+                                      ...(kind ? { kind } : {}),
+                                  };
+                              })
                             : [],
                 },
                 pages: [...snapshotPages].sort((a, b) =>

@@ -13,6 +13,7 @@ import { mayChangeWho, onlyTo } from "@/components/bookings/sheets/change-who";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
+import { contactEmail } from "@/lib/crm/format";
 import { formatMoney } from "@/lib/format/money";
 import { firstName } from "@/lib/names";
 import type { PageBooking, PageFacts } from "@/lib/services/booking-page";
@@ -388,7 +389,10 @@ export function BookingDetailView({
                             .map((p) => p?.trim())
                             .find(Boolean) ?? null
                     }
-                    email={contact?.email ?? booking.bookerEmail ?? null}
+                    email={
+                        contactEmail(contact?.email) ??
+                        contactEmail(booking.bookerEmail)
+                    }
                     person={person}
                     note={booking.intakeNote?.trim() ?? null}
                     className="min-[760px]:col-start-2 min-[760px]:[grid-row:1/span_var(--column-rows)]"

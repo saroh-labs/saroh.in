@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import {
     ENTITY_DESCRIPTORS,
+    globalCustomerWords,
     isImportEntity,
     normalizeMoney,
     normalizeStatus,
@@ -202,6 +203,56 @@ describe("sample files", () => {
             expect(plan.counts.CREATE).toBe(rows.length);
         });
     }
+});
+
+describe("a Global business's customer file", () => {
+    it.each([
+        ["US", "ZIP code"],
+        ["GB", "Postcode"],
+        ["CA", "Postal code"],
+        [null, "Postcode"],
+    ])(
+        "%s: its country's word, never PIN, and every heading maps",
+        (country, word) => {
+            const { fieldLabels, sample } = globalCustomerWords(country);
+            expect(fieldLabels.zipCode).toBe(word);
+            expect(JSON.stringify(sample)).not.toMatch(/PIN/);
+            const [headers, ...rows] = sample;
+            const mapping = suggestMapping(
+                headers,
+                customers.mappableFields,
+                customers.aliases,
+            );
+            expect(Object.keys(mapping)).toEqual([...headers]);
+            expect(mapping[word]).toBe("zipCode");
+            const plan = buildImportPlan({
+                records: rows.map((cells) =>
+                    Object.fromEntries(headers.map((h, i) => [h, cells[i]])),
+                ),
+                mapping,
+                policy: "SKIP",
+                existingKeys: new Set(),
+                requiredFields: customers.requiredFields,
+                fieldLabels,
+                keyOf: customers.keyOf,
+                validateRow: customers.validateRow,
+            });
+            expect(plan.issueGroups).toEqual([]);
+        },
+    );
+
+    it.each(["ZIP code", "Postcode", "Postal code", "Eircode", "PIN code"])(
+        'maps a "%s" heading to the postcode, India\'s included',
+        (heading) => {
+            expect(
+                suggestMapping(
+                    [heading],
+                    customers.mappableFields,
+                    customers.aliases,
+                ),
+            ).toEqual({ [heading]: "zipCode" });
+        },
+    );
 });
 
 describe("customers descriptor", () => {

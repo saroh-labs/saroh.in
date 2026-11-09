@@ -60,8 +60,11 @@ const SHORT: Record<Weekday, string> = {
     SUN: "Sun",
 };
 
-/** Where no business has said otherwise (DEC-033): India. */
-export const FALLBACK_TIME_ZONE = "Asia/Kolkata";
+/**
+ * Only where no business zone is sent (KTD-C): every site sends its
+ * business's, so this is never another country's zone standing in for it.
+ */
+export const FALLBACK_TIME_ZONE = "UTC";
 
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 

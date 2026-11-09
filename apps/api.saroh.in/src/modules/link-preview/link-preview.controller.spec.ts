@@ -15,6 +15,7 @@ jest.mock("../../common/email", () => ({
 
 import type { LookupAddress } from "node:dns";
 
+import { Logger } from "@nestjs/common";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { prisma } from "@saroh/database";
 
@@ -545,5 +546,36 @@ describe("the concurrency cap", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+});
+
+describe("the edition a report unlock files under (KTD11)", () => {
+    it("is the address's edition, and India with a WARN for an address of none", async () => {
+        const { controller, gate } = setup();
+        const unlock = jest
+            .spyOn(gate, "unlock")
+            .mockResolvedValue({ unlocked: false, failure: "not-html" });
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
+        const dto = { email: "a@example.com", url: "shop.example.com" };
+
+        await controller.unlock(dto, anyone(), "api.saroh.tech");
+        expect(unlock).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "GLOBAL" }),
+        );
+        await controller.unlock(dto, anyone(), "api.saroh.in");
+        expect(unlock).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "INDIA" }),
+        );
+        expect(warn).not.toHaveBeenCalled();
+        await controller.unlock(dto, anyone(), "stray.example.com");
+        expect(unlock).toHaveBeenLastCalledWith(
+            expect.objectContaining({ edition: "INDIA" }),
+        );
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining("form_host_of_no_edition"),
+        );
+        warn.mockRestore();
     });
 });

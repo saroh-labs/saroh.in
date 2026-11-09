@@ -63,6 +63,10 @@ import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import {
+    isLateStripeHoldInTx,
+    refundLateHoldInTx,
+} from "../payments/late-hold-refund";
 import type { ChargeFailure } from "../payments/mandate-charge-outcome";
 import { recordChargeEventInTx } from "../payments/mandate-charge-outcome";
 import {
@@ -132,6 +136,8 @@ interface IntentRow {
     invoiceId?: string | null;
     purpose?: string | null;
     providerIntentId?: string | null;
+    /** A hosted checkout's session (Stripe `cs_…`), kept after the swap. */
+    providerCheckoutId?: string | null;
     status: string;
     amountCents: number;
     currency: string;
@@ -575,13 +581,34 @@ export class WebhooksService {
         );
         if (mismatch.handled) return { applied: mismatch.applied };
 
-        const intent = await this.findIntent(
+        const found = await this.findIntent(
             tx,
             provider,
             organizationId,
             event,
         );
-        if (!intent) return { applied: false };
+        if (!found) return { applied: false };
+        // A hosted checkout's row names its session until the payment is
+        // known; then the PaymentIntent, before anything below reserves a
+        // refund that must name it (KTD-2).
+        const linked = await linkProviderIntentInTx(tx, found, event);
+        const intent = linked.intent;
+
+        // A slow method under way, or a session that can't be paid any
+        // more (KTD-11): the intent only, never an order or invoice. A
+        // cancelled intent (a released hold) is left to its late payment.
+        if (event.outcome === "PROCESSING" || event.outcome === "CLOSED") {
+            const { count } = await tx.paymentIntent.updateMany({
+                where: { id: intent.id, status: "REQUIRES_PAYMENT" },
+                data: {
+                    status:
+                        event.outcome === "PROCESSING"
+                            ? "PROCESSING"
+                            : "CANCELLED",
+                },
+            });
+            return { applied: count > 0 || linked.changed };
+        }
 
         // PAY-06: a capture is compared with what Saroh asked for before
         // anything is marked paid. A signed event that reports no amount
@@ -595,7 +622,7 @@ export class WebhooksService {
 
         const result = await this.applyOutcome(tx, intent, event);
         const feeRecorded = await recordFee(tx, intent, event);
-        return { applied: result.applied || feeRecorded };
+        return { applied: result.applied || feeRecorded || linked.changed };
     }
 
     /**
@@ -741,9 +768,12 @@ export class WebhooksService {
     }
 
     /**
-     * Resolve the PaymentIntent by provider intent id, else by the merchant
-     * reference we submitted at create — an Order's id or, for a pay link,
-     * an Invoice's.
+     * Resolve the PaymentIntent (KTD-3): by provider intent id (a Stripe
+     * row's `cs_…` or `pi_…`), by its hosted-checkout session, by Saroh's
+     * own intent id echoed back, else by the merchant reference we
+     * submitted at create — an Order's id or, for a pay link, an
+     * Invoice's. Every step is scoped to the event's business and
+     * provider.
      */
     private async findIntent(
         tx: Tx,
@@ -751,31 +781,46 @@ export class WebhooksService {
         organizationId: string,
         event: NormalizedWebhookEvent,
     ): Promise<IntentRow | null> {
-        if (event.providerIntentId) {
-            const byIntent = (await tx.paymentIntent.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    providerIntentId: event.providerIntentId,
-                },
+        const exact: Prisma.PaymentIntentWhereInput[] = [
+            ...(event.providerIntentId
+                ? [{ providerIntentId: event.providerIntentId }]
+                : []),
+            ...(event.providerCheckoutId
+                ? [{ providerCheckoutId: event.providerCheckoutId }]
+                : []),
+            ...(event.sarohIntentId ? [{ id: event.sarohIntentId }] : []),
+        ];
+        for (const where of exact) {
+            const row = (await tx.paymentIntent.findFirst({
+                where: { organizationId, provider, ...where },
             })) as IntentRow | null;
-            if (byIntent) return byIntent;
+            if (row) return row;
         }
-        if (event.orderRef) {
-            const byOrder = (await tx.paymentIntent.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    OR: [
-                        { orderId: event.orderRef },
-                        { invoiceId: event.orderRef },
-                    ],
-                },
-                orderBy: { createdAt: "desc" },
-            })) as IntentRow | null;
-            return byOrder;
+        if (!event.orderRef) return null;
+        const ofOrder = {
+            organizationId,
+            provider,
+            OR: [{ orderId: event.orderRef }, { invoiceId: event.orderRef }],
+        };
+        if (provider === "STRIPE") {
+            // By the order alone only when it names nothing of its own and
+            // exactly one session is open there, still on its `cs_…`: the
+            // event is then that session's, and swaps it (KTD-2). Anything
+            // else could settle the wrong row; it is left unmatched.
+            if (event.providerCheckoutId || event.sarohIntentId) return null;
+            const open = (await tx.paymentIntent.findMany({
+                where: { ...ofOrder, status: { in: OPEN_STRIPE_STATUSES } },
+                take: 2,
+            })) as IntentRow[];
+            return open.length === 1 &&
+                open[0].providerIntentId?.startsWith("cs_")
+                ? open[0]
+                : null;
         }
-        return null;
+        return await tx.paymentIntent.findFirst({
+            where: ofOrder,
+            orderBy: { createdAt: "desc" },
+        });
     }
 
     private async applySuccess(
@@ -1700,8 +1745,16 @@ export class WebhooksService {
             return { applied: true };
         }
 
+        // A Stripe hold paid after it was let go: released as the payment
+        // was under way, or by the sweep before it landed (U5).
+        const lateHold = await isLateStripeHoldInTx(
+            tx,
+            intent.provider,
+            invoice,
+            held,
+        );
         const found =
-            held === "released"
+            held === "released" || lateHold
                 ? "RELEASED_HOLD"
                 : bought === "gone"
                   ? "PACK_NOT_BOUGHT"
@@ -1722,6 +1775,14 @@ export class WebhooksService {
                 rawResponse: { invoiceStatus: found },
             },
         });
+        // Its money goes back on its own and the team is told (U5). Other
+        // providers' late payments stay owed back by hand on Home.
+        if (lateHold && (await refundLateHoldInTx(tx, intent))) {
+            this.logger.warn(
+                `Payment captured for invoice ${invoiceId} after its hold was released; refunding it`,
+            );
+            return { applied: true };
+        }
         this.logger.warn(
             `Payment captured for invoice ${invoiceId} while it was ${found}; recorded as needing a refund`,
         );
@@ -1800,6 +1861,46 @@ async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
         order.status !== "CANCELLED" &&
         dueCentsOf(order) <= 0
     );
+}
+
+/** A Stripe row whose session can still take its payment. */
+const OPEN_STRIPE_STATUSES = ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"];
+
+/**
+ * Swap a Stripe row's Checkout Session (`cs_…`) for the PaymentIntent
+ * (`pi_…`) its payment is on (KTD-2), so refunds, look-ups and
+ * `payment_intent.*`/`refund.*` events name it. Only when the event is
+ * about this very row (its session, Saroh's id, or the order's one open
+ * session), only from `cs_` to `pi_`, and never over another `pi_`:
+ * the condition is in the UPDATE, which takes the row's lock. Idempotent.
+ */
+async function linkProviderIntentInTx(
+    tx: Tx,
+    intent: IntentRow,
+    event: NormalizedWebhookEvent,
+): Promise<{ intent: IntentRow; changed: boolean }> {
+    const pi = event.providerIntentId;
+    const current = intent.providerIntentId ?? "";
+    // An event naming neither reached a `cs_` row only as its order's one
+    // open session (`findIntent`).
+    const own =
+        (!!event.providerCheckoutId &&
+            event.providerCheckoutId === intent.providerCheckoutId) ||
+        (!!event.sarohIntentId && event.sarohIntentId === intent.id) ||
+        (!event.providerCheckoutId && !event.sarohIntentId);
+    if (
+        intent.provider !== "STRIPE" ||
+        !pi?.startsWith("pi_") ||
+        !current.startsWith("cs_") ||
+        !own
+    ) {
+        return { intent, changed: false };
+    }
+    const { count } = await tx.paymentIntent.updateMany({
+        where: { id: intent.id, providerIntentId: current },
+        data: { providerIntentId: pi },
+    });
+    return { intent: { ...intent, providerIntentId: pi }, changed: count > 0 };
 }
 
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {

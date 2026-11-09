@@ -12,6 +12,11 @@ import type {
 import { destructiveAlertClasses } from "../alert";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import {
+    leavesForProvider,
+    returnPathHere,
+    TO_PAYMENT_PAGE_WORDS,
+} from "../booking-flow/hosted-checkout";
 import type { InlineCodeHandle } from "../booking-flow/inline-code";
 import { InlineCode } from "../booking-flow/inline-code";
 import { formatAmount } from "../lib/money";
@@ -19,7 +24,7 @@ import { pickupReadyWords } from "../lib/shop-facts";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 import { readQrSource } from "../qr-source";
-import { useSiteBusiness } from "../site-business";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import { SoldByLine } from "../sold-by";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
@@ -170,8 +175,31 @@ export function chargeWords(
 /** What paying says, from what is known only. Pure. */
 export function payingWords(
     status: "open" | Exclude<CheckoutOutcome, "paid"> | "confirming",
-    { handover, upi = true }: { handover: string | null; upi?: boolean },
+    {
+        handover,
+        upi = true,
+        redirect = false,
+    }: {
+        handover: string | null;
+        upi?: boolean;
+        /** The payment leaves the page for Stripe's hosted Checkout. */
+        redirect?: boolean;
+    },
 ): { title: string; body: string; problem: boolean } {
+    if (redirect && status === "open") {
+        return {
+            title: TO_PAYMENT_PAGE_WORDS,
+            body: "Your order is placed once the payment comes through.",
+            problem: false,
+        };
+    }
+    if (redirect && status === "closed") {
+        return {
+            title: "You came back before paying",
+            body: "Nothing was paid. Pay when you're ready.",
+            problem: false,
+        };
+    }
     switch (status) {
         case "open":
             return {
@@ -240,7 +268,8 @@ export function LookCheckout({
     const router = useRouter();
     const items = useBag(site);
     const testRelease = useTestRelease() !== null;
-    const { address: addressBy, upi } = useSiteBusiness();
+    const seller = useSiteBusiness();
+    const { address: addressBy, upi } = seller;
     const code = useRef<InlineCodeHandle>(null);
     const [customer, setCustomer] = useState(account.customer);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
@@ -339,7 +368,8 @@ export function LookCheckout({
                         ...d,
                         address: last,
                         saved:
-                            addressLeft(last, addressBy) === null
+                            addressLeft(last, addressBy, seller.country) ===
+                            null
                                 ? "shown"
                                 : "typing",
                     };
@@ -348,7 +378,7 @@ export function LookCheckout({
         return () => {
             live = false;
         };
-    }, [askSaved, addressBy]);
+    }, [askSaved, addressBy, seller.country]);
 
     // Paid in the window: ask the server until it has placed the order.
     const confirmTries = paying.kind === "confirming" ? paying.tries : null;
@@ -415,7 +445,7 @@ export function LookCheckout({
     const quote = load.kind === "ready" ? load.quote : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressNote = needsAddress(way)
-        ? addressLeft(draft.address, addressBy)
+        ? addressLeft(draft.address, addressBy, seller.country)
         : null;
     const pays =
         quote?.payments ??
@@ -480,6 +510,11 @@ export function LookCheckout({
             apiUrl,
         });
         session.current = opened;
+        // Stripe's hosted Checkout leaves the page: the order is
+        // remembered first, so the bag asks how it stands on the way back.
+        if (leavesForProvider(started.payment)) {
+            writePendingCheckout(site, started.orderId);
+        }
         setPaying({ kind: "window", started, status: "open" });
         void opened.outcome.then((outcome) => {
             if (session.current !== opened) return;
@@ -526,16 +561,28 @@ export function LookCheckout({
         if (checkout !== draft.checkout) change((d) => ({ ...d, checkout }));
         setPaying({ kind: "starting" });
         setProblem(null);
-        const request: StartCheckout = {
-            ...body,
-            key: checkout.key,
-            ...(source ? { source } : {}),
-        };
-        const result = await api.start(request).catch(() => ({
-            ok: false as const,
-            reason: "error" as const,
-            message: SHOP_OFFLINE,
-        }));
+        const path = returnPathHere();
+        const startWith = (key: string) =>
+            api
+                .start({
+                    ...body,
+                    key,
+                    ...(source ? { source } : {}),
+                    ...(path ? { returnPath: path } : {}),
+                })
+                .catch(() => ({
+                    ok: false as const,
+                    reason: "error" as const,
+                    message: SHOP_OFFLINE,
+                }));
+        let result = await startWith(checkout.key);
+        if (!result.ok && result.reason === "checkout-closed") {
+            // The Stripe checkout this key started was cancelled or ran
+            // out: the same bag starts once more, under a new key.
+            const again = { print, key: checkoutKey() };
+            change((d) => ({ ...d, checkout: again }));
+            result = await startWith(again.key);
+        }
         if (result.ok) {
             if (result.data.payment === null) {
                 placed(result.data.orderId);
@@ -599,7 +646,13 @@ export function LookCheckout({
               ? "confirming"
               : null;
     const words = windowState
-        ? payingWords(windowState, { handover, upi })
+        ? payingWords(windowState, {
+              handover,
+              upi,
+              redirect:
+                  paying.kind === "window" &&
+                  leavesForProvider(paying.started.payment),
+          })
         : null;
 
     return (
@@ -1028,7 +1081,7 @@ export function LookCheckout({
                     )}
                     <p className="text-site-body mt-1 text-[13.5px]">
                         {quote?.gst
-                            ? `Includes ${formatAmount(quote.gst, quote.currency)} GST. `
+                            ? `Includes ${formatAmount(quote.gst, quote.currency)} ${taxWordOf(seller)}. `
                             : null}
                         <button
                             type="button"

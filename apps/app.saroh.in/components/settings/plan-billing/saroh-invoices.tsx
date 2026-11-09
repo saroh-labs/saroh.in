@@ -1,4 +1,3 @@
-import { formatInr } from "@saroh/pricing-catalog";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
@@ -9,6 +8,7 @@ import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { SarohInvoice } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
+import { planMoney } from "@/lib/saroh-billing/money";
 import { RefreshButton } from "./refresh-button";
 import { card, cardHead } from "./styles";
 
@@ -60,7 +60,7 @@ export function SarohInvoices({
                             {invoice.number}
                         </span>
                         <span className="tabular-nums">
-                            {formatInr(invoice.totalPaise)}
+                            {planMoney(invoice.totalPaise)}
                         </span>
                         <Badge variant="success" size="sm">
                             Paid

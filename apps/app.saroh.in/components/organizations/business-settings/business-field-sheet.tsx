@@ -23,6 +23,7 @@ import {
 import { businessTypeOf } from "@/lib/organizations/business-types";
 import {
     addressProblems,
+    byCountry,
     stateProblem,
 } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
@@ -30,7 +31,7 @@ import type {
     OrganizationSettings,
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
-import { browserZone } from "@/lib/organizations/time-zones";
+import { offeredZone } from "@/lib/organizations/time-zones";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import type { FormValues } from "./business-form";
 import {
@@ -119,7 +120,8 @@ export function BusinessFieldSheet({
 
     // No zone saved: the browser's is offered, as a change to save.
     useEffect(() => {
-        const zone = sheet === "timezone" && !zoneSaved && browserZone();
+        const zone =
+            sheet === "timezone" && !zoneSaved && offeredZone(saved.country);
         if (zone) form.setValue("timezone", zone, { shouldDirty: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the sheet opens
     }, []);
@@ -201,10 +203,19 @@ export function BusinessFieldSheet({
                 pending={isSubmitting}
                 onClose={onClose}
                 onSubmit={(e) => {
-                    // Nothing changed: there is nothing to check or send.
+                    // Nothing changed: there is nothing to send. A Global
+                    // address is still checked, so one stored before its
+                    // country's rules says what it lacks instead of closing.
                     if (!isDirty) {
                         e.preventDefault();
-                        onClose();
+                        if (
+                            sheet === "address" &&
+                            byCountry(saved.country, saved.gstRegistered)
+                        ) {
+                            void form.trigger().then((ok) => {
+                                if (ok) onClose();
+                            });
+                        } else onClose();
                         return;
                     }
                     void form.handleSubmit(onSubmit)(e);

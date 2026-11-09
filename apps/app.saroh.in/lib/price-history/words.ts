@@ -2,6 +2,7 @@ import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { modeSays, rateSays } from "@/lib/gst/item-words";
 import { ITEM_MODE_LABEL } from "@/lib/gst/price-mode";
+import { MRP_LABEL } from "@/lib/products/mrp-label";
 
 /**
  * Price history (owner, 12 Oct 2026), as it is said: what a product, one of
@@ -64,7 +65,7 @@ export interface PriceHistoryPage {
 }
 
 /** What a money field is called at the start of a line. */
-const MONEY_LABEL = { price: "Price", mrp: "MRP" } as const;
+const MONEY_LABEL = { price: "Price", mrp: MRP_LABEL } as const;
 
 /**
  * One change as a short line: "Price ₹780 → ₹820", "MRP set to ₹1,000",

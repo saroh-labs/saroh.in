@@ -44,6 +44,8 @@ export interface SettingsRow {
         addressLine2?: string | null;
         city?: string | null;
         postalCode?: string | null;
+        /** Global's region (U3): part of the one registered address. */
+        region?: string | null;
     } | null;
 }
 
@@ -53,6 +55,7 @@ const ADDRESS_COLUMNS = new Set([
     "addressLine2",
     "city",
     "postalCode",
+    "region",
 ]);
 
 const RESTART_WORDS: Record<NumberRestart, string> = {
@@ -88,11 +91,14 @@ function numberExample(
     }
 }
 
-/** "14 Hill Road, Indiranagar, Bengaluru 560038", or null when blank. */
+/**
+ * "14 Hill Road, Indiranagar, Bengaluru 560038", or null when blank. A
+ * Global region sits before the postcode ("Austin TX 78701").
+ */
 function printedAddress(
     p: NonNullable<SettingsRow["businessProfile"]>,
 ): string | null {
-    const town = [p.city, p.postalCode]
+    const town = [p.city, p.region, p.postalCode]
         .map((part) => part?.trim())
         .filter(Boolean)
         .join(" ");

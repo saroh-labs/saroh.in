@@ -7,10 +7,12 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { errorFacts } from "../../common/observability/report-error";
+import type { AttentionReason } from "../../common/providers/provider-attention";
 import {
     isKeysRefused,
     KEYS_REFUSED,
     NO_ATTENTION,
+    PERMISSION_MISSING,
 } from "../../common/providers/provider-attention";
 import { queueProviderBack } from "../notifications/provider-alerts";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
@@ -18,6 +20,7 @@ import type {
     MerchantProvider,
     ProviderCredentials,
 } from "./providers/provider.port";
+import { STRIPE_KEY_PERMISSIONS } from "./providers/stripe-payments";
 
 /**
  * A business's payment keys, checked on connect and watched on use
@@ -63,8 +66,7 @@ export async function assertKeysAccepted(
     }
     if (check === "PERMISSION_MISSING") {
         throw new BadRequestException({
-            message:
-                "This key can't see payments or refunds. Give it Payment Intents: Write and Refunds: Write.",
+            message: `This key can't make Checkout sessions or customers, or see payments and refunds. Give it ${STRIPE_KEY_PERMISSIONS}.`,
             field: "keySecret",
         });
     }
@@ -77,6 +79,14 @@ export async function assertKeysAccepted(
 /** What a customer reads when the business's provider fails at checkout. */
 export const PROVIDER_FAILED_MESSAGE =
     "The business can't take payment online right now. Please try again later, or pay them another way.";
+
+/**
+ * Stripe answered a live call 403: a real restricted key missing a
+ * permission (STRIPE.md), not keys it refused (401).
+ */
+export function lacksPermission(err: unknown): boolean {
+    return isKeysRefused(err) && err.httpStatus === 403;
+}
 
 /**
  * A provider order that failed, as a handled answer (UX-012): a
@@ -148,21 +158,34 @@ export function credentialsUnreadable(
  * Mark a payment connection as needing attention and queue the team's
  * alert, on one transaction. Only a connection not already flagged is
  * marked, so each refusal tells the team once; true when this call did.
+ *
+ * `PERMISSION_MISSING` (Stripe, KTD-14) marks a connection that still
+ * takes payments: no "down" alert, as nothing stopped, and a refusal
+ * later replaces it (the refusal is the worse news, and is told).
  */
 export async function flagPaymentProvider(
     row: Pick<MerchantPaymentProvider, "id" | "organizationId">,
     now: Date = new Date(),
+    reason: AttentionReason = KEYS_REFUSED,
 ): Promise<boolean> {
     return prisma.$transaction(async (tx) => {
         const marked = await tx.merchantPaymentProvider.updateMany({
             where: {
                 id: row.id,
                 organizationId: row.organizationId,
-                attentionAt: null,
+                ...(reason === KEYS_REFUSED
+                    ? {
+                          OR: [
+                              { attentionAt: null },
+                              { attentionReason: PERMISSION_MISSING },
+                          ],
+                      }
+                    : { attentionAt: null }),
             },
-            data: { attentionReason: KEYS_REFUSED, attentionAt: now },
+            data: { attentionReason: reason, attentionAt: now },
         });
         if (marked.count === 0) return false;
+        if (reason !== KEYS_REFUSED) return true;
         await enqueueTeamAlert(tx, row.organizationId, {
             event: "provider",
             change: "down",

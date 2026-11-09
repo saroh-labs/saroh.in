@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { accountMoney } from "../account/model";
 import { formatPrice } from "../blocks/services-list";
@@ -23,6 +23,30 @@ describe("siteMoney", () => {
         expect(siteMoney(12.05, "INR", "en-IN")).toBe("₹12.05");
         // A float a hair off whole is whole.
         expect(siteMoney(0.1 + 0.2 + 499.7, "INR", "en-IN")).toBe("₹500");
+    });
+
+    it("is the business's format, not the visitor's, when no locale is given", () => {
+        // A visitor's default can write "US$20"; a site writes it as the app does.
+        const Real = Intl.NumberFormat;
+        // A runtime whose default writes "US$20" (en-GB here; en-IN in some browsers).
+        const pinned = vi
+            .spyOn(Intl, "NumberFormat")
+            .mockImplementation(function (locale, options) {
+                return new Real(locale ?? "en-GB", options);
+            });
+        try {
+            expect(
+                new Intl.NumberFormat(undefined, {
+                    style: "currency",
+                    currency: "USD",
+                }).format(20),
+            ).toMatch(/^US\$/);
+            expect(siteMoney(20, "USD")).toBe("$20");
+            expect(siteMoney(20, "USD")).not.toMatch(/^US\$/);
+            expect(siteMoney(125000, "INR")).toBe("₹1,25,000");
+        } finally {
+            pinned.mockRestore();
+        }
     });
 
     it("is no price for an unknown currency or a non-number", () => {

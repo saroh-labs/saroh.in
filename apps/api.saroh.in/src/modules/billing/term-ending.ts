@@ -101,6 +101,7 @@ export async function termEndingOf(
             freeChosenAt: true,
             pendingFrom: true,
             pendingPlan: { select: { priceCents: true } },
+            organization: { select: { edition: true } },
             plan: {
                 select: {
                     name: true,
@@ -131,6 +132,9 @@ export async function termEndingOf(
     });
     const term = termOf(sub, await termCheckoutOf(db, checkout), now);
     if (!term?.renewOpen) return null;
+    // A month paid once is told when the next month falls due
+    // (`openMonthDueInTx`, stage 9), never asked to renew a term.
+    if (term.payment === "ONE_TIME" && checkout?.cycle === "month") return null;
     const stage = termEndingStage(term.endsAt, now);
     if (!stage) return null;
     // Arranged already: a move to Free that takes over first, or a renewal
@@ -150,7 +154,7 @@ export async function termEndingOf(
     });
     if (waiting) return null;
 
-    const live = await liveCatalogueVersion(db, now);
+    const live = await liveCatalogueVersion(db, sub.organization.edition, now);
     const next = live
         ? await db.plan.findUnique({
               where: {

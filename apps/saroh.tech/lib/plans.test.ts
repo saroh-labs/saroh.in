@@ -14,6 +14,7 @@ import {
     freeUsage,
     pricingModel,
     readCatalog,
+    readPricing,
 } from "./plans";
 
 /** Made up on purpose (Plan A, 111): no test carries a real plan's terms. */
@@ -292,5 +293,90 @@ describe("Free's limits beyond /pricing", () => {
         const [card] = freeCardModel(null).views["month-excl"].plans;
         expect(card.name).toBe("Free");
         expect(card.price).not.toBe("Free");
+    });
+});
+
+describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
+    const usd = () =>
+        parseCatalog({
+            ...fakeInput(),
+            currency: "USD",
+            tax: "none",
+            yearly: { on: false, paid: 10 },
+        });
+
+    it("shows Plan B and Plan C at their dollar prices, with no tax", () => {
+        const model = pricingModel(usd(), true);
+        const all = JSON.stringify(model.views["month-excl"]);
+        expect(model.placeholder).toBe(false);
+        expect(all).toContain("$111");
+        expect(all).toContain("$222");
+        // No rupee and no tax line; row words are the Global catalogue's own.
+        expect(all).not.toMatch(/₹/);
+        expect(all).not.toMatch(/\+ GST|incl\. GST/);
+        expect(model.tax.toggle).toBe(false);
+    });
+
+    it("leaves out rows and words that only mean something in India (owner, 8 Nov 2026)", () => {
+        const input = fakeInput();
+        input.modules.push(
+            {
+                id: "upi-pay",
+                name: "UPI payments",
+                group: "one",
+                cells: { grow: { inc: true, text: "Included", card: "" } },
+            },
+            {
+                id: "zones",
+                name: "Delivery",
+                group: "one",
+                cells: {
+                    grow: {
+                        inc: true,
+                        text: "By PIN code",
+                        card: "Rates by PIN code",
+                    },
+                    pro: { inc: true, text: "Zones", card: "Delivery zones" },
+                },
+            },
+        );
+        const catalog = parseCatalog({
+            ...input,
+            currency: "USD",
+            tax: "none",
+            yearly: { on: false, paid: 10 },
+        });
+        const model = pricingModel(catalog, true);
+        const all = JSON.stringify([model.views["month-excl"], model.rows]);
+        expect(all).not.toMatch(/\bUPI\b|\bPIN\b|\bGST\b/);
+        expect(all).toContain("Delivery");
+        expect(all).toContain("Delivery zones");
+        expect(all).toContain("Products");
+    });
+
+    it("keeps today's Free-only page while it isn't offered", () => {
+        const view = pricingModel(usd(), false).views["month-excl"];
+        expect(JSON.stringify(view)).not.toMatch(/\$|111|222/);
+    });
+
+    it("never draws an India catalogue's prices", () => {
+        const view = pricingModel(parseCatalog(fakeInput()), true).views[
+            "month-excl"
+        ];
+        expect(JSON.stringify(view)).not.toMatch(/₹|111|222/);
+    });
+
+    it("reads offered from the API's answer", async () => {
+        const fetcher = vi.fn(() =>
+            Promise.resolve(
+                new Response(
+                    JSON.stringify({ catalog: usd(), offered: true }),
+                    { status: 200 },
+                ),
+            ),
+        ) as unknown as typeof fetch;
+        const read = await readPricing("https://api.example.test", fetcher);
+        expect(read?.offered).toBe(true);
+        expect(read?.catalog.currency).toBe("USD");
     });
 });

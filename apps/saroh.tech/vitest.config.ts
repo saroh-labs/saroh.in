@@ -13,5 +13,13 @@ export default defineConfig({
             "scripts/**/*.test.ts",
             "tailwind-content.test.ts",
         ],
+        // tailwind-content.test.ts reads @saroh/ui from disk, not by import,
+        // so `vitest --changed` (the local gate) only reruns it on a trigger.
+        forceRerunTriggers: [
+            "**/package.json/**",
+            "**/vitest.config.*/**",
+            "**/vite.config.*/**",
+            "**/packages/ui/src/**",
+        ],
     },
 });

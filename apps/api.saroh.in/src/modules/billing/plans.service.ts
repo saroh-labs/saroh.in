@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
 import { liveCatalogueVersion, prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import type { BillingCycle } from "@saroh/pricing-catalog";
 import { catalogPlanKey } from "@saroh/pricing-catalog";
 
@@ -57,11 +58,14 @@ export class PlansService {
      * a retired plan (`active` false) comes back for the caller to refuse.
      */
     async resolveCatalogue(
+        edition: Edition,
         planId: string,
         cycle: BillingCycle,
         now: Date = new Date(),
     ): Promise<Plan & { liveVersion: number }> {
-        const live = await liveCatalogueVersion(prisma, now);
+        // The business's own edition's live version (stage 9, KTD1): a plan
+        // of the other edition is never found.
+        const live = await liveCatalogueVersion(prisma, edition, now);
         const row = live
             ? await prisma.plan.findUnique({
                   where: {

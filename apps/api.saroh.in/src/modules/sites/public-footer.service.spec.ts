@@ -182,6 +182,29 @@ describe("who the customer is buying from (DEC-121)", () => {
         expect(select.taxId).toBeUndefined();
     });
 
+    it("a US business's address names its state and country (U4)", async () => {
+        siteFind.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { referralCode: null, edition: "GLOBAL" },
+        });
+        profileFind.mockResolvedValue({
+            contactEmail: null,
+            legalName: null,
+            addressLine1: "500 Congress Ave",
+            addressLine2: null,
+            city: "Austin",
+            postalCode: "78701",
+            region: "TX",
+            country: "US",
+            gstState: null,
+            phone: null,
+        });
+        const footer = await service(onPlan("paid-plan")).read("site_1", "v");
+        expect(footer.seller.address).toBe(
+            "500 Congress Ave, Austin, TX 78701, United States",
+        );
+    });
+
     it("is all null for a business that has set none of it", async () => {
         site(null);
         profileFind.mockResolvedValueOnce(null);

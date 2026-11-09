@@ -11,13 +11,6 @@ import type { ChooseStep } from "./traverse";
  * Pure, so each rule is tested without the flow.
  */
 
-/**
- * How long a pay-now booking holds its time while it is paid (the API's
- * `HOLD_MINUTES`, `bookings/booking-hold.ts`). The page never starts the
- * clock itself: the hold's own `holdExpiresAt` says when it ends.
- */
-export const HOLD_MINUTES = 15;
-
 /** A step the look draws while choosing. */
 export type LookStep = ChooseStep;
 
@@ -172,16 +165,22 @@ export function cancelText(
  * GST at 18%. The receipt shows the exact amount." No paise on the page.
  * Null where the API says none.
  */
-export function lookGstText(service: BookingService | null): string | null {
+export function lookGstText(
+    service: BookingService | null,
+    taxName = "GST",
+): string | null {
     const gst = gstOnPriceOf(service?.gst);
     if (!gst) return null;
-    return `Includes GST at ${gst.rate}%. The receipt shows the exact amount.`;
+    return `Includes ${taxName} at ${gst.rate}%. The receipt shows the exact amount.`;
 }
 
 /**
- * Said before paying now (VD08e): the time is held for 15 minutes from the
- * moment they press Pay. Only where a way to pay now is on offer.
+ * Said before paying now (VD08e): the time is held for a while from the
+ * moment they press Pay. Only where a way to pay now is on offer. No
+ * length: it depends on the business's provider (15 minutes, 30 at
+ * Stripe, the API's `holdMinutesFor`), which the page doesn't know before
+ * the hold exists; the hold's own `holdExpiresAt` then says when it ends.
  */
 export function holdBeforeText(time: string): string {
-    return `Paying now? We hold ${time} for you for ${HOLD_MINUTES} minutes from when you press Pay.`;
+    return `Paying now? We hold ${time} for you for a short time from when you press Pay.`;
 }

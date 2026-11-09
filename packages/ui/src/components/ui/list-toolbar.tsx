@@ -3,6 +3,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { MONEY_LOCALE } from "../../lib/money";
 import {
     DEFAULT_PAGE_SIZE,
     PAGE_SIZES,
@@ -297,7 +298,8 @@ export function ListFilter<V extends string>({
     );
 }
 
-const figures = new Intl.NumberFormat("en-IN");
+// The deployment's grouping: lakh in India (DEC-079), thousands on Global.
+const figures = new Intl.NumberFormat(MONEY_LOCALE);
 
 /**
  * The ONE chip a list toolbar may hold: an on/off filter for what needs

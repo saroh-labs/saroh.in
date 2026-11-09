@@ -139,6 +139,8 @@ export class DownloadGateService {
             contact.email,
             mail.subject,
             mail.text,
+            // The downloads are saroh.in's, and the mail says so.
+            "INDIA",
         );
         if (outcome !== "sent") {
             this.logger.warn(

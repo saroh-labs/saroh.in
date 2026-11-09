@@ -687,6 +687,7 @@ describe("what each limit counts (DB, U13)", () => {
         }
         // And the admin's usage lines read the same counts.
         const { businesses, measured } = await new ImpactService().read(
+            "INDIA",
             new Set(["free", "grow", "pro"]),
             new Date(),
         );

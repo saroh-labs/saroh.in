@@ -1,8 +1,9 @@
 import type { AutopayDoneState, AutopayStartResult } from "@saroh/site-blocks";
-import { payInstructionsOf } from "@saroh/site-blocks";
+import { payInstructionsOf, sameSitePath } from "@saroh/site-blocks";
 
 import { serverApiUrl, serverReadSignal } from "./api-url";
 import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
+import { checkoutClosed } from "./checkout-closed";
 import type { CheckoutIntent } from "./checkout-shape";
 import { isIntent } from "./checkout-shape";
 import { payAmountOf, payPaymentsOf } from "./invoice-paid-shape";
@@ -87,7 +88,43 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
 
 export type StartResult =
     | { ok: true; intent: CheckoutIntent }
-    | { ok: false; message: string; settled?: boolean };
+    | {
+          ok: false;
+          message: string;
+          settled?: boolean;
+          /** The key's Stripe checkout closed: start again with a new key. */
+          restart?: boolean;
+      };
+
+/**
+ * A pay link's Stripe checkout that can't be paid any more (KTD-13):
+ * cancelled, expired, or made before hosted Checkout. The page starts
+ * again under a new key. Null for any other answer.
+ */
+export function checkoutClosedOf(
+    status: number,
+    body: unknown,
+): StartResult | null {
+    return checkoutClosed(status, body)
+        ? {
+              ok: false,
+              restart: true,
+              message:
+                  "That payment closed before it was paid. Press Pay to start again.",
+          }
+        : null;
+}
+
+/** The create-intent body: the key, and a same-site page to come back to. */
+export function intentBody(
+    idempotencyKey: string,
+    returnPath?: unknown,
+): string {
+    const back = sameSitePath(returnPath);
+    return JSON.stringify(
+        back ? { idempotencyKey, returnPath: back } : { idempotencyKey },
+    );
+}
 
 /**
  * Start paying. The page's own sentences, never the API's text — the API's
@@ -96,6 +133,7 @@ export type StartResult =
 export async function startInvoicePayment(
     token: string,
     idempotencyKey: string,
+    returnPath?: string,
 ): Promise<StartResult> {
     let res: Response;
     try {
@@ -108,7 +146,7 @@ export async function startInvoicePayment(
                     accept: "application/json",
                     "content-type": "application/json",
                 }),
-                body: JSON.stringify({ idempotencyKey }),
+                body: intentBody(idempotencyKey, returnPath),
             },
         );
     } catch {
@@ -126,6 +164,8 @@ export async function startInvoicePayment(
                   message: "We couldn't start the payment. Please try again.",
               };
     }
+    const closed = checkoutClosedOf(res.status, body);
+    if (closed) return closed;
     switch (res.status) {
         case 404:
             return {

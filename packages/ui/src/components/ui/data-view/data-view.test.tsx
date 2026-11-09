@@ -150,6 +150,28 @@ describe("DataView — on the client", () => {
         expect(screen.queryByText("Paid in cash")).toBeNull();
     });
 
+    it("gives a phone's row one link, named by the row, over the whole row", () => {
+        setWidth(false);
+        render(
+            <DataView
+                viewId="phone-links"
+                rows={rows}
+                columns={columns}
+                rowKey={(r) => r.id}
+                rowHref={(r) => `/customers/${r.id}`}
+                noun={{ one: "customer", other: "customers" }}
+            />,
+        );
+
+        const item = screen.getByRole("listitem");
+        // One link per row: two on the same pixels is a collision (e2e
+        // four-scenes), and an aria-hidden one has no name.
+        expect(item.querySelectorAll("a[href]")).toHaveLength(1);
+        const link = screen.getByRole("link", { name: "Asha Rao" });
+        expect(link).toHaveAttribute("href", "/customers/a");
+        expect(link.className).toContain("after:inset-0");
+    });
+
     it("draws the saved list on a desk", () => {
         setWidth(true);
         window.localStorage.setItem("saroh-view-mode:desk-saved", "list");

@@ -3,8 +3,9 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 
-import { appBaseOf } from "../../common/app-url";
+import { appBase, editionOf } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
+import { businessTimezone } from "../bookings/staff-availability";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
@@ -66,6 +67,8 @@ export class DataExportHandler {
                         slug: true,
                         lifecycleStatus: true,
                         legalHoldAt: true,
+                        edition: true,
+                        currency: true,
                     },
                 },
             },
@@ -104,6 +107,8 @@ export class DataExportHandler {
                 organizationId: row.organizationId,
                 exportId,
                 businessName: row.organization.name,
+                edition: row.organization.edition,
+                currency: row.organization.currency,
                 storage: this.storage,
             });
             unclaimed = built.storageKey;
@@ -221,13 +226,22 @@ export class DataExportHandler {
                     ),
                 },
             );
-            const outcome = await sendDataExportReadyEmail(user.email, {
-                businessName: row.organization.name,
-                url: signed.url,
-                linkExpiresAt: new Date(signed.expiresAt),
-                keptUntil,
-                workspaceUrl: `${await appBaseOf(row.organizationId)}/settings/data`,
-            });
+            const edition = await editionOf(row.organizationId);
+            const outcome = await sendDataExportReadyEmail(
+                user.email,
+                {
+                    businessName: row.organization.name,
+                    url: signed.url,
+                    linkExpiresAt: new Date(signed.expiresAt),
+                    keptUntil,
+                    workspaceUrl: `${appBase(edition)}/settings/data`,
+                    timeZone: await businessTimezone(
+                        prisma,
+                        row.organizationId,
+                    ),
+                },
+                edition,
+            );
             this.logger.log(
                 `data_export_email org=${row.organizationId} outcome=${outcome}`,
             );

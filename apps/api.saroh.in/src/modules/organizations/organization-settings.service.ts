@@ -38,7 +38,7 @@ import {
     payInstructionsView,
     payInstructionsWrite,
 } from "./business-pay-instructions";
-import { phoneWrite } from "./business-phone";
+import { phoneHomeCountryFor, phoneWrite } from "./business-phone";
 import { socialLinksRead, socialLinksWrite } from "./business-social";
 import type {
     RegisteredAddressView,
@@ -173,6 +173,7 @@ const SITE_CONTACT_COLUMNS: ReadonlySet<string> = new Set([
     "addressLine2",
     "city",
     "postalCode",
+    "region",
 ]);
 
 /**
@@ -268,6 +269,7 @@ const PROFILE_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    region: true,
     socialLinks: true,
     siteShowsRegisteredAddress: true,
     registeredAddressMapUrl: true,
@@ -300,6 +302,7 @@ interface ProfileRow {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    region?: string | null;
     socialLinks?: unknown;
     siteShowsRegisteredAddress?: boolean | null;
     registeredAddressMapUrl?: string | null;
@@ -345,6 +348,7 @@ function splitProfile(
         addressLine2: _a2,
         city: _ci,
         postalCode: _pc,
+        region: _rg,
         legallyRegistered,
         payUpiId: _u,
         payBankAccountName: _ban,
@@ -546,15 +550,17 @@ export class OrganizationSettingsService {
             : {};
         // Social links (DEC-128): each sent one rebuilt into its canonical
         // address or refused on its field, over the ones already kept.
+        const socialStored = dto.socialLinks
+            ? await prisma.businessProfile.findUnique({
+                  where: { organizationId: ctx.organizationId },
+                  select: { socialLinks: true, country: true },
+              })
+            : null;
         const socialData = dto.socialLinks
             ? socialLinksWrite(
                   dto.socialLinks,
-                  (
-                      await prisma.businessProfile.findUnique({
-                          where: { organizationId: ctx.organizationId },
-                          select: { socialLinks: true },
-                      })
-                  )?.socialLinks,
+                  socialStored?.socialLinks,
+                  phoneHomeCountryFor(ctx.edition, socialStored?.country),
               )
             : {};
         // The registered address's Google Maps link: Google's own map

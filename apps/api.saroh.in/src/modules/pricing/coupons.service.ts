@@ -10,6 +10,7 @@ import {
     outsideOrgContext,
     prisma,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import { validateCatalog } from "@saroh/pricing-catalog";
 
 import {
@@ -94,9 +95,9 @@ export class CouponsService {
     constructor(private readonly audit: AdminAuditService) {}
 
     /** Every coupon that isn't archived, newest first. */
-    async list(): Promise<AdminCoupon[]> {
+    async list(edition: Edition): Promise<AdminCoupon[]> {
         const rows = await prisma.pricingCoupon.findMany({
-            where: { archivedAt: null },
+            where: { edition, archivedAt: null },
             orderBy: { createdAt: "desc" },
             include: withUses,
         });
@@ -104,6 +105,7 @@ export class CouponsService {
     }
 
     async create(
+        edition: Edition,
         actorUserId: string,
         input: CouponFields & {
             code: string;
@@ -114,7 +116,7 @@ export class CouponsService {
         now: Date,
     ): Promise<AdminCoupon> {
         const code = input.code.trim().toUpperCase();
-        await this.checkFields(input, now);
+        await this.checkFields(edition, input, now);
         return prisma.$transaction(async (tx) => {
             // Insert-or-nothing: a caught unique violation would abort the
             // transaction, so a taken code is read from the count.
@@ -122,6 +124,7 @@ export class CouponsService {
                 data: [
                     {
                         code,
+                        edition,
                         discountPaise: input.discountPaise,
                         months: input.months,
                         planIds: input.planIds,
@@ -166,6 +169,7 @@ export class CouponsService {
     }
 
     async update(
+        edition: Edition,
         actorUserId: string,
         id: string,
         input: Partial<CouponFields> & {
@@ -176,7 +180,7 @@ export class CouponsService {
         now: Date,
     ): Promise<AdminCoupon> {
         return prisma.$transaction(async (tx) => {
-            const row = await this.lock(tx, id);
+            const row = await this.lock(tx, edition, id);
             const next: CouponFields = {
                 discountPaise: input.discountPaise ?? row.discountPaise,
                 months: input.months ?? row.months,
@@ -191,7 +195,7 @@ export class CouponsService {
                         ? row.razorpayOfferId
                         : input.razorpayOfferId,
             };
-            await this.checkFields(next, now, {
+            await this.checkFields(edition, next, now, {
                 // An expiry already passed may stay as it is (pausing an
                 // expired coupon, say); only a new one must be ahead.
                 expiryChanged: input.expiresAt !== undefined,
@@ -247,13 +251,14 @@ export class CouponsService {
      * checkout was quoted with (its row keeps the coupon, RESTRICT).
      */
     async remove(
+        edition: Edition,
         actorUserId: string,
         id: string,
         input: { reason: string; idempotencyKey: string },
         now: Date,
     ): Promise<{ id: string; code: string; outcome: "deleted" | "archived" }> {
         return prisma.$transaction(async (tx) => {
-            const row = await this.lock(tx, id);
+            const row = await this.lock(tx, edition, id);
             const used =
                 row._count.redemptions > 0 ||
                 (await tx.billingCheckout.count({ where: { couponId: id } })) >
@@ -283,13 +288,18 @@ export class CouponsService {
     }
 
     /** The coupon, locked for this transaction; an archived one is gone. */
-    private async lock(tx: Tx, id: string): Promise<CouponRow> {
+    private async lock(
+        tx: Tx,
+        edition: Edition,
+        id: string,
+    ): Promise<CouponRow> {
         await tx.$queryRaw`SELECT "id" FROM "PricingCoupon" WHERE "id" = ${id} FOR UPDATE`;
         const row = await tx.pricingCoupon.findUnique({
             where: { id },
             include: withUses,
         });
-        if (!row || row.archivedAt) {
+        // Another edition's coupon is no coupon in this console.
+        if (!row || row.archivedAt || row.edition !== edition) {
             throw new NotFoundException("There's no such coupon.");
         }
         return row;
@@ -297,6 +307,7 @@ export class CouponsService {
 
     /** The plans and discount make sense against the live catalogue. */
     private async checkFields(
+        edition: Edition,
         f: CouponFields,
         now: Date,
         opts: { expiryChanged: boolean } = { expiryChanged: true },
@@ -321,7 +332,7 @@ export class CouponsService {
                 details: { field: "expiresAt" },
             });
         }
-        const live = await liveCatalogueVersion(prisma, now);
+        const live = await liveCatalogueVersion(prisma, edition, now);
         const check = live ? validateCatalog(live.catalog) : null;
         if (!check?.ok) {
             throw new ConflictException(
@@ -393,6 +404,8 @@ export class CouponsService {
 export async function findUsableCoupon(input: {
     code: string;
     organizationId: string;
+    /** The business's edition: a coupon redeems only in its own (stage 9). */
+    edition: Edition;
     /** The catalogue plan id (`grow`), not the `Plan` row. */
     planId: string;
     planName: string;
@@ -408,7 +421,7 @@ export async function findUsableCoupon(input: {
     const coupon = code
         ? await prisma.pricingCoupon.findUnique({ where: { code } })
         : null;
-    if (!coupon || coupon.archivedAt) {
+    if (!coupon || coupon.archivedAt || coupon.edition !== input.edition) {
         return refuse(`There's no coupon ${code || "with that code"}.`);
     }
     if (!coupon.active) return refuse(`Coupon ${code} isn't available now.`);

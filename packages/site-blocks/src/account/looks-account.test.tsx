@@ -332,8 +332,8 @@ describe("the page's one heading", () => {
         expect(greetingWords("2026-10-20T14:00:00.000Z", "Asia/Kolkata")).toBe(
             "Good evening",
         );
-        // An unknown zone reads India's clock, never throws.
-        expect(greetingWords("2026-10-20T02:00:00.000Z", "Mars/Base")).toBe(
+        // An unknown zone reads UTC's clock, never another country's, never throws.
+        expect(greetingWords("2026-10-20T08:00:00.000Z", "Mars/Base")).toBe(
             "Good morning",
         );
     });

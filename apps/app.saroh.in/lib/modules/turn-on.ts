@@ -174,7 +174,7 @@ export function bookingPageLine(
 /** What turning each one on gives, said once in the sheet. Only what is true. */
 export const GIVES: Readonly<Record<string, string>> = {
     COMMERCE: "Orders, products and customers, sold from your first location.",
-    APPOINTMENTS: "A calendar people book into, with your first service.",
+    APPOINTMENTS: "A calendar people book into, and the services they book.",
     CRM: "Contacts, leads and a pipeline, ready to use.",
     WEBSITE: "A starter site at your web address, ready for you to publish.",
     PAYMENTS:
@@ -272,40 +272,61 @@ export function tidyAddress(typed: string): string {
     return cleanAddressInput(typed);
 }
 
-/** What `PUT …/modules/:key` is sent as `setup`. */
+/**
+ * What `PUT …/modules/:key` is sent as `setup`. What is left empty (only
+ * possible where nothing is required, DEC-212) isn't sent, and the API
+ * uses its default (the business's name, Pick-up, Mon–Sat 10 to 7, a free
+ * web address) or, for Bookings' first service, makes none and leaves it
+ * for Finish setup.
+ */
 export function setupFor(key: string, draft: TurnOnDraft): object {
     if (key === "COMMERCE") {
         const chosen = new Set<Fulfilment>(draft.COMMERCE.fulfilment);
+        const storefrontName = draft.COMMERCE.storefrontName.trim();
+        const fulfilment = FULFILMENTS.filter((f) => chosen.has(f));
         return {
-            storefrontName: draft.COMMERCE.storefrontName.trim(),
-            fulfilment: FULFILMENTS.filter((f) => chosen.has(f)),
-        } satisfies CommerceSetup;
+            ...(storefrontName ? { storefrontName } : {}),
+            ...(fulfilment.length > 0 ? { fulfilment } : {}),
+        } satisfies Partial<CommerceSetup>;
     }
     if (key === "APPOINTMENTS") {
         const b = draft.APPOINTMENTS;
+        const hours = openDays(draft).map(({ weekday, open, close }) => ({
+            weekday,
+            open,
+            close,
+        }));
+        const name = b.name.trim();
         return {
-            hours: openDays(draft).map(({ weekday, open, close }) => ({
-                weekday,
-                open,
-                close,
-            })),
-            service: {
-                name: b.name.trim(),
-                durationMinutes: Number(b.duration.trim()),
-                price: b.price.trim(),
-            },
-        } satisfies AppointmentsSetup;
+            ...(hours.length > 0 ? { hours } : {}),
+            ...(name
+                ? {
+                      service: {
+                          name,
+                          durationMinutes: Number(b.duration.trim()),
+                          price: b.price.trim(),
+                      },
+                  }
+                : {}),
+        } satisfies Partial<AppointmentsSetup>;
     }
     if (key === "WEBSITE") {
         const { templateId } = draft.WEBSITE;
+        const siteName = draft.WEBSITE.siteName.trim();
+        const address = draft.WEBSITE.address.trim();
         return {
-            siteName: draft.WEBSITE.siteName.trim(),
-            address: draft.WEBSITE.address.trim(),
+            ...(siteName ? { siteName } : {}),
+            ...(address ? { address } : {}),
             // Only a choice made in the sheet; else the API picks the kind's.
             ...(templateId ? { templateId } : {}),
-        } satisfies WebsiteSetup;
+        } satisfies Partial<WebsiteSetup>;
     }
     return {};
+}
+
+/** Bookings' first service was left out: none is made (DEC-212). */
+export function noFirstService(draft: TurnOnDraft): boolean {
+    return !draft.APPOINTMENTS.name.trim();
 }
 
 const PRICE = /^\d{1,7}(\.\d{1,2})?$/;
@@ -314,18 +335,25 @@ const ADDRESS = /^[a-z0-9](?:[a-z0-9-]{1,55}[a-z0-9])$/;
 
 /**
  * What must be fixed before sending, by module and field path (the same
- * paths a 400 names). The API judges again; this only saves a round trip
- * for what is plainly missing.
+ * paths a 400 names). The API judges again; this only saves a round trip.
+ *
+ * `required` is DEC-068's minimum, asked by the sheet everywhere but
+ * Settings › Modules. From there nothing is required (DEC-212): an empty
+ * field takes its default or is left for Finish setup, and only what was
+ * typed wrong is a problem.
  */
 export function problemsOf(
     draft: TurnOnDraft,
     order: readonly string[],
+    /** The business's currency (ISO 4217), named in the price's message. */
+    currency = "INR",
+    required = true,
 ): Partial<Record<string, FieldErrors>> {
     const out: Partial<Record<string, FieldErrors>> = {};
     const put = (key: string, path: string, message: string) => {
         out[key] = { ...(out[key] ?? {}), [path]: message };
     };
-    if (order.includes("COMMERCE")) {
+    if (order.includes("COMMERCE") && required) {
         const c = draft.COMMERCE;
         if (!c.storefrontName.trim()) {
             put("COMMERCE", "storefrontName", "Give your location a name.");
@@ -341,7 +369,8 @@ export function problemsOf(
     if (order.includes("APPOINTMENTS")) {
         const b = draft.APPOINTMENTS;
         const days = openDays(draft);
-        if (days.length === 0) {
+        // Not required: no open day gives the first service Mon–Sat 10 to 7.
+        if (days.length === 0 && required) {
             put("APPOINTMENTS", "hours", "Open on at least one day.");
         }
         days.forEach((d, i) => {
@@ -349,32 +378,41 @@ export function problemsOf(
                 put("APPOINTMENTS", `hours.${i}`, "Close after you open.");
             }
         });
-        if (!b.name.trim()) {
+        if (noFirstService(draft) && required) {
             put("APPOINTMENTS", "service.name", "Name your first service.");
         }
-        const minutes = Number(b.duration.trim());
-        if (!/^\d+$/.test(b.duration.trim()) || minutes < 5 || minutes > 1440) {
-            put(
-                "APPOINTMENTS",
-                "service.durationMinutes",
-                "Say how long it takes, from 5 to 1440 minutes.",
-            );
-        }
-        if (!PRICE.test(b.price.trim())) {
-            put(
-                "APPOINTMENTS",
-                "service.price",
-                "Write the price in rupees, like 500 or 499.50.",
-            );
+        // Not required and unnamed: no first service, so its length and
+        // price aren't judged.
+        if (required || !noFirstService(draft)) {
+            const minutes = Number(b.duration.trim());
+            if (
+                !/^\d+$/.test(b.duration.trim()) ||
+                minutes < 5 ||
+                minutes > 1440
+            ) {
+                put(
+                    "APPOINTMENTS",
+                    "service.durationMinutes",
+                    "Say how long it takes, from 5 to 1440 minutes.",
+                );
+            }
+            // Not required, no price is a service without one.
+            if ((required || b.price.trim()) && !PRICE.test(b.price.trim())) {
+                put(
+                    "APPOINTMENTS",
+                    "service.price",
+                    `Write the price in ${currency === "INR" ? "rupees" : currency}, like 500 or 499.50.`,
+                );
+            }
         }
     }
     if (order.includes("WEBSITE")) {
         const w = draft.WEBSITE;
-        if (!w.siteName.trim()) {
+        if (!w.siteName.trim() && required) {
             put("WEBSITE", "siteName", "Give your site a name.");
         }
         const address = w.address.trim();
-        if (!ADDRESS.test(address)) {
+        if ((address || required) && !ADDRESS.test(address)) {
             put(
                 "WEBSITE",
                 "address",
@@ -386,6 +424,25 @@ export function problemsOf(
                 "address",
                 "An address can't have two hyphens in a row.",
             );
+        }
+    }
+    return out;
+}
+
+/**
+ * The errors still to show after an edit: only those already shown that the
+ * draft still has, so a field's message goes as it is fixed and no new one
+ * appears before the next try.
+ */
+export function stillWrong(
+    shown: Partial<Record<string, FieldErrors>>,
+    now: Partial<Record<string, FieldErrors>>,
+): Partial<Record<string, FieldErrors>> {
+    const out: Partial<Record<string, FieldErrors>> = {};
+    for (const [key, fields] of Object.entries(shown)) {
+        for (const path of Object.keys(fields ?? {})) {
+            const message = now[key]?.[path];
+            if (message) out[key] = { ...(out[key] ?? {}), [path]: message };
         }
     }
     return out;
@@ -510,7 +567,7 @@ export function finishSetupItems(
     return out;
 }
 
-/** "Bookings and Contacts are on. Finish setup: Add a bookable service." */
+/** "Bookings and Contacts are on. Finish setup: Add a service to open your booking page." */
 export function turnedOnToast(names: readonly string[], items: string[]) {
     const on = `${listWords(names)} ${plural(names.length, "is", "are")} on.`;
     return items.length > 0 ? `${on} Finish setup: ${items.join(" ")}` : on;

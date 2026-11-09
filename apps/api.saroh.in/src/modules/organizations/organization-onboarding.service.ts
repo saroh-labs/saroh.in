@@ -209,6 +209,7 @@ export class OrganizationOnboardingService {
                     timezone: startingZone(
                         dto.profile?.timezone,
                         dto.profile?.country,
+                        edition,
                     ),
                 },
             });
@@ -303,12 +304,16 @@ export class OrganizationOnboardingService {
         // the business up. Not awaited: a mail server's pause is not the
         // setup screen's, and a welcome that didn't leave undoes nothing.
         if (owner?.email) {
-            void sendWelcomeEmail(owner.email, {
-                businessName: dto.name,
-                goal: dto.goal ?? null,
-                openUrl: `${appBase(edition)}/open/${onboarded.id}`,
-                address: onboarded.slug,
-            }).then(
+            void sendWelcomeEmail(
+                owner.email,
+                {
+                    businessName: dto.name,
+                    goal: dto.goal ?? null,
+                    openUrl: `${appBase(edition)}/open/${onboarded.id}`,
+                    address: onboarded.slug,
+                },
+                edition,
+            ).then(
                 (outcome) => {
                     if (outcome === "failed") {
                         this.logger.warn(

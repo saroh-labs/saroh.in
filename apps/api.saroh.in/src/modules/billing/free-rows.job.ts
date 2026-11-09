@@ -5,6 +5,9 @@ import {
     prisma,
     startMissingFreeRows,
 } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+
+import { CATALOG_PLAN_KEY_PREFIX } from "@saroh/pricing-catalog";
 
 import { FREE_PLAN_ID } from "./catalogue-access.service";
 
@@ -27,6 +30,8 @@ export const BILLING_FREE_ROWS_TYPE = "billing.free-rows.start";
 export interface FreeRowsPayload {
     /** The version going live; for the logs only. */
     version: number;
+    /** Its edition, whose businesses it starts (stage 9); absent: India's. */
+    edition?: Edition;
 }
 
 type JobTx = Prisma.TransactionClient;
@@ -42,7 +47,8 @@ export async function enqueueFreeRows(
     runAt: Date,
     now: Date,
 ): Promise<boolean> {
-    if (!(await freeRowsMayBeMissing(tx, now))) return false;
+    const edition = payload.edition ?? "INDIA";
+    if (!(await freeRowsMayBeMissing(tx, edition, now))) return false;
     await tx.job.create({
         data: { type: BILLING_FREE_ROWS_TYPE, payload: { ...payload }, runAt },
     });
@@ -53,12 +59,28 @@ export async function enqueueFreeRows(
  * Whether a business may be without its Free row by the go-live: one is
  * already, or no version is live (so every sign-up until then gets none).
  */
-async function freeRowsMayBeMissing(tx: JobTx, now: Date): Promise<boolean> {
+async function freeRowsMayBeMissing(
+    tx: JobTx,
+    edition: Edition,
+    now: Date,
+): Promise<boolean> {
     const missing = await tx.organization.count({
-        where: { subscription: null, deletedRetainedAt: null },
+        where: { edition, subscription: null, deletedRetainedAt: null },
     });
     if (missing > 0) return true;
-    return (await liveCatalogueVersion(tx, now)) === null;
+    // Its businesses still on another edition's Free row (stage 9, KTD3b).
+    const ours = await tx.pricingCatalogVersion.findMany({
+        where: { edition },
+        select: { version: true },
+    });
+    const elsewhere = await tx.subscription.count({
+        where: {
+            organization: { edition },
+            plan: { version: { notIn: ours.map((v) => v.version) } },
+        },
+    });
+    if (elsewhere > 0) return true;
+    return (await liveCatalogueVersion(tx, edition, now)) === null;
 }
 
 @Injectable()
@@ -66,10 +88,20 @@ export class FreeRowsHandler {
     private readonly logger = new Logger(FreeRowsHandler.name);
 
     readonly handle = async (job: Job): Promise<void> => {
-        const version = (job.payload as Partial<FreeRowsPayload> | null)
-            ?.version;
+        const payload = job.payload as Partial<FreeRowsPayload> | null;
+        const version = payload?.version;
+        const edition = payload?.edition ?? "INDIA";
+        const repointed = await prisma.$transaction((tx) =>
+            repointFreeRowsInTx(tx, edition, new Date()),
+        );
+        if (repointed > 0) {
+            this.logger.log(
+                `billing_free_rows_repointed job=${job.id} edition=${edition} moved=${repointed}`,
+            );
+        }
         const report = await startMissingFreeRows(prisma, {
             planId: FREE_PLAN_ID,
+            edition,
         });
         if (!report) {
             // Cancelled, held, or a live version with no Free plan: the next
@@ -83,4 +115,49 @@ export class FreeRowsHandler {
             `billing_free_rows job=${job.id} version=${version ?? "?"} started=${report.started} not_grandfathered=${report.notGrandfathered} read=${report.organizations}`,
         );
     };
+}
+
+/**
+ * Move an edition's businesses on Free off another edition's Free row onto
+ * its own live one (stage 9, KTD3b): a Global business started before
+ * Global had a catalogue sits on India's. Only a plain Free row is moved: no
+ * provider, nothing pending, nothing paid. Returns how many moved.
+ */
+export async function repointFreeRowsInTx(
+    tx: Prisma.TransactionClient,
+    edition: Edition,
+    now: Date,
+): Promise<number> {
+    const live = await liveCatalogueVersion(tx, edition, now);
+    if (!live) return 0;
+    const free = await tx.plan.findFirst({
+        where: {
+            key: { startsWith: CATALOG_PLAN_KEY_PREFIX },
+            version: live.version,
+            interval: "month",
+            priceCents: 0,
+            active: true,
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+    });
+    if (!free) return 0;
+    const ours = await tx.pricingCatalogVersion.findMany({
+        where: { edition },
+        select: { version: true },
+    });
+    const moved = await tx.subscription.updateMany({
+        where: {
+            organization: { edition },
+            provider: null,
+            pendingPlanId: null,
+            plan: {
+                key: { startsWith: CATALOG_PLAN_KEY_PREFIX },
+                priceCents: 0,
+                version: { notIn: ours.map((v) => v.version) },
+            },
+        },
+        data: { planId: free.id },
+    });
+    return moved.count;
 }

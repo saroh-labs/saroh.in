@@ -446,6 +446,7 @@ export class SignInCodesService {
             code,
             businessName: cleanBusinessName(site.businessName, site.host),
             minutes: CODE_TTL_MS / 60_000,
+            edition: site.edition,
         });
         if (!sent) {
             // The code never left: nothing may be left live for it, and the

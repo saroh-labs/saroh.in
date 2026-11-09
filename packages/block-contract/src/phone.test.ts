@@ -10,6 +10,8 @@ import {
     PHONE_COUNTRIES,
     phoneCountry,
     phoneE164,
+    phoneExample,
+    phoneHomeCountry,
     phoneLabel,
     phoneNumberProblem,
     searchCountries,
@@ -46,6 +48,77 @@ describe("the one phone rule (#1036)", () => {
     it("keeps what it can't read as typed, for the server to refuse", () => {
         expect(phoneE164(" 98765 ")).toBe("98765");
         expect(phoneE164("098765 43210")).toBe("+919876543210");
+    });
+});
+
+describe("a number typed without + reads the business's country (DEC-204)", () => {
+    it("is India's when no country is given, or India", () => {
+        for (const country of [undefined, "IN", "in"]) {
+            for (const typed of [
+                "98450 12345",
+                "098450 12345",
+                "919845012345",
+            ]) {
+                expect(normalisePhoneNumber(typed, country)).toEqual({
+                    phone: "+919845012345",
+                });
+            }
+        }
+        expect(phoneNumberProblem("98765")).toBe(
+            "Start with + and the country code, like +91 98450 12345.",
+        );
+        expect(phoneExample()).toBe("+91 98450 12345");
+    });
+
+    it("takes a US business's code, never +91", () => {
+        for (const typed of [
+            "212 555 0123",
+            "1 212 555 0123",
+            "(212) 555-0123",
+        ]) {
+            expect(normalisePhoneNumber(typed, "US")).toEqual({
+                phone: "+12125550123",
+            });
+        }
+        expect(normalisePhoneNumber("+44 20 7946 0000", "US")).toEqual({
+            phone: "+442079460000",
+        });
+        expect(phoneNumberProblem("212 555 012", "US")).toBe(
+            "That isn't a whole phone number. Check the digits, like +1 202 555 0123.",
+        );
+        expect(phoneE164("98450 12345", "US")).not.toMatch(/^\+91/);
+    });
+
+    it("drops a trunk 0 elsewhere, and keeps Italy's", () => {
+        expect(normalisePhoneNumber("020 7946 0000", "GB")).toEqual({
+            phone: "+442079460000",
+        });
+        expect(normalisePhoneNumber("06 1234 5678", "IT")).toEqual({
+            phone: "+390612345678",
+        });
+    });
+
+    it("needs the + on Global with no country", () => {
+        expect(phoneNumberProblem("2125550123", null)).toBe(
+            "Start with + and the country code, like +1 202 555 0123.",
+        );
+        expect(normalisePhoneNumber("+1 212 555 0123", null)).toEqual({
+            phone: "+12125550123",
+        });
+    });
+
+    it("picks the home country from the edition's fact", () => {
+        expect(phoneHomeCountry("indian", null)).toBe("IN");
+        expect(phoneHomeCountry("indian", "US")).toBe("IN");
+        expect(phoneHomeCountry("with-country-code", "us")).toBe("US");
+        expect(phoneHomeCountry("with-country-code", null)).toBeNull();
+        expect(phoneHomeCountry("with-country-code", "ZZ")).toBeNull();
+    });
+
+    it("quotes each country's own example", () => {
+        expect(phoneExample("GB")).toBe("+44 20 7946 0000");
+        expect(phoneExample("DE")).toBe("+1 202 555 0123");
+        expect(phoneExample(null)).toBe("+1 202 555 0123");
     });
 });
 

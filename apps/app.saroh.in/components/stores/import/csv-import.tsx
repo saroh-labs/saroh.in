@@ -23,7 +23,7 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { PlanWay } from "@/components/billing/plan-way";
 import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
-import { importRoom } from "@/lib/billing/meter";
+import { importNext, importRoom } from "@/lib/billing/meter";
 import { joinFacts } from "@/lib/format/join";
 import { count } from "@/lib/format/plural";
 import { applyImport, previewImport } from "@/lib/imports/actions";
@@ -797,10 +797,9 @@ export function CsvImport({
                                 <Notice tone="info" align="center">
                                     <div className="flex flex-wrap items-center gap-3">
                                         <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
-                                            {room.words}{" "}
-                                            {room.fits > 0
-                                                ? `Import the first ${room.fits}, or upgrade for more.`
-                                                : "Upgrade to bring them in."}
+                                            {[room.words, importNext(room.fits)]
+                                                .filter(Boolean)
+                                                .join(" ")}
                                         </p>
                                         <PlanWay className="text-foreground/80">
                                             <Button

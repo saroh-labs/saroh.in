@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { useSiteBusiness } from "../site-business";
 import type { CheckoutRequest } from "./checkout";
 import type { Phase } from "./flow-state";
+import { leavesForProvider, TO_PAYMENT_PAGE_WORDS } from "./hosted-checkout";
 import {
     lookLink,
     lookOutline,
@@ -42,6 +43,7 @@ export function payingWords({
     started,
     payError,
     upi = true,
+    redirect = false,
 }: {
     status: CheckoutStatus;
     /** The payment has been started with the provider (a handoff). */
@@ -49,6 +51,8 @@ export function payingWords({
     payError: string | null;
     /** Its customers pay by UPI (the edition's profile). Absent: yes. */
     upi?: boolean;
+    /** The payment leaves the page for Stripe's hosted Checkout. */
+    redirect?: boolean;
 }): PayingWords {
     if (payError) {
         return {
@@ -61,6 +65,20 @@ export function payingWords({
         return {
             title: "Starting the payment…",
             body: "The payment window opens over this page.",
+            problem: false,
+        };
+    }
+    if (redirect && (status === "idle" || status === "open")) {
+        return {
+            title: TO_PAYMENT_PAGE_WORDS,
+            body: "You come back here once you've paid.",
+            problem: false,
+        };
+    }
+    if (redirect && status === "closed") {
+        return {
+            title: "You came back before paying",
+            body: "Nothing was paid. Pay when you're ready.",
             problem: false,
         };
     }
@@ -81,7 +99,9 @@ export function payingWords({
             };
         case "unavailable":
             return {
-                title: "We couldn't open the payment window",
+                title: redirect
+                    ? "We couldn't open the secure payment page"
+                    : "We couldn't open the payment window",
                 body: "Check your connection and try again.",
                 problem: true,
             };
@@ -147,6 +167,7 @@ export function LookPaying({
         started: phase.handoff !== null,
         payError: phase.payError,
         upi,
+        redirect: leavesForProvider(phase.handoff),
     });
     const until = phase.booking.holdExpiresAt;
     const minutesLeft =

@@ -67,7 +67,9 @@ export function describeMismatch(
 /**
  * Record a mismatched capture on its intent as owed back, once per
  * provider payment: Razorpay sends `payment.captured` and `order.paid` for
- * one payment, a look-up may find it too, and a replay repeats them.
+ * one payment, a look-up may find it too, and a replay repeats them. A
+ * Stripe intent is one payment however an event names it, so once per
+ * intent there: two records would let its refund be reserved twice.
  * Returns whether this call wrote it. The caller holds the intent's row
  * lock.
  *
@@ -92,7 +94,11 @@ export async function recordCaptureMismatchInTx(
         where: {
             paymentIntentId: intent.id,
             status: CAPTURED_NEEDS_REFUND,
-            providerRef: providerPaymentRef,
+            // A Stripe row is one PaymentIntent, so one capture: its session
+            // names it by `pi_…`, its own event and a look-up by `ch_…`.
+            ...(intent.provider === "STRIPE"
+                ? {}
+                : { providerRef: providerPaymentRef }),
         },
         select: { id: true },
     });

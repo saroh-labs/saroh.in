@@ -7,6 +7,7 @@ import {
     INDIAN_E164,
     normalisePhoneNumber,
     PHONE_EXAMPLE,
+    phoneHomeCountry,
 } from "@saroh/block-contract";
 import type { Edition } from "@saroh/edition";
 import { editionProfile } from "@saroh/edition";
@@ -29,11 +30,42 @@ export { E164, PHONE_EXAMPLE };
 
 /**
  * A typed number as it is stored, or why it can't be: "" clears it (null),
- * "+91 98450-12345" is kept as "+919845012345", and an Indian number typed
- * without the + ("98450 12345") gets +91. Pure; the settings save says the
+ * "+91 98450-12345" is kept as "+919845012345", and a number typed without
+ * the + is read as the home country's (`phoneHomeCountryOf`; left out,
+ * India's: "98450 12345" gets +91). Pure; the settings save says the
  * problem on the field.
  */
 export const normalisePublicPhone = normalisePhoneNumber;
+
+/**
+ * The country a phone typed without its + is read as for a business: India
+ * on India; on Global the business's own country, or null when it has none
+ * (the number then needs its +, DEC-204).
+ */
+export function phoneHomeCountryFor(
+    edition: Edition | undefined,
+    country: string | null | undefined,
+): string | null {
+    return phoneHomeCountry(
+        editionProfile(edition ?? "INDIA").phoneNumbers,
+        country,
+    );
+}
+
+/** `phoneHomeCountryFor` with the country read, only where it is needed. */
+export async function phoneHomeCountryOf(
+    organizationId: string,
+    edition: Edition | undefined,
+): Promise<string | null> {
+    if (editionProfile(edition ?? "INDIA").phoneNumbers === "indian") {
+        return "IN";
+    }
+    const profile = await prisma.businessProfile.findUnique({
+        where: { organizationId },
+        select: { country: true },
+    });
+    return phoneHomeCountryFor(edition, profile?.country);
+}
 
 /** Why a foreign number is refused as a business's or a payer's phone. */
 export const INDIAN_PHONE_ONLY = `Use an Indian number: +91 and then 10 digits, like ${PHONE_EXAMPLE}.`;

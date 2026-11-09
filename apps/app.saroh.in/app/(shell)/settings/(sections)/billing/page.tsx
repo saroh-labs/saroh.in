@@ -1,4 +1,4 @@
-import { autopayCharges, formatInr } from "@saroh/pricing-catalog";
+import { autopayCharges } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { PartialRead } from "@saroh/ui/failed-read";
@@ -13,6 +13,7 @@ import {
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
 import { BillingProfilePanel } from "@/components/settings/plan-billing/billing-profile-panel";
 import { CurrentPlanCard } from "@/components/settings/plan-billing/current-plan-card";
+import { FreeNote } from "@/components/settings/plan-billing/free-note";
 import { HowBillingWorks } from "@/components/settings/plan-billing/how-billing-works";
 import { OldPlanLink } from "@/components/settings/plan-billing/old-plan-link";
 import { SarohInvoices } from "@/components/settings/plan-billing/saroh-invoices";
@@ -23,16 +24,18 @@ import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { freeNoteShown } from "@/lib/saroh-billing/global-free";
+import { planMoney } from "@/lib/saroh-billing/money";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
 import { readPlanBasics, readPlanCards } from "@/lib/saroh-billing/plan-reads";
 import { planMessage } from "@/lib/saroh-billing/plan-status";
 import { addonRows, yourPlan } from "@/lib/saroh-billing/plan-view";
-import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import {
     getBillingProfileView,
     getPlanUsage,
     listAddons,
     listSarohInvoices,
+    plansOpen,
 } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
@@ -94,7 +97,18 @@ export default async function PlanBillingPage({
         cycle?: string | string[];
     }>;
 } = {}) {
-    if (!plansShown()) notFound();
+    if (!(await plansOpen())) {
+        if (!freeNoteShown()) notFound();
+        // No Saroh billing on this edition (Global, KTD7): Free, and "Tell me when".
+        await requireSession();
+        return (
+            <SettingsPanel
+                header={<SettingsPanelHeader title="Plan and billing" />}
+            >
+                <FreeNote />
+            </SettingsPanel>
+        );
+    }
     await requireSession();
     // Where every "Upgrade" used to land: the plan's change opens on the
     // next screen now. Not kept by a browser: it is the address that moved.
@@ -229,7 +243,7 @@ export default async function PlanBillingPage({
                         rows={addonList}
                         sum={
                             addonsView && addonsView.heldPaise > 0
-                                ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
+                                ? `${planMoney(addonsView.heldPaise)} a month in add-ons`
                                 : ""
                         }
                         canChange={canChange && (addonsView?.canBuy ?? false)}

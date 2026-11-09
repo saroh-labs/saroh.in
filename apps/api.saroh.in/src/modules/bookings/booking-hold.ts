@@ -15,6 +15,8 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
+import { businessPayLinkProvider } from "../payments/pay-link-provider";
+import { paysInWindow } from "../payments/stripe-checkout-style";
 import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { seatsHeld } from "./held-seats";
 import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
@@ -22,7 +24,8 @@ import { offerFreedPlaceInTx } from "./waitlist-queue";
 
 /**
  * Pay now on the booking page (U19, ADR-008): a PENDING booking that holds
- * its place for {@link HOLD_MINUTES}, and a DRAFT invoice for it (source
+ * its place for {@link HOLD_MINUTES} ({@link STRIPE_HOLD_MINUTES} at
+ * Stripe), and a DRAFT invoice for it (source
  * BOOKING) that the customer pays through the invoice payment path. The
  * provider's webhook confirms the booking and gives the invoice its number;
  * a hold nobody paid lets its place go — at once for every read (a hold whose
@@ -47,6 +50,13 @@ type Tx = Prisma.TransactionClient;
 export const HOLD_MINUTES = 15;
 
 /**
+ * …when its payment goes through Stripe: as long as Stripe's shortest
+ * Checkout session (30 minutes, STRIPE.md), so the hold and the session
+ * that pays for it end together (plan 2026-11-07-002, KTD-9).
+ */
+export const STRIPE_HOLD_MINUTES = 30;
+
+/**
  * Why a hold is let go (#1137): the booker or the team let it go
  * (`let-go`, a cancel), its time ran out unpaid (`lapsed`), or its money
  * came after its place was taken (`paid-late`, lapsed and owed back).
@@ -58,7 +68,7 @@ export const RELEASE_HOLDS_TYPE = "booking.release-holds";
 
 /** Why a released hold's draft invoice was voided. */
 export const HOLD_RELEASED_REASON =
-    "Not paid within 15 minutes, so the place was released.";
+    "Not paid in time, so the place was released.";
 
 /**
  * What takes a place: a confirmed booking, or a hold still inside its time.
@@ -106,8 +116,31 @@ export function isExpiredHold(booking: HoldFields, now: Date): boolean {
 }
 
 /** When a hold made now runs out. */
-export function holdExpiry(now: Date): Date {
-    return new Date(now.getTime() + HOLD_MINUTES * 60_000);
+export function holdExpiry(now: Date, minutes: number = HOLD_MINUTES): Date {
+    return new Date(now.getTime() + minutes * 60_000);
+}
+
+/**
+ * How long a business's pay-now hold lasts: {@link STRIPE_HOLD_MINUTES}
+ * when its hold is paid on Stripe's hosted Checkout (the provider its hold
+ * invoice's intent will use, `businessPayLinkProvider`), else
+ * {@link HOLD_MINUTES}. Saroh's own card window (a Stripe connection set
+ * to it, DEC-208, 8 Nov) has no session to outlast, so it keeps the usual
+ * length, as it did before hosted Checkout. No provider ready yet reads as
+ * the usual length.
+ */
+export async function holdMinutesFor(
+    db: Parameters<typeof businessPayLinkProvider>[0],
+    organizationId: string,
+): Promise<number> {
+    try {
+        const row = await businessPayLinkProvider(db, organizationId);
+        return row.provider === "STRIPE" && !paysInWindow(row)
+            ? STRIPE_HOLD_MINUTES
+            : HOLD_MINUTES;
+    } catch {
+        return HOLD_MINUTES;
+    }
 }
 
 /** The invoice line for a booking: the service and when, in its zone. */

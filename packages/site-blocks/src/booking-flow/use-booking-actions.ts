@@ -20,6 +20,7 @@ import {
 } from "./booking-draft";
 import { newKey } from "./flow-helpers";
 import { holdActions, SIGNED_OUT } from "./hold-actions";
+import { returnPathHere } from "./hosted-checkout";
 import type { BookResult } from "./model";
 import { creditUsedText } from "./model";
 import { TIME_GONE } from "./use-kept-choice";
@@ -327,7 +328,12 @@ export function useBookingActions(ctx: FlowActionsContext) {
                 rest: ctx.rest,
                 pay,
             });
-            const started = await startPayment(apiUrl, token, newKey());
+            const started = await startPayment(
+                apiUrl,
+                token,
+                newKey(),
+                returnPathHere(),
+            );
             ctx.s.setPhase((p) =>
                 p.kind === "paying" && p.token === token
                     ? started.ok

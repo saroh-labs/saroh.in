@@ -1,4 +1,6 @@
-import { joinDeliveryPlace } from "@saroh/block-contract";
+import { joinDeliveryPlace, listedCountry } from "@saroh/block-contract";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
@@ -669,6 +671,11 @@ export function buildManualInvoice(
 /**
  * The registered address as one printed line: "line 1, line 2, city PIN,
  * state". Null without a first line — a half-typed address is not printed.
+ *
+ * A Global business's (U4) ends with its region before the postcode and its
+ * country's name last (owner, 8 Nov): "…, Austin, TX 78701, United States",
+ * or "…, London SW1A 1AA, United Kingdom" with no region. India passes
+ * neither, and prints exactly as it always has.
  */
 export function formatSellerAddress(a: {
     addressLine1: string | null;
@@ -676,17 +683,43 @@ export function formatSellerAddress(a: {
     city: string | null;
     postalCode: string | null;
     stateName: string | null;
+    region?: string | null;
+    countryName?: string | null;
 }): string | null {
     if (!a.addressLine1?.trim()) return null;
+    const join = (...xs: (string | null | undefined)[]) =>
+        xs.filter((x) => x?.trim()).join(" ");
+    const place = a.region?.trim()
+        ? [a.city, join(a.region, a.postalCode)]
+        : [join(a.city, a.postalCode)];
     return [
         a.addressLine1,
         a.addressLine2,
-        [a.city, a.postalCode].filter((x) => x?.trim()).join(" "),
+        ...place,
         a.stateName,
+        a.countryName,
     ]
         .map((x) => x?.trim() ?? "")
         .filter((x) => x !== "")
         .join(", ");
+}
+
+/**
+ * What a seller's printed address adds past India's (U4): on an edition
+ * that writes addresses as a country and region, the region and the
+ * country's name. Nothing in India, so its paper stays byte-identical.
+ */
+export function sellerAddressEnd(
+    edition: Edition | null | undefined,
+    p: { region?: string | null; country?: string | null },
+): { region: string | null; countryName: string | null } {
+    if (editionProfile(edition ?? "INDIA").address !== "country-and-region") {
+        return { region: null, countryName: null };
+    }
+    return {
+        region: p.region ?? null,
+        countryName: listedCountry(p.country)?.name ?? null,
+    };
 }
 
 /** Normalises a typed state for the bill-to: a code, or null. */

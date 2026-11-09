@@ -1,4 +1,6 @@
 import { prisma, runInOrgContext } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { buildObjectKey, sanitizeFilename } from "@saroh/object-storage";
 import { randomUUID } from "node:crypto";
@@ -60,8 +62,38 @@ export function dataExportKey(
     });
 }
 
-const README = (businessName: string, made: Date) =>
-    [
+/**
+ * How the README names money and tax: India's paise, rupees and GST, or,
+ * for any other currency, its cents and a tax line (private audit, 8 Nov).
+ */
+export function readmeWords(edition: Edition, currency: string | null) {
+    const gst = editionProfile(edition).taxSystem === "gst";
+    // No currency on file (a business from before DEC-204): its edition's.
+    const rupees = currency ? currency === "INR" : gst;
+    return {
+        units: rupees
+            ? "a column ending in Cents is in the smallest unit (paise), the others in rupees."
+            : `a column ending in Cents is in cents of the currency (the smallest unit${currency ? ` of ${currency}` : ""}), the others in whole units.`,
+        added: gst
+            ? [
+                  "that member joined at. If GST is added to your prices, what a customer pays is that",
+                  "price plus GST (gstRate and gstPriceMode are on the same row, where one is set).",
+              ]
+            : ["that member joined at."],
+        charged: gst
+            ? "the customer was charged, GST and all."
+            : "the customer was charged, tax and all.",
+    };
+}
+
+export const README = (
+    businessName: string,
+    made: Date,
+    edition: Edition = "INDIA",
+    currency: string | null = null,
+) => {
+    const words = readmeWords(edition, currency);
+    return [
         `Your data from Saroh: ${businessName}`,
         `Made ${made.toISOString()} (UTC).`,
         "",
@@ -69,7 +101,7 @@ const README = (businessName: string, made: Date) =>
         "Records refer to each other by id: an order line's orderId is the id in orders.csv,",
         "a booking's contactId is the id in customers.csv, and so on.",
         "Dates and times are in UTC. Amounts are in the currency named on the same row:",
-        "a column ending in Cents is in the smallest unit (paise), the others in rupees.",
+        words.units,
         "Credit notes are in invoices-and-credit-notes.csv, with kind CREDIT_NOTE.",
         "invoice-history.csv lists what happened to each invoice: issued, sent, reminded,",
         "voided, credited and so on, with when, and actorUserId for the person who did it",
@@ -79,17 +111,17 @@ const README = (businessName: string, made: Date) =>
         "",
         "A price in services.csv, membership-plans.csv, class-packs.csv and courses.csv is",
         "the price you set, as you typed it. So is the price in memberships.csv: the price",
-        "that member joined at. If GST is added to your prices, what a customer pays is that",
-        "price plus GST (gstRate and gstPriceMode are on the same row, where one is set).",
+        ...words.added,
         "A price in order-lines.csv, class-pack-purchases.csv and course-enrolments.csv, and",
         "every total in orders.csv, invoices-and-credit-notes.csv and payments.csv, is what",
-        "the customer was charged, GST and all.",
+        words.charged,
         "Text that a spreadsheet would read as a formula starts with ' so it stays text.",
         "",
         "media/ holds the photos and videos you uploaded. media.csv lists every one,",
         "and says if a file was left out of this download and why.",
         "",
     ].join("\r\n");
+};
 
 /**
  * Build one business's zip and put it in object storage (DEC-120).
@@ -103,6 +135,9 @@ export async function buildDataExport(input: {
     organizationId: string;
     exportId: string;
     businessName: string;
+    /** For the README's money and tax words; absent, India's. */
+    edition?: Edition;
+    currency?: string | null;
     storage: ObjectStorage;
     now?: Date;
 }): Promise<BuiltDataExport> {
@@ -119,10 +154,21 @@ export async function buildDataExport(input: {
         media: { included: 0, leftOut: 0, bytes: 0 },
     };
     try {
-        await zip.add("README.txt", [README(input.businessName, made)], {
-            compress: true,
-            modified: made,
-        });
+        await zip.add(
+            "README.txt",
+            [
+                README(
+                    input.businessName,
+                    made,
+                    input.edition,
+                    input.currency ?? null,
+                ),
+            ],
+            {
+                compress: true,
+                modified: made,
+            },
+        );
         for (const table of EXPORT_TABLES) {
             counts.files[table.file] = 0;
             await zip.add(

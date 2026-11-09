@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { OrganizationSwitcher } from "@/components/organizations/switcher/organization-switcher";
 import { CommandTrigger } from "@/components/shared/navigation/command-trigger";
+import { PROFILE } from "@/lib/edition";
 import type { AccountManager, Organization } from "@/lib/organizations/service";
 import { NotificationsLink } from "./notifications-link";
 import { SkinSwitcher } from "./skin-switcher";
@@ -116,9 +117,11 @@ export function AppHeader(props: AppHeaderProps) {
                     name={user.name}
                     email={user.email}
                     businessName={activeOrg?.name}
-                    ownsABusiness={organizations.some(
-                        (o) => o.role === "OWNER",
-                    )}
+                    // Billing profiles only where Saroh bills (not Global).
+                    ownsABusiness={
+                        PROFILE.sarohBilling &&
+                        organizations.some((o) => o.role === "OWNER")
+                    }
                     accountManager={accountManager}
                 />
             </div>

@@ -9,8 +9,9 @@ import { RETIRED_MODULE_IDS } from "./module-map";
  * shape. Coupons are not part of a snapshot (they apply at once, outside
  * versions).
  *
- * Every amount is integer paise (KTD-18). The design prototype held rupees;
- * the snapshot never does.
+ * Every amount is a whole number of the catalogue's currency's minor unit
+ * (KTD-18; paise on India's). The design prototype held rupees; the snapshot
+ * never does.
  */
 
 /** Ids end up in billing keys (`catalog.<planId>`) and URLs (`?plan=`). */
@@ -29,6 +30,21 @@ export type PricingDisplay = (typeof PRICING_DISPLAY)[number];
 
 export const GST_SHOW = ["excl", "incl"] as const;
 export type GstShow = (typeof GST_SHOW)[number];
+
+/**
+ * The currency a catalogue's amounts are in (stage 9, KTD2). Every `*Paise`
+ * field is a whole number of that currency's minor unit: paise for INR,
+ * cents for USD. One catalogue, one currency.
+ */
+export const CATALOG_CURRENCIES = ["INR", "USD"] as const;
+export type CatalogCurrency = (typeof CATALOG_CURRENCIES)[number];
+
+/**
+ * The tax Saroh adds to a catalogue's prices: India's GST, or none (an
+ * export of services to a business abroad, KTD6).
+ */
+export const CATALOG_TAX = ["gst", "none"] as const;
+export type CatalogTax = (typeof CATALOG_TAX)[number];
 
 export const ADDON_KINDS = [
     "module",
@@ -231,6 +247,10 @@ const catalogShape = z.object({
         .transform((rows) => rows.filter((m) => !RETIRED_MODULE_IDS.has(m.id))),
     yearly: yearlySchema,
     gst: gstSchema,
+    /** Absent from every version before stage 9: India's, in rupees. */
+    currency: z.enum(CATALOG_CURRENCIES).default("INR"),
+    /** Absent from every version before stage 9: GST. */
+    tax: z.enum(CATALOG_TAX).default("gst"),
     /** Absent from a version published before DEC-161: 12, as it was then. */
     autopay: autopaySchema.default({ charges: AUTOPAY_CHARGES_DEFAULT }),
     addons: z
@@ -300,6 +320,11 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
         for (const d of duplicates(c.freeStyles?.[kind] ?? [])) {
             issue(`"${d}" is listed as free twice`, ["freeStyles", kind]);
         }
+    }
+
+    // GST is India's tax on a sale in rupees; an export carries none.
+    if (c.tax === "gst" && c.currency !== "INR") {
+        issue("GST applies only to a catalogue in rupees", ["tax"]);
     }
 
     const featured = c.plans.filter((p) => p.featured);
@@ -424,6 +449,21 @@ export type Trial = z.infer<typeof trialSchema>;
 export type Autopay = z.infer<typeof autopaySchema>;
 export type FreeStyles = z.infer<typeof freeStylesSchema>;
 
+/**
+ * A catalogue's currency and tax mode. Tolerates a snapshot or draft read
+ * without the schema, or one from before stage 9: rupees and GST.
+ */
+export function catalogMoney(
+    catalog: { currency?: string; tax?: string } | null | undefined,
+): { currency: CatalogCurrency; tax: CatalogTax } {
+    const currency = (CATALOG_CURRENCIES as readonly string[]).includes(
+        catalog?.currency ?? "",
+    )
+        ? (catalog?.currency as CatalogCurrency)
+        : "INR";
+    return { currency, tax: catalog?.tax === "none" ? "none" : "gst" };
+}
+
 /** A cell the snapshot leaves out reads as excluded and locked. */
 export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
 
@@ -513,4 +553,36 @@ export function validateCatalog(
             i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message,
         ),
     };
+}
+
+/**
+ * A catalogue with only its free plans, in another currency and tax mode
+ * (stage 9, KTD3b): the Global edition's first version, made from India's
+ * live one so Free's rows and limits match without a number in the repo.
+ * Paid plans, their cells, first-month offers, add-ons, yearly and message
+ * prices go; nothing in it has a price to set.
+ */
+export function freeOnlyCatalog(
+    catalog: Catalog,
+    money: { currency: CatalogCurrency; tax: CatalogTax },
+): Catalog {
+    const plans = catalog.plans
+        .filter((p) => p.pricePaise === 0 && !p.retired)
+        .map(({ trial: _trial, ...p }) => p);
+    const ids = new Set(plans.map((p) => p.id));
+    return parseCatalog({
+        ...catalog,
+        ...money,
+        plans,
+        modules: catalog.modules.map((m) => ({
+            ...m,
+            cells: Object.fromEntries(
+                Object.entries(m.cells).filter(([id]) => ids.has(id)),
+            ),
+        })),
+        yearly: { ...catalog.yearly, on: false },
+        addons: [],
+        messagePrices: undefined,
+        messagePacks: undefined,
+    });
 }

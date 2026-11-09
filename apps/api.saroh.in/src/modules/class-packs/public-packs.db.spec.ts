@@ -13,6 +13,14 @@ import { prisma } from "@saroh/database";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { PublicPacksService } from "./public-packs.service";
 
+// Class packs are hidden for now (DEC-099); this tests the sale kept for
+// when they return, so the module is rolled out by its flag alone.
+jest.mock("../capabilities/module-registry", () =>
+    jest
+        .requireActual("../../../test/fixtures/class-packs-shown")
+        .registryShowingClassPacks(),
+);
+
 const tag = `${process.pid}-${Date.now()}`;
 let seq = 0;
 const uniq = (label: string) => `${label}-${tag}-${++seq}`;

@@ -106,7 +106,8 @@ export async function listOrderRows(
     const zone =
         query.from || query.to || query.date
             ? await businessTimezone(prisma, organizationId)
-            : "Asia/Kolkata";
+            : // No day asked for, so no zone is read.
+              "UTC";
     const range = query.date
         ? presetRange(query.date, zone, now)
         : dayRange(query.from, query.to, zone);

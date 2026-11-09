@@ -262,7 +262,7 @@ async function seedOne(
             id: sid("subscription"),
             organizationId: orgId,
             // The wall clock: `now` is rounded down, to before a catalogue just imported.
-            planId: await seedPlanId(prisma, new Date(), "free"),
+            planId: await seedPlanId(prisma, new Date(), "free", "GLOBAL"),
             status: "ACTIVE",
             currentPeriodEnd: at(30, 540),
         },

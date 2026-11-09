@@ -22,6 +22,7 @@ import { PROFILE } from "@/lib/edition";
 import { rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";
+import { inIndia } from "@/lib/organizations/business-details";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 
 import { GlobalTaxFields } from "./global-tax-fields";
@@ -110,8 +111,9 @@ export function BusinessTaxFields({
             registered={registered}
             gstinState={(v.taxId ?? "").trim().slice(0, 2).toUpperCase()}
             // States are India's (GST's list); another country's address
-            // has none.
-            inIndia={registered || ["", "IN"].includes(v.country ?? "")}
+            // has none, and a blank one is the edition's.
+            inIndia={registered || inIndia(v.country)}
+            country={v.country}
             withCountry
             at={at}
         />
@@ -139,7 +141,13 @@ export function BusinessTaxFields({
     switch (sheet) {
         case "gst":
             if (PROFILE.taxSystem === "named-line") {
-                return <GlobalTaxFields control={control} taxId={taxId} />;
+                return (
+                    <GlobalTaxFields
+                        control={control}
+                        taxId={taxId}
+                        country={v.country}
+                    />
+                );
             }
             return (
                 <>

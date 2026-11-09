@@ -573,6 +573,11 @@ model BusinessProfile {
   addressLine2        String?
   city                String?
   postalCode          String?
+  // Global's only (DEC-204, `address: "country-and-region"`): the address's
+  // state, province or region, by its country's rules
+  // (@saroh/edition/address-rules). A listed one is stored as its code
+  // ("TX", "ON", "NSW"). India's state is `gstState`, so this stays null.
+  region              String?
   // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
   // RC-0001 when not). Null: the legacy INV series.
   invoicePrefix       String?
@@ -4781,6 +4786,11 @@ model Contact {
 
   // Explicit links to commerce Customer records (#120).
   identityLinks CustomerIdentityLink[]
+  // This person as a Customer (`cus_…`) in the business's own Stripe account,
+  // refreshed on each Stripe payment. A record for the merchant, never
+  // searched by.
+  stripeCustomerId String?
+
 
   // What this person holds (ADR-007). Holdings go with the person; invoices
   // keep a bill-to snapshot and only lose the link.
@@ -5784,11 +5794,18 @@ model MerchantPaymentProvider {
 
   // Needs attention (UX-012): the provider refused these keys on a live
   // call. Null while it works; cleared when the keys are entered again.
-  attentionReason String? // "KEYS_REFUSED"
+  attentionReason String? // "KEYS_REFUSED" | "PERMISSION_MISSING" (Stripe, KTD-14)
   attentionAt     DateTime?
 
   // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
   publicKey String?
+  // The account's country (ISO 3166-1 alpha-2) as the provider reports it;
+  // null until read (Stripe: read at connect, else lazily on a checkout).
+  accountCountry String?
+  // Where a Stripe customer pays (owner, 8 Nov 2026, DEC-208): "WINDOW" is
+  // Saroh's own card window on the business's page; null or "HOSTED" is
+  // Stripe's hosted Checkout, the default. Other providers leave it null.
+  checkoutStyle String?
 
   // AES-256-GCM encrypted secret credentials (JSON blob). Plaintext NEVER
   // stored; the key lives in app env. iv + authTag are needed to decrypt.
@@ -5820,8 +5837,15 @@ model PaymentIntent {
   invoiceId String?
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  provider         String // which MerchantPaymentProvider
-  providerIntentId String? // the provider's order/intent id, set after create
+  provider           String // which MerchantPaymentProvider
+  // The provider's order/intent id, set after create. For Stripe it is the
+  // Checkout Session (`cs_…`) until the customer pays, then the PaymentIntent
+  // (`pi_…`) refunds and webhooks name.
+  providerIntentId   String?
+  // The provider's hosted-checkout session (Stripe `cs_…`), kept after the
+  // PaymentIntent is known, so the return page and `checkout.session.*`
+  // events still find the row. Null for every other provider.
+  providerCheckoutId String? @unique
 
   amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
@@ -8373,7 +8397,12 @@ model ClassWaitlistEntry {
 // `diff()` against the version before it (the change log).
 model PricingCatalogVersion {
   id      String @id @default(cuid())
+  // One number sequence across editions, so a version, its Plan rows and
+  // their provider plans stay keyed by the number alone (stage 9).
   version Int    @unique
+  // Whose catalogue this is (stage 9, KTD1): each edition has its own
+  // draft, versions and go-live. Every version before it is India's.
+  edition Edition @default(INDIA)
 
   catalog  Json
   goLiveAt DateTime
@@ -8389,9 +8418,11 @@ model PricingCatalogVersion {
   createdAt DateTime @default(now())
 
   @@index([goLiveAt])
+  @@index([edition, goLiveAt])
 }
 
-// PricingCatalogDraft — the one shared draft (KTD-3), a row keyed "shared".
+// PricingCatalogDraft — one shared draft per edition (KTD-3, stage 9): India's
+// is the row keyed "shared", Global's "global" (`draftIdOf`).
 // `revision` goes up on every save; a save naming an older revision is
 // refused (409) with who saved since. Deleted on publish or discard.
 model PricingCatalogDraft {
@@ -8416,6 +8447,10 @@ model PricingCatalogDraft {
 model PricingCoupon {
   id   String @id @default(cuid())
   code String @unique
+  // The catalogue it belongs to (stage 9): redeemed only by a business of
+  // this edition, in that catalogue's currency. Codes stay unique across
+  // editions.
+  edition Edition @default(INDIA)
 
   // Taken off each month for `months` months (monthly), or off the first
   // yearly charge as `months` months' worth, capped at that charge (U16).
@@ -8610,6 +8645,13 @@ model BillingProfile {
   // a second customer with the same email and phone.
   billingEmail String
   phone        String?
+  // The payer's country, ISO 3166-1 alpha-2 (stage 9, KTD7): India's rules
+  // (GSTIN, GST state, six-digit PIN) apply only to "IN". Every profile
+  // before it is Indian.
+  country      String  @default("IN")
+  // A payer's own tax number outside India (VAT, EIN, ABN), as typed;
+  // printed on Saroh's export invoice. India's is the GSTIN.
+  taxId        String?
 
   provider           String
   // Razorpay's `cust_…`; null until the provider has made it.
@@ -8828,6 +8870,15 @@ model SarohInvoice {
 
   issuedAt DateTime
   currency String   @default("INR")
+  // An export invoice (stage 9, KTD6): the payment's value in rupees as the
+  // provider settles it (Razorpay's base_amount and base_currency), for
+  // Saroh's books, FIRC and export reporting. Stored, not printed, until
+  // the CA names the rate. Null on India's invoices.
+  providerBaseAmount   Int?
+  providerBaseCurrency String?
+  // The LUT note an export invoice carries, frozen as issued (from the
+  // API's SAROH_EXPORT_LUT). Null on India's invoices.
+  exportNote           String?
 
   sellerName      String
   sellerLegalName String?
@@ -8843,6 +8894,10 @@ model SarohInvoice {
   billToAddress String?
   billToState   String?
   billToGstin   String?
+  // A buyer abroad (stage 9): its country (ISO 3166-1 alpha-2) and own tax
+  // number, as on its billing profile at issue.
+  billToCountry String?
+  billToTaxId   String?
 
   // GST state code; INTRA (CGST + SGST) or INTER (IGST).
   placeOfSupply String?

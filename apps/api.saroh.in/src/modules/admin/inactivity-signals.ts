@@ -168,7 +168,12 @@ async function readFacts(ids: string[]): Promise<Map<string, BusinessFacts>> {
         }),
         prisma.merchantPaymentProvider.findMany({
             where: { organizationId: { in: ids } },
-            select: { organizationId: true, status: true, attentionAt: true },
+            select: {
+                organizationId: true,
+                status: true,
+                attentionAt: true,
+                attentionReason: true,
+            },
         }),
     ]);
 

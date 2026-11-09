@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import {
     CATALOG_PLAN_KEY_PREFIX,
     MOVE_NOTICE_DAYS,
@@ -111,7 +112,7 @@ async function dropNotices(
  */
 export async function scheduleMoves(
     tx: Tx,
-    input: { version: number; goLiveAt: Date },
+    input: { version: number; goLiveAt: Date; edition: Edition },
 ): Promise<ScheduledMoves> {
     const targets = await tx.plan.findMany({
         where: {
@@ -132,6 +133,8 @@ export async function scheduleMoves(
     const subs = await tx.subscription.findMany({
         where: {
             status: { in: MOVABLE_STATUSES },
+            // A version moves only its own edition's businesses (stage 9).
+            organization: { edition: input.edition },
             plan: {
                 key: { startsWith: CATALOG_PLAN_KEY_PREFIX },
                 version: { lt: input.version },

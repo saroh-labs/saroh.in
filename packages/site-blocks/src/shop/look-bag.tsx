@@ -8,6 +8,7 @@ import { destructiveAlertClasses } from "../alert";
 import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { taxWordOf, useSiteBusiness } from "../site-business";
 import type { CheckoutQuote, QuoteLine, ShopCheckoutApi } from "./api";
 import { SHOP_OFFLINE } from "./api";
 import type { RemovedLine } from "./bag-lines";
@@ -117,6 +118,7 @@ export function LookBagSheet({
     checkoutHref: string;
     onClose: () => void;
 }) {
+    const seller = useSiteBusiness();
     const [load, setLoad] = useState<Load>({ kind: "loading" });
     const [round, setRound] = useState(0);
     const [caps, setCaps] = useState<Readonly<Record<string, number>>>({});
@@ -252,7 +254,7 @@ export function LookBagSheet({
                     </div>
                     <p className="text-site-body mt-1 text-[13.5px] leading-normal">
                         {quote.gst
-                            ? `Includes ${formatAmount(quote.gst, quote.currency)} GST. `
+                            ? `Includes ${formatAmount(quote.gst, quote.currency)} ${taxWordOf(seller)}. `
                             : null}
                         {waysLine(quote) ?? null}
                     </p>

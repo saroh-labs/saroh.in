@@ -1,3 +1,4 @@
+import { zonesOfCountry } from "@saroh/edition";
 import {
     SETUP_PLAN,
     SETUP_PLAN_ACCOUNT_STEPS,
@@ -12,6 +13,7 @@ import { managerCodeProblem } from "./referral-carry";
 
 import type { SetupBilling } from "./setup-billing";
 import { BILLING_FIELDS, billingProblems } from "./setup-billing";
+import { zoneAsked } from "./time-zones";
 
 /**
  * Setup as a stepper (DEC-130, amended 11 Oct 2026): one question to a
@@ -73,6 +75,9 @@ export function setupSchema(
                 ),
             // Global's one currency for the business. India's isn't asked.
             currency: z.string().optional(),
+            // Asked only for a Global country that keeps several zones
+            // (KTD-C); any other country's zone comes from the country.
+            timezone: z.string().optional(),
             // A goal's key, or "LATER".
             goal: z.string().min(1),
             // Bookings' trade (DEC-189): asked only when the goal is
@@ -85,6 +90,9 @@ export function setupSchema(
             billEmail: z.string().optional(),
             billGstin: z.string().optional(),
             billState: z.string().optional(),
+            billCountry: z.string().optional(),
+            billTaxId: z.string().optional(),
+            billPhone: z.string().optional(),
             billAddress: z.string().optional(),
             billCity: z.string().optional(),
             billPin: z.string().optional(),
@@ -93,6 +101,16 @@ export function setupSchema(
             managerCode: z.string().optional(),
         })
         .superRefine((values, ctx) => {
+            if (
+                zoneAsked(values.country) &&
+                !zonesOfCountry(values.country).includes(values.timezone ?? "")
+            ) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["timezone"],
+                    message: "Choose your business's time zone",
+                });
+            }
             const codeProblem = managerCodeProblem(values.managerCode);
             if (codeProblem) {
                 ctx.addIssue({
@@ -170,7 +188,15 @@ export interface SetupStep {
 
 const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
     kind: ["kind"],
-    name: ["yourName", "name", "address", "country", "currency", "managerCode"],
+    name: [
+        "yourName",
+        "name",
+        "address",
+        "country",
+        "currency",
+        "timezone",
+        "managerCode",
+    ],
     billing: BILLING_FIELDS,
     first: ["goal", "trade"],
 };
@@ -434,6 +460,7 @@ const draftSchema = z.object({
         // India's reads as IN, whatever a draft from before #1214 said.
         country: z.string().max(2),
         currency: z.string().max(3).optional(),
+        timezone: z.string().max(64).optional(),
         goal: z.string().min(1).max(40),
         trade: z.enum(SETUP_TRADES).optional(),
         managerCode: z.string().max(20).optional(),

@@ -12,6 +12,7 @@ import {
     ListPaging,
     ListToolbar,
 } from "@/components/shared/lists/list-toolbar";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 
 import { productHref } from "@/lib/products/links";
 import type { StockHref, StockListPage } from "@/lib/stock/list-query";
@@ -145,7 +146,7 @@ export function LevelsPanel({
             <LevelsTable
                 storefronts={levels.storefronts}
                 rows={levels.rows}
-                timezone={levels.timezone ?? "Asia/Kolkata"}
+                timezone={levels.timezone ?? DEFAULT_BUSINESS_ZONE}
                 counting={counting}
                 values={values}
                 onValue={onValue}

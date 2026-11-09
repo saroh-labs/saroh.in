@@ -50,3 +50,33 @@ describe("inviteIntentFrom", () => {
         expect(inviteToTake({ kind: "none" })).toBeNull();
     });
 });
+
+describe("a Global invite: Free only (DEC-211, owner 9 Nov 2026)", () => {
+    it("reads the API's Free answer as a valid invite with no offer, taken only to mark it joined", () => {
+        const intent = inviteIntentFrom(TOKEN, {
+            status: "free",
+            businessName: "Asha Salon",
+        });
+        expect(intent).toEqual({
+            kind: "free",
+            token: TOKEN,
+            businessName: "Asha Salon",
+        });
+        expect(inviteNote(intent)).toBeNull();
+        expect(inviteToTake(intent)).toBe(TOKEN);
+    });
+
+    it("reads a ready answer as Free where the edition gives no offer", () => {
+        const intent = inviteIntentFrom(
+            TOKEN,
+            { status: "ready", businessName: null, planKey: "grow", days: 37 },
+            false,
+        );
+        expect(intent).toEqual({
+            kind: "free",
+            token: TOKEN,
+            businessName: null,
+        });
+        expect(inviteNote(intent)).toBeNull();
+    });
+});

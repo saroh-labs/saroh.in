@@ -15,13 +15,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseJsonc } from "./cf-env.mjs";
 
-const SUBDOMAIN = {
+export const SUBDOMAIN = {
     "apps/app.saroh.in": "app",
     "apps/accounts.saroh.in": "accounts",
     "apps/admin.saroh.in": "admin",
 };
 
-const SITE = "apps/saroh.tech";
+export const SITE = "apps/saroh.tech";
 
 export function globalDevConfig(config, dir, domain) {
     if (dir === SITE) {

@@ -54,6 +54,10 @@ const envSchema = z.object({
     // OAuth providers (optional — email/password works without them).
     AUTH_GITHUB_ID: z.string().optional(),
     AUTH_GITHUB_SECRET: z.string().optional(),
+    // The Global instance's own GitHub app (one callback per app, KTD5).
+    // Without both, GitHub is off on Global.
+    AUTH_GITHUB_GLOBAL_ID: z.string().optional(),
+    AUTH_GITHUB_GLOBAL_SECRET: z.string().optional(),
     AUTH_GOOGLE_ID: z.string().optional(),
     AUTH_GOOGLE_SECRET: z.string().optional(),
 
@@ -90,6 +94,8 @@ const envSchema = z.object({
     // Email (Nodemailer). Legacy aliases kept until callers converge.
     EMAIL_FROM: z.string().optional(),
     SENDER_EMAIL_ID: z.string().optional(),
+    // Global mail's sender (KTD6). Unset: "Saroh <noreply@saroh.tech>".
+    EMAIL_FROM_GLOBAL: z.string().optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_HOSTNAME: z.string().optional(),
     SMTP_PORT: z.string().optional(),
@@ -187,6 +193,8 @@ const envSchema = z.object({
     // The code email's own sending address and stream, apart from workspace
     // sign-in mail. The SMTP_* set below is the fallback transport.
     SITE_CODES_EMAIL_FROM: z.email().optional(),
+    // Global sites' code sender (KTD6). Unset: codes@saroh.tech.
+    SITE_CODES_EMAIL_FROM_GLOBAL: z.email().optional(),
     SITE_CODES_SMTP_HOST: z.string().optional(),
     SITE_CODES_SMTP_PORT: z.string().optional(),
     SITE_CODES_SMTP_USER: z.string().optional(),
@@ -322,6 +330,16 @@ const envSchema = z.object({
         .string()
         .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
         .optional(),
+    // Saroh's export invoices to Global businesses (stage 9, KTD6): their own
+    // series' prefix (1–3 capitals or digits, never India's), and the LUT
+    // reference and wording the CA confirms, printed as one note. No
+    // default: an export invoice without them is not issued (a Needs-action
+    // row says so).
+    SAROH_INVOICE_PREFIX_GLOBAL: z
+        .string()
+        .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
+        .optional(),
+    SAROH_EXPORT_LUT: z.string().max(400).optional(),
 
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This
@@ -397,6 +415,19 @@ const TEST_ONLY = [
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
+    // Two editions never share a series (stage 9, KTD6).
+    if (
+        value.SAROH_INVOICE_PREFIX_GLOBAL &&
+        value.SAROH_INVOICE_PREFIX_GLOBAL ===
+            // India's default is DEFAULT_SAROH_INVOICE_PREFIX (saroh-seller.ts).
+            (value.SAROH_INVOICE_PREFIX ?? "SA")
+    ) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["SAROH_INVOICE_PREFIX_GLOBAL"],
+            message: "must differ from SAROH_INVOICE_PREFIX",
+        });
+    }
     if (value.NODE_ENV !== "production") return;
     for (const key of TEST_ONLY) {
         if (value[key]) {

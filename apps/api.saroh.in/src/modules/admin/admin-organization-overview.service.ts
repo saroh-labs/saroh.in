@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { liveCatalogueVersion, prisma } from "@saroh/database";
 import type { LimitPeriod } from "@saroh/pricing-catalog";
 import { MODULE_MAP, validateCatalog } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import type { Term } from "../billing/billing-term";
 import { mapEntry } from "../billing/catalogue-access";
@@ -320,7 +321,9 @@ export class AdminOrganizationOverviewService {
                 },
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             }),
-            liveCatalogueVersion(prisma, now),
+            editionOf(organizationId).then((edition) =>
+                liveCatalogueVersion(prisma, edition, now),
+            ),
         ]);
 
         const terms = subscription

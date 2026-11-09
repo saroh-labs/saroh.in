@@ -1,0 +1,110 @@
+{
+    "id": "evt_1SarohFixtureAsyncFailed",
+    "object": "event",
+    "api_version": "2026-10-28.endive",
+    "created": 1762400600,
+    "data": {
+        "object": {
+            "id": "cs_test_a1SarohFixtureMadeUp0000000000000000000000000000000001",
+            "object": "checkout.session",
+            "after_expiration": null,
+            "allow_promotion_codes": null,
+            "allowed_payment_method_types": null,
+            "amount_subtotal": 2000,
+            "amount_total": 2000,
+            "automatic_tax": {
+                "enabled": false,
+                "liability": null,
+                "status": null
+            },
+            "billing_address_collection": "required",
+            "cancel_url": "https://studio.example.com/paid?cancelled=1",
+            "client_reference_id": "cmintent000000000000000001",
+            "consent": null,
+            "consent_collection": null,
+            "created": 1762400000,
+            "currency": "usd",
+            "custom_fields": [],
+            "custom_text": {
+                "shipping_address": null,
+                "submit": null
+            },
+            "customer": "cus_SarohFixture0001",
+            "customer_creation": "if_required",
+            "customer_details": {
+                "address": {
+                    "city": "San Francisco",
+                    "country": "US",
+                    "line1": "510 Townsend St",
+                    "line2": null,
+                    "postal_code": "94103",
+                    "state": "CA"
+                },
+                "email": "asha@example.com",
+                "name": "Asha Rao",
+                "phone": null,
+                "tax_exempt": "none",
+                "tax_ids": []
+            },
+            "customer_email": null,
+            "excluded_payment_method_types": null,
+            "expires_at": 1762401860,
+            "invoice": null,
+            "invoice_creation": {
+                "enabled": false,
+                "invoice_data": {
+                    "account_tax_ids": null,
+                    "custom_fields": null,
+                    "description": null,
+                    "footer": null,
+                    "issuer": null,
+                    "metadata": {},
+                    "rendering_options": null
+                }
+            },
+            "livemode": false,
+            "locale": null,
+            "metadata": {
+                "saroh_ref": "cminvoice00000000000000001",
+                "saroh_intent": "cmintent000000000000000001"
+            },
+            "mode": "payment",
+            "payment_intent": "pi_3SarohFixtureMadeUp0001",
+            "payment_link": null,
+            "payment_method_collection": "always",
+            "payment_method_options": {},
+            "payment_method_types": [
+                "card",
+                "us_bank_account"
+            ],
+            "payment_status": "unpaid",
+            "phone_number_collection": {
+                "enabled": false
+            },
+            "recovered_from": null,
+            "setup_intent": null,
+            "shipping_address_collection": null,
+            "shipping_cost": null,
+            "shipping_options": [],
+            "status": "complete",
+            "submit_type": "pay",
+            "subscription": null,
+            "success_url": "https://studio.example.com/paid?session_id={CHECKOUT_SESSION_ID}",
+            "total_details": {
+                "amount_discount": 0,
+                "amount_shipping": 0,
+                "amount_tax": 0
+            },
+            "return_url": null,
+            "ui_mode": "hosted_page",
+            "url": null
+        }
+    },
+    "livemode": false,
+    "pending_webhooks": 1,
+    "request": {
+        "id": null,
+        "idempotency_key": null
+    },
+    "type": "checkout.session.async_payment_failed"
+}

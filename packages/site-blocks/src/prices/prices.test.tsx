@@ -253,6 +253,8 @@ describe("Join on the Plans block", () => {
         expect(join).toHaveBeenCalledWith(
             "plan_monthly",
             expect.stringMatching(/^join-[A-Za-z0-9_-]+$/),
+            undefined,
+            "/",
         );
         expect(pageWindow.open).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -436,7 +438,11 @@ describe("the Class packs block", () => {
         await press(
             within(sheet).getByRole("button", { name: "Buy · ₹4,500" }),
         );
-        expect(packs.buy).toHaveBeenCalledWith("pack_10", expect.any(String));
+        expect(packs.buy).toHaveBeenCalledWith(
+            "pack_10",
+            expect.any(String),
+            "/",
+        );
         // The window's return goes to the API (P1).
         expect(pageWindow.open).toHaveBeenCalledWith(
             expect.objectContaining({ apiUrl: "https://api.test" }),

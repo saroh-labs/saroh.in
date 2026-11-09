@@ -18,6 +18,13 @@ jest.mock("@saroh/database", () => {
     const billingCheckout = { findUnique: jest.fn(() => null) };
     // Nor a messaging top-up (#1241).
     const messagingTopup = { findFirst: jest.fn(() => null) };
+    // Nor a month's add-on bought on its own order (stage 9).
+    const subscriptionAddonCharge = {
+        findFirst: jest.fn(() => null),
+        findMany: jest.fn(() => []),
+        updateMany: jest.fn(() => ({ count: 0 })),
+    };
+    const subscriptionAddon = { upsert: jest.fn() };
     // Merchant delegates — present ONLY so we can assert billing never uses them.
     const merchantPaymentProvider = { findUnique: jest.fn() };
     const paymentIntent = { findFirst: jest.fn(), update: jest.fn() };
@@ -31,6 +38,8 @@ jest.mock("@saroh/database", () => {
         billingAction,
         billingCheckout,
         messagingTopup,
+        subscriptionAddonCharge,
+        subscriptionAddon,
         // The row lock the reconcile takes.
         $queryRaw: jest.fn(() => []),
         merchantPaymentProvider,
@@ -285,5 +294,46 @@ describe("BillingWebhookService state machine", () => {
                 data: [expect.objectContaining({ organizationId: null })],
             }),
         );
+    });
+});
+
+describe("a month's add-on bought on its own order (stage 9)", () => {
+    const charges = () =>
+        prisma.subscriptionAddonCharge as unknown as Record<string, jest.Mock>;
+
+    it("holds what the paid order added, once, and never touches merchant payments", async () => {
+        const { service } = makeService();
+        onSubscription(null);
+        bweCreate.mockResolvedValue({ count: 1 });
+        charges().findFirst.mockResolvedValueOnce({
+            subscriptionId: "sub_1",
+            organizationId: "org_1",
+        });
+        charges().findMany.mockResolvedValueOnce([
+            { id: "row_1", addonId: "pack", quantity: 2, status: "SENT" },
+        ]);
+
+        const raw = bodyOf({
+            type: "order.paid",
+            providerSubscriptionId: "order_1",
+            status: "ACTIVE",
+            phase: "charged",
+        });
+        const result = await service.handle("razorpay", raw, {
+            "x-fake-signature": sign(raw),
+        });
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(prisma.subscriptionAddon.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                update: { quantity: { increment: 2 } },
+            }),
+        );
+        expect(charges().updateMany).toHaveBeenCalledWith({
+            where: { id: { in: ["row_1"] }, status: "SENT" },
+            data: { status: "INVOICED", invoiceId: null },
+        });
+        expect(prisma.billingAction.createMany).not.toHaveBeenCalled();
+        expectNoMerchantAccess();
     });
 });

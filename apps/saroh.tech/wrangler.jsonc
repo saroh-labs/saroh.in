@@ -1,6 +1,8 @@
 // saroh.tech: static files from `next build` (out/), behind worker/index.ts.
-// No production routes until the owner says so. A Global development deploy
-// adds its routes and settings in its own checkout (scripts/cf-global-dev.mjs).
+// No production routes until the owner says so: a production deploy adds them
+// in its own checkout when GLOBAL_ROUTES is on (scripts/cf-global-prod.mjs).
+// A Global development deploy adds its settings the same way
+// (scripts/cf-global-dev.mjs).
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-tech-dev",
@@ -11,12 +13,16 @@
         "binding": "ASSETS",
         "run_worker_first": true,
         "html_handling": "auto-trailing-slash",
-        "not_found_handling": "404-page"
+        "not_found_handling": "404-page",
     },
     "observability": { "enabled": true },
     "env": {
         "production": {
             "name": "saroh-tech",
+            // Never a public workers.dev or preview address: Global answers
+            // only on its own hosts, and only once the launch adds the routes.
+            "workers_dev": false,
+            "preview_urls": false,
             // Without it a build uses the local API (site.config.ts). Give it to
             // the build with scripts/cf-env.mjs, as deploy-frontends.yml does.
             "vars": { "GLOBAL_PRODUCTION_HOSTS": "on" },
@@ -25,8 +31,8 @@
                 "binding": "ASSETS",
                 "run_worker_first": true,
                 "html_handling": "auto-trailing-slash",
-                "not_found_handling": "404-page"
-            }
-        }
-    }
+                "not_found_handling": "404-page",
+            },
+        },
+    },
 }

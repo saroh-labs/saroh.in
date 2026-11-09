@@ -40,7 +40,7 @@ export function ExpiredCard({
             <p className="text-site-body mt-2 text-[15px] leading-relaxed">
                 {checkoutPaid
                     ? `${when} went back on the calendar before your payment was confirmed. If money left your account, get in touch with ${business} and they can refund it.`
-                    : `${when} wasn't paid for within 15 minutes, so it went back on the calendar. Nothing was charged.`}
+                    : `${when} wasn't paid for in time, so it went back on the calendar. Nothing was charged.`}
             </p>
             {checkoutPaid ? (
                 <ReachLinks reach={reach} className="mt-1" />

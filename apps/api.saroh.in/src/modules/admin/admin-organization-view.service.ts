@@ -6,6 +6,7 @@ import {
     resolveAllAccess,
     validateCatalog,
 } from "@saroh/pricing-catalog";
+import { editionOf } from "../../common/app-url";
 
 import { mapEntry } from "../billing/catalogue-access";
 import type { BusinessAccess } from "../billing/catalogue-access.service";
@@ -652,7 +653,9 @@ export class AdminOrganizationViewService {
                 // enforcement uses; a row it doesn't count reads as not
                 // measured.
                 catalogueUsage(organizationId, Object.keys(MODULE_MAP), now),
-                liveCatalogueVersion(prisma, now),
+                editionOf(organizationId).then((edition) =>
+                    liveCatalogueVersion(prisma, edition, now),
+                ),
             ]);
         const { usage, storefronts } = metered;
         const planValues = access.planEntitlements;

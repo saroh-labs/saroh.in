@@ -10,7 +10,6 @@ import {
     addonOfferedOn,
     addonPlanNames,
     cellOf,
-    formatInr,
     GST_PERCENT,
     monthlyEquivalentPaise,
     TRIAL_DAYS_MAX,
@@ -19,6 +18,7 @@ import {
     yearlyPaise,
 } from "@saroh/pricing-catalog";
 
+import { planMoney } from "@/lib/plan-money";
 import type { AdminPricing, ModuleUsage } from "@/lib/pricing-types";
 
 /**
@@ -42,7 +42,7 @@ export function paidPlans(catalog: Catalog): Plan[] {
 export function yearlyLines(catalog: Catalog): string[] {
     return paidPlans(catalog).map((p) => {
         const year = yearlyPaise(p.pricePaise, catalog.yearly.paid);
-        return `${p.name}: ${formatInr(year)} a year, about ${formatInr(monthlyEquivalentPaise(year))} a month`;
+        return `${p.name}: ${planMoney(year)} a year, about ${planMoney(monthlyEquivalentPaise(year))} a month`;
     });
 }
 
@@ -52,8 +52,8 @@ export function yearlyLines(catalog: Catalog): string[] {
 export function gstExample(catalog: Catalog): string {
     const eg = paidPlans(catalog).at(0);
     if (!eg) return "";
-    const ex = formatInr(eg.pricePaise);
-    const inc = formatInr(withGstPaise(eg.pricePaise));
+    const ex = planMoney(eg.pricePaise);
+    const inc = planMoney(withGstPaise(eg.pricePaise));
     return catalog.gst.show === "incl"
         ? `${eg.name} shows ${inc} incl. GST, or ${ex} + GST (${GST_PERCENT}%)`
         : `${eg.name} shows ${ex} + GST, or ${inc} incl. GST (${GST_PERCENT}%)`;
@@ -241,7 +241,7 @@ export function newAddonId(catalog: Catalog, now: number = Date.now()): string {
 
 /** The add-on's line, as the design words it. */
 export function addonSummary(addon: Addon, catalog: Catalog): string {
-    const price = formatInr(addon.pricePaise);
+    const price = planMoney(addon.pricePaise);
     if (addon.kind === "module") {
         const m = catalog.modules.find((x) => x.id === addon.module);
         return `${m ? m.name : "Pick a module"} for ${price} a month, on plans that don't include it`;

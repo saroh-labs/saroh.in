@@ -449,9 +449,10 @@ describe("today, in the footer's week", () => {
         };
         expect(marked("Asia/Kolkata")).toBe("Thursday");
         expect(marked("America/New_York")).toBe("Monday to Wednesday");
-        // No zone known, or one that isn't a zone: India (DEC-033).
-        expect(marked(null)).toBe("Thursday");
-        expect(marked("Not/AZone")).toBe("Thursday");
+        // No zone sent, or one that isn't a zone: UTC, never another
+        // country's (KTD-C); every site sends its business's.
+        expect(marked(null)).toBe(marked("UTC"));
+        expect(marked("Not/AZone")).toBe(marked("UTC"));
     });
 
     it("marks no day on the server, where a kept page would be wrong tomorrow", () => {

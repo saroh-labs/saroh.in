@@ -733,7 +733,8 @@ describe("the place button follows the choice", () => {
 });
 
 describe("a look's checkout for a Global business", () => {
-    it("takes a delivery with no region or postcode", async () => {
+    // Owner, 8 Nov: a US delivery needs its state from the list and its ZIP.
+    it("asks a US delivery for its state and ZIP code", async () => {
         stubVisit();
         fillBag();
         const { api, start } = makeApi();
@@ -779,6 +780,13 @@ describe("a look's checkout for a Global business", () => {
                 target: { value },
             });
         }
+        expect(placeButton()).toBeDisabled();
+        fireEvent.change(screen.getByLabelText(/^State \*/), {
+            target: { value: "TX" },
+        });
+        fireEvent.change(screen.getByLabelText(/^ZIP code \*/), {
+            target: { value: "78701" },
+        });
         await waitFor(() => expect(placeButton()).toBeEnabled());
         await act(async () => {
             fireEvent.click(placeButton());
@@ -789,8 +797,8 @@ describe("a look's checkout for a Global business", () => {
                 address: {
                     line1: "1 Main St",
                     city: "Austin",
-                    state: "",
-                    postalCode: "",
+                    state: "TX",
+                    postalCode: "78701",
                     phone: "+14155550100",
                 },
             }),

@@ -42,8 +42,8 @@ export type { BookingAccount, BookingFlowProps } from "./booking-account";
  * reached is drawn one under the other, as before.
  *
  * Sign-in is always on (A9, ADR-011): the last step signs in with a code,
- * and the booking is made the moment it checks. Pay now holds the place for
- * 15 minutes while the booker pays through the business's own provider;
+ * and the booking is made the moment it checks. Pay now holds the place
+ * (15 minutes, 30 at Stripe) while the booker pays through the business's own provider;
  * Back from paying keeps the hold (U9). A class credit is offered first
  * (A10); a full class offers its waitlist (A12).
  *

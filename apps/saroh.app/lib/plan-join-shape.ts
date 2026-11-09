@@ -3,11 +3,13 @@ import type {
     PlanJoinAttempt,
     PlanJoinStarted,
 } from "@saroh/site-blocks";
+
 import {
     autopayStartOf,
     gstOnPriceOf,
     isTestReleaseRefusal,
 } from "@saroh/site-blocks";
+import { checkoutClosed } from "./checkout-closed";
 
 /**
  * Joining a plan from the site (round-2 G20): the API's answers narrowed,
@@ -106,6 +108,14 @@ export function joinStartAnswer(
     const message =
         isString(error?.message) && error.message.trim() ? error.message : null;
     const details = isRecord(error?.details) ? error.details : null;
+    if (checkoutClosed(status, body)) {
+        // The key's Stripe checkout closed (KTD-13): the sheet starts again.
+        return {
+            ok: false,
+            reason: "checkout-closed",
+            message: "That payment closed before it was paid. Try again.",
+        };
+    }
     if (status === 409 && message) {
         return {
             ok: false,

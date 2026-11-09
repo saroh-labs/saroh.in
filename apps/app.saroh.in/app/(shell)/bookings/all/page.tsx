@@ -22,6 +22,7 @@ import { readOnlyLine } from "@/lib/access/who-can-change";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { bookingsListMoment } from "@/lib/moments/read";
@@ -130,7 +131,7 @@ export default async function BookingsPage({
             : null;
 
     const canBook = may("booking:write");
-    const timezone = calendar.timezone || "Asia/Kolkata";
+    const timezone = calendar.timezone || DEFAULT_BUSINESS_ZONE;
 
     const page = (
         <PageContainer width="full">

@@ -52,7 +52,13 @@ export interface PlanJoinAttempt {
  * - test-release: the page is a test release (DEC-071); nobody joins.
  * - error: anything else, said in words.
  */
-export type JoinProblem = "signed-out" | "ask" | "error" | "test-release";
+export type JoinProblem =
+    | "signed-out"
+    | "ask"
+    | "error"
+    | "test-release"
+    /** The key's Stripe checkout closed: start again with a new key. */
+    | "checkout-closed";
 
 export type JoinResult<T> =
     { ok: true; data: T } | { ok: false; reason: JoinProblem; message: string };
@@ -67,6 +73,8 @@ export interface JoinApi {
         ref: string,
         idempotencyKey: string,
         autopay?: AutopayMethod,
+        /** The page Stripe's hosted Checkout comes back to. */
+        returnPath?: string,
     ): Promise<JoinResult<PlanJoinStarted>>;
     /** How a started join stands. */
     standing(ref: string): Promise<JoinResult<PlanJoinAttempt>>;

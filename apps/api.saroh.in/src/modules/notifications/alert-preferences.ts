@@ -139,6 +139,8 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "refund.failed",
         "refund.failed.booking",
         "refund.failed.invoice",
+        // A late Stripe hold payment Saroh refunded (U5).
+        "refund.late-hold.booking",
         // A provider's event Saroh couldn't apply after its tries.
         "payment.event_unapplied",
     ],

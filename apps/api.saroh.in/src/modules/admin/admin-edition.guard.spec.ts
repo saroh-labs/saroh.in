@@ -62,6 +62,15 @@ describe("AdminEditionGuard", () => {
         );
     });
 
+    it("hides another edition's domain from a recheck", async () => {
+        const domain = prisma.domain.findUnique as jest.Mock;
+        domain.mockResolvedValue({ organization: { edition: "GLOBAL" } });
+        await expect(run("INDIA", { domainId: "d" })).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        await expect(run("GLOBAL", { domainId: "d" })).resolves.toBe(true);
+    });
+
     it("hides another edition's lead", async () => {
         const lead = prisma.sarohLead.findUnique as jest.Mock;
         lead.mockResolvedValue({ edition: "INDIA" });

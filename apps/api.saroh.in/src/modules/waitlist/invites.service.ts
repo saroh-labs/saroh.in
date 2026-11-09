@@ -1,9 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
-import { sendWaitlistLaunchInviteEmail } from "../../common/email";
+import {
+    accountsBaseFor,
+    sendWaitlistLaunchInviteEmail,
+} from "../../common/email";
 import { env } from "../../env";
-import type { LaunchOffer } from "./invite-token";
 import {
     hashInviteToken,
     INVITE_VALID_DAYS,
@@ -13,7 +17,11 @@ import {
     newInviteToken,
     STALE_CLAIM_MS,
 } from "./invite-token";
-import { isFreeToolSource, maskEmail } from "./waitlist-keys";
+import {
+    isFreeToolSource,
+    maskEmail,
+    PAID_PLANS_SOURCE,
+} from "./waitlist-keys";
 
 /** What a dry run says about one entry (the admin operations' shape). */
 export interface InvitePlanItem {
@@ -30,8 +38,7 @@ export interface InviteOutcome {
 
 /** Whether this instance can send invites, and why not. */
 export type InviteReadiness =
-    | { ready: true; signupBase: string; offer: LaunchOffer }
-    | { ready: false; reason: string };
+    { ready: true; signupBase: string } | { ready: false; reason: string };
 
 /**
  * Opening-day invites (marketing plan U31, KTD-17). Staff send them in
@@ -49,7 +56,12 @@ export type InviteReadiness =
 export class WaitlistInvitesService {
     private readonly logger = new Logger(WaitlistInvitesService.name);
 
-    readiness(): InviteReadiness {
+    /**
+     * Whether invites can go, for an edition's entries (none named: the
+     * instance as a whole). Only India's carry the launch offer, so only
+     * they wait for its length; Global's give Free (owner, 9 Nov 2026).
+     */
+    readiness(edition?: Edition): InviteReadiness {
         const signupBase = signupUrl();
         if (!signupBase) {
             return {
@@ -57,19 +69,21 @@ export class WaitlistInvitesService {
                 reason: "Invites are off until Saroh knows where people sign up. Whoever runs the API sets it (ACCOUNTS_URL).",
             };
         }
-        const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
-        if (!offer) {
+        if (
+            edition &&
+            editionProfile(edition).sarohBilling &&
+            !launchOffer(env.LAUNCH_OFFER_DAYS)
+        ) {
             return {
                 ready: false,
                 reason: "Invites are off until the launch offer has a length. Whoever runs the API sets it (LAUNCH_OFFER_DAYS).",
             };
         }
-        return { ready: true, signupBase, offer };
+        return { ready: true, signupBase };
     }
 
     /** What inviting each entry would do, changing nothing. */
     async classify(ids: string[], now = new Date()): Promise<InvitePlanItem[]> {
-        const readiness = this.readiness();
         const rows = await prisma.waitlistSignup.findMany({
             where: { id: { in: ids } },
             select: {
@@ -77,6 +91,7 @@ export class WaitlistInvitesService {
                 email: true,
                 businessName: true,
                 source: true,
+                edition: true,
                 invitedAt: true,
                 inviteSentAt: true,
                 joinedAt: true,
@@ -95,6 +110,7 @@ export class WaitlistInvitesService {
             const who = row.businessName
                 ? `${row.businessName} · ${row.email}`
                 : row.email;
+            const readiness = this.readiness(row.edition);
             if (!readiness.ready) {
                 return {
                     targetId: id,
@@ -114,6 +130,13 @@ export class WaitlistInvitesService {
                     targetId: id,
                     verdict: "skip",
                     detail: `${who}: came from a free tool, not waiting for Saroh`,
+                };
+            }
+            if (row.source === PAID_PLANS_SOURCE) {
+                return {
+                    targetId: id,
+                    verdict: "skip",
+                    detail: `${who}: asked to hear about paid plans, not waiting for Saroh`,
                 };
             }
             if (row.inviteSentAt) {
@@ -151,6 +174,9 @@ export class WaitlistInvitesService {
             return { status: "FAILED", detail: readiness.reason };
         const planned = (await this.classify([id], now))[0] as
             InvitePlanItem | undefined;
+        if (planned?.verdict === "unsafe") {
+            return { status: "FAILED", detail: planned.detail };
+        }
         if (planned?.verdict !== "act") {
             return {
                 status: "SKIPPED",
@@ -188,7 +214,7 @@ export class WaitlistInvitesService {
         }
         const row = await prisma.waitlistSignup.findUnique({
             where: { id },
-            select: { email: true, businessName: true },
+            select: { email: true, businessName: true, edition: true },
         });
         if (!row)
             return {
@@ -196,11 +222,19 @@ export class WaitlistInvitesService {
                 detail: "Not on the waitlist any more",
             };
 
-        const outcome = await sendWaitlistLaunchInviteEmail(row.email, {
-            url: inviteUrl(readiness.signupBase, token, row.email),
-            businessName: row.businessName,
-            validDays: INVITE_VALID_DAYS,
-        });
+        const outcome = await sendWaitlistLaunchInviteEmail(
+            row.email,
+            {
+                url: inviteUrl(
+                    signupUrl(row.edition) ?? readiness.signupBase,
+                    token,
+                    row.email,
+                ),
+                businessName: row.businessName,
+                validDays: INVITE_VALID_DAYS,
+            },
+            row.edition,
+        );
         if (outcome === "sent") {
             await prisma.waitlistSignup.updateMany({
                 where: { id, inviteTokenHash: tokenHash },
@@ -232,9 +266,14 @@ function isStale(invitedAt: Date, now: Date): boolean {
     return invitedAt.getTime() < now.getTime() - STALE_CLAIM_MS;
 }
 
-/** Where an invitee creates their account, or null when this instance cannot say. */
-export function signupUrl(): string | null {
+/**
+ * Where an invitee creates their account, or null when this instance cannot
+ * say. With the entry's edition, that edition's accounts (DEC-204), so a
+ * Global entry signs up on Global.
+ */
+export function signupUrl(edition?: Edition): string | null {
     const base =
+        (edition ? accountsBaseFor(edition) : null) ??
         env.ACCOUNTS_URL ??
         (env.NODE_ENV === "development"
             ? "https://accounts.saroh.localhost"

@@ -207,6 +207,7 @@ describe("unlocking the downloads", () => {
             "owner@example.com",
             QR_MAKER_SUBJECT,
             qrMakerEmailText(),
+            "INDIA",
         );
         expect(qrMakerEmailText()).toContain(QR_MAKER_URL);
     });
@@ -236,6 +237,7 @@ describe("unlocking the downloads", () => {
             "owner@example.com",
             "GST calculator: your link back",
             toolEmail("gst-calculator").text,
+            "INDIA",
         );
         expect(toolEmail("gst-calculator").text).toContain(
             "https://www.saroh.in/tools/gst-calculator",

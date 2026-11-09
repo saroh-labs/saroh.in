@@ -5,6 +5,10 @@
  * claims ledger. Each feature carries its state (`StatedFeature`), and a Limited
  * page says plainly what works today in `worksToday`.
  *
+ * Card payments online go through the business's own Stripe (Global launch
+ * plan KTD9), the one page outside the receipt maker, the changelog and
+ * Integrations that may name it (`scripts/check-claims.mjs`).
+ *
  * Left out on purpose: payment links, deposits, reminders and invoice email,
  * your own domain, and saroh.in's tax words. A Free business has one place
  * customers visit, so "your place and your online shop", never "every location". Screenshots are
@@ -20,7 +24,7 @@ import { FEATURE_SLUGS } from "@saroh/marketing/content-types";
 export { NOT_AVAILABLE_YET } from "./coming";
 
 /** The day this module's words last changed: its pages' `updated`. */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-07";
 
 export const features: Record<FeatureSlug, StatedFeature> = {
     dashboard: {
@@ -178,7 +182,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         slug: "orders",
         state: "limited",
         worksToday:
-            "Today you take orders at the counter, paid at pick-up or recorded by hand. Online payment isn't available yet.",
+            "Today you take orders at the counter, paid at pick-up or recorded by hand. Customers can pay by card online, through your own Stripe.",
         phrase: "order management",
         seoTitle: "Order management software for small business",
         seoDescription:
@@ -445,7 +449,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         slug: "billing",
         state: "limited",
         worksToday:
-            "Today you write invoices or make them from an order, and record what's paid. Saroh doesn't work out tax, and online payment isn't available yet.",
+            "Today you write invoices or make them from an order, and record what's paid. Customers can pay by card online, through your own Stripe. Saroh doesn't work out tax.",
         phrase: "invoice software",
         seoTitle: "Invoice software for small business",
         seoDescription:

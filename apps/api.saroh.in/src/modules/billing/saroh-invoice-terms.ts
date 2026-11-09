@@ -1,9 +1,10 @@
+import { editionProfile } from "@saroh/edition";
 import { GST_PERCENT, gstPaise } from "@saroh/pricing-catalog";
 
 import type { TaxType } from "../invoices/gst";
 import { placeOfSupply, taxTypeFor } from "../invoices/gst";
 import { stateCode } from "../invoices/gst-states";
-import { DEFAULT_TIMEZONE, financialYear } from "../invoices/numbering";
+import { financialYear } from "../invoices/numbering";
 
 /**
  * The pure rules of Saroh's own invoices (pricing catalogue U17): what each
@@ -18,21 +19,28 @@ import { DEFAULT_TIMEZONE, financialYear } from "../invoices/numbering";
  * states it is IGST.
  */
 
-/** What was charged: the checkout kinds, a renewal, and a messaging top-up. */
+/**
+ * What was charged: the checkout kinds, a renewal, a messaging top-up, and a
+ * month's add-on bought on its own order (stage 9).
+ */
 export const SAROH_INVOICE_SOURCES = [
     "NEW",
     "UPGRADE",
     "SCHEDULED",
     "RENEWAL",
     "TOPUP",
+    "ADDON",
 ] as const;
 export type SarohInvoiceSource = (typeof SAROH_INVOICE_SOURCES)[number];
 
 /** Saroh's GST rate on its plans, in basis points. */
 export const SAROH_GST_RATE_BPS = GST_PERCENT * 100;
 
-/** The zone Saroh's own financial year and paper dates are kept in. */
-export const SAROH_TIMEZONE = DEFAULT_TIMEZONE;
+/**
+ * The zone Saroh's own financial year and paper dates are kept in: Saroh's
+ * India billing, not a business's zone, so India's on purpose.
+ */
+export const SAROH_TIMEZONE = editionProfile("INDIA").defaultZone;
 
 export interface SarohLineInput {
     description: string;
@@ -73,17 +81,24 @@ export interface SarohTotals {
 const whole = (n: number | undefined): number =>
     typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : 0;
 
+/**
+ * How Saroh's invoice is taxed: GST within India (CGST + SGST, or IGST), or
+ * an export of services to a business abroad, with none (stage 9, KTD6).
+ */
+export type SarohTaxType = TaxType | "EXPORT";
+
 /** One line's GST: on its amount after discount, rounded once, then split. */
 export function taxSarohLine(
     input: SarohLineInput,
-    taxType: TaxType,
+    taxType: SarohTaxType,
 ): SarohLine {
     const quantity = Math.max(1, whole(input.quantity) || 1);
     const unitPaise = whole(input.unitPaise);
     const gross = quantity * unitPaise;
     const discountPaise = Math.min(gross, whole(input.discountPaise));
     const taxablePaise = gross - discountPaise;
-    const taxPaise = gstPaise(taxablePaise);
+    // An export carries no tax (stage 9, KTD6: under Saroh's LUT).
+    const taxPaise = taxType === "EXPORT" ? 0 : gstPaise(taxablePaise);
     const sgst = taxType === "INTRA" ? Math.floor(taxPaise / 2) : 0;
     return {
         description: input.description,
@@ -92,7 +107,7 @@ export function taxSarohLine(
         unitPaise,
         discountPaise,
         taxablePaise,
-        gstRateBps: SAROH_GST_RATE_BPS,
+        gstRateBps: taxType === "EXPORT" ? 0 : SAROH_GST_RATE_BPS,
         cgstPaise: taxType === "INTRA" ? taxPaise - sgst : 0,
         sgstPaise: sgst,
         igstPaise: taxType === "INTER" ? taxPaise : 0,
@@ -104,7 +119,7 @@ export function taxSarohLine(
 /** Every line taxed, and the invoice's sums from them (never re-rounded). */
 export function taxSarohLines(
     inputs: readonly SarohLineInput[],
-    taxType: TaxType,
+    taxType: SarohTaxType,
 ): { lines: SarohLine[]; totals: SarohTotals } {
     const lines = inputs.map((l) => taxSarohLine(l, taxType));
     const sum = (pick: (l: SarohLine) => number) =>

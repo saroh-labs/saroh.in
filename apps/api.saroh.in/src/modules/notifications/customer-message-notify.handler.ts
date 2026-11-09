@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { appBaseOf } from "../../common/app-url";
+import { appBase, editionOf } from "../../common/app-url";
 import { sendCustomerMessageNotificationEmail } from "../../common/email";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { CustomerMessageNotifyPayload } from "./customer-message-notify";
@@ -137,13 +137,18 @@ export class CustomerMessageNotifyHandler {
         }
 
         const recipients = await this.ownerAdminEmails(message.organizationId);
-        const threadUrl = `${await appBaseOf(message.organizationId)}/contacts/${contactId}?tab=msg`;
+        const edition = await editionOf(message.organizationId);
+        const threadUrl = `${appBase(edition)}/contacts/${contactId}?tab=msg`;
         for (const to of recipients) {
-            await sendCustomerMessageNotificationEmail(to, {
-                customerName: who,
-                message: quote,
-                threadUrl,
-            });
+            await sendCustomerMessageNotificationEmail(
+                to,
+                {
+                    customerName: who,
+                    message: quote,
+                    threadUrl,
+                },
+                edition,
+            );
         }
     };
 

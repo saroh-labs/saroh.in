@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatTime } from "@/lib/format/datetime";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -187,7 +188,7 @@ export function LogList({
         );
     }
 
-    const timezone = log.timezone ?? "Asia/Kolkata";
+    const timezone = log.timezone ?? DEFAULT_BUSINESS_ZONE;
     const days = groupByDay(log.entries, timezone);
     const byId = new Map(log.entries.map((e) => [e.id, e]));
     const pairOf = (e: StockLogEntry) =>

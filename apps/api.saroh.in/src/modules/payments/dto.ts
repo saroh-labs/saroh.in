@@ -16,6 +16,8 @@ import {
 } from "class-validator";
 
 import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
+import type { StripeCheckoutStyle } from "./stripe-checkout-style";
+import { STRIPE_CHECKOUT_STYLES } from "./stripe-checkout-style";
 import { needsWebhookSecret, webhookSecretRequired } from "./webhook-secret";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -81,6 +83,27 @@ export class ConnectProviderDto {
     @MinLength(1, { message: secretRequiredFor })
     @MaxLength(1024)
     webhookSecret?: string;
+
+    /**
+     * Stripe only: where customers pay (DEC-208, 8 Nov), Stripe's hosted
+     * page (`HOSTED`) or Saroh's card window (`WINDOW`). Absent keeps what
+     * is saved; a new connection then pays on Stripe's page.
+     */
+    @IsOptional()
+    @Transform(upper)
+    @IsIn(STRIPE_CHECKOUT_STYLES, {
+        message: `checkoutStyle must be one of: ${STRIPE_CHECKOUT_STYLES.join(", ")}`,
+    })
+    checkoutStyle?: StripeCheckoutStyle;
+}
+
+/** Where a Stripe connection's customers pay (DEC-208, 8 Nov). */
+export class CheckoutStyleDto {
+    @Transform(upper)
+    @IsIn(STRIPE_CHECKOUT_STYLES, {
+        message: `checkoutStyle must be one of: ${STRIPE_CHECKOUT_STYLES.join(", ")}`,
+    })
+    checkoutStyle!: StripeCheckoutStyle;
 }
 
 /**
@@ -104,6 +127,16 @@ export class CreateIntentDto {
     @IsString()
     @MaxLength(255)
     idempotencyKey?: string;
+
+    /**
+     * Where a hosted checkout (Stripe) sends the customer back to. Checked
+     * where it is used (`safeReturnPath`): anything but a same-site path is
+     * ignored.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    returnPath?: string;
 }
 
 /** One line to refund, and how many of it (U6). */

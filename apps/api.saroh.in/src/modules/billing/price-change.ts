@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import { planTaxOf } from "./autopay-currency";
 
 import { moneyWordsMinor } from "../../common/words-format";
 
@@ -27,13 +28,20 @@ export interface PriceChange {
     fromPaise: number;
     toPaise: number;
     interval: "month" | "year";
+    /** The plan's currency (stage 9): its money is said in it. */
+    currency: string;
     /** When the new price was to start: the move's date. */
     pendingFrom: Date;
 }
 
-/** "₹999 a month plus GST". */
-export function priceWords(paise: number, interval: "month" | "year") {
-    return `${moneyWordsMinor(paise, "INR")} ${interval === "year" ? "a year" : "a month"} plus GST`;
+/** "₹999 a month plus GST", or "$19 a month" for a plan with no tax (stage 9). */
+export function priceWords(
+    paise: number,
+    interval: "month" | "year",
+    currency = "INR",
+) {
+    const tax = planTaxOf(currency) === "gst" ? " plus GST" : "";
+    return `${moneyWordsMinor(paise, currency)} ${interval === "year" ? "a year" : "a month"}${tax}`;
 }
 
 /**
@@ -55,7 +63,9 @@ export async function priceChangeOf(
             providerSubscriptionId: true,
             pendingPlanId: true,
             pendingFrom: true,
-            plan: { select: { priceCents: true, interval: true } },
+            plan: {
+                select: { priceCents: true, interval: true, currency: true },
+            },
             pendingPlan: {
                 select: { name: true, priceCents: true, interval: true },
             },
@@ -97,6 +107,7 @@ export async function priceChangeOf(
         fromPaise: sub.plan.priceCents,
         toPaise: sub.pendingPlan.priceCents,
         interval: sub.plan.interval === "year" ? "year" : "month",
+        currency: sub.plan.currency,
         pendingFrom: sub.pendingFrom,
     };
 }

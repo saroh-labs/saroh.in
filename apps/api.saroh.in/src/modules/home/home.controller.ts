@@ -34,6 +34,7 @@ export class HomeController {
             organizationRoleKey: ctx.roleKey,
             organizationActions: ctx.actions,
             projectId,
+            edition: ctx.edition,
         };
         return parts === "rail"
             ? this.home.rail(input)

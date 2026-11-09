@@ -253,7 +253,8 @@ export class AdminHealthService {
      * go-live job); one that joined before waits for the grandfather step.
      */
     private async planRows() {
-        const live = await liveCatalogueVersion(prisma);
+        // India's: Global runs on Free until its catalogue is published.
+        const live = await liveCatalogueVersion(prisma, "INDIA");
         if (!live) {
             return {
                 state: "unmeasured" as const,

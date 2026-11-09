@@ -433,9 +433,9 @@ describe("presetRange — the date presets in the business's zone (B4)", () => {
         );
     });
 
-    it("reads an unknown zone as India's", () => {
+    it("reads an unknown zone as UTC, never another country's", () => {
         expect(iso(presetRange("today", "Mars/Olympus", now))).toEqual(
-            iso(presetRange("today", "Asia/Kolkata", now)),
+            iso(presetRange("today", "UTC", now)),
         );
     });
 });

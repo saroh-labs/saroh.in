@@ -92,11 +92,19 @@ describe("a delivery in an India business", () => {
 
 describe("a delivery in a Global business", () => {
     it.each([
-        ["gb", "Greater London", "SW1A 1AA", "GB"],
-        ["US", "Texas", "78701-1234", "US"],
+        [
+            "gb",
+            "Greater London",
+            "SW1A 1AA",
+            "Greater London",
+            "SW1A 1AA",
+            "GB",
+        ],
+        ["US", "Texas", "78701-1234", "TX", "78701-1234", "US"],
+        ["CA", "on", "k1a0b1", "ON", "K1A 0B1", "CA"],
     ])(
-        "%s keeps its region, postcode and country apart",
-        (sent, state, postal, code) => {
+        "%s keeps its region, postcode and country apart, as its country writes them",
+        (sent, state, postal, region, written, code) => {
             const out = deliveryAddressFor(
                 home({
                     city: "Town",
@@ -106,8 +114,8 @@ describe("a delivery in a Global business", () => {
                 }),
                 UK,
             );
-            expect(out.state).toBe(state);
-            expect(out.postalCode).toBe(postal);
+            expect(out.state).toBe(region);
+            expect(out.postalCode).toBe(written);
             expect(out.country).toBe(code);
         },
     );
@@ -130,8 +138,77 @@ describe("a delivery in a Global business", () => {
 
     it('reads a typed "Region, country" line apart', () => {
         expect(
-            deliveryAddressFor(home({ state: "Texas, United States" }), UK),
-        ).toMatchObject({ state: "Texas", country: "US" });
+            deliveryAddressFor(
+                home({ state: "Texas, United States", postalCode: "78701" }),
+                UK,
+            ),
+        ).toMatchObject({ state: "TX", country: "US" });
+    });
+
+    // Owner, 8 Nov: the US, Canada and Australia need the state and the
+    // code; elsewhere both are optional, but a typed postcode must fit.
+    it("holds a US delivery to its state from the list and its ZIP code", () => {
+        const US = { edition: "GLOBAL", country: "US" } as const;
+        expect(
+            refusal(() =>
+                deliveryAddressFor(
+                    home({ state: "", postalCode: "78701" }),
+                    US,
+                ),
+            ),
+        ).toMatchObject({
+            message: "Choose the state.",
+            field: "address.state",
+        });
+        expect(
+            refusal(() =>
+                deliveryAddressFor(home({ state: "TX", postalCode: "" }), US),
+            ),
+        ).toMatchObject({ field: "address.postalCode" });
+        expect(
+            refusal(() =>
+                deliveryAddressFor(
+                    home({ state: "Atlantis", postalCode: "78701" }),
+                    US,
+                ),
+            ),
+        ).toMatchObject({ field: "address.state" });
+    });
+
+    it("checks a customer abroad against their own country, never refusing them for it", () => {
+        const US = { edition: "GLOBAL", country: "US" } as const;
+        expect(
+            deliveryAddressFor(
+                home({ state: "ON", postalCode: "K1A 0B1", country: "CA" }),
+                US,
+            ),
+        ).toMatchObject({ state: "ON", postalCode: "K1A 0B1", country: "CA" });
+        expect(
+            refusal(() =>
+                deliveryAddressFor(
+                    home({ state: "ON", postalCode: "78701", country: "CA" }),
+                    US,
+                ),
+            ),
+        ).toMatchObject({
+            message: expect.stringContaining("K1A 0B1"),
+            field: "address.postalCode",
+        });
+        // The UK: no state asked, the postcode checked.
+        expect(
+            deliveryAddressFor(
+                home({ state: "", postalCode: "sw1a1aa", country: "GB" }),
+                US,
+            ),
+        ).toMatchObject({ state: null, postalCode: "SW1A 1AA", country: "GB" });
+        expect(
+            refusal(() =>
+                deliveryAddressFor(
+                    home({ state: "", postalCode: "78701", country: "GB" }),
+                    US,
+                ),
+            ),
+        ).toMatchObject({ field: "address.postalCode" });
     });
 
     it("refuses an unlisted country and a long postcode or region", () => {
@@ -152,7 +229,7 @@ describe("a delivery in a Global business", () => {
 
     it("gets no place of supply out of free text, and no crash", () => {
         const { state } = deliveryAddressFor(
-            home({ state: "Goa, or nearby", country: "US" }),
+            home({ state: "Goa, or nearby", postalCode: "", country: "AE" }),
             UK,
         );
         expect(
