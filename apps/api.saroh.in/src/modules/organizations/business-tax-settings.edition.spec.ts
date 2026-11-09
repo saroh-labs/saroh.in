@@ -185,6 +185,39 @@ describe("a business's own address, by its country (U3, KTD-A)", () => {
         ).toMatchObject({ postalCode: null, region: null });
     });
 
+    it("clears the region when the country changes to one that takes none, with no address sent", () => {
+        const onFile = {
+            country: "US",
+            addressLine1: "500 Congress Ave",
+            city: "Austin",
+            postalCode: "78701",
+            region: "TX",
+        };
+        // Singapore takes no region; its postcode is 6 digits.
+        expect(refusal(() => address("SG", {}, onFile))).toMatchObject({
+            details: { field: "postalCode" },
+        });
+        expect(address("SG", {}, { ...onFile, postalCode: "018956" })).toEqual({
+            region: null,
+        });
+        // The same country again changes nothing.
+        expect(address("US", {}, onFile)).toEqual({});
+        // India's state is its GST state: a country sent there leaves the
+        // address as it is.
+        expect(
+            taxChanges(
+                { ...onFile, country: "IN", postalCode: "560038" } as never,
+                {
+                    tax: undefined,
+                    taxId: undefined,
+                    country: "IN",
+                    address: undefined,
+                } as never,
+                "INDIA",
+            ),
+        ).toEqual({});
+    });
+
     it("refuses a region from an Indian business, and leaves India's PIN rule as it was", () => {
         const india = (a: Record<string, string>) =>
             taxChanges(
