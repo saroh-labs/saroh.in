@@ -378,3 +378,60 @@ describe("a Stripe business paying in Saroh's card window (real database)", () =
         expect(stripe.sessions).toHaveLength(1);
     });
 });
+
+describe("a hold whose key can't make PaymentIntents (real database)", () => {
+    async function statusOf(id: string) {
+        return (await prisma.paymentIntent.findUniqueOrThrow({ where: { id } }))
+            .status;
+    }
+
+    it("a 403 on the window pays on Stripe's page: a hosted handoff, the hold moved to the session's 30 minutes, and the connection flagged PERMISSION_MISSING", async () => {
+        const { ProviderKeysRefusedError } =
+            await import("../../common/providers/provider-attention");
+        await payments.setCheckoutStyle(owner, "stripe", "WINDOW");
+        const at = Date.now();
+        const made = await hold(`no-write-${tag}@example.com`);
+        expect(Math.round(minutesOf(made, at))).toBe(HOLD_MINUTES);
+        jest.spyOn(stripe, "createElementIntent").mockRejectedValue(
+            new ProviderKeysRefusedError(
+                "Stripe order creation failed (HTTP 403)",
+                403,
+            ),
+        );
+
+        const intent = await publicInvoices.createIntent(made.payToken ?? "", {
+            idempotencyKey: `kw_${tag}_nowrite_1`,
+        });
+
+        expect(intent.providerIntentId).toMatch(/^cs_fake_/);
+        expect(intent.clientParams).not.toHaveProperty("clientSecret");
+        expect(intent.clientParams.checkoutUrl).toEqual(expect.any(String));
+        const booking = await prisma.booking.findUniqueOrThrow({
+            where: { id: made.booking.id },
+        });
+        expect(
+            Math.round((booking.holdExpiresAt!.getTime() - at) / 60_000),
+        ).toBe(STRIPE_HOLD_MINUTES + 1);
+        const row = await prisma.merchantPaymentProvider.findUniqueOrThrow({
+            where: {
+                organizationId_provider: {
+                    organizationId: owner.organizationId,
+                    provider: "STRIPE",
+                },
+            },
+        });
+        expect(row.attentionReason).toBe("PERMISSION_MISSING");
+        expect(row.status).toBe("CONNECTED");
+
+        // Pay again, still refused: the same session, never a longer hold.
+        const again = await publicInvoices.createIntent(made.payToken ?? "", {
+            idempotencyKey: `kw_${tag}_nowrite_2`,
+        });
+        expect(again.paymentIntentId).toBe(intent.paymentIntentId);
+
+        await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { attentionReason: null, attentionAt: null },
+        });
+    });
+});

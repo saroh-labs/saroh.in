@@ -141,7 +141,7 @@ on its own page (see "The card window" below).
   read; the permissions reference puts `GET /v1/refunds` under `charge_read`,
   so the dashboard row that covers refunds may be named for charges. Saroh's
   words say "Checkout Sessions: Write, Customers: Write, Payment Intents:
-  Read and Refunds: Write" until a dashboard screenshot settles them.
+  Write and Refunds: Write" until a dashboard screenshot settles them.
 - **`expire` on a session that isn't open**: an error, but its HTTP status
   and code are not documented. The adapter reads any 400 as "past expiring"
   (false) and anything else as unsure (throws).

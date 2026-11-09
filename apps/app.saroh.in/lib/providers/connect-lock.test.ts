@@ -327,7 +327,7 @@ describe("a connection whose provider refused its keys (UX-012, FB-7)", () => {
         expect(entry.state).toBe("ATTENTION");
         expect(entry.fix).toBe("Enter keys again");
         expect(entry.note).toBe(
-            "Needs attention. Its restricted key can't make customers in Stripe, so payments go through without one. In Stripe, give the key Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write, then enter the keys again.",
+            "Needs attention. Its restricted key is missing a permission, so payments go through without a Stripe customer, or on Stripe's page instead of yours. In Stripe, give the key Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write, then enter the keys again.",
         );
     });
 });

@@ -267,7 +267,7 @@ a note saying so.
   `field`. Then one read each of PaymentIntents, Refunds, Checkout Sessions
   and Customers (`verifyCredentials`): a 403 says which permission is
   missing, in one sentence (`STRIPE_KEY_PERMISSIONS`: Checkout Sessions:
-  Write, Customers: Write, Payment Intents: Read and Refunds: Write). The
+  Write, Customers: Write, Payment Intents: Write and Refunds: Write). The
   account's country is read once at connect (`GET /v1/account`) and kept
   (`accountCountry`); an older connection reads it on its next checkout.
   Webhooks are signed per endpoint, not with the API key: `Stripe-Signature:
@@ -363,6 +363,12 @@ t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
       Checkout. A replay hands the client secret back while the connection
       still pays in the window, and closes the `pi_` (409
       `checkout-closed`) once it pays on Stripe's page.
+    - _No Payment Intents: Write_ (owner, 8 Nov 2026). A 403 from
+      `createElementIntent` is a key missing a permission
+      (`lacksPermission`), not refused keys: that payment falls back to
+      hosted Checkout (its 30-minute hold and `earlierHoldSession`) and the
+      connection is flagged `PERMISSION_MISSING`. A 401 is still
+      `KEYS_REFUSED`.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

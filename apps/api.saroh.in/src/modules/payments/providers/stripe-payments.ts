@@ -59,12 +59,13 @@ export function isStripeSecretKey(key: string): boolean {
 
 /** What a business is told when it pastes its full secret key. */
 /**
- * The restricted key's permissions hosted Checkout needs (KTD-14), in the
- * dashboard's words as far as STRIPE.md could verify them: sessions and
- * customers are made (Write implies Read), payments read, refunds made.
+ * The restricted key's permissions Stripe payments need (KTD-14), in the
+ * dashboard's words as far as STRIPE.md could verify them: sessions,
+ * customers and PaymentIntents are made (Write implies Read; the card
+ * window makes its PaymentIntent, owner 8 Nov 2026), refunds made.
  */
 export const STRIPE_KEY_PERMISSIONS =
-    "Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write";
+    "Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write";
 
 export const STRIPE_SECRET_KEY_REFUSED = `That's your Stripe secret key, which can do anything in your account. Make a restricted key instead (it starts rk_live_ or rk_test_) with ${STRIPE_KEY_PERMISSIONS}, in Stripe › Developers › API keys.`;
 

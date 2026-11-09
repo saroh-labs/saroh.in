@@ -406,7 +406,7 @@ describe("Stripe setup (Global)", () => {
         const t = text();
         expect(t).toContain("Developers › API keys");
         expect(t).toContain(
-            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
+            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write.",
         );
         expect(STRIPE_EVENTS).toHaveLength(9);
         expect(t).toContain("Developers › Webhooks › Add endpoint");
@@ -450,7 +450,7 @@ describe("Stripe setup (Global)", () => {
         openStripe();
         fillStripe({ rk: "sk_test_example" });
         expect(said("Restricted key")).toBe(
-            "Use a restricted key, not your secret key. In Stripe, create one with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
+            "Use a restricted key, not your secret key. In Stripe, create one with Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write.",
         );
         await press();
         expect(connectPaymentProvider).not.toHaveBeenCalled();
@@ -591,7 +591,7 @@ describe("Stripe setup (Global)", () => {
         "puts the API's refusal about %s under %s, and clears it when that key changes",
         async (field, label) => {
             const error =
-                "This key can't make Checkout sessions or customers, or see payments and refunds. Give it Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.";
+                "This key can't make Checkout sessions or customers, or see payments and refunds. Give it Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write.";
             connectPaymentProvider.mockResolvedValue({
                 ok: false,
                 error,
