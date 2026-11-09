@@ -335,8 +335,8 @@ const noSubscription = () => () => undefined;
  * False while rendering on the server (and during hydration), true after.
  *
  * The two live-data previews draw what only the VIEWER's machine can know:
- * sample open times formatted in the visitor's time zone, prices in their
- * locale. Rendered on the server they come out in the server's zone and locale
+ * sample open times formatted in the visitor's time zone. Rendered on the
+ * server they come out in the server's zone
  * and then disagree with the browser's first render, which React reports as a
  * hydration mismatch on the catalog's /preview/booking (review of #267). The
  * live blocks never hit this: they load in an effect, after mount.
