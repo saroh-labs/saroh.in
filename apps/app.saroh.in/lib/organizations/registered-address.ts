@@ -140,7 +140,10 @@ export function addressProblems(v: {
         ].some((x) => x.trim() !== "");
         return countryAddressProblems(v.country, v, typed ? undefined : false);
     }
-    const india = v.gstRegistered || (v.country ?? "").toUpperCase() === "IN";
+    // A typed Indian country (its code or name), as the API reads it; a
+    // blank one asks no PIN shape here, though inIndia reads it as India.
+    const india =
+        v.gstRegistered || (!!v.country?.trim() && inIndia(v.country));
     const pin = v.postalCode.replace(/\s+/g, "");
     if (pin && india && !PIN_SHAPE.test(pin)) {
         problems.push({
