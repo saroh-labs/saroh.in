@@ -99,3 +99,21 @@ describe("sendWaitlistLaunchInviteEmail with SMTP", () => {
         expect(message.html).toContain("for 7 days");
     });
 });
+
+describe("launchInviteEmail", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { launchInviteEmail } =
+        require("./email") as typeof import("./email");
+
+    it("names the launch offer for India's entries, unchanged", () => {
+        expect(launchInviteEmail(DETAILS.url, "Asha", 7)).toContain(
+            "It starts on the launch offer from the waitlist page, and you add no payment details to begin.",
+        );
+    });
+
+    it("says nothing of an offer or plan for Global's: Free only (owner, 9 Nov 2026)", () => {
+        const html = launchInviteEmail(DETAILS.url, "Asha", 7, false);
+        expect(html).toContain("set up Asha.</p>");
+        expect(html).not.toMatch(/offer|plan|payment/i);
+    });
+});

@@ -213,7 +213,8 @@ export class AdminWaitlistService {
             joined,
             // Free-tool email gates, kept apart from Waiting.
             fromTools,
-            ...inviteState(this.invites.readiness()),
+            // Every edition's list holds India's, which wait for the offer.
+            ...inviteState(this.invites.readiness(edition ?? "INDIA")),
         };
     }
 

@@ -108,6 +108,21 @@ describe("public launch offer (DB, U31)", () => {
         ).resolves.toMatchObject({ planName: "Plan E" });
     });
 
+    it("is a 404 through Global's address: Global is Free only (DEC-211)", async () => {
+        await publish(1, new Date(Date.now() - DAY), withOfferPlan("Plan D"));
+
+        await expect(
+            controller.get(fakeRes().res, "api.saroh.tech"),
+        ).rejects.toMatchObject({ status: 404 });
+        await expect(
+            service.publicOffer(new Date(), "GLOBAL"),
+        ).resolves.toBeNull();
+        // India's address still answers it.
+        await expect(
+            controller.get(fakeRes().res, "api.saroh.in"),
+        ).resolves.toMatchObject({ planName: "Plan D" });
+    });
+
     it("is a 404 when the instance gives no offer", async () => {
         env.LAUNCH_OFFER_DAYS = undefined;
         await publish(1, new Date(Date.now() - DAY), withOfferPlan("Plan D"));

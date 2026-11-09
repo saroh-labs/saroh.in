@@ -1,4 +1,11 @@
-import { Controller, Get, NotFoundException, Res } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Headers,
+    NotFoundException,
+    Res,
+} from "@nestjs/common";
+import { editionOfHost } from "@saroh/edition";
 import type { Response } from "express";
 
 import type { PublicLaunchOffer } from "./invite-token";
@@ -19,7 +26,8 @@ export const PUBLIC_OFFER_CACHE = "public, max-age=300";
  * The contract:
  * - 200 `{ planId, planName, days }` when `LAUNCH_OFFER_DAYS` is set and the
  *   live catalogue has the offer plan; `planName` is the live catalogue's.
- * - 404 otherwise (no offer set, no live catalogue, or no such plan in it).
+ * - 404 otherwise (no offer set, no live catalogue, or no such plan in it),
+ *   and always through a Global address: Global is Free only (DEC-211).
  *   The page then says the offer is announced at launch.
  *
  * Its own controller, not a GET on `WaitlistController`: that one stays
@@ -32,9 +40,13 @@ export class PublicLaunchOfferController {
     @Get()
     async get(
         @Res({ passthrough: true }) res: Response,
+        @Headers("host") host?: string,
     ): Promise<PublicLaunchOffer> {
         res.setHeader("Cache-Control", PUBLIC_OFFER_CACHE);
-        const offer = await this.offers.publicOffer(new Date());
+        const offer = await this.offers.publicOffer(
+            new Date(),
+            editionOfHost(host ?? "") ?? undefined,
+        );
         if (!offer) throw new NotFoundException("No launch offer is set");
         return offer;
     }

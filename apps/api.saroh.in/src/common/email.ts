@@ -867,7 +867,8 @@ export type EmailOutcome = "sent" | "not-configured" | "failed";
  * `siteCodesFakeAllowed`), `log` prints it and counts it sent and `fail`
  * fails it; anywhere else nothing left. `businessName` is what the visitor
  * typed, so it is escaped. The email names no offer length or price: the
- * waitlist page says what the offer is.
+ * waitlist page says what the offer is. A Global entry's names no offer at
+ * all: Global is Free only (DEC-211, owner 9 Nov 2026).
  */
 export async function sendWaitlistLaunchInviteEmail(
     to: string,
@@ -888,7 +889,12 @@ export async function sendWaitlistLaunchInviteEmail(
         await send(edition, {
             to,
             subject: LAUNCH_INVITE_SUBJECT,
-            html: launchInviteEmail(url, businessName, validDays),
+            html: launchInviteEmail(
+                url,
+                businessName,
+                validDays,
+                editionProfile(edition).sarohBilling,
+            ),
         });
         return "sent";
     } catch {
@@ -898,18 +904,25 @@ export async function sendWaitlistLaunchInviteEmail(
 
 export const LAUNCH_INVITE_SUBJECT = "Your Saroh invite";
 
-/** The invite's body; every value in it is escaped. */
+/**
+ * The invite's body; every value in it is escaped. `withOffer`: India's
+ * names the launch offer, Global's (Free only) says nothing of plans.
+ */
 export function launchInviteEmail(
     url: string,
     businessName: string | null,
     validDays: number,
+    withOffer = true,
 ): string {
     const href = esc(url);
     const what = businessName ? esc(businessName) : "your business";
+    const start = withOffer
+        ? ` It starts on the launch offer from the waitlist page, and you add no payment details to begin.`
+        : "";
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <h2>Saroh is open, and you're in</h2>
   <p>You joined the waitlist and we promised one email, on opening day. This is it.</p>
-  <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
+  <p>Create your account with this email address and set up ${what}.${start}</p>
   <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
   <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
 </div>`;

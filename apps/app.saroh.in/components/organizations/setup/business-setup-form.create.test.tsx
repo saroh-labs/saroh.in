@@ -11,6 +11,9 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GOAL_LATER } from "@/lib/modules/goals";
+import type { SetupValues } from "@/lib/organizations/setup-steps";
+
 import {
     button,
     choose,
@@ -26,6 +29,7 @@ import {
     typeInto,
     unmount,
 } from "./business-setup-form.test-kit";
+import { createFromSetup } from "./setup-create";
 
 const createOrganization = vi.fn();
 vi.mock("@/lib/organizations/actions", () => ({
@@ -65,6 +69,21 @@ vi.mock("@/lib/saroh-billing/checkout-actions", () => ({
     takeLaunchOfferAfterOnboarding: (...args: unknown[]) =>
         takeOffer(...args) as unknown,
 }));
+// The edition's profile, India unless a test says Global.
+const edition = vi.hoisted(() => ({ global: false }));
+vi.mock("@/lib/edition", async (actual) => {
+    const real = await actual<typeof import("@/lib/edition")>();
+    const { editionProfile } =
+        await vi.importActual<typeof import("@saroh/edition")>(
+            "@saroh/edition",
+        );
+    return {
+        ...real,
+        get PROFILE() {
+            return edition.global ? editionProfile("GLOBAL") : real.PROFILE;
+        },
+    };
+});
 const showError = vi.fn();
 const showInfo = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -444,6 +463,27 @@ describe("an opening-day invite (U31)", () => {
             "Asha Salon is set up, but the launch offer isn't applied yet.",
             "This invite has already been used. Ask for a new invite.",
         );
+    });
+
+    it("on Global (Free only, DEC-211) marks the invite joined and says nothing of an offer, even when that fails", async () => {
+        takeOffer.mockResolvedValue({
+            ok: false,
+            error: "That didn't go through.",
+        });
+        startWithGoalAction.mockResolvedValue({ href: "/" });
+        edition.global = true;
+        try {
+            await expect(
+                createFromSetup(
+                    { name: "Asha Salon", goal: GOAL_LATER } as SetupValues,
+                    { needsName: false, invite: TOKEN, onMade: vi.fn() },
+                ),
+            ).resolves.toMatchObject({ made: true });
+        } finally {
+            edition.global = false;
+        }
+        expect(takeOffer).toHaveBeenCalledWith(TOKEN);
+        expect(showError).not.toHaveBeenCalled();
     });
 
     it("never takes the offer when the business wasn't made", async () => {

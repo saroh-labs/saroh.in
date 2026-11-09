@@ -372,6 +372,72 @@ describe("signing up through an invite (U31)", () => {
     });
 });
 
+describe("a Global invite: Free only, no launch offer (owner, 9 Nov 2026, DEC-211)", () => {
+    it("is sent without an offer length, checks as Free, and joins the business with no plan override", async () => {
+        const email = `lata-${tag}@example.test`;
+        const made = await waitlist.join({
+            email,
+            business: "Lata Studio",
+            kind: "salon",
+            edition: "GLOBAL",
+        });
+        if (!made.created) throw new Error("expected a new entry");
+        const row = await prisma.waitlistSignup.findFirstOrThrow({
+            where: { businessName: "Lata Studio" },
+        });
+        const days = env.LAUNCH_OFFER_DAYS;
+        env.LAUNCH_OFFER_DAYS = undefined;
+        try {
+            await sendInvites([row.id]);
+            expect(send).toHaveBeenCalledTimes(1);
+            expect(send.mock.calls[0]![2]).toBe("GLOBAL");
+            const token = tokenSentTo(email);
+            const me = user(email);
+            await expect(offers.check(me, token)).resolves.toEqual({
+                status: "free",
+                businessName: "Lata Studio",
+            });
+
+            const org = await prisma.organization.create({
+                data: {
+                    name: "Lata Studio",
+                    slug: `inv-lata-${tag}`,
+                    edition: "GLOBAL",
+                },
+            });
+            const ctx = { ...owner(org.id, me.id), edition: "GLOBAL" as const };
+            await expect(offers.redeem(ctx, me, token)).resolves.toEqual({
+                planKey: null,
+                until: null,
+            });
+            // A double submit answers the same.
+            await expect(offers.redeem(ctx, me, token)).resolves.toEqual({
+                planKey: null,
+                until: null,
+            });
+
+            const joined = await prisma.waitlistSignup.findUniqueOrThrow({
+                where: { id: row.id },
+            });
+            expect(joined.joinedAt).not.toBeNull();
+            expect(joined.joinedOrganizationId).toBe(org.id);
+            await expect(
+                prisma.entitlementOverride.count({
+                    where: { organizationId: org.id },
+                }),
+            ).resolves.toBe(0);
+            await expect(
+                prisma.auditEvent.count({ where: { organizationId: org.id } }),
+            ).resolves.toBe(0);
+            await expect(offers.check(me, token)).resolves.toMatchObject({
+                status: "used",
+            });
+        } finally {
+            env.LAUNCH_OFFER_DAYS = days;
+        }
+    });
+});
+
 describe("Tell me when entries (Global launch plan KTD8)", () => {
     it("gets no invite (so no invite key and no opening-day mail)", async () => {
         await waitlist.tellMeWhen({

@@ -205,7 +205,13 @@ const SAROH_BILLED: Record<
     ...Object.fromEntries(
         Object.entries(WRITES).filter(
             ([route]) =>
-                !["POST cancel", "PATCH profile/:profileId"].includes(route),
+                ![
+                    "POST cancel",
+                    "PATCH profile/:profileId",
+                    // A Global invite joins on Free instead (owner, 9 Nov
+                    // 2026): invites.service.spec.ts, invites.db.spec.ts.
+                    "POST launch-offer",
+                ].includes(route),
         ),
     ),
     "GET change-plan": (ctx) =>

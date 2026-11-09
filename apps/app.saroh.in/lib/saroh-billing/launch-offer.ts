@@ -19,6 +19,11 @@ export type InviteIntent =
           planName: string;
           days: number;
       }
+    /**
+     * A valid invite with no offer: Global's, Free only (DEC-211, owner
+     * 9 Nov 2026). Taken once the business exists, to mark it joined.
+     */
+    | { kind: "free"; token: string; businessName: string | null }
     /** The API couldn't be asked; it is tried once the business exists. */
     | { kind: "unchecked"; token: string }
     /** It can't be used, in the API's words ("ask for a new invite"). */
@@ -36,12 +41,24 @@ export interface InviteCheckAnswer {
 /** An invite token's shape; anything else is no invite. */
 export const INVITE_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
-/** What the API's answer means for onboarding. */
+/**
+ * What the API's answer means for onboarding. `offers`: whether this
+ * edition gives the launch offer (India); where it doesn't, a ready invite
+ * is read as Free.
+ */
 export function inviteIntentFrom(
     token: string,
     answer: InviteCheckAnswer | null,
+    offers = true,
 ): InviteIntent {
     if (!answer) return { kind: "unchecked", token };
+    if (answer.status === "free" || (answer.status === "ready" && !offers)) {
+        return {
+            kind: "free",
+            token,
+            businessName: answer.businessName ?? null,
+        };
+    }
     if (
         answer.status === "ready" &&
         typeof answer.planKey === "string" &&
@@ -84,7 +101,9 @@ export function inviteNote(intent: InviteIntent): string | null {
 
 /** The token to take the offer with once the business exists, if any. */
 export function inviteToTake(intent: InviteIntent): string | null {
-    return intent.kind === "ready" || intent.kind === "unchecked"
+    return intent.kind === "ready" ||
+        intent.kind === "free" ||
+        intent.kind === "unchecked"
         ? intent.token
         : null;
 }
