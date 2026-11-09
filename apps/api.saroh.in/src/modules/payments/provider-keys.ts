@@ -81,6 +81,14 @@ export const PROVIDER_FAILED_MESSAGE =
     "The business can't take payment online right now. Please try again later, or pay them another way.";
 
 /**
+ * Stripe answered a live call 403: a real restricted key missing a
+ * permission (STRIPE.md), not keys it refused (401).
+ */
+export function lacksPermission(err: unknown): boolean {
+    return isKeysRefused(err) && err.httpStatus === 403;
+}
+
+/**
  * A provider order that failed, as a handled answer (UX-012): a
  * deliberate 503 in the customer's words, never the provider's. When the
  * provider refused the keys themselves the connection is marked as

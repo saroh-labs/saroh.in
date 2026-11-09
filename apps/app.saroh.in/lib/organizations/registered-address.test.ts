@@ -84,6 +84,24 @@ describe("what the settings form refuses before the API does", () => {
         ).toEqual([]);
     });
 
+    it("reads India by its name too, and asks no PIN shape of a blank country, as the API", () => {
+        const unregistered = { ...filled, gstRegistered: false };
+        expect(
+            addressProblems({
+                ...unregistered,
+                country: "india",
+                postalCode: "56003",
+            }).map((p) => p.path),
+        ).toEqual(["postalCode"]);
+        expect(
+            addressProblems({
+                ...unregistered,
+                country: "",
+                postalCode: "56003",
+            }),
+        ).toEqual([]);
+    });
+
     it("leaves an unregistered business free to have no address", () => {
         expect(
             addressProblems({

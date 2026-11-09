@@ -1,3 +1,5 @@
+import type { StripeCheckoutStyle } from "@saroh/edition";
+
 /**
  * Where a Stripe customer pays (owner, 8 Nov 2026, DEC-208): on Stripe's
  * hosted Checkout page (the default, as it handles every country's rules)
@@ -5,8 +7,8 @@
  * connection (`MerchantPaymentProvider.checkoutStyle`); null reads as
  * hosted, and other providers have no choice.
  */
-export const STRIPE_CHECKOUT_STYLES = ["HOSTED", "WINDOW"] as const;
-export type StripeCheckoutStyle = (typeof STRIPE_CHECKOUT_STYLES)[number];
+export { STRIPE_CHECKOUT_STYLES } from "@saroh/edition";
+export type { StripeCheckoutStyle } from "@saroh/edition";
 
 /** Whether a connection's customers pay in Saroh's card window. */
 export function paysInWindow(row: {

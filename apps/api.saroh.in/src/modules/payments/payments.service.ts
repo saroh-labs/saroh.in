@@ -71,6 +71,7 @@ import {
     assertKeysAccepted,
     credentialsUnreadable,
     flagPaymentProvider,
+    lacksPermission,
     paymentProviderWorks,
     PROVIDER_FAILED_MESSAGE,
     providerLabel,
@@ -2259,29 +2260,93 @@ export class PaymentsService {
         const stripe = providerRow.provider === "STRIPE";
         // Saroh's own card window (DEC-208, 8 Nov): a PaymentIntent the
         // page confirms, no session, no payer or return pages to prepare.
-        const cardWindow = paysInWindow(providerRow);
+        let cardWindow = paysInWindow(providerRow);
         const description = stripe
             ? await paymentDescription(organizationId, target.kind)
             : undefined;
-        // A hold already paying through a session gets it back, never a
-        // new one that would hold its place longer (U6).
-        if (stripe && !cardWindow && target.kind === "invoice") {
-            const earlier = await earlierHoldSession(target.id);
-            if (earlier === "closed") throw checkoutClosed();
-            if (earlier) return this.replay(organizationId, earlier);
-        }
         // Stripe's hosted Checkout (DEC-208, 7 Nov amendment) echoes Saroh's
         // intent id, so the row's id is made before the call.
         const intentId = stripe ? randomUUID() : undefined;
-        const inWindow = cardWindow
-            ? await prepareStripeWindow({
-                  organizationId,
-                  target,
-                  providerRow,
-                  adapter: provider,
-                  credentials,
-              })
-            : null;
+        const holdInvoice = stripe && target.kind === "invoice";
+        let intent: CreateOrderIntentResult | null = null;
+        let inWindow: Awaited<ReturnType<typeof prepareStripeWindow>> | null =
+            null;
+        // The key can't make PaymentIntents (no Payment Intents: Write).
+        let windowRefused = false;
+        if (cardWindow) {
+            inWindow = await prepareStripeWindow({
+                organizationId,
+                target,
+                providerRow,
+                adapter: provider,
+                credentials,
+            });
+            try {
+                if (!provider.createElementIntent) {
+                    throw new Error("Stripe's card window isn't available");
+                }
+                intent = await provider.createElementIntent({
+                    amountCents,
+                    currency,
+                    orderId: target.id,
+                    credentials,
+                    ...(description ? { description } : {}),
+                    ...(intentId ? { intentId } : {}),
+                    customerId: inWindow.customerId,
+                    receiptEmail: inWindow.receiptEmail,
+                });
+            } catch (err) {
+                if (!lacksPermission(err)) {
+                    throw await providerOrderFailed(providerRow, err);
+                }
+                // A restricted key without Payment Intents: Write (owner,
+                // 8 Nov 2026): this payment goes to Stripe's hosted page,
+                // and the connection names the permission to add.
+                this.logger.warn(
+                    `Stripe's card window was refused for business ${organizationId} (missing permission); paying on Stripe's page`,
+                );
+                windowRefused = true;
+                cardWindow = false;
+            }
+            // The card's billing address starts on the business's
+            // country, never the browser's guess (owner, 8 Nov).
+            if (intent && inWindow.country) {
+                intent = {
+                    ...intent,
+                    clientParams: {
+                        ...intent.clientParams,
+                        country: inWindow.country,
+                    },
+                };
+            }
+            // A hold now paying in the window closes a session left open
+            // from before the business switched, so one place can't be
+            // paid twice.
+            if (intent && holdInvoice) {
+                await this.closeOtherStyleHoldIntents(
+                    target.id,
+                    true,
+                    providerRow,
+                );
+            }
+        }
+        if (holdInvoice && !cardWindow) {
+            // And a hold paying on Stripe's page closes an open window.
+            await this.closeOtherStyleHoldIntents(
+                target.id,
+                false,
+                providerRow,
+            );
+            // A hold already paying through a session gets it back, never
+            // a new one that would hold its place longer (U6).
+            const earlier = await earlierHoldSession(target.id);
+            if (earlier === "closed") throw checkoutClosed();
+            if (earlier) {
+                if (windowRefused)
+                    await this.flagPermissionMissing(providerRow);
+                return this.replay(organizationId, earlier);
+            }
+        }
         const checkout =
             intentId && !cardWindow
                 ? await prepareStripeCheckout({
@@ -2294,34 +2359,8 @@ export class PaymentsService {
                       returnPath,
                   })
                 : null;
-        let intent: CreateOrderIntentResult;
-        try {
-            if (cardWindow) {
-                if (!provider.createElementIntent) {
-                    throw new Error("Stripe's card window isn't available");
-                }
-                intent = await provider.createElementIntent({
-                    amountCents,
-                    currency,
-                    orderId: target.id,
-                    credentials,
-                    ...(description ? { description } : {}),
-                    ...(intentId ? { intentId } : {}),
-                    customerId: inWindow?.customerId,
-                    receiptEmail: inWindow?.receiptEmail,
-                });
-                // The card's billing address starts on the business's
-                // country, never the browser's guess (owner, 8 Nov).
-                if (inWindow?.country) {
-                    intent = {
-                        ...intent,
-                        clientParams: {
-                            ...intent.clientParams,
-                            country: inWindow.country,
-                        },
-                    };
-                }
-            } else {
+        if (!intent) {
+            try {
                 intent = await provider.createOrderIntent({
                     amountCents,
                     currency,
@@ -2330,31 +2369,26 @@ export class PaymentsService {
                     ...(description ? { description } : {}),
                     ...(checkout ? { hosted: checkout.hosted } : {}),
                 });
+            } catch (err) {
+                // A handled 503 in the customer's words, never an unhandled
+                // 500; refused keys also flag the connection and tell the
+                // team (UX-012).
+                throw await providerOrderFailed(providerRow, err);
             }
-        } catch (err) {
-            // A handled 503 in the customer's words, never an unhandled
-            // 500; refused keys also flag the connection and tell the
-            // team (UX-012).
-            throw await providerOrderFailed(providerRow, err);
         }
         const customerFound = checkout
             ? checkout.hosted.customerId
             : inWindow?.customerId;
-        if (checkout?.permissionMissing || inWindow?.permissionMissing) {
-            // The key can't read or make customers: the payment went ahead
-            // without one, and the connection names the permission to add
-            // (KTD-14). A later payment that makes its customer clears it.
-            try {
-                await flagPaymentProvider(
-                    providerRow,
-                    new Date(),
-                    PERMISSION_MISSING,
-                );
-            } catch (err) {
-                this.logger.warn(
-                    `Could not mark provider ${providerRow.id} as needing attention: ${errorMessage(err)}`,
-                );
-            }
+        if (
+            windowRefused ||
+            checkout?.permissionMissing ||
+            inWindow?.permissionMissing
+        ) {
+            // The key lacks a permission (Customers, KTD-14; Payment
+            // Intents: Write for the window): the payment went ahead
+            // without it, and the connection names the permission to add.
+            // A later payment that makes its customer clears it.
+            await this.flagPermissionMissing(providerRow);
         } else if (
             providerRow.attentionAt &&
             // A missing permission is cleared only by a payment that made
@@ -2676,7 +2710,75 @@ export class PaymentsService {
         if (intent.status === "CANCELLED" || open) throw checkoutClosed();
     }
 
-    /** Cancel an in-page PaymentIntent at Stripe, then the row. Never throws. */
+    /** Mark the connection `PERMISSION_MISSING`. Never throws. */
+    private async flagPermissionMissing(
+        providerRow: MerchantPaymentProvider,
+    ): Promise<void> {
+        try {
+            await flagPaymentProvider(
+                providerRow,
+                new Date(),
+                PERMISSION_MISSING,
+            );
+        } catch (err) {
+            this.logger.warn(
+                `Could not mark provider ${providerRow.id} as needing attention: ${errorMessage(err)}`,
+            );
+        }
+    }
+
+    /**
+     * A booking hold that pays in one Stripe style closes the other style's
+     * open intents first (a hosted session left from before the business
+     * switched to the window, or a window PaymentIntent once it pays on
+     * Stripe's page), so one place is never paid twice. A session is
+     * expired by its `cs_` id. Never throws.
+     */
+    private async closeOtherStyleHoldIntents(
+        invoiceId: string,
+        inWindow: boolean,
+        providerRow: MerchantPaymentProvider,
+    ): Promise<void> {
+        let others: {
+            id: string;
+            providerIntentId: string | null;
+            providerCheckoutId: string | null;
+        }[];
+        try {
+            others = await prisma.paymentIntent.findMany({
+                where: {
+                    invoiceId,
+                    provider: "STRIPE",
+                    status: { in: [...OPEN_INTENT_STATUSES] },
+                    providerIntentId: { not: null },
+                    providerCheckoutId: inWindow ? { not: null } : null,
+                    invoice: { status: "DRAFT", source: "BOOKING" },
+                },
+                select: {
+                    id: true,
+                    providerIntentId: true,
+                    providerCheckoutId: true,
+                },
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Could not read the open payments of invoice ${invoiceId}: ${errorMessage(err)}`,
+            );
+            return;
+        }
+        for (const other of others) {
+            await this.closeLegacyStripeIntent(
+                {
+                    id: other.id,
+                    providerIntentId:
+                        other.providerCheckoutId ?? other.providerIntentId,
+                },
+                providerRow,
+            );
+        }
+    }
+
+    /** Cancel an in-page PaymentIntent (or expire a session) at Stripe, then the row. Never throws. */
     private async closeLegacyStripeIntent(
         intent: { id: string; providerIntentId: string | null },
         providerRow: MerchantPaymentProvider,

@@ -551,7 +551,7 @@ export function DataView<TRow>({
                                         <Link
                                             href={href}
                                             data-row-link=""
-                                            className="block min-w-0 truncate rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-ring"
+                                            className="block min-w-0 truncate rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                         >
                                             {primary?.cell(row)}
                                         </Link>
@@ -562,7 +562,7 @@ export function DataView<TRow>({
                                         <button
                                             type="button"
                                             onClick={() => onRowClick(row)}
-                                            className="block w-full min-w-0 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            className="block w-full min-w-0 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                         >
                                             {primary?.cell(row)}
                                         </button>

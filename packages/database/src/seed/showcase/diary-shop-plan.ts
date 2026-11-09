@@ -569,11 +569,37 @@ export function planDiaryShop(
             return null;
         };
         const spanDays = sc.spanDays ?? 3;
+        // A past scene (an unmarked visit, a no-show) stays in the past: its
+        // own day up to now, else a day earlier, never a later slot that
+        // makes it upcoming (a salon closed yesterday, seeded Monday morning).
+        let pastSlot: { s: number; span: Span } | null = null;
+        if (sc.day < 0) {
+            for (let back = 0; back < 7 && !pastSlot; back++) {
+                const start = istAt(
+                    now,
+                    sc.day - back,
+                    minuteOf(sc.from ?? "00:00"),
+                ).getTime();
+                const until = Math.min(
+                    istAt(now, sc.day - back + 1, 0).getTime(),
+                    t,
+                );
+                for (const s of candidates) {
+                    if (!takes(s, svc)) continue;
+                    const span = firstSlot(s, svc, contact, start, until);
+                    if (span && span.end <= t) {
+                        pastSlot = { s, span };
+                        break;
+                    }
+                }
+            }
+        }
         // A scene from today on that lands on a closure (Diwali), a stretch
         // its staff don't work, or a day already past its last slot (a seed
         // run late in the IST evening) moves to the next week's first slot,
         // so the seed holds at any `--now`.
         const found: { s: number; span: Span } | null =
+            pastSlot ??
             slotWithin(spanDays) ??
             (sc.day >= 0 ? slotWithin(spanDays + 7) : null);
         if (!found) {

@@ -317,3 +317,12 @@ export * from "./address-rules";
 export * from "./bank-details";
 export * from "./country-words";
 export * from "./country-zones";
+
+/**
+ * Where a Stripe business's customers pay (owner, 8 Nov 2026, DEC-208):
+ * Stripe's hosted Checkout page (the default) or Saroh's own card window on
+ * the business's page. Kept per Stripe connection; null reads as hosted.
+ * Shared by the API's DTO and the workspace.
+ */
+export const STRIPE_CHECKOUT_STYLES = ["HOSTED", "WINDOW"] as const;
+export type StripeCheckoutStyle = (typeof STRIPE_CHECKOUT_STYLES)[number];

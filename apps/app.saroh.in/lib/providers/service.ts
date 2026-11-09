@@ -1,3 +1,5 @@
+import type { StripeCheckoutStyle } from "@saroh/edition";
+
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
@@ -9,12 +11,8 @@ import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 export type PaymentProviderName = "RAZORPAY" | "CASHFREE" | "STRIPE";
 
-/**
- * Where a Stripe business's customers pay (owner, 8 Nov 2026, DEC-208):
- * Stripe's hosted page (the default) or Saroh's card window on the
- * business's own page.
- */
-export type StripeCheckoutStyle = "HOSTED" | "WINDOW";
+/** Where a Stripe business's customers pay (DEC-208), as the API takes it. */
+export type { StripeCheckoutStyle };
 
 /**
  * Why a connection that is still CONNECTED needs a person (UX-012): its

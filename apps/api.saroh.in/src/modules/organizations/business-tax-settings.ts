@@ -285,15 +285,18 @@ function taxError(message: string, field: string): never {
  * A Global business's own address against its country's rules (KTD-A): the
  * postcode's shape, and the region from its list, each required where the
  * country needs one once any of the address is in (an address being cleared
- * whole needs nothing). Checked only when the address is sent; what was sent
- * is written as the rules store it ("k1a0b1" is "K1A 0B1", "Texas" is "TX").
+ * whole needs nothing). Checked when the address or the country is sent;
+ * what was sent is written as the rules store it ("k1a0b1" is "K1A 0B1",
+ * "Texas" is "TX"). A new country rewrites the postcode and region too, so
+ * one it takes none of (Singapore's region) never keeps the old country's.
  */
 function countryAddress(
     country: string,
     current: TaxCurrent | null,
     sent: AddressData,
+    countrySent: boolean,
 ): AddressData {
-    if (Object.keys(sent).length === 0) return {};
+    if (Object.keys(sent).length === 0 && !countrySent) return {};
     const now = {
         addressLine1: current?.addressLine1 ?? null,
         city: current?.city ?? null,
@@ -307,11 +310,15 @@ function countryAddress(
     if ("problem" in postcode) taxError(postcode.problem, "postalCode");
     const region = checkRegion(country, now.region, required);
     if ("problem" in region) taxError(region.problem, "region");
+    const postalCode = postcode.value || null;
+    const regionCode = region.value || null;
+    // Sent, or changed by a new country's rules.
+    const write = (key: "postalCode" | "region", value: string | null) =>
+        sent[key] !== undefined ||
+        (countrySent && value !== (current?.[key] ?? null));
     return {
-        ...(sent.postalCode !== undefined
-            ? { postalCode: postcode.value || null }
-            : {}),
-        ...(sent.region !== undefined ? { region: region.value || null } : {}),
+        ...(write("postalCode", postalCode) ? { postalCode } : {}),
+        ...(write("region", regionCode) ? { region: regionCode } : {}),
     };
 }
 
@@ -426,7 +433,15 @@ export function taxChanges(
         taxError("A PIN code is six digits, like 560038.", "postalCode");
     }
     if (editionProfile(edition).address === "country-and-region") {
-        Object.assign(data, countryAddress(country, current, addressData));
+        Object.assign(
+            data,
+            countryAddress(
+                country,
+                current,
+                addressData,
+                sent.country !== undefined,
+            ),
+        );
     } else if (addressData.region !== undefined) {
         // India's state is its GST state: one place for it.
         if (addressData.region) {

@@ -197,7 +197,7 @@ test.describe("the Global app (DEC-204)", () => {
         // The restricted key's permissions hosted Checkout needs, and how
         // customers pay (card, with Apple Pay and Google Pay, or Link).
         await expect(sheet).toContainText(
-            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write.",
+            "create a restricted key with Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write.",
         );
         await expect(sheet).toContainText(
             "Customers pay on Stripe's own checkout page, by card (Apple Pay and Google Pay included) or Link.",

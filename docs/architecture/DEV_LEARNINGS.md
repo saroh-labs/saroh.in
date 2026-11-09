@@ -6606,3 +6606,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `lib/money.ts` added to `UI_FILES`; saroh.tech's `vitest.config.ts` lists `packages/ui/src/**` in `forceRerunTriggers`, so a `@saroh/ui` change reruns its whole suite under `--changed`.
 - **Rule:** a test that reads another package's files by path, not by import, needs a `forceRerunTriggers` entry for them, or the local gate never runs it.
 - **Category:** tooling · tests
+
+## The showcase seed failed on a Monday morning: "a past visit nobody has marked" (9 Nov 2026)
+
+- **Symptom:** every Browser E2E shard on PR #1332 failed at `db:seed:showcase`: "Gulmohar Salon & Bridal is missing what its demos need: a past visit nobody has marked". The run seeded at 04:30 UTC on Monday 9 Nov (10:00 Kolkata); nothing in the PR touched the seed.
+- **Cause:** the salon's `priyanka_blowdry` scene is `day: -1, outcome: "UNMARKED"`, but the scene search (`diary-shop-plan.ts`) looks from that day _forward_ three days for a free slot. With the salon shut on Sunday, it found Monday's or Tuesday's slot, so the "past, unmarked" visit was upcoming and the seed's own check refused the run.
+- **Fix:** a scene with `day < 0` looks only for a slot that has already ended, on its day or the days before it, before the forward search; `diary-shop-plan.test.ts` plans at CI's exact `now` and asserts a past unmarked visit at every `now`.
+- **Rule:** a seeded scene that means "in the past" must never be moved forward to find a slot; test a planner at the time of day CI seeds, not only noon.
+- **Category:** seed · e2e

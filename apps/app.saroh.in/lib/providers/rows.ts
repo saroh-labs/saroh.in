@@ -307,17 +307,18 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
  * before needs its keys entered again with the secret.
  */
 /**
- * The restricted key's permissions Stripe's hosted Checkout needs (plan
+ * The restricted key's permissions Stripe payments need (plan
  * 2026-11-07-002, KTD-14), as the API's words say them
  * (`stripe-payments.ts` `STRIPE_KEY_PERMISSIONS`).
  */
 export const STRIPE_KEY_PERMISSIONS =
-    "Checkout Sessions: Write, Customers: Write, Payment Intents: Read and Refunds: Write";
+    "Checkout Sessions: Write, Customers: Write, Payment Intents: Write and Refunds: Write";
 
 /**
  * A Stripe connection that still takes payments, but whose restricted key
- * lacks a permission a payment uses on the side (Customers, KTD-14): each
- * payment goes through without its Stripe customer until the key has it.
+ * lacks a permission a payment uses on the side: Customers (KTD-14), so a
+ * payment goes without its Stripe customer, or Payment Intents: Write, so
+ * a card-window payment goes to Stripe's page instead (owner, 8 Nov 2026).
  */
 export function permissionMissing(p: {
     status: string;
@@ -449,7 +450,7 @@ function paymentEntry(
                 : noSecret
                   ? "Needs its webhook signing secret. Payments can't be confirmed until you add it."
                   : lacking
-                    ? `Needs attention. Its restricted key can't make customers in Stripe, so payments go through without one. In Stripe, give the key ${STRIPE_KEY_PERMISSIONS}, then enter the keys again.`
+                    ? `Needs attention. Its restricted key is missing a permission, so payments go through without a Stripe customer, or on Stripe's page instead of yours. In Stripe, give the key ${STRIPE_KEY_PERMISSIONS}, then enter the keys again.`
                     : stores.length > 0
                       ? sentence(`Takes online payments at ${words(stores)}`)
                       : "Ready to take online payments. No location's checkout uses it yet.",
