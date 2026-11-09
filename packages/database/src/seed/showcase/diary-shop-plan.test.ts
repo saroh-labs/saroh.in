@@ -25,6 +25,7 @@ const NOWS = [
     "2026-10-18T13:30:00Z", // a Sunday afternoon
     "2026-11-07T18:30:00Z", // midnight before Diwali, Kolkata
     "2026-11-09T06:00:00Z",
+    "2026-11-09T04:30:00Z", // Monday 10:00, Kolkata: CI's seed, salon shut Sunday
     "2027-03-31T12:00:00Z", // financial year's last day
     "2027-01-31T20:00:00Z",
     "2026-12-24T02:30:00Z",
@@ -49,6 +50,16 @@ describe.each([
         );
         const t = now.getTime();
         const live = w.bookings.filter((b) => b.status !== "CANCELLED");
+        // Home's "nobody marked it" scene is a visit that has ended (the
+        // seed's own check refuses a run without one).
+        expect(
+            live.some(
+                (b) =>
+                    b.status === "CONFIRMED" &&
+                    b.outcome === null &&
+                    new Date(b.endAt).getTime() <= t,
+            ),
+        ).toBe(true);
         // Nobody, staff or client, in two places at once.
         for (const key of ["staffId", "contactId"] as const) {
             const by = new Map<string, { s: number; e: number }[]>();
