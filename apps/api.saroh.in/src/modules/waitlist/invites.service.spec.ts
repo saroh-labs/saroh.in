@@ -30,6 +30,10 @@ jest.mock("../../env", () => ({
     },
 }));
 jest.mock("../../common/email", () => ({
+    accountsBaseFor:
+        jest.requireActual<typeof import("../../common/email")>(
+            "../../common/email",
+        ).accountsBaseFor,
     sendWaitlistLaunchInviteEmail: jest.fn(),
 }));
 
@@ -109,6 +113,27 @@ describe("WaitlistInvitesService.sendOne", () => {
             where: { id: "w1", inviteTokenHash: claim.data.inviteTokenHash },
             data: { inviteSentAt: expect.any(Date) },
         });
+    });
+
+    it("links a Global entry to Global sign-up (DEC-204)", async () => {
+        const global = { ...waiting, edition: "GLOBAL" };
+        signups.findMany!.mockResolvedValue([global]);
+        signups.findUnique!.mockResolvedValue(global);
+        signups.updateMany!.mockResolvedValue({ count: 1 });
+        send.mockResolvedValue("sent");
+        const before = env.ACCOUNTS_URL;
+        (env as { ACCOUNTS_URL?: string }).ACCOUNTS_URL =
+            "https://accounts.saroh.in";
+        try {
+            await invites.sendOne("w1", NOW);
+        } finally {
+            (env as { ACCOUNTS_URL?: string }).ACCOUNTS_URL = before;
+        }
+        const [, details] = send.mock.calls[0] as [string, { url: string }];
+        const url = new URL(details.url);
+        expect(url.origin + url.pathname).toBe(
+            "https://accounts.saroh.tech/signup",
+        );
     });
 
     it("releases an entry whose email did not leave, so it is still waiting", async () => {

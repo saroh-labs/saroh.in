@@ -275,10 +275,11 @@ export class AdminMachineryService {
     /**
      * Check a waiting domain's DNS again, now, through the same verifier its
      * owner uses. The result is recorded on the domain and in the trail.
+     * Another edition's domain is a 404 (DEC-204 item 6).
      */
     async recheckDomain(staff: PlatformAdminInfo, domainId: string) {
-        const domain = await prisma.domain.findUnique({
-            where: { id: domainId },
+        const domain = await prisma.domain.findFirst({
+            where: { id: domainId, ...viaBusiness(staff.edition) },
             select: { id: true, organizationId: true },
         });
         if (!domain) throw new NotFoundException("Domain not found");

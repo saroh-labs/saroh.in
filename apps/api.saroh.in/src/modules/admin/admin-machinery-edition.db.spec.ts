@@ -1,20 +1,24 @@
 /**
  * The console's machinery stays in its edition (KTD11, DEC-204 item 6): a
  * retry, cancel or replay naming another edition's business, planned or run,
- * is a 404 and nothing runs; so are that edition's operations and a flag
- * explained for its business. A job of no business is reached from both.
+ * is a 404 and nothing runs; so are that edition's operations, a flag
+ * explained for its business, a waitlist invite for its signups and a recheck
+ * of its business's domain. A job of no business is reached from both.
  * Integration project (TEST_DATABASE_URL).
  */
 import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
+import type { DomainsService } from "../domains/domains.service";
 import type { WaitlistInvitesService } from "../waitlist/invites.service";
 import type { WebhooksService } from "../webhooks/webhooks.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { assertBusinessInEdition } from "./admin-edition";
+import { AdminMachineryService } from "./admin-machinery.service";
 import { AdminOperationsService } from "./admin-operations.service";
 import { AdminRole, permissionsFor } from "./admin-permissions";
+import { assertWaitlistInEdition } from "./admin-waitlist.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -52,7 +56,7 @@ async function failedJob(organizationId: string | null) {
 
 const start = (
     edition: Edition | null,
-    kind: "jobs.retry" | "jobs.cancel" | "webhooks.replay",
+    kind: "jobs.retry" | "jobs.cancel" | "webhooks.replay" | "waitlist.invite",
     ids: string[],
     key: string,
 ) =>
@@ -198,5 +202,56 @@ describe("explaining a flag for a business", () => {
         await expect(
             assertBusinessInEdition(globalId, null),
         ).resolves.toBeUndefined();
+    });
+});
+
+describe("inviting from the waitlist from a console", () => {
+    it("is a 404 for another edition's signup, planned or run", async () => {
+        const signup = await prisma.waitlistSignup.create({
+            data: {
+                edition: "GLOBAL",
+                email: `wl-${tag}@example.com`,
+                emailKey: `wl-${tag}@example.com`,
+            },
+        });
+        await expect(
+            assertWaitlistInEdition([signup.id], "INDIA"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.plan("waitlist.invite", [signup.id], "INDIA"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            start("INDIA", "waitlist.invite", [signup.id], "in-invite"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            assertWaitlistInEdition([signup.id], "GLOBAL"),
+        ).resolves.toBeUndefined();
+    });
+});
+
+describe("rechecking a domain from a console", () => {
+    it("is a 404 for another edition's business's domain, and checks its own", async () => {
+        const verify = jest.fn().mockResolvedValue({ verified: false });
+        const machinery = new AdminMachineryService(
+            { verify } as unknown as DomainsService,
+            new AdminAuditService(),
+        );
+        const domain = await prisma.domain.create({
+            data: {
+                organizationId: globalId,
+                hostname: `recheck-${tag}.example.com`,
+                verificationToken: "token",
+            },
+        });
+
+        await expect(
+            machinery.recheckDomain(staff("INDIA"), domain.id),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(verify).not.toHaveBeenCalled();
+
+        await expect(
+            machinery.recheckDomain(staff("GLOBAL"), domain.id),
+        ).resolves.toEqual({ verified: false, reason: null });
+        expect(verify).toHaveBeenCalledTimes(1);
     });
 });

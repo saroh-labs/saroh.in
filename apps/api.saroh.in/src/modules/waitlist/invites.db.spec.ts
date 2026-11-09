@@ -22,6 +22,10 @@ jest.mock("../../env", () => {
     };
 });
 jest.mock("../../common/email", () => ({
+    accountsBaseFor:
+        jest.requireActual<typeof import("../../common/email")>(
+            "../../common/email",
+        ).accountsBaseFor,
     sendWaitlistLaunchInviteEmail: jest.fn(),
 }));
 
