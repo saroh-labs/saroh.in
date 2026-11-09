@@ -4,13 +4,14 @@ import { modulesOrUnknown } from "@/lib/modules/guard";
 import { startingCurrency } from "@/lib/organizations/starting-currency";
 
 import { plansShowClasses } from "./plan-cards";
+import type { TakenPlan } from "./plan-editor";
 import type { Plan } from "./service";
 import { getAutopayOffer, listPlans } from "./service";
 
 /**
  * What the Plan Editor's pages read beside the plan itself (D7). Server-only.
  *
- * - the other plans' names, for a clash seen as it is typed (a name is free
+ * - the other plans' names and ids, for a clash seen as it is typed (a name is free
  *   among plans that aren't archived, D1, drafts included);
  * - whether the business sells classes (Appointments on, default 31), read
  *   from the module projection as Plan Detail reads it;
@@ -25,7 +26,7 @@ import { getAutopayOffer, listPlans } from "./service";
  */
 export async function planEditorContext(planId: string | null): Promise<{
     gst: GstAsk;
-    takenNames: string[];
+    takenPlans: TakenPlan[];
     withClasses: boolean;
     currency: string;
     /** This plan as the list reads it: who is on it, what it brings in. */
@@ -45,9 +46,9 @@ export async function planEditorContext(planId: string | null): Promise<{
         : null;
     const mine = plans.filter((p) => p.id === planId);
     return {
-        takenNames: plans
+        takenPlans: plans
             .filter((p) => p.id !== planId && p.status !== "ARCHIVED")
-            .map((p) => p.name),
+            .map((p) => ({ id: p.id, name: p.name })),
         withClasses: plansShowClasses(appointments, mine.length ? mine : plans),
         currency:
             [...plans].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]

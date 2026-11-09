@@ -58,7 +58,7 @@ export default async function EditPlanPage({
         <PlanEditor
             initial={record}
             figures={context.plan}
-            takenNames={context.takenNames}
+            takenPlans={context.takenPlans}
             withClasses={context.withClasses}
             autopayOffered={context.autopayOffered}
             currency={record.values.currency}

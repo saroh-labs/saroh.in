@@ -86,7 +86,7 @@ export default async function NewPlanPage() {
         <PlanEditor
             initial={null}
             figures={null}
-            takenNames={context.takenNames}
+            takenPlans={context.takenPlans}
             withClasses={context.withClasses}
             autopayOffered={context.autopayOffered}
             currency={context.currency}
