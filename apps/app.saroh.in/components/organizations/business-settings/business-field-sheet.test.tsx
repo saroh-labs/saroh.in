@@ -5,6 +5,7 @@
  * from another row is asked for in that sheet, so nobody is sent to
  * another tab halfway. Made-up details only.
  */
+import type { Edition } from "@saroh/edition";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -31,6 +32,17 @@ import {
     type,
     unmount,
 } from "./business-settings.test-kit";
+
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
 
 const save = vi.fn();
 vi.mock("@/lib/organizations/settings-actions", () => ({
@@ -68,7 +80,10 @@ beforeEach(() => {
     showError.mockReset();
 });
 
-afterEach(unmount);
+afterEach(() => {
+    edition.name = "INDIA";
+    unmount();
+});
 
 const GSTIN = "29AAGCR4375J1ZU";
 
@@ -191,5 +206,53 @@ describe("GST on delivery", () => {
             tax?: { deliveryRate?: string };
         };
         expect(sent.tax?.deliveryRate).toBe("12");
+    });
+});
+
+describe("an unchanged address, saved", () => {
+    /** A US business whose stored address is an Indian one, with no state. */
+    const us = (over: { city: string; postalCode: string; region?: string }) =>
+        settings({
+            profile: {
+                ...PROFILE,
+                country: "US",
+                timezone: "America/New_York",
+            },
+            tax: {
+                registered: false,
+                state: null,
+                stateName: null,
+                invoicePrefix: "HR",
+                deliveryRate: "0",
+                deliverySac: null,
+            },
+            registeredAddress: {
+                line1: "1 Janpath",
+                line2: null,
+                region: null,
+                state: null,
+                stateName: null,
+                ...over,
+            },
+        });
+
+    it("on Global, says what breaks the country's rules instead of closing", async () => {
+        edition.name = "GLOBAL";
+        onTab("address", "&edit=address");
+        draw(us({ city: "New Delhi", postalCode: "110001" }));
+        expect(sheet()).not.toBeNull();
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()).not.toBeNull();
+        expect(sheet()?.querySelector('[aria-invalid="true"]')).not.toBeNull();
+    });
+
+    it("on Global, a valid one just closes, sending nothing", async () => {
+        edition.name = "GLOBAL";
+        onTab("address", "&edit=address");
+        draw(us({ city: "Austin", postalCode: "78701", region: "TX" }));
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()).toBeNull();
     });
 });

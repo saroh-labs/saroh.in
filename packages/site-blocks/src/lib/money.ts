@@ -13,15 +13,16 @@ export const moneyLocaleOf = (currency: string | null | undefined) =>
  * helpers their modules already export (`formatPrice`, `formatAmount`,
  * `formatMoney`, `accountMoney`).
  *
- * `locale` is Intl's default when omitted (the visitor's); callers pin
- * {@link moneyLocaleOf} where the page has always pinned one. Null for a
+ * Always in the business's own format, never the visitor's: `locale`
+ * defaults to {@link moneyLocaleOf} its currency, so a US business's $20
+ * reads "$20" to a browser set to en-IN too, as in the workspace. Null for a
  * currency Intl doesn't know, or an amount that isn't a number: better no
  * price than a wrong one, and each caller says what it shows instead.
  */
 export function siteMoney(
     amount: number,
     currency: string,
-    locale?: string,
+    locale = moneyLocaleOf(currency),
 ): string | null {
     if (!Number.isFinite(amount) || !currency) return null;
     // Whole to the paisa: 499.999999 from a float is still 500.
