@@ -1,6 +1,7 @@
 import type { Catalog, CatalogModule, Cell } from "@saroh/pricing-catalog";
-import { formatCount, formatInr, limitWordsFor } from "@saroh/pricing-catalog";
+import { formatCount, limitWordsFor } from "@saroh/pricing-catalog";
 
+import { planMoney } from "@/lib/plan-money";
 import { cellChanged, liveCellOf } from "../plans/catalog-edits";
 
 /**
@@ -97,7 +98,7 @@ export function priceWas(
     if (!was) return "new";
     return was.pricePaise === now.pricePaise
         ? null
-        : `was ${formatInr(was.pricePaise)}`;
+        : `was ${planMoney(was.pricePaise)}`;
 }
 
 /** Rows a filter keeps (before the search). */

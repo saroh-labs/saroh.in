@@ -25,6 +25,17 @@ describe("planRows", () => {
         expect(new Set(rows.map((r) => r.currency))).toEqual(new Set(["INR"]));
     });
 
+    it("takes the catalogue's currency (stage 9)", () => {
+        const rows = planRows(
+            edit(fixture(), (c) => {
+                c.currency = "USD";
+                c.tax = "none";
+            }),
+            1,
+        );
+        expect(new Set(rows.map((r) => r.currency))).toEqual(new Set(["USD"]));
+    });
+
     it("marks a retired plan's rows not offerable", () => {
         const rows = planRows(
             edit(fixture(), (c) => (c.plans[2].retired = true)),

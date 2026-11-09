@@ -87,7 +87,8 @@ export class LaunchOfferService {
     async publicOffer(now = new Date()): Promise<PublicLaunchOffer | null> {
         const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
         if (!offer) return null;
-        const live = await liveCatalogueVersion(prisma, now);
+        // saroh.in's waitlist: India's catalogue (KTD3c, India-only offer).
+        const live = await liveCatalogueVersion(prisma, "INDIA", now);
         if (!live) return null;
         const parsed = validateCatalog(live.catalog);
         if (!parsed.ok) {

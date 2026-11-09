@@ -33,6 +33,7 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/saroh-billing/service", () => ({
+    plansOpen: () => Promise.resolve(true),
     pausedOrNull: () => Promise.resolve(null),
     billingAccessOrNull: () => Promise.resolve(null),
 }));

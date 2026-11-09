@@ -1,6 +1,7 @@
 import type { Catalog, Cell, Plan } from "@saroh/pricing-catalog";
-import { cellOf, formatInr, yearlyPaise } from "@saroh/pricing-catalog";
+import { cellOf, yearlyPaise } from "@saroh/pricing-catalog";
 
+import { planMoney } from "@/lib/plan-money";
 import { sameCell } from "../plans/catalog-edits";
 
 /**
@@ -31,7 +32,7 @@ export function cellWords(c: Cell): string {
 
 function yearlyWords(catalog: Catalog, plan: Plan): string {
     return catalog.yearly.on && plan.pricePaise
-        ? formatInr(yearlyPaise(plan.pricePaise, catalog.yearly.paid))
+        ? planMoney(yearlyPaise(plan.pricePaise, catalog.yearly.paid))
         : "—";
 }
 
@@ -51,8 +52,8 @@ export function comparePlans(
         };
         line(
             "Price",
-            o ? formatInr(o.pricePaise) : "—",
-            formatInr(p.pricePaise),
+            o ? planMoney(o.pricePaise) : "—",
+            planMoney(p.pricePaise),
         );
         if (o && live) {
             line("Yearly", yearlyWords(live, o), yearlyWords(draft, p));

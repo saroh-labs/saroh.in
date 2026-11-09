@@ -493,5 +493,10 @@ On each unit's GitHub issue, comment when the unit lands on development.
   backfill (U12) with the same cutoff; the catalogue replaces
   `FREE_ENTITLEMENTS` only where both have run, and `PLAN_ENFORCEMENT` goes
   on last.
+- **Current** — **Stage 9's release** (Saroh's plans abroad, DEC-211) is
+  `docs/architecture/STAGE_9_ROLLOUT.md`: after the migrations and the API,
+  `catalogue:global-free` runs in a one-off container (on development once
+  stage 9 merges there); once it has run the API is not rolled back past
+  stage 9.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

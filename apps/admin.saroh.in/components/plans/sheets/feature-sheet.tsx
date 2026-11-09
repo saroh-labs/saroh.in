@@ -13,6 +13,7 @@ import {
 } from "@saroh/ui/sheet";
 import { useId, useMemo, useRef } from "react";
 
+import { indiaOnlyNote } from "@/lib/plan-money";
 import type { ImpactItem } from "@/lib/pricing-types";
 
 import { useDraft } from "../draft-store";
@@ -276,6 +277,11 @@ export function FeatureSheet({
                                         card: at(`${path}.card`),
                                         limit: at(`${path}.limit`),
                                     }}
+                                    indiaOnly={indiaOnlyNote(
+                                        cell.inc
+                                            ? `${feature.name} ${cell.text} ${cell.card}`
+                                            : feature.name,
+                                    )}
                                     onInclude={(on) => include(plan.id, on)}
                                     onPatch={(patch) =>
                                         edit((c) =>

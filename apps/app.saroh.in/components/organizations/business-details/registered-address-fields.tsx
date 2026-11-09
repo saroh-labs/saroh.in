@@ -16,8 +16,8 @@ import type { Control, FieldPath, FieldValues } from "react-hook-form";
 import { PROFILE } from "@/lib/edition";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type { RegisteredAddressValues } from "@/lib/organizations/registered-address";
+import { CountrySelect } from "@saroh/ui/country-select";
 import { OptionSelect } from "@saroh/ui/option-select";
-import { CountrySelect } from "./country-select";
 
 /** What a form holding the registered address carries. */
 export type RegisteredAddressFormValues = RegisteredAddressValues & {

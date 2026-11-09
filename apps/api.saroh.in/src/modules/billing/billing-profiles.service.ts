@@ -10,8 +10,11 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { gstinProblem, stateCode } from "../invoices/gst-states";
-import { normaliseIndianPhone } from "../organizations/business-phone";
-import { nonEmpty } from "./billing-details";
+import {
+    normaliseIndianPhone,
+    normalisePublicPhone,
+} from "../organizations/business-phone";
+import { nonEmpty, profileIsIndian } from "./billing-details";
 import { enqueueBillingProfileSync } from "./billing-profile-sync";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 
@@ -38,6 +41,10 @@ import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 /** What a profile is made of, as the owner gives it. "" clears an optional field. */
 export interface BillingProfileInput {
     legalName?: string;
+    /** ISO 3166-1 alpha-2; absent on a new profile: India (stage 9). */
+    country?: string;
+    /** A tax number outside India (VAT, EIN, ABN); "" clears it. */
+    taxId?: string | null;
     gstin?: string | null;
     gstState?: string | null;
     addressLine1?: string | null;
@@ -52,6 +59,8 @@ export interface BillingProfileInput {
 export interface BillingProfileView {
     id: string;
     legalName: string;
+    country: string;
+    taxId: string | null;
     gstin: string | null;
     gstState: string | null;
     addressLine1: string | null;
@@ -76,6 +85,8 @@ const PIN = /^\d{6}$/;
 const VIEW_SELECT = {
     id: true,
     legalName: true,
+    country: true,
+    taxId: true,
     gstin: true,
     gstState: true,
     addressLine1: true,
@@ -100,6 +111,60 @@ function view(row: ViewRow): BillingProfileView {
     return { ...rest, businesses: _count.organizations };
 }
 
+/**
+ * A payer outside India: no GSTIN or GST state (a change of country clears
+ * them), a free postcode, a phone with its country code, and an optional
+ * tax number kept as typed.
+ */
+function foreignProfileWrite(
+    input: BillingProfileInput,
+    countryChanged: boolean,
+): Partial<ProfileWrite> {
+    const out: Partial<ProfileWrite> = {};
+    if (nonEmpty(input.gstin)) {
+        refuse("A GSTIN is only for a billing address in India.", "gstin");
+    }
+    if (nonEmpty(input.gstState)) {
+        refuse(
+            "A GST state is only for a billing address in India.",
+            "gstState",
+        );
+    }
+    if (countryChanged || input.gstin !== undefined) out.gstin = null;
+    if (countryChanged || input.gstState !== undefined) out.gstState = null;
+    if (input.taxId !== undefined) {
+        const taxId = nonEmpty(input.taxId);
+        if (taxId && taxId.length > 40) {
+            refuse("Keep the tax number under 40 characters.", "taxId");
+        }
+        out.taxId = taxId;
+    }
+    for (const [field, max] of [
+        ["addressLine1", 120],
+        ["addressLine2", 120],
+        ["city", 60],
+        ["postalCode", 20],
+    ] as const) {
+        const raw = input[field];
+        if (raw === undefined) continue;
+        const value = nonEmpty(raw);
+        if (value && value.length > max) {
+            refuse(`Keep this under ${max} characters.`, field);
+        }
+        out[field] = value;
+    }
+    if (input.phone !== undefined) {
+        const raw = input.phone?.trim() ?? "";
+        if (raw && !raw.startsWith("+")) {
+            refuse("Start with + and the country code.", "phone");
+        }
+        const result = normalisePublicPhone(raw);
+        if ("problem" in result) refuse(result.problem, "phone");
+        out.phone = result.phone;
+    }
+    return out;
+}
+
 function refuse(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
 }
@@ -121,9 +186,17 @@ type ProfileWrite = Omit<
  */
 function profileWrite(
     input: BillingProfileInput,
-    current: { gstState: string | null } | null,
+    current: { gstState: string | null; country: string } | null,
 ): Partial<ProfileWrite> {
     const out: Partial<ProfileWrite> = {};
+    if (input.country !== undefined) {
+        const country = input.country.trim().toUpperCase();
+        if (!/^[A-Z]{2}$/.test(country)) {
+            refuse("Choose the country of the billing address.", "country");
+        }
+        out.country = country;
+    }
+
     if (input.legalName !== undefined) {
         const name = nonEmpty(input.legalName);
         if (!name) {
@@ -146,6 +219,17 @@ function profileWrite(
             refuse("That email doesn't look right.", "billingEmail");
         }
         out.billingEmail = email;
+    }
+    const country = out.country ?? current?.country ?? "IN";
+    if (!profileIsIndian(country)) {
+        return {
+            ...out,
+            ...foreignProfileWrite(input, country !== current?.country),
+        };
+    }
+    // Back in India: a tax number abroad is no longer the bill's.
+    if (out.country && current && current.country !== out.country) {
+        out.taxId = null;
     }
     if (input.gstState !== undefined) {
         const raw = nonEmpty(input.gstState);
@@ -506,7 +590,7 @@ export class BillingProfilesService {
             await prisma.$transaction(async (tx) => {
                 const current = await tx.billingProfile.findFirst({
                     where: { id, ownerUserId: userId },
-                    select: { gstState: true },
+                    select: { gstState: true, country: true },
                 });
                 if (!current) throw notFound();
                 const data = profileWrite(input, current);

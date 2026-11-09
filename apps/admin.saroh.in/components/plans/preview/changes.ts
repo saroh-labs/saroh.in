@@ -10,12 +10,12 @@ import {
     autopayCharges,
     cellOf,
     formatCount,
-    formatInr,
 } from "@saroh/pricing-catalog";
 
 import type { PlansTab } from "@/lib/pricing-draft";
 import type { AdminPlanCount, Impact } from "@/lib/pricing-types";
 
+import { planMoney } from "@/lib/plan-money";
 import type { PlansFocus } from "../plans-nav";
 import { removeModule, removePlan } from "../plans/structure-edits";
 
@@ -107,7 +107,7 @@ function planChanges(live: Catalog, draft: Catalog): DraftChange[] {
                 key: `plan-new:${p.id}`,
                 plan: p.name,
                 reaches: "page",
-                what: `New plan: ${p.name} at ${formatInr(p.pricePaise)}`,
+                what: `New plan: ${p.name} at ${planMoney(p.pricePaise)}`,
                 edit: at,
                 undo: (d) => {
                     removePlan(d, live, p.id);
@@ -136,7 +136,7 @@ function planChanges(live: Catalog, draft: Catalog): DraftChange[] {
                 key: `plan-price:${p.id}`,
                 plan: p.name,
                 reaches: [p.id],
-                what: `${p.name}: ${formatInr(o.pricePaise)} → ${formatInr(p.pricePaise)} a month`,
+                what: `${p.name}: ${planMoney(o.pricePaise)} → ${planMoney(p.pricePaise)} a month`,
                 edit: at,
                 undo: set((now, was) => {
                     now.pricePaise = was.pricePaise;
@@ -457,7 +457,7 @@ function offerChanges(live: Catalog, draft: Catalog): DraftChange[] {
                 reaches: [p.id],
                 what:
                     fb > 0
-                        ? `${p.name}: first ${tb.days} days cost ${formatInr(fb)} + GST`
+                        ? `${p.name}: first ${tb.days} days cost ${planMoney(fb)} + GST`
                         : `${p.name}: first ${tb.days} days free`,
                 edit: offers,
                 undo: trial((now) => {

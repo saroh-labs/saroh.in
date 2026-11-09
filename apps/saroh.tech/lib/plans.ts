@@ -3,12 +3,18 @@ import type {
     PricingPageModel,
     PricingView,
 } from "@saroh/marketing/pricing-model";
-import { placeholderPricingModel } from "@saroh/marketing/pricing-view";
+import {
+    placeholderPricingModel,
+    pricingPageModel,
+} from "@saroh/marketing/pricing-view";
 import { sentenceList } from "@saroh/marketing/sentence-list";
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
+    catalogMoney,
     cellOf,
     countedWhat,
+    formatMinor,
+    indiaOnlyWord,
     LIMIT_WORDS,
     limitWordsFor,
     parseCatalog,
@@ -19,8 +25,35 @@ import { faqItems } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
 
-/** Words of India's catalogue that mean nothing on this edition. */
-const INDIA_ONLY = /₹|rupee|\bINR\b|\bGST\b|\bUPI\b|razorpay|cashfree/i;
+/** Words of India's catalogue that mean nothing on this edition (`indiaOnlyWord`). */
+const indiaOnly = (text: string) => indiaOnlyWord(text) !== null;
+
+/**
+ * The catalogue as this edition's pricing page may show it (owner, 8 Nov
+ * 2026: "filter and flag"): a row whose name says something India-only is
+ * hidden, and a plan's words that do are left blank, so the page never
+ * prints them. The admin console flags the same words on the draft.
+ */
+export function withoutIndiaWords(catalog: Catalog): Catalog {
+    return {
+        ...catalog,
+        modules: catalog.modules.map((m) =>
+            indiaOnly(`${m.name} ${m.what}`)
+                ? { ...m, pricing: "hidden" }
+                : {
+                      ...m,
+                      cells: Object.fromEntries(
+                          Object.entries(m.cells).map(([plan, cell]) => [
+                              plan,
+                              cell.inc && indiaOnly(`${cell.text} ${cell.card}`)
+                                  ? { ...cell, text: "", card: "" }
+                                  : cell,
+                          ]),
+                      ),
+                  },
+        ),
+    };
+}
 
 /**
  * The published catalogue, when the page is built, for Free's limits alone.
@@ -32,6 +65,18 @@ export async function readCatalog(
     api = process.env.API_URL?.trim(),
     fetcher: typeof fetch = fetch,
 ): Promise<Catalog | null> {
+    return (await readPricing(api, fetcher))?.catalog ?? null;
+}
+
+/**
+ * The catalogue and whether Saroh sells its paid plans now (stage 9,
+ * DEC-211: the API's `offered`, its switch on and a paid plan published).
+ * Null as {@link readCatalog} is.
+ */
+export async function readPricing(
+    api = process.env.API_URL?.trim(),
+    fetcher: typeof fetch = fetch,
+): Promise<{ catalog: Catalog; offered: boolean } | null> {
     if (!api) return null;
     try {
         const res = await fetcher(`${api}/public/pricing`, {
@@ -41,8 +86,14 @@ export async function readCatalog(
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`GET /public/pricing: ${res.status}`);
-        const body = (await res.json()) as { catalog?: unknown };
-        return parseCatalog(body.catalog);
+        const body = (await res.json()) as {
+            catalog?: unknown;
+            offered?: unknown;
+        };
+        return {
+            catalog: parseCatalog(body.catalog),
+            offered: body.offered === true,
+        };
     } catch (err) {
         console.warn(
             "[pricing] the catalogue could not be read; Free keeps its general lines",
@@ -74,7 +125,7 @@ export function freePlanLine(catalog: Catalog | null): string {
         const m = catalog.modules.find((x) => x.id === id);
         if (m?.pricing !== "show") return [];
         const cell = cellOf(m, free.id);
-        return cell.inc && cell.card && !INDIA_ONLY.test(cell.card)
+        return cell.inc && cell.card && !indiaOnly(cell.card)
             ? [lowerFirst(cell.card)]
             : [];
     });
@@ -113,7 +164,7 @@ export function freeLimitLines(catalog: Catalog): string[] | null {
             (words && cell.limit !== null
                 ? `${cell.limit.toLocaleString("en-US")} ${countedWhat(words.what, cell.limit)}`
                 : "");
-        return line && !INDIA_ONLY.test(line) ? [line] : [];
+        return line && !indiaOnly(line) ? [line] : [];
     });
     return lines.length ? lines : null;
 }
@@ -144,16 +195,35 @@ export function freeUsage(
         const label =
             cell.card ||
             `${cell.limit.toLocaleString("en-US")} ${countedWhat(words.what, cell.limit)}`;
-        return INDIA_ONLY.test(label) ? [] : [{ label, at: words.paused }];
+        return indiaOnly(label) ? [] : [{ label, at: words.paused }];
     });
     return rows.length ? rows : null;
 }
 
 /**
- * The pricing page's plans. Only Free's limits come from a catalogue. Stage 9:
- * with a USD catalogue, return `pricingPageModel(catalog, { money, count, tax: null })`.
+ * The pricing page's plans. While Saroh doesn't sell its paid plans here
+ * (DEC-211), only Free's limits come from a catalogue and paid plans say
+ * they come later. Once it does (`offered`, stage 9), the whole catalogue
+ * in its own money, dollars with no tax: never an India catalogue, which
+ * is in rupees.
  */
-export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
+export function pricingModel(
+    catalog: Catalog | null = null,
+    offered = false,
+): PricingPageModel {
+    const money = catalog ? catalogMoney(catalog) : null;
+    if (
+        catalog &&
+        offered &&
+        money?.tax === "none" &&
+        catalog.plans.some((p) => p.pricePaise > 0)
+    ) {
+        return pricingPageModel(withoutIndiaWords(catalog), {
+            money: (minor) => formatMinor(minor, money.currency),
+            count: (n) => n.toLocaleString("en-US"),
+            tax: null,
+        });
+    }
     const limits = catalog && freeLimitLines(catalog);
     const model = placeholderPricingModel({
         plans: PRICING.plans,

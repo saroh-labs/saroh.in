@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
     formatInr,
+    formatMinor,
     gstPaise,
     monthlyEquivalentPaise,
     planPricePaise,
+    taxPaise,
     withGstPaise,
+    withTaxPaise,
     yearlyPaise,
 } from "./price";
 
@@ -55,5 +58,20 @@ describe("catalogue money", () => {
         expect(formatInr(12_345_600)).toBe(`${R}1,23,456`);
         expect(formatInr(83_333)).toBe(`${R}833.33`);
         expect(formatInr(0)).toBe(`${R}0`);
+    });
+});
+
+describe("money in a catalogue's currency and tax (stage 9)", () => {
+    it("adds GST on a GST catalogue and nothing on an export one", () => {
+        expect(taxPaise("gst", 83_333)).toBe(gstPaise(83_333));
+        expect(withTaxPaise("gst", 83_333)).toBe(withGstPaise(83_333));
+        expect(taxPaise("none", 1_999)).toBe(0);
+        expect(withTaxPaise("none", 1_999)).toBe(1_999);
+    });
+
+    it("formats dollars with cents only when there are some", () => {
+        expect(formatMinor(1_900, "USD")).toBe("$19");
+        expect(formatMinor(1_950, "USD")).toBe("$19.50");
+        expect(formatMinor(1_900, "INR")).toBe(formatInr(1_900));
     });
 });

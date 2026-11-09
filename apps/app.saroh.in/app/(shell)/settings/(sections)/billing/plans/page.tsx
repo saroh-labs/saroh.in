@@ -15,7 +15,7 @@ import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readPlanBasics, readPlanCards } from "@/lib/saroh-billing/plan-reads";
-import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { plansOpen } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -42,7 +42,7 @@ export const metadata = { title: "Change plan · Settings" };
 const PARENT = { label: "Plan and billing", href: BILLING_HREF };
 
 export default async function ChangePlanPage() {
-    if (!plansShown()) notFound();
+    if (!(await plansOpen())) notFound();
     await requireSession();
     const org = await resolveActiveOrganization();
     // Unknown (no business resolved) opens, and the API decides.

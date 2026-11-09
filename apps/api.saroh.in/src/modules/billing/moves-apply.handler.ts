@@ -21,7 +21,7 @@ import type { DomainPlanService } from "./domain-plan.service";
 import { domainPlan } from "./domain-plan.service";
 import { noticeMoveDowns, pausesForMoveInTx } from "./move-down-notice";
 import { overLimit, OverLimitService } from "./over-limit.service";
-import { closeOverduePayments } from "./payment-due";
+import { closeOverduePayments, openMonthDueInTx } from "./payment-due";
 import {
     PLAN_ENDING_NOTICE_KIND,
     PLAN_ENDING_NOTIFICATION_TYPE,
@@ -205,6 +205,8 @@ export class MovesApplyHandler {
                 provider: { not: null },
                 providerSubscriptionId: { not: null },
                 pendingFrom: null,
+                // A month already due waits for its payment or its deadline.
+                paymentDueUntil: null,
                 currentPeriodEnd: { lte: now },
             },
             select: {
@@ -224,9 +226,12 @@ export class MovesApplyHandler {
                         providerSubscriptionId: s.providerSubscriptionId,
                     },
                 },
-                select: { providerPlanId: true },
+                select: { providerPlanId: true, cycle: true },
             });
             if (!checkout || !isOneTime(checkout)) continue;
+            // A month paid once (stage 9, KTD5b): the next month is due,
+            // never an end. A year paid once ends, as it always has.
+            const monthDue = checkout.cycle === "month";
             try {
                 const done = await prisma.$transaction(async (tx) => {
                     await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${s.id} FOR UPDATE`;
@@ -234,7 +239,10 @@ export class MovesApplyHandler {
                         where: { id: s.id },
                         select: {
                             id: true,
+                            organizationId: true,
                             pendingFrom: true,
+                            paymentDueUntil: true,
+                            freeChosenAt: true,
                             currentPeriodEnd: true,
                             providerSubscriptionId: true,
                             plan: { select: { version: true } },
@@ -246,6 +254,14 @@ export class MovesApplyHandler {
                         sub.providerSubscriptionId !== s.providerSubscriptionId
                     ) {
                         return false;
+                    }
+                    if (monthDue && !sub.paymentDueUntil && !sub.freeChosenAt) {
+                        await openMonthDueInTx(tx, {
+                            id: sub.id,
+                            organizationId: sub.organizationId,
+                            currentPeriodEnd: sub.currentPeriodEnd,
+                        });
+                        return true;
                     }
                     return endTermAtInTx(tx, sub, sub.currentPeriodEnd);
                 });

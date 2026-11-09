@@ -36,6 +36,13 @@ vi.mock("@/lib/api/http", () => ({
     orgBase: () => Promise.resolve("/organizations/org_1"),
 }));
 vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
+// Whether the API sells Global its plans (stage 9) is `plansOpen`'s own test;
+// here it follows the switch, as before.
+vi.mock("@/lib/saroh-billing/service", async (actual) => ({
+    ...(await actual<object>()),
+    plansOpen: async () =>
+        (await import("@/lib/saroh-billing/plans-shown")).plansShown(),
+}));
 vi.mock("next/navigation", () => ({
     notFound: () => {
         throw new Error("NOT_FOUND");

@@ -26,6 +26,7 @@ export async function installFirstCatalogue(
     try {
         await writeCatalogueVersion(db, {
             version: 1,
+            edition: "INDIA",
             catalog: input.catalog,
             goLiveAt: input.now,
             policy: "keep",

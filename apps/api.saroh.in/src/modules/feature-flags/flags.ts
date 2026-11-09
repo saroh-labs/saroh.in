@@ -151,6 +151,18 @@ export const FlagKey = {
      * `PaymentsService.connectProvider` and its intent core.
      */
     STRIPE_PAYMENTS: "STRIPE_PAYMENTS",
+
+    /**
+     * Saroh's own plans abroad (stage 9, DEC-211): a Global business may buy
+     * Grow or Pro in US dollars by card. On in local development and on the
+     * development environment, off in production until the owner opens it.
+     * Off, every purchase from a Global business is the same refusal as
+     * before (`saroh-billing-unavailable`); leaving, moving to Free and
+     * editing its billing profile stay open to one already paying.
+     * Readers: `SarohBillsService` (every Saroh billing entry point) and
+     * `GET /billing/offered`, which the workspace asks before it shows plans.
+     */
+    SAROH_BILLING_GLOBAL: "SAROH_BILLING_GLOBAL",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -336,5 +348,15 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Stripe payments have been on for every Global business for a release and needed no kill switch, and the adapter's rolloutFlag is removed.",
+    },
+    SAROH_BILLING_GLOBAL: {
+        shownAs: "Saroh plans abroad",
+        group: "feature",
+        purpose:
+            "Lets a Global business buy Saroh's paid plans in US dollars by card through Saroh's Razorpay account (DEC-211). Turn it on in production only once Razorpay has confirmed USD renewals, the purpose code is set, the CA's export wording and LUT are in the API's settings, the Global invoice prefix is set and the Global catalogue is published; off, Global stays Free-only and a business already paying can still leave or move to Free.",
+        owner: "Owner",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Saroh's plans have been on for every Global business for a release, and SarohBillsService no longer asks it.",
     },
 };

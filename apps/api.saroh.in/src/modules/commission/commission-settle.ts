@@ -47,7 +47,12 @@ export async function lockKeyInTx(tx: Tx, key: string): Promise<void> {
 
 /** Why a payment made no line. */
 export type NoLine =
-    "gone" | "nothing-earned" | "no-manager" | "off-commission";
+    | "gone"
+    | "nothing-earned"
+    | "no-manager"
+    | "off-commission"
+    /** Not in rupees: commission is India's only (stage 9, KTD9). */
+    | "not-rupees";
 
 export interface Settled {
     /** Lines written now (0 when they existed already, or none are owed). */
@@ -308,9 +313,14 @@ export async function settleInvoiceInTx(
             taxablePaise: true,
             totalPaise: true,
             providerAmountPaise: true,
+            currency: true,
         },
     });
     if (!invoice) return { written: 0, moved: 0, noLine: "gone" };
+    // A Global invoice earns no commission until that is decided (KTD9).
+    if (invoice.currency !== "INR") {
+        return { written: 0, moved: 0, noLine: "not-rupees" };
+    }
 
     const refunds = await refundsInTx(tx, invoice);
     const refund = refundSignal(refunds);

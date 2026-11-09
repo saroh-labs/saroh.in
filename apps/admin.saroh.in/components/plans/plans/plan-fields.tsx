@@ -1,10 +1,11 @@
 "use client";
 
 import type { Catalog, Plan } from "@saroh/pricing-catalog";
-import { formatInr, yearlyPaise } from "@saroh/pricing-catalog";
+import { yearlyPaise } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { useId } from "react";
 
+import { planCurrencySign, planMoney } from "@/lib/plan-money";
 import { PRICE_HINT, parseRupees, rupeesText } from "./catalog-edits";
 import { FIELD, Field, NumberField } from "./fields";
 
@@ -49,7 +50,7 @@ export function PlanFields({
     const name = plan.name || "this plan";
     const yearlyLine =
         yearly.on && plan.pricePaise > 0
-            ? ` Yearly: ${formatInr(yearlyPaise(plan.pricePaise, yearly.paid))} a year.`
+            ? ` Yearly: ${planMoney(yearlyPaise(plan.pricePaise, yearly.paid))} a year.`
             : "";
     return (
         <div className="grid gap-4">
@@ -69,7 +70,7 @@ export function PlanFields({
                 // plan never carries over.
                 key={plan.id}
                 label="Price a month, before GST"
-                prefix="₹"
+                prefix={planCurrencySign()}
                 value={plan.pricePaise}
                 format={rupeesText}
                 parse={(t) => parseRupees(t) ?? undefined}

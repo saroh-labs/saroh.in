@@ -1,5 +1,5 @@
 jest.mock("@saroh/database", () => ({
-    prisma: {},
+    prisma: { $transaction: jest.fn(async () => 0) },
     liveCatalogueVersion: jest.fn(),
     startMissingFreeRows: jest.fn(),
 }));
@@ -23,11 +23,13 @@ const startMissingFreeRows = startFn as unknown as jest.Mock;
 const NOW = new Date("2026-10-06T10:00:00.000Z");
 const LATER = new Date("2026-10-08T10:00:00.000Z");
 
-function fakeTx(missing: number) {
+function fakeTx(missing: number, elsewhere = 0) {
     const create = jest.fn(async () => ({}));
     const tx = {
         job: { create },
         organization: { count: jest.fn(async () => missing) },
+        pricingCatalogVersion: { findMany: jest.fn(async () => []) },
+        subscription: { count: jest.fn(async () => elsewhere) },
     } as unknown as Prisma.TransactionClient;
     return { tx, create };
 }
@@ -70,6 +72,16 @@ describe("enqueueFreeRows (#839)", () => {
         ).resolves.toBe(false);
         expect(create).not.toHaveBeenCalled();
     });
+
+    it("queues while the edition's businesses sit on another edition's rows (stage 9)", async () => {
+        liveCatalogueVersion.mockResolvedValue({ version: 3 });
+        const { tx, create } = fakeTx(0, 2);
+
+        await expect(
+            enqueueFreeRows(tx, { version: 4, edition: "GLOBAL" }, NOW, NOW),
+        ).resolves.toBe(true);
+        expect(create).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("FreeRowsHandler", () => {
@@ -88,6 +100,7 @@ describe("FreeRowsHandler", () => {
         await new FreeRowsHandler().handle(job);
         expect(startMissingFreeRows).toHaveBeenCalledWith(expect.anything(), {
             planId: "free",
+            edition: "INDIA",
         });
     });
 

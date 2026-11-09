@@ -406,6 +406,11 @@ export interface CheckoutHandoff {
     /** An order's amount, GST included, in paise; null for a subscription. */
     amountPaise: number | null;
     currency: string;
+    /**
+     * Cards only (stage 9, KTD4): Razorpay takes a currency other than
+     * rupees only by card, so the window shows nothing else. Absent: false.
+     */
+    cardOnly?: boolean;
     prefill: {
         name: string | null;
         email: string | null;
@@ -466,6 +471,16 @@ export interface ParsedBillingEvent {
     providerPaymentId?: string | null;
     /** That payment's amount in paise, when the event carries it. */
     paymentAmountPaise?: number | null;
+    /**
+     * That payment's currency, whether its card was issued outside India,
+     * and, for a payment not in rupees, its value in rupees as the provider
+     * settles it (stage 9, KTD5; Razorpay's `currency`, `international`,
+     * `base_amount`, `base_currency`). Absent when the event doesn't say.
+     */
+    paymentCurrency?: string | null;
+    paymentInternational?: boolean | null;
+    paymentBaseAmount?: number | null;
+    paymentBaseCurrency?: string | null;
     /** The provider's customer it bills, when the event names one. */
     providerCustomerId?: string | null;
     /** A `refund.*` event's refund (DEC-166). */

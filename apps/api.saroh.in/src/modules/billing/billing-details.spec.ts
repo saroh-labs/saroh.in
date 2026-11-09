@@ -19,6 +19,8 @@ const wholeProfile: BilledProfile = {
     addressLine2: null,
     city: "Bengaluru",
     postalCode: "560038",
+    country: "IN",
+    taxId: null,
     providerCustomerId: null,
 };
 
@@ -26,6 +28,7 @@ const party = (over: Partial<BillingParty> = {}): BillingParty => ({
     profile: wholeProfile,
     orgName: "Rye",
     orgSlug: "rye",
+    edition: "INDIA",
     ...over,
 });
 
@@ -289,5 +292,62 @@ describe("checkoutDetails", () => {
                 NO_STATE,
             ).profile.phone,
         ).toBeUndefined();
+    });
+});
+
+describe("a payer outside India (stage 9, KTD7)", () => {
+    const uk: BilledProfile = {
+        ...wholeProfile,
+        legalName: "Rye Bakes Ltd",
+        country: "GB",
+        gstState: null,
+        postalCode: "SW1A 1AA",
+        taxId: "GB123456789",
+        phone: "+442071234567",
+    };
+    const global = (p: Partial<BilledProfile> = {}): BillingParty =>
+        party({ profile: { ...uk, ...p }, edition: "GLOBAL" });
+
+    it("is whole with a free postcode, no GST state and a phone", () => {
+        expect(missingBillingDetails(global())).toEqual([]);
+        expect(addressComplete(uk)).toBe(true);
+        expect(addressComplete({ ...uk, postalCode: null })).toBe(true);
+        expect(
+            refusal(() => checkoutDetails(global(), {}, NO_STATE)),
+        ).toBeNull();
+    });
+
+    it("asks for a phone with its country code before any provider call", () => {
+        const noPhone = global({ phone: null });
+        expect(missingBillingDetails(noPhone)).toEqual(["phone"]);
+        expect(
+            refusal(() => checkoutDetails(noPhone, {}, NO_STATE)),
+        ).toMatchObject({ field: "phone", status: 400 });
+        expect(
+            refusal(() =>
+                checkoutDetails(noPhone, { phone: "2071234567" }, NO_STATE),
+            ),
+        ).toMatchObject({ field: "phone" });
+        expect(
+            checkoutDetails(noPhone, { phone: "+44 20 7123 4567" }, NO_STATE)
+                .profile.phone,
+        ).toBe("+442071234567");
+    });
+
+    it("refuses a profile of the other edition's country", () => {
+        expect(
+            refusal(() =>
+                checkoutDetails(party({ profile: uk }), {}, NO_STATE),
+            ),
+        ).toMatchObject({ field: "billing-profile", status: 400 });
+        expect(
+            refusal(() =>
+                checkoutDetails(
+                    party({ profile: wholeProfile, edition: "GLOBAL" }),
+                    {},
+                    NO_STATE,
+                ),
+            ),
+        ).toMatchObject({ field: "billing-profile" });
     });
 });

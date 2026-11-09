@@ -166,7 +166,7 @@ describe("admin pricing reads (DB, U3)", () => {
     });
 
     it("lists versions newest first as Scheduled, Live and Earlier, with who published and who is on each", async () => {
-        const r = await service.adminPricing(now);
+        const r = await service.adminPricing("INDIA", now);
         expect(r.liveVersion).toBe(2);
         expect(
             r.versions.map((v) => [
@@ -195,7 +195,7 @@ describe("admin pricing reads (DB, U3)", () => {
     });
 
     it("counts businesses per plan after plan overrides, and who is on an older version", async () => {
-        const r = await service.adminPricing(now);
+        const r = await service.adminPricing("INDIA", now);
         const mine = (planId: string) =>
             r.plans.find((p) => p.planId === planId);
         // The suite's businesses only: other files' rows are truncated between files.
@@ -212,7 +212,7 @@ describe("admin pricing reads (DB, U3)", () => {
     });
 
     it("gives usage lines from real counts, and none for what isn't counted", async () => {
-        const r = await service.adminPricing(now);
+        const r = await service.adminPricing("INDIA", now);
         const products = r.usage.b!.find((u) => u.moduleId === "products")!;
         expect(products).toMatchObject({
             businesses: 4,
@@ -246,7 +246,7 @@ describe("admin pricing reads (DB, U3)", () => {
                 updatedByUserId: staffId,
             },
         });
-        const r = await service.adminPricing(now);
+        const r = await service.adminPricing("INDIA", now);
         expect(r.editing).toBe("draft");
         expect(r.draft).toMatchObject({
             revision: 7,
@@ -273,13 +273,13 @@ describe("admin pricing reads (DB, U3)", () => {
                 revision: 2,
             },
         });
-        const r = await service.adminPricing(now);
+        const r = await service.adminPricing("INDIA", now);
         expect(r.editing).toBe("live");
         expect(r.draft).toMatchObject({ valid: false, changes: [] });
         expect(r.draft!.errors).toEqual([
             "plans: Only one plan can be highlighted",
         ]);
-        await expect(service.adminImpact(now)).rejects.toMatchObject({
+        await expect(service.adminImpact("INDIA", now)).rejects.toMatchObject({
             status: 422,
         });
     });
@@ -297,7 +297,7 @@ describe("admin pricing reads (DB, U3)", () => {
                 revision: 9,
             },
         });
-        const r = await service.adminImpact(now);
+        const r = await service.adminImpact("INDIA", now);
         expect(r).toMatchObject({ revision: 9, liveVersion: 2 });
         const cap = r.impact.items.find((i) =>
             i.title.startsWith("Things on Plan B"),
@@ -319,7 +319,7 @@ describe("admin pricing reads (DB, U3)", () => {
     });
 
     it("is a 404 to check the impact with no draft", async () => {
-        await expect(service.adminImpact(now)).rejects.toMatchObject({
+        await expect(service.adminImpact("INDIA", now)).rejects.toMatchObject({
             status: 404,
         });
     });

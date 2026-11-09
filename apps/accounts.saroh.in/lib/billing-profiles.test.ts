@@ -17,6 +17,7 @@ import {
     editSays,
     emailTakenBy,
     gstinStateProblem,
+    indianAddress,
     moveBusinessLine,
     moveConfirm,
     moveNote,
@@ -26,6 +27,7 @@ import {
     phoneLabel,
     planLine,
     profileEdit,
+    profileInput,
     profileProblems,
     startFrom,
     syncBadge,
@@ -241,5 +243,46 @@ describe("lines", () => {
         });
         expect(syncBadge("failed", "list")?.label).toBe("Couldn't link");
         expect(syncBadge("linking", "list")?.label).toBe("Linking");
+    });
+});
+
+describe("a billing address abroad (stage 9)", () => {
+    const uk = {
+        ...valuesOf(null),
+        country: "GB",
+        legalName: "Rye Bakes Ltd",
+        addressLine1: "10 Downing Street",
+        city: "London",
+        postalCode: "SW1A 1AA",
+        billingEmail: "accounts@example.com",
+        phone: "+442071234567",
+        taxId: "GB123456789",
+    };
+
+    it("takes a free postcode, a tax number and no GST or state", () => {
+        expect(profileProblems(uk, [])).toEqual([]);
+        expect(profileInput(uk)).toMatchObject({
+            country: "GB",
+            gstin: "",
+            gstState: "",
+            postalCode: "SW1A 1AA",
+            taxId: "GB123456789",
+        });
+    });
+
+    it("asks for the country first", () => {
+        expect(profileProblems({ ...uk, country: "" }, [])[0]?.[0]).toBe(
+            "country",
+        );
+    });
+
+    it("keeps India's rules for an Indian address", () => {
+        expect(indianAddress("IN")).toBe(true);
+        expect(indianAddress("GB")).toBe(false);
+        expect(
+            profileProblems({ ...uk, country: "IN", registered: "no" }, []).map(
+                ([f]) => f,
+            ),
+        ).toContain("postalCode");
     });
 });

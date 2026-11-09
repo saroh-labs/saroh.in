@@ -1,11 +1,13 @@
-import type { BillingCycle } from "@saroh/pricing-catalog";
+import type { BillingCycle, CatalogTax } from "@saroh/pricing-catalog";
 import {
     addMonthsUtc,
     AUTOPAY_CHARGES_DEFAULT,
     CATALOG_PLAN_KEY_PREFIX,
-    gstPaise,
-    withGstPaise,
+    taxPaise,
+    withTaxPaise,
 } from "@saroh/pricing-catalog";
+
+import { autopayTakes } from "./autopay-currency";
 
 import type { FirstMonthMove } from "./change-timing";
 import {
@@ -95,8 +97,10 @@ export interface QuotePlanRow {
     key: string;
     version: number;
     interval: string;
-    /** Before GST, in paise. */
+    /** Before tax, in the currency's minor unit. */
     priceCents: number;
+    /** The plan's currency (stage 9); absent: rupees. */
+    currency?: string;
 }
 
 /** The business's subscription, as much as the rule needs. */
@@ -247,10 +251,14 @@ export function quoteChange(input: QuoteInput): ChangeQuote {
             ? couponDiscount(input.coupon, price, cycle)
             : { discountPaise: 0, discountCharges: 0 };
     const first = price - off.discountPaise;
-    const firstTotal = withGstPaise(first);
+    const firstTotal = withTaxPaise(input.tax ?? "gst", first);
     const nothing = base.kind === "NONE" || base.kind === "TO_FREE";
+    // A year is one payment; so is a month in a currency the provider
+    // doesn't renew on autopay (stage 9, KTD5b: Global pays each month).
     const payment: PaymentKind =
-        cycle === "year" && !nothing ? "ONE_TIME" : "AUTOPAY";
+        (cycle === "year" || !autopayTakes(input.target.currency)) && !nothing
+            ? "ONE_TIME"
+            : "AUTOPAY";
     const payNowTotalPaise = nothing
         ? 0
         : payment === "ONE_TIME"
@@ -264,9 +272,10 @@ export function quoteChange(input: QuoteInput): ChangeQuote {
         ...base,
         ...off,
         firstChargePaise: first,
-        firstChargeGstPaise: gstPaise(first),
+        firstChargeGstPaise: taxPaise(input.tax ?? "gst", first),
         firstChargeTotalPaise: firstTotal,
-        discountTotalPaise: withGstPaise(price) - firstTotal,
+        discountTotalPaise:
+            withTaxPaise(input.tax ?? "gst", price) - firstTotal,
         payment,
         termCharges: nothing
             ? 0
@@ -287,6 +296,8 @@ export interface QuoteInput {
     subscription: QuoteSubscription | null;
     target: QuotePlanRow;
     now: Date;
+    /** The target's catalogue's tax mode (stage 9); absent: GST. */
+    tax?: CatalogTax;
     /**
      * The target plan's free trial, in days, when the business may still
      * have one (the service decides: the plan offers one and it never had
@@ -349,8 +360,8 @@ function baseQuote(input: QuoteInput): BaseQuote {
     const price = target.priceCents;
     const base = {
         pricePaise: price,
-        gstPaise: gstPaise(price),
-        totalPaise: withGstPaise(price),
+        gstPaise: taxPaise(input.tax ?? "gst", price),
+        totalPaise: withTaxPaise(input.tax ?? "gst", price),
         chargeNowPaise: 0,
         chargeNowGstPaise: 0,
         chargeNowTotalPaise: 0,
@@ -418,8 +429,8 @@ function baseQuote(input: QuoteInput): BaseQuote {
                 ...base,
                 kind: "TRIAL",
                 chargeNowPaise: first,
-                chargeNowGstPaise: gstPaise(first),
-                chargeNowTotalPaise: withGstPaise(first),
+                chargeNowGstPaise: taxPaise(input.tax ?? "gst", first),
+                chargeNowTotalPaise: withTaxPaise(input.tax ?? "gst", first),
                 startAt: ends,
                 effectiveAt: null,
                 trialEndsAt: ends,
@@ -484,8 +495,8 @@ function baseQuote(input: QuoteInput): BaseQuote {
             ...base,
             kind: "UPGRADE",
             chargeNowPaise: diff,
-            chargeNowGstPaise: gstPaise(diff),
-            chargeNowTotalPaise: withGstPaise(diff),
+            chargeNowGstPaise: taxPaise(input.tax ?? "gst", diff),
+            chargeNowTotalPaise: withTaxPaise(input.tax ?? "gst", diff),
             startAt: periodEndAt,
             effectiveAt: null,
         };

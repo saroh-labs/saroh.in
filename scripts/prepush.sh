@@ -367,7 +367,7 @@ e2e_stack() {
     # runs, as CI does on every shard. Unset, those specs skip themselves.
     local global=""
     # shellcheck disable=SC2086,SC2116
-    case " $(echo $specs) " in *global-screens.spec.ts*) global=1 ;; esac
+    case " $(echo $specs) " in *global-screens.spec.ts* | *global-plan-billing.spec.ts*) global=1 ;; esac
     if [ -n "$global" ]; then
         export E2E_GLOBAL_APP_URL=http://localhost:3007
         export E2E_GLOBAL_ACCOUNTS_URL=http://localhost:3008

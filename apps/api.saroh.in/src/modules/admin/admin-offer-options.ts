@@ -88,7 +88,7 @@ export async function offerOptions(
         }),
     ]);
     const catalogue = a.source === "catalogue" ? a : null;
-    const live = catalogue ? null : await liveCatalog();
+    const live = catalogue ? null : await liveCatalog(organizationId);
     const plans = (catalogue?.catalog ?? live)?.plans ?? [];
     const paid = catalogue
         ? await paidPlanIncludes(

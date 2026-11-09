@@ -50,6 +50,18 @@ export class NewBillingProfileDto {
     @MaxLength(20)
     gstin?: string;
 
+    /** ISO 3166-1 alpha-2; absent on a new profile: India (stage 9). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2)
+    country?: string;
+
+    /** A tax number outside India (VAT, EIN, ABN). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    taxId?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(32)
@@ -104,6 +116,18 @@ export class UpdateBillingProfileDto {
     @IsString()
     @MaxLength(20)
     gstin?: string;
+
+    /** ISO 3166-1 alpha-2; absent on a new profile: India (stage 9). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2)
+    country?: string;
+
+    /** A tax number outside India (VAT, EIN, ABN). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    taxId?: string;
 
     @IsOptional()
     @IsString()

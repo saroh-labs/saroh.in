@@ -83,7 +83,9 @@ describe("public pricing (DB, U3)", () => {
     });
 
     it("is a 404 before any version is installed", async () => {
-        await expect(service.publicPricing(new Date())).rejects.toMatchObject({
+        await expect(
+            service.publicPricing("INDIA", new Date()),
+        ).rejects.toMatchObject({
             status: 404,
         });
     });
@@ -99,7 +101,12 @@ describe("public pricing (DB, U3)", () => {
         );
 
         const first = fakeRes();
-        const body = await controller.get(undefined, undefined, first.res);
+        const body = await controller.get(
+            undefined,
+            undefined,
+            undefined,
+            first.res,
+        );
         // goLiveAt dates saroh.in's /pricing in its sitemap (R3).
         expect(body).toMatchObject({
             version: 1,
@@ -110,11 +117,12 @@ describe("public pricing (DB, U3)", () => {
         expect(first.headers["cache-control"]).toBe(PUBLIC_PRICING_CACHE);
 
         const second = fakeRes();
-        await controller.get(undefined, undefined, second.res);
+        await controller.get(undefined, undefined, undefined, second.res);
         expect(second.headers.etag).toBe(first.headers.etag);
 
         const revalidate = fakeRes();
         const nothing = await controller.get(
+            undefined,
             undefined,
             first.headers.etag,
             revalidate.res,
@@ -134,11 +142,12 @@ describe("public pricing (DB, U3)", () => {
             }),
         );
 
-        const today = await service.publicPricing(now);
+        const today = await service.publicPricing("INDIA", now);
         expect(today.version).toBe(1);
         expect(today.catalog.plans[1]!.pricePaise).toBe(22_200);
 
         const tomorrow = await service.publicPricing(
+            "INDIA",
             new Date(now.getTime() + 2 * DAY),
         );
         expect(tomorrow.version).toBe(2);
@@ -157,13 +166,19 @@ describe("public pricing (DB, U3)", () => {
         it("serves the draft for a token minted for its revision, never cacheable", async () => {
             await saveDraft(draftCatalog, 3);
             const { token, revision } = await service.mintPreviewToken(
+                "INDIA",
                 3,
                 new Date(),
             );
             expect(revision).toBe(3);
 
             const out = fakeRes();
-            const body = await controller.get(token, undefined, out.res);
+            const body = await controller.get(
+                undefined,
+                token,
+                undefined,
+                out.res,
+            );
             expect(body).toMatchObject({
                 version: null,
                 goLiveAt: null,
@@ -179,7 +194,7 @@ describe("public pricing (DB, U3)", () => {
         async function refused(token: string) {
             const out = fakeRes();
             await expect(
-                controller.get(token, undefined, out.res),
+                controller.get(undefined, token, undefined, out.res),
             ).rejects.toMatchObject({ status: 404 });
             // A refusal is not cacheable either.
             expect(out.headers["cache-control"]).toBe("no-store");
@@ -208,7 +223,11 @@ describe("public pricing (DB, U3)", () => {
 
         it("is a 404 once the draft has been saved again", async () => {
             await saveDraft(draftCatalog, 3);
-            const { token } = await service.mintPreviewToken(3, new Date());
+            const { token } = await service.mintPreviewToken(
+                "INDIA",
+                3,
+                new Date(),
+            );
             await prisma.pricingCatalogDraft.update({
                 where: { id: SHARED_DRAFT_ID },
                 data: { revision: 4 },
@@ -218,7 +237,11 @@ describe("public pricing (DB, U3)", () => {
 
         it("is a 404 for a new draft that happens to reach the same revision", async () => {
             const first = await saveDraft(draftCatalog, 3);
-            const { token } = await service.mintPreviewToken(3, new Date());
+            const { token } = await service.mintPreviewToken(
+                "INDIA",
+                3,
+                new Date(),
+            );
             // A later draft, told apart by its createdAt rather than a sleep.
             await saveDraft(
                 draftCatalog,
@@ -230,19 +253,23 @@ describe("public pricing (DB, U3)", () => {
 
         it("is a 404 once the draft is gone", async () => {
             await saveDraft(draftCatalog, 3);
-            const { token } = await service.mintPreviewToken(3, new Date());
+            const { token } = await service.mintPreviewToken(
+                "INDIA",
+                3,
+                new Date(),
+            );
             await prisma.pricingCatalogDraft.deleteMany({});
             await refused(token);
         });
 
         it("won't mint for a stale revision, a draft that doesn't validate, or no draft", async () => {
             await expect(
-                service.mintPreviewToken(3, new Date()),
+                service.mintPreviewToken("INDIA", 3, new Date()),
             ).rejects.toMatchObject({ status: 404 });
 
             await saveDraft(draftCatalog, 5);
             await expect(
-                service.mintPreviewToken(4, new Date()),
+                service.mintPreviewToken("INDIA", 4, new Date()),
             ).rejects.toMatchObject({ status: 409 });
 
             const twoFeatured = JSON.parse(JSON.stringify(draftCatalog)) as {
@@ -251,7 +278,7 @@ describe("public pricing (DB, U3)", () => {
             for (const p of twoFeatured.plans) p.featured = true;
             await saveDraft(twoFeatured, 6);
             await expect(
-                service.mintPreviewToken(6, new Date()),
+                service.mintPreviewToken("INDIA", 6, new Date()),
             ).rejects.toMatchObject({ status: 422 });
         });
     });
@@ -280,7 +307,7 @@ describe("installFirstCatalogue (DB, U3)", () => {
         ).toBe(6);
         const live = await new CatalogueService(
             new ImpactService(),
-        ).publicPricing(new Date(now.getTime() + 1));
+        ).publicPricing("INDIA", new Date(now.getTime() + 1));
         expect(live.version).toBe(1);
 
         const again = await installFirstCatalogue(prisma, {

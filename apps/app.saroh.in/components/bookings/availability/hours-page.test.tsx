@@ -47,6 +47,7 @@ vi.mock("@/lib/services/service-hours-read", () => ({
     readServiceHours: reads.readServiceHours,
 }));
 vi.mock("@/lib/saroh-billing/service", () => ({
+    plansOpen: () => Promise.resolve(true),
     billingAccessOrNull: reads.billingAccessOrNull,
 }));
 vi.mock("@/components/billing/plan-limit-notice", () => ({

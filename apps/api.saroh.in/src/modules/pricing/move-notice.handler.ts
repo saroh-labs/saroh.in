@@ -92,8 +92,16 @@ export class MoveNoticeHandler {
             ? priceChangeNotice({
                   planName,
                   changesOn: when,
-                  now: priceWords(change.fromPaise, change.interval),
-                  next: priceWords(change.toPaise, change.interval),
+                  now: priceWords(
+                      change.fromPaise,
+                      change.interval,
+                      change.currency,
+                  ),
+                  next: priceWords(
+                      change.toPaise,
+                      change.interval,
+                      change.currency,
+                  ),
               })
             : {
                   title: `Your ${planName} plan changes on ${when}`,

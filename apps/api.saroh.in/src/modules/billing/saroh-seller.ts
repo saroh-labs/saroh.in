@@ -22,6 +22,13 @@ export interface SarohSeller {
     sac: string | null;
     /** The series prefix: SA → SA/26-27/0001 (DEC-162). */
     prefix: string;
+    /**
+     * The export series' prefix (stage 9, KTD6), on Saroh's Indian financial
+     * year like India's; null until set (no export invoice is issued).
+     */
+    exportPrefix: string | null;
+    /** The LUT reference and wording an export invoice prints; null: unset. */
+    exportNote: string | null;
 }
 
 export const DEFAULT_SAROH_INVOICE_PREFIX = "SA";
@@ -35,6 +42,8 @@ export interface SellerEnv {
     SAROH_BILLING_EMAIL?: string;
     SAROH_INVOICE_SAC?: string;
     SAROH_INVOICE_PREFIX?: string;
+    SAROH_INVOICE_PREFIX_GLOBAL?: string;
+    SAROH_EXPORT_LUT?: string;
 }
 
 const clean = (v: string | undefined): string | null => {
@@ -51,6 +60,11 @@ const clean = (v: string | undefined): string | null => {
 export function sarohSeller(source: SellerEnv = env): SarohSeller {
     const gstin = clean(source.SAROH_GSTIN)?.toUpperCase() ?? null;
     const prefix = clean(source.SAROH_INVOICE_PREFIX);
+    const indiaPrefix =
+        prefix && /^[A-Z0-9]{1,3}$/.test(prefix)
+            ? prefix
+            : DEFAULT_SAROH_INVOICE_PREFIX;
+    const exportPrefix = clean(source.SAROH_INVOICE_PREFIX_GLOBAL);
     return {
         name: "Saroh",
         legalName: clean(source.SAROH_LEGAL_NAME),
@@ -62,10 +76,14 @@ export function sarohSeller(source: SellerEnv = env): SarohSeller {
         address: clean(source.SAROH_REGISTERED_ADDRESS),
         email: clean(source.SAROH_BILLING_EMAIL),
         sac: clean(source.SAROH_INVOICE_SAC),
-        prefix:
-            prefix && /^[A-Z0-9]{1,3}$/.test(prefix)
-                ? prefix
-                : DEFAULT_SAROH_INVOICE_PREFIX,
+        prefix: indiaPrefix,
+        exportPrefix:
+            exportPrefix &&
+            /^[A-Z0-9]{1,3}$/.test(exportPrefix) &&
+            exportPrefix !== indiaPrefix
+                ? exportPrefix
+                : null,
+        exportNote: clean(source.SAROH_EXPORT_LUT),
     };
 }
 

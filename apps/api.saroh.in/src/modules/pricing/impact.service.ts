@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 import type { Override, OverrideKind } from "@saroh/pricing-catalog";
 import {
     CATALOG_PLAN_KEY_PREFIX,
@@ -51,6 +52,8 @@ export interface CatalogueBusinesses {
 @Injectable()
 export class ImpactService {
     async read(
+        /** Whose businesses (stage 9): a catalogue reaches only its edition's. */
+        edition: Edition,
         knownPlanIds: ReadonlySet<string>,
         now: Date,
         /** The plans' prices: a dearer billed plan beats a plan override. */
@@ -58,11 +61,15 @@ export class ImpactService {
     ): Promise<CatalogueBusinesses> {
         const [orgs, subs, overrides] = await Promise.all([
             prisma.organization.findMany({
-                where: { lifecycleStatus: { not: "DELETED_RETAINED" } },
+                where: {
+                    edition,
+                    lifecycleStatus: { not: "DELETED_RETAINED" },
+                },
                 select: { id: true, name: true },
                 orderBy: { createdAt: "asc" },
             }),
             prisma.subscription.findMany({
+                where: { organization: { edition } },
                 select: {
                     organizationId: true,
                     status: true,
@@ -79,6 +86,7 @@ export class ImpactService {
             }),
             prisma.entitlementOverride.findMany({
                 where: {
+                    organization: { edition },
                     kind: { in: ["plan", "price"] },
                     revokedAt: null,
                     OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
@@ -179,12 +187,18 @@ export class ImpactService {
     }
 
     /** What publishing `next` over `live` would do, from today's businesses. */
-    async impactOf(live: Catalog, next: Catalog, now: Date): Promise<Impact> {
+    async impactOf(
+        edition: Edition,
+        live: Catalog,
+        next: Catalog,
+        now: Date,
+    ): Promise<Impact> {
         const known = new Set([
             ...live.plans.map((p) => p.id),
             ...next.plans.map((p) => p.id),
         ]);
         const { businesses, measured } = await this.read(
+            edition,
             known,
             now,
             planPriceOf(live),

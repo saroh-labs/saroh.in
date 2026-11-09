@@ -157,7 +157,26 @@ export function paymentFailedEmail(input: {
     dueBy?: string | null;
     /** Plan and billing, where the payment is made. */
     payUrl?: string | null;
+    /** A month paid once is over and the next is due (stage 9): nothing failed. */
+    monthDue?: boolean;
 }): RenderedEmail {
+    if (input.monthDue && !input.final) {
+        return {
+            subject: `${input.businessName}'s next month of ${input.planName} is due`,
+            html: wrap(
+                "Your next month is due",
+                [
+                    `${input.businessName}'s month of ${input.planName} has ended, and the next month is due.`,
+                    input.dueBy
+                        ? `Pay by ${input.dueBy} to keep ${input.planName}. If it isn't paid by then, ${input.businessName} moves to the Free plan. Nothing you made is lost.`
+                        : `Pay to keep ${input.planName}. If it isn't paid, ${input.businessName} moves to the Free plan. Nothing you made is lost.`,
+                ],
+                input.payUrl
+                    ? { label: "Pay now", href: input.payUrl }
+                    : undefined,
+            ),
+        };
+    }
     if (input.final) {
         return {
             subject: `${input.businessName} is now on the Free plan`,

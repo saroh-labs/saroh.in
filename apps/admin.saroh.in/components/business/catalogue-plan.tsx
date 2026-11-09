@@ -1,4 +1,3 @@
-import { formatInr } from "@saroh/pricing-catalog";
 import { Badge } from "@saroh/ui/badge";
 
 import type {
@@ -11,6 +10,7 @@ import { asWords, camelToWords, formatDate } from "@/lib/format";
 import { overrideKindWords } from "@/lib/overrides";
 import { planLine, USAGE_NOTE_WORDS } from "@/lib/plan-words";
 
+import { planMoney } from "@/lib/plan-money";
 import { Facts } from "../panel";
 import { RemoveOverride } from "./catalogue-actions";
 import { RevokeLimit } from "./plan-actions";
@@ -79,8 +79,8 @@ export function CataloguePlan({
                     [
                         "Price a month",
                         catalogue.pricePaise === catalogue.planPricePaise
-                            ? `${formatInr(catalogue.pricePaise)} before GST`
-                            : `${formatInr(catalogue.pricePaise)} before GST (custom; plan ${formatInr(catalogue.planPricePaise)})`,
+                            ? `${planMoney(catalogue.pricePaise)} before GST`
+                            : `${planMoney(catalogue.pricePaise)} before GST (custom; plan ${planMoney(catalogue.planPricePaise)})`,
                     ],
                     [
                         "Billing",
@@ -182,7 +182,7 @@ export function CataloguePlan({
                     o.kind === "plan"
                         ? planName(o.planKey ?? "")
                         : o.kind === "price"
-                          ? formatInr(o.value ?? 0)
+                          ? planMoney(o.value ?? 0)
                           : (catalogue.modules.find(
                                 (m) => m.moduleId === (o.moduleKey ?? o.key),
                             )?.name ?? camelToWords(o.key))

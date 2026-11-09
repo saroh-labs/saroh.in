@@ -1,4 +1,4 @@
-import { autopayCharges, formatInr } from "@saroh/pricing-catalog";
+import { autopayCharges } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { PartialRead } from "@saroh/ui/failed-read";
@@ -25,16 +25,17 @@ import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
+import { planMoney } from "@/lib/saroh-billing/money";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
 import { readPlanBasics, readPlanCards } from "@/lib/saroh-billing/plan-reads";
 import { planMessage } from "@/lib/saroh-billing/plan-status";
 import { addonRows, yourPlan } from "@/lib/saroh-billing/plan-view";
-import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import {
     getBillingProfileView,
     getPlanUsage,
     listAddons,
     listSarohInvoices,
+    plansOpen,
 } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
@@ -96,7 +97,7 @@ export default async function PlanBillingPage({
         cycle?: string | string[];
     }>;
 } = {}) {
-    if (!plansShown()) {
+    if (!(await plansOpen())) {
         if (!freeNoteShown()) notFound();
         // No Saroh billing on this edition (Global, KTD7): Free, and "Tell me when".
         await requireSession();
@@ -242,7 +243,7 @@ export default async function PlanBillingPage({
                         rows={addonList}
                         sum={
                             addonsView && addonsView.heldPaise > 0
-                                ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
+                                ? `${planMoney(addonsView.heldPaise)} a month in add-ons`
                                 : ""
                         }
                         canChange={canChange && (addonsView?.canBuy ?? false)}

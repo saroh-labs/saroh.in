@@ -53,6 +53,21 @@ function prefillOf(h: CheckoutHandoff): Record<string, string> {
 }
 
 /** Open the window for one subscription or order; settles once. */
+/**
+ * Razorpay's display blocks for cards alone (stage 9, KTD4): a payment in a
+ * currency other than rupees can only be made by card, so the window shows
+ * nothing else. The API says when (`cardOnly`); the browser never infers it.
+ */
+export const CARD_ONLY = {
+    display: {
+        blocks: {
+            card: { name: "Pay by card", instruments: [{ method: "card" }] },
+        },
+        sequence: ["block.card"],
+        preferences: { show_default_blocks: false },
+    },
+} as const;
+
 export async function openRazorpayWindow(
     handoff: CheckoutHandoff,
     description: string,
@@ -83,6 +98,7 @@ export async function openRazorpayWindow(
                 name: "Saroh",
                 description,
                 prefill: prefillOf(handoff),
+                ...(handoff.cardOnly ? { config: CARD_ONLY } : {}),
                 ...(handoff.notes && Object.keys(handoff.notes).length > 0
                     ? { notes: handoff.notes }
                     : {}),

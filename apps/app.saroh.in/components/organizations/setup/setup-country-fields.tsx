@@ -5,6 +5,7 @@ import {
     GLOBAL_CURRENCIES,
     zonesOfCountry,
 } from "@saroh/edition";
+import { CountrySelect } from "@saroh/ui/country-select";
 import {
     FormControl,
     FormDescription,
@@ -22,7 +23,6 @@ import {
 } from "@saroh/ui/select";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { CountrySelect } from "@/components/organizations/business-details/country-select";
 import { TimeZoneSelect } from "@/components/organizations/business-details/time-zone-select";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
 import { browserZoneIn, zoneAsked } from "@/lib/organizations/time-zones";

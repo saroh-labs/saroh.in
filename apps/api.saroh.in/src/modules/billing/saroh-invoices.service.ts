@@ -7,12 +7,15 @@ import {
 } from "@nestjs/common";
 import type { BillingCheckout, MessagingTopup, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { stateCode } from "../invoices/gst-states";
 import { formatSellerAddress } from "../invoices/order-invoice";
 import { authorize } from "../organizations/organization-policy";
 import { chargedAddonRowsInTx } from "./addon-charges";
+import type { BillingActionCode } from "./billing-actions";
+import { raiseBillingActionInTx } from "./billing-actions";
 import { nonEmpty } from "./billing-details";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { periodStart as periodStartOf } from "./checkout-quote";
@@ -20,7 +23,11 @@ import { keepProviderAmountInTx } from "./invoice-amount";
 import { enqueuePaymentNotes } from "./payment-notes.job";
 import type { ParsedBillingEvent } from "./providers/billing-provider.port";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
-import type { SarohInvoiceSource, SarohLineInput } from "./saroh-invoice-terms";
+import type {
+    SarohInvoiceSource,
+    SarohLineInput,
+    SarohTaxType,
+} from "./saroh-invoice-terms";
 import {
     FIRST_MONTH_KEY,
     samePeriodWindow,
@@ -55,6 +62,11 @@ export interface ChargeToInvoice {
     providerAmountPaise?: number | null;
     /** The business as the provider's customer; null: the subscription's. */
     providerCustomerId?: string | null;
+    /**
+     * The payment's currency, card origin and rupee value, as the provider
+     * said (stage 9, KTD5); absent where the event didn't say.
+     */
+    payment?: PaymentFacts;
     checkoutId?: string | null;
     planId: string | null;
     planName: string;
@@ -147,6 +159,7 @@ export class SarohInvoicesService {
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
             providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
             providerCustomerId: event.providerCustomerId ?? null,
             planId: null,
             planName: "Messaging balance",
@@ -163,6 +176,61 @@ export class SarohInvoicesService {
             ],
             billTo: null,
             issuedAt: now,
+        });
+    }
+
+    /**
+     * A month's add-on bought on its own order (stage 9, owner 8 Nov 2026):
+     * one line per add-on the order added, a whole month each. Once per
+     * order (`addon-order:<order>`).
+     */
+    async invoiceAddonOrderInTx(
+        tx: Tx,
+        input: {
+            organizationId: string;
+            provider: string;
+            orderId: string;
+            rows: {
+                description: string;
+                quantity: number;
+                unitPaise: number;
+                periodStart: Date;
+                periodEnd: Date;
+            }[];
+            event: ParsedBillingEvent;
+            now: Date;
+        },
+    ): Promise<string | null> {
+        const { event } = input;
+        const sub = await tx.subscription.findUnique({
+            where: { organizationId: input.organizationId },
+            select: { plan: { select: { id: true, name: true } } },
+        });
+        const sac = this.sellerNow().sac;
+        return this.recordInTx(tx, {
+            organizationId: input.organizationId,
+            source: "ADDON",
+            chargeKey: `addon-order:${input.orderId}`,
+            provider: input.provider,
+            providerSubscriptionId: input.orderId,
+            providerEventId: event.providerEventId,
+            providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
+            providerCustomerId: event.providerCustomerId ?? null,
+            planId: sub?.plan.id ?? null,
+            planName: sub?.plan.name ?? "Add-ons",
+            cycle: "month",
+            periodStart: input.rows[0]?.periodStart ?? null,
+            periodEnd: input.rows[0]?.periodEnd ?? null,
+            lines: input.rows.map((r) => ({
+                description: r.description,
+                sac,
+                quantity: r.quantity,
+                unitPaise: r.unitPaise,
+            })),
+            billTo: null,
+            issuedAt: input.now,
         });
     }
 
@@ -205,6 +273,7 @@ export class SarohInvoicesService {
                 providerEventId: event.providerEventId,
                 providerPaymentId: event.providerPaymentId ?? null,
                 providerAmountPaise: event.paymentAmountPaise ?? null,
+                payment: paymentOf(event),
                 providerCustomerId: customerOf(checkout, event),
                 checkoutId: checkout.id,
                 planId: checkout.planId,
@@ -255,6 +324,7 @@ export class SarohInvoicesService {
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
             providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
             providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
@@ -303,6 +373,7 @@ export class SarohInvoicesService {
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
             providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
             providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
@@ -424,6 +495,7 @@ export class SarohInvoicesService {
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
             providerAmountPaise: event.paymentAmountPaise ?? null,
+            payment: paymentOf(event),
             providerCustomerId:
                 event.providerCustomerId ??
                 checkout?.providerCustomerId ??
@@ -551,6 +623,25 @@ export class SarohInvoicesService {
             null;
 
         const seller = this.sellerNow();
+        // Who sells in which money (stage 9, KTD6): a Global business is
+        // billed for an export of services, in its plans' currency, no tax.
+        const org = await tx.organization.findUnique({
+            where: { id: charge.organizationId },
+            select: { edition: true },
+        });
+        const money = editionProfile(org?.edition).sarohPlanMoney;
+        const exporting = money.tax === "none";
+        if (
+            await refuseChargeInTx(
+                tx,
+                charge,
+                money.currency,
+                exporting,
+                seller,
+            )
+        ) {
+            return null;
+        }
         const gaps = sellerGaps(seller);
         if (gaps.length) {
             this.logger.warn(
@@ -566,15 +657,22 @@ export class SarohInvoicesService {
         const billToGstin = given?.gstin ?? buyer.gstin;
         const billToState =
             given?.state ?? (given?.gstin ? given.gstin.slice(0, 2) : null);
-        const supply = sarohSupply({
-            billToState,
-            billToGstin,
-            profileState: buyer.state,
-            sellerState: seller.state,
-        });
+        const supply: { placeOfSupply: string | null; taxType: SarohTaxType } =
+            exporting
+                ? { placeOfSupply: null, taxType: "EXPORT" }
+                : sarohSupply({
+                      billToState,
+                      billToGstin,
+                      profileState: buyer.state,
+                      sellerState: seller.state,
+                  });
         const { lines, totals } = taxSarohLines(charge.lines, supply.taxType);
 
-        const series = sarohSeries(seller.prefix, charge.issuedAt);
+        const series = sarohSeries(
+            // Refused above when an export has no prefix of its own.
+            exporting ? (seller.exportPrefix ?? seller.prefix) : seller.prefix,
+            charge.issuedAt,
+        );
         const counted = await tx.$queryRaw<{ last: number }[]>`
             INSERT INTO "SarohInvoiceSequence" ("series", "last", "updatedAt")
             VALUES (${series}, 1, now())
@@ -603,6 +701,16 @@ export class SarohInvoicesService {
                 periodStart: charge.periodStart,
                 periodEnd: charge.periodEnd,
                 issuedAt: charge.issuedAt,
+                currency: money.currency,
+                providerBaseAmount: exporting
+                    ? (charge.payment?.baseAmount ?? null)
+                    : null,
+                providerBaseCurrency: exporting
+                    ? (charge.payment?.baseCurrency ?? null)
+                    : null,
+                exportNote: exporting ? seller.exportNote : null,
+                billToCountry: buyer.country,
+                billToTaxId: exporting ? buyer.taxId : null,
                 sellerName: seller.name,
                 sellerLegalName: seller.legalName,
                 sellerGstin: seller.gstin,
@@ -615,12 +723,13 @@ export class SarohInvoicesService {
                 // The address only: the paper adds the state from the
                 // place of supply, so the two never disagree (Rule 46(e)).
                 billToAddress: buyer.address,
-                billToState:
-                    stateCode(billToState) ??
-                    stateCode(billToGstin?.slice(0, 2)) ??
-                    stateCode(buyer.state) ??
-                    null,
-                billToGstin,
+                billToState: exporting
+                    ? null
+                    : (stateCode(billToState) ??
+                      stateCode(billToGstin?.slice(0, 2)) ??
+                      stateCode(buyer.state) ??
+                      null),
+                billToGstin: exporting ? null : billToGstin,
                 placeOfSupply: supply.placeOfSupply,
                 taxType: supply.taxType,
                 ...totals,
@@ -780,6 +889,10 @@ function buyerName(
 interface Buyer {
     /** The billing profile it is addressed to; null: none (before profiles). */
     billingProfileId: string | null;
+    /** The billing address's country (stage 9); India before profiles. */
+    country: string;
+    /** A tax number abroad (VAT, EIN, ABN); null in India. */
+    taxId: string | null;
     /** Read from a billing profile (else the business's own details). */
     fromProfile: boolean;
     /**
@@ -845,6 +958,8 @@ async function buyerInTx(
         addressLine2: true,
         city: true,
         postalCode: true,
+        country: true,
+        taxId: true,
         providerCustomerId: true,
     } as const;
     let profile = null;
@@ -861,6 +976,8 @@ async function buyerInTx(
     }
     return {
         billingProfileId: profile.id,
+        country: profile.country,
+        taxId: nonEmpty(profile.taxId),
         fromProfile: true,
         checkoutOnProfile: profile.id === checkout?.billingProfileId,
         name: buyerName(profile.legalName, org?.name),
@@ -927,6 +1044,8 @@ async function buyerBeforeProfilesInTx(
     }
     return {
         billingProfileId: null,
+        country: "IN",
+        taxId: null,
         fromProfile: false,
         checkoutOnProfile: false,
         name: buyerName(business?.legalName, orgName),
@@ -977,4 +1096,76 @@ function customerOf(
     event: ParsedBillingEvent,
 ): string | null {
     return checkout.providerCustomerId ?? event.providerCustomerId ?? null;
+}
+
+/** What a payment event says of its money (stage 9, KTD5). */
+export interface PaymentFacts {
+    currency: string | null;
+    international: boolean | null;
+    baseAmount: number | null;
+    baseCurrency: string | null;
+}
+
+/** The payment facts of a provider event, as the invoice keeps them. */
+export function paymentOf(event: ParsedBillingEvent): PaymentFacts {
+    return {
+        currency: event.paymentCurrency ?? null,
+        international: event.paymentInternational ?? null,
+        baseAmount: event.paymentBaseAmount ?? null,
+        baseCurrency: event.paymentBaseCurrency ?? null,
+    };
+}
+
+/**
+ * A charge Saroh must not invoice as it stands, raised in Needs action
+ * (stage 9, KTD5, KTD6): a payment in another currency than the plan's; a
+ * Global plan paid with a card issued in India (export needs foreign
+ * exchange: owner and CA); an export invoice without its prefix or LUT
+ * note. True when refused; nothing is written then, and a later fix is
+ * raised by hand.
+ */
+async function refuseChargeInTx(
+    tx: Tx,
+    charge: ChargeToInvoice,
+    currency: string,
+    exporting: boolean,
+    seller: SarohSeller,
+): Promise<boolean> {
+    const refs = {
+        chargeKey: charge.chargeKey,
+        providerPaymentId: charge.providerPaymentId ?? null,
+        providerSubscriptionId: charge.providerSubscriptionId,
+    };
+    const raise = (code: BillingActionCode, note: string) =>
+        raiseBillingActionInTx(tx, {
+            organizationId: charge.organizationId,
+            code,
+            refs,
+            note,
+            dedupeKey: `${code}:${charge.chargeKey}`,
+        });
+    const paid = charge.payment?.currency;
+    if (paid && paid !== currency) {
+        await raise(
+            "billing_payment_currency_mismatch",
+            `A payment in ${paid} was taken for a plan priced in ${currency}. No invoice was written: check the payment in Razorpay and refund or invoice it by hand.`,
+        );
+        return true;
+    }
+    if (!exporting) return false;
+    if (charge.payment?.international === false) {
+        await raise(
+            "billing_export_domestic_card",
+            "A Global plan was paid with a card issued in India, so it isn't an export of services. No invoice was written: ask the CA how to bill it.",
+        );
+        return true;
+    }
+    if (!seller.exportPrefix || !seller.exportNote) {
+        await raise(
+            "saroh_export_invoice_unset",
+            "An export invoice couldn't be written: set SAROH_INVOICE_PREFIX_GLOBAL and SAROH_EXPORT_LUT on the API, then issue it by hand.",
+        );
+        return true;
+    }
+    return false;
 }

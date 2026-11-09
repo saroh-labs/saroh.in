@@ -25,7 +25,7 @@
  *
  * Run: `pnpm --filter @saroh/database exec tsx src/backfill/pricing-free-subscriptions.cli.ts`
  */
-import type { PrismaClient } from "@prisma/client";
+import type { Edition, PrismaClient } from "@prisma/client";
 
 import { liveCataloguePlanRow, startOnFreePlan } from "../pricing-catalogue";
 
@@ -65,6 +65,8 @@ export function decideFreeRow(
 export interface FreeRowsOptions {
     /** The catalogue's Free plan id, e.g. `free`. */
     planId: string;
+    /** Whose businesses and catalogue (stage 9); India unless named. */
+    edition?: Edition;
     /** The grandfather backfill's `--joined-before` (the release). */
     grandfatheredBefore: Date;
     dryRun?: boolean;
@@ -97,8 +99,10 @@ export async function backfillFreeSubscriptions(
     if (Number.isNaN(options.grandfatheredBefore.getTime())) {
         throw new Error("The grandfather cutoff must be a valid date.");
     }
+    const edition = options.edition ?? "INDIA";
     const row = await liveCataloguePlanRow(
         prisma,
+        edition,
         options.planId,
         "month",
         now,
@@ -118,8 +122,8 @@ export async function backfillFreeSubscriptions(
     };
     const organizations = await prisma.organization.findMany({
         where: options.onlyWithoutSubscription
-            ? { subscription: null, deletedRetainedAt: null }
-            : undefined,
+            ? { edition, subscription: null, deletedRetainedAt: null }
+            : { edition },
         select: { id: true },
         orderBy: { id: "asc" },
     });
@@ -220,11 +224,13 @@ export async function catalogueStartedAt(
  */
 export async function startMissingFreeRows(
     prisma: PrismaClient,
-    options: { planId: string; now?: Date },
+    options: { planId: string; edition?: Edition; now?: Date },
 ): Promise<FreeRowsReport | null> {
     const now = options.now ?? new Date();
+    const edition = options.edition ?? "INDIA";
     const row = await liveCataloguePlanRow(
         prisma,
+        edition,
         options.planId,
         "month",
         now,
@@ -234,6 +240,7 @@ export async function startMissingFreeRows(
     if (!startedAt) return null;
     return backfillFreeSubscriptions(prisma, {
         planId: options.planId,
+        edition,
         grandfatheredBefore: startedAt,
         now,
         onlyWithoutSubscription: true,

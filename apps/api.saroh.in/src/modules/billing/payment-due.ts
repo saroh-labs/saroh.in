@@ -1,4 +1,5 @@
 import type { Logger } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { enqueueBillingEmail } from "./billing-email.job";
@@ -26,6 +27,34 @@ export function paymentDueFrom(now: Date): Date {
 }
 
 const BATCH = 200;
+
+/**
+ * A month paid one payment at a time is over (stage 9, KTD5b: Global's
+ * monthly route while Razorpay can't renew a USD plan on autopay): the next
+ * month is due. The plan stays {@link PAYMENT_DUE_DAYS} days from the
+ * month's end, the business is told once with Pay now, and Pay now is a
+ * USD order for the next month, in the plan's own currency. Unpaid by then,
+ * {@link closeOverduePayments} moves it to Free, as a failed renewal. The
+ * caller holds the subscription's row lock.
+ */
+export async function openMonthDueInTx(
+    tx: Prisma.TransactionClient,
+    sub: { id: string; organizationId: string; currentPeriodEnd: Date },
+): Promise<void> {
+    const until = paymentDueFrom(sub.currentPeriodEnd);
+    await tx.subscription.update({
+        where: { id: sub.id },
+        data: { status: "PAST_DUE", paymentDueUntil: until },
+    });
+    await enqueueBillingEmail(tx, {
+        kind: "PAYMENT_FAILED",
+        organizationId: sub.organizationId,
+        subscriptionId: sub.id,
+        eventKey: `month-due:${sub.id}:${sub.currentPeriodEnd.toISOString()}`,
+        final: false,
+        monthDue: true,
+    });
+}
 
 /**
  * Move every business whose payment is still due past its date to Free.

@@ -141,7 +141,7 @@ export class VerificationSendService {
             ) {
                 return false;
             }
-            const live = await this.catalogue.live(new Date());
+            const live = await this.catalogue.live("INDIA", new Date());
             const price = live?.catalog.messagePrices?.whatsapp;
             if (price === undefined) return false;
             const wallet = await this.wallet.get(organizationId);
@@ -153,9 +153,12 @@ export class VerificationSendService {
         }
     }
 
-    /** The live catalogue's WhatsApp price; none published refuses the send. */
+    /**
+     * The live catalogue's WhatsApp price; none published refuses the send.
+     * India's: a Global business is never approved (DEC-211).
+     */
     private async whatsappPrice(): Promise<number> {
-        const live = await this.catalogue.live(new Date());
+        const live = await this.catalogue.live("INDIA", new Date());
         const price = live?.catalog.messagePrices?.whatsapp;
         if (price === undefined) {
             this.logger.error("verification_send no_whatsapp_price");

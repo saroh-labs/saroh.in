@@ -202,7 +202,7 @@ describe("catalogue writes (DB, U4)", () => {
             ).rejects.toMatchObject({ status: 409 });
 
             // Both editors are named on the read (D-2), first save first.
-            const read = await catalogue.adminPricing(new Date());
+            const read = await catalogue.adminPricing("INDIA", new Date());
             expect(read.draft?.editors.map((e) => e.name)).toEqual([
                 "Ana",
                 "Ben",
@@ -323,7 +323,9 @@ describe("catalogue writes (DB, U4)", () => {
                 idempotencyKey: key(),
             });
             // Version 2 waits for the billing provider: 1 is still live.
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                1,
+            );
 
             await expect(
                 controller.saveDraft(staff(ana), {
@@ -477,8 +479,10 @@ describe("catalogue writes (DB, U4)", () => {
                 idempotencyKey: key(),
             });
 
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
-            const held = await catalogue.adminPricing(new Date());
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                1,
+            );
+            const held = await catalogue.adminPricing("INDIA", new Date());
             expect(held.liveVersion).toBe(1);
             expect(
                 held.versions.map((x) => [x.version, x.status, x.sync]),
@@ -488,10 +492,12 @@ describe("catalogue writes (DB, U4)", () => {
             ]);
 
             await syncAll();
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
-            expect((await catalogue.adminPricing(new Date())).liveVersion).toBe(
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
                 2,
             );
+            expect(
+                (await catalogue.adminPricing("INDIA", new Date())).liveVersion,
+            ).toBe(2);
         });
 
         it("goes live at once when there's nothing to bill, and queues saroh.in's refresh", async () => {
@@ -514,12 +520,14 @@ describe("catalogue writes (DB, U4)", () => {
                 status: "live",
                 providerPlans: 0,
             });
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                2,
+            );
             const jobs = await prisma.job.findMany({
                 where: { type: PRICING_REVALIDATE_TYPE },
             });
             expect(jobs.map((j) => j.payload)).toEqual([
-                { version: 2, cause: "publish" },
+                { version: 2, cause: "publish", edition: "INDIA" },
             ]);
         });
 
@@ -577,7 +585,9 @@ describe("catalogue writes (DB, U4)", () => {
             });
             expect(await prisma.pricingCatalogVersion.count()).toBe(2);
             expect(await prisma.pricingCatalogDraft.count()).toBe(1);
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                2,
+            );
         });
 
         it("refuses a draft that changes nothing", async () => {
@@ -795,7 +805,9 @@ describe("catalogue writes (DB, U4)", () => {
             });
             expect(r).toMatchObject({ version: 2, status: "scheduled" });
             await syncAll();
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                1,
+            );
             expect(
                 await prisma.job.count({
                     where: { type: PRICING_REVALIDATE_TYPE },
@@ -916,7 +928,9 @@ describe("catalogue writes (DB, U4)", () => {
             expect(v3.catalog).toEqual(v1.catalog);
             expect(v3.note).toBe("Rolled back to version 1");
             await syncAll();
-            expect((await liveCatalogueVersion(prisma))?.version).toBe(3);
+            expect((await liveCatalogueVersion(prisma, "INDIA"))?.version).toBe(
+                3,
+            );
             expect(
                 await prisma.adminAuditEvent.findFirstOrThrow({
                     where: { action: "pricing.version.rollback" },

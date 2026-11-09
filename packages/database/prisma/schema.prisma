@@ -8397,7 +8397,12 @@ model ClassWaitlistEntry {
 // `diff()` against the version before it (the change log).
 model PricingCatalogVersion {
   id      String @id @default(cuid())
+  // One number sequence across editions, so a version, its Plan rows and
+  // their provider plans stay keyed by the number alone (stage 9).
   version Int    @unique
+  // Whose catalogue this is (stage 9, KTD1): each edition has its own
+  // draft, versions and go-live. Every version before it is India's.
+  edition Edition @default(INDIA)
 
   catalog  Json
   goLiveAt DateTime
@@ -8413,9 +8418,11 @@ model PricingCatalogVersion {
   createdAt DateTime @default(now())
 
   @@index([goLiveAt])
+  @@index([edition, goLiveAt])
 }
 
-// PricingCatalogDraft — the one shared draft (KTD-3), a row keyed "shared".
+// PricingCatalogDraft — one shared draft per edition (KTD-3, stage 9): India's
+// is the row keyed "shared", Global's "global" (`draftIdOf`).
 // `revision` goes up on every save; a save naming an older revision is
 // refused (409) with who saved since. Deleted on publish or discard.
 model PricingCatalogDraft {
@@ -8440,6 +8447,10 @@ model PricingCatalogDraft {
 model PricingCoupon {
   id   String @id @default(cuid())
   code String @unique
+  // The catalogue it belongs to (stage 9): redeemed only by a business of
+  // this edition, in that catalogue's currency. Codes stay unique across
+  // editions.
+  edition Edition @default(INDIA)
 
   // Taken off each month for `months` months (monthly), or off the first
   // yearly charge as `months` months' worth, capped at that charge (U16).
@@ -8634,6 +8645,13 @@ model BillingProfile {
   // a second customer with the same email and phone.
   billingEmail String
   phone        String?
+  // The payer's country, ISO 3166-1 alpha-2 (stage 9, KTD7): India's rules
+  // (GSTIN, GST state, six-digit PIN) apply only to "IN". Every profile
+  // before it is Indian.
+  country      String  @default("IN")
+  // A payer's own tax number outside India (VAT, EIN, ABN), as typed;
+  // printed on Saroh's export invoice. India's is the GSTIN.
+  taxId        String?
 
   provider           String
   // Razorpay's `cust_…`; null until the provider has made it.
@@ -8852,6 +8870,15 @@ model SarohInvoice {
 
   issuedAt DateTime
   currency String   @default("INR")
+  // An export invoice (stage 9, KTD6): the payment's value in rupees as the
+  // provider settles it (Razorpay's base_amount and base_currency), for
+  // Saroh's books, FIRC and export reporting. Stored, not printed, until
+  // the CA names the rate. Null on India's invoices.
+  providerBaseAmount   Int?
+  providerBaseCurrency String?
+  // The LUT note an export invoice carries, frozen as issued (from the
+  // API's SAROH_EXPORT_LUT). Null on India's invoices.
+  exportNote           String?
 
   sellerName      String
   sellerLegalName String?
@@ -8867,6 +8894,10 @@ model SarohInvoice {
   billToAddress String?
   billToState   String?
   billToGstin   String?
+  // A buyer abroad (stage 9): its country (ISO 3166-1 alpha-2) and own tax
+  // number, as on its billing profile at issue.
+  billToCountry String?
+  billToTaxId   String?
 
   // GST state code; INTRA (CGST + SGST) or INTER (IGST).
   placeOfSupply String?

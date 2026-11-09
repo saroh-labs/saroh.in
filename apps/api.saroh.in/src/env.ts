@@ -330,6 +330,16 @@ const envSchema = z.object({
         .string()
         .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
         .optional(),
+    // Saroh's export invoices to Global businesses (stage 9, KTD6): their own
+    // series' prefix (1–3 capitals or digits, never India's), and the LUT
+    // reference and wording the CA confirms, printed as one note. No
+    // default: an export invoice without them is not issued (a Needs-action
+    // row says so).
+    SAROH_INVOICE_PREFIX_GLOBAL: z
+        .string()
+        .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
+        .optional(),
+    SAROH_EXPORT_LUT: z.string().max(400).optional(),
 
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This
@@ -405,6 +415,19 @@ const TEST_ONLY = [
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
+    // Two editions never share a series (stage 9, KTD6).
+    if (
+        value.SAROH_INVOICE_PREFIX_GLOBAL &&
+        value.SAROH_INVOICE_PREFIX_GLOBAL ===
+            // India's default is DEFAULT_SAROH_INVOICE_PREFIX (saroh-seller.ts).
+            (value.SAROH_INVOICE_PREFIX ?? "SA")
+    ) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["SAROH_INVOICE_PREFIX_GLOBAL"],
+            message: "must differ from SAROH_INVOICE_PREFIX",
+        });
+    }
     if (value.NODE_ENV !== "production") return;
     for (const key of TEST_ONLY) {
         if (value[key]) {

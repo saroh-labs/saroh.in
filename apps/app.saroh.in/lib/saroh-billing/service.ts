@@ -1,3 +1,5 @@
+import { env } from "@/env";
+import { PROFILE } from "@/lib/edition";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { parseCatalog } from "@saroh/pricing-catalog";
 import { cache } from "react";
@@ -101,6 +103,27 @@ export const pausedOrNull = cache(async (): Promise<PausedView | null> => {
     } catch {
         // Degraded, not failed: the marks are an aid the write backs up.
         return null;
+    }
+});
+
+/**
+ * Whether Plan and billing shows Saroh's plans to this business now
+ * (stage 9, DEC-211): where the edition is billed from the start, the
+ * switch alone (`plansShown`); abroad, the same switch and the API's word
+ * that it sells this business its plans (`SAROH_BILLING_GLOBAL` and a live
+ * paid catalogue, `GET …/billing/offered`). Not read: no plans, and the
+ * Free note stays. Server only; request-cached.
+ */
+export const plansOpen = cache(async (): Promise<boolean> => {
+    if (plansShown()) return true;
+    if (env.NEXT_PUBLIC_PLANS !== "on" || PROFILE.sarohBilling) return false;
+    try {
+        const read = await orgRead<{ offered: boolean }>("/billing/offered", {
+            offered: false,
+        });
+        return read.status === "ok" && read.data.offered;
+    } catch {
+        return false;
     }
 });
 
