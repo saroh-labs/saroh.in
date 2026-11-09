@@ -60,7 +60,9 @@ export function globalProductionConfig(
     { routes = false, now = new Date() } = {},
 ) {
     const production = config.env.production;
-    const dark = { workers_dev: false, preview_urls: false };
+    // `routes: []`, never left out: wrangler fills a missing env key from the
+    // top level, which holds the dev Worker's saroh.io routes.
+    const dark = { workers_dev: false, preview_urls: false, routes: [] };
     if (dir === SITE) {
         const { routes: _none, ...rest } = production;
         return {
