@@ -368,7 +368,8 @@ t=…,v1=…`, each `v1` the hex HMAC-SHA256 of `<t>.<raw body>` keyed by the
       (`lacksPermission`), not refused keys: that payment falls back to
       hosted Checkout (its 30-minute hold and `earlierHoldSession`) and the
       connection is flagged `PERMISSION_MISSING`. A 401 is still
-      `KEYS_REFUSED`.
+      `KEYS_REFUSED`. A hold whose style changed mid-hold closes the other
+      style's open intent first (`closeOtherStyleHoldIntents`).
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

@@ -2319,8 +2319,24 @@ export class PaymentsService {
                     },
                 };
             }
+            // A hold now paying in the window closes a session left open
+            // from before the business switched, so one place can't be
+            // paid twice.
+            if (intent && holdInvoice) {
+                await this.closeOtherStyleHoldIntents(
+                    target.id,
+                    true,
+                    providerRow,
+                );
+            }
         }
         if (holdInvoice && !cardWindow) {
+            // And a hold paying on Stripe's page closes an open window.
+            await this.closeOtherStyleHoldIntents(
+                target.id,
+                false,
+                providerRow,
+            );
             // A hold already paying through a session gets it back, never
             // a new one that would hold its place longer (U6).
             const earlier = await earlierHoldSession(target.id);
@@ -2711,7 +2727,58 @@ export class PaymentsService {
         }
     }
 
-    /** Cancel an in-page PaymentIntent at Stripe, then the row. Never throws. */
+    /**
+     * A booking hold that pays in one Stripe style closes the other style's
+     * open intents first (a hosted session left from before the business
+     * switched to the window, or a window PaymentIntent once it pays on
+     * Stripe's page), so one place is never paid twice. A session is
+     * expired by its `cs_` id. Never throws.
+     */
+    private async closeOtherStyleHoldIntents(
+        invoiceId: string,
+        inWindow: boolean,
+        providerRow: MerchantPaymentProvider,
+    ): Promise<void> {
+        let others: {
+            id: string;
+            providerIntentId: string | null;
+            providerCheckoutId: string | null;
+        }[];
+        try {
+            others = await prisma.paymentIntent.findMany({
+                where: {
+                    invoiceId,
+                    provider: "STRIPE",
+                    status: { in: [...OPEN_INTENT_STATUSES] },
+                    providerIntentId: { not: null },
+                    providerCheckoutId: inWindow ? { not: null } : null,
+                    invoice: { status: "DRAFT", source: "BOOKING" },
+                },
+                select: {
+                    id: true,
+                    providerIntentId: true,
+                    providerCheckoutId: true,
+                },
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Could not read the open payments of invoice ${invoiceId}: ${errorMessage(err)}`,
+            );
+            return;
+        }
+        for (const other of others) {
+            await this.closeLegacyStripeIntent(
+                {
+                    id: other.id,
+                    providerIntentId:
+                        other.providerCheckoutId ?? other.providerIntentId,
+                },
+                providerRow,
+            );
+        }
+    }
+
+    /** Cancel an in-page PaymentIntent (or expire a session) at Stripe, then the row. Never throws. */
     private async closeLegacyStripeIntent(
         intent: { id: string; providerIntentId: string | null },
         providerRow: MerchantPaymentProvider,

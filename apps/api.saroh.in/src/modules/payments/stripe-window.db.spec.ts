@@ -379,11 +379,48 @@ describe("a Stripe business paying in Saroh's card window (real database)", () =
     });
 });
 
-describe("a hold whose key can't make PaymentIntents (real database)", () => {
+describe("a hold whose Stripe style changes, or whose key can't make PaymentIntents (real database)", () => {
     async function statusOf(id: string) {
         return (await prisma.paymentIntent.findUniqueOrThrow({ where: { id } }))
             .status;
     }
+
+    it("a new intent of one style closes the other style's open one first", async () => {
+        // Window first, then Stripe's page with a new key: the window closes.
+        await payments.setCheckoutStyle(owner, "stripe", "WINDOW");
+        const made = await hold(`style-a-${tag}@example.com`);
+        const inWindow = await publicInvoices.createIntent(
+            made.payToken ?? "",
+            { idempotencyKey: `kw_${tag}_style_a1` },
+        );
+        await payments.setCheckoutStyle(owner, "stripe", "HOSTED");
+        const cancel = jest.spyOn(stripe, "cancelIntent");
+        const hosted = await publicInvoices.createIntent(made.payToken ?? "", {
+            idempotencyKey: `kw_${tag}_style_a2`,
+        });
+        expect(hosted.providerIntentId).toMatch(/^cs_fake_/);
+        expect(cancel).toHaveBeenCalledWith(
+            expect.objectContaining({
+                providerIntentId: inWindow.providerIntentId,
+            }),
+        );
+        expect(await statusOf(inWindow.paymentIntentId)).toBe("CANCELLED");
+        expect(await statusOf(hosted.paymentIntentId)).toBe("REQUIRES_PAYMENT");
+
+        // Back to the window: the open session is expired by its cs_ id.
+        await payments.setCheckoutStyle(owner, "stripe", "WINDOW");
+        cancel.mockClear();
+        const again = await publicInvoices.createIntent(made.payToken ?? "", {
+            idempotencyKey: `kw_${tag}_style_a3`,
+        });
+        expect(again.providerIntentId).toMatch(/^pi_fake_/);
+        expect(cancel).toHaveBeenCalledWith(
+            expect.objectContaining({
+                providerIntentId: hosted.providerIntentId,
+            }),
+        );
+        expect(await statusOf(hosted.paymentIntentId)).toBe("CANCELLED");
+    });
 
     it("a 403 on the window pays on Stripe's page: a hosted handoff, the hold moved to the session's 30 minutes, and the connection flagged PERMISSION_MISSING", async () => {
         const { ProviderKeysRefusedError } =
