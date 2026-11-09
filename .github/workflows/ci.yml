@@ -358,8 +358,12 @@ jobs:
           SEED_SWEEPS: later
         run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED --concurrency=2 -- --maxWorkers=2
 
+      # Builds the packages the seed imports first: a PR that touches no
+      # package builds nothing above, and the sweeps run on every PR (#1338).
       - name: Seed sweeps
-        run: pnpm --filter @saroh/database exec vitest run src/seed/showcase/clinic.test.ts src/seed/showcase/bakery-any-day.test.ts
+        run: |
+          pnpm turbo run build --filter=@saroh/database^...
+          pnpm --filter @saroh/database exec vitest run src/seed/showcase/clinic.test.ts src/seed/showcase/bakery-any-day.test.ts
 
   build:
     name: Build
