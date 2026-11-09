@@ -22,6 +22,7 @@ import {
     businessTypeOf,
 } from "@/lib/organizations/business-types";
 import { kindWords } from "@/lib/organizations/kind";
+import { addressPlace } from "@/lib/organizations/registered-address";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import {
     NO_SOCIAL_LINKS,
@@ -311,7 +312,9 @@ export function BusinessDetailRows({
                 ) : (
                     <Absent>No registered address yet</Absent>
                 )}
-                {saved.country ? (
+                {/* A Global address already ends with its country (U4). */}
+                {saved.country &&
+                !(address && addressPlace(saved, saved.country).countryName) ? (
                     <Follows>{countryName(saved.country)}</Follows>
                 ) : null}
             </Row>

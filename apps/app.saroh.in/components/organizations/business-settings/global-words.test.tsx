@@ -18,6 +18,7 @@ import {
     mount,
     onTab,
     PROFILE,
+    row,
     settings,
     unmount,
 } from "./business-settings.test-kit";
@@ -129,6 +130,23 @@ describe("Settings › Business says nothing India's to a US business", () => {
         expect(text).not.toBe("");
         expect(text).not.toMatch(INDIA_ONLY);
         expect(text).not.toMatch(LAKH_GROUPED);
+    });
+
+    it("prints a US address's country once", () => {
+        edition.name = "GLOBAL";
+        onTab("address");
+        draw(US);
+        const text = row("business-registered-address")?.textContent ?? "";
+        expect(text).toContain("Austin");
+        expect(text.split("United States")).toHaveLength(2);
+    });
+
+    it("India unchanged: its address row still names India under it", () => {
+        onTab("address");
+        draw(INDIA);
+        const text = row("business-registered-address")?.textContent ?? "";
+        expect(text).toContain("Bengaluru");
+        expect(text).toContain("India");
     });
 
     it("India unchanged: its tax tab still names GST and the GSTIN", () => {
