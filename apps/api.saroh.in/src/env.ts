@@ -294,6 +294,17 @@ const envSchema = z.object({
     // refuses with a clear error when it is missing or malformed. Never
     // logged, never in an example file with a value.
     STAFF_PII_ENC_KEY: z.string().optional(),
+    // Public API keys and webhook signing secrets (plan 2026-11-10-001, U3/U5):
+    // each its own 32-byte AES-256-GCM key (base64 or 64-hex), checked at use
+    // like PAYMENTS_ENC_KEY. Never logged, never in an example file with a value.
+    APIKEY_ENC_KEY: z.string().optional(),
+    WEBHOOK_SECRET_KEY: z.string().optional(),
+    // Durable public-API rate limits (U4, `modules/rate-limits/`). Unset, or
+    // Redis down: each replica limits in process at the cap / API_REPLICAS.
+    REDIS_URL: z.url().optional(),
+    API_REPLICAS: z.coerce.number().int().positive().default(1),
+    // The pg pool's `max` (`@saroh/database` reads it); unset keeps pg's 10.
+    DB_POOL_MAX: z.coerce.number().int().positive().optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client

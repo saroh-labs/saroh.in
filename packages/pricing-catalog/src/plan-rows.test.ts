@@ -84,6 +84,10 @@ describe("plan keys", () => {
     it("maps every design row to the product", () => {
         expect(Object.keys(MODULE_MAP).sort()).toEqual(
             [
+                "api-keys",
+                "api-mcp",
+                "api-secret",
+                "api-storefront",
                 "blog",
                 "bookings",
                 "integrations",
@@ -104,6 +108,7 @@ describe("plan keys", () => {
                 "themes",
                 "variants",
                 "visits",
+                "webhooks",
                 "website",
             ].sort(),
         );
