@@ -11,6 +11,7 @@ import {
     everyNote,
     formOf,
     glance,
+    namesBesides,
     parsePrice,
     payloadOf,
     planBlocker,
@@ -123,6 +124,18 @@ describe("what stops Publish", () => {
             ),
         ).toEqual([
             { field: "name", message: "There's already a plan called Drop-in" },
+        ]);
+    });
+
+    it("never counts a plan's own name against it, only the others'", () => {
+        const taken = [
+            { id: "plan_1", name: "Personal training" },
+            { id: "plan_2", name: "Drop-in" },
+        ];
+        expect(namesBesides(taken, "plan_1")).toEqual(["Drop-in"]);
+        expect(namesBesides(taken, null)).toEqual([
+            "Personal training",
+            "Drop-in",
         ]);
     });
 
