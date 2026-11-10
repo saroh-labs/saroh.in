@@ -92,7 +92,7 @@ const team = (label: string, value: string): SettingsEntry => ({
 
 /**
  * In the design's order: Business by its tabs, then Team, Modules, Plan and
- * billing, Your profile, Share, Activity, Providers.
+ * billing, Your profile, Share, Activity, Providers, API and AI apps.
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
@@ -234,6 +234,21 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         page: "/settings/providers",
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },
+    {
+        label: "API and AI apps: AI assistants, keys and webhooks",
+        page: "/settings/api",
+        words: [
+            "API",
+            "Key",
+            "Token",
+            "Webhook",
+            "MCP",
+            "Claude",
+            "ChatGPT",
+            "Zapier",
+            "n8n",
+        ],
+    },
     { label: "Download your data", page: "/settings/data" },
     {
         label: "Payment provider",

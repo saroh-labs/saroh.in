@@ -81,6 +81,7 @@ const SETTINGS = [
     "/settings/modules",
     "/settings/profile",
     "/settings/share",
+    "/settings/api",
 ];
 
 /** The Orders list at this width: the desk grid or the phone cards. */

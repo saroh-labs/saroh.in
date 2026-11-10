@@ -122,6 +122,37 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         one: "connection",
         paused: "You can't connect more tools.",
         monthly: false,
+    }, // The public API (plan 2026-11-10-001): rates a minute are refused with a
+    // 429 and never metered, so their words only name the limit.
+    "api.mcp.rpm": {
+        what: "AI assistant requests a minute",
+        one: "AI assistant request a minute",
+        paused: "AI assistant requests wait until the next minute.",
+        monthly: false,
+    },
+    "api.secret.rpm": {
+        what: "API requests a minute",
+        one: "API request a minute",
+        paused: "API requests wait until the next minute.",
+        monthly: false,
+    },
+    "api.storefront.rpm": {
+        what: "storefront API requests a minute",
+        one: "storefront API request a minute",
+        paused: "Storefront API requests wait until the next minute.",
+        monthly: false,
+    },
+    "api.keys.max": {
+        what: "API keys",
+        one: "API key",
+        paused: "You can't make more API keys.",
+        monthly: false,
+    },
+    "webhooks.max": {
+        what: "webhook endpoints",
+        one: "webhook endpoint",
+        paused: "You can't add more webhook endpoints.",
+        monthly: false,
     },
 };
 

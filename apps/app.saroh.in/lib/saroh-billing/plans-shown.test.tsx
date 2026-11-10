@@ -21,6 +21,7 @@ vi.mock("@/env", () => ({
         get NEXT_PUBLIC_PLANS() {
             return flag.plans;
         },
+        NEXT_PUBLIC_API_AREA: "on",
     },
 }));
 vi.mock("@/lib/edition", async (actual) => {
@@ -217,6 +218,7 @@ describe.each([
             "/settings/share",
             "/settings/activity",
             "/settings/providers",
+            "/settings/api",
             "/settings/data",
         ]);
     });

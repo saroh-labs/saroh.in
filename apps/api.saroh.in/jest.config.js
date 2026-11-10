@@ -231,6 +231,8 @@ module.exports = {
         "<rootDir>/src/modules/products/product-path.spec.ts",
         "<rootDir>/src/modules/products/sku-holder.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
+        // Plan 2026-11-10-001 U4: public API rate limits, with a fake Redis.
+        "<rootDir>/src/modules/rate-limits/**/*.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",

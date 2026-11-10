@@ -171,7 +171,16 @@ export type OrgAction =
     // `module:manage` (OWNER/ADMIN) enables/disables Organization modules and
     // manages Project selection.
     | "module:read"
-    | "module:manage";
+    | "module:manage"
+    // The public API (R7, plan 2026-11-10-001): make and revoke API keys,
+    // and disconnect anyone's AI app. The Owner's alone, never a custom
+    // role's, never an extra and never a key's: a key that could make keys
+    // would outlive whoever revoked it.
+    | "apikey:manage"
+    // Notifications to the business's own systems (webhooks, R8). The
+    // Owner's by default; an Owner may give it to an Admin as an extra or
+    // to a custom role. Connecting one's own AI app needs no action.
+    | "webhook:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -265,4 +274,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     // Modular capabilities (ADR-003).
     "module:read",
     "module:manage",
+    // Public API and MCP (plan 2026-11-10-001, U2).
+    "apikey:manage",
+    "webhook:manage",
 ];

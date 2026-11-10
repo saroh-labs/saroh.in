@@ -215,10 +215,36 @@ describe("searchSettings", () => {
         // not the business's details, its plan or its providers.
         const hits = searchSettings("", member, { limit: 99 });
         expect(new Set(hits.map((h) => h.where))).toEqual(
-            // And the website's QR codes, which they may see.
-            new Set(["Team", "Modules", "Your profile", "Share"]),
+            // And the website's QR codes, which they may see, and their own
+            // AI assistant.
+            new Set([
+                "Team",
+                "Modules",
+                "Your profile",
+                "Share",
+                "API and AI apps",
+            ]),
         );
         expect(searchSettings("gstin", member)).toEqual([]);
+    });
+
+    it("finds API and AI apps by the words people use (plan 2026-11-10-001)", () => {
+        for (const q of [
+            "API",
+            "key",
+            "token",
+            "webhook",
+            "MCP",
+            "Claude",
+            "ChatGPT",
+            "Zapier",
+            "n8n",
+        ]) {
+            expect(
+                searchSettings(q, member, { byPage: false }).map((h) => h.href),
+            ).toContain("/settings/api");
+        }
+        expect(searchSettings("claude", { role: "REVIEWER" })).toEqual([]);
     });
 
     it("finds QR codes by what people call them, while Website is on", () => {

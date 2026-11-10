@@ -164,6 +164,36 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: null,
         legacyEntitlementKey: null,
+    } /**
+     * The public API and MCP (plan 2026-11-10-001, U4): requests a minute per
+     * surface, read by `rate-limits/caps.ts`, and how many keys and webhook
+     * endpoints a business may have (U5, U13). Under no registry module and
+     * never metered: the caps are the catalogue's numbers, never the repo's.
+     */,
+    "api-mcp": {
+        registry: null,
+        limitKey: "api.mcp.rpm",
+        legacyEntitlementKey: null,
+    },
+    "api-secret": {
+        registry: null,
+        limitKey: "api.secret.rpm",
+        legacyEntitlementKey: null,
+    },
+    "api-storefront": {
+        registry: null,
+        limitKey: "api.storefront.rpm",
+        legacyEntitlementKey: null,
+    },
+    "api-keys": {
+        registry: null,
+        limitKey: "api.keys.max",
+        legacyEntitlementKey: null,
+    },
+    webhooks: {
+        registry: null,
+        limitKey: "webhooks.max",
+        legacyEntitlementKey: null,
     },
 };
 

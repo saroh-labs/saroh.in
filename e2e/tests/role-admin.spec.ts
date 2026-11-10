@@ -87,6 +87,7 @@ const SETTINGS = [
     "/settings/share",
     "/settings/activity",
     "/settings/providers",
+    "/settings/api",
 ];
 
 test.describe("an Admin", () => {

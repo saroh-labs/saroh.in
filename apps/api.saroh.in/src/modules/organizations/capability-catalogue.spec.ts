@@ -236,3 +236,24 @@ describe("Count and move stock (#513)", () => {
         );
     });
 });
+
+describe("the public API powers (plan 2026-11-10-001, U2)", () => {
+    it("keeps API keys the Owner's alone, off the grantable list", () => {
+        expect(CAPABILITY_BY_ACTION.get("apikey:manage")?.ownerOnly).toBe(true);
+        expect(grantableCapabilities().map((c) => c.action)).not.toContain(
+            "apikey:manage",
+        );
+        expect(isNeverExtra("apikey:manage")).toBe(true);
+    });
+
+    it("offers webhooks to custom roles and as an extra", () => {
+        const webhooks = CAPABILITY_BY_ACTION.get("webhook:manage");
+        expect(webhooks?.label).toBe(
+            "Manage notifications to your systems (webhooks)",
+        );
+        expect(grantableCapabilities().map((c) => c.action)).toContain(
+            "webhook:manage",
+        );
+        expect(isNeverExtra("webhook:manage")).toBe(false);
+    });
+});

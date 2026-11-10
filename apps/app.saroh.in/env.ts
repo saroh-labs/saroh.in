@@ -62,6 +62,13 @@ export const env = createEnv({
          * (`lib/sites/templates-switch.ts`).
          */
         NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
+        /**
+         * Settings › API and AI apps (plan 2026-11-10-001): `on` shows the
+         * tab, its search hits and the page; anything else, unset included,
+         * hides them (`lib/settings/api-area-switch.ts`). Off in production
+         * until the area ships (#1357).
+         */
+        NEXT_PUBLIC_API_AREA: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
@@ -99,6 +106,7 @@ export const env = createEnv({
             process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
+        NEXT_PUBLIC_API_AREA: process.env.NEXT_PUBLIC_API_AREA,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,

@@ -173,14 +173,30 @@ export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:delete",
     "org:address:update",
     "billing:manage",
+    // API keys (R7): a key acts for the business with no person behind it.
+    "apikey:manage",
 ];
 
 const OWNER_ONLY: ReadonlySet<OrgAction> = new Set(OWNER_ONLY_ACTIONS);
 
+/**
+ * Powers the built-in Owner holds and the built-in Admin does not, which an
+ * Owner may still give: to an Admin (or anyone) as an extra, or to a custom
+ * role. Unlike `OWNER_ONLY_ACTIONS`, nothing strips them from a stored list.
+ */
+export const OWNER_DEFAULT_ACTIONS: readonly OrgAction[] = [
+    // Webhooks (R8) send the business's data to an address someone typed.
+    "webhook:manage",
+];
+
 const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
     OWNER: new Set<OrgAction>(ORG_ACTIONS),
     ADMIN: new Set<OrgAction>(
-        ORG_ACTIONS.filter((action) => !OWNER_ONLY_ACTIONS.includes(action)),
+        ORG_ACTIONS.filter(
+            (action) =>
+                !OWNER_ONLY_ACTIONS.includes(action) &&
+                !OWNER_DEFAULT_ACTIONS.includes(action),
+        ),
     ),
     MEMBER: new Set<OrgAction>([...READ_ONLY_ACTIONS, ...MEMBER_ACTIONS]),
     /*

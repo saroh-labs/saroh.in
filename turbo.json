@@ -135,6 +135,7 @@
         "GLOBAL_PRODUCTION_HOSTS",
         "NEXT_PUBLIC_EDITION",
         "NEXT_PUBLIC_TEMPLATES",
+        "NEXT_PUBLIC_API_AREA",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",

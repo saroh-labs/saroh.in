@@ -1,0 +1,302 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildOpenApi > is deterministic 1`] = `
+{
+  "info": {
+    "title": "Saroh API",
+    "version": "1",
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/products": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "maxLength": 64,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "price": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amountMinor": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer",
+                              },
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "amountMinor",
+                              "currency",
+                            ],
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "price",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "maxLength": 512,
+                          "pattern": "^[A-Za-z0-9_-]+$",
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "rate_limited",
+                            "internal",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Error",
+          },
+        },
+        "summary": "List products",
+        "tags": [
+          "Catalogue",
+        ],
+        "x-saroh-capability": "catalogue:read",
+      },
+    },
+    "/products/{productId}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "name",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "maxLength": 64,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "price": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "amountMinor": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "amountMinor",
+                        "currency",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "price",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "rate_limited",
+                            "internal",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Error",
+          },
+        },
+        "summary": "Rename a product",
+        "tags": [
+          "Catalogue",
+        ],
+        "x-saroh-capability": "catalogue:write",
+      },
+    },
+  },
+  "tags": [
+    {
+      "name": "Catalogue",
+    },
+  ],
+}
+`;
