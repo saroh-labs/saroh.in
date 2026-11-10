@@ -120,6 +120,20 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "business",
         label: "Manage automations",
     },
+    {
+        action: "apikey:manage",
+        group: "business",
+        label: "Make and revoke keys for other software",
+        note: "A key lets other software work in the business without anyone signing in. Includes disconnecting anyone's AI assistant.",
+        // The owner's alone (R7): a key acts with no person behind it.
+        ownerOnly: true,
+    },
+    {
+        action: "webhook:manage",
+        group: "business",
+        label: "Manage notifications to your systems (webhooks)",
+        note: "Sends details of orders, bookings and customers to an address someone types in, as they happen.",
+    },
 
     // — Team ——————————————————————————————————————————————————
     { action: "member:read", group: "team", label: "See who is in the team" },

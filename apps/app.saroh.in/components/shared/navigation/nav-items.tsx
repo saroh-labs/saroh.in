@@ -13,6 +13,7 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
+    Plug,
     QrCode,
     ReceiptText,
     SlidersHorizontal,
@@ -1194,6 +1195,8 @@ export interface SettingsPage {
     icon: LucideIcon;
     action?: NavAction;
     ownerOnly?: true;
+    /** Offered to every role but the Reviewer, who holds no part of the business. */
+    notForReviewer?: true;
 }
 
 /**
@@ -1265,6 +1268,16 @@ export const SETTINGS_PAGES = [
         action: "provider:read",
     },
     {
+        // Every member connects their own AI assistant (plan 2026-11-10-001,
+        // R9); keys and webhooks inside ask `apikey:manage` and
+        // `webhook:manage`. Not a Reviewer's (owner, v1).
+        href: "/settings/api",
+        label: "API and AI apps",
+        description: "AI assistants, keys and webhooks",
+        icon: Plug,
+        notForReviewer: true,
+    },
+    {
         // "Download your data" (DEC-120): the owner's alone, by role, as
         // the API has it. Last, after everything the business runs on.
         href: "/settings/data",
@@ -1300,6 +1313,7 @@ export function mayOpenSettingsPage(
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
         return false;
     }
+    if (page.notForReviewer && actor.role === "REVIEWER") return false;
     return true;
 }
 

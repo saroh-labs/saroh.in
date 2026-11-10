@@ -25,14 +25,17 @@ import {
 // implementation so this test actually pins behavior rather than mirroring it.
 const EXPECTED: Record<OrgRole, OrgAction[]> = {
     OWNER: [...ORG_ACTIONS],
-    // Closing the business, changing its web address (DEC-069) and
-    // changing what it pays Saroh (DEC-131, amended 2026-10-11) are the
-    // Owner's alone.
+    // Closing the business, changing its web address (DEC-069),
+    // changing what it pays Saroh (DEC-131, amended 2026-10-11) and API
+    // keys (R7) are the Owner's alone; webhooks (R8) are the Owner's by
+    // default.
     ADMIN: ORG_ACTIONS.filter(
         (action) =>
             action !== "org:delete" &&
             action !== "org:address:update" &&
-            action !== "billing:manage",
+            action !== "billing:manage" &&
+            action !== "apikey:manage" &&
+            action !== "webhook:manage",
     ),
     // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
     // does NOT include it. media:read IS in the floor; media:write is not.
@@ -91,18 +94,21 @@ describe("organization-policy: can()", () => {
         }
     });
 
-    it("ADMIN may do everything except the three owner-only powers", () => {
+    it("ADMIN may do everything except the owner-only and owner-default powers", () => {
         const ownerOnly = [
             "org:delete",
             "org:address:update",
             "billing:manage",
+            "apikey:manage",
         ];
         expect([...OWNER_ONLY_ACTIONS].sort()).toEqual([...ownerOnly].sort());
         expect(can("ADMIN", "org:delete")).toBe(false);
         expect(can("ADMIN", "org:address:update")).toBe(false);
         expect(can("ADMIN", "billing:manage")).toBe(false);
+        expect(can("ADMIN", "apikey:manage")).toBe(false);
+        expect(can("ADMIN", "webhook:manage")).toBe(false);
         for (const action of ORG_ACTIONS.filter(
-            (a) => !ownerOnly.includes(a),
+            (a) => !ownerOnly.includes(a) && a !== "webhook:manage",
         )) {
             expect(can("ADMIN", action)).toBe(true);
         }
@@ -464,7 +470,13 @@ describe("reach (F19): nobody grants what they don't hold", () => {
         // powers, so a role holding one is beyond an Admin.
         expect(withinReach(ctx("OWNER"), ORG_ACTIONS)).toBe(true);
         expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS).sort()).toEqual(
-            ["billing:manage", "org:address:update", "org:delete"].sort(),
+            [
+                "apikey:manage",
+                "billing:manage",
+                "org:address:update",
+                "org:delete",
+                "webhook:manage",
+            ].sort(),
         );
         expect(withinReach(ctx("MEMBER"), ["payment:manage"])).toBe(false);
     });
@@ -853,5 +865,40 @@ describe("the booking and class-pack capabilities (DEC-039, E26)", () => {
         expect(
             withinReach(lead, resolveCapabilities("seller", ["pack:sell"])),
         ).toBe(true);
+    });
+});
+
+describe("apikey:manage and webhook:manage (plan 2026-11-10-001, U2)", () => {
+    it("an Owner holds both; an Admin, Member or Reviewer neither by default", () => {
+        expect(can("OWNER", "apikey:manage")).toBe(true);
+        expect(can("OWNER", "webhook:manage")).toBe(true);
+        for (const role of ["ADMIN", "MEMBER", "REVIEWER"] as const) {
+            expect(can(role, "apikey:manage")).toBe(false);
+            expect(can(role, "webhook:manage")).toBe(false);
+        }
+    });
+
+    it("an Admin given webhook:manage holds it; given apikey:manage does not", () => {
+        const set = resolveCapabilities("ADMIN", null, [
+            "webhook:manage",
+            "apikey:manage",
+        ]);
+        expect(set.has("webhook:manage")).toBe(true);
+        expect(set.has("apikey:manage")).toBe(false);
+    });
+
+    it("a custom role keeps webhook:manage and never apikey:manage", () => {
+        const set = resolveCapabilities("integrations", [
+            "webhook:manage",
+            "apikey:manage",
+        ]);
+        expect([...set]).toEqual(["webhook:manage"]);
+    });
+
+    it("only an Owner can hand webhook:manage on", () => {
+        expect(outOfReach(ctx("ADMIN"), ["webhook:manage"])).toEqual([
+            "webhook:manage",
+        ]);
+        expect(withinReach(ctx("OWNER"), ["webhook:manage"])).toBe(true);
     });
 });
