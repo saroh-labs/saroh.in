@@ -13,17 +13,24 @@ export const contractRefusal = z.object({
 
 /** Names each failing field by where it came from: `body.items.0.qty: Too small`. */
 function describe(error: z.ZodError, where: string): string {
-    return error.issues
-        .map((issue) => {
-            const path = [where, ...issue.path.map(String)];
-            if (issue.code === "unrecognized_keys") {
-                return issue.keys
-                    .map((key) => `${[...path, key].join(".")}: Unknown field`)
-                    .join("; ");
-            }
-            return `${path.join(".")}: ${issue.message}`;
-        })
-        .join("; ");
+    return (
+        error.issues
+            .map((issue) => {
+                const path = [where, ...issue.path.map(String)];
+                if (issue.code === "unrecognized_keys") {
+                    return issue.keys
+                        .map(
+                            (key) =>
+                                `${[...path, key].join(".")}: Unknown field`,
+                        )
+                        .join("; ");
+                }
+                return `${path.join(".")}: ${issue.message}`;
+            })
+            // Two checks on one field can say the same thing; say it once.
+            .filter((message, i, all) => all.indexOf(message) === i)
+            .join("; ")
+    );
 }
 
 /**
