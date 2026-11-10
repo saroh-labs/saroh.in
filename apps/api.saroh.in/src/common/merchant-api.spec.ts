@@ -38,6 +38,10 @@ describe("merchantApiOnly", () => {
             "/api/auth/session",
             "/admin/users",
             "/billing/plans",
+            // The keyed public API is never on merchant sites' address (U6).
+            "/v1/products",
+            `/v1/storefront/pk_live_${"Ab9".repeat(14)}z/products`,
+            "/mcp",
             "/public/waitlist",
             "/public/webhooks/razorpay",
             "/",

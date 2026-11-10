@@ -44,6 +44,7 @@ import {
     authorize,
     OWNER_ONLY_ACTIONS,
 } from "../organizations/organization-policy";
+import { keyContextCache } from "./key-context.cache";
 
 /** How long a rolled key keeps working beside its replacement. */
 export const ROLL_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -364,6 +365,7 @@ export class ApiKeysService {
                 },
             });
         });
+        keyContextCache.forgetOrganization(ctx.organizationId);
         await this.record(ctx, AuditAction.ApiKeyRolled, key, {
             rolledFromId: old.id,
             graceUntil: graceUntil.toISOString(),
@@ -384,6 +386,7 @@ export class ApiKeysService {
             where: { id: old.id },
             data: { revokedAt: now },
         });
+        keyContextCache.forgetOrganization(ctx.organizationId);
         await this.record(ctx, AuditAction.ApiKeyRevoked, key);
         return toView(key);
     }
