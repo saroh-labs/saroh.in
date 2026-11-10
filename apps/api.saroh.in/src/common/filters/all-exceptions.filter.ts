@@ -11,6 +11,7 @@ import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
 import { logHttpRequestOnce } from "../logging/http-request-log";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
 import { reportError } from "../observability/report-error";
+import { contractRefusal } from "../pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../types/organization-context";
 
 /**
@@ -186,9 +187,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
             },
         };
 
+        // A public route's refusal keeps the public contract's shape (plan
+        // 2026-11-10-001, U1); internal routes keep the envelope above.
+        const contract =
+            isHttp && !isServerError
+                ? contractRefusal.safeParse(exception.getResponse())
+                : undefined;
+
         if (!res.headersSent) {
             res.setHeader(RESPONSE_ID_HEADER, correlationId);
-            res.status(statusCode).json(envelope);
+            res.status(statusCode).json(
+                contract?.success
+                    ? {
+                          error: {
+                              ...contract.data.error,
+                              requestId: correlationId,
+                          },
+                      }
+                    : envelope,
+            );
         }
     }
 }

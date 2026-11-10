@@ -28,6 +28,7 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/terminus": "^11.1.1",
     "@prisma/client": "catalog:prisma",
+    "@saroh/api-contract": "workspace:*",
     "@saroh/auth": "workspace:*",
     "@saroh/block-contract": "workspace:*",
     "@saroh/database": "workspace:*",
