@@ -521,6 +521,13 @@ model Organization {
   sarohInvoices                 SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges      SubscriptionAddonCharge[]
+  // Public API and MCP (plan 2026-11-10-001, U3).
+  apiKeys                       ApiKey[]
+  storefrontTokens              StorefrontToken[]
+  webhookEndpoints              WebhookEndpoint[]
+  webhookDeliveries             WebhookDelivery[]
+  mcpActivities                 McpActivity[]
+  siteRestorePoints             SiteRestorePoint[]
 
   @@index([referredByOrganizationId])
   @@index([billingProfileId])
@@ -3913,6 +3920,9 @@ model Site {
 
   // Which pages each reviewer has opened (DEC-200, U9).
   reviewPageViews SiteReviewPageView[]
+
+  // What an AI connection's session started from, to undo it (U3).
+  restorePoints SiteRestorePoint[]
 
   // The storefront this site sells from (G11): what `/shop`, the Product
   // grid and checkout read. Set on its own only when the business has
@@ -9416,4 +9426,154 @@ model SearchPageEvent {
   at         DateTime          @default(now())
 
   @@index([path, at])
+}
+
+// ============================================================================
+// PUBLIC API AND MCP (plan 2026-11-10-001, U3)
+// ============================================================================
+
+enum ApiKeyKind {
+  // Safe in a browser: storefront reads, bound to allowedOrigins.
+  PUBLISHABLE
+  SECRET
+}
+
+// A business's API key. Only a digest of the token is stored; the token is
+// shown once. A roll leaves the old key working until graceUntil.
+// Table "OrganizationApiKey": the legacy StoreApiKey already holds "ApiKey".
+model ApiKey {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUserId String
+  kind            ApiKeyKind
+  edition         Edition
+  name            String
+  // The visible start of the token, to tell keys apart.
+  prefix          String
+  tokenDigest     String       @unique
+  scope           String[]
+  allowedOrigins  String[]
+  aiEnabled       Boolean      @default(false)
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+  // The key this one was rolled from.
+  rolledFromId    String?
+  rolledFrom      ApiKey?      @relation("ApiKeyRoll", fields: [rolledFromId], references: [id], onDelete: SetNull)
+  rolledTo        ApiKey[]     @relation("ApiKeyRoll")
+  graceUntil      DateTime?
+  lastUsedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  storefrontTokens StorefrontToken[]
+  mcpActivities    McpActivity[]
+
+  @@index([organizationId])
+  @@index([rolledFromId])
+  @@map("OrganizationApiKey")
+}
+
+// A short-lived browser token minted by a secret key; swept after expiresAt.
+model StorefrontToken {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // The secret key that minted it.
+  apiKeyId       String
+  apiKey         ApiKey       @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  tokenDigest    String       @unique
+  allowedOrigins String[]
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([apiKeyId])
+  @@index([expiresAt])
+}
+
+// Where a business's events are POSTed. The signing secret is sealed like a
+// payment connection's credentials (AES-256-GCM, key in app env).
+model WebhookEndpoint {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  url              String
+  events           String[]
+  secretCiphertext String
+  secretIv         String
+  secretAuthTag    String
+  disabledAt       DateTime?
+  failureStreak    Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event          String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  lastStatusCode Int?
+  lastError      String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([organizationId])
+  @@index([endpointId, createdAt])
+}
+
+// What an AI client did through MCP, for the business's activity list.
+// Either userId (an OAuth grant) or apiKeyId is set.
+model McpActivity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  apiKeyId       String?
+  apiKey         ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  clientName     String
+  tool           String
+  target         String?
+  summary        String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([apiKeyId])
+}
+
+// A site as it was when an AI connection's session started editing it.
+model SiteRestorePoint {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId           String
+  site             Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  // The OAuth grant or API key id the session ran under.
+  connectionId     String
+  sessionStartedAt DateTime
+  snapshot         Json
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, siteId, createdAt])
+  @@index([siteId])
 }
