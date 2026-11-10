@@ -233,6 +233,8 @@ module.exports = {
         // #513 the stock log's words and arithmetic — pure.
         // Plan 2026-11-10-001 U4: public API rate limits, with a fake Redis.
         "<rootDir>/src/modules/rate-limits/**/*.spec.ts",
+        // U5: API keys' rules with a jest-mocked Prisma; rows in api-keys.db.spec.ts.
+        "<rootDir>/src/modules/api-keys/**/*.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",

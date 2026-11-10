@@ -41,6 +41,19 @@ describe("scrubText", () => {
         expect(scrubText("Basic dXNlcjpwYXNz")).toBe("Basic [token]");
     });
 
+    it("masks Saroh's API keys past their display prefix (plan 2026-11-10-001, U5)", () => {
+        // Base62 bodies, one with no digit at all: still masked by its prefix.
+        const secret = `sk_live_${"aB3".repeat(14)}x`;
+        const publishable = `pk_live_${"Qz".repeat(21)}y`;
+        const text = scrubText(
+            `bad key ${secret} and ${publishable}; shown as pk_live_Qz9a`,
+        );
+        expect(text).not.toContain(secret);
+        expect(text).not.toContain(publishable);
+        expect(text).not.toContain("aB3aB3");
+        expect(text).toContain("shown as pk_live_Qz9a");
+    });
+
     it("masks Authorization, Cookie and API-key header lines whole", () => {
         const text = [
             "request failed",

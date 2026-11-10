@@ -15,10 +15,9 @@
  */
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import type { LimitPeriod, ModuleAccess } from "@saroh/pricing-catalog";
-import { limitNotice } from "@saroh/pricing-catalog";
+import { LIMIT_WORDS, limitNotice } from "@saroh/pricing-catalog";
 
 import type { ItemLimitKey, MeteredLimitKey } from "./metering";
-import { METER_WORDS } from "./metering";
 
 export const PLAN_LIMIT_REACHED = "PLAN_LIMIT_REACHED";
 export const MODULE_LOCKED = "MODULE_LOCKED";
@@ -45,7 +44,7 @@ export function upgradeOf(row: ModuleAccess): UpgradeTo | null {
 export interface PlanLimitDetails {
     code: typeof PLAN_LIMIT_REACHED;
     moduleId: string;
-    limitKey: MeteredLimitKey | ItemLimitKey;
+    limitKey: MeteredLimitKey | ItemLimitKey | CountedLimitKey;
     limit: number;
     /**
      * The count against `limit`: across the business, or, for a cap inside
@@ -59,14 +58,20 @@ export interface PlanLimitDetails {
     notice: { title: string; body: string; cta: string };
 }
 
+/**
+ * A cap counted by its own service, not by metering: API keys (U5), whose
+ * live count needs the key's own rules (grace, expiry).
+ */
+export type CountedLimitKey = "api.keys.max";
+
 /** 403: adding one more would pass the plan's cap on this row. */
 export function planLimitReached(
     row: ModuleAccess,
-    key: MeteredLimitKey,
+    key: MeteredLimitKey | CountedLimitKey,
     limit: number,
     used: number,
 ): ForbiddenException {
-    const words = METER_WORDS[key];
+    const words = LIMIT_WORDS[key];
     const n = limitNotice(
         {
             inc: true,
