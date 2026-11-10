@@ -21,6 +21,7 @@ vi.mock("@/env", () => ({
         get NEXT_PUBLIC_PLANS() {
             return flag.plans;
         },
+        NEXT_PUBLIC_API_AREA: "on",
     },
 }));
 vi.mock("@/lib/edition", async (actual) => {
