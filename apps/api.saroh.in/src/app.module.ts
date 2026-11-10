@@ -5,6 +5,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { mountedAuth } from "./common/auth/auth";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { ApiKeysModule } from "./modules/api-keys/api-keys.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
@@ -110,6 +111,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         SavedViewsModule,
         OrganizationsModule,
         DataExportModule,
+        ApiKeysModule,
         ProjectsModule,
         AuditModule,
         StoresModule,

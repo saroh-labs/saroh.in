@@ -25,8 +25,24 @@ import { WEBHOOK_ROUTE } from "@saroh/integrations";
 export function corsOptionsFor(
     path: string,
     trustedOrigins: string[],
+    keyOrigins: readonly string[] = [],
 ): CorsOptions {
     const bare = path.split("?")[0] ?? "";
+    switch (publicApiSurfaceOf(bare)) {
+        // Only the publishable key's own origins, never credentials; an
+        // unlisted origin gets no Allow-Origin, so the browser refuses.
+        case "storefront":
+            return { origin: [...keyOrigins], credentials: false };
+        // Server to server with a secret key: no browser may read it.
+        case "secret":
+            return { origin: false };
+        case "mcp":
+            return {
+                origin: trustedOrigins,
+                credentials: false,
+                exposedHeaders: MCP_EXPOSED_HEADERS,
+            };
+    }
     // A live read the edge may keep (review #4, #21) answers "*", never the
     // caller's own origin: one kept answer serves every site's address
     // (its saroh.app one, its own domain, the editor's preview), and an
@@ -43,6 +59,64 @@ export function corsOptionsFor(
         exposedHeaders: EXPOSED_HEADERS,
     };
 }
+
+/** The public API's surfaces (plan 2026-11-10-001, Key Technical Decisions). */
+export type PublicApiSurface = "storefront" | "secret" | "mcp";
+
+/**
+ * Which keyed surface a path is on: `/v1/storefront/…` (publishable key in
+ * the path), the rest of `/v1` (secret key, Bearer) or `/mcp`. None of them
+ * reads the session cookie.
+ */
+export function publicApiSurfaceOf(path: string): PublicApiSurface | undefined {
+    const bare = path.split("?")[0] ?? "";
+    if (bare === "/mcp" || bare.startsWith("/mcp/")) return "mcp";
+    if (bare.startsWith("/v1/storefront/")) return "storefront";
+    if (bare === "/v1" || bare.startsWith("/v1/")) return "secret";
+    return undefined;
+}
+
+/** The publishable key a storefront path carries: `/v1/storefront/{pk_…}/…`. */
+export function storefrontKeyOf(path: string): string | undefined {
+    return /^\/v1\/storefront\/(pk_(?:live|test)_[0-9A-Za-z]{43})(?:[/?]|$)/.exec(
+        path,
+    )?.[1];
+}
+
+/**
+ * The CORS delegate main.ts installs. A storefront path's preflight and
+ * real request are answered from its key's allowed origins (the guard's
+ * short cache, so both cost one lookup); a key that opens nothing, or a
+ * failed lookup, answers no origin at all.
+ */
+export function corsDelegate(
+    trustedOrigins: string[],
+    keyOrigins: (token: string) => Promise<readonly string[]>,
+) {
+    return (
+        req: { url?: string },
+        callback: (error: Error | null, options: CorsOptions) => void,
+    ): void => {
+        const url = req.url ?? "";
+        const token = storefrontKeyOf(url);
+        if (!token) {
+            callback(null, corsOptionsFor(url, trustedOrigins));
+            return;
+        }
+        keyOrigins(token).then(
+            (origins) =>
+                callback(null, corsOptionsFor(url, trustedOrigins, origins)),
+            () => callback(null, corsOptionsFor(url, trustedOrigins)),
+        );
+    };
+}
+
+/** What an MCP client in a browser may read besides the body. */
+export const MCP_EXPOSED_HEADERS = [
+    "Mcp-Session-Id",
+    "Mcp-Protocol-Version",
+    "WWW-Authenticate",
+];
 
 /**
  * The public live reads whose answer is the same for every visitor and may

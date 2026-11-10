@@ -172,4 +172,50 @@ describe("OriginGuard (B3 CSRF origin check)", () => {
             ),
         ).toBe(true);
     });
+
+    // ---- the keyed public API (plan 2026-11-10-001, U6) ------------------
+    it("lets servers call /v1 and /mcp with no Origin, on any method", () => {
+        for (const path of ["/v1/products", "/mcp"]) {
+            for (const method of ["GET", "POST", "DELETE"]) {
+                expect(guard.canActivate(ctx({ method, path }))).toBe(true);
+            }
+        }
+    });
+
+    it("refuses a present untrusted Origin on /v1 and /mcp, reads included", () => {
+        for (const path of ["/v1/products", "/v1/storefront-tokens", "/mcp"]) {
+            for (const method of ["GET", "POST"]) {
+                expect(() =>
+                    guard.canActivate(
+                        ctx({
+                            method,
+                            path,
+                            headers: { origin: "https://evil.com" },
+                        }),
+                    ),
+                ).toThrow(ForbiddenException);
+            }
+        }
+        expect(
+            guard.canActivate(
+                ctx({
+                    method: "POST",
+                    path: "/mcp",
+                    headers: { origin: "https://app.saroh.in" },
+                }),
+            ),
+        ).toBe(true);
+    });
+
+    it("leaves a storefront call's Origin to the key's own list (ApiKeyGuard)", () => {
+        expect(
+            guard.canActivate(
+                ctx({
+                    method: "POST",
+                    path: "/v1/storefront/pk_live_x/products",
+                    headers: { origin: "https://shop.example.com" },
+                }),
+            ),
+        ).toBe(true);
+    });
 });

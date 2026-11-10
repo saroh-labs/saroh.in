@@ -8,6 +8,8 @@ import { z } from "zod";
 export const ERROR_CODES = [
     "invalid_request",
     "unauthorized",
+    // The key's creator no longer holds the business (left, removed or paused).
+    "key_owner_inactive",
     "forbidden",
     "not_found",
     "conflict",

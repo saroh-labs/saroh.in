@@ -163,6 +163,19 @@ export const FlagKey = {
      * `GET /billing/offered`, which the workspace asks before it shows plans.
      */
     SAROH_BILLING_GLOBAL: "SAROH_BILLING_GLOBAL",
+
+    /**
+     * The public API's kill switches (plan 2026-11-10-001), one per surface,
+     * each off for everyone until the release turns it on (U18); a business's
+     * override turns one on or off for it alone. Off, that surface answers
+     * 404. Global's keys and webhooks are held back by the plan gate, not
+     * here. Readers so far: `api-keys/api-keys.service.ts` (making or rolling
+     * a secret or publishable key). The surfaces' own guards come in U6–U13.
+     */
+    API_MCP: "API_MCP",
+    API_SECRET: "API_SECRET",
+    API_STOREFRONT: "API_STOREFRONT",
+    API_WEBHOOKS: "API_WEBHOOKS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -216,6 +229,15 @@ const MODULE_ROLLOUT = (label: string): FlagMetadata => ({
     owner: "Release manager",
     reviewBy: "2027-03-31",
     removeWhen: `${label} is on for every business on every instance and has needed no kill switch for a release.`,
+});
+
+const API_SURFACE = (shownAs: string, what: string): FlagMetadata => ({
+    shownAs,
+    group: "safety",
+    purpose: `The kill switch for ${what}. Turn it on only after the release's security checks, Cloudflare rules and pentests have passed; off, that surface answers not found and its tab is hidden.`,
+    owner: "Release manager",
+    reviewBy: "2027-06-30",
+    removeWhen: `${shownAs} has been on for every business on every instance for a release with no need to switch it off.`,
 });
 
 export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
@@ -359,4 +381,20 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         removeWhen:
             "Saroh's plans have been on for every Global business for a release, and SarohBillsService no longer asks it.",
     },
+    API_MCP: API_SURFACE(
+        "AI apps (MCP)",
+        "AI assistants connecting to a business over MCP",
+    ),
+    API_SECRET: API_SURFACE(
+        "API keys",
+        "the secret-key API (/v1) and making secret keys",
+    ),
+    API_STOREFRONT: API_SURFACE(
+        "Website API keys",
+        "the read-only API a business's own website calls with a publishable key, and making those keys",
+    ),
+    API_WEBHOOKS: API_SURFACE(
+        "Webhooks",
+        "webhooks to a business's own systems",
+    ),
 };

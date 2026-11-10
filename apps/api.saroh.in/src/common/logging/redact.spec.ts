@@ -97,6 +97,17 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides a publishable key in a storefront path past its kind (U5)", () => {
+        const pk = `pk_live_${"Ab9".repeat(14)}z`;
+        expect(redactUrl(`/v1/storefront/${pk}/products?limit=5`)).toBe(
+            "/v1/storefront/pk_live_[token]/products?limit=5",
+        );
+        const sk = `sk_live_${"Ab9".repeat(14)}z`;
+        expect(redactUrl(`/v1/storefront/${sk}/products`)).toBe(
+            "/v1/storefront/sk_live_[token]/products",
+        );
+    });
+
     it("drops a public tool's query string: the address someone checked", () => {
         expect(
             redactUrl(

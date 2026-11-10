@@ -128,6 +128,10 @@ const TOKEN_PATHS = [
     /^(\/public\/organization-invitations\/)[^/?#]+/,
     /^(\/organization-invitations\/)[^/?#]+/,
     /^(\/invitations\/)[^/?#]+/,
+    // A publishable key in a storefront path (plan 2026-11-10-001): its
+    // kind and mode stay, so a log still says which surface was called. A
+    // secret key pasted there by mistake is refused (U6) and hidden too.
+    /^(\/v1\/storefront\/(?:pk|sk)_(?:live|test)_)[^/?#]+/,
 ];
 
 /**

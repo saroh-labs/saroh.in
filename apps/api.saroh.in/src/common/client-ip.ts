@@ -1,7 +1,8 @@
 import { createHmac } from "node:crypto";
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 
 import { visitorHashSecret } from "../modules/analytics/visitor-hash";
+import { trustedProxyRanges } from "./trust-proxy";
 
 /**
  * The address a public rate limit counts a caller by. IPv4 as it is — an
@@ -61,4 +62,46 @@ function hextets(address: string): string[] {
     return [...left, ...zeros, ...right].map((g) =>
         parseInt(g, 16).toString(16),
     );
+}
+
+/** Cloudflare's edge and the private network: who may hand us `CF-Connecting-IP`. */
+const CLOUDFLARE_PATH = new BlockList();
+for (const range of trustedProxyRanges("cloudflare")) {
+    const [net = "", bits = ""] = range.split("/");
+    CLOUDFLARE_PATH.addSubnet(
+        net,
+        Number(bits),
+        isIP(net) === 6 ? "ipv6" : "ipv4",
+    );
+}
+
+/**
+ * Who a per-visitor limit counts (plan 2026-11-10-001): `CF-Connecting-IP`
+ * when the socket's peer is the tunnel or Cloudflare (`TRUST_PROXY` is
+ * `cloudflare`), which writes it over anything the visitor sent; otherwise
+ * the socket's own address. Never `X-Forwarded-For`, which the caller writes.
+ */
+export function visitorAddress(
+    req: {
+        headers: Record<string, string | string[] | undefined>;
+        socket?: { remoteAddress?: string };
+    },
+    trustProxyMode: string | undefined,
+): string | undefined {
+    const raw = req.socket?.remoteAddress;
+    const peer = raw?.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, "");
+    const cf = req.headers["cf-connecting-ip"];
+    const named = (Array.isArray(cf) ? cf[0] : cf)?.trim();
+    const kind = peer ? isIP(peer) : 0;
+    if (
+        trustProxyMode === "cloudflare" &&
+        peer &&
+        kind &&
+        named &&
+        isIP(named) &&
+        CLOUDFLARE_PATH.check(peer, kind === 6 ? "ipv6" : "ipv4")
+    ) {
+        return named;
+    }
+    return peer;
 }

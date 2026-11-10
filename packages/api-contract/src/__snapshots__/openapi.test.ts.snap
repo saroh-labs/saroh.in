@@ -118,6 +118,7 @@ exports[`buildOpenApi > is deterministic 1`] = `
                           "enum": [
                             "invalid_request",
                             "unauthorized",
+                            "key_owner_inactive",
                             "forbidden",
                             "not_found",
                             "conflict",
@@ -252,6 +253,7 @@ exports[`buildOpenApi > is deterministic 1`] = `
                           "enum": [
                             "invalid_request",
                             "unauthorized",
+                            "key_owner_inactive",
                             "forbidden",
                             "not_found",
                             "conflict",

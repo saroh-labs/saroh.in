@@ -1,4 +1,4 @@
-import { corsOptionsFor } from "./cors";
+import { corsDelegate, corsOptionsFor, storefrontKeyOf } from "./cors";
 
 const TRUSTED = ["https://app.saroh.in"];
 
@@ -57,5 +57,71 @@ describe("corsOptionsFor (U19)", () => {
         expect(
             corsOptionsFor("/public/sites/site_1/today/extra", TRUSTED),
         ).toEqual({ origin: true, credentials: false });
+    });
+});
+
+describe("the keyed public API's CORS (plan 2026-11-10-001, U6)", () => {
+    const pk = `pk_live_${"Ab9".repeat(14)}z`;
+    const SITE = "https://shop.example.com";
+
+    it("answers a storefront path only for its key's origins, without credentials", () => {
+        expect(
+            corsOptionsFor(`/v1/storefront/${pk}/products`, TRUSTED, [SITE]),
+        ).toEqual({ origin: [SITE], credentials: false });
+        // A key that opens nothing lists no origin.
+        expect(
+            corsOptionsFor(`/v1/storefront/${pk}/products`, TRUSTED),
+        ).toEqual({ origin: [], credentials: false });
+    });
+
+    it("gives secret routes no CORS, and /mcp no credentials", () => {
+        expect(corsOptionsFor("/v1/products", TRUSTED)).toEqual({
+            origin: false,
+        });
+        expect(corsOptionsFor("/v1/storefront-tokens", TRUSTED)).toEqual({
+            origin: false,
+        });
+        expect(corsOptionsFor("/mcp", TRUSTED)).toMatchObject({
+            origin: TRUSTED,
+            credentials: false,
+        });
+        // Only the prefix itself: /v1beta is the workspace's answer.
+        expect(corsOptionsFor("/v1beta", TRUSTED)).toEqual(WORKSPACE);
+    });
+
+    it("reads the publishable key from the path, never a secret one", () => {
+        expect(storefrontKeyOf(`/v1/storefront/${pk}/products?x=1`)).toBe(pk);
+        expect(storefrontKeyOf(`/v1/storefront/${pk}`)).toBe(pk);
+        expect(
+            storefrontKeyOf(`/v1/storefront/${pk.replace("pk_", "sk_")}/x`),
+        ).toBeUndefined();
+        expect(storefrontKeyOf(`/v1/storefront/write/holds`)).toBeUndefined();
+    });
+
+    it("looks the key up for a storefront path and refuses on a failed lookup", async () => {
+        const answer = (
+            lookup: (t: string) => Promise<readonly string[]>,
+            url: string,
+        ) =>
+            new Promise((resolve) =>
+                corsDelegate(TRUSTED, lookup)({ url }, (_e, o) => resolve(o)),
+            );
+        const lookup = jest.fn().mockResolvedValue([SITE]);
+        expect(await answer(lookup, `/v1/storefront/${pk}/products`)).toEqual({
+            origin: [SITE],
+            credentials: false,
+        });
+        expect(lookup).toHaveBeenCalledWith(pk);
+        expect(
+            await answer(
+                () => Promise.reject(new Error("down")),
+                `/v1/storefront/${pk}/products`,
+            ),
+        ).toEqual({ origin: [], credentials: false });
+        // Everything else is answered without a lookup, as before.
+        expect(await answer(lookup, "/organizations/o/services")).toEqual(
+            WORKSPACE,
+        );
+        expect(lookup).toHaveBeenCalledTimes(1);
     });
 });

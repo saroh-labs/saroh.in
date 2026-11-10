@@ -198,6 +198,13 @@ export const AuditAction = {
     SiteDetailsFilled: "site.starter_content.filled",
     SiteDraftRolledBack: "site.draft.rolled_back",
     SiteSectionBroughtIn: "site.draft.section_brought_in",
+    // An owner made, rolled or revoked an API key (plan 2026-11-10-001, U5),
+    // with the key as the target. Metadata: its kind, name and display
+    // prefix, and for a roll the key it replaced and when that one stops.
+    // Never the token or its digest.
+    ApiKeyCreated: "apikey.created",
+    ApiKeyRolled: "apikey.rolled",
+    ApiKeyRevoked: "apikey.revoked",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

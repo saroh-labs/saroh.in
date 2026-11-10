@@ -399,6 +399,10 @@ const NEVER: Record<string, string> = {
     // Messaging core: Saroh's own sender's monthly counts, no business.
     "messaging/admin-messaging-usage.controller.ts":
         "staff control plane (Saroh's own sender's usage), not a tenant surface",
+    // Plan 2026-11-10-001 U5: the owner's API keys, gated by the API's own
+    // kill switches and plan rows, not by a module.
+    "api-keys/api-keys.controller.ts":
+        "the owner's API keys — the API's own flags and plan rows gate them, no module holds them",
 };
 
 /** Controllers with a test of their own below, not a row above. */
