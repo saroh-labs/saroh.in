@@ -358,6 +358,8 @@ e2e_stack() {
     # Templates on, as CI (DEC-135): the gallery on saroh.in and the template
     # picker in the app, which the templates specs open. Unset is off.
     export NEXT_PUBLIC_TEMPLATES=on
+    # Settings › API and AI apps on, as CI: the role specs list its tab.
+    export NEXT_PUBLIC_API_AREA=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""

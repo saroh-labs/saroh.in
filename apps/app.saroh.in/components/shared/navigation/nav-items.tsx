@@ -28,6 +28,7 @@ import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -1179,6 +1180,7 @@ export function isNavSectionActive(
 
 /** Settings › Plan and billing, hidden while plans aren't shown. */
 const PLAN_PAGE_HREF = "/settings/billing";
+const API_AREA_HREF = "/settings/api";
 
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
@@ -1314,6 +1316,7 @@ export function mayOpenSettingsPage(
         return false;
     }
     if (page.notForReviewer && actor.role === "REVIEWER") return false;
+    if (page.href === API_AREA_HREF && !apiAreaOn()) return false;
     return true;
 }
 
