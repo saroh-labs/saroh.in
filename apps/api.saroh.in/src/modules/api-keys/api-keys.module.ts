@@ -7,6 +7,8 @@ import { LimitsModule } from "../rate-limits/limits.module";
 import { ApiKeyGuard } from "./api-key.guard";
 import { ApiKeysController } from "./api-keys.controller";
 import { ApiKeysService } from "./api-keys.service";
+import { ApiUsageController } from "./api-usage.controller";
+import { ApiUsageService } from "./api-usage.service";
 
 /**
  * Owner-managed API keys (plan 2026-11-10-001, U5) and the guard that turns
@@ -22,8 +24,8 @@ import { ApiKeysService } from "./api-keys.service";
         LimitsModule,
         FeatureFlagModule,
     ],
-    controllers: [ApiKeysController],
-    providers: [ApiKeysService, ApiKeyGuard],
+    controllers: [ApiKeysController, ApiUsageController],
+    providers: [ApiKeysService, ApiUsageService, ApiKeyGuard],
     exports: [
         ApiKeysService,
         ApiKeyGuard,

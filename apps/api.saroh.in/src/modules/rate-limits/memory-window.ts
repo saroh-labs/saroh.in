@@ -60,6 +60,22 @@ export function gcraShape(
     return { interval, burst: interval * cap };
 }
 
+/**
+ * How many calls the rolling window holds now, read off a stored TAT
+ * without taking one (Usage, U14): each call pushed the TAT on by one
+ * `interval`, so the time it is ahead of now is that many calls.
+ */
+export function gcraUsed(
+    stored: number | null,
+    now: number,
+    cap: number,
+    windowMs = WINDOW_MS,
+): number {
+    if (cap <= 0 || stored === null || stored <= now) return 0;
+    const { interval } = gcraShape(cap, windowMs);
+    return Math.min(cap, Math.ceil((stored - now) / interval));
+}
+
 /** How many keys may pile up before `take` sweeps the full-again ones. */
 const SWEEP_AT = 10_000;
 
@@ -69,6 +85,11 @@ const SWEEP_AT = 10_000;
  */
 export class MemoryWindow {
     private readonly tats = new Map<string, number>();
+
+    /** {@link gcraUsed} for a key, taking nothing. */
+    used(key: string, cap: number, now: number = Date.now()): number {
+        return gcraUsed(this.tats.get(key) ?? null, now, cap);
+    }
 
     take(key: string, cap: number, now: number = Date.now()): LimitDecision {
         if (this.tats.size >= SWEEP_AT) {

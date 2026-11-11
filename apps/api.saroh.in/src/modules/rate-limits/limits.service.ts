@@ -6,7 +6,7 @@ import type Redis from "ioredis";
 
 import type { LimitScope } from "./caps";
 import type { LimitDecision } from "./memory-window";
-import { MemoryWindow } from "./memory-window";
+import { gcraUsed, MemoryWindow } from "./memory-window";
 import { redisTake } from "./redis-window";
 
 /** At most one `rate_limit_open` WARN a minute; the rest are counted into it. */
@@ -59,6 +59,35 @@ export class LimitsService implements OnModuleDestroy {
         const share =
             cap <= 0 ? 0 : Math.max(1, Math.floor(cap / this.replicas));
         return this.memory.take(key, share, now);
+    }
+
+    /**
+     * How many calls the window holds now, taking none (Usage, U14). Read
+     * from Redis, or from this replica's window when Redis fails, where it
+     * counts this replica's share only.
+     */
+    async used(
+        scope: LimitScope,
+        id: string,
+        cap: number,
+        now: number = Date.now(),
+    ): Promise<number> {
+        const key = `rl:${scope}:${id}`;
+        if (this.redis) {
+            try {
+                const stored = (await this.redis.eval(
+                    "return redis.call('GET', KEYS[1])",
+                    1,
+                    key,
+                )) as string | null;
+                return gcraUsed(stored ? Number(stored) : null, now, cap);
+            } catch (error) {
+                this.opened(error, now);
+            }
+        }
+        const share =
+            cap <= 0 ? 0 : Math.max(1, Math.floor(cap / this.replicas));
+        return this.memory.used(key, share, now);
     }
 
     /**

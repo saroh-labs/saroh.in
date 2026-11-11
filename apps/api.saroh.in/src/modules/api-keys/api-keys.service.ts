@@ -164,7 +164,7 @@ export function isUsable(key: KeyState, now: Date = new Date()): boolean {
 }
 
 /** Live (and in-grace) keys: what counts toward the cap. */
-const liveWhere = (now: Date): Prisma.ApiKeyWhereInput => ({
+export const liveWhere = (now: Date): Prisma.ApiKeyWhereInput => ({
     revokedAt: null,
     AND: [
         { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
