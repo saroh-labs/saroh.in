@@ -27,25 +27,20 @@ import {
     liftToLatest,
     SECTION_TYPES,
 } from "@saroh/block-contract";
-import type { Job, PageKind } from "@saroh/database";
-import { Prisma, prisma, runInOrgContext } from "@saroh/database";
+import type { PageKind } from "@saroh/database";
+import { Prisma, prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@saroh/object-storage";
 import { z } from "zod";
 
-import { appBaseOf } from "../../../common/app-url";
 import { strictFetch } from "../../../common/net/ssrf";
-import type {
-    OrganizationContext,
-    OrgRole,
-} from "../../../common/types/organization-context";
+import type { OrganizationContext } from "../../../common/types/organization-context";
 import { JobHandlerRegistry } from "../../jobs/job-handler.registry";
 import type { JobQueue } from "../../jobs/job-queue.port";
 import { JOB_QUEUE } from "../../jobs/job-queue.port";
 import { MediaService } from "../../media/media.service";
 import { OBJECT_STORAGE } from "../../media/object-storage.provider";
 import { IMAGE_TOO_BIG_MESSAGE } from "../../media/upload-checks";
-import type { OrgAction } from "../../organizations/organization-actions";
 import { authorize } from "../../organizations/organization-policy";
 import { pageList } from "../../public-api/v1-support";
 import { lockSite } from "../../sites/live-pointer";
@@ -69,12 +64,21 @@ import {
     McpToolRegistry,
     READ_ONLY,
     ToolError,
-    toolError,
 } from "../tool-registry";
 import { quoteUntrusted, untrusted } from "../untrusted";
-
-/** The job `create_site_from_template` starts; `get_job` reports it. */
-export const SITE_FROM_TEMPLATE_JOB = "mcp.site-from-template";
+import type { SiteFromTemplatePayload } from "./site-from-template.job";
+import {
+    describeSiteJob,
+    editorUrl,
+    SITE_FROM_TEMPLATE_JOB,
+    siteFromTemplateHandler,
+} from "./site-from-template.job";
+export {
+    describeSiteJob,
+    SITE_FROM_TEMPLATE_JOB,
+    siteFromTemplateHandler,
+} from "./site-from-template.job";
+export type { SiteFromTemplatePayload } from "./site-from-template.job";
 
 /** How much section content `get_page` returns before cutting the rest. */
 const PAGE_CONTENT_BUDGET = 16_000;
@@ -110,15 +114,6 @@ export interface SiteToolDeps {
 // ---------------------------------------------------------------------------
 // Links and activity targets
 // ---------------------------------------------------------------------------
-
-async function editorUrl(
-    organizationId: string,
-    siteId: string,
-    pageId?: string,
-): Promise<string> {
-    const page = pageId ? `?page=${encodeURIComponent(pageId)}` : "";
-    return `${await appBaseOf(organizationId)}/sites/${encodeURIComponent(siteId)}${page}`;
-}
 
 /**
  * A site write's links: a fresh one-day preview of the draft (the token is
@@ -1304,97 +1299,6 @@ async function restoreSnapshot(
     );
 }
 
-// ---------------------------------------------------------------------------
-// The template job
-// ---------------------------------------------------------------------------
-
-export interface SiteFromTemplatePayload {
-    /** Who asked, as the connection's context had it then. */
-    actor: {
-        userId: string;
-        role: OrgRole;
-        roleKey: string | null;
-        actions: OrgAction[] | null;
-    };
-    request: {
-        name: string;
-        templateId?: string;
-        styleId?: string;
-        subdomain?: string;
-    };
-    /** Written by the job: the site made, or why not. */
-    outcome?: { site_id: string; editor_url: string } | { error: string };
-}
-
-/** Runs `SITE_FROM_TEMPLATE_JOB`: the site, as the person who asked. */
-export function siteFromTemplateHandler(d: Pick<SiteToolDeps, "sites">) {
-    return async (job: Job): Promise<void> => {
-        const payload = job.payload as unknown as SiteFromTemplatePayload;
-        const organizationId = job.organizationId;
-        if (!organizationId) return;
-        const { actor, request } = payload;
-        const ctx: OrganizationContext = {
-            organizationId,
-            userId: actor.userId,
-            role: actor.role,
-            ...(actor.roleKey ? { roleKey: actor.roleKey } : {}),
-            ...(actor.actions ? { actions: new Set(actor.actions) } : {}),
-        };
-        const record = (outcome: SiteFromTemplatePayload["outcome"]) =>
-            runInOrgContext(organizationId, () =>
-                prisma.job.update({
-                    where: { id: job.id },
-                    data: {
-                        payload: {
-                            ...payload,
-                            outcome,
-                        },
-                    },
-                    select: { id: true },
-                }),
-            );
-        try {
-            const created = await runInOrgContext(organizationId, () =>
-                d.sites.createFromTemplate(ctx, request),
-            );
-            await record({
-                site_id: created.siteId,
-                editor_url: await editorUrl(organizationId, created.siteId),
-            });
-        } catch (error) {
-            // A refusal the person can act on is kept for get_job; the job
-            // still fails, so it reads "failed".
-            const said = toolError(error, "create_site_from_template");
-            await record({ error: said.content[0].text });
-            throw error;
-        }
-    };
-}
-
-/** What `get_job` says about a template job. */
-export function describeSiteJob(job: Job) {
-    const outcome = (job.payload as unknown as SiteFromTemplatePayload).outcome;
-    if (outcome && "site_id" in outcome) {
-        return {
-            summary: `Made the website: site_id ${outcome.site_id}. Call get_site to see its pages. Editor: ${outcome.editor_url}`,
-            result: { ...outcome },
-        };
-    }
-    if (outcome) {
-        return {
-            summary: `Couldn't make the website. ${outcome.error}`,
-            result: null,
-        };
-    }
-    return {
-        summary:
-            job.status === "FAILED" || job.status === "CANCELLED"
-                ? "Couldn't make the website. Try again in a minute."
-                : "Making the website from the template.",
-        result: null,
-    };
-}
-
 /** Registers the website tools and their template job at boot. */
 @Injectable()
 export class SiteTools implements OnModuleInit {
@@ -1422,7 +1326,9 @@ export class SiteTools implements OnModuleInit {
         };
         this.registry.register(...siteTools(deps));
         this.registry.registerJobKind(SITE_FROM_TEMPLATE_JOB, describeSiteJob);
-        this.jobs.register(
+        // Named `registry` so job-consumers.spec sees this handler.
+        const registry = this.jobs;
+        registry.register(
             SITE_FROM_TEMPLATE_JOB,
             siteFromTemplateHandler(deps),
         );
