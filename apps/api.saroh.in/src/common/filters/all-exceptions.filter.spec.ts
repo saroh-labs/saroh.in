@@ -95,6 +95,32 @@ describe("AllExceptionsFilter", () => {
         expect(res.setHeader).toHaveBeenCalledWith("X-Request-Id", "cid-123");
     });
 
+    it("never lets a cache keep a refusal other than not-there, over a route's public Cache-Control", () => {
+        const PUBLIC = "public, max-age=30, s-maxage=30";
+        for (const [thrown, kept] of [
+            [new HttpException("Too many requests.", 429), "no-store"],
+            [new ForbiddenException(), "no-store"],
+            [new Error("boom"), "no-store"],
+            // The same for everyone, like a success: the route's own.
+            [new NotFoundException(), PUBLIC],
+            [new GoneException(), PUBLIC],
+        ] as const) {
+            const res = makeResponse();
+            // What a storefront catalogue route set before its handler threw.
+            res.headers["Cache-Control"] = PUBLIC;
+            filter.catch(
+                thrown,
+                makeHost(res, {
+                    method: "GET",
+                    originalUrl: "/v1/storefront/pk_test_x/products/gone",
+                    correlationId: "cid-1",
+                    headers: {},
+                }),
+            );
+            expect(res.headers["Cache-Control"]).toBe(kept);
+        }
+    });
+
     it("surfaces class-validator field messages under details", () => {
         const res = makeResponse();
         filter.catch(

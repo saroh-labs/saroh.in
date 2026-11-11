@@ -6654,3 +6654,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** tick boxes at pick and consent; the business set on the grant and in the token; the guard checks the set and the tool registry resolves the target business per call against the person's live role there; `list_businesses`; disconnect takes one business off the set.
 - **Rule:** a build brief starts from the plan's Requirements and Key Decisions, then the unit; where the unit text and a requirement disagree, the requirement wins and the brief says so. Before calling a unit done, check its report against the requirements it traces to.
 - **Category:** process · planning
+
+## Storefront catalogue reads sent their refusals with a public Cache-Control (11 Nov 2026)
+
+- **Symptom:** the load test (U17) found that a storefront catalogue read (`GET /v1/storefront/{pk}/products…`) refused by the shop's per-visitor limiter answered 429 with `Cache-Control: public, max-age=30, s-maxage=30`, as would a 500: Cloudflare could keep one visitor's refusal and serve it to every visitor for 30 seconds.
+- **Cause:** Nest sets a route's `@Header(...)` once its guards pass, before the handler runs, so the header is already on the response when the handler throws, and the exception filter wrote its error body under it. The live public reads avoid this by keeping `no-store` on the route and marking only a success (`common/live-read-headers.ts`); U7's catalogue routes put the public value on the route.
+- **Fix:** `AllExceptionsFilter` sets `Cache-Control: no-store` on every error except 404 and 410, which are the same for every visitor and may be kept like a success (the launch offer keeps its 404 on purpose). Unit test in the filter's spec; the storefront db spec checks a 200's header and ETag.
+- **Rule:** a `public` Cache-Control on a route covers its success and its "not there"; any other refusal is `no-store` (the filter enforces it). Pattern: `docs/patterns/backend-nestjs.md` → Responses and errors.
+- **Category:** api · caching

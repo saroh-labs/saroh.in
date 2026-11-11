@@ -22,12 +22,15 @@ const WARN_EVERY_MS = 60_000;
  * this replica limited in process. At most one line a minute, carrying how
  * many calls fell back since the last; any steady stream means Redis is down
  * or unreachable from this replica and limits are per replica until it's back.
+ * `reason=recovered calls=N` marks the first call Redis answered again.
  */
 export class LimitsService implements OnModuleDestroy {
     private readonly logger = new Logger(LimitsService.name);
     private readonly memory = new MemoryWindow();
     private lastWarnAt = Number.NEGATIVE_INFINITY;
     private unwarned = 0;
+    /** Whether the last Redis call failed: the next success says so. */
+    private open = false;
     /** Calls that fell back to the in-process window since boot. */
     openCount = 0;
 
@@ -51,7 +54,9 @@ export class LimitsService implements OnModuleDestroy {
         const key = `rl:${scope}:${id}`;
         if (this.redis) {
             try {
-                return await redisTake(this.redis, key, cap, now);
+                const decision = await redisTake(this.redis, key, cap, now);
+                if (this.open) this.closed();
+                return decision;
             } catch (error) {
                 this.opened(error, now);
             }
@@ -125,7 +130,22 @@ export class LimitsService implements OnModuleDestroy {
         await this.redis?.quit().catch(() => undefined);
     }
 
+    /**
+     * Redis answered again: the calls that fell back since the last WARN,
+     * which no later WARN would carry (an outage shorter than a minute
+     * otherwise logs only its first call).
+     */
+    private closed(): void {
+        this.logger.warn(
+            `rate_limit_open reason=recovered calls=${this.unwarned}`,
+        );
+        this.unwarned = 0;
+        this.open = false;
+        this.lastWarnAt = Number.NEGATIVE_INFINITY;
+    }
+
     private opened(error: unknown, now: number): void {
+        this.open = true;
         this.openCount += 1;
         this.unwarned += 1;
         if (now - this.lastWarnAt < WARN_EVERY_MS) return;

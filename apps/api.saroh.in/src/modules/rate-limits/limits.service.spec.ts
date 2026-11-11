@@ -138,6 +138,25 @@ describe("LimitsService failing open", () => {
         expect(await limits.used("mcp", "org", 5, T0)).toBe(2);
     });
 
+    it("says how many calls fell back when Redis answers again", async () => {
+        const flaky = {
+            eval: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+            quit: jest.fn(),
+        };
+        const limits = new LimitsService(flaky as never);
+        for (let i = 0; i < 3; i++) await limits.take("secret", "org", 6, T0);
+        flaky.eval.mockImplementation((...args: unknown[]) =>
+            new RedisMock().eval(...(args as [string, number, ...string[]])),
+        );
+        await limits.take("secret", "org", 6, T0 + 1);
+        // The first fallback warned; the two after it are counted here.
+        expect(warn).toHaveBeenLastCalledWith(
+            "rate_limit_open reason=recovered calls=2",
+        );
+        await limits.take("secret", "org", 6, T0 + 2);
+        expect(warn).toHaveBeenCalledTimes(2);
+    });
+
     it("with no REDIS_URL limits in process and says so once", async () => {
         const limits = new LimitsService(null);
         expect(warn).toHaveBeenCalledWith(
