@@ -6622,6 +6622,7 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the page passes `takenPlans` (id and name), and the editor leaves out the record's own id (`namesBesides`) when it checks the name. Tests: `plan-editor.test.tsx` (a new plan's own draft is not a clash) and `plan-editor.test.ts`.
 - **Rule:** a "name already taken" list for an editor that creates its record on the first save carries ids, and the check leaves out the record's own id. A list keyed on names alone breaks the moment the record exists.
 - **Category:** app · editors
+
 ## The dark Global Workers failed their first production deploy: "routes assigned to another worker" (9 Nov 2026)
 
 - **Symptom:** release #1337's frontend deploy failed `Deploy application-global`, `admin-global` and `auth-global` (production): wrangler refused routes held by `saroh-app-dev`, `saroh-admin-dev` and `saroh-accounts-dev` on the dev zone. India's Workers and saroh.tech deployed.
@@ -6637,3 +6638,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the step builds `@saroh/database`'s dependencies first (`turbo run build --filter=@saroh/database^...`, cached when already built).
 - **Rule:** a CI step that runs outside turbo's affected filter builds what it imports itself.
 - **Category:** CI
+
+## The storefront browser spec failed with "Failed to fetch" though the API answered CORS correctly (11 Nov 2026)
+
+- **Symptom:** `e2e/tests/api-storefront.spec.ts` failed in `pnpm prepush --all` (desk-serial and phone-serial): the in-page `fetch` from the test's website at `http://localhost:4599` threw `TypeError: Failed to fetch`, and the API logged no `/v1/storefront/*` call. curl with the same Origin got the right preflight and `Access-Control-Allow-Origin`.
+- **Cause:** Chrome's Local Network Access (Playwright 1.63's Chromium). A page served by `page.route` has no address, so Chrome counts it public, and a public page may not call loopback (`localhost:3333`) without the `local-network-access` permission. The console says "Permission was denied for this request to access the `loopback` address space". A page from a real server on localhost is loopback itself and passes, which is why the API, its db spec and curl all looked right.
+- **Fix:** the spec grants `local-network-access` for its website's origin (`page.context().grantPermissions([...], { origin })`). No API change: a real merchant site and the API are both public addresses.
+- **Rule:** a browser spec whose page is served by `page.route` at a made-up origin and calls the stack on localhost grants `local-network-access` for that origin. When a browser `fetch` fails with no server log, read the page's console before the API's CORS code.
+- **Category:** e2e · browser

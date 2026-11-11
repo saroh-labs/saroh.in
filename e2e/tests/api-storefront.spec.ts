@@ -121,7 +121,13 @@ test(
             expect(minted.status(), await minted.text()).toBe(201);
             const { token } = (await minted.json()) as { token: string };
 
-            // The website, on its own origin.
+            // The website, on its own origin. A routed page has no address,
+            // so Chrome's Local Network Access counts it public and refuses
+            // its calls to the API on loopback ("Failed to fetch") unless
+            // allowed; a real site and the API are both public.
+            await page.context().grantPermissions(["local-network-access"], {
+                origin: TEST_ORIGIN,
+            });
             await page.route(`${TEST_ORIGIN}/**`, (route) =>
                 route.fulfill({
                     contentType: "text/html",
