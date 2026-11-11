@@ -1,3 +1,8 @@
+import type {
+    SharedProduct,
+    SharedStock,
+    SharedVariant,
+} from "@/lib/api/client";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
 import type { PlanRefusal } from "@/lib/billing/refusal";
@@ -20,11 +25,8 @@ import type { SoldOutPlace } from "./tracking";
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
-export interface Product {
-    id: string;
-    name: string;
-    slug: string;
-    description: string | null;
+/** Price is a decimal string and status UPPERCASE here; `/v1` differs. */
+export interface Product extends SharedProduct {
     image: string | null;
     categoryId: string | null;
     price: string;
@@ -144,11 +146,8 @@ export interface CatalogueProduct extends ProductListItem {
     listings: CatalogueListing[];
 }
 
-export interface Variant {
-    id: string;
+export interface Variant extends SharedVariant {
     productId: string;
-    sku: string;
-    title: string;
     price: string | null;
     image: string | null;
     mrp?: string | null;
@@ -160,11 +159,7 @@ export interface Variant {
     inventory?: Inventory | null;
 }
 
-export interface Inventory {
-    quantity: number;
-    reserved: number;
-    lowStockAlert: number;
-}
+export type Inventory = SharedStock;
 
 /** A custom field (#482) as a product holds it. */
 export interface ProductCustomField {

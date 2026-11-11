@@ -1,0 +1,44 @@
+---
+title: "Retrying safely"
+---
+
+## Retrying safely
+
+A network can drop an answer after Saroh has done the work. Retry blindly
+and you might book the same slot twice. Send an `Idempotency-Key` with
+every write, and a retry is safe.
+
+```
+Idempotency-Key: 4f9c2d1e-booking-asha
+```
+
+- Use a new key for each new thing you do. A random UUID is fine.
+- Send the **same** key when you retry the same request.
+- A key is 1 to 255 visible characters, with no spaces.
+
+### What Saroh does with it
+
+| You send                                             | Saroh answers                                     |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| A key it hasn't seen                                 | Does the work, and keeps the answer for 24 hours  |
+| The same key and the same request, after it finished | The first answer again. Nothing is done twice     |
+| The same key and the same request, while it runs     | `409 conflict`. Wait a moment and retry           |
+| The same key with a different request                | `409 conflict`. Use a new key                     |
+
+If the first try failed, Saroh keeps nothing, and a retry with the same key
+runs again.
+
+Keys belong to one API key (or one visitor token) and one route. Two
+integrations, or two visitors, can't clash even if they pick the same
+key.
+
+### Where it applies
+
+Every write on `/v1` and every visitor-token write on
+`/v1/storefront/write/…` takes it. Without the header, a write isn't
+protected.
+
+The one exception is `POST /v1/storefront-tokens`. A token is shown only
+once, so a replay can't give it back. Ask for a new token instead.
+
+Reads don't need it: reading twice changes nothing.

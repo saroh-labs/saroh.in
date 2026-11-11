@@ -1,0 +1,62 @@
+---
+title: "Getting a key"
+---
+
+import { API_URL } from "../../components/api-reference";
+
+## Getting a key
+
+Owners make keys in **Settings › API and AI apps › Keys**. Other people in
+the business can't make, see or change keys. Keys come with some plans,
+not all.
+
+There are two kinds.
+
+| Kind        | Starts with | Use it                                   | It can                                                                                       |
+| ----------- | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Publishable | `pk_live_`  | On your website, in the browser          | Read what the business's Saroh website shows: products, stock, services, open slots, staff names, posts and plans. Nothing else. |
+| Secret      | `sk_live_`  | On your server only, never in a browser  | What you chose when you made it, and never more than you can do yourself.                    |
+
+### When you make a key
+
+- **Name** it after where it's used, like "Shop website" or "Stock sync".
+- **Publishable keys** need the websites that may use them. See
+  [Storefront keys](/api/storefront).
+- **Secret keys** need what they may do, like reading orders or changing
+  products. You can only choose what your own role allows.
+- **Expiry** is optional. After it, the key stops working.
+- **AI apps** is off by default. Turn it on to let a tool that isn't
+  Claude or ChatGPT (n8n or Cursor, for example) use this secret key to
+  reach the business through the MCP. See [Claude and ChatGPT](/api/ai-apps).
+
+Saroh shows the key once, when you make it. Copy it then. Saroh keeps only
+a fingerprint of it, so nobody can show it to you again. The list shows the
+first few characters, so you can tell keys apart.
+
+### Using a secret key
+
+Send it as a Bearer token on every call to <code>{API_URL}/v1</code>:
+
+```
+Authorization: Bearer sk_live_…
+```
+
+Keep it on your server, in an environment variable, and out of your code
+and your website.
+
+### Rolling and revoking
+
+- **Roll** a key when you think it may have leaked, or to change it on a
+  schedule. You get a new key with the same name, settings and websites.
+  The old one keeps working for 24 hours, so you have time to swap it in.
+- **Revoke** a key to stop it at once.
+
+### When a key stops on its own
+
+A key acts for the person who made it, as they are now. If their role
+changes, the key can do only what both the key and their new role allow.
+If they leave the business or are paused, their keys stop: calls get `401`
+with the code `key_owner_inactive`. An owner can make a new key.
+
+A key works only on the API address of the Saroh it was made on. Elsewhere
+it gets `404`.

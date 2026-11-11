@@ -1,0 +1,124 @@
+{/* verify against U13 */}
+
+# Webhooks
+
+A webhook tells your server the moment something happens in the business,
+so you don't have to keep asking.
+
+## Setting one up
+
+In **Settings › API and AI apps › Webhooks**, add your address and pick
+the events you want. The address must be `https://` on the standard port,
+on the public internet. Owners can add webhooks, and can let others do it
+too. Webhooks come with some plans, not all.
+
+Saroh shows a signing secret for the webhook. Keep it on your server: you
+use it to check that each delivery came from Saroh.
+
+You can only pick an event whose records you may read. For example,
+`customer.created` needs the right to read customers.
+
+## Events
+
+| Event                  | When                                          |
+| ---------------------- | --------------------------------------------- |
+| `booking.created`      | A booking is made                             |
+| `booking.moved`        | A booking moves to another time               |
+| `order.created`        | An order is placed                            |
+| `order.paid`           | An order is paid                              |
+| `order.status_changed` | An order's status changes                     |
+| `customer.created`     | A customer is added (not by a file import)    |
+| `enquiry.received`     | An enquiry comes in                           |
+
+**Send a test** sends a `ping` event, so you can check your end.
+
+More events may be added later. Ignore any you don't know.
+
+## What arrives
+
+Saroh sends a `POST` with a JSON body and these headers:
+
+| Header                | Means                                                         |
+| --------------------- | ------------------------------------------------------------- |
+| `X-Saroh-Signature`   | `t=<time>,v1=<signature>`: when it was signed, and the signature |
+| `X-Saroh-Delivery-Id` | One id per delivery. A retry or a resend keeps the same id    |
+
+Answer with any `2xx` status within 10 seconds. Do the slow work after
+you answer.
+
+## Checking the signature
+
+The signature is an HMAC-SHA256 of the time, a full stop, and the raw body,
+keyed with your signing secret, written as hex. Check it before you trust
+a delivery:
+
+1. Read `t` and every `v1` from `X-Saroh-Signature`.
+2. Refuse it if `t` is more than 5 minutes from now. This stops someone
+   replaying an old delivery.
+3. Work out the HMAC of `` `${t}.${rawBody}` `` with your secret.
+4. Accept it if your result matches any `v1`, compared in constant time.
+
+Use the raw body exactly as it arrived. Parsing the JSON and writing it out
+again changes the bytes, and the signature won't match.
+
+```js
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const TOLERANCE_SECONDS = 5 * 60;
+
+export function verifySarohSignature(rawBody, header, secret) {
+  const parts = header.split(",").map((part) => part.split("="));
+  const t = parts.find(([k]) => k === "t")?.[1];
+  const signatures = parts.filter(([k]) => k === "v1").map(([, v]) => v);
+  if (!t || signatures.length === 0) return false;
+
+  const age = Math.abs(Date.now() / 1000 - Number(t));
+  if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return false;
+
+  const expected = createHmac("sha256", secret)
+    .update(`${t}.${rawBody}`)
+    .digest();
+  return signatures.some((sig) => {
+    const given = Buffer.from(sig, "hex");
+    return given.length === expected.length && timingSafeEqual(given, expected);
+  });
+}
+```
+
+With Express, read the raw body for this route only:
+
+```js
+app.post("/saroh-webhook", express.raw({ type: "application/json" }), (req, res) => {
+  const ok = verifySarohSignature(
+    req.body.toString("utf8"),
+    req.get("X-Saroh-Signature") ?? "",
+    process.env.SAROH_WEBHOOK_SECRET,
+  );
+  if (!ok) return res.sendStatus(400);
+  res.sendStatus(200);
+  // Then handle the event, once per X-Saroh-Delivery-Id.
+});
+```
+
+## Rolling the secret
+
+When you roll the signing secret, both the old and the new one sign every
+delivery for 24 hours, so the header carries two `v1` values. Code that
+accepts any matching `v1`, like the example above, keeps working while you
+swap in the new secret.
+
+## Retries and duplicates
+
+- If your server doesn't answer `2xx` in time, Saroh tries again later,
+  waiting longer each time.
+- A delivery can arrive more than once. Use `X-Saroh-Delivery-Id` to do
+  the work only once.
+- Every try is signed again with the time it's sent, so a retry has a new
+  `t`.
+- After many failures in a row, Saroh turns the webhook off and tells the
+  business's owners. Fix your end, then turn it back on.
+- Settings shows each delivery and can send one again.
+
+## What it never contains
+
+Webhooks leave out sensitive customer details, as the API does.

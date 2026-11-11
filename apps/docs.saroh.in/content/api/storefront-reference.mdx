@@ -1,0 +1,18 @@
+---
+title: "Reference: storefront"
+---
+
+import { ApiReference } from "../../components/api-reference";
+import spec from "../../public/api/storefront.json";
+
+## Reference: storefront
+
+Reads take a publishable key in the path, `/{key}/…`, and answer only the
+key's [allowed origins](/api/storefront). Writes, under `/write/…`, take a
+[visitor token](/api/bookings-and-orders) in `Authorization: Bearer st_live_…`.
+Every right named here comes with the key or the token. Refusals are
+described in [Errors](/api/errors).
+
+Download this as OpenAPI 3.1: <a href="/api/storefront.json" download>storefront.json</a>
+
+<ApiReference spec={spec} />

@@ -920,6 +920,8 @@ bg_step migration-ids pnpm run check:migration-ids
 bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step domains pnpm run check:domains
+bg_step openapi pnpm run check:openapi
+bg_step docs-links pnpm run check:docs-links
 bg_step shared-data pnpm run check:shared-data
 bg_step edition-branches pnpm run check:edition-branches
 bg_step date-inputs pnpm run check:date-inputs
