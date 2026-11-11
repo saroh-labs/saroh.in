@@ -17,6 +17,7 @@ import {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+import { mcpOAuthPlugins } from "./mcp-oauth";
 import { getTrustedOrigins, isTrustedOrigin } from "./origins";
 import { phoneSignIn } from "./phone-sign-in";
 import type { OnAuthServerError } from "./server-errors";
@@ -36,6 +37,16 @@ export {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+export {
+    MCP_IDLE_SECONDS,
+    MCP_SCOPES,
+    mcpAddressesOf,
+    OAUTH_PICK_SECONDS,
+    oauthPickIdentifier,
+    readOAuthPick,
+    verifyMcpAccessToken,
+} from "./mcp-oauth";
+export type { McpAddresses, McpTokenClaims } from "./mcp-oauth";
 export { startPhoneSession } from "./phone-sign-in";
 export type { AuthServerFault, OnAuthServerError } from "./server-errors";
 
@@ -584,6 +595,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const options: BetterAuthOptions = {
         secret,
         baseURL,
+        // `jwt()` (AI apps' sign-in) adds a session-to-JWT `/token`: nothing
+        // here hands a session out as a bearer token.
+        disabledPaths: ["/token"],
         trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",
@@ -770,6 +784,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                     await opts.sendVerificationOTP?.({ to: email, otp, type });
                 },
             }),
+            // Sign-in for AI apps over MCP (`mcp-oauth.ts`); the API's
+            // `API_MCP` switch answers 404 for all of it while off.
+            ...mcpOAuthPlugins(baseURL),
         ],
     };
 

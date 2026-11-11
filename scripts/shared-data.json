@@ -10,7 +10,15 @@
         "AccountPhoneCode": "phone sign-in, India only for now",
         "AccountPhoneEvent": "phone sign-in, India only for now",
         "OtpWidgetTokenUse": "phone sign-in, India only for now",
-        "BillingProfile": "who pays, and it can span a person's businesses"
+        "BillingProfile": "who pays, and it can span a person's businesses",
+        "Jwks": "AI apps' sign-in: the keys that sign access tokens",
+        "OauthClient": "AI apps' sign-in: an app registered once, used by people of many businesses",
+        "OauthResource": "AI apps' sign-in: the MCP resource, per edition address",
+        "OauthClientResource": "AI apps' sign-in: which app may ask for which resource",
+        "OauthRefreshToken": "AI apps' sign-in: a person's refresh token; the business is its referenceId",
+        "OauthAccessToken": "AI apps' sign-in: opaque tokens, which the MCP refuses",
+        "OauthConsent": "AI apps' sign-in: a person's grant to an app for one business (referenceId)",
+        "OauthClientAssertion": "AI apps' sign-in: used client assertion ids, against replay"
     },
     "staff": {
         "PlatformAdmin": "staff are shared",

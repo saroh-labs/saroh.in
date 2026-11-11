@@ -37,11 +37,13 @@ import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { LinkPreviewModule } from "./modules/link-preview/link-preview.module";
+import { McpModule } from "./modules/mcp/mcp.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { OutboundWebhooksModule } from "./modules/outbound-webhooks/outbound-webhooks.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
 import { PricingModule } from "./modules/pricing/pricing.module";
@@ -114,6 +116,9 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         DataExportModule,
         ApiKeysModule,
         PublicApiModule,
+        // AI apps' sign-in and connections (plan 2026-11-10-001, U9).
+        McpModule,
+        OutboundWebhooksModule,
         ProjectsModule,
         AuditModule,
         StoresModule,

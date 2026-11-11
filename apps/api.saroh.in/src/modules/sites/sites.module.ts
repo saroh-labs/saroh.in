@@ -92,7 +92,9 @@ import { TestReleasesService } from "./test-releases.service";
         PageCacheRevalidateHandler,
         OrganizationGuard,
     ],
-    exports: [SitesService],
+    // The preview links and test releases too: the MCP website tools mint a
+    // preview with every draft change and send a publish for approval.
+    exports: [SitesService, SitePreviewLinksService, TestReleasesService],
 })
 export class SitesModule implements OnModuleInit {
     constructor(

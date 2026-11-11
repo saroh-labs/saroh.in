@@ -98,9 +98,19 @@ const productView = (p: ProductRow): ProductView => ({
     updatedAt: p.updatedAt.toISOString(),
 });
 
-export async function productsPage(organizationId: string, q: Paging) {
+/** `query`: words in the name (the MCP's `list_products`). */
+export async function productsPage(
+    organizationId: string,
+    q: Paging & { query?: string },
+) {
     const rows = await prisma.product.findMany({
-        where: { organizationId, ...afterCursor(q.cursor) },
+        where: {
+            organizationId,
+            ...(q.query
+                ? { name: { contains: q.query, mode: "insensitive" as const } }
+                : {}),
+            ...afterCursor(q.cursor),
+        },
         ...paged(q),
         select: PRODUCT,
     });
@@ -343,15 +353,31 @@ export const bookingView = (b: BookingRow): BookingView => ({
     createdAt: b.createdAt.toISOString(),
 });
 
+/** `contactId`, `from` and `to` (on the start) are the MCP's `list_bookings`. */
 export async function bookingsPage(
     organizationId: string,
-    q: Paging & { status?: BookingView["status"]; serviceId?: string },
+    q: Paging & {
+        status?: BookingView["status"];
+        serviceId?: string;
+        contactId?: string;
+        from?: Date;
+        to?: Date;
+    },
 ) {
     const rows = await prisma.booking.findMany({
         where: {
             organizationId,
             ...(q.status ? { status: bookingStatus.in(q.status) } : {}),
             ...(q.serviceId ? { serviceId: q.serviceId } : {}),
+            ...(q.contactId ? { contactId: q.contactId } : {}),
+            ...(q.from || q.to
+                ? {
+                      startAt: {
+                          ...(q.from ? { gte: q.from } : {}),
+                          ...(q.to ? { lt: q.to } : {}),
+                      },
+                  }
+                : {}),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -552,9 +578,31 @@ const customerView = (c: CustomerRow): CustomerView => {
 };
 
 // A merged-away contact is a tombstone (DEC-042): never listed.
-export async function customersPage(organizationId: string, q: Paging) {
+// `query`: part of a name, email, phone or company (the MCP's `list_customers`).
+export async function customersPage(
+    organizationId: string,
+    q: Paging & { query?: string },
+) {
+    // Every word somewhere, so "Priya Shah" finds first name + last name.
+    const words = (q.query ?? "").split(/\s+/).filter(Boolean).slice(0, 5);
     const rows = await prisma.contact.findMany({
-        where: { organizationId, mergedIntoId: null, ...afterCursor(q.cursor) },
+        where: {
+            organizationId,
+            mergedIntoId: null,
+            AND: words.map((word) => {
+                const like = { contains: word, mode: "insensitive" as const };
+                return {
+                    OR: [
+                        { firstName: like },
+                        { lastName: like },
+                        { email: like },
+                        { phone: like },
+                        { company: like },
+                    ],
+                };
+            }),
+            ...afterCursor(q.cursor),
+        },
         ...paged(q),
         select: CUSTOMER,
     });

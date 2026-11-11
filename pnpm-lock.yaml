@@ -343,6 +343,12 @@ importers:
 
   apps/api.saroh.in:
     dependencies:
+      '@modelcontextprotocol/node':
+        specifier: 2.1.2
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
+      '@modelcontextprotocol/server':
+        specifier: 2.4.0
+        version: 2.4.0
       '@nestjs/common':
         specifier: ^11.1.28
         version: 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -1361,6 +1367,15 @@ importers:
 
   packages/auth:
     dependencies:
+      '@better-auth/cimd':
+        specifier: 1.7.19
+        version: 1.7.19(5h5c52qx3jf67bypyfhlmfu43m)
+      '@better-auth/mcp':
+        specifier: 1.7.19
+        version: 1.7.19(uxzrmb3wq2sf3wslfesidtgaum)
+      '@better-auth/oauth-provider':
+        specifier: 1.7.19
+        version: 1.7.19(uxzrmb3wq2sf3wslfesidtgaum)
       '@saroh/database':
         specifier: workspace:*
         version: link:../database
@@ -2603,6 +2618,14 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
+  '@better-auth/cimd@1.7.19':
+    resolution: {integrity: sha512-HG4tIWnFtrv0yMBRkHBFXOZSKL+Nn+QtWQxMHxAHpCNtUQ2dhYLfZPBEZcESn/OlZVPw8Sk/d51W7mKLQ54vUQ==}
+    peerDependencies:
+      '@better-auth/core': ^1.7.19
+      '@better-auth/oauth-provider': ^1.7.19
+      better-auth: ^1.7.19
+      better-call: 1.4.5
+
   '@better-auth/core@1.7.19':
     resolution: {integrity: sha512-ZydLa+xlm6UOJiVrnyOoK7lnuuKiNnCUKiRuIAOYKktc3pY2pjGfKemRSman5+tYLheYP8Q/pS7WkzIQTkKvVw==}
     peerDependencies:
@@ -2637,6 +2660,13 @@ packages:
       kysely:
         optional: true
 
+  '@better-auth/mcp@1.7.19':
+    resolution: {integrity: sha512-aR8L+31gE7xw6hJvWSzBuUigoeUwR/OtsldSIUYsPdRWLa0Z6NbPICU/wEMPqxUS5up2Vkt6kyWY2U90FIH8uw==}
+    peerDependencies:
+      '@better-auth/core': ^1.7.19
+      better-auth: ^1.7.19
+      better-call: 1.4.5
+
   '@better-auth/memory-adapter@1.7.19':
     resolution: {integrity: sha512-kaB+gwEAHLXmgG72rpeS7V8984Y4n09MKWnHBAhT9+ZtFKO4sysnkjRBupL730RRPr+rjZuf4BILgWLWKPmCIw==}
     peerDependencies:
@@ -2652,6 +2682,15 @@ packages:
     peerDependenciesMeta:
       mongodb:
         optional: true
+
+  '@better-auth/oauth-provider@1.7.19':
+    resolution: {integrity: sha512-RdslcDLaH24JiWgzfzd5Zq4+GJPOZNJYhQCVWTMZEj9N2f53J6VGgXPB6wn6qxpIJEW5w5QPAiO0A3QfLl7CrA==}
+    peerDependencies:
+      '@better-auth/core': ^1.7.19
+      '@better-auth/utils': ^0.4.2 || ^0.5.0
+      '@better-fetch/fetch': 1.3.3
+      better-auth: ^1.7.19
+      better-call: 1.4.5
 
   '@better-auth/prisma-adapter@1.7.19':
     resolution: {integrity: sha512-zuzdoWGJrSWTjbdU/wWLuvWI5Q80bnrK4OicvOCrysZM/RHsTb2TCYMQwD7VZm1Uh4gLphmndgYocwnuVVHr/g==}
@@ -3077,6 +3116,12 @@ packages:
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
       react-dom: ^18 || ^19 || ^19.0.0-rc
+
+  '@hono/node-server@2.1.6':
+    resolution: {integrity: sha512-p/KH9MnfNcsm3sR6x4lNgm5j+QN4Et8srKredl9DZfXiyZ1UQ3aQ2YVpFLbqktYN5JI+DB+VZFKM2PqE5hLKjQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@hookform/resolvers@5.4.0':
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
@@ -3616,6 +3661,20 @@ packages:
 
   '@mermaid-js/parser@1.2.0':
     resolution: {integrity: sha512-oYPyv8A4As1yH5Bx+04iQEQxXuIQDe0GKCNSRgao6z8AM9jixXIfP0vsppRLvGf+nKIOb9/LdpWA4YuJiVvESA==}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/node@2.1.2':
+    resolution: {integrity: sha512-IIcIqBpr6NCQQs5DgJTgvbSOAw+3iaR/uquqg+e0nXCdudfjPg/80x0TseUnQx14AUAtE4fsJCEpJKPyb6WPVA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@modelcontextprotocol/server': ^2.4.0
+
+  '@modelcontextprotocol/server@2.4.0':
+    resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
+    engines: {node: '>=20'}
 
   '@napi-rs/canvas-android-arm64@0.1.80':
     resolution: {integrity: sha512-sk7xhN/MoXeuExlggf91pNziBxLPVUqF2CAVnB57KLG/pz7+U5TKG8eXdc3pm0d7Od0WreB6ZKLj37sX9muGOQ==}
@@ -8637,6 +8696,10 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
+  hono@4.13.17:
+    resolution: {integrity: sha512-vZIcbkvjOR5hHRWERbGkr8fGfF0GGM1ooYkuH448iO3b2AdVEr3AXZSw4Z3Kn+1L5z0CVoVeyV29VGYmFh05kQ==}
+    engines: {node: '>=16.9.0'}
+
   html-encoding-sniffer@4.0.0:
     resolution: {integrity: sha512-Y22oTqIU4uuPgEemfz7NDJz6OeKf12Lsu+QC+s3BVpda64lTiMYCyGwg5ki4vFxkMwQdeZDl2adZoqUgdFuTgQ==}
     engines: {node: '>=18'}
@@ -13130,6 +13193,13 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
+  '@better-auth/cimd@1.7.19(5h5c52qx3jf67bypyfhlmfu43m)':
+    dependencies:
+      '@better-auth/core': 1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)
+      '@better-auth/oauth-provider': 1.7.19(uxzrmb3wq2sf3wslfesidtgaum)
+      better-auth: 1.7.19(@prisma/client@7.9.1(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3))(mysql2@3.23.1(@types/node@20.19.33))(next@16.4.2(@playwright/test@1.63.0)(@types/node@20.19.33)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.12(@types/node@20.19.33)(jsdom@25.0.1)(vite@7.3.6(@types/node@20.19.33)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.1)))
+      better-call: 1.4.5(zod@4.6.7)
+
   '@better-auth/core@1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)':
     dependencies:
       '@better-auth/utils': 0.5.1
@@ -13153,6 +13223,17 @@ snapshots:
     optionalDependencies:
       kysely: 0.29.4
 
+  '@better-auth/mcp@1.7.19(uxzrmb3wq2sf3wslfesidtgaum)':
+    dependencies:
+      '@better-auth/core': 1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)
+      '@better-auth/oauth-provider': 1.7.19(uxzrmb3wq2sf3wslfesidtgaum)
+      better-auth: 1.7.19(@prisma/client@7.9.1(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3))(mysql2@3.23.1(@types/node@20.19.33))(next@16.4.2(@playwright/test@1.63.0)(@types/node@20.19.33)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.12(@types/node@20.19.33)(jsdom@25.0.1)(vite@7.3.6(@types/node@20.19.33)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.1)))
+      better-call: 1.4.5(zod@4.6.7)
+      jose: 6.2.8
+    transitivePeerDependencies:
+      - '@better-auth/utils'
+      - '@better-fetch/fetch'
+
   '@better-auth/memory-adapter@1.7.19(@better-auth/core@1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2))(@better-auth/utils@0.5.1)':
     dependencies:
       '@better-auth/core': 1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)
@@ -13162,6 +13243,16 @@ snapshots:
     dependencies:
       '@better-auth/core': 1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)
       '@better-auth/utils': 0.5.1
+
+  '@better-auth/oauth-provider@1.7.19(uxzrmb3wq2sf3wslfesidtgaum)':
+    dependencies:
+      '@better-auth/core': 1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2)
+      '@better-auth/utils': 0.5.1
+      '@better-fetch/fetch': 1.3.3
+      better-auth: 1.7.19(@prisma/client@7.9.1(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3))(mysql2@3.23.1(@types/node@20.19.33))(next@16.4.2(@playwright/test@1.63.0)(@types/node@20.19.33)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.12(@types/node@20.19.33)(jsdom@25.0.1)(vite@7.3.6(@types/node@20.19.33)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.1)))
+      better-call: 1.4.5(zod@4.6.7)
+      jose: 6.2.8
+      zod: 4.6.7
 
   '@better-auth/prisma-adapter@1.7.19(@better-auth/core@1.7.19(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.8)(kysely@0.29.4)(nanostores@1.4.2))(@better-auth/utils@0.5.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3))(prisma@7.9.1(@types/node@20.19.33)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))':
     dependencies:
@@ -13492,6 +13583,10 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       use-sync-external-store: 1.6.0(react@19.2.8)
+
+  '@hono/node-server@2.1.6(hono@4.13.17)':
+    dependencies:
+      hono: 4.13.17
 
   '@hookform/resolvers@5.4.0(react-hook-form@7.71.1(react@19.2.8))':
     dependencies:
@@ -14181,6 +14276,21 @@ snapshots:
   '@mermaid-js/parser@1.2.0':
     dependencies:
       '@chevrotain/types': 11.1.2
+
+  '@modelcontextprotocol/core@2.4.0':
+    dependencies:
+      zod: 4.6.7
+
+  '@modelcontextprotocol/node@2.1.2(@modelcontextprotocol/server@2.4.0)':
+    dependencies:
+      '@hono/node-server': 2.1.6(hono@4.13.17)
+      '@modelcontextprotocol/server': 2.4.0
+      hono: 4.13.17
+
+  '@modelcontextprotocol/server@2.4.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.4.0
+      zod: 4.6.7
 
   '@napi-rs/canvas-android-arm64@0.1.80':
     optional: true
@@ -19814,6 +19924,8 @@ snapshots:
   hermes-parser@0.25.1:
     dependencies:
       hermes-estree: 0.25.1
+
+  hono@4.13.17: {}
 
   html-encoding-sniffer@4.0.0:
     dependencies:

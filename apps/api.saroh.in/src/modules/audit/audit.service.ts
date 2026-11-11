@@ -205,6 +205,26 @@ export const AuditAction = {
     ApiKeyCreated: "apikey.created",
     ApiKeyRolled: "apikey.rolled",
     ApiKeyRevoked: "apikey.revoked",
+    // A person connected an AI app to the business by signing in, or the
+    // connection was ended (U9), with the connection as the target.
+    // Metadata: the app's name, whether Saroh knows it and the scopes; for
+    // a disconnect, whose connection it was and why (a person, or idle).
+    AiConnectionConnected: "ai_connection.connected",
+    AiConnectionDisconnected: "ai_connection.disconnected",
+    // An AI app changed something through an MCP write tool (U10), with
+    // the connection as the target. Metadata: the tool, the connection's
+    // kind, the app's name and the record it touched. Never its content.
+    AiToolWrite: "ai_connection.tool_write",
+    // A webhook endpoint made, changed, deleted or its secret rolled by
+    // someone with `webhook:manage`, and switched off by Saroh after
+    // repeated failed deliveries (plan 2026-11-10-001, U13; actor
+    // `system:webhooks`). Metadata: the address's host, the events and the
+    // failure count. Never the secret.
+    WebhookEndpointCreated: "webhook.created",
+    WebhookEndpointUpdated: "webhook.updated",
+    WebhookEndpointDeleted: "webhook.deleted",
+    WebhookSecretRolled: "webhook.secret_rolled",
+    WebhookEndpointAutoDisabled: "webhook.auto_disabled",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
