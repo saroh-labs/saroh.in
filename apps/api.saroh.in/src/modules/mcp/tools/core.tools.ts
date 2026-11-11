@@ -26,8 +26,7 @@ const DRAFTS_AND_PUBLISH =
 
 const isRead = (a: OrgAction) => /:read(-own)?$/.test(a);
 
-const editionOf = (e: string) =>
-    e === "GLOBAL" ? ("global" as const) : ("india" as const);
+const editionOf = (e: string) => e.toLowerCase() as "india" | "global";
 const yesNo = (b: boolean) => (b ? "yes" : "no");
 
 /** What this connection may do in one business, after the person's role. */

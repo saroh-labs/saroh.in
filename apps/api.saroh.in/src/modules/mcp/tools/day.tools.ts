@@ -713,7 +713,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "update_customer",
             title: "Change a customer",
             description:
-                'Use this when the person corrects a customer\'s email, name, phone or company. Send only what changes; null clears a field. Example: customer_id from list_customers, phone "+91 98450 00000". Not for a new customer (create_customer).',
+                "Use this when the person corrects a customer's email, name, phone or company. Send only what changes; null clears a field. Example: customer_id from list_customers, phone with its country code. Not for a new customer (create_customer).",
             contract: updateCustomerTool,
             capability: "contact:write",
             hints: UPDATE,
