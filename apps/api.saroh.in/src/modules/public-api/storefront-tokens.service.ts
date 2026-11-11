@@ -26,7 +26,8 @@ export function mintStorefrontToken(): string {
  * `storefront:mint`, mints one per visitor; the visitor's browser then
  * books, orders and sends enquiries with it under `/v1/storefront/write/…`.
  * About 30 minutes, the allowed origins copied from a publishable key the
- * business chose, and only a digest stored. Swept after `expiresAt`.
+ * business chose, the visitor's email the server vouches for (the only one
+ * its orders and bookings may use), and only a digest stored. Swept after `expiresAt`.
  */
 @Injectable()
 export class StorefrontTokensService {
@@ -60,6 +61,7 @@ export class StorefrontTokensService {
                 apiKeyId: secretKeyId,
                 tokenDigest: tokenDigest(token),
                 allowedOrigins: publishable.allowedOrigins,
+                visitorEmail: body.visitor?.email.trim().toLowerCase() ?? null,
                 expiresAt,
             },
         });

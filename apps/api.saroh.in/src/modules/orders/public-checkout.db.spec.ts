@@ -27,7 +27,7 @@ jest.mock("../../env", () => {
 import type { INestApplication } from "@nestjs/common";
 import { ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import type { Job } from "@saroh/database";
+import type { Job, StorefrontToken } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
@@ -50,6 +50,7 @@ import {
     SEND_REFUND_TYPE,
     SendRefundHandler,
 } from "../payments/send-refund.handler";
+import { StorefrontService } from "../public-api/storefront.service";
 import {
     SiteCodeAlerts,
     SiteCodeDelivery,
@@ -2080,5 +2081,124 @@ describe("the last delivery's address, for the bag to offer again", () => {
             },
         });
         expect((await address(s, asha.token)).body).toEqual({ address: null });
+    });
+});
+
+describe("a storefront API guest's order (U7 review)", () => {
+    // Only the checkout is used by an order; the token is the row's two
+    // fields an order reads.
+    const storefront = new StorefrontService(
+        null as never,
+        null as never,
+        null as never,
+        null as never,
+        null as never,
+        null as never,
+        new PublicCheckoutService(
+            payments,
+            new FixedWindowRateLimiter(1_000),
+            new FixedWindowRateLimiter(1_000),
+        ),
+    );
+    const tokenFor = (email: string) =>
+        ({ id: `st_row_${next()}`, visitorEmail: email }) as StorefrontToken;
+    const guestOrder = (s: Shop, token: StorefrontToken) =>
+        storefront.order(
+            s.organizationId,
+            token,
+            {
+                name: "Someone Else",
+                lines: [{ listingId: s.listingId, quantity: 1 }],
+                fulfilment: "LOCAL_DELIVERY",
+                payment: "ONLINE",
+                address: {
+                    name: "Someone Else",
+                    phone: "9800000001",
+                    line1: "14, 2nd Cross",
+                    city: "Bengaluru",
+                    state: "Karnataka",
+                    postalCode: "560038",
+                },
+                idempotencyKey: `guest_${next()}`.replace(
+                    /[^A-Za-z0-9_-]/g,
+                    "_",
+                ),
+            },
+            `guest-${next()}`,
+        );
+
+    it("leaves the email's own checkouts, orders and contact as they were", async () => {
+        const s = await shop();
+        const { email, token } = await signIn(s.host);
+        const mine = await start(s, token);
+        expect(mine.status).toBe(201);
+        const customer = await prisma.order.findUniqueOrThrow({
+            where: { id: mine.body.orderId as string },
+            select: { customerId: true },
+        });
+        const handover = await prisma.order.create({
+            data: {
+                storeId: s.storeId,
+                organizationId: s.organizationId,
+                orderId: `ORD-H${next()}`,
+                customerId: customer.customerId,
+                currency: "INR",
+                subtotal: "250.00",
+                total: "250.00",
+                placedOnline: true,
+                payOnHandover: true,
+            },
+        });
+        const before = await prisma.contact.findFirstOrThrow({
+            where: { organizationId: s.organizationId, email },
+        });
+
+        const placed = await guestOrder(s, tokenFor(email));
+        expect(placed.payBy).toBe("ONLINE");
+
+        const after = await prisma.order.findMany({
+            where: { id: { in: [mine.body.orderId as string, handover.id] } },
+            select: { status: true },
+        });
+        expect(after.map((o) => o.status)).toEqual(["PENDING", "PENDING"]);
+        const contact = await prisma.contact.findFirstOrThrow({
+            where: { organizationId: s.organizationId, email },
+        });
+        expect(contact).toMatchObject({
+            firstName: before.firstName,
+            lastName: before.lastName,
+            phone: before.phone,
+        });
+        // The signed-in account's own next checkout still replaces its own.
+        expect((await start(s, token)).status).toBe(201);
+    });
+
+    it("replaces only the same token's earlier checkout", async () => {
+        const s = await shop();
+        const email = `guest-${next()}@example.in`;
+        const first = tokenFor(email);
+        const a = await guestOrder(s, first);
+        const b = await guestOrder(s, first);
+        const c = await guestOrder(s, tokenFor(email));
+        const byId = new Map(
+            (
+                await prisma.order.findMany({
+                    where: { id: { in: [a.orderId, b.orderId, c.orderId] } },
+                    select: { id: true, status: true, storefrontTokenId: true },
+                })
+            ).map((o) => [o.id, o]),
+        );
+        expect(byId.get(a.orderId)?.status).toBe("CANCELLED");
+        expect(byId.get(b.orderId)).toMatchObject({
+            status: "PENDING",
+            storefrontTokenId: first.id,
+        });
+        expect(byId.get(c.orderId)?.status).toBe("PENDING");
+        // Made for the guest with what they gave.
+        expect(
+            await prisma.contact.findFirstOrThrow({
+                where: { organizationId: s.organizationId, email },
+            }),
+        ).toMatchObject({ firstName: "Someone", lastName: "Else" });
     });
 });

@@ -10,6 +10,7 @@ import {
     Post,
     Query,
     Req,
+    UnauthorizedException,
     UseGuards,
 } from "@nestjs/common";
 import type {
@@ -33,6 +34,7 @@ import {
     mintStorefrontTokenBody,
     orderBody,
 } from "@saroh/api-contract";
+import type { StorefrontToken } from "@saroh/database";
 
 import { hashClientIp, visitorAddress } from "../../common/client-ip";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -57,6 +59,12 @@ export const CATALOGUE_CACHE = "public, max-age=30, s-maxage=30";
 const visitorOf = (req: KeyedRequest) =>
     hashClientIp(visitorAddress(req, env.TRUST_PROXY));
 
+/** The token the guard put on the request; it lets nothing through without. */
+function tokenOf(req: TokenRequest): StorefrontToken {
+    if (!req.storefrontToken) throw new UnauthorizedException();
+    return req.storefrontToken;
+}
+
 /**
  * A visitor's writes (plan 2026-11-10-001, U7), `/v1/storefront/write/…`
  * with a storefront token. Registered before the reads, so `write` is
@@ -76,7 +84,12 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(bookBody)) body: BookBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.book(ctx.organizationId, body, req.visitorHash);
+        return this.storefront.book(
+            ctx.organizationId,
+            tokenOf(req),
+            body,
+            req.visitorHash,
+        );
     }
 
     @Post("holds")
@@ -87,7 +100,12 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(holdBody)) body: HoldBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.hold(ctx.organizationId, body, req.visitorHash);
+        return this.storefront.hold(
+            ctx.organizationId,
+            tokenOf(req),
+            body,
+            req.visitorHash,
+        );
     }
 
     @Post("holds/release")
@@ -131,6 +149,7 @@ export class StorefrontWriteController {
         authorize(ctx, "storefront:mint");
         return this.storefront.order(
             ctx.organizationId,
+            tokenOf(req),
             body,
             req.visitorHash ?? `token:${req.storefrontToken?.id ?? ""}`,
         );

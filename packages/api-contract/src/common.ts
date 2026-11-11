@@ -15,6 +15,10 @@ export const ERROR_CODES = [
     "conflict",
     // The business takes no online payment: no provider connected, or Payments off.
     "payments_unavailable",
+    // A storefront token's order or booking with no visitor email minted on
+    // the token, or under an email other than the one minted on it.
+    "visitor_email_required",
+    "visitor_email_mismatch",
     "rate_limited",
     "internal",
 ] as const;

@@ -306,8 +306,14 @@ async function keyFor(
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
-/** A storefront token minted over HTTP, as a business's server would. */
-async function mint(org: { id: string; owner: string }) {
+/**
+ * A storefront token minted over HTTP, as a business's server would, for
+ * the visitor it knows by `email` (none: an enquiries-only token).
+ */
+async function mint(
+    org: { id: string; owner: string },
+    email: string | null = "asha@example.com",
+) {
     const pk = await keyFor(org, "PUBLISHABLE");
     const sk = await keyFor(org, "SECRET");
     const minted = await call(
@@ -316,13 +322,18 @@ async function mint(org: { id: string; owner: string }) {
         bearer(sk.token),
         {
             publishableKeyId: pk.id,
+            ...(email ? { visitor: { email } } : {}),
         },
     );
     expect(minted.status).toBe(201);
     return { pk, sk, token: minted.body.token as string, minted };
 }
 
-function booking(serviceId: string, startAt: Date, email = "asha@example.com") {
+function booking(
+    serviceId: string,
+    startAt: Date,
+    email: string | undefined = "asha@example.com",
+) {
     return {
         serviceId,
         startAt: startAt.toISOString(),
@@ -555,12 +566,86 @@ describe("storefront writes (storefront token)", () => {
             "POST",
             "/v1/storefront/write/bookings",
             bearer(token),
-            booking(org.serviceId, startAt, "ravi@example.com"),
+            // No email: the token's.
+            booking(org.serviceId, startAt, undefined),
         );
         expect(again.status).toBe(409);
         expect(again.body.error?.code).toBe("conflict");
         expect(typeof again.body.error?.message).toBe("string");
         expect(typeof again.body.error?.requestId).toBe("string");
+    });
+
+    it("books and orders only as the visitor the token was minted for", async () => {
+        const org = await business("Rye");
+        const { token } = await mint(org, "Asha@Example.com");
+        const row = await prisma.storefrontToken.findFirstOrThrow({
+            where: { organizationId: org.id },
+        });
+        expect(row.visitorEmail).toBe("asha@example.com");
+        const order = {
+            name: "Ravi",
+            email: "ravi@example.com",
+            lines: [{ listingId: "listing_1", quantity: 1 }],
+            fulfilment: "PICKUP",
+            payment: "ON_HANDOVER",
+            idempotencyKey: "order-key-mismatch",
+        };
+        for (const [path, body] of [
+            [
+                "bookings",
+                booking(org.serviceId, nextMonday(6), "ravi@example.com"),
+            ],
+            [
+                "holds",
+                booking(org.serviceId, nextMonday(7), "ravi@example.com"),
+            ],
+            ["orders", order],
+        ] as const) {
+            const refused = await call(
+                "POST",
+                `/v1/storefront/write/${path}`,
+                bearer(token),
+                body,
+            );
+            expect(refused.status).toBe(403);
+            expect(refused.body.error?.code).toBe("visitor_email_mismatch");
+        }
+        // A token minted with no visitor can't book or order at all.
+        const { token: anonymous } = await mint(org, null);
+        const bare = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            bearer(anonymous),
+            booking(org.serviceId, nextMonday(6)),
+        );
+        expect(bare.status).toBe(403);
+        expect(bare.body.error?.code).toBe("visitor_email_required");
+        const noEmailOrder = await call(
+            "POST",
+            "/v1/storefront/write/orders",
+            bearer(anonymous),
+            { ...order, email: undefined },
+        );
+        expect(noEmailOrder.status).toBe(403);
+        expect(noEmailOrder.body.error?.code).toBe("visitor_email_required");
+        // Nothing written for anyone.
+        expect(
+            await prisma.booking.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.order.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.contact.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
+        // The same email in another case is the visitor's own.
+        const own = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            bearer(token),
+            booking(org.serviceId, nextMonday(6), "ASHA@example.com"),
+        );
+        expect(own.status).toBe(201);
     });
 
     it("answers a write's preflight, and refuses an origin outside the token's list", async () => {

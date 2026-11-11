@@ -1,5 +1,6 @@
 import {
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -11,6 +12,7 @@ import type {
     HoldBody,
     OrderBody,
 } from "@saroh/api-contract";
+import type { StorefrontToken } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { onlinePaymentBlocker } from "../bookings/booking-payment";
@@ -41,6 +43,36 @@ export function paymentsUnavailable(): ConflictException {
                 "This business can't take payment online right now. Book or order to pay in person.",
         },
     });
+}
+
+/**
+ * The email a token's order or booking is made under: the one its server
+ * minted it with. A body email must be that one (any case) or left out, so
+ * a visitor can't book or order as someone else (review of U7).
+ */
+export function visitorEmailOf(
+    token: Pick<StorefrontToken, "visitorEmail">,
+    given: string | undefined,
+): string {
+    if (!token.visitorEmail) {
+        throw new ForbiddenException({
+            error: {
+                code: "visitor_email_required",
+                message:
+                    "This token has no visitor email. Mint it with visitor.email to book or order with it.",
+            },
+        });
+    }
+    if (given && given.trim().toLowerCase() !== token.visitorEmail) {
+        throw new ForbiddenException({
+            error: {
+                code: "visitor_email_mismatch",
+                message:
+                    "This email isn't the one the token was minted for. Leave email out, or send that one.",
+            },
+        });
+    }
+    return token.visitorEmail;
 }
 
 /** A visitor's booking, renamed for the API: its hold token, not a pay token. */
@@ -200,19 +232,31 @@ export class StorefrontService {
     // — Writes, with a storefront token ————————————————————————————
 
     /** Book to pay at the desk, or a service with nothing to pay. */
-    async book(organizationId: string, body: BookBody, visitor?: string) {
+    async book(
+        organizationId: string,
+        token: StorefrontToken,
+        body: BookBody,
+        visitor?: string,
+    ) {
+        const email = visitorEmailOf(token, body.email);
         await this.service(organizationId, body.serviceId);
         return bookingAnswer(
             await this.bookings.bookOnline(
                 body.serviceId,
-                { ...bookInput(body), pay: "DESK" },
+                { ...bookInput(body, email), pay: "DESK" },
                 visitor,
             ),
         );
     }
 
     /** Hold the slot while the customer pays online; 409 without a provider. */
-    async hold(organizationId: string, body: HoldBody, visitor?: string) {
+    async hold(
+        organizationId: string,
+        token: StorefrontToken,
+        body: HoldBody,
+        visitor?: string,
+    ) {
+        const email = visitorEmailOf(token, body.email);
         await this.service(organizationId, body.serviceId);
         if ((await onlinePaymentBlocker(organizationId)) !== null) {
             throw paymentsUnavailable();
@@ -220,7 +264,7 @@ export class StorefrontService {
         return bookingAnswer(
             await this.bookings.bookOnline(
                 body.serviceId,
-                { ...bookInput(body), pay: body.pay },
+                { ...bookInput(body, email), pay: body.pay },
                 visitor,
             ),
         );
@@ -255,11 +299,19 @@ export class StorefrontService {
     }
 
     /**
-     * An order for a guest the business's server vouched for by minting the
-     * token: their contact by email, made if new, filling only what is
-     * empty, as a guest's booking does (UX-049). No site account is made.
+     * An order for the guest the business's server vouched for by minting
+     * the token with their email: their contact by email, made if new and
+     * otherwise left as it is. No site account is made, and the order
+     * replaces or counts against only the same token's orders
+     * (`createCheckoutOrder`).
      */
-    async order(organizationId: string, body: OrderBody, clientHash: string) {
+    async order(
+        organizationId: string,
+        token: StorefrontToken,
+        body: OrderBody,
+        clientHash: string,
+    ) {
+        const email = visitorEmailOf(token, body.email);
         if (
             body.payment === "ONLINE" &&
             (await onlinePaymentBlocker(organizationId)) !== null
@@ -267,7 +319,6 @@ export class StorefrontService {
             throw paymentsUnavailable();
         }
         const site = await this.site(organizationId);
-        const email = body.email.trim().toLowerCase();
         const { first, last } = splitName(body.name);
         const dto = {
             lines: body.lines,
@@ -302,6 +353,7 @@ export class StorefrontService {
                     contactId: contact.id,
                     firstName: contact.firstName,
                     lastName: contact.lastName,
+                    storefrontTokenId: token.id,
                 };
             },
             clientHash,
@@ -329,11 +381,11 @@ export class StorefrontService {
     }
 }
 
-function bookInput(body: BookBody): BookInput {
+function bookInput(body: BookBody, email: string): BookInput {
     return {
         startAt: body.startAt,
         bookerName: body.name,
-        bookerEmail: body.email.trim().toLowerCase(),
+        bookerEmail: email,
         bookerPhone: body.phone,
         staffId: body.staffId,
         idempotencyKey: body.idempotencyKey,

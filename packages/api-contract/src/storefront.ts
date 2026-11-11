@@ -164,7 +164,13 @@ const idempotencyKey = z
 
 const booker = {
     name: z.string().trim().min(1).max(120),
-    email: z.email().max(254),
+    email: z
+        .email()
+        .max(254)
+        .optional()
+        .describe(
+            "The visitor's email. The token must have been minted with one (`visitor.email`); this must match it, any case, or be left out to use it.",
+        ),
     phone: z.string().trim().max(32).optional(),
 };
 
@@ -276,6 +282,12 @@ export const storefrontSubmission = z
 export const mintStorefrontTokenBody = z.strictObject({
     /** The publishable key whose allowed origins the token copies. */
     publishableKeyId: id,
+    /**
+     * The visitor your server knows, by email. Orders and bookings made
+     * with the token are made under this email and no other; without it,
+     * the token can only send enquiries.
+     */
+    visitor: z.strictObject({ email: z.email().max(254) }).optional(),
 });
 export type MintStorefrontTokenBody = z.infer<typeof mintStorefrontTokenBody>;
 

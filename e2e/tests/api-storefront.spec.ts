@@ -114,7 +114,8 @@ test(
                 `${urls.API_URL}/v1/storefront-tokens`,
                 {
                     headers: { authorization: `Bearer ${sk.token}` },
-                    data: { publishableKeyId: pk.id },
+                    // The visitor it knows: the token books only as them.
+                    data: { publishableKeyId: pk.id, visitor: { email } },
                 },
             );
             expect(minted.status(), await minted.text()).toBe(201);

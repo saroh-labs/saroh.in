@@ -476,6 +476,43 @@ describe("/v1 catalogue", () => {
             200,
         );
     });
+
+    it("refuses a service price past its column with 400, making and changing nothing", async () => {
+        const org = await business();
+        const key = await secretKey(org);
+        const tooBig = { amountMinor: 2_147_483_648, currency: "INR" };
+        const made = await call(key, "POST", "/v1/services", {
+            name: "Haircut",
+            durationMinutes: 45,
+            price: tooBig,
+        });
+        expect(made.status).toBe(400);
+        expect(made.body.error?.code).toBe("invalid_request");
+        expect(
+            await prisma.service.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
+        const ok = await call(key, "POST", "/v1/services", {
+            name: "Haircut",
+            durationMinutes: 45,
+            price: { amountMinor: 2_147_483_647, currency: "INR" },
+        });
+        expect(ok.status).toBe(201);
+        const patched = await call(
+            key,
+            "PATCH",
+            `/v1/services/${String(ok.body.id)}`,
+            { price: tooBig },
+        );
+        expect(patched.status).toBe(400);
+        expect(patched.body.error?.code).toBe("invalid_request");
+        expect(
+            (
+                await prisma.service.findUniqueOrThrow({
+                    where: { id: String(ok.body.id) },
+                })
+            ).priceCents,
+        ).toBe(2_147_483_647);
+    });
 });
 
 describe("/v1 paging", () => {

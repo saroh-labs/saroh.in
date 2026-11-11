@@ -138,6 +138,12 @@ export type ServiceView = z.infer<typeof serviceView>;
 
 const minutes = z.number().int().min(0).max(1440);
 
+/** A service's price is a 32-bit column (`Service.priceCents`); a product's
+ * fits the shared bound (`Decimal(10, 2)`). */
+const servicePrice = price.extend({
+    amountMinor: z.number().int().min(0).max(2_147_483_647),
+});
+
 export const createServiceBody = z.strictObject({
     name: text(128),
     description: text(2000, 0).optional(),
@@ -145,7 +151,7 @@ export const createServiceBody = z.strictObject({
     bufferBeforeMinutes: minutes.optional(),
     bufferAfterMinutes: minutes.optional(),
     capacity: z.number().int().min(1).max(10_000).optional(),
-    price: price.optional(),
+    price: servicePrice.optional(),
     /** IANA time zone its hours are in; left out, the business's own. */
     timezone: z.string().min(1).max(64).optional(),
 });
