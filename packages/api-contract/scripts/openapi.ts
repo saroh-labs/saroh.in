@@ -15,7 +15,7 @@ import { hostsFor, urlOf } from "../../edition/src/index";
 import type { Surface } from "../src/index";
 import { buildOpenApi } from "../src/index";
 
-// The docs are written for saroh.in; a Global copy (served at docs.saroh.tech)
+// The docs are written for the India edition; the Global copy (its docs host)
 // changes this one line, and the docs read every host from these files.
 const EDITION = "INDIA" as const;
 
