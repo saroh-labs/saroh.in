@@ -558,7 +558,9 @@ describe("storefront writes (storefront token)", () => {
             booking(org.serviceId, startAt, "ravi@example.com"),
         );
         expect(again.status).toBe(409);
-        expect(again.body.error?.code).toBeDefined();
+        expect(again.body.error?.code).toBe("conflict");
+        expect(typeof again.body.error?.message).toBe("string");
+        expect(typeof again.body.error?.requestId).toBe("string");
     });
 
     it("answers a write's preflight, and refuses an origin outside the token's list", async () => {

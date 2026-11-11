@@ -519,6 +519,7 @@ e2e_seed_key() {
     {
         for p in packages/database/prisma packages/database/src \
             packages/database/package.json packages/block-contract/src \
+            packages/pricing-catalog/src \
             pnpm-lock.yaml; do
             git rev-parse "HEAD:$p" 2>/dev/null || echo "no $p"
         done

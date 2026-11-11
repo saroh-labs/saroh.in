@@ -336,7 +336,7 @@ export class CatalogueV1Controller {
                 timezone ?? (await businessTimezone(ctx.organizationId));
             if (!zone) {
                 throw invalid(
-                    "body.timezone: Name the time zone, like Asia/Kolkata",
+                    "body.timezone: Name the time zone by its IANA name, like Europe/London",
                 );
             }
             const made = await this.bookings.createService(ctx, {

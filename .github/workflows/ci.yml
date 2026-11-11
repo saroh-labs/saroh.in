@@ -784,7 +784,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/e2e-seed.dump
-          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'pnpm-lock.yaml') }}
+          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'packages/pricing-catalog/src/**', 'pnpm-lock.yaml') }}
       - name: Load the seeded database from the dump
         if: steps.seed-dump.outputs.cache-hit == 'true'
         run: >-

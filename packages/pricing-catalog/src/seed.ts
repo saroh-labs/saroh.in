@@ -358,6 +358,34 @@ const input: CatalogInput = {
                 pro: C("Included", "QR codes in your own style"),
             },
         },
+        // The public API (plan 2026-11-10-001): off on every sample plan, so
+        // a seeded business makes keys only by an operator's grant (the
+        // browser specs' `grantNorthwindApi`). Admin can only grant a row
+        // the catalogue has.
+        {
+            id: "api-storefront",
+            name: "Storefront API",
+            group: "usage",
+            pricing: "hidden",
+            what: "Your own website reads your catalogue and takes bookings with a publishable key.",
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+        },
+        {
+            id: "api-secret",
+            name: "Server API",
+            group: "usage",
+            pricing: "hidden",
+            what: "Your own server reads and writes your business with a secret key.",
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+        },
+        {
+            id: "api-keys",
+            name: "API keys",
+            group: "usage",
+            pricing: "hidden",
+            what: "How many API keys the business can hold.",
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+        },
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
