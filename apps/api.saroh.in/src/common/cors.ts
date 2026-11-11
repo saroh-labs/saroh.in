@@ -31,8 +31,14 @@ export function corsOptionsFor(
     switch (publicApiSurfaceOf(bare)) {
         // Only the publishable key's own origins, never credentials; an
         // unlisted origin gets no Allow-Origin, so the browser refuses.
+        // A visitor's writes carry their storefront token in Authorization,
+        // which a preflight never sends, so any origin is answered, without
+        // credentials; `StorefrontTokenGuard` then refuses an origin
+        // outside the token's list before anything is written.
         case "storefront":
-            return { origin: [...keyOrigins], credentials: false };
+            return isStorefrontWrite(bare)
+                ? { origin: true, credentials: false }
+                : { origin: [...keyOrigins], credentials: false };
         // Server to server with a secret key: no browser may read it.
         case "secret":
             return { origin: false };
@@ -74,6 +80,11 @@ export function publicApiSurfaceOf(path: string): PublicApiSurface | undefined {
     if (bare.startsWith("/v1/storefront/")) return "storefront";
     if (bare === "/v1" || bare.startsWith("/v1/")) return "secret";
     return undefined;
+}
+
+/** A visitor's write with a storefront token: `/v1/storefront/write/…` (U7). */
+export function isStorefrontWrite(path: string): boolean {
+    return (path.split("?")[0] ?? "").startsWith("/v1/storefront/write/");
 }
 
 /** The publishable key a storefront path carries: `/v1/storefront/{pk_…}/…`. */

@@ -51,6 +51,6 @@ import { VariantsService } from "./variants.service";
         PublicCatalogueService,
         OrganizationGuard,
     ],
-    exports: [ProductsService],
+    exports: [ProductsService, PublicCatalogueService],
 })
 export class ProductsModule {}

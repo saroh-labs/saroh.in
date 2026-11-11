@@ -20,6 +20,8 @@ export interface RouteDef {
     responses: Partial<Record<number, z.ZodType>>;
     /** The capability a key needs; null only for a route open to any key on its surface. */
     capability: string | null;
+    /** A write takes `Idempotency-Key` unless this is false. */
+    idempotent?: false;
 }
 
 const routes: RouteDef[] = [];
@@ -78,6 +80,30 @@ function jsonContent(schema: JsonSchema) {
     return { "application/json": { schema } };
 }
 
+/** Each refusal a route can give, with the codes it carries. */
+const REFUSALS: Record<number, string> = {
+    400: "The request is malformed or breaks a rule (invalid_request)",
+    401: "No key or token, or one that no longer works (unauthorized, key_owner_inactive)",
+    403: "The key or token may not do this (forbidden, visitor_email_required, visitor_email_mismatch)",
+    404: "Nothing like that in this business (not_found)",
+    409: "It clashes with how things stand, or an Idempotency-Key was sent again with a different request or while the first is running (conflict, payments_unavailable)",
+    429: "Too many requests: wait the Retry-After seconds (rate_limited)",
+};
+
+const idempotencyKeyHeader = {
+    name: "Idempotency-Key",
+    in: "header",
+    required: false,
+    description:
+        "Makes a retry safe: the same key with the same request answers the first answer again for 24 hours; with a different request, 409. Keys are per key or token and per route.",
+    schema: {
+        type: "string",
+        minLength: 1,
+        maxLength: 255,
+        pattern: "^[\\x21-\\x7e]+$",
+    },
+};
+
 function operation(route: RouteDef) {
     const { params, query, body } = route.request ?? {};
     const responses: Record<string, unknown> = {};
@@ -88,13 +114,30 @@ function operation(route: RouteDef) {
             content: jsonContent(toSchema(schema, "output")),
         };
     }
-    responses.default = {
-        description: "Error",
-        content: jsonContent(toSchema(errorEnvelope, "output")),
-    };
+    const error = jsonContent(toSchema(errorEnvelope, "output"));
+    const write = route.method !== "get";
+    for (const [status, description] of Object.entries(REFUSALS)) {
+        if (status === "409" && !write) continue;
+        responses[status] = {
+            description,
+            ...(status === "429"
+                ? {
+                      headers: {
+                          "Retry-After": {
+                              description: "Seconds to wait",
+                              schema: { type: "integer" },
+                          },
+                      },
+                  }
+                : {}),
+            content: error,
+        };
+    }
+    responses.default = { description: "Error", content: error };
     const parameterList = [
         ...(params ? parameters("path", params) : []),
         ...(query ? parameters("query", query) : []),
+        ...(write && route.idempotent !== false ? [idempotencyKeyHeader] : []),
     ];
     return {
         summary: route.summary,

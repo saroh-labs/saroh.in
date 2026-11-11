@@ -134,6 +134,12 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Manage notifications to your systems (webhooks)",
         note: "Sends details of orders, bookings and customers to an address someone types in, as they happen.",
     },
+    {
+        action: "storefront:mint",
+        group: "business",
+        label: "Let your own website take bookings and orders",
+        note: "A secret key with this gives each visitor of the business's own website a short-lived pass to book, order and send enquiries.",
+    },
 
     // — Team ——————————————————————————————————————————————————
     { action: "member:read", group: "team", label: "See who is in the team" },

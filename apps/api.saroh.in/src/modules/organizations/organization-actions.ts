@@ -180,7 +180,11 @@ export type OrgAction =
     // Notifications to the business's own systems (webhooks, R8). The
     // Owner's by default; an Owner may give it to an Admin as an extra or
     // to a custom role. Connecting one's own AI app needs no action.
-    | "webhook:manage";
+    | "webhook:manage"
+    // Let a website take bookings, orders and enquiries through the public
+    // API: a secret key with it mints a short-lived token for one visitor
+    // (plan 2026-11-10-001, U7). Owner and Admin by default.
+    | "storefront:mint";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -277,4 +281,5 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     // Public API and MCP (plan 2026-11-10-001, U2).
     "apikey:manage",
     "webhook:manage",
+    "storefront:mint",
 ];

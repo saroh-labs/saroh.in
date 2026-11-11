@@ -68,6 +68,7 @@ import { SEND_REFUND_TYPE, SendRefundHandler } from "./send-refund.handler";
     ],
     exports: [
         AutopayService,
+        PublicInvoicesService,
         PaymentsService,
         MandatesService,
         MandateSetupService,

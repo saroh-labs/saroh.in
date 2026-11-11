@@ -49,6 +49,7 @@ import { ProductReviewsModule } from "./modules/product-reviews/product-reviews.
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
+import { PublicApiModule } from "./modules/public-api/public-api.module";
 import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchPagesModule } from "./modules/search-pages/search-pages.module";
 import { SearchModule } from "./modules/search/search.module";
@@ -112,6 +113,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         OrganizationsModule,
         DataExportModule,
         ApiKeysModule,
+        PublicApiModule,
         ProjectsModule,
         AuditModule,
         StoresModule,

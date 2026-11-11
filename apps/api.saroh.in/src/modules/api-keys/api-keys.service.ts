@@ -51,13 +51,17 @@ export const ROLL_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * What every publishable key may do, whatever was asked: read what the
- * business's website already shows (R4). The storefront routes (U7) narrow
- * it further to their published reads.
+ * business's website already shows (R4), exactly the capabilities the
+ * storefront reads (U7) declare: the shop (`store:read`), the services
+ * and their slots (`service:read`), posts (`site:read`) and the plans on
+ * sale (`subscription:read`). The key is read-only whatever its scope:
+ * `ApiKeyGuard` refuses any other method on the storefront.
  */
 export const STOREFRONT_SCOPE: readonly OrgAction[] = [
     "store:read",
     "service:read",
     "site:read",
+    "subscription:read",
 ];
 
 /** Never on a key, whoever makes it (R7). */

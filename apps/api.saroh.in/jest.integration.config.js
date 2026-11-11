@@ -95,6 +95,7 @@ module.exports = {
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/api-keys/(?!.*\\.db\\.spec\\.ts$)",
+        "<rootDir>/src/modules/public-api/(?!.*\\.db\\.spec\\.ts$)",
         // DB-free specs that mock @saroh/database and run in the unit project:
         // the discount redemption core and the storefront settings spec.
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",

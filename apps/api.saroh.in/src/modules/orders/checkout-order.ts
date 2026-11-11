@@ -33,12 +33,22 @@ import { fromCents, withGstRates } from "./order-pricing";
 
 /** The signed-in site account a checkout is for (ADR-011). */
 export interface SiteAccount {
-    /** The account itself, named on the order it places (A7). */
-    accountId: string;
+    /**
+     * The account itself, named on the order it places (A7); null for a
+     * storefront API guest (U7), whose order is found by its contact.
+     */
+    accountId: string | null;
     email: string;
     contactId: string;
     firstName: string | null;
     lastName: string | null;
+    /**
+     * A storefront API guest's token (U7). Its order changes nothing on
+     * an existing contact, replaces only the same token's checkouts, and
+     * counts against the open cap only with them: the email is the
+     * business's word for who it is, not proof against their other orders.
+     */
+    storefrontTokenId?: string;
 }
 
 /**
@@ -85,6 +95,7 @@ export async function createCheckoutOrder(
     const onHandover = input.payOnHandover === true;
     const applied = input.discount ?? null;
     const storeId = scope.storefront.id;
+    const guestToken = account.storefrontTokenId ?? null;
     const sold = lines.flatMap((l) =>
         l.productId
             ? [
@@ -139,20 +150,29 @@ export async function createCheckoutOrder(
                             soft: true,
                         },
                     );
-                    const named = await nameContactInTx(
-                        tx,
-                        scope.organizationId,
-                        account,
-                        address?.name,
-                    );
+                    // A guest's order fills nothing: their contact was made
+                    // with what they gave, or is someone's already.
+                    const named = guestToken
+                        ? {
+                              firstName: account.firstName,
+                              lastName: account.lastName,
+                          }
+                        : await nameContactInTx(
+                              tx,
+                              scope.organizationId,
+                              account,
+                              address?.name,
+                          );
                     // The phone typed for the delivery fills their contact
                     // when it has none, as the booking page's does (UX-049).
-                    await fillContactPhoneInTx(
-                        tx,
-                        scope.organizationId,
-                        account.contactId,
-                        address?.phone,
-                    );
+                    if (!guestToken) {
+                        await fillContactPhoneInTx(
+                            tx,
+                            scope.organizationId,
+                            account.contactId,
+                            address?.phone,
+                        );
+                    }
                     // Found whatever case staff typed it in, as a treatment's
                     // customer is; made only when there is none.
                     const customer =
@@ -191,6 +211,9 @@ export async function createCheckoutOrder(
                         where: {
                             storeId,
                             customerId: customer.id,
+                            ...(guestToken
+                                ? { storefrontTokenId: guestToken }
+                                : {}),
                             placedOnline: true,
                             payOnHandover: false,
                             status: "PENDING",
@@ -214,12 +237,19 @@ export async function createCheckoutOrder(
                                 ? { in: ["PENDING", "PROCESSING"] }
                                 : "PENDING",
                             paymentStatus: { in: ["UNPAID", "FAILED"] },
-                            customer: {
-                                email: {
-                                    equals: account.email,
-                                    mode: "insensitive",
-                                },
-                            },
+                            // A guest's own token's; an account's, under its
+                            // email, leaving guests' token orders out.
+                            ...(guestToken
+                                ? { storefrontTokenId: guestToken }
+                                : {
+                                      storefrontTokenId: null,
+                                      customer: {
+                                          email: {
+                                              equals: account.email,
+                                              mode: "insensitive",
+                                          },
+                                      },
+                                  }),
                         },
                     });
                     if (open >= MAX_OPEN_CHECKOUTS) {
@@ -271,6 +301,7 @@ export async function createCheckoutOrder(
                             checkoutKey: dto.key,
                             // The account's Orders find it by this (A7).
                             customerAccountId: account.accountId,
+                            storefrontTokenId: guestToken,
                             sourceCode: input.sourceCode ?? null,
                             ...(address
                                 ? {

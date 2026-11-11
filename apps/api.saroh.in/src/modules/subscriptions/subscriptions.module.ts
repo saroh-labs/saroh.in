@@ -108,7 +108,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
                 null) satisfies AutopayChargePending,
         },
     ],
-    exports: [SubscriptionsService],
+    exports: [SubscriptionsService, PublicPlansService],
 })
 export class SubscriptionsModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;

@@ -138,6 +138,15 @@ export class ApiKeyGuard implements CanActivate {
             throw new NotFoundException();
         }
         if (surface === "storefront") {
+            // A publishable key only reads (U7); a visitor's writes take a
+            // storefront token under `/v1/storefront/write/…`.
+            if (!["GET", "HEAD"].includes(req.method.toUpperCase())) {
+                throw refusal(
+                    HttpStatus.FORBIDDEN,
+                    "forbidden",
+                    "A publishable key only reads. Send a visitor's bookings and orders with a visitor token from the business's server.",
+                );
+            }
             const origin = req.headers.origin;
             // No Origin: not a browser's cross-site call (a merchant's server).
             if (origin && !key.allowedOrigins.includes(origin)) {

@@ -7,10 +7,13 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 
+import type { ErrorCode } from "@saroh/api-contract";
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
 import { logHttpRequestOnce } from "../logging/http-request-log";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
 import { reportError } from "../observability/report-error";
+
+import { publicApiSurfaceOf } from "../cors";
 import { contractRefusal } from "../pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../types/organization-context";
 
@@ -193,9 +196,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
             isHttp && !isServerError
                 ? contractRefusal.safeParse(exception.getResponse())
                 : undefined;
+        // On `/v1` every error is the contract's, whoever threw it (a role
+        // refusal, an idempotency clash, a service's 409): U8.
+        const surface = publicApiSurfaceOf(String(req.originalUrl));
+        const keyed = surface === "secret" || surface === "storefront";
 
         if (!res.headersSent) {
             res.setHeader(RESPONSE_ID_HEADER, correlationId);
+            if (
+                keyed &&
+                statusCode === Number(HttpStatus.TOO_MANY_REQUESTS) &&
+                !res.getHeader("Retry-After")
+            ) {
+                res.setHeader(
+                    "Retry-After",
+                    String(DEFAULT_RETRY_AFTER_SECONDS),
+                );
+            }
             res.status(statusCode).json(
                 contract?.success
                     ? {
@@ -204,11 +221,43 @@ export class AllExceptionsFilter implements ExceptionFilter {
                               requestId: correlationId,
                           },
                       }
-                    : envelope,
+                    : keyed
+                      ? {
+                            error: {
+                                code: contractCode(statusCode),
+                                message,
+                                requestId: correlationId,
+                            },
+                        }
+                      : envelope,
             );
         }
     }
 }
+
+/** The public contract's code for a status (plan 2026-11-10-001, U8). */
+export function contractCode(status: number): ErrorCode {
+    const known: Partial<Record<number, ErrorCode>> = {
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        409: "conflict",
+        // A service no longer taken (a withdrawn service's 410) reads as missing.
+        410: "not_found",
+        413: "payload_too_large",
+        415: "unsupported_media_type",
+        422: "unprocessable",
+        429: "rate_limited",
+        503: "unavailable",
+    };
+    return known[status] ?? (status >= 500 ? "internal" : "invalid_request");
+}
+
+/**
+ * The wait a public 429 names when whoever refused set none: the services'
+ * own limiters count per minute.
+ */
+export const DEFAULT_RETRY_AFTER_SECONDS = 60;
 
 /** body-parser's "entity.too.large" error (a plain Error with type and status 413). */
 function isTooLarge(exception: unknown): boolean {

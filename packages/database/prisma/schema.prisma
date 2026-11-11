@@ -2038,6 +2038,12 @@ model Order {
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
+  // The storefront token a guest's API order came with (plan
+  // 2026-11-10-001, U7): such an order replaces, and counts against the
+  // open-order cap, only orders of the same token, never others under the
+  // email. No relation: tokens are swept after they expire.
+  storefrontTokenId String?
+
   // A walk-in's name, and their phone if they gave one, for "call when it's
   // ready" (plan B, B13). Set only when `customerId` is null; kept like any
   // order's contact details (DEC-042). No contact is made from them, because
@@ -9484,6 +9490,9 @@ model StorefrontToken {
   apiKey         ApiKey       @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
   tokenDigest    String       @unique
   allowedOrigins String[]
+  // The visitor's email the minting server vouched for, lower-cased: the
+  // only email the token's orders and bookings may be made under.
+  visitorEmail   String?
   expiresAt      DateTime
   createdAt      DateTime     @default(now())
 

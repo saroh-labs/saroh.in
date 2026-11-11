@@ -68,7 +68,7 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrderStageBatchService,
         OrderStageBatchCommitHandler,
     ],
-    exports: [OrdersService],
+    exports: [OrdersService, PublicCheckoutService],
 })
 export class OrdersModule implements OnModuleInit {
     constructor(

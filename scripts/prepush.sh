@@ -324,6 +324,7 @@ e2e_stack() {
     export TRUST_PROXY=private
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
+    export APIKEY_ENC_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex)
     export BETTER_AUTH_URL=http://localhost:3333
     export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3333
     export APP_URL=http://localhost:3003
@@ -519,6 +520,7 @@ e2e_seed_key() {
     {
         for p in packages/database/prisma packages/database/src \
             packages/database/package.json packages/block-contract/src \
+            packages/pricing-catalog/src \
             pnpm-lock.yaml; do
             git rev-parse "HEAD:$p" 2>/dev/null || echo "no $p"
         done
