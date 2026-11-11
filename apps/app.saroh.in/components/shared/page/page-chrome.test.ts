@@ -58,6 +58,12 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "sites/[siteId]/(tabs)/pages": "full",
     "sites/[siteId]/(tabs)/posts": "full",
     "sites/[siteId]/(tabs)/review": "full",
+    // API and AI apps' layout draws the panel, the header and its tabs.
+    "settings/(sections)/developers": "full",
+    "settings/(sections)/developers/ai": "full",
+    "settings/(sections)/developers/keys": "full",
+    "settings/(sections)/developers/usage": "full",
+    "settings/(sections)/developers/webhooks": "full",
     // The post editor owns its viewport.
     "sites/[siteId]/posts/[postId]": "full",
     "sites/[siteId]/posts/new": "full",

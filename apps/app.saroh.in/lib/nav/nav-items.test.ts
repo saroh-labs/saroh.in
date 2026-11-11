@@ -205,7 +205,7 @@ describe("what each role is offered", () => {
             "/settings/share",
             "/settings/activity",
             "/settings/providers",
-            "/settings/api",
+            "/settings/developers",
             "/settings/data",
         ]);
         expect(offered).toContain("/sites/site_1");
@@ -334,7 +334,7 @@ describe("what each role is offered", () => {
             "/settings/profile",
             // They read the website, so its QR codes too: to see, not change.
             "/settings/share",
-            "/settings/api",
+            "/settings/developers",
         ]);
         expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
@@ -519,7 +519,7 @@ describe("navFor — an invented role", () => {
             "/settings/people",
             "/settings/modules",
             "/settings/profile",
-            "/settings/api",
+            "/settings/developers",
         ]);
     });
 
@@ -544,7 +544,7 @@ describe("navFor — an invented role", () => {
             "/settings/organization",
             "/settings/people",
             "/settings/profile",
-            "/settings/api",
+            "/settings/developers",
         ]);
     });
 
@@ -1284,7 +1284,7 @@ describe("settings tabs — owner only, and everyone's", () => {
         // and its own AI assistant.
         expect(tabsFor({ role: "MEMBER", actions: [] })).toEqual([
             "/settings/profile",
-            "/settings/api",
+            "/settings/developers",
         ]);
     });
 
@@ -1305,13 +1305,15 @@ describe("settings tabs — owner only, and everyone's", () => {
 
     it("offers API and AI apps to every member but a Reviewer (plan 2026-11-10-001)", () => {
         for (const role of ["OWNER", "ADMIN", "MEMBER"] as const) {
-            expect(tabsFor({ role })).toContain("/settings/api");
+            expect(tabsFor({ role })).toContain("/settings/developers");
         }
-        expect(tabsFor({ role: "REVIEWER" })).not.toContain("/settings/api");
+        expect(tabsFor({ role: "REVIEWER" })).not.toContain(
+            "/settings/developers",
+        );
         // By role, whatever the actions say.
         expect(
             tabsFor({ role: "REVIEWER", actions: ["org:read"] }),
-        ).not.toContain("/settings/api");
+        ).not.toContain("/settings/developers");
     });
 
     it("offers Share to whoever may see the website", () => {

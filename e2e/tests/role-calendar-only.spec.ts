@@ -56,7 +56,11 @@ const MENU: readonly MenuRow[] = [
 ];
 
 /** `SETTINGS_PAGES` the role opens: what the business runs on, and their own. */
-const SETTINGS = ["/settings/modules", "/settings/profile", "/settings/api"];
+const SETTINGS = [
+    "/settings/modules",
+    "/settings/profile",
+    "/settings/developers",
+];
 
 test.describe("someone who is Calendar only", () => {
     test.beforeEach(async ({ page }) => {

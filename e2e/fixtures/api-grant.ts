@@ -5,8 +5,11 @@ import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 import { stamp } from "./own-data";
 import { useSession } from "./sessions";
 
-/** The catalogue rows a business needs to make API keys (`api-keys.service.ts`). */
-const ROWS = ["api-storefront", "api-secret", "api-keys"];
+/**
+ * The catalogue rows a business needs to make API keys
+ * (`api-keys.service.ts`) and webhook addresses (`endpoints.service.ts`).
+ */
+const ROWS = ["api-storefront", "api-secret", "api-keys", "webhooks"];
 
 /**
  * Give Northwind the public API's rows, as staff do on its admin page (a
@@ -57,4 +60,35 @@ export async function grantNorthwindApi(
         throw e;
     }
     return { restore };
+}
+
+/**
+ * Turn one of the public API's kill switches on for Northwind, as staff
+ * do (`API_SECRET`, `API_STOREFRONT`, `API_WEBHOOKS`, `API_MCP`). Left on:
+ * every spec that needs one turns it on itself.
+ */
+export async function switchOnNorthwind(
+    browser: Browser,
+    flag: "API_SECRET" | "API_STOREFRONT" | "API_WEBHOOKS" | "API_MCP",
+    testInfo: TestInfo,
+): Promise<void> {
+    const context = await browser.newContext({ ignoreHTTPSErrors });
+    try {
+        const staff = await context.newPage();
+        await useSession(staff, "staff");
+        const res = await staff.request.put(
+            `${urls.API_URL}/admin/flags/${flag}/organizations/${NORTHWIND_ORG}`,
+            {
+                headers: { origin: urls.APP_URL },
+                data: {
+                    enabled: true,
+                    reason: "Browser test of the public API",
+                    idempotencyKey: `${flag}-${stamp(testInfo)}`,
+                },
+            },
+        );
+        expect(res.ok(), `switch on ${flag}: ${await res.text()}`).toBe(true);
+    } finally {
+        await context.close();
+    }
 }
