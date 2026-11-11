@@ -599,7 +599,8 @@ describe("/v1 paging", () => {
 describe("/v1 customers", () => {
     it("adds, changes and reads a customer, never with anything sensitive", async () => {
         const org = await business();
-        const key = await secretKey(org);
+        // Even a key that may see sensitive notes gets none through /v1.
+        const key = await secretKey(org, [...FULL_SCOPE, "customer:sensitive"]);
         const made = await call(key, "POST", "/v1/customers", {
             email: `${uniq("meera")}@example.com`,
             firstName: "Meera",
@@ -654,22 +655,45 @@ describe("/v1 customers", () => {
         ).toBe(0);
 
         // What only `customer:sensitive` sees: a medical entry, and a note
-        // on a booking.
+        // on a booking, each carrying a marker that must never come back.
+        const MARKER = `zq-sensitive-${tag}`;
         await prisma.contactAttention.create({
             data: {
                 organizationId: org.id,
                 contactId: id,
                 kind: "MEDICAL",
-                label: "Heart condition SECRET-LABEL",
-                detail: "SECRET-DETAIL",
+                label: `Heart condition ${MARKER}`,
+                detail: MARKER,
                 sensitive: true,
+            },
+        });
+        const svc = await prisma.service.create({
+            data: {
+                organizationId: org.id,
+                name: "Intake",
+                durationMinutes: 30,
+                timezone: "UTC",
+            },
+        });
+        const at = nextStart();
+        await prisma.booking.create({
+            data: {
+                organizationId: org.id,
+                serviceId: svc.id,
+                contactId: id,
+                startAt: at,
+                endAt: new Date(at.getTime() + 30 * 60_000),
+                timezone: "UTC",
+                snapshot: {},
+                intakeNote: `Allergic to latex ${MARKER}`,
             },
         });
         const read = await call(key, "GET", `/v1/customers/${id}`);
         const list = await call(key, "GET", "/v1/customers");
         for (const res of [read, list]) {
             expect(res.status).toBe(200);
-            expect(res.text).not.toMatch(/SECRET|attention|sensitive/i);
+            expect(JSON.stringify(res.body)).not.toContain(MARKER);
+            expect(res.text).not.toMatch(/attention|sensitive/i);
         }
         expect(Object.keys(read.body).sort()).toEqual(
             [

@@ -183,17 +183,20 @@ test(
                 booking: { state: "confirmed" },
             });
 
-            // A publishable key never writes, even from its own origin.
+            // A publishable key never writes, even from its own origin: the
+            // API's own 403, readable here because the origin is listed. A
+            // network or CORS failure is "blocked" and fails the check.
             const write = await page.evaluate(
                 async ({ api, pk }) =>
                     (
                         await fetch(`${api}/v1/storefront/${pk}/services`, {
                             method: "POST",
+                            mode: "cors",
                         }).catch(() => null)
                     )?.status ?? "blocked",
                 { api: urls.API_URL, pk: pk.token },
             );
-            expect([403, "blocked"]).toContain(write);
+            expect(write).toBe(403);
 
             // The booking is in the team's diary.
             await expect

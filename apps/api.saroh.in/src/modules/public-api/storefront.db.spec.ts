@@ -24,11 +24,6 @@ jest.mock("@saroh/auth", () => ({
     },
 }));
 
-import { randomBytes } from "node:crypto";
-import { request as httpRequest } from "node:http";
-
-import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import {
     storefrontBooking,
     storefrontProduct,
@@ -36,326 +31,24 @@ import {
     storefrontServices,
     storefrontSlots,
 } from "@saroh/api-contract";
-import type { ApiKeyKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { z } from "zod";
 
-import { giveBusinessDetails } from "../../../test/business-details";
-import { corsDelegate } from "../../common/cors";
-import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
-import { OriginGuard } from "../../common/guards/origin.guard";
-import { IdempotencyService } from "../../common/idempotency/idempotency.service";
-import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
-import { env } from "../../env";
-import { ApiKeyGuard } from "../api-keys/api-key.guard";
-import { ApiKeysModule } from "../api-keys/api-keys.module";
 import {
-    displayPrefix,
-    mintToken,
-    STOREFRONT_SCOPE,
-    tokenDigest,
-} from "../api-keys/api-keys.service";
-import { keyContextCache } from "../api-keys/key-context.cache";
-import type { EntitlementService } from "../billing/entitlement.service";
-import { PublicBookingsService } from "../bookings/public-bookings.service";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
-import { EnquiryService } from "../enquiry/enquiry.service";
-import { FeatureFlagService } from "../feature-flags/feature-flags.service";
-import { PublicCheckoutService } from "../orders/public-checkout.service";
-import { PaymentsService } from "../payments/payments.service";
-import {
-    FakeMerchantProvider,
-    FakeProviderFactory,
-} from "../payments/providers/fake.provider";
-import { PublicInvoicesService } from "../payments/public-invoices.service";
-import { PublicCatalogueService } from "../products/public-catalogue.service";
-import { CapsService } from "../rate-limits/caps";
-import { LimitsService } from "../rate-limits/limits.service";
-import { SitesService } from "../sites/sites.service";
-import { PublicPlansService } from "../subscriptions/public-plans.service";
-import { StorefrontTokenGuard } from "./storefront-token.guard";
-import { StorefrontTokensService } from "./storefront-tokens.service";
-import {
-    StorefrontController,
-    StorefrontTokensController,
-    StorefrontWriteController,
-} from "./storefront.controller";
-import { StorefrontService } from "./storefront.service";
+    bearer,
+    booking,
+    business,
+    call,
+    exactly,
+    keyFor,
+    mint,
+    nextMonday,
+    SITE,
+    uniq,
+    useStorefrontApp,
+} from "../../../test/fixtures/storefront";
+import { tokenDigest } from "../api-keys/api-keys.service";
 
-const mutableEnv = env as {
-    APIKEY_ENC_KEY?: string;
-    TRUST_PROXY?: string;
-    PAYMENTS_ENC_KEY?: string;
-};
-const before = { ...mutableEnv };
-
-// Fixture cap: an obviously fake number, never a plan's.
-const CAP = 1_000;
-const SITE = "https://shop.example.com";
-const MONDAY = 1;
-
-const tag = `${process.pid}x${Date.now() % 100000}`;
-let seq = 0;
-const uniq = (label: string) => `${label}-${tag}-${++seq}`;
-
-/** The next Monday at `hour`:00 UTC, `weeksOut` weeks on. */
-function nextMonday(hour: number, weeksOut = 1): Date {
-    const d = new Date();
-    d.setUTCHours(0, 0, 0, 0);
-    const ahead = (MONDAY - d.getUTCDay() + 7) % 7 || 7;
-    d.setUTCDate(d.getUTCDate() + ahead + (weeksOut - 1) * 7);
-    d.setUTCHours(hour);
-    return d;
-}
-
-let app: INestApplication;
-let port: number;
-
-beforeAll(async () => {
-    // Throwaway keys for this run only, never values in the repo.
-    mutableEnv.APIKEY_ENC_KEY = randomBytes(32).toString("base64");
-    mutableEnv.PAYMENTS_ENC_KEY = randomBytes(32).toString("hex");
-    mutableEnv.TRUST_PROXY = "cloudflare";
-    const payments = new PaymentsService(
-        new FakeProviderFactory(new FakeMerchantProvider("RAZORPAY")),
-    );
-    const generous = () => new FixedWindowRateLimiter(1_000);
-    const moduleRef = await Test.createTestingModule({
-        imports: [ApiKeysModule],
-        controllers: [
-            StorefrontWriteController,
-            StorefrontController,
-            StorefrontTokensController,
-        ],
-        providers: [
-            IdempotencyService,
-            StorefrontService,
-            StorefrontTokensService,
-            StorefrontTokenGuard,
-            {
-                provide: PublicCatalogueService,
-                useValue: new PublicCatalogueService(generous()),
-            },
-            {
-                provide: PublicBookingsService,
-                useValue: new PublicBookingsService(generous()),
-            },
-            {
-                provide: PublicPlansService,
-                useValue: new PublicPlansService(generous()),
-            },
-            {
-                provide: SitesService,
-                useValue: new SitesService({
-                    check: jest.fn().mockResolvedValue(true),
-                    can: jest.fn().mockResolvedValue(true),
-                    getEntitlements: jest.fn(),
-                } as unknown as EntitlementService),
-            },
-            { provide: EnquiryService, useValue: new EnquiryService() },
-            {
-                provide: PublicInvoicesService,
-                useValue: new PublicInvoicesService(payments),
-            },
-            {
-                provide: PublicCheckoutService,
-                useValue: new PublicCheckoutService(payments),
-            },
-        ],
-    })
-        .overrideProvider(CapsService)
-        .useValue({ rpm: () => Promise.resolve(CAP) })
-        .overrideProvider(LimitsService)
-        .useValue(new LimitsService(null))
-        .overrideProvider(FeatureFlagService)
-        .useValue({ isEnabled: () => Promise.resolve(true) })
-        .compile();
-    app = moduleRef.createNestApplication({ logger: false });
-    const guard = app.get(ApiKeyGuard);
-    app.enableCors(
-        corsDelegate(["https://app.saroh.in"], (t) => guard.allowedOrigins(t)),
-    );
-    app.useGlobalGuards(new OriginGuard());
-    app.useGlobalInterceptors(new OrgRlsInterceptor());
-    app.useGlobalFilters(new AllExceptionsFilter());
-    await app.listen(0, "127.0.0.1");
-    port = (app.getHttpServer().address() as { port: number }).port;
-});
-
-afterAll(async () => {
-    await app?.close();
-    Object.assign(mutableEnv, before);
-});
-
-beforeEach(() => keyContextCache.clear());
-
-type Answer = {
-    status: number;
-    headers: Record<string, string | string[] | undefined>;
-    body: { error?: { code?: string } } & Record<string, unknown>;
-};
-
-function call(
-    method: string,
-    path: string,
-    headers: Record<string, string> = {},
-    body?: unknown,
-): Promise<Answer> {
-    const payload = body === undefined ? undefined : JSON.stringify(body);
-    return new Promise((resolve, reject) => {
-        const req = httpRequest(
-            {
-                host: "127.0.0.1",
-                port,
-                method,
-                path,
-                headers: {
-                    ...(payload ? { "content-type": "application/json" } : {}),
-                    ...headers,
-                },
-            },
-            (res) => {
-                let text = "";
-                res.on("data", (c: Buffer) => (text += c.toString()));
-                res.on("end", () =>
-                    resolve({
-                        status: res.statusCode ?? 0,
-                        headers: res.headers,
-                        body: text ? JSON.parse(text) : {},
-                    }),
-                );
-            },
-        );
-        req.on("error", reject);
-        if (payload) req.write(payload);
-        req.end();
-    });
-}
-
-/** A business with a published site at `<address>.saroh.app` and one free, one-hour service on Monday mornings. */
-async function business(name: string) {
-    const org = await prisma.organization.create({
-        data: { name, slug: uniq("u7-org") },
-    });
-    const user = await prisma.user.create({
-        data: { email: `${uniq("owner")}@example.com`, name: "Owner" },
-    });
-    await prisma.membership.create({
-        data: { organizationId: org.id, userId: user.id, role: "OWNER" },
-    });
-    await prisma.businessProfile.create({
-        data: { organizationId: org.id, timezone: "UTC" },
-    });
-    await giveBusinessDetails(org.id);
-    const address = uniq("u7");
-    const site = await prisma.site.create({
-        data: {
-            organizationId: org.id,
-            name,
-            slug: uniq("u7-site"),
-            subdomain: address,
-        },
-    });
-    const publication = await prisma.publication.create({
-        data: {
-            siteId: site.id,
-            organizationId: org.id,
-            snapshot: {},
-            templateId: "blank",
-            templateVersion: 1,
-        },
-    });
-    await prisma.site.update({
-        where: { id: site.id },
-        data: { currentPublicationId: publication.id },
-    });
-    const service = await prisma.service.create({
-        data: {
-            organizationId: org.id,
-            name: "Consultation",
-            durationMinutes: 60,
-            capacity: 1,
-            timezone: "UTC",
-            availabilityRules: {
-                create: {
-                    organizationId: org.id,
-                    dayOfWeek: MONDAY,
-                    startMinute: 6 * 60,
-                    endMinute: 9 * 60,
-                },
-            },
-        },
-    });
-    return { id: org.id, owner: user.id, address, serviceId: service.id };
-}
-
-async function keyFor(
-    org: { id: string; owner: string },
-    kind: ApiKeyKind,
-    scope?: string[],
-) {
-    const token = mintToken(kind);
-    const row = await prisma.apiKey.create({
-        data: {
-            organizationId: org.id,
-            createdByUserId: org.owner,
-            kind,
-            edition: "INDIA",
-            name: "Fixture key",
-            prefix: displayPrefix(token),
-            tokenDigest: tokenDigest(token),
-            scope:
-                kind === "SECRET"
-                    ? (scope ?? ["storefront:mint"])
-                    : [...STOREFRONT_SCOPE],
-            allowedOrigins: kind === "SECRET" ? [] : [SITE],
-        },
-    });
-    return { token, id: row.id };
-}
-
-/** A real answer is exactly its contract schema: parsing drops nothing (review #2). */
-function exactly(schema: z.ZodType, body: unknown) {
-    expect(schema.parse(body)).toEqual(body);
-}
-
-const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
-
-/**
- * A storefront token minted over HTTP, as a business's server would, for
- * the visitor it knows by `email` (none: an enquiries-only token).
- */
-async function mint(
-    org: { id: string; owner: string },
-    email: string | null = "asha@example.com",
-) {
-    const pk = await keyFor(org, "PUBLISHABLE");
-    const sk = await keyFor(org, "SECRET");
-    const minted = await call(
-        "POST",
-        "/v1/storefront-tokens",
-        bearer(sk.token),
-        {
-            publishableKeyId: pk.id,
-            ...(email ? { visitor: { email } } : {}),
-        },
-    );
-    expect(minted.status).toBe(201);
-    return { pk, sk, token: minted.body.token as string, minted };
-}
-
-function booking(
-    serviceId: string,
-    startAt: Date,
-    email: string | undefined = "asha@example.com",
-) {
-    return {
-        serviceId,
-        startAt: startAt.toISOString(),
-        name: "Asha Rao",
-        email,
-    };
-}
+useStorefrontApp();
 
 describe("storefront reads (publishable key)", () => {
     it("lists the services with each one's hosted booking link", async () => {
@@ -507,6 +200,9 @@ describe("storefront reads (publishable key)", () => {
             );
             expect(answer.status).toBe(403);
             expect(answer.body.error?.code).toBe("forbidden");
+            // Readable from the listed origin: the browser test expects
+            // exactly this 403, not a CORS failure.
+            expect(answer.headers["access-control-allow-origin"]).toBe(SITE);
         }
         // An unknown read is a 404, not a hole.
         expect(
@@ -869,5 +565,62 @@ describe("storefront writes (storefront token)", () => {
         );
         expect(answer.status).toBe(400);
         expect(answer.body.error?.code).toBe("invalid_request");
+    });
+
+    it("refuses a write body with a field it doesn't know: 400, nothing written", async () => {
+        const org = await business("Rye");
+        const { token } = await mint(org);
+        const form = await prisma.form.create({
+            data: { organizationId: org.id, name: "Contact", fields: [] },
+        });
+        const extra = { isAdmin: true };
+        for (const [path, body] of [
+            [
+                "bookings",
+                { ...booking(org.serviceId, nextMonday(6)), ...extra },
+            ],
+            [
+                "holds",
+                {
+                    ...booking(org.serviceId, nextMonday(6)),
+                    pay: "now",
+                    ...extra,
+                },
+            ],
+            [
+                "holds/release",
+                { holdToken: "a-hold-token-that-is-long", ...extra },
+            ],
+            ["payments", { holdToken: "a-hold-token-that-is-long", ...extra }],
+            [
+                "orders",
+                {
+                    name: "Asha Rao",
+                    lines: [{ productId: "product_1", quantity: 1 }],
+                    fulfilment: "pickup",
+                    payment: "on_handover",
+                    ...extra,
+                },
+            ],
+            [`forms/${form.id}/submissions`, { data: {}, ...extra }],
+        ] as const) {
+            const answer = await call(
+                "POST",
+                `/v1/storefront/write/${path}`,
+                bearer(token),
+                body,
+            );
+            expect({ path, status: answer.status }).toEqual({
+                path,
+                status: 400,
+            });
+            expect(answer.body.error?.code).toBe("invalid_request");
+        }
+        expect(
+            await prisma.booking.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.order.count({ where: { organizationId: org.id } }),
+        ).toBe(0);
     });
 });
