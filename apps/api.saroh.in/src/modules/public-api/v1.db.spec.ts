@@ -29,7 +29,18 @@ import { request as httpRequest } from "node:http";
 
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import {
+    bookingView,
+    cancelledBookingView,
+    customerView,
+    enquiryView,
+    orderView,
+    page,
+    productView,
+    serviceView,
+} from "@saroh/api-contract";
 import { prisma } from "@saroh/database";
+import type { z } from "zod";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
@@ -295,19 +306,27 @@ const loaf = (name = "Sourdough", amountMinor = 18_000) => ({
     price: { amountMinor, currency: "INR" },
 });
 
+/** A real answer is exactly its contract schema: parsing drops nothing (review #2). */
+function exactly(schema: z.ZodType, body: unknown) {
+    expect(schema.parse(body)).toEqual(body);
+}
+
 describe("/v1 catalogue", () => {
     it("creates a product, then lists and reads it", async () => {
         const org = await business();
         const key = await secretKey(org);
         const made = await call(key, "POST", "/v1/products", loaf());
         expect(made.status).toBe(201);
+        exactly(productView, made.body);
         expect(made.body).toMatchObject({
             name: "Sourdough",
+            status: "draft",
             price: { amountMinor: 18_000, currency: "INR" },
             variants: [],
         });
         const list = await call(key, "GET", "/v1/products");
         expect(list.status).toBe(200);
+        exactly(page(productView), list.body);
         expect((list.body.data as { id: string }[]).map((p) => p.id)).toContain(
             made.body.id,
         );
@@ -455,10 +474,31 @@ describe("/v1 catalogue", () => {
             price: { amountMinor: 50_000, currency: "INR" },
         });
         expect(made.status).toBe(201);
+        exactly(serviceView, made.body);
         expect(made.body).toMatchObject({
             name: "Haircut",
             price: { amountMinor: 50_000, currency: "INR" },
+            timezone: "UTC",
+            status: "active",
         });
+        // What it takes it answers, and null clears what can be cleared.
+        const patched = await call(
+            key,
+            "PATCH",
+            `/v1/services/${String(made.body.id)}`,
+            { description: "Wash and cut", timezone: "Asia/Kolkata" },
+        );
+        expect(patched.body).toMatchObject({
+            description: "Wash and cut",
+            timezone: "Asia/Kolkata",
+        });
+        const cleared = await call(
+            key,
+            "PATCH",
+            `/v1/services/${String(made.body.id)}`,
+            { description: null },
+        );
+        expect(cleared.body.description).toBeNull();
         const windows = [{ dayOfWeek: 1, startMinute: 540, endMinute: 1080 }];
         const hours = await call(
             key,
@@ -563,19 +603,55 @@ describe("/v1 customers", () => {
         const made = await call(key, "POST", "/v1/customers", {
             email: `${uniq("meera")}@example.com`,
             firstName: "Meera",
+            company: "Meera Bakes",
+            address: {
+                line1: "14, 2nd Cross",
+                city: "Bengaluru",
+                country: "IN",
+            },
         });
         expect(made.status).toBe(201);
+        exactly(customerView, made.body);
+        expect(made.body.address).toEqual({
+            line1: "14, 2nd Cross",
+            line2: null,
+            city: "Bengaluru",
+            state: null,
+            postalCode: null,
+            country: "IN",
+        });
         const id = String(made.body.id);
+        // What it answers, it takes back: the nested address, null to clear.
         const changed = await call(key, "PATCH", `/v1/customers/${id}`, {
             phone: "+91 98450 00000",
-            city: "Bengaluru",
+            company: null,
+            address: { postalCode: "560038" },
         });
         expect(changed.status).toBe(200);
         expect(changed.body).toMatchObject({
             firstName: "Meera",
             phone: "+91 98450 00000",
-            address: expect.objectContaining({ city: "Bengaluru" }),
+            company: null,
+            address: expect.objectContaining({
+                city: "Bengaluru",
+                postalCode: "560038",
+            }),
         });
+        const moved = await call(key, "PATCH", `/v1/customers/${id}`, {
+            address: null,
+        });
+        expect(moved.body.address).toBeNull();
+        // A bad address makes no customer.
+        const bad = await call(key, "POST", "/v1/customers", {
+            email: `${uniq("bad")}@example.com`,
+            address: { city: "Pune", state: "Narnia", country: "IN" },
+        });
+        expect(bad.status).toBe(400);
+        expect(
+            await prisma.contact.count({
+                where: { organizationId: org.id, city: "Pune" },
+            }),
+        ).toBe(0);
 
         // What only `customer:sensitive` sees: a medical entry, and a note
         // on a booking.
@@ -706,9 +782,11 @@ describe("/v1 bookings", () => {
             bookerEmail: `${uniq("asha")}@example.com`,
         });
         expect(made.status).toBe(201);
+        exactly(bookingView, made.body);
         expect(made.body).toMatchObject({
             serviceId: service,
-            status: "CONFIRMED",
+            status: "confirmed",
+            outcome: null,
         });
         expect(made.text).not.toContain("intakeNote");
         const to = nextStart().toISOString();
@@ -728,6 +806,17 @@ describe("/v1 bookings", () => {
         expect((list.body.data as { id: string }[]).map((b) => b.id)).toContain(
             made.body.id,
         );
+        const confirmed = await call(
+            key,
+            "GET",
+            `/v1/bookings?serviceId=${service}&status=confirmed`,
+        );
+        expect(
+            (confirmed.body.data as { id: string }[]).map((b) => b.id),
+        ).toContain(made.body.id);
+        expect(
+            (await call(key, "GET", "/v1/bookings?status=CONFIRMED")).status,
+        ).toBe(400);
     });
 
     it("cancels a paid booking under the policy: one refund, and a second cancel changes nothing", async () => {
@@ -745,8 +834,9 @@ describe("/v1 bookings", () => {
             headers,
         );
         expect(first.status).toBe(200);
+        exactly(cancelledBookingView, first.body);
         expect(first.body).toMatchObject({
-            status: "CANCELLED",
+            status: "cancelled",
             money: {
                 // Cancelled in time: the deposit (half of ₹800) goes back.
                 refund: { amount: { amountMinor: 40_000, currency: "INR" } },
@@ -769,7 +859,7 @@ describe("/v1 bookings", () => {
             `/v1/bookings/${bookingId}/cancel`,
         );
         expect(again.status).toBe(200);
-        expect(again.body).toMatchObject({ status: "CANCELLED" });
+        expect(again.body).toMatchObject({ status: "cancelled" });
         expect(await refunds()).toBe(1);
     });
 });
@@ -786,9 +876,12 @@ describe("/v1 orders", () => {
             customer: { email: `${uniq("ravi")}@example.com`, name: "Ravi" },
         });
         expect(made.status).toBe(201);
+        exactly(orderView, made.body);
         expect(made.body).toMatchObject({
-            status: "PENDING",
-            paymentStatus: "UNPAID",
+            status: "pending",
+            paymentStatus: "unpaid",
+            stage: "new",
+            fulfilment: "pickup",
             storefrontId: org.storeId,
             items: [
                 expect.objectContaining({
@@ -800,10 +893,10 @@ describe("/v1 orders", () => {
         });
         const id = String(made.body.id);
         const moved = await call(key, "POST", `/v1/orders/${id}/status`, {
-            status: "PROCESSING",
+            status: "processing",
         });
         expect(moved.status).toBe(200);
-        expect(moved.body.status).toBe("PROCESSING");
+        expect(moved.body.status).toBe("processing");
         expect((await call(key, "GET", `/v1/orders/${id}`)).body).toEqual(
             moved.body,
         );
@@ -815,7 +908,7 @@ describe("/v1 orders", () => {
             "POST",
             `/v1/orders/${id}/status`,
             {
-                status: "CANCELLED",
+                status: "cancelled",
             },
         );
         expect(refused.status).toBe(403);
@@ -868,10 +961,12 @@ describe("/v1 enquiries", () => {
             },
         });
         const enquiries = await call(key, "GET", "/v1/enquiries");
+        exactly(page(enquiryView), enquiries.body);
         expect(enquiries.body.data).toEqual([
             expect.objectContaining({
                 id: lead.id,
-                stage: "New",
+                status: "open",
+                stage: { id: pipeline.stages[0]?.id, name: "New" },
                 customerId: contact.id,
             }),
         ]);

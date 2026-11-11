@@ -1,17 +1,20 @@
 import { z } from "zod";
 
-import { id, page, pageQuery } from "../common";
+import { id, openEnum, page, pageQuery } from "../common";
 import { defineRoute } from "../openapi";
 import { idParam, timestamp } from "./shared";
 
 /** Enquiries and form entries on `/v1` (plan 2026-11-10-001, U8): read only. */
 
+export const ENQUIRY_STATUSES = ["open", "won", "lost"] as const;
+
 export const enquiryView = z
     .object({
         id,
         title: z.string(),
-        status: z.string(),
-        stage: z.string(),
+        status: openEnum(ENQUIRY_STATUSES, "Whether it is still open"),
+        /** The business's own pipeline step: its id stays, its name is the business's to change. */
+        stage: z.object({ id, name: z.string() }),
         customerId: id,
         formId: id.nullable(),
         createdAt: timestamp,

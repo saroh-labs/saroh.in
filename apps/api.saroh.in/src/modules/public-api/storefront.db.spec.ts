@@ -29,13 +29,22 @@ import { request as httpRequest } from "node:http";
 
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import {
+    storefrontBooking,
+    storefrontProduct,
+    storefrontProducts,
+    storefrontServices,
+    storefrontSlots,
+} from "@saroh/api-contract";
 import type { ApiKeyKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { z } from "zod";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import { corsDelegate } from "../../common/cors";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OriginGuard } from "../../common/guards/origin.guard";
+import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { env } from "../../env";
 import { ApiKeyGuard } from "../api-keys/api-key.guard";
@@ -119,6 +128,7 @@ beforeAll(async () => {
             StorefrontTokensController,
         ],
         providers: [
+            IdempotencyService,
             StorefrontService,
             StorefrontTokensService,
             StorefrontTokenGuard,
@@ -304,6 +314,11 @@ async function keyFor(
     return { token, id: row.id };
 }
 
+/** A real answer is exactly its contract schema: parsing drops nothing (review #2). */
+function exactly(schema: z.ZodType, body: unknown) {
+    expect(schema.parse(body)).toEqual(body);
+}
+
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 /**
@@ -351,13 +366,17 @@ describe("storefront reads (publishable key)", () => {
         });
         expect(read.status).toBe(200);
         expect(read.headers["cache-control"]).toMatch(/max-age=30/);
-        expect(read.body.data).toEqual([
-            expect.objectContaining({
-                id: org.serviceId,
-                name: "Consultation",
-                hostedUrl: `https://${org.address}.saroh.app/book?service=${org.serviceId}`,
-            }),
-        ]);
+        exactly(storefrontServices, read.body);
+        expect(read.body).toEqual({
+            data: [
+                expect.objectContaining({
+                    id: org.serviceId,
+                    name: "Consultation",
+                    hostedUrl: `https://${org.address}.saroh.app/book?service=${org.serviceId}`,
+                }),
+            ],
+            nextCursor: null,
+        });
     });
 
     it("lists the shop's products with their hosted pages; an unpublished product is 404", async () => {
@@ -408,20 +427,31 @@ describe("storefront reads (publishable key)", () => {
         }
         const pk = await keyFor(org, "PUBLISHABLE");
         const shop = `https://${org.address}.saroh.app/shop`;
+        const sourdough = await prisma.product.findFirstOrThrow({
+            where: { organizationId: org.id, slug: "sourdough" },
+        });
         const list = await call("GET", `/v1/storefront/${pk.token}/products`);
         expect(list.status).toBe(200);
-        expect(list.body.products).toEqual([
+        exactly(storefrontProducts, list.body);
+        expect(list.body.data).toEqual([
             expect.objectContaining({
+                id: sourdough.id,
                 slug: "sourdough",
+                price: { amountMinor: 30_000, currency: "INR" },
                 hostedUrl: `${shop}/sourdough`,
             }),
         ]);
+        expect(list.body.nextCursor).toBeNull();
         const one = await call(
             "GET",
             `/v1/storefront/${pk.token}/products/sourdough`,
         );
         expect(one.status).toBe(200);
-        expect(one.body.hostedUrl).toBe(`${shop}/sourdough`);
+        exactly(storefrontProduct, one.body);
+        expect(one.body).toMatchObject({
+            id: sourdough.id,
+            hostedUrl: `${shop}/sourdough`,
+        });
         expect(
             (
                 await call(
@@ -444,7 +474,20 @@ describe("storefront reads (publishable key)", () => {
             `/v1/storefront/${pk.token}/services/${a.serviceId}/availability?${q}`,
         );
         expect(own.status).toBe(200);
-        expect((own.body.data as unknown[]).length).toBeGreaterThan(0);
+        exactly(storefrontSlots, own.body);
+        expect((own.body.data as unknown[]).length).toBeGreaterThan(1);
+        // One at a time, the next page starting after the first.
+        const first = await call(
+            "GET",
+            `/v1/storefront/${pk.token}/services/${a.serviceId}/availability?${q}&limit=1`,
+        );
+        const data = own.body.data as { startAt: string }[];
+        expect(first.body.data).toEqual([data[0]]);
+        const second = await call(
+            "GET",
+            `/v1/storefront/${pk.token}/services/${a.serviceId}/availability?${q}&limit=1&cursor=${String(first.body.nextCursor)}`,
+        );
+        expect(second.body.data).toEqual([data[1]]);
         const theirs = await call(
             "GET",
             `/v1/storefront/${pk.token}/services/${b.serviceId}/availability?${q}`,
@@ -549,9 +592,10 @@ describe("storefront writes (storefront token)", () => {
             booking(org.serviceId, startAt),
         );
         expect(booked.status).toBe(201);
+        exactly(storefrontBooking, booked.body);
         expect(booked.body).toMatchObject({
             serviceName: "Consultation",
-            state: "CONFIRMED",
+            state: "confirmed",
             holdToken: null,
         });
         expect(booked.headers["access-control-allow-origin"]).toBe(SITE);
@@ -585,10 +629,9 @@ describe("storefront writes (storefront token)", () => {
         const order = {
             name: "Ravi",
             email: "ravi@example.com",
-            lines: [{ listingId: "listing_1", quantity: 1 }],
-            fulfilment: "PICKUP",
-            payment: "ON_HANDOVER",
-            idempotencyKey: "order-key-mismatch",
+            lines: [{ productId: "product_1", quantity: 1 }],
+            fulfilment: "pickup",
+            payment: "on_handover",
         };
         for (const [path, body] of [
             [
@@ -763,9 +806,8 @@ describe("storefront writes (storefront token)", () => {
             {
                 name: "Asha Rao",
                 email: "asha@example.com",
-                lines: [{ listingId: "listing_1", quantity: 1 }],
-                fulfilment: "PICKUP",
-                idempotencyKey: "order-key-1",
+                lines: [{ productId: "product_1", quantity: 1 }],
+                fulfilment: "pickup",
             },
         );
         expect(order.status).toBe(409);
@@ -773,6 +815,47 @@ describe("storefront writes (storefront token)", () => {
         expect(
             await prisma.booking.count({ where: { organizationId: org.id } }),
         ).toBe(0);
+    });
+
+    it("books once for one Idempotency-Key, per token; another request with it is a 409", async () => {
+        const org = await business("Pulse Fitness");
+        const { token } = await mint(org);
+        const headers = { ...bearer(token), "idempotency-key": uniq("sf") };
+        const body = booking(org.serviceId, nextMonday(6));
+        const first = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            headers,
+            body,
+        );
+        expect(first.status).toBe(201);
+        const again = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            headers,
+            body,
+        );
+        expect(again.status).toBe(201);
+        expect(again.body).toEqual(first.body);
+        expect(
+            await prisma.booking.count({ where: { organizationId: org.id } }),
+        ).toBe(1);
+        const different = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            headers,
+            booking(org.serviceId, nextMonday(7)),
+        );
+        expect(different.status).toBe(409);
+        expect(different.body.error?.code).toBe("conflict");
+        // The body field is gone: one way to say it, the header.
+        const old = await call(
+            "POST",
+            "/v1/storefront/write/bookings",
+            bearer(token),
+            { ...body, idempotencyKey: "old-style-key" },
+        );
+        expect(old.status).toBe(400);
     });
 
     it("refuses a bad body with 400 invalid_request", async () => {

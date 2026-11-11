@@ -27,6 +27,7 @@ jest.mock("../../env", () => {
 import type { INestApplication } from "@nestjs/common";
 import { ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { storefrontOrder } from "@saroh/api-contract";
 import type { Job, StorefrontToken } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 import { createHmac } from "node:crypto";
@@ -2108,9 +2109,9 @@ describe("a storefront API guest's order (U7 review)", () => {
             token,
             {
                 name: "Someone Else",
-                lines: [{ listingId: s.listingId, quantity: 1 }],
-                fulfilment: "LOCAL_DELIVERY",
-                payment: "ONLINE",
+                lines: [{ productId: s.productId, quantity: 1 }],
+                fulfilment: "local_delivery",
+                payment: "online",
                 address: {
                     name: "Someone Else",
                     phone: "9800000001",
@@ -2119,10 +2120,6 @@ describe("a storefront API guest's order (U7 review)", () => {
                     state: "Karnataka",
                     postalCode: "560038",
                 },
-                idempotencyKey: `guest_${next()}`.replace(
-                    /[^A-Za-z0-9_-]/g,
-                    "_",
-                ),
             },
             `guest-${next()}`,
         );
@@ -2154,7 +2151,12 @@ describe("a storefront API guest's order (U7 review)", () => {
         });
 
         const placed = await guestOrder(s, tokenFor(email));
-        expect(placed.payBy).toBe("ONLINE");
+        // The real answer is exactly the contract's (review #2, #5).
+        expect(storefrontOrder.parse(placed)).toEqual(placed);
+        expect(placed).toMatchObject({
+            payBy: "online",
+            payment: { provider: "razorpay" },
+        });
 
         const after = await prisma.order.findMany({
             where: { id: { in: [mine.body.orderId as string, handover.id] } },
@@ -2183,17 +2185,17 @@ describe("a storefront API guest's order (U7 review)", () => {
         const byId = new Map(
             (
                 await prisma.order.findMany({
-                    where: { id: { in: [a.orderId, b.orderId, c.orderId] } },
+                    where: { id: { in: [a.id, b.id, c.id] } },
                     select: { id: true, status: true, storefrontTokenId: true },
                 })
             ).map((o) => [o.id, o]),
         );
-        expect(byId.get(a.orderId)?.status).toBe("CANCELLED");
-        expect(byId.get(b.orderId)).toMatchObject({
+        expect(byId.get(a.id)?.status).toBe("CANCELLED");
+        expect(byId.get(b.id)).toMatchObject({
             status: "PENDING",
             storefrontTokenId: first.id,
         });
-        expect(byId.get(c.orderId)?.status).toBe("PENDING");
+        expect(byId.get(c.id)?.status).toBe("PENDING");
         // Made for the guest with what they gave.
         expect(
             await prisma.contact.findFirstOrThrow({

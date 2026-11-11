@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import { id } from "./common";
+import { id, money, openEnum, page, pageQuery } from "./common";
 import { defineRoute } from "./openapi";
+import { planInterval } from "./v1/catalogue";
 
 /**
  * The storefront surface (plan 2026-11-10-001, U7), served under
@@ -11,13 +12,38 @@ import { defineRoute } from "./openapi";
  * business comes from the key or the token; no route names a site or a
  * business.
  *
- * Answers are the same objects the business's own Saroh site reads, so
- * each item schema names the fields a client can rely on and lets the
- * rest through.
+ * Every answer is an explicit list of fields, mapped one by one from what
+ * the business's own Saroh site reads, so nothing else is published by
+ * accident. Money, ids and names are /v1's; lists are /v1's page.
  */
 
 export const PUBLISHABLE_KEY_PATTERN = /^pk_(?:live|test)_[0-9A-Za-z]{43}$/;
 export const STOREFRONT_TOKEN_PATTERN = /^st_(?:live|test)_[0-9A-Za-z]{43}$/;
+
+/** How a storefront order is paid: online now, or at handover. */
+export const PAY_BY = ["online", "on_handover"] as const;
+/** How much a hold is paid online: the whole price, or the deposit. */
+export const HOLD_PAY = ["now", "deposit"] as const;
+/** Where a visitor's booking stands. */
+export const BOOKING_STATES = [
+    "held",
+    "confirmed",
+    "released",
+    "cancelled",
+] as const;
+/** The business's own payment provider, whose checkout takes `clientParams`. */
+export const PAYMENT_PROVIDERS = [
+    "stripe",
+    "razorpay",
+    "cashfree",
+    "dodo",
+] as const;
+/** The ways a storefront order can leave (a subset of /v1's `fulfilment`). */
+export const STOREFRONT_FULFILMENTS = [
+    "pickup",
+    "local_delivery",
+    "shipping",
+] as const;
 
 const keyParams = z.object({
     key: z
@@ -38,79 +64,94 @@ const hostedUrl = z
         "Saroh's page for it on the business's site (its own domain, else saroh.app); null without a published site",
     );
 
-const productCard = z.looseObject({
+const image = z.object({ url: z.string(), alt: z.string() });
+
+const productCard = z.object({
+    id,
     slug: z.string(),
     name: z.string(),
+    price: money.describe("The lowest price it is offered at"),
+    priceFrom: z
+        .boolean()
+        .describe("True when its options sell at different prices"),
+    image: image.nullable(),
+    soldOut: z.boolean(),
     hostedUrl,
 });
 
-export const storefrontProducts = z
-    .looseObject({
-        storefront: z.object({ name: z.string() }),
-        products: z.array(productCard),
-    })
+export const storefrontProducts = page(productCard)
+    .extend({ storefront: z.object({ name: z.string() }) })
     .describe("Products");
 
 export const storefrontProduct = z
-    .looseObject({
-        productId: id,
+    .object({
+        id,
         slug: z.string(),
-        listingId: id,
         name: z.string(),
-        currency: z.string(),
-        price: z.string().describe("A decimal string, e.g. 1200.00"),
+        description: z.string().nullable(),
+        price: money,
+        images: z.array(
+            image.extend({
+                kind: openEnum(["photo", "video"], "What it is"),
+            }),
+        ),
+        variants: z.array(
+            z.object({
+                id,
+                title: z.string(),
+                price: money.nullable().describe("Null: the product's price"),
+                soldOut: z.boolean(),
+            }),
+        ),
         hostedUrl,
     })
     .describe("Product");
 
-export const storefrontStock = z
-    .object({
-        items: z.array(
-            z.looseObject({
-                slug: z.string(),
-                listingId: id,
-                variantId: id.nullable(),
-                left: z.number().int().nullable(),
-                soldOut: z.boolean(),
-            }),
-        ),
-    })
-    .describe("Stock");
+export const storefrontStock = page(
+    z.object({
+        productId: id,
+        variantId: id
+            .nullable()
+            .describe("The option Add to bag adds; null without options"),
+        left: z
+            .number()
+            .int()
+            .nullable()
+            .describe("How many are left, when only a few are; else null"),
+        soldOut: z.boolean(),
+    }),
+).describe("Stock");
 
-const service = z.looseObject({
-    id,
-    name: z.string(),
-    durationMinutes: z.number().int(),
-    priceCents: z.number().int().nullable(),
-    currency: z.string().nullable(),
-    hostedUrl,
-});
-
-export const storefrontServices = z
-    .object({ data: z.array(service) })
-    .describe("Services");
+export const storefrontServices = page(
+    z.object({
+        id,
+        name: z.string(),
+        description: z.string().nullable(),
+        durationMinutes: z.number().int(),
+        price: money.nullable(),
+        hostedUrl,
+    }),
+).describe("Services");
 
 const serviceParams = keyParams.extend({ serviceId: id });
 
-export const availabilityQuery = z.strictObject({
+export const availabilityQuery = pageQuery.extend({
     from: z.iso.datetime({ offset: true }),
     to: z.iso.datetime({ offset: true }),
     staffId: id.optional(),
 });
 export type AvailabilityQuery = z.infer<typeof availabilityQuery>;
 
-export const storefrontSlots = z
-    .object({
-        data: z.array(
-            z.looseObject({
-                startAt: z.string(),
-                endAt: z.string(),
-                staffIds: z.array(id).optional(),
-                placesLeft: z.number().int().optional(),
-            }),
-        ),
-    })
-    .describe("Open slots");
+export const storefrontSlots = page(
+    z.object({
+        startAt: z.string(),
+        endAt: z.string(),
+        /** Who is free then; empty for a service with no people of its own. */
+        staffIds: z.array(id),
+        /** A class's places still open; null for a one-to-one. */
+        placesLeft: z.number().int().nullable(),
+    }),
+).describe("Open slots");
 
 export const daysQuery = z.strictObject({
     skip: z.coerce.number().int().min(0).max(70).optional(),
@@ -119,48 +160,71 @@ export const daysQuery = z.strictObject({
 export type DaysQuery = z.infer<typeof daysQuery>;
 
 export const storefrontDays = z
-    .looseObject({
+    .object({
         timezone: z.string(),
-        kind: z.enum(["one", "class"]),
+        kind: openEnum(["one", "class"], "One-to-one, or a class"),
         capacity: z.number().int(),
-        days: z.array(z.looseObject({})),
+        days: z.array(
+            z.object({
+                /** YYYY-MM-DD in the business's time zone. */
+                date: z.string(),
+                open: z.boolean(),
+                /** The business itself is closed that day. */
+                closed: z.boolean(),
+                starts: z.array(
+                    z.object({
+                        startAt: z.string(),
+                        endAt: z.string(),
+                        staffId: id.nullable(),
+                        placesLeft: z.number().int().nullable(),
+                    }),
+                ),
+            }),
+        ),
         staff: z.array(z.object({ id, name: z.string() })),
     })
     .describe("Days");
 
-export const storefrontStaff = z
-    .object({ data: z.array(z.object({ id, name: z.string() })) })
-    .describe("Staff");
+export const storefrontStaff = page(
+    z.object({ id, name: z.string() }),
+).describe("Staff");
 
-export const storefrontPosts = z
-    .object({ posts: z.array(z.unknown()) })
-    .describe("Posts");
+const postCard = z.object({
+    slug: z.string(),
+    title: z.string(),
+    excerpt: z.string().nullable(),
+    /** The cover photo's address, or null. */
+    image: z.string().nullable(),
+    category: z.object({ name: z.string(), slug: z.string() }).nullable(),
+    author: z.string().nullable(),
+    publishedAt: z.string(),
+    hostedUrl,
+});
 
-export const storefrontPost = z
-    .looseObject({ snapshot: z.unknown(), publishedAt: z.unknown() })
+export const storefrontPosts = page(postCard).describe("Posts");
+
+export const storefrontPost = postCard
+    .extend({ content: z.string().describe("The post, as sanitised HTML") })
     .describe("Post");
 
-export const storefrontPlans = z
-    .looseObject({
-        plans: z.array(
-            z.looseObject({
-                id,
-                name: z.string(),
-                price: z.string(),
-                currency: z.string(),
-                interval: z.string(),
-                hostedUrl,
-            }),
-        ),
-        payOnline: z.boolean(),
+export const storefrontPlans = page(
+    z.object({
+        id,
+        name: z.string(),
+        description: z.string().nullable(),
+        price: money,
+        interval: planInterval,
+        hostedUrl,
+    }),
+)
+    .extend({
+        payOnline: z
+            .boolean()
+            .describe("Whether someone signed in can join and pay online now"),
     })
     .describe("Plans");
 
 // — Writes, with a storefront token ————————————————————————————————
-
-const idempotencyKey = z
-    .string()
-    .regex(/^[A-Za-z0-9_-]{8,64}$/, "8 to 64 letters, digits, - or _");
 
 const booker = {
     name: z.string().trim().min(1).max(120),
@@ -179,13 +243,12 @@ export const bookBody = z.strictObject({
     startAt: z.iso.datetime({ offset: true }),
     ...booker,
     staffId: id.optional(),
-    idempotencyKey: idempotencyKey.optional(),
 });
 export type BookBody = z.infer<typeof bookBody>;
 
 export const holdBody = bookBody.extend({
     /** The whole price now, or the service's deposit. */
-    pay: z.enum(["NOW", "DEPOSIT"]).default("NOW"),
+    pay: z.enum(HOLD_PAY).default("now"),
 });
 export type HoldBody = z.infer<typeof holdBody>;
 
@@ -195,12 +258,12 @@ export const holdTokenBody = z.strictObject({
 export type HoldTokenBody = z.infer<typeof holdTokenBody>;
 
 export const storefrontBooking = z
-    .looseObject({
-        reference: z.string(),
+    .object({
+        id,
+        serviceName: z.string(),
         startAt: z.string(),
         endAt: z.string(),
-        serviceName: z.string(),
-        state: z.string(),
+        state: openEnum(BOOKING_STATES, "Where the booking stands"),
         holdExpiresAt: z.string().nullable(),
         holdToken: z
             .string()
@@ -210,22 +273,32 @@ export const storefrontBooking = z
             ),
     })
     .describe("Booking");
-
-export const storefrontHold = z
-    .looseObject({
-        state: z.string(),
-        holdExpiresAt: z.string().nullable(),
-        booking: z.looseObject({ reference: z.string() }),
-    })
-    .describe("Hold");
+export type StorefrontBookingView = z.infer<typeof storefrontBooking>;
 
 /** The provider's checkout data, as its own page or widget takes it. */
 export const storefrontPayment = z
-    .looseObject({ provider: z.string().optional() })
+    .object({
+        id,
+        provider: openEnum(
+            PAYMENT_PROVIDERS,
+            "The business's payment provider",
+        ),
+        amount: money,
+        publicKey: z
+            .string()
+            .nullable()
+            .describe(
+                "The provider's public key for its checkout, if it takes one",
+            ),
+        clientParams: z
+            .record(z.string(), z.unknown())
+            .describe("What the provider's own checkout takes, as it names it"),
+    })
     .describe("Payment");
+export type StorefrontPaymentView = z.infer<typeof storefrontPayment>;
 
 const bagLine = z.strictObject({
-    listingId: id,
+    productId: id,
     variantId: id.nullable().optional(),
     quantity: z.number().int().min(1).max(99),
 });
@@ -244,37 +317,35 @@ const address = z.strictObject({
 export const orderBody = z.strictObject({
     ...booker,
     lines: z.array(bagLine).min(1).max(30),
-    fulfilment: z.enum(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]),
-    payment: z.enum(["ONLINE", "ON_HANDOVER"]).default("ONLINE"),
+    fulfilment: z.enum(STOREFRONT_FULFILMENTS),
+    payment: z.enum(PAY_BY).default("online"),
     address: address.optional(),
     notes: z.string().max(500).nullable().optional(),
     discountCode: z.string().trim().max(32).nullable().optional(),
-    /** One order per key: the same key again answers the same order. */
-    idempotencyKey,
     /** Where the provider sends the customer back to, on the business's site. */
     returnPath: z.string().max(2048).optional(),
 });
 export type OrderBody = z.infer<typeof orderBody>;
 
 export const storefrontOrder = z
-    .looseObject({
-        orderId: id,
-        orderNumber: z.string(),
-        total: z.string(),
-        currency: z.string(),
-        payBy: z.enum(["ONLINE", "ON_HANDOVER"]),
+    .object({
+        id,
+        /** The storefront's own number, like ORD-001. */
+        number: z.string(),
+        total: money,
+        payBy: openEnum(PAY_BY, "How it is paid"),
         payment: storefrontPayment.nullable(),
     })
     .describe("Order");
+export type StorefrontOrderView = z.infer<typeof storefrontOrder>;
 
 export const formSubmitBody = z.strictObject({
     data: z.record(z.string(), z.unknown()),
-    idempotencyKey: idempotencyKey.optional(),
 });
 export type FormSubmitBody = z.infer<typeof formSubmitBody>;
 
 export const storefrontSubmission = z
-    .looseObject({})
+    .object({ id })
     .describe("Form submission");
 
 // — Minting, with a secret key ———————————————————————————————————
@@ -312,7 +383,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "List the products the business's shop sells",
-        request: { params: keyParams },
+        request: { params: keyParams, query: pageQuery },
         responses: { 200: storefrontProducts },
         capability: "store:read",
     }),
@@ -332,7 +403,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "How many of each product are left",
-        request: { params: keyParams },
+        request: { params: keyParams, query: pageQuery },
         responses: { 200: storefrontStock },
         capability: "store:read",
     }),
@@ -342,7 +413,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "List the services that can be booked",
-        request: { params: keyParams },
+        request: { params: keyParams, query: pageQuery },
         responses: { 200: storefrontServices },
         capability: "service:read",
     }),
@@ -372,7 +443,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "Who takes a service, by name",
-        request: { params: serviceParams },
+        request: { params: serviceParams, query: pageQuery },
         responses: { 200: storefrontStaff },
         capability: "service:read",
     }),
@@ -382,7 +453,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "The site's published posts, newest first",
-        request: { params: keyParams },
+        request: { params: keyParams, query: pageQuery },
         responses: { 200: storefrontPosts },
         capability: "site:read",
     }),
@@ -402,7 +473,7 @@ export const STOREFRONT_ROUTES = [
         surface: "storefront",
         tag: READ,
         summary: "The membership plans on sale",
-        request: { params: keyParams },
+        request: { params: keyParams, query: pageQuery },
         responses: { 200: storefrontPlans },
         capability: "subscription:read",
     }),
@@ -433,7 +504,7 @@ export const STOREFRONT_ROUTES = [
         tag: WRITE,
         summary: "Let a hold go before its time",
         request: { body: holdTokenBody },
-        responses: { 200: storefrontHold },
+        responses: { 200: storefrontBooking },
         capability: "storefront:mint",
     }),
     defineRoute({
@@ -479,5 +550,7 @@ export const STOREFRONT_ROUTES = [
         request: { body: mintStorefrontTokenBody },
         responses: { 201: storefrontToken },
         capability: "storefront:mint",
+        // A replay would keep the token, which is given once.
+        idempotent: false,
     }),
 ] as const;

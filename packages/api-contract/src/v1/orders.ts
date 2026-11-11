@@ -1,18 +1,50 @@
 import { z } from "zod";
 
-import { id, money, page, pageQuery } from "../common";
+import { id, money, openEnum, page, pageQuery } from "../common";
 import { defineRoute } from "../openapi";
 import { idParam, text, timestamp } from "./shared";
 
 /** Orders on `/v1` (plan 2026-11-10-001, U8): list, get, create and status. */
 
 export const ORDER_STATUSES = [
-    "PENDING",
-    "PROCESSING",
-    "SHIPPED",
-    "DELIVERED",
-    "CANCELLED",
+    "pending",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
 ] as const;
+
+export const PAYMENT_STATUSES = [
+    "unpaid",
+    "paid",
+    "failed",
+    "partially_refunded",
+    "refunded",
+] as const;
+
+/** The kitchen step under the status, which walks its fulfilment's own steps. */
+export const ORDER_STAGES = [
+    "new",
+    "preparing",
+    "ready",
+    "collected",
+    "handed_to_courier",
+    "out_for_delivery",
+    "delivered",
+    "sent",
+] as const;
+
+export const FULFILMENTS = [
+    "pickup",
+    "local_delivery",
+    "shipping",
+    "digital",
+    "appointment_in_person",
+    "appointment_online",
+] as const;
+
+export const orderStatus = openEnum(ORDER_STATUSES, "Where the order stands");
+export const fulfilment = openEnum(FULFILMENTS, "How the order leaves");
 
 export const orderView = z
     .object({
@@ -21,10 +53,10 @@ export const orderView = z
         number: z.string(),
         storefrontId: id,
         customerId: id.nullable(),
-        status: z.string(),
-        paymentStatus: z.string(),
-        stage: z.string(),
-        fulfilment: z.string(),
+        status: orderStatus,
+        paymentStatus: openEnum(PAYMENT_STATUSES, "Whether it is paid"),
+        stage: openEnum(ORDER_STAGES, "The kitchen step"),
+        fulfilment,
         subtotal: money,
         tax: money,
         shipping: money,

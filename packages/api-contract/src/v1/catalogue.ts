@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { id, money, page, pageQuery } from "../common";
+import { id, money, openEnum, page, pageQuery } from "../common";
 import { defineRoute } from "../openapi";
 import { idParam, price, text, timestamp } from "./shared";
 
@@ -10,8 +10,16 @@ import { idParam, price, text, timestamp } from "./shared";
  * to read.
  */
 
-export const PRODUCT_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
-export const productStatus = z.enum(PRODUCT_STATUSES);
+export const PRODUCT_STATUSES = ["draft", "published", "archived"] as const;
+export const productStatus = openEnum(
+    PRODUCT_STATUSES,
+    "Whether it is on sale: only published is",
+);
+export const SERVICE_STATUSES = ["active", "archived"] as const;
+export const POST_STATUSES = ["draft", "published", "archived"] as const;
+export const PLAN_STATUSES = ["draft", "active", "archived"] as const;
+export const PLAN_INTERVALS = ["week", "month", "quarter", "year"] as const;
+export const planInterval = openEnum(PLAN_INTERVALS, "How often it is paid");
 
 export const variantView = z.object({
     id,
@@ -28,7 +36,7 @@ export const productView = z
         name: z.string(),
         slug: z.string(),
         description: z.string().nullable(),
-        status: z.string(),
+        status: productStatus,
         price: money,
         variants: z.array(variantView),
         createdAt: timestamp,
@@ -129,7 +137,9 @@ export const serviceView = z
         bufferAfterMinutes: z.number().int(),
         capacity: z.number().int(),
         price: money.nullable(),
-        status: z.string(),
+        /** The IANA time zone its hours are in. */
+        timezone: z.string(),
+        status: openEnum(SERVICE_STATUSES, "Whether it can be booked"),
         createdAt: timestamp,
         updatedAt: timestamp,
     })
@@ -159,6 +169,7 @@ export type CreateServiceBody = z.infer<typeof createServiceBody>;
 
 export const patchServiceBody = createServiceBody
     .partial()
+    .extend({ description: text(2000, 0).nullable().optional() })
     .refine((b) => Object.keys(b).length > 0, "Send at least one field");
 export type PatchServiceBody = z.infer<typeof patchServiceBody>;
 
@@ -188,7 +199,7 @@ export const postView = z
         title: z.string(),
         slug: z.string(),
         excerpt: z.string().nullable(),
-        status: z.string(),
+        status: openEnum(POST_STATUSES, "Whether it is live"),
         publishedAt: timestamp.nullable(),
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -202,8 +213,8 @@ export const subscriptionPlanView = z
         name: z.string(),
         description: z.string().nullable(),
         price: money,
-        interval: z.string(),
-        status: z.string(),
+        interval: planInterval,
+        status: openEnum(PLAN_STATUSES, "Whether it takes new members"),
         classesPerMonth: z.number().int().nullable(),
         createdAt: timestamp,
     })

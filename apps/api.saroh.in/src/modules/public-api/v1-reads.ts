@@ -13,6 +13,20 @@ import type {
 import { prisma } from "@saroh/database";
 
 import { readableAnswers } from "../forms/enquiry-entries";
+import {
+    bookingOutcome,
+    bookingStatus,
+    enquiryStatus,
+    orderFulfilment,
+    orderStage,
+    orderStatus,
+    paymentStatus,
+    planInterval,
+    planStatus,
+    postStatus,
+    productStatus,
+    serviceStatus,
+} from "./v1-enums";
 import { afterCursor, iso, NEWEST_FIRST, pageOf, toMoney } from "./v1-support";
 
 /**
@@ -22,6 +36,9 @@ import { afterCursor, iso, NEWEST_FIRST, pageOf, toMoney } from "./v1-support";
  * accident, and nothing `customer:sensitive` (needs attention, notes, a
  * booking's intake note) is ever selected.
  */
+
+/** The app clears a text field to ""; the API answers a cleared field as null. */
+const orNull = (value: string | null) => (value === "" ? null : value);
 
 type Paging = Pick<PageQuery, "cursor" | "limit">;
 const paged = (q: Paging) => ({
@@ -69,7 +86,7 @@ const productView = (p: ProductRow): ProductView => ({
     name: p.name,
     slug: p.slug,
     description: p.description,
-    status: p.status,
+    status: productStatus.out(p.status),
     price: toMoney(p.price, p.currency),
     variants: p.variants.map((v) => ({
         id: v.id,
@@ -163,6 +180,7 @@ const SERVICE = {
     capacity: true,
     priceCents: true,
     currency: true,
+    timezone: true,
     status: true,
     createdAt: true,
     updatedAt: true,
@@ -178,6 +196,7 @@ interface ServiceRow {
     capacity: number;
     priceCents: number | null;
     currency: string | null;
+    timezone: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -186,7 +205,7 @@ interface ServiceRow {
 const serviceView = (s: ServiceRow): ServiceView => ({
     id: s.id,
     name: s.name,
-    description: s.description,
+    description: orNull(s.description),
     durationMinutes: s.durationMinutes,
     bufferBeforeMinutes: s.bufferBeforeMinutes,
     bufferAfterMinutes: s.bufferAfterMinutes,
@@ -195,7 +214,8 @@ const serviceView = (s: ServiceRow): ServiceView => ({
         s.priceCents === null || !s.currency
             ? null
             : { amountMinor: s.priceCents, currency: s.currency },
-    status: s.status,
+    timezone: s.timezone,
+    status: serviceStatus.out(s.status),
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
 });
@@ -235,6 +255,7 @@ export async function postsPage(organizationId: string, q: Paging) {
     });
     return pageOf(rows, q.limit, (p): PostView => ({
         ...p,
+        status: postStatus.out(p.status),
         publishedAt: iso(p.publishedAt),
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
@@ -262,6 +283,8 @@ export async function plansPage(organizationId: string, q: Paging) {
         q.limit,
         ({ price, currency, ...p }): SubscriptionPlanView => ({
             ...p,
+            interval: planInterval.out(p.interval),
+            status: planStatus.out(p.status),
             price: toMoney(price, currency),
             createdAt: p.createdAt.toISOString(),
         }),
@@ -310,24 +333,24 @@ export const bookingView = (b: BookingRow): BookingView => ({
     serviceId: b.serviceId,
     contactId: b.contactId,
     staffId: b.staffId,
-    status: b.status,
+    status: bookingStatus.out(b.status),
     startAt: b.startAt.toISOString(),
     endAt: b.endAt.toISOString(),
     timezone: b.timezone,
     booker: { name: b.bookerName, email: b.bookerEmail, phone: b.bookerPhone },
-    outcome: b.outcome,
+    outcome: b.outcome === null ? null : bookingOutcome.out(b.outcome),
     cancelledAt: iso(b.cancelledAt),
     createdAt: b.createdAt.toISOString(),
 });
 
 export async function bookingsPage(
     organizationId: string,
-    q: Paging & { status?: string; serviceId?: string },
+    q: Paging & { status?: BookingView["status"]; serviceId?: string },
 ) {
     const rows = await prisma.booking.findMany({
         where: {
             organizationId,
-            ...(q.status ? { status: q.status } : {}),
+            ...(q.status ? { status: bookingStatus.in(q.status) } : {}),
             ...(q.serviceId ? { serviceId: q.serviceId } : {}),
             ...afterCursor(q.cursor),
         },
@@ -412,10 +435,10 @@ const orderView = (o: OrderRow): OrderView => ({
     number: o.orderId,
     storefrontId: o.storeId,
     customerId: o.customerId,
-    status: o.status,
-    paymentStatus: o.paymentStatus,
-    stage: o.stage,
-    fulfilment: o.fulfilment,
+    status: orderStatus.out(o.status),
+    paymentStatus: paymentStatus.out(o.paymentStatus),
+    stage: orderStage.out(o.stage),
+    fulfilment: orderFulfilment.out(o.fulfilment),
     subtotal: toMoney(o.subtotal, o.currency),
     tax: toMoney(o.tax, o.currency),
     shipping: toMoney(o.shipping, o.currency),
@@ -435,12 +458,12 @@ const orderView = (o: OrderRow): OrderView => ({
 
 export async function ordersPage(
     organizationId: string,
-    q: Paging & { status?: string },
+    q: Paging & { status?: OrderView["status"] },
 ) {
     const rows = await prisma.order.findMany({
         where: {
             organizationId,
-            ...(q.status ? { status: q.status } : {}),
+            ...(q.status ? { status: orderStatus.in(q.status) } : {}),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -516,10 +539,10 @@ const customerView = (c: CustomerRow): CustomerView => {
     return {
         id: c.id,
         email: c.email,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        phone: c.phone,
-        company: c.company,
+        firstName: orNull(c.firstName),
+        lastName: orNull(c.lastName),
+        phone: orNull(c.phone),
+        company: orNull(c.company),
         address: Object.values(address).some((v) => v !== null)
             ? address
             : null,
@@ -552,7 +575,7 @@ const ENQUIRY = {
     id: true,
     title: true,
     status: true,
-    stage: { select: { name: true } },
+    stage: { select: { id: true, name: true } },
     contactId: true,
     formId: true,
     createdAt: true,
@@ -563,7 +586,7 @@ const enquiryView = (l: {
     id: string;
     title: string;
     status: string;
-    stage: { name: string };
+    stage: { id: string; name: string };
     contactId: string;
     formId: string | null;
     createdAt: Date;
@@ -571,8 +594,8 @@ const enquiryView = (l: {
 }): EnquiryView => ({
     id: l.id,
     title: l.title,
-    status: l.status,
-    stage: l.stage.name,
+    status: enquiryStatus.out(l.status),
+    stage: { id: l.stage.id, name: l.stage.name },
     customerId: l.contactId,
     formId: l.formId,
     createdAt: l.createdAt.toISOString(),

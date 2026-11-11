@@ -27,6 +27,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { OrdersService } from "../orders/orders.service";
 import { authorize } from "../organizations/organization-policy";
+import { orderStatus } from "./v1-enums";
 import {
     onlyStorefront,
     orderById,
@@ -111,12 +112,12 @@ export class OrdersV1Controller {
     ): Promise<OrderView> {
         authorize(ctx, "order:edit");
         // Cancelling hands money back: `order:refund` too (B16).
-        if (body.status === "CANCELLED") authorize(ctx, "order:refund");
+        if (body.status === "cancelled") authorize(ctx, "order:refund");
         return once(this.idempotency, req, ctx, { orderId, body }, async () => {
             const storeId = await orderStorefront(ctx.organizationId, orderId);
             if (!storeId) throw notFound("order");
             await this.orders.updateStatus(storeId, orderId, ctx.userId, {
-                status: body.status,
+                status: orderStatus.in(body.status),
             });
             return this.order(ctx, orderId);
         });

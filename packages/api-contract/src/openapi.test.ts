@@ -62,11 +62,31 @@ describe("buildOpenApi", () => {
                 in: "path",
                 required: true,
             }),
+            expect.objectContaining({
+                name: "Idempotency-Key",
+                in: "header",
+                required: false,
+            }),
         ]);
         expect(JSON.stringify(rename.requestBody)).toContain(
             '"additionalProperties":false',
         );
-        expect(Object.keys(rename.responses)).toEqual(["200", "default"]);
+        expect(Object.keys(rename.responses)).toEqual([
+            "200",
+            "400",
+            "401",
+            "403",
+            "404",
+            "409",
+            "429",
+            "default",
+        ]);
+        // A read can't clash, so it names no 409.
+        expect(
+            Object.keys(
+                (doc.paths["/products"].get as { responses: object }).responses,
+            ),
+        ).toEqual(["200", "400", "401", "403", "404", "429", "default"]);
     });
 
     it("keeps surfaces apart", () => {

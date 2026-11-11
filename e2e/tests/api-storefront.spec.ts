@@ -180,7 +180,7 @@ test(
             expect(result, JSON.stringify(result)).toMatchObject({
                 step: "book",
                 status: 201,
-                booking: { state: "CONFIRMED" },
+                booking: { state: "confirmed" },
             });
 
             // A publishable key never writes, even from its own origin.

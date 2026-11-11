@@ -56,6 +56,7 @@ import { authorize } from "../organizations/organization-policy";
 import { InventoryService } from "../products/inventory.service";
 import { ProductsService } from "../products/products.service";
 import { VariantsService } from "../products/variants.service";
+import { productStatus } from "./v1-enums";
 import {
     businessTimezone,
     plansPage,
@@ -125,7 +126,9 @@ export class CatalogueV1Controller {
                     ? { description: body.description }
                     : {}),
                 ...(body.slug !== undefined ? { slug: body.slug } : {}),
-                ...(body.status !== undefined ? { status: body.status } : {}),
+                ...(body.status !== undefined
+                    ? { status: productStatus.in(body.status) }
+                    : {}),
             });
             return this.product(ctx, made.id);
         });
@@ -174,7 +177,7 @@ export class CatalogueV1Controller {
                         ? { description: body.description }
                         : {}),
                     ...(body.status !== undefined
-                        ? { status: body.status }
+                        ? { status: productStatus.in(body.status) }
                         : {}),
                 };
                 await this.products.patchIn(
@@ -378,9 +381,13 @@ export class CatalogueV1Controller {
             ctx,
             { serviceId, body },
             async () => {
-                const { price, ...rest } = body;
+                const { price, description, ...rest } = body;
                 await this.bookings.updateService(ctx, serviceId, {
                     ...rest,
+                    // Null clears it, as the app's empty box does.
+                    ...(description !== undefined
+                        ? { description: description ?? "" }
+                        : {}),
                     ...(price
                         ? {
                               priceCents: price.amountMinor,
@@ -406,14 +413,23 @@ export class CatalogueV1Controller {
     /** A PUT: sending the same week twice leaves the same week. */
     @ContractRoute(v1SetHours)
     @RequireModule("APPOINTMENTS")
-    async setHours(
+    setHours(
         @OrgContext() ctx: OrganizationContext,
+        @Req() req: KeyedRequest,
         @Param("serviceId", anId) serviceId: string,
         @Body(new ZodContractPipe(setHoursBody)) body: SetHoursBody,
     ): Promise<HoursView> {
         authorize(ctx, "service:write");
-        await this.bookings.replaceRules(ctx, serviceId, body.windows);
-        return hoursOf(await this.bookings.listRules(ctx, serviceId));
+        return once(
+            this.idempotency,
+            req,
+            ctx,
+            { serviceId, body },
+            async () => {
+                await this.bookings.replaceRules(ctx, serviceId, body.windows);
+                return hoursOf(await this.bookings.listRules(ctx, serviceId));
+            },
+        );
     }
 
     @ContractRoute(v1ListPosts)

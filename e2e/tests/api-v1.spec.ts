@@ -169,7 +169,7 @@ test(
             );
             expect(cancelled.status()).toBe(200);
             expect(await cancelled.json()).toMatchObject({
-                status: "CANCELLED",
+                status: "cancelled",
                 money: { refund: null },
             });
         } finally {

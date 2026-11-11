@@ -29,6 +29,7 @@ import { BookingsService } from "../bookings/bookings.service";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { authorize } from "../organizations/organization-policy";
+import { refundStatus } from "./v1-enums";
 import { bookingById, bookingsPage, bookingView } from "./v1-reads";
 import { ContractRoute, notFound, once } from "./v1-support";
 
@@ -129,7 +130,7 @@ export class BookingsV1Controller {
                             amountMinor: money.refund.amountCents,
                             currency: money.refund.currency,
                         },
-                        status: money.refund.status,
+                        status: refundStatus.out(money.refund.status),
                     },
                     kept: money.kept && {
                         amountMinor: money.kept.amountCents,

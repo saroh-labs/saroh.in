@@ -1,6 +1,7 @@
 import { Body, Controller, Param, Query, Req, UseGuards } from "@nestjs/common";
 import type {
     CreateCustomerBody,
+    CustomerAddressBody,
     CustomerView,
     PageQuery,
     PatchCustomerBody,
@@ -22,6 +23,8 @@ import { ZodContractPipe } from "../../common/pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { KeyedRequest } from "../api-keys/api-key.guard";
 import { ApiKeyGuard } from "../api-keys/api-key.guard";
+import type { AddressField, AddressPatch } from "../contacts/contact-address";
+import { ADDRESS_FIELDS, nextAddress } from "../contacts/contact-address";
 import { ContactsService } from "../contacts/contacts.service";
 import { CustomerAddService } from "../customer-workspace/customer-add.service";
 import { authorize } from "../organizations/organization-policy";
@@ -29,6 +32,36 @@ import { customerById, customersPage } from "./v1-reads";
 import { ContractRoute, notFound, once } from "./v1-support";
 
 const anId = new ZodContractPipe(id);
+
+const ADDRESS_PARTS: Record<keyof CustomerAddressBody, AddressField> = {
+    line1: "addressLine1",
+    line2: "addressLine2",
+    city: "city",
+    state: "state",
+    postalCode: "postalCode",
+    country: "country",
+};
+
+/** The answer's nested address as the contact's columns; "" clears one, as in the app. */
+function addressPatch(address: CustomerAddressBody | null): AddressPatch {
+    const patch: AddressPatch = {};
+    for (const [part, field] of Object.entries(ADDRESS_PARTS) as [
+        keyof CustomerAddressBody,
+        AddressField,
+    ][]) {
+        const value = address === null ? null : address[part];
+        if (value !== undefined) patch[field] = value ?? "";
+    }
+    return patch;
+}
+
+const NO_ADDRESS = Object.fromEntries(
+    ADDRESS_FIELDS.map((f) => [f, null]),
+) as Record<AddressField, null>;
+
+/** A field null clears, as the app's empty box does. */
+const cleared = (value: string | null | undefined) =>
+    value === null ? "" : value;
 
 /**
  * Customers on `/v1` (plan 2026-11-10-001, U8). Answers are the fixed
@@ -71,7 +104,14 @@ export class CustomersV1Controller {
     ): Promise<CustomerView> {
         authorize(ctx, "contact:write");
         return once(this.idempotency, req, ctx, body, async () => {
-            const { contactId } = await this.adds.add(ctx, body);
+            const { address, ...details } = body;
+            const patch = address ? addressPatch(address) : {};
+            // Checked before the customer is made, so a bad address makes nothing.
+            nextAddress(NO_ADDRESS, patch);
+            const { contactId } = await this.adds.add(ctx, details);
+            if (Object.keys(patch).length > 0) {
+                await this.contacts.update(ctx, contactId, patch);
+            }
             return this.customer(ctx, contactId);
         });
     }
@@ -91,7 +131,18 @@ export class CustomersV1Controller {
             { customerId, body },
             async () => {
                 await this.customer(ctx, customerId);
-                await this.contacts.update(ctx, customerId, body);
+                const { address, ...details } = body;
+                await this.contacts.update(ctx, customerId, {
+                    ...(details.email !== undefined
+                        ? { email: details.email }
+                        : {}),
+                    ...Object.fromEntries(
+                        (["firstName", "lastName", "phone", "company"] as const)
+                            .filter((f) => details[f] !== undefined)
+                            .map((f) => [f, cleared(details[f])]),
+                    ),
+                    ...(address !== undefined ? addressPatch(address) : {}),
+                });
                 return this.customer(ctx, customerId);
             },
         );

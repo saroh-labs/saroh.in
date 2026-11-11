@@ -22,6 +22,23 @@ describe("v1 contract (plan 2026-11-10-001, U8)", () => {
         for (const op of operations) expect(op.capability).toBeTruthy();
     });
 
+    it("declares Idempotency-Key and its 409 on every write but the token mint", () => {
+        for (const [path, ops] of Object.entries(doc.paths)) {
+            for (const [method, op] of Object.entries(ops)) {
+                if (method === "get") continue;
+                const o = op as {
+                    parameters?: { name: string }[];
+                    responses: Record<string, unknown>;
+                };
+                const names = (o.parameters ?? []).map((p) => p.name);
+                expect(names.includes("Idempotency-Key"), path).toBe(
+                    path !== "/storefront-tokens",
+                );
+                expect(o.responses["409"], path).toBeTruthy();
+            }
+        }
+    });
+
     it("takes a price only in whole, non-negative minor units", () => {
         const ok = {
             name: "Loaf",

@@ -104,6 +104,284 @@ exports[`buildOpenApi > is deterministic 1`] = `
             },
             "description": "Success",
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "The request is malformed or breaks a rule (invalid_request)",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "No key or token, or one that no longer works (unauthorized, key_owner_inactive)",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "The key or token may not do this (forbidden, visitor_email_required, visitor_email_mismatch)",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Nothing like that in this business (not_found)",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Too many requests: wait the Retry-After seconds (rate_limited)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait",
+                "schema": {
+                  "type": "integer",
+                },
+              },
+            },
+          },
           "default": {
             "content": {
               "application/json": {
@@ -126,7 +404,11 @@ exports[`buildOpenApi > is deterministic 1`] = `
                             "visitor_email_required",
                             "visitor_email_mismatch",
                             "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
                             "internal",
+                            "unavailable",
                           ],
                           "type": "string",
                         },
@@ -172,6 +454,18 @@ exports[`buildOpenApi > is deterministic 1`] = `
             "schema": {
               "maxLength": 64,
               "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "description": "Makes a retry safe: the same key with the same request answers the first answer again for 24 hours; with a different request, 409. Keys are per key or token and per route.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[\\x21-\\x7e]+$",
               "type": "string",
             },
           },
@@ -242,6 +536,338 @@ exports[`buildOpenApi > is deterministic 1`] = `
             },
             "description": "Success",
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "The request is malformed or breaks a rule (invalid_request)",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "No key or token, or one that no longer works (unauthorized, key_owner_inactive)",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "The key or token may not do this (forbidden, visitor_email_required, visitor_email_mismatch)",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Nothing like that in this business (not_found)",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "It clashes with how things stand, or an Idempotency-Key was sent again with a different request or while the first is running (conflict, payments_unavailable)",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "description": "Error",
+                  "properties": {
+                    "error": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "invalid_request",
+                            "unauthorized",
+                            "key_owner_inactive",
+                            "forbidden",
+                            "not_found",
+                            "conflict",
+                            "payments_unavailable",
+                            "visitor_email_required",
+                            "visitor_email_mismatch",
+                            "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
+                            "internal",
+                            "unavailable",
+                          ],
+                          "type": "string",
+                        },
+                        "message": {
+                          "type": "string",
+                        },
+                        "requestId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Too many requests: wait the Retry-After seconds (rate_limited)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait",
+                "schema": {
+                  "type": "integer",
+                },
+              },
+            },
+          },
           "default": {
             "content": {
               "application/json": {
@@ -264,7 +890,11 @@ exports[`buildOpenApi > is deterministic 1`] = `
                             "visitor_email_required",
                             "visitor_email_mismatch",
                             "rate_limited",
+                            "payload_too_large",
+                            "unsupported_media_type",
+                            "unprocessable",
                             "internal",
+                            "unavailable",
                           ],
                           "type": "string",
                         },

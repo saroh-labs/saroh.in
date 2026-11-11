@@ -11,11 +11,17 @@ import type {
     FormSubmitBody,
     HoldBody,
     OrderBody,
+    PageQuery,
+    StorefrontBookingView,
+    StorefrontOrderView,
+    StorefrontPaymentView,
 } from "@saroh/api-contract";
 import type { StorefrontToken } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import { randomUUID } from "node:crypto";
 
 import { onlinePaymentBlocker } from "../bookings/booking-payment";
+import type { PublicBooking } from "../bookings/public-booking-page";
 import { publicBookingResult } from "../bookings/public-bookings.controller";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import type { BookInput } from "../bookings/reservation";
@@ -25,11 +31,21 @@ import { hashPayToken } from "../invoices/pay-token";
 import type { CheckoutStartDto } from "../orders/checkout.dto";
 import { PublicCheckoutService } from "../orders/public-checkout.service";
 import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
+import type { CreateIntentResult } from "../payments/payments.service";
 import { PublicInvoicesService } from "../payments/public-invoices.service";
 import { PublicCatalogueService } from "../products/public-catalogue.service";
+import { effectiveStorefront } from "../sites/sells-from";
 import { siteOriginOf } from "../sites/site-origin";
 import { SitesService } from "../sites/sites.service";
 import { PublicPlansService } from "../subscriptions/public-plans.service";
+import {
+    bookingState,
+    holdPay,
+    payBy,
+    paymentProvider,
+    planInterval,
+} from "./v1-enums";
+import { invalid, pageList, toMoney } from "./v1-support";
 
 const notFound = (message: string) =>
     new NotFoundException({ error: { code: "not_found", message } });
@@ -75,15 +91,71 @@ export function visitorEmailOf(
     return token.visitorEmail;
 }
 
-/** A visitor's booking, renamed for the API: its hold token, not a pay token. */
+/** A visitor's booking as the API names it: its hold token, not a pay token. */
+function bookingView(
+    booking: PublicBooking,
+    state: string,
+    holdExpiresAt: string | null,
+    holdToken: string | null,
+): StorefrontBookingView {
+    return {
+        id: booking.reference,
+        serviceName: booking.serviceName,
+        startAt: booking.startAt,
+        endAt: booking.endAt,
+        state: bookingState.out(state),
+        holdExpiresAt,
+        holdToken,
+    };
+}
+
 function bookingAnswer(
     result: Awaited<ReturnType<PublicBookingsService["bookOnline"]>>,
-) {
-    const { payToken, ...rest } = publicBookingResult(
-        result.booking,
-        result.payToken,
-    );
-    return { ...rest, holdToken: payToken };
+): StorefrontBookingView {
+    const made = publicBookingResult(result.booking, result.payToken);
+    return bookingView(made, made.state, made.holdExpiresAt, made.payToken);
+}
+
+/** The provider's checkout data, with Saroh's own ids and words left out. */
+function paymentView(intent: CreateIntentResult): StorefrontPaymentView {
+    return {
+        id: intent.paymentIntentId,
+        provider: paymentProvider.out(intent.provider),
+        amount: { amountMinor: intent.amountCents, currency: intent.currency },
+        publicKey: intent.publicKey,
+        clientParams: intent.clientParams,
+    };
+}
+
+/** Optional text the site reads as a string; anything else is null. */
+const textOr = (value: unknown): string | null =>
+    typeof value === "string" ? value : null;
+
+/** A post's published snapshot (`posts.service.ts` publish), as the API answers it. */
+function postView(snapshot: unknown, origin: string | null) {
+    const { post, path } = (snapshot ?? {}) as {
+        post?: Record<string, unknown>;
+        path?: unknown;
+    };
+    const p = post ?? {};
+    const category = p.category as { name?: unknown; slug?: unknown } | null;
+    return {
+        slug: textOr(p.slug) ?? "",
+        title: textOr(p.title) ?? "",
+        excerpt: textOr(p.excerpt),
+        image: textOr(p.image),
+        category:
+            category &&
+            typeof category.name === "string" &&
+            typeof category.slug === "string"
+                ? { name: category.name, slug: category.slug }
+                : null,
+        author: textOr(p.author),
+        publishedAt: textOr(p.publishedAt) ?? "",
+        hostedUrl:
+            origin && typeof path === "string" ? `${origin}${path}` : null,
+        content: textOr(p.content) ?? "",
+    };
 }
 
 /**
@@ -140,15 +212,47 @@ export class StorefrontService {
 
     // — Reads ——————————————————————————————————————————————————————
 
-    async products(organizationId: string, visitor: string | undefined) {
+    /** Each listing's product id: the API names products, never listings. */
+    private async productIdsOf(organizationId: string, listingIds: string[]) {
+        const rows = await prisma.productListing.findMany({
+            where: { organizationId, id: { in: listingIds } },
+            select: { id: true, productId: true },
+        });
+        return new Map(rows.map((r) => [r.id, r.productId]));
+    }
+
+    async products(
+        organizationId: string,
+        q: PageQuery,
+        visitor: string | undefined,
+    ) {
         const site = await this.site(organizationId);
         const list = await this.catalogue.list(site.id, visitor);
+        const ids = await this.productIdsOf(
+            organizationId,
+            list.products.map((p) => p.listingId),
+        );
+        const cards = list.products.flatMap((p) => {
+            const productId = ids.get(p.listingId);
+            return productId ? [{ ...p, productId }] : [];
+        });
         return {
-            ...list,
-            products: list.products.map((p) => ({
-                ...p,
-                hostedUrl: productUrl(site.origin, p.slug),
-            })),
+            ...pageList(
+                cards,
+                q,
+                (p) => p.productId,
+                (p) => ({
+                    id: p.productId,
+                    slug: p.slug,
+                    name: p.name,
+                    price: toMoney(p.price, p.currency),
+                    priceFrom: p.priceFrom,
+                    image: p.image && { url: p.image.url, alt: p.image.alt },
+                    soldOut: p.soldOut,
+                    hostedUrl: productUrl(site.origin, p.slug),
+                }),
+            ),
+            storefront: { name: list.storefront.name },
         };
     }
 
@@ -158,24 +262,75 @@ export class StorefrontService {
         visitor: string | undefined,
     ) {
         const site = await this.site(organizationId);
-        const product = await this.catalogue.product(site.id, slug, visitor);
-        return { ...product, hostedUrl: productUrl(site.origin, product.slug) };
+        const p = await this.catalogue.product(site.id, slug, visitor);
+        return {
+            id: p.productId,
+            slug: p.slug,
+            name: p.name,
+            description: p.description,
+            price: toMoney(p.price, p.currency),
+            images: p.images.map((i) => ({
+                url: i.url,
+                alt: i.alt,
+                kind: i.kind,
+            })),
+            variants: p.variants.map((v) => ({
+                id: v.id,
+                title: v.title,
+                price: v.price === null ? null : toMoney(v.price, p.currency),
+                soldOut: v.stock === "SOLD_OUT",
+            })),
+            hostedUrl: productUrl(site.origin, p.slug),
+        };
     }
 
-    async stock(organizationId: string, visitor: string | undefined) {
+    async stock(
+        organizationId: string,
+        q: PageQuery,
+        visitor: string | undefined,
+    ) {
         const site = await this.site(organizationId);
-        return this.catalogue.stock(site.id, visitor);
+        const { items } = await this.catalogue.stock(site.id, visitor);
+        const ids = await this.productIdsOf(
+            organizationId,
+            items.map((i) => i.listingId),
+        );
+        const rows = items.flatMap((i) => {
+            const productId = ids.get(i.listingId);
+            return productId ? [{ ...i, productId }] : [];
+        });
+        return pageList(
+            rows,
+            q,
+            (i) => i.productId,
+            (i) => ({
+                productId: i.productId,
+                variantId: i.variantId,
+                left: i.left,
+                soldOut: i.soldOut,
+            }),
+        );
     }
 
-    async services(organizationId: string) {
+    async services(organizationId: string, q: PageQuery) {
         const site = await this.site(organizationId);
         const page = await this.bookings.publicBookingPage(site.id);
-        return {
-            data: page.services.map((s) => ({
-                ...s,
+        return pageList(
+            page.services,
+            q,
+            (s) => s.id,
+            (s) => ({
+                id: s.id,
+                name: s.name,
+                description: s.description,
+                durationMinutes: s.durationMinutes,
+                price:
+                    s.priceCents === null || !s.currency
+                        ? null
+                        : { amountMinor: s.priceCents, currency: s.currency },
                 hostedUrl: serviceUrl(site.origin, s.id),
-            })),
-        };
+            }),
+        );
     }
 
     async availability(
@@ -184,48 +339,101 @@ export class StorefrontService {
         query: AvailabilityQuery,
     ) {
         await this.service(organizationId, serviceId);
-        return {
-            data: await this.bookings.publicAvailability(
-                serviceId,
-                query.from,
-                query.to,
-                query.staffId,
-            ),
-        };
+        const slots = await this.bookings.publicAvailability(
+            serviceId,
+            query.from,
+            query.to,
+            query.staffId,
+        );
+        return pageList(
+            slots,
+            query,
+            (slot) => new Date(slot.startAt).toISOString(),
+            (slot) => ({
+                startAt: new Date(slot.startAt).toISOString(),
+                endAt: new Date(slot.endAt).toISOString(),
+                staffIds: slot.staffIds ?? [],
+                placesLeft: slot.placesLeft ?? null,
+            }),
+        );
     }
 
     async days(organizationId: string, serviceId: string, query: DaysQuery) {
         await this.service(organizationId, serviceId);
-        return this.bookings.publicDays(serviceId, new Date(), {
+        const read = await this.bookings.publicDays(serviceId, new Date(), {
             skip: query.skip ?? 0,
             staffId: query.staffId ?? null,
         });
+        return {
+            timezone: read.timezone,
+            kind: read.kind,
+            capacity: read.capacity,
+            days: read.days.map((d) => ({
+                date: d.date,
+                open: d.open,
+                closed: d.closed,
+                starts: d.starts.map((st) => ({
+                    startAt: st.startAt,
+                    endAt: st.endAt,
+                    staffId: st.staffId,
+                    placesLeft: st.placesLeft,
+                })),
+            })),
+            staff: read.staff.map((p) => ({ id: p.id, name: p.name })),
+        };
     }
 
-    async staff(organizationId: string, serviceId: string) {
+    async staff(organizationId: string, serviceId: string, q: PageQuery) {
         await this.service(organizationId, serviceId);
-        return { data: await this.bookings.publicServiceStaff(serviceId) };
+        return pageList(
+            await this.bookings.publicServiceStaff(serviceId),
+            q,
+            (p) => p.id,
+            (p) => ({ id: p.id, name: p.name }),
+        );
     }
 
-    async posts(organizationId: string) {
+    async posts(organizationId: string, q: PageQuery) {
         const site = await this.site(organizationId);
-        return this.sites.getPublicPosts(site.id);
+        const { posts } = await this.sites.getPublicPosts(site.id);
+        return pageList(
+            posts.map((snapshot) => postView(snapshot, site.origin)),
+            q,
+            (p) => p.slug,
+            ({ content: _content, ...card }) => card,
+        );
     }
 
     async post(organizationId: string, slug: string) {
         const site = await this.site(organizationId);
-        return this.sites.getPublicPost(site.id, slug);
+        const { snapshot } = await this.sites.getPublicPost(site.id, slug);
+        return postView(snapshot, site.origin);
     }
 
-    async planList(organizationId: string, visitor: string | undefined) {
+    async planList(
+        organizationId: string,
+        q: PageQuery,
+        visitor: string | undefined,
+    ) {
         const site = await this.site(organizationId);
         const read = await this.plans.list(site.id, visitor);
         return {
-            ...read,
-            plans: read.plans.map((p) => ({
-                ...p,
-                hostedUrl: site.origin ? `${site.origin}/account/plan` : null,
-            })),
+            ...pageList(
+                read.plans,
+                q,
+                (p) => p.id,
+                (p) => ({
+                    id: p.id,
+                    name: p.name,
+                    description: p.description,
+                    price: toMoney(p.price, p.currency),
+                    interval: planInterval.out(p.interval),
+                    hostedUrl: site.origin
+                        ? `${site.origin}/account/plan`
+                        : null,
+                }),
+            ),
+            payOnline: read.payOnline,
         };
     }
 
@@ -264,15 +472,20 @@ export class StorefrontService {
         return bookingAnswer(
             await this.bookings.bookOnline(
                 body.serviceId,
-                { ...bookInput(body, email), pay: body.pay },
+                { ...bookInput(body, email), pay: holdPay.in(body.pay) },
                 visitor,
             ),
         );
     }
 
-    async release(organizationId: string, holdToken: string, visitor?: string) {
+    async release(
+        organizationId: string,
+        holdToken: string,
+        visitor?: string,
+    ): Promise<StorefrontBookingView> {
         await this.holdOf(organizationId, holdToken);
-        return this.bookings.releasePublicHold(holdToken, visitor);
+        const hold = await this.bookings.releasePublicHold(holdToken, visitor);
+        return bookingView(hold.booking, hold.state, hold.holdExpiresAt, null);
     }
 
     /** The business's own provider's checkout data for a hold. */
@@ -281,7 +494,9 @@ export class StorefrontService {
             throw paymentsUnavailable();
         }
         await this.holdOf(organizationId, holdToken);
-        return this.invoices.createIntent(holdToken, {}, visitor);
+        return paymentView(
+            await this.invoices.createIntent(holdToken, {}, visitor),
+        );
     }
 
     /** A hold token of this business, or 404: another's is as good as missing. */
@@ -310,10 +525,11 @@ export class StorefrontService {
         token: StorefrontToken,
         body: OrderBody,
         clientHash: string,
-    ) {
+    ): Promise<StorefrontOrderView> {
         const email = visitorEmailOf(token, body.email);
+        const payment = payBy.in(body.payment);
         if (
-            body.payment === "ONLINE" &&
+            payment === "ONLINE" &&
             (await onlinePaymentBlocker(organizationId)) !== null
         ) {
             throw paymentsUnavailable();
@@ -321,16 +537,18 @@ export class StorefrontService {
         const site = await this.site(organizationId);
         const { first, last } = splitName(body.name);
         const dto = {
-            lines: body.lines,
-            fulfilment: body.fulfilment,
+            lines: await this.bagLines(site.id, body.lines),
+            fulfilment: body.fulfilment.toUpperCase(),
             address: body.address,
-            payment: body.payment,
+            payment,
             notes: body.notes ?? null,
             discountCode: body.discountCode ?? null,
-            key: body.idempotencyKey,
+            // The checkout's own retry key; a retry of this call is
+            // `Idempotency-Key`'s, through `once` in the controller.
+            key: randomUUID(),
             returnPath: body.returnPath,
         } as CheckoutStartDto;
-        return this.checkout.startAs(
+        const started = await this.checkout.startAs(
             site.id,
             organizationId,
             async () => {
@@ -359,6 +577,45 @@ export class StorefrontService {
             clientHash,
             dto,
         );
+        return {
+            id: started.orderId,
+            number: started.orderNumber,
+            total: toMoney(started.total, started.currency),
+            payBy: payBy.out(started.payBy),
+            payment: started.payment && paymentView(started.payment),
+        };
+    }
+
+    /** The bag as the checkout takes it: each product's listing at the site's storefront. */
+    private async bagLines(siteId: string, lines: OrderBody["lines"]) {
+        const site = await prisma.site.findFirst({
+            where: { id: siteId },
+            select: { organizationId: true, storefrontId: true },
+        });
+        const store = site && (await effectiveStorefront(prisma, site));
+        const listings = store
+            ? await prisma.productListing.findMany({
+                  where: {
+                      storeId: store.id,
+                      productId: { in: lines.map((l) => l.productId) },
+                  },
+                  select: { id: true, productId: true },
+              })
+            : [];
+        const listingOf = new Map(listings.map((l) => [l.productId, l.id]));
+        return lines.map((line, i) => {
+            const listingId = listingOf.get(line.productId);
+            if (!listingId) {
+                throw invalid(
+                    `body.lines.${i}.productId: This product isn't sold on this site.`,
+                );
+            }
+            return {
+                listingId,
+                variantId: line.variantId ?? null,
+                quantity: line.quantity,
+            };
+        });
     }
 
     async submitForm(
@@ -372,12 +629,14 @@ export class StorefrontService {
             select: { id: true },
         });
         if (!form) throw notFound("Form not found.");
-        return this.enquiry.submit(
+        // A retry is `Idempotency-Key`'s, through `once` in the controller.
+        const made = await this.enquiry.submit(
             formId,
             body.data,
-            body.idempotencyKey,
+            undefined,
             visitor,
         );
+        return { id: made.submissionId };
     }
 }
 
@@ -388,7 +647,6 @@ function bookInput(body: BookBody, email: string): BookInput {
         bookerEmail: email,
         bookerPhone: body.phone,
         staffId: body.staffId,
-        idempotencyKey: body.idempotencyKey,
     };
 }
 

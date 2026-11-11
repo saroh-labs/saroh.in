@@ -91,6 +91,36 @@ export function pageOf<R extends { id: string; createdAt: Date }, V>(
     };
 }
 
+/**
+ * One page of a list a service reads whole, in the list's own order, the
+ * cursor naming the last item's key (`keyOf`). An item gone since the last
+ * page leaves its cursor nowhere to resume: 400, start again.
+ */
+// shortcut: reads the whole list (each service caps its own) and slices it; page in the query if a list can grow past its cap.
+export function pageList<T, V>(
+    items: readonly T[],
+    q: { cursor?: string; limit: number },
+    keyOf: (item: T) => string,
+    view: (item: T) => V,
+): { data: V[]; nextCursor: string | null } {
+    let start = 0;
+    if (q.cursor) {
+        const key = decodeCursor(q.cursor);
+        const at = items.findIndex((item) => keyOf(item) === key);
+        if (at < 0) throw invalid("query.cursor: Not a valid cursor");
+        start = at + 1;
+    }
+    const kept = items.slice(start, start + q.limit);
+    const last = kept[kept.length - 1];
+    return {
+        data: kept.map(view),
+        nextCursor:
+            last !== undefined && items.length > start + q.limit
+                ? encodeCursor(keyOf(last))
+                : null,
+    };
+}
+
 const cursorAt = (row: { id: string; createdAt: Date }) =>
     encodeCursor(`${row.createdAt.toISOString()}|${row.id}`);
 
@@ -115,15 +145,26 @@ export const iso = (d: Date | null): string | null =>
 
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{1,255}$/;
 
+/** What `once` reads off a secret key's or a storefront token's request. */
+export interface IdempotentRequest {
+    headers: Record<string, string | string[] | undefined>;
+    method: string;
+    path: string;
+    route?: unknown;
+    apiKey?: { id: string };
+    storefrontToken?: { id: string };
+}
+
 /**
- * Runs a POST or PATCH at most once per `Idempotency-Key`: the same key with
- * the same request answers the first answer again; with a different request,
- * 409. Keys are per API key and per route, so two integrations never share
- * one. No header, no idempotency.
+ * Runs a write at most once per `Idempotency-Key`: the same key with the
+ * same request answers the first answer again; with a different request,
+ * 409. Keys are per API key (per storefront token, for a visitor's write)
+ * and per route, so two integrations, or two visitors, never share one. No
+ * header, no idempotency.
  */
 export function once<T>(
     idempotency: IdempotencyService,
-    req: KeyedRequest,
+    req: IdempotentRequest | KeyedRequest,
     ctx: OrganizationContext,
     request: unknown,
     operation: () => Promise<T>,
@@ -142,7 +183,7 @@ export function once<T>(
         (req.route as { path?: string } | undefined)?.path ?? req.path;
     return idempotency.run(
         {
-            scope: `v1:${req.method} ${route}:${req.apiKey?.id ?? "-"}`,
+            scope: `v1:${req.method} ${route}:${ownerOf(req)}`,
             key,
             actorUserId: ctx.userId,
             organizationId: ctx.organizationId,
@@ -151,3 +192,8 @@ export function once<T>(
         operation,
     );
 }
+
+const ownerOf = (req: IdempotentRequest | KeyedRequest) =>
+    "storefrontToken" in req && req.storefrontToken
+        ? `st:${req.storefrontToken.id}`
+        : (req.apiKey?.id ?? "-");

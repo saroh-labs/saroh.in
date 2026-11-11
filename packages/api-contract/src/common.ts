@@ -20,7 +20,15 @@ export const ERROR_CODES = [
     "visitor_email_required",
     "visitor_email_mismatch",
     "rate_limited",
+    // The body is over the size the route takes (413).
+    "payload_too_large",
+    // The body isn't JSON (415).
+    "unsupported_media_type",
+    // Well formed, but the business's rules refuse it as sent (422).
+    "unprocessable",
     "internal",
+    // Saroh or a provider it relies on can't serve it now; try again (503).
+    "unavailable",
 ] as const;
 
 export const errorCode = z.enum(ERROR_CODES);
@@ -37,6 +45,22 @@ export const errorEnvelope = z
     })
     .describe("Error");
 export type ErrorEnvelope = z.infer<typeof errorEnvelope>;
+
+/**
+ * A response field with a fixed set of lower_snake_case values. The API
+ * maps its own values to these through one table per field, so a rename
+ * inside Saroh never reaches a client; a value may be added later, so a
+ * client handles one it doesn't know.
+ */
+export const openEnum = <const T extends readonly [string, ...string[]]>(
+    values: T,
+    what: string,
+) =>
+    z
+        .enum(values)
+        .describe(
+            `${what}. More values may be added later: handle one you don't know.`,
+        );
 
 /** Ids are opaque strings; callers never parse them. */
 export const id = z.string().min(1).max(64);

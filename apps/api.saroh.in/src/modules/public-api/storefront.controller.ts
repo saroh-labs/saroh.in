@@ -22,6 +22,7 @@ import type {
     HoldTokenBody,
     MintStorefrontTokenBody,
     OrderBody,
+    PageQuery,
     StorefrontTokenView,
 } from "@saroh/api-contract";
 import {
@@ -33,11 +34,13 @@ import {
     holdTokenBody,
     mintStorefrontTokenBody,
     orderBody,
+    pageQuery,
 } from "@saroh/api-contract";
 import type { StorefrontToken } from "@saroh/database";
 
 import { hashClientIp, visitorAddress } from "../../common/client-ip";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
+import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { ZodContractPipe } from "../../common/pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
@@ -48,6 +51,7 @@ import type { TokenRequest } from "./storefront-token.guard";
 import { StorefrontTokenGuard } from "./storefront-token.guard";
 import { StorefrontTokensService } from "./storefront-tokens.service";
 import { StorefrontService } from "./storefront.service";
+import { once } from "./v1-support";
 
 /**
  * What the edge and a browser may keep of a catalogue read (U17): the
@@ -74,7 +78,10 @@ function tokenOf(req: TokenRequest): StorefrontToken {
 @Controller("v1/storefront/write")
 @UseGuards(StorefrontTokenGuard)
 export class StorefrontWriteController {
-    constructor(private readonly storefront: StorefrontService) {}
+    constructor(
+        private readonly storefront: StorefrontService,
+        private readonly idempotency: IdempotencyService,
+    ) {}
 
     @Post("bookings")
     @Header("Cache-Control", "no-store")
@@ -84,11 +91,13 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(bookBody)) body: BookBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.book(
-            ctx.organizationId,
-            tokenOf(req),
-            body,
-            req.visitorHash,
+        return once(this.idempotency, req, ctx, body, () =>
+            this.storefront.book(
+                ctx.organizationId,
+                tokenOf(req),
+                body,
+                req.visitorHash,
+            ),
         );
     }
 
@@ -100,11 +109,13 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(holdBody)) body: HoldBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.hold(
-            ctx.organizationId,
-            tokenOf(req),
-            body,
-            req.visitorHash,
+        return once(this.idempotency, req, ctx, body, () =>
+            this.storefront.hold(
+                ctx.organizationId,
+                tokenOf(req),
+                body,
+                req.visitorHash,
+            ),
         );
     }
 
@@ -117,10 +128,12 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(holdTokenBody)) body: HoldTokenBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.release(
-            ctx.organizationId,
-            body.holdToken,
-            req.visitorHash,
+        return once(this.idempotency, req, ctx, body, () =>
+            this.storefront.release(
+                ctx.organizationId,
+                body.holdToken,
+                req.visitorHash,
+            ),
         );
     }
 
@@ -132,10 +145,12 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(holdTokenBody)) body: HoldTokenBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.pay(
-            ctx.organizationId,
-            body.holdToken,
-            req.visitorHash,
+        return once(this.idempotency, req, ctx, body, () =>
+            this.storefront.pay(
+                ctx.organizationId,
+                body.holdToken,
+                req.visitorHash,
+            ),
         );
     }
 
@@ -147,11 +162,13 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(orderBody)) body: OrderBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.order(
-            ctx.organizationId,
-            tokenOf(req),
-            body,
-            req.visitorHash ?? `token:${req.storefrontToken?.id ?? ""}`,
+        return once(this.idempotency, req, ctx, body, () =>
+            this.storefront.order(
+                ctx.organizationId,
+                tokenOf(req),
+                body,
+                req.visitorHash ?? `token:${req.storefrontToken?.id ?? ""}`,
+            ),
         );
     }
 
@@ -164,11 +181,13 @@ export class StorefrontWriteController {
         @Body(new ZodContractPipe(formSubmitBody)) body: FormSubmitBody,
     ) {
         authorize(ctx, "storefront:mint");
-        return this.storefront.submitForm(
-            ctx.organizationId,
-            formId,
-            body,
-            req.visitorHash,
+        return once(this.idempotency, req, ctx, { formId, body }, () =>
+            this.storefront.submitForm(
+                ctx.organizationId,
+                formId,
+                body,
+                req.visitorHash,
+            ),
         );
     }
 }
@@ -185,9 +204,17 @@ export class StorefrontController {
 
     @Get("products")
     @Header("Cache-Control", CATALOGUE_CACHE)
-    products(@OrgContext() ctx: OrganizationContext, @Req() req: KeyedRequest) {
+    products(
+        @OrgContext() ctx: OrganizationContext,
+        @Req() req: KeyedRequest,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
+    ) {
         authorize(ctx, "store:read");
-        return this.storefront.products(ctx.organizationId, visitorOf(req));
+        return this.storefront.products(
+            ctx.organizationId,
+            query,
+            visitorOf(req),
+        );
     }
 
     @Get("products/:slug")
@@ -207,16 +234,23 @@ export class StorefrontController {
 
     @Get("stock")
     @Header("Cache-Control", "no-store")
-    stock(@OrgContext() ctx: OrganizationContext, @Req() req: KeyedRequest) {
+    stock(
+        @OrgContext() ctx: OrganizationContext,
+        @Req() req: KeyedRequest,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
+    ) {
         authorize(ctx, "store:read");
-        return this.storefront.stock(ctx.organizationId, visitorOf(req));
+        return this.storefront.stock(ctx.organizationId, query, visitorOf(req));
     }
 
     @Get("services")
     @Header("Cache-Control", CATALOGUE_CACHE)
-    services(@OrgContext() ctx: OrganizationContext) {
+    services(
+        @OrgContext() ctx: OrganizationContext,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
+    ) {
         authorize(ctx, "service:read");
-        return this.storefront.services(ctx.organizationId);
+        return this.storefront.services(ctx.organizationId, query);
     }
 
     @Get("services/:serviceId/availability")
@@ -250,16 +284,20 @@ export class StorefrontController {
     staff(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
     ) {
         authorize(ctx, "service:read");
-        return this.storefront.staff(ctx.organizationId, serviceId);
+        return this.storefront.staff(ctx.organizationId, serviceId, query);
     }
 
     @Get("posts")
     @Header("Cache-Control", CATALOGUE_CACHE)
-    posts(@OrgContext() ctx: OrganizationContext) {
+    posts(
+        @OrgContext() ctx: OrganizationContext,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
+    ) {
         authorize(ctx, "site:read");
-        return this.storefront.posts(ctx.organizationId);
+        return this.storefront.posts(ctx.organizationId, query);
     }
 
     @Get("posts/:slug")
@@ -271,9 +309,17 @@ export class StorefrontController {
 
     @Get("plans")
     @Header("Cache-Control", CATALOGUE_CACHE)
-    plans(@OrgContext() ctx: OrganizationContext, @Req() req: KeyedRequest) {
+    plans(
+        @OrgContext() ctx: OrganizationContext,
+        @Req() req: KeyedRequest,
+        @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
+    ) {
         authorize(ctx, "subscription:read");
-        return this.storefront.planList(ctx.organizationId, visitorOf(req));
+        return this.storefront.planList(
+            ctx.organizationId,
+            query,
+            visitorOf(req),
+        );
     }
 
     /**

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { id, money, page, pageQuery } from "../common";
+import { id, money, openEnum, page, pageQuery } from "../common";
 import { defineRoute } from "../openapi";
 import { idParam, instant, text, timestamp } from "./shared";
 
@@ -11,7 +11,9 @@ import { idParam, instant, text, timestamp } from "./shared";
  * intake note is sensitive and never in an answer.
  */
 
-export const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "CANCELLED"] as const;
+export const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"] as const;
+export const BOOKING_OUTCOMES = ["attended", "no_show"] as const;
+export const REFUND_STATUSES = ["sent", "confirming", "refused"] as const;
 
 export const bookingView = z
     .object({
@@ -19,7 +21,7 @@ export const bookingView = z
         serviceId: id,
         contactId: id.nullable(),
         staffId: id.nullable(),
-        status: z.string(),
+        status: openEnum(BOOKING_STATUSES, "Whether the booking stands"),
         startAt: timestamp,
         endAt: timestamp,
         timezone: z.string(),
@@ -28,7 +30,10 @@ export const bookingView = z
             email: z.string().nullable(),
             phone: z.string().nullable(),
         }),
-        outcome: z.string().nullable(),
+        outcome: openEnum(
+            BOOKING_OUTCOMES,
+            "How the visit went; null until someone says",
+        ).nullable(),
         cancelledAt: timestamp.nullable(),
         createdAt: timestamp,
     })
@@ -39,7 +44,15 @@ export const cancelledBookingView = bookingView
     .extend({
         /** What the cancel did with money paid online: the business's policy. */
         money: z.object({
-            refund: z.object({ amount: money, status: z.string() }).nullable(),
+            refund: z
+                .object({
+                    amount: money,
+                    status: openEnum(
+                        REFUND_STATUSES,
+                        "sent: the provider took it; confirming: its answer is awaited; refused: none was made",
+                    ),
+                })
+                .nullable(),
             kept: money.nullable(),
         }),
     })

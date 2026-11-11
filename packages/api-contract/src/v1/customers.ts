@@ -35,27 +35,44 @@ export const customerView = z
     .describe("Customer");
 export type CustomerView = z.infer<typeof customerView>;
 
+/**
+ * The address as `customerView` answers it. Each part left out stays as it
+ * is, null clears it, and `address: null` clears the whole address.
+ */
+export const customerAddressBody = z.strictObject({
+    line1: text(120).nullable().optional(),
+    line2: text(120).nullable().optional(),
+    city: text(60).nullable().optional(),
+    /** In India, a GST state's code ("29") or name ("Karnataka"). */
+    state: text(60).nullable().optional(),
+    postalCode: text(12).nullable().optional(),
+    country: z
+        .string()
+        .regex(/^[A-Za-z]{2}$/, "An ISO 3166-1 alpha-2 code, like IN")
+        .nullable()
+        .optional(),
+});
+export type CustomerAddressBody = z.infer<typeof customerAddressBody>;
+
 export const createCustomerBody = z.strictObject({
     email: z.email().max(254),
     firstName: text(100).optional(),
     lastName: text(100).optional(),
     phone: text(32).optional(),
     company: text(200).optional(),
+    address: customerAddressBody.optional(),
 });
 export type CreateCustomerBody = z.infer<typeof createCustomerBody>;
 
+/** Null clears a field. */
 export const patchCustomerBody = z
     .strictObject({
         email: z.email().max(254).optional(),
-        firstName: text(100, 0).optional(),
-        lastName: text(100, 0).optional(),
-        phone: text(32, 0).optional(),
-        company: text(200, 0).optional(),
-        addressLine1: text(200, 0).optional(),
-        addressLine2: text(200, 0).optional(),
-        city: text(100, 0).optional(),
-        state: text(100, 0).optional(),
-        postalCode: text(16, 0).optional(),
+        firstName: text(100).nullable().optional(),
+        lastName: text(100).nullable().optional(),
+        phone: text(32).nullable().optional(),
+        company: text(200).nullable().optional(),
+        address: customerAddressBody.nullable().optional(),
     })
     .refine((b) => Object.keys(b).length > 0, "Send at least one field");
 export type PatchCustomerBody = z.infer<typeof patchCustomerBody>;
