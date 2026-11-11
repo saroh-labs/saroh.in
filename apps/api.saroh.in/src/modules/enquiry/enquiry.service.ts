@@ -11,6 +11,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { enqueueEnquiryReply } from "./enquiry-reply";
 import { fieldsFromSnapshot } from "./live-form-fields";
 import { FixedWindowRateLimiter } from "./rate-limiter";
@@ -172,6 +173,11 @@ export class EnquiryService {
                         title: this.leadTitle(contactFields, form.name),
                         status: "OPEN",
                     },
+                });
+                await emitWebhook(tx, {
+                    organizationId,
+                    type: "enquiry.received",
+                    id: lead.id,
                 });
 
                 const submission = await tx.submission.create({
@@ -448,7 +454,7 @@ export class EnquiryService {
         if (c.company !== undefined && !known?.company)
             update.company = c.company;
 
-        return tx.contact.upsert({
+        const contact = await tx.contact.upsert({
             where: {
                 organizationId_email: { organizationId, email: c.email },
             },
@@ -463,6 +469,14 @@ export class EnquiryService {
                 source: `enquiry:form:${formId}`,
             },
         });
+        if (!known) {
+            await emitWebhook(tx, {
+                organizationId: organizationId,
+                type: "customer.created",
+                id: contact.id,
+            });
+        }
+        return contact;
     }
 
     /**

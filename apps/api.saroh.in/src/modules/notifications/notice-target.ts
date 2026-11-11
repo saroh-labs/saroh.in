@@ -84,6 +84,9 @@ export const NOTICE_KINDS = {
     "plan.move": "plan",
     // Written by the catalogue backfill in `@saroh/database`.
     "catalogue.merge-report": "products",
+    // A webhook endpoint Saroh switched off after repeated failed
+    // deliveries (plan 2026-11-10-001, U13): Settings › API and AI apps.
+    "webhook.disabled": "developers",
 } as const;
 
 export type NoticeType = keyof typeof NOTICE_KINDS;
@@ -106,6 +109,7 @@ interface TargetColumns {
     products: Record<never, never>;
     "customer-request": { contactId: string | null };
     member: { contactId: string };
+    developers: Record<never, never>;
 }
 
 /** What a notice of type `T` must point at. */
@@ -239,6 +243,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     products: () => null,
     "customer-request": (n) => n.contactId ?? null,
     member: (n) => n.contactId ?? null,
+    developers: () => null,
 };
 
 /**

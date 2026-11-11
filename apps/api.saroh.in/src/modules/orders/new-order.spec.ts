@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import {

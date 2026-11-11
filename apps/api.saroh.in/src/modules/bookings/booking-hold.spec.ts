@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free unit tests for the booking page's pay-now hold (U19). The
 // transaction client is a plain object of jest mocks, so every read and write
 // the hold makes is asserted in the one transaction it was handed.

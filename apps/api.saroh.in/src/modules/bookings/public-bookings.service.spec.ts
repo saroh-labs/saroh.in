@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free unit tests: @saroh/database is mocked so nothing touches a real
 // Postgres. The `$transaction` mock invokes its callback with the SAME mocked
 // client (ignoring the isolationLevel option), so every write inside the booking

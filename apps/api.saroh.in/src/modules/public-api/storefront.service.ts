@@ -31,6 +31,7 @@ import { hashPayToken } from "../invoices/pay-token";
 import type { CheckoutStartDto } from "../orders/checkout.dto";
 import { PublicCheckoutService } from "../orders/public-checkout.service";
 import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PublicInvoicesService } from "../payments/public-invoices.service";
 import { PublicCatalogueService } from "../products/public-catalogue.service";
@@ -552,6 +553,12 @@ export class StorefrontService {
             site.id,
             organizationId,
             async () => {
+                // Not on the checkout's transaction: the contact stays even if
+                // the checkout fails, so its webhook goes with it.
+                const known = await prisma.contact.findUnique({
+                    where: { organizationId_email: { organizationId, email } },
+                    select: { id: true },
+                });
                 const contact = await prisma.contact.upsert({
                     where: { organizationId_email: { organizationId, email } },
                     update: {},
@@ -565,6 +572,13 @@ export class StorefrontService {
                     },
                     select: { id: true, firstName: true, lastName: true },
                 });
+                if (!known) {
+                    await emitWebhook(prisma, {
+                        organizationId,
+                        type: "customer.created",
+                        id: contact.id,
+                    });
+                }
                 return {
                     accountId: null,
                     email,

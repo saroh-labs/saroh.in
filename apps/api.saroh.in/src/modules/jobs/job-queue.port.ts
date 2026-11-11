@@ -145,6 +145,9 @@ export const RETRY_SCHEDULES: Readonly<
     "webhook.process": [1, 5, 15, 30, 60, 120, 240, 480].map(
         (m) => m * MINUTE_MS,
     ),
+    // A business's own server that is down (outbound webhooks, U13): about
+    // 8 hours of tries before the delivery is FAILED.
+    "webhooks.deliver": [1, 5, 15, 30, 60, 120, 240].map((m) => m * MINUTE_MS),
 };
 
 /** The wait before a failed job of `type` runs again (`attempts` as in {@link nextBackoff}). */

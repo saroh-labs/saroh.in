@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { authorize } from "../organizations/organization-policy";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import type {
     CreateActivityDto,
@@ -141,6 +142,11 @@ export class LeadsService {
                     status: "OPEN",
                     value: dto.value ?? null,
                 },
+            });
+            await emitWebhook(tx, {
+                organizationId: ctx.organizationId,
+                type: "enquiry.received",
+                id: lead.id,
             });
 
             await tx.activity.create({
@@ -419,34 +425,50 @@ export class LeadsService {
 
         if (dto.contact) {
             const c = dto.contact;
-            const contact = await prisma.contact.upsert({
-                where: {
-                    organizationId_email: {
-                        organizationId: ctx.organizationId,
-                        email: c.email,
-                    },
-                },
-                update: {
-                    ...(c.firstName !== undefined
-                        ? { firstName: c.firstName }
-                        : {}),
-                    ...(c.lastName !== undefined
-                        ? { lastName: c.lastName }
-                        : {}),
-                    ...(c.phone !== undefined ? { phone: c.phone } : {}),
-                    ...(c.company !== undefined ? { company: c.company } : {}),
-                },
-                create: {
+            const where = {
+                organizationId_email: {
                     organizationId: ctx.organizationId,
                     email: c.email,
-                    firstName: c.firstName ?? null,
-                    lastName: c.lastName ?? null,
-                    phone: c.phone ?? null,
-                    company: c.company ?? null,
-                    source: "manual",
                 },
+            };
+            return prisma.$transaction(async (tx) => {
+                const known = await tx.contact.findUnique({
+                    where,
+                    select: { id: true },
+                });
+                const contact = await tx.contact.upsert({
+                    where,
+                    update: {
+                        ...(c.firstName !== undefined
+                            ? { firstName: c.firstName }
+                            : {}),
+                        ...(c.lastName !== undefined
+                            ? { lastName: c.lastName }
+                            : {}),
+                        ...(c.phone !== undefined ? { phone: c.phone } : {}),
+                        ...(c.company !== undefined
+                            ? { company: c.company }
+                            : {}),
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        email: c.email,
+                        firstName: c.firstName ?? null,
+                        lastName: c.lastName ?? null,
+                        phone: c.phone ?? null,
+                        company: c.company ?? null,
+                        source: "manual",
+                    },
+                });
+                if (!known) {
+                    await emitWebhook(tx, {
+                        organizationId: ctx.organizationId,
+                        type: "customer.created",
+                        id: contact.id,
+                    });
+                }
+                return contact.id;
             });
-            return contact.id;
         }
 
         throw new BadRequestException(

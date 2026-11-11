@@ -32,7 +32,8 @@ export type NoticeKind =
     | "plan"
     | "products"
     | "customer-request"
-    | "member";
+    | "member"
+    | "developers";
 
 export interface NoticeTarget {
     kind: NoticeKind;
@@ -90,6 +91,8 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
     // A member's own cancel or pause, or autopay off at their bank (#1150):
     // the person's Memberships tab.
     member: (id) => (id ? personHref(id, "sub") : "/billing/subscriptions"),
+    // A webhook endpoint Saroh switched off after repeated failures (U13).
+    developers: () => "/settings/developers/webhooks",
 };
 
 function isKind(kind: string): kind is NoticeKind {

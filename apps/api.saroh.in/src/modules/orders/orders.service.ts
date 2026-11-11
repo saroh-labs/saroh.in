@@ -26,6 +26,7 @@ import {
 } from "../invoices/order-invoicing";
 import { assertPaymentsOn } from "../invoices/payments-on";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { emitOrderWebhook, emitWebhook } from "../outbound-webhooks/emitter";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import { assertLocationTakingOrders } from "./checkout-paused";
@@ -444,6 +445,11 @@ export class OrdersService {
                                 },
                             },
                         });
+                        await emitWebhook(tx, {
+                            organizationId,
+                            type: "order.created",
+                            id: order.id,
+                        });
                         await applyInventoryTransition(
                             tx,
                             items,
@@ -686,6 +692,9 @@ export class OrdersService {
                     ...(kitchen ?? {}),
                 },
             });
+            if (statusChanging) {
+                await emitOrderWebhook(tx, "order.status_changed", orderId);
+            }
             // Paid by hand (pay later, cash at the counter): the order's
             // invoice is made now, once — the same one a payment webhook
             // would have made (ADR-008). Refunded by hand: what is left of
@@ -706,6 +715,7 @@ export class OrdersService {
                 });
                 // Insights' orders figure (#867), with the payment.
                 await recordOrderPaidInTx(tx, orderId);
+                await emitOrderWebhook(tx, "order.paid", orderId);
                 if (order.organizationId) {
                     // On the timeline, with no amount in the note; the
                     // step's amount says it to a money reader.

@@ -13,6 +13,7 @@ import { BookingEventType } from "../bookings/booking-event-type";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import {
     autopayRefusal,
     cancelAutopayFirst,
@@ -489,17 +490,25 @@ export class ContactsService {
             });
         }
 
-        return prisma.contact.create({
-            data: {
+        return prisma.$transaction(async (tx) => {
+            const contact = await tx.contact.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    email: dto.email,
+                    // An empty field is nothing known, stored as nothing.
+                    firstName: blankToNull(dto.firstName),
+                    lastName: blankToNull(dto.lastName),
+                    phone: blankToNull(dto.phone),
+                    company: blankToNull(dto.company),
+                    source: "manual",
+                },
+            });
+            await emitWebhook(tx, {
                 organizationId: ctx.organizationId,
-                email: dto.email,
-                // An empty field is nothing known, stored as nothing.
-                firstName: blankToNull(dto.firstName),
-                lastName: blankToNull(dto.lastName),
-                phone: blankToNull(dto.phone),
-                company: blankToNull(dto.company),
-                source: "manual",
-            },
+                type: "customer.created",
+                id: contact.id,
+            });
+            return contact;
         });
     }
 

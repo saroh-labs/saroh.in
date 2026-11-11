@@ -13,6 +13,7 @@ import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { queueUncollectedAlert } from "../notifications/uncollected-alert";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
 import type { ShopScope } from "./checkout-bag";
 import type { QuotedLine } from "./checkout-quote";
@@ -335,6 +336,11 @@ export async function createCheckoutOrder(
                             createdAt: true,
                             items: { select: { id: true } },
                         },
+                    });
+                    await emitWebhook(tx, {
+                        organizationId: scope.organizationId,
+                        type: "order.created",
+                        id: order.id,
                     });
                     if (applied) {
                         // The code's use, in this transaction: one count with

@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free unit tests: the database package is mocked so nothing touches a real
 // Postgres. The lead/booking delegates are here because the list rollup reads
 // them — see ContactListItem.

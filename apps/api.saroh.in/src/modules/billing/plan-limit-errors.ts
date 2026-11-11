@@ -60,9 +60,10 @@ export interface PlanLimitDetails {
 
 /**
  * A cap counted by its own service, not by metering: API keys (U5), whose
- * live count needs the key's own rules (grace, expiry).
+ * live count needs the key's own rules (grace, expiry), and webhook
+ * endpoints (U13).
  */
-export type CountedLimitKey = "api.keys.max";
+export type CountedLimitKey = "api.keys.max" | "webhooks.max";
 
 /** 403: adding one more would pass the plan's cap on this row. */
 export function planLimitReached(

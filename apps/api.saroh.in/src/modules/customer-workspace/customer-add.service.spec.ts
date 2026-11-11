@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { Prisma } from "@saroh/database";
 import { plainToInstance } from "class-transformer";
@@ -29,6 +31,8 @@ function make() {
             create: jest.fn().mockResolvedValue({ id: "c_new" }),
         },
         customer: { create: jest.fn() },
+        // The contact and its webhook in one transaction, on this same client.
+        $transaction: jest.fn((run: (tx: unknown) => unknown) => run(db)),
     };
     const service = new CustomerAddService(
         db as unknown as ConstructorParameters<typeof CustomerAddService>[0],
