@@ -1,11 +1,12 @@
 "use server";
 
-import type { CreateApiKeyBody } from "@saroh/api-contract";
+import type { CreateApiKeyBody, UpdateApiKeyBody } from "@saroh/api-contract";
 
 import {
     createApiKey as create,
     revokeApiKey as revoke,
     rollApiKey as roll,
+    updateApiKey as update,
 } from "./service";
 
 /**
@@ -16,6 +17,10 @@ import {
 
 export async function createApiKey(body: CreateApiKeyBody) {
     return create(body);
+}
+
+export async function updateApiKey(id: string, body: UpdateApiKeyBody) {
+    return update(id, body);
 }
 
 export async function rollApiKey(id: string) {

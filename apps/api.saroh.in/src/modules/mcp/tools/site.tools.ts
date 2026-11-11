@@ -158,7 +158,7 @@ function linksText(links: {
  * revision (`deleted` for a page it removed). `restore_site_draft` reads
  * these to tell this connection's edits from anyone else's.
  */
-function revisionsTarget(
+export function revisionsTarget(
     siteId: string,
     pages: Record<string, number | "deleted">,
 ): string {
@@ -1087,7 +1087,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * This connection's restore point for the site: the latest session's, and
  * of two taken by simultaneous first writes, the earlier.
  */
-async function sessionPoint(d: SiteToolDeps, call: McpCall, siteId: string) {
+export async function sessionPoint(
+    d: Pick<SiteToolDeps, "restorePoints">,
+    call: McpCall,
+    siteId: string,
+) {
     const latest = await d.restorePoints.latest(call, siteId);
     if (!latest) {
         throw new ToolError(
@@ -1122,7 +1126,7 @@ async function sessionPoint(d: SiteToolDeps, call: McpCall, siteId: string) {
  * it, a page added or deleted by someone else, or the site's settings saved
  * after this connection's last write.
  */
-async function changedOutside(
+export async function changedOutside(
     { ctx, connection }: McpCall,
     siteId: string,
     point: { sessionStartedAt: Date; snapshot: RestoreSnapshot },
@@ -1205,7 +1209,7 @@ const jsonOrNull = (value: Prisma.JsonValue | null) =>
  * place and sections are put back, then the style, menu, footer and search
  * text. The live site is never touched.
  */
-async function restoreSnapshot(
+export async function restoreSnapshot(
     ctx: OrganizationContext,
     siteId: string,
     snap: RestoreSnapshot,

@@ -5,6 +5,7 @@ import { addressLine, endpointState, eventLabel, eventsFor } from "./events";
 
 const endpoint = (over: Partial<WebhookEndpointView>): WebhookEndpointView => ({
     id: "e1",
+    name: null,
     url: "https://hooks.example.com/saroh",
     events: ["order.paid"],
     enabled: true,
@@ -12,6 +13,7 @@ const endpoint = (over: Partial<WebhookEndpointView>): WebhookEndpointView => ({
     failureStreak: 0,
     createdByUserId: "u1",
     previousSecretUntil: null,
+    lastSent: null,
     createdAt: "2026-11-01T00:00:00.000Z",
     ...over,
 });

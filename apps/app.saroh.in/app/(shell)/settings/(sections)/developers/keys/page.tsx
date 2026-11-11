@@ -5,7 +5,6 @@ import { DevelopersLocked } from "@/components/settings/developers/locked";
 import { listApiKeys, readApiUsage } from "@/lib/api-keys/service";
 import { upgradeHref } from "@/lib/billing/access";
 import { DOCS_URL } from "@/lib/help/links";
-import { listMembers } from "@/lib/organizations/members";
 import {
     activeBusinessZone,
     resolveActiveOrganization,
@@ -44,17 +43,13 @@ export default async function KeysPage() {
             />
         );
     }
-    const [keys, members, zone] = await Promise.all([
+    const [keys, zone] = await Promise.all([
         listApiKeys(),
-        listMembers(),
         activeBusinessZone(),
     ]);
     return (
         <Keys
             keys={keys}
-            people={Object.fromEntries(
-                members.map((m) => [m.userId, m.name ?? m.email]),
-            )}
             selfId={session.user.id}
             business={business}
             actions={org?.actions ?? []}

@@ -17,6 +17,7 @@ import type { FeatureFlagService } from "../feature-flags/feature-flags.service"
 import { ORG_ACTIONS } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
 import { ApiKeysService, ROLL_GRACE_MS, tokenDigest } from "./api-keys.service";
+import { keyContextCache } from "./key-context.cache";
 
 const mutableEnv = env as { APIKEY_ENC_KEY?: string };
 const keyBefore = mutableEnv.APIKEY_ENC_KEY;
@@ -209,5 +210,96 @@ describe("API keys (U5)", () => {
         const written = JSON.stringify(events);
         expect(written).not.toContain(made.token);
         expect(written).not.toContain(rolled.token);
+    });
+
+    it("renames a key, keeping what it may do, and audits the old name", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, secret("Old"), NOW);
+        const renamed = await service.update(
+            owner,
+            made.key.id,
+            { name: "Stock sync" },
+            NOW,
+        );
+        expect(renamed.name).toBe("Stock sync");
+        expect(renamed.scope).toEqual(made.key.scope);
+        expect(renamed.prefix).toBe(made.key.prefix);
+        const event = await prisma.auditEvent.findFirstOrThrow({
+            where: { organizationId: org.id, action: "apikey.renamed" },
+        });
+        expect(event.targetId).toBe(made.key.id);
+        expect(event.metadata).toMatchObject({ previousName: "Old" });
+
+        const other = await business();
+        await expect(
+            service.update(other.owner, made.key.id, { name: "Mine" }, NOW),
+        ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("changes what a key can do on its next call, and audits before and after", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, secret(), NOW);
+        const digest = tokenDigest(made.token);
+        const load = jest.fn(async () => {
+            const key = await prisma.apiKey.findUniqueOrThrow({
+                where: { id: made.key.id },
+            });
+            return { key, context: owner };
+        });
+        await keyContextCache.get(digest, load);
+
+        const edited = await service.update(
+            owner,
+            made.key.id,
+            { scope: ["order:read"], aiEnabled: true },
+            NOW,
+        );
+        expect(edited.scope).toEqual(["order:read"]);
+        expect(edited.aiEnabled).toBe(true);
+        // The cached context is gone: the next call reads the key again.
+        const again = await keyContextCache.get(digest, load);
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(again?.key.scope).toEqual(["order:read"]);
+
+        const event = await prisma.auditEvent.findFirstOrThrow({
+            where: { organizationId: org.id, action: "apikey.updated" },
+        });
+        expect(event.metadata).toMatchObject({
+            scopeBefore: "order:read order:write",
+            scopeAfter: "order:read",
+        });
+    });
+
+    it("says whether each key's maker is still on the team", async () => {
+        const { org, owner, person } = await business();
+        const leaver = await person("leaver");
+        await prisma.membership.createMany({
+            data: [
+                { organizationId: org.id, userId: owner.userId, role: "OWNER" },
+                {
+                    organizationId: org.id,
+                    userId: leaver.userId,
+                    role: "OWNER",
+                },
+            ],
+        });
+        const mine = await service.create(owner, secret("Mine"), NOW);
+        const theirs = await service.create(leaver, secret("Theirs"), NOW);
+        await prisma.membership.deleteMany({
+            where: { organizationId: org.id, userId: leaver.userId },
+        });
+
+        const list = await service.list(owner);
+        const by = Object.fromEntries(list.data.map((k) => [k.id, k.madeBy]));
+        expect(by[mine.key.id]).toEqual({
+            id: owner.userId,
+            name: "owner",
+            stillHere: true,
+        });
+        expect(by[theirs.key.id]).toEqual({
+            id: leaver.userId,
+            name: "leaver",
+            stillHere: false,
+        });
     });
 });

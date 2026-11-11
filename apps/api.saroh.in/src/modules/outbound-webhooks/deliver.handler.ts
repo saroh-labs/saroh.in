@@ -1,5 +1,6 @@
 import { HttpException, Injectable, Logger, Optional } from "@nestjs/common";
 import type { WebhookEvent } from "@saroh/api-contract";
+import { WEBHOOK_PING } from "@saroh/api-contract";
 import type { Job, Prisma, WebhookEndpoint } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -147,8 +148,12 @@ export class WebhookDeliverHandler {
                       : {}),
             },
         });
+        // Only a test reaches an address that is off. One that gets through
+        // turns it back on; one that fails leaves it off, its count as it was.
+        const off = endpoint.disabledAt !== null;
         if (attempt.ok) {
-            if (endpoint.failureStreak !== 0) {
+            if (off) await this.onAfterTest(endpoint, delivery.id);
+            else if (endpoint.failureStreak !== 0) {
                 await prisma.webhookEndpoint.update({
                     where: { id: endpoint.id },
                     data: { failureStreak: 0 },
@@ -156,7 +161,7 @@ export class WebhookDeliverHandler {
             }
             return;
         }
-        if (last) await this.countFailure(endpoint, now);
+        if (last && !off) await this.countFailure(endpoint, now);
         throw new DeliveryFailed(attempt.error ?? "Not delivered");
     };
 
@@ -166,7 +171,10 @@ export class WebhookDeliverHandler {
         event: string,
     ): Promise<string | null> {
         const { organizationId } = endpoint;
-        if (endpoint.disabledAt) return "The endpoint is switched off.";
+        // A test goes to an address that is off, to check it before it's turned on.
+        if (endpoint.disabledAt && event !== WEBHOOK_PING) {
+            return "The endpoint is switched off.";
+        }
         if (
             !(await this.flags.isEnabled(FlagKey.API_WEBHOOKS, organizationId))
         ) {
@@ -297,6 +305,27 @@ export class WebhookDeliverHandler {
         });
         if (off.count !== 1) return;
         await this.tellOff(endpoint, counted.failureStreak);
+    }
+
+    /** An address that was off, on again because a test got through. */
+    private async onAfterTest(
+        endpoint: WebhookEndpoint,
+        deliveryId: string,
+    ): Promise<void> {
+        const on = await prisma.webhookEndpoint.updateMany({
+            where: { id: endpoint.id, disabledAt: { not: null } },
+            data: { disabledAt: null, failureStreak: 0 },
+        });
+        if (on.count !== 1) return;
+        await this.audit.record({
+            action: AuditAction.WebhookEndpointOnAfterTest,
+            actorUserId: SYSTEM_ACTOR,
+            organizationId: endpoint.organizationId,
+            targetType: "webhook-endpoint",
+            targetId: endpoint.id,
+            outcome: AuditOutcome.Success,
+            metadata: { host: hostOf(endpoint.url), deliveryId },
+        });
     }
 
     private async tellOff(

@@ -5,6 +5,7 @@ import {
     Header,
     HttpCode,
     Param,
+    Patch,
     Post,
     UseGuards,
 } from "@nestjs/common";
@@ -13,8 +14,9 @@ import type {
     ApiKeyView,
     CreateApiKeyBody,
     CreatedApiKey,
+    UpdateApiKeyBody,
 } from "@saroh/api-contract";
-import { createApiKeyBody } from "@saroh/api-contract";
+import { createApiKeyBody, updateApiKeyBody } from "@saroh/api-contract";
 
 import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -47,6 +49,16 @@ export class ApiKeysController {
         @Body(new ZodContractPipe(createApiKeyBody)) body: CreateApiKeyBody,
     ): Promise<CreatedApiKey> {
         return this.keys.create(ctx, body);
+    }
+
+    @Patch(":keyId")
+    @Header("Cache-Control", "no-store")
+    update(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("keyId") keyId: string,
+        @Body(new ZodContractPipe(updateApiKeyBody)) body: UpdateApiKeyBody,
+    ): Promise<ApiKeyView> {
+        return this.keys.update(ctx, keyId, body);
     }
 
     @Post(":keyId/roll")

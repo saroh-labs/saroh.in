@@ -85,7 +85,35 @@ export type ApiKeyView = z.infer<typeof apiKeyView>;
 export const createdApiKey = z.object({ key: apiKeyView, token: z.string() });
 export type CreatedApiKey = z.infer<typeof createdApiKey>;
 
-export const apiKeyList = z.object({ data: z.array(apiKeyView) });
+/**
+ * Editing a key: its name and what it can do, in create's shape. A secret
+ * key's scope is clamped to the editor's own powers; a publishable key's
+ * stays fixed (only its websites change). Its kind and expiry stay as made.
+ */
+export const updateApiKeyBody = z
+    .strictObject({
+        name: z.string().trim().min(1).max(80).optional(),
+        scope: z.array(z.string().max(64)).max(200).optional(),
+        allowedOrigins: z.array(allowedOrigin).max(20).optional(),
+        aiEnabled: z.boolean().optional(),
+    })
+    .refine((b) => Object.keys(b).length > 0, {
+        message: "Nothing to change",
+    });
+export type UpdateApiKeyBody = z.infer<typeof updateApiKeyBody>;
+
+/** A key as the list shows it: with who made it and whether they're still on the team. */
+export const apiKeyListItem = apiKeyView.extend({
+    madeBy: z.object({
+        id,
+        name: z.string().nullable(),
+        /** False once the maker has left or is paused: the key has stopped working. */
+        stillHere: z.boolean(),
+    }),
+});
+export type ApiKeyListItem = z.infer<typeof apiKeyListItem>;
+
+export const apiKeyList = z.object({ data: z.array(apiKeyListItem) });
 export type ApiKeyList = z.infer<typeof apiKeyList>;
 
 /**

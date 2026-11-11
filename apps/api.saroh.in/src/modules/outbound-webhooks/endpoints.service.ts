@@ -2,6 +2,8 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    HttpException,
+    HttpStatus,
     Injectable,
     NotFoundException,
     Optional,
@@ -46,6 +48,7 @@ import {
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { allows, authorize } from "../organizations/organization-policy";
+import { LimitsService } from "../rate-limits/limits.service";
 import {
     EVENT_CAPABILITY,
     queueDelivery,
@@ -56,6 +59,9 @@ import { mintSecret } from "./signing";
 
 /** How long a rolled secret keeps signing beside its replacement. */
 export const SECRET_ROLL_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** "Send a test"s one address may get in a minute. */
+export const TESTS_PER_MINUTE = 5;
 
 /** The pricing-catalogue row: on the plan, and how many addresses (`webhooks.max`). */
 const WEBHOOKS_ROW = "webhooks";
@@ -130,9 +136,16 @@ export function signingSecrets(
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-export function endpointView(e: WebhookEndpoint): WebhookEndpointView {
+/** The latest try to an address, as its row shows it. */
+type LastSent = WebhookEndpointView["lastSent"];
+
+export function endpointView(
+    e: WebhookEndpoint,
+    lastSent: LastSent = null,
+): WebhookEndpointView {
     return {
         id: e.id,
+        name: e.name,
         url: e.url,
         events: e.events,
         enabled: e.disabledAt === null,
@@ -140,6 +153,7 @@ export function endpointView(e: WebhookEndpoint): WebhookEndpointView {
         failureStreak: e.failureStreak,
         createdByUserId: e.createdByUserId,
         previousSecretUntil: iso(e.previousSecretUntil),
+        lastSent,
         createdAt: e.createdAt.toISOString(),
     };
 }
@@ -183,6 +197,8 @@ export class WebhookEndpointsService {
         private readonly flags: FeatureFlagService = new FeatureFlagService(),
         @Optional()
         private readonly access: CatalogueAccessService = new CatalogueAccessService(),
+        @Optional()
+        private readonly limits: LimitsService = new LimitsService(null),
     ) {}
 
     /** Where a saved address's name is looked up; tests put a stub here. */
@@ -195,7 +211,37 @@ export class WebhookEndpointsService {
             orderBy: { createdAt: "desc" },
             take: 200,
         });
-        return { data: rows.map(endpointView) };
+        const last = await this.lastSent(
+            ctx.organizationId,
+            rows.map((e) => e.id),
+        );
+        return {
+            data: rows.map((e) => endpointView(e, last.get(e.id) ?? null)),
+        };
+    }
+
+    /** Each address's latest tried delivery, from the log. */
+    private async lastSent(organizationId: string, endpointIds: string[]) {
+        const out = new Map<string, NonNullable<LastSent>>();
+        if (endpointIds.length === 0) return out;
+        const rows = await prisma.webhookDelivery.findMany({
+            where: {
+                organizationId,
+                endpointId: { in: endpointIds },
+                lastAttemptAt: { not: null },
+            },
+            orderBy: [{ lastAttemptAt: "desc" }, { id: "desc" }],
+            distinct: ["endpointId"],
+            select: { endpointId: true, lastAttemptAt: true, status: true },
+        });
+        for (const d of rows) {
+            if (!d.lastAttemptAt) continue;
+            out.set(d.endpointId, {
+                at: d.lastAttemptAt.toISOString(),
+                status: d.status,
+            });
+        }
+        return out;
     }
 
     async create(
@@ -231,6 +277,7 @@ export class WebhookEndpointsService {
                 data: {
                     organizationId: ctx.organizationId,
                     createdByUserId: ctx.userId,
+                    name: body.name ?? null,
                     url,
                     events,
                     secretCiphertext: sealed.ciphertext,
@@ -267,6 +314,7 @@ export class WebhookEndpointsService {
             data: {
                 createdByUserId: ctx.userId,
                 ...(url ? { url } : {}),
+                ...(body.name !== undefined ? { name: body.name } : {}),
                 ...(events ? { events } : {}),
                 ...(body.enabled === false && old.disabledAt === null
                     ? { disabledAt: now }
@@ -381,14 +429,29 @@ export class WebhookEndpointsService {
         return deliveryView(delivery);
     }
 
-    /** "Send a test": a `ping` to this endpoint, whatever it subscribes to. */
+    /**
+     * "Send a test": a `ping` to this endpoint, whatever it subscribes to,
+     * and whether it is on or off. To an address that is off, one that
+     * gets through turns it back on (the deliver job does). At most
+     * {@link TESTS_PER_MINUTE} a minute per address, shared by replicas.
+     */
     async test(
         ctx: OrganizationContext,
         endpointId: string,
     ): Promise<WebhookDeliveryView> {
         await this.open(ctx);
         const endpoint = await this.find(ctx, endpointId);
-        this.assertOn(endpoint);
+        const turn = await this.limits.take(
+            "webhook-test",
+            endpoint.id,
+            TESTS_PER_MINUTE,
+        );
+        if (!turn.allowed) {
+            throw new HttpException(
+                "That's a lot of tests in a minute. Wait a moment and send another.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
         const id = await prisma.$transaction((tx) =>
             queueDelivery(tx, {
                 organizationId: ctx.organizationId,

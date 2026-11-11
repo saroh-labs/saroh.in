@@ -11,8 +11,10 @@ import { NORTHWIND_ORG } from "../playwright.config";
 /**
  * Settings › API and AI apps (plan 2026-11-10-001, U14), desk and phone:
  * the Keys tab locked on a plan without keys; a key made, shown once,
- * then only its start; Revoke asking first; a webhook address added and a
- * test sent showing in its log; a Member with no Keys tab; and on a phone
+ * then only its start; Edit what it can do (name and AI switch); Revoke
+ * asking first; a named webhook address added, a test sent showing in its
+ * log, and a test still sent once the address is turned off; a Member with no
+ * Keys tab; and on a phone
  * the tabs as a list. Everything is made on Northwind for the test.
  *
  * @serial: it switches the API's surfaces on for Northwind and grants its
@@ -81,19 +83,33 @@ test(
         await expect(row).toContainText(token.slice(0, "sk_live_".length + 4));
 
         await row.click();
-        const detail = page.getByRole("dialog", { name });
+        // Edit what it can do: a new name, and the AI switch on.
+        const renamed = `${name} renamed`;
+        await page
+            .getByRole("dialog", { name })
+            .getByRole("button", { name: "Edit what it can do" })
+            .click();
+        const edit = page.getByRole("dialog", { name: "Edit what it can do" });
+        await edit.getByLabel("Name").fill(renamed);
+        await edit.getByText("Let AI apps use this key").click();
+        await edit.getByRole("button", { name: "Save" }).click();
+        await expect(edit).toBeHidden();
+        const after = page.getByRole("button", { name: `Open ${renamed}` });
+        await expect(after).toContainText("AI apps");
+        await after.click();
+        const detail = page.getByRole("dialog", { name: renamed });
         await detail.getByRole("button", { name: "Revoke" }).click();
         const confirm = page.getByRole("alertdialog");
         await expect(confirm).toContainText("stops working now");
         await confirm.getByRole("button", { name: "Revoke key" }).click();
         await expect(
-            page.getByRole("button", { name: `Open ${name}` }),
+            page.getByRole("button", { name: `Open ${renamed}` }),
         ).toHaveCount(0);
     },
 );
 
 test(
-    "Send a test shows a message in an address's log",
+    "Send a test shows a message in an address's log, on or off",
     { tag: "@serial" },
     async ({ browser, page }, testInfo) => {
         await switchOnNorthwind(browser, "API_WEBHOOKS", testInfo);
@@ -107,6 +123,8 @@ test(
             page.getByRole("dialog", { name: "Add an address" }),
         );
         const sheet = page.getByRole("dialog", { name: "Add an address" });
+        const label = `E2E sync ${stamp(testInfo)}`;
+        await sheet.getByLabel("Name").fill(label);
         await sheet.getByLabel("Address").fill(address);
         await sheet.getByRole("button", { name: "Add address" }).click();
         const once = page.getByRole("dialog", {
@@ -116,15 +134,25 @@ test(
         await once.getByRole("button", { name: "Copy secret" }).click();
         await once.getByRole("button", { name: "I've saved it" }).click();
 
-        const row = page
-            .getByRole("button", { name: "Open example.com" })
-            .first();
+        const row = page.getByRole("button", { name: `Open ${label}` });
+        await expect(row).toContainText("example.com");
         await row.click();
-        const detail = page.getByRole("dialog", { name: "example.com" });
+        const detail = page.getByRole("dialog", { name: label });
         await detail.getByRole("button", { name: "Send a test" }).click();
         await expect(
             detail.locator("[data-delivery-log] li").first(),
         ).toContainText("Test message");
+
+        // Turned off, a test still goes (one that gets through turns it on).
+        await detail.getByText("Sending", { exact: true }).click();
+        await detail.getByRole("button", { name: "Save" }).click();
+        await expect(detail).toBeHidden();
+        await row.click();
+        await expect(
+            detail.getByText("Off. Turns on once a test gets through."),
+        ).toBeVisible();
+        await detail.getByRole("button", { name: "Send a test" }).click();
+        await expect(detail.locator("[data-delivery-log] li")).toHaveCount(2);
 
         // Put it away.
         await detail.getByRole("button", { name: "Remove address" }).click();

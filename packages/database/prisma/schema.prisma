@@ -9676,6 +9676,8 @@ model WebhookEndpoint {
   organizationId   String
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUserId  String
+  // A name the business gives the address ("Order sync"); null shows the host.
+  name             String?
   url              String
   events           String[]
   secretCiphertext String

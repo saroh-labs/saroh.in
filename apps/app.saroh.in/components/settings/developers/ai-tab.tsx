@@ -24,6 +24,7 @@ export async function AiTab() {
             owner={
                 org?.actions?.includes("apikey:manage") ?? org?.role === "OWNER"
             }
+            canEditSite={org?.actions?.includes("section:write") ?? false}
             mcp={mcpAddress()}
             docs={DOCS_URL}
             zone={zone}

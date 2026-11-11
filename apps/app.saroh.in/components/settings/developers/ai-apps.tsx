@@ -1,22 +1,28 @@
 "use client";
 
+import type { AiConnectionActivity } from "@saroh/api-contract";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
-import { showSuccess } from "@saroh/ui/toast";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronRight, ExternalLink, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { disconnectAiConnection } from "@/lib/ai-connections/actions";
+import {
+    disconnectAiConnection,
+    readAiActivity,
+    rollBackAiSiteDraft,
+} from "@/lib/ai-connections/actions";
 import { CONNECT_IN } from "@/lib/ai-connections/mcp-address";
 import type { AiConnection } from "@/lib/ai-connections/types";
 import { runAction } from "@/lib/api/run-action";
@@ -48,6 +54,8 @@ export interface AiAppsProps {
     selfId: string;
     /** Sees and ends everyone's (`apikey:manage`). */
     owner: boolean;
+    /** May edit the website, so may roll back an assistant's draft changes. */
+    canEditSite: boolean;
     mcp: string | null;
     docs: string;
     zone: string;
@@ -186,7 +194,16 @@ function CanAndCant() {
  * sheet with Disconnect from this business.
  */
 export function AiApps(props: AiAppsProps) {
-    const { connections, business, selfId, owner, mcp, docs, zone } = props;
+    const {
+        connections,
+        business,
+        selfId,
+        owner,
+        canEditSite,
+        mcp,
+        docs,
+        zone,
+    } = props;
     const [openId, setOpenId] = useState<string | null>(null);
     const open = connections.find((c) => c.id === openId) ?? null;
     const now = new Date();
@@ -347,7 +364,8 @@ export function AiApps(props: AiAppsProps) {
                     </ul>
                 </ListTable>
                 <p className="mt-2.5 text-[12.5px] text-muted-foreground">
-                    Open one to see when it was used, or disconnect it.
+                    Open one to see what it changed, roll back its site draft or
+                    disconnect it.
                     {owner ? null : " Only your own connections show here."}
                 </p>
             </section>
@@ -369,6 +387,7 @@ export function AiApps(props: AiAppsProps) {
                 connection={open}
                 business={business}
                 selfId={selfId}
+                canEditSite={canEditSite}
                 zone={zone}
                 onClose={() => setOpenId(null)}
             />
@@ -380,12 +399,14 @@ function ConnectionSheet({
     connection,
     business,
     selfId,
+    canEditSite,
     zone,
     onClose,
 }: {
     connection: AiConnection | null;
     business: string;
     selfId: string;
+    canEditSite: boolean;
     zone: string;
     onClose: () => void;
 }) {
@@ -482,18 +503,13 @@ function ConnectionSheet({
                                 </>
                             ) : null}
                         </dl>
-                        <div className="flex flex-wrap items-center gap-2 text-[13.5px]">
-                            <span data-ph-unmask="" className="font-semibold">
-                                What it changed
-                            </span>
-                            <Link
-                                data-ph-unmask=""
-                                href="/settings/activity"
-                                className="ml-auto font-semibold underline decoration-border-strong underline-offset-[3px]"
-                            >
-                                See all in Activity
-                            </Link>
-                        </div>
+                        <Changes
+                            key={c.id}
+                            connection={c}
+                            app={app}
+                            canEditSite={canEditSite}
+                            zone={zone}
+                        />
                     </>
                 ) : null}
             </FormSheet>
@@ -515,6 +531,221 @@ function ConnectionSheet({
                 busyLabel="Disconnecting…"
                 keepLabel={`Keep ${app}`}
                 onConfirm={disconnect}
+            />
+        </>
+    );
+}
+
+/**
+ * What one connection changed in this business, newest first, read when
+ * its sheet opens, with More for older ones; and each website draft it
+ * changed, with Roll back. The words are Saroh's, but they can quote names
+ * someone typed, so they are shown as plain text only.
+ */
+function Changes({
+    connection: c,
+    app,
+    canEditSite,
+    zone,
+}: {
+    connection: AiConnection;
+    app: string;
+    canEditSite: boolean;
+    zone: string;
+}) {
+    const router = useRouter();
+    const [page, setPage] = useState<AiConnectionActivity | null | "loading">(
+        "loading",
+    );
+    const [more, setMore] = useState(false);
+    const [rolling, setRolling] = useState<{
+        siteId: string;
+        siteName: string;
+        since: string;
+    } | null>(null);
+    const now = new Date();
+
+    async function load() {
+        setPage("loading");
+        setPage(await readAiActivity(c.id).catch(() => null));
+    }
+    // Read once, when the sheet opens on this connection.
+    useEffect(() => {
+        let live = true;
+        void readAiActivity(c.id)
+            .catch(() => null)
+            .then((read) => {
+                if (live) setPage(read);
+            });
+        return () => {
+            live = false;
+        };
+    }, [c.id]);
+
+    async function loadMore() {
+        if (page === "loading" || !page?.nextCursor) return;
+        setMore(true);
+        const next = await readAiActivity(c.id, page.nextCursor).catch(
+            () => null,
+        );
+        setMore(false);
+        if (!next) return showError("We couldn't load more. Try again.");
+        setPage({
+            ...page,
+            data: [...page.data, ...next.data],
+            nextCursor: next.nextCursor,
+        });
+    }
+
+    async function rollBack() {
+        if (!rolling) return;
+        const res = await runAction(() =>
+            rollBackAiSiteDraft(c.id, rolling.siteId),
+        );
+        if (!res) return false;
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess(
+            `${rolling.siteName}'s draft is back to how it was. Your live site hasn't changed.`,
+        );
+        await load();
+        router.refresh();
+        return true;
+    }
+
+    return (
+        <>
+            <div>
+                <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[13.5px]">
+                    <span data-ph-unmask="" className="font-semibold">
+                        What it changed
+                    </span>
+                    <Link
+                        data-ph-unmask=""
+                        href="/settings/activity"
+                        className="ml-auto font-semibold underline decoration-border-strong underline-offset-[3px]"
+                    >
+                        See all in Activity
+                    </Link>
+                </div>
+                {page === "loading" ? (
+                    <p
+                        data-ph-unmask=""
+                        className="text-[12.5px] text-muted-foreground"
+                        aria-busy="true"
+                    >
+                        Loading changes…
+                    </p>
+                ) : page === null ? (
+                    <p
+                        className="text-[12.5px] text-muted-foreground"
+                        role="alert"
+                    >
+                        Couldn't load what it changed.{" "}
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="inline"
+                            onClick={() => void load()}
+                        >
+                            Try again
+                        </Button>
+                    </p>
+                ) : page.data.length === 0 ? (
+                    <EmptyState
+                        size="inline"
+                        title="No changes yet"
+                        description={`What ${app} changes here shows up in this list.`}
+                    />
+                ) : (
+                    <>
+                        <ul
+                            className="overflow-hidden rounded-[10px] border border-border bg-card"
+                            data-ai-changes=""
+                        >
+                            {page.data.map((row) => (
+                                <li
+                                    key={row.id}
+                                    className="border-b border-border px-3 py-2 text-[13.5px] last:border-b-0"
+                                >
+                                    <span className="block" data-ph-mask="">
+                                        {row.summary}
+                                    </span>
+                                    <span className="block text-[12.5px] text-muted-foreground">
+                                        {relativeWhen(row.at, now, zone)}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        {page.nextCursor ? (
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="sm"
+                                busy={more}
+                                busyLabel="Loading…"
+                                onClick={() => void loadMore()}
+                            >
+                                Show older changes
+                            </Button>
+                        ) : null}
+                    </>
+                )}
+            </div>
+            {page && page !== "loading"
+                ? page.siteDrafts.map((d) => (
+                      <div
+                          key={d.siteId}
+                          className="rounded-[10px] border border-border bg-card p-3 text-[13.5px]"
+                      >
+                          <span
+                              data-ph-unmask=""
+                              className="block font-semibold"
+                          >
+                              Site draft
+                          </span>
+                          <p
+                              className="mt-0.5 text-foreground/80"
+                              data-ph-mask=""
+                          >
+                              {app} changed the draft of {d.siteName}. Your live
+                              site hasn't changed.
+                          </p>
+                          {canEditSite ? (
+                              <>
+                                  <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="mt-2"
+                                      onClick={() => setRolling(d)}
+                                  >
+                                      Roll back site draft
+                                  </Button>
+                                  <p
+                                      data-ph-unmask=""
+                                      className="mt-1.5 text-[12.5px] text-muted-foreground"
+                                  >
+                                      Puts the draft back to how it was before
+                                      this session (
+                                      {formatDateTime(d.since, zone)}
+                                      ). Your live site isn't touched.
+                                  </p>
+                              </>
+                          ) : null}
+                      </div>
+                  ))
+                : null}
+            <ConfirmDialog
+                open={rolling !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRolling(null);
+                }}
+                title="Roll back the site draft?"
+                description={`The draft of ${rolling?.siteName ?? "your site"} goes back to how it was before ${app}'s session. Your live site isn't touched. If someone else changed the draft since, nothing is rolled back.`}
+                confirmLabel="Roll back draft"
+                busyLabel="Rolling back…"
+                keepLabel="Keep the draft"
+                onConfirm={rollBack}
             />
         </>
     );

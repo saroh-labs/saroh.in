@@ -198,11 +198,15 @@ export const AuditAction = {
     SiteDetailsFilled: "site.starter_content.filled",
     SiteDraftRolledBack: "site.draft.rolled_back",
     SiteSectionBroughtIn: "site.draft.section_brought_in",
-    // An owner made, rolled or revoked an API key (plan 2026-11-10-001, U5),
-    // with the key as the target. Metadata: its kind, name and display
-    // prefix, and for a roll the key it replaced and when that one stops.
-    // Never the token or its digest.
+    // An owner made, renamed, edited, rolled or revoked an API key (plan
+    // 2026-11-10-001, U5), with the key as the target. Metadata: its kind,
+    // name and display prefix; for a rename the name before; for an edit
+    // the scope, websites and AI switch before and after; and for a roll
+    // the key it replaced and when that one stops. Never the token or its
+    // digest.
     ApiKeyCreated: "apikey.created",
+    ApiKeyRenamed: "apikey.renamed",
+    ApiKeyUpdated: "apikey.updated",
     ApiKeyRolled: "apikey.rolled",
     ApiKeyRevoked: "apikey.revoked",
     // A person connected an AI app to the business by signing in, or the
@@ -215,6 +219,10 @@ export const AuditAction = {
     // the connection as the target. Metadata: the tool, the connection's
     // kind, the app's name and the record it touched. Never its content.
     AiToolWrite: "ai_connection.tool_write",
+    // Someone rolled back the website draft an AI connection changed, from
+    // Settings, with the connection as the target. Metadata: the site and
+    // the time the draft went back to.
+    AiConnectionSiteRolledBack: "ai_connection.site_rolled_back",
     // A webhook endpoint made, changed, deleted or its secret rolled by
     // someone with `webhook:manage`, and switched off by Saroh after
     // repeated failed deliveries (plan 2026-11-10-001, U13; actor
@@ -225,6 +233,9 @@ export const AuditAction = {
     WebhookEndpointDeleted: "webhook.deleted",
     WebhookSecretRolled: "webhook.secret_rolled",
     WebhookEndpointAutoDisabled: "webhook.auto_disabled",
+    // An address that was off turned back on because a test got through
+    // (actor `system:webhooks`). Metadata: the host and the test delivery.
+    WebhookEndpointOnAfterTest: "webhook.on_after_test",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

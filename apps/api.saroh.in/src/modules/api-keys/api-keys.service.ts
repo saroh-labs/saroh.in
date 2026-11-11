@@ -15,6 +15,7 @@ import type {
     ApiKeyView,
     CreateApiKeyBody,
     CreatedApiKey,
+    UpdateApiKeyBody,
 } from "@saroh/api-contract";
 import type { ApiKey, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -30,6 +31,7 @@ import {
 } from "../audit/audit.service";
 import type { BusinessAccess } from "../billing/catalogue-access.service";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { overLimit } from "../billing/over-limit.service";
 import {
     MODULE_LOCKED,
     moduleLocked,
@@ -191,6 +193,9 @@ export function clampScope(
     return [...out];
 }
 
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((x) => b.includes(x));
+
 function toView(key: ApiKey): ApiKeyView {
     const iso = (d: Date | null) => (d ? d.toISOString() : null);
     return {
@@ -242,7 +247,116 @@ export class ApiKeysService {
             orderBy: { createdAt: "desc" },
             take: 200,
         });
-        return { data: rows.map(toView) };
+        const makers = [...new Set(rows.map((k) => k.createdByUserId))];
+        const [people, members, paused] = await Promise.all([
+            prisma.user.findMany({
+                where: { id: { in: makers } },
+                select: { id: true, name: true },
+            }),
+            prisma.membership.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    userId: { in: makers },
+                },
+                select: { id: true, userId: true },
+            }),
+            overLimit.pausedNow(ctx.organizationId),
+        ]);
+        const nameOf = new Map(people.map((p) => [p.id, p.name]));
+        // On the team and not paused: a key made by anyone else has stopped.
+        const here = new Set(
+            members
+                .filter((m) => !paused?.memberIds.has(m.id))
+                .map((m) => m.userId),
+        );
+        return {
+            data: rows.map((k) => ({
+                ...toView(k),
+                madeBy: {
+                    id: k.createdByUserId,
+                    name: nameOf.get(k.createdByUserId) ?? null,
+                    stillHere: here.has(k.createdByUserId),
+                },
+            })),
+        };
+    }
+
+    /**
+     * Edits a key: its name and what it can do. A secret key's scope is
+     * clamped to the editor's own powers, as on create, so nobody gives a
+     * key more than they hold; a publishable key stays read-only (its
+     * fixed scope, no AI switch), only its websites change. The change
+     * bites on the key's next call: the cached contexts are dropped. A
+     * revoked, expired or replaced key is a 409.
+     */
+    async update(
+        ctx: OrganizationContext,
+        keyId: string,
+        body: UpdateApiKeyBody,
+        now: Date = new Date(),
+    ): Promise<ApiKeyView> {
+        authorize(ctx, "apikey:manage");
+        const old = await this.find(ctx, keyId);
+        if (old.graceUntil !== null || !isUsable(old, now)) {
+            throw new ConflictException(
+                "This key can't be changed: it has been replaced, revoked or has expired.",
+            );
+        }
+        const secret = old.kind === "SECRET";
+        const data: Prisma.ApiKeyUpdateInput = {};
+        if (body.name !== undefined && body.name !== old.name) {
+            data.name = body.name;
+        }
+        if (secret && body.scope !== undefined) {
+            const scope = clampScope(ctx, body.scope);
+            if (scope.length === 0) {
+                throw new BadRequestException(
+                    "Choose at least one thing this key may do.",
+                );
+            }
+            if (!sameSet(scope, old.scope)) data.scope = scope;
+        }
+        if (
+            secret &&
+            body.aiEnabled !== undefined &&
+            body.aiEnabled !== old.aiEnabled
+        ) {
+            data.aiEnabled = body.aiEnabled;
+        }
+        if (
+            !secret &&
+            body.allowedOrigins !== undefined &&
+            !sameSet(body.allowedOrigins, old.allowedOrigins)
+        ) {
+            if (body.allowedOrigins.length === 0) {
+                throw new BadRequestException("Add the website it works on.");
+            }
+            data.allowedOrigins = body.allowedOrigins;
+        }
+        if (Object.keys(data).length === 0) return toView(old);
+        const key = await prisma.apiKey.update({
+            where: { id: old.id },
+            data,
+        });
+        keyContextCache.forgetOrganization(ctx.organizationId);
+        const nameOnly = Object.keys(data).length === 1 && "name" in data;
+        await this.record(
+            ctx,
+            nameOnly ? AuditAction.ApiKeyRenamed : AuditAction.ApiKeyUpdated,
+            key,
+            nameOnly
+                ? { previousName: old.name }
+                : {
+                      previousName: old.name,
+                      scopeBefore: old.scope.join(" "),
+                      scopeAfter: key.scope.join(" "),
+                      originsBefore: old.allowedOrigins.join(" "),
+                      originsAfter: key.allowedOrigins.join(" "),
+                      aiBefore: String(old.aiEnabled),
+                      aiAfter: String(key.aiEnabled),
+                  },
+        );
+        return toView(key);
     }
 
     async create(

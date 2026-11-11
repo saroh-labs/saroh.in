@@ -53,6 +53,20 @@ export interface WebhooksProps {
 }
 
 const host = (url: string) => addressLine(url).split("/")[0] ?? url;
+/** What a row and its sheet are called: the name the business gave it, else its host. */
+const title = (e: WebhookEndpointView) => e.name ?? host(e.url);
+
+/** "Last sent 4 minutes ago", with how it went when it didn't get through. */
+function lastSentLine(
+    e: WebhookEndpointView,
+    now: Date,
+    zone: string,
+): string | null {
+    if (!e.lastSent) return null;
+    const when = relativeWhen(e.lastSent.at, now, zone).toLowerCase();
+    if (e.lastSent.status === "FAILED") return `Last try failed ${when}`;
+    return `Last sent ${when}`;
+}
 
 function EndpointStatus({ endpoint }: { endpoint: WebhookEndpointView }) {
     const state = endpointState(endpoint);
@@ -104,6 +118,7 @@ export function Webhooks({
         (e) => endpointState(e) === "turned-off",
     );
     const full = cap !== null && count >= cap;
+    const now = new Date();
 
     const add = full ? null : (
         <Button size="sm" onClick={() => setAdding(true)}>
@@ -138,10 +153,10 @@ export function Webhooks({
             {turnedOff.length > 0 ? (
                 <Notice
                     tone="warning"
-                    title={`${host(turnedOff[0].url)} was turned off.`}
+                    title={`${title(turnedOff[0])} was turned off.`}
                 >
                     {turnedOff.length === 1
-                        ? "Saroh stopped sending after too many messages in a row failed. Open it to turn it back on and send a test."
+                        ? "Saroh stopped sending after too many messages in a row failed. Open it and send a test. Once one gets through, it turns back on."
                         : `${turnedOff.length} addresses were turned off after too many messages in a row failed. Open each to turn it back on.`}
                 </Notice>
             ) : null}
@@ -157,19 +172,21 @@ export function Webhooks({
             ) : (
                 <ListTable>
                     <ListTableHead className="hidden grid-cols-[2fr_1.8fr_0.9fr_44px] gap-3 sm:grid">
-                        <span data-ph-unmask="">Address</span>
+                        <span data-ph-unmask="">Name and address</span>
                         <span data-ph-unmask="">State</span>
                         <span data-ph-unmask="">Sends</span>
                         <span />
                     </ListTableHead>
                     <ul>
                         {endpoints.map((e) => {
-                            const line = stateLine(e, zone);
+                            const line =
+                                stateLine(e, zone) ??
+                                lastSentLine(e, now, zone);
                             return (
                                 <li key={e.id} className={listTable.rule}>
                                     <button
                                         type="button"
-                                        aria-label={`Open ${host(e.url)}`}
+                                        aria-label={`Open ${title(e)}`}
                                         onClick={() => setOpenId(e.id)}
                                         className={cn(
                                             listTable.rowInner,
@@ -184,7 +201,7 @@ export function Webhooks({
                                             data-ph-mask=""
                                         >
                                             <span className="block font-semibold">
-                                                {host(e.url)}
+                                                {title(e)}
                                             </span>
                                             <span className="block truncate font-mono text-[12px] text-muted-foreground">
                                                 {addressLine(e.url)}
@@ -252,6 +269,27 @@ export function Webhooks({
                 }}
             />
         </div>
+    );
+}
+
+function NameField({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+}) {
+    return (
+        <Field
+            label="Name"
+            hint="Optional. So you know what it's for, like Order sync."
+        >
+            <Input
+                value={value}
+                maxLength={80}
+                onChange={(ev) => onChange(ev.target.value)}
+            />
+        </Field>
     );
 }
 
@@ -328,6 +366,7 @@ function AddFields({
     onAdded: (s: string) => void;
 }) {
     const [url, setUrl] = useState("https://");
+    const [name, setName] = useState("");
     const [picked, setPicked] = useState<Set<string>>(new Set(events));
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -340,6 +379,7 @@ function AddFields({
             () =>
                 createWebhook({
                     url: url.trim(),
+                    name: name.trim() || null,
                     events: Array.from(picked) as WebhookEvent[],
                 }),
             { setBusy },
@@ -352,6 +392,7 @@ function AddFields({
     return (
         <>
             <FormSheetBody>
+                <NameField value={name} onChange={setName} />
                 <Field
                     label="Address"
                     hint="An https address on your own server, like https://hooks.example.com/saroh."
@@ -395,7 +436,7 @@ function EndpointSheet({
     return (
         <FormSheet
             open={e !== null}
-            title={e ? host(e.url) : ""}
+            title={e ? title(e) : ""}
             description={e ? addressLine(e.url) : ""}
             onClose={onClose}
             key={e?.id ?? "closed"}
@@ -428,6 +469,7 @@ function EndpointFields({
 }) {
     const router = useRouter();
     const [enabled, setEnabled] = useState(e.enabled);
+    const [name, setName] = useState(e.name ?? "");
     // Events it already sends stay listed even when the person can't add them.
     const shown = Array.from(
         new Set([...events, ...(e.events as WebhookEvent[])]),
@@ -468,8 +510,10 @@ function EndpointFields({
         const res = await runAction(
             () =>
                 updateWebhook(e.id, {
+                    name: name.trim() || null,
                     events: Array.from(picked) as WebhookEvent[],
-                    enabled,
+                    // Only when changed: a test may have turned it on meanwhile.
+                    ...(enabled !== e.enabled ? { enabled } : {}),
                 }),
             { setBusy },
         );
@@ -486,7 +530,11 @@ function EndpointFields({
         });
         if (!res) return;
         if (!res.ok) return showError(res.error);
-        showSuccess("Test sent. It shows below once it's answered.");
+        showSuccess(
+            e.enabled
+                ? "Test sent. It shows below once it's answered."
+                : "Test sent. If it gets through, the address turns back on.",
+        );
         await load();
     }
 
@@ -511,7 +559,7 @@ function EndpointFields({
         const res = await runAction(() => removeWebhook(e.id));
         if (!res) return false;
         if (!res.ok) return { ok: false, error: res.error };
-        showSuccess(`${host(e.url)} is removed.`);
+        showSuccess(`${title(e)} is removed.`);
         onClose();
         router.refresh();
         return true;
@@ -525,10 +573,10 @@ function EndpointFields({
                         tone="warning"
                         title={`Turned off ${formatDate(e.disabledAt, zone, { now })} after ${e.failureStreak} messages in a row failed.`}
                     >
-                        Turn Sending back on and save, then send a test to check
-                        it gets through.
+                        Send a test. If it gets through, it turns back on.
                     </Notice>
                 ) : null}
+                <NameField value={name} onChange={setName} />
                 <CheckRow
                     checked={enabled}
                     onChange={setEnabled}
@@ -542,7 +590,7 @@ function EndpointFields({
                         >
                             {enabled
                                 ? "Saroh sends to this address."
-                                : "Off. Nothing is sent until you turn it on."}
+                                : "Off. Turns on once a test gets through."}
                         </span>
                     </span>
                 </CheckRow>
@@ -596,19 +644,17 @@ function EndpointFields({
                         >
                             Latest messages
                         </span>
-                        {e.enabled ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="ml-auto"
-                                busy={testing}
-                                busyLabel="Sending…"
-                                onClick={() => void test()}
-                            >
-                                Send a test
-                            </Button>
-                        ) : null}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto"
+                            busy={testing}
+                            busyLabel="Sending…"
+                            onClick={() => void test()}
+                        >
+                            Send a test
+                        </Button>
                     </div>
                     {log === "loading" ? (
                         <p
@@ -693,7 +739,7 @@ function EndpointFields({
             <ConfirmDialog
                 open={removing}
                 onOpenChange={setRemoving}
-                title={`Remove ${host(e.url)}?`}
+                title={`Remove ${title(e)}?`}
                 description="Saroh stops sending to it now, and its message log goes with it. This cannot be undone."
                 confirmLabel="Remove address"
                 busyLabel="Removing…"

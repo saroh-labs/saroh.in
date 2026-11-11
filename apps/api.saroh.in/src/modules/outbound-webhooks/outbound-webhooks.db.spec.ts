@@ -577,6 +577,104 @@ describe("delivering (U13)", () => {
         });
     });
 
+    it("keeps an address's name, and lists when it was last sent to and how that went", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            name: "Order sync",
+            events: ["customer.created"],
+        });
+        expect(made.endpoint.name).toBe("Order sync");
+        expect(made.endpoint.lastSent).toBeNull();
+        const renamed = await service.update(owner, made.endpoint.id, {
+            name: null,
+        });
+        expect(renamed.name).toBeNull();
+        await service.update(owner, made.endpoint.id, { name: "Orders" });
+
+        await newCustomer(org.id);
+        const [job] = await jobsOf(org.id);
+        await run(job);
+        const [listed] = (await service.list(owner)).data;
+        expect(listed.name).toBe("Orders");
+        expect(listed.lastSent?.status).toBe("DELIVERED");
+        expect(listed.lastSent?.at).toEqual(expect.any(String));
+    });
+
+    it("sends a test to an address that is off: one that gets through turns it back on", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await prisma.webhookEndpoint.update({
+            where: { id: made.endpoint.id },
+            data: { disabledAt: new Date(), failureStreak: AUTO_OFF_AFTER },
+        });
+
+        // A failed test leaves it off, its count as it was.
+        answer = { status: 500, body: "" };
+        await service.test(owner, made.endpoint.id);
+        let jobs = await jobsOf(org.id);
+        const failed = jobs[jobs.length - 1];
+        expect(await run(failed, failed.maxAttempts)).toBeInstanceOf(Error);
+        let endpoint = await prisma.webhookEndpoint.findUniqueOrThrow({
+            where: { id: made.endpoint.id },
+        });
+        expect(endpoint.disabledAt).not.toBeNull();
+        expect(endpoint.failureStreak).toBe(AUTO_OFF_AFTER);
+
+        answer = { status: 200, body: "thanks" };
+        const ping = await service.test(owner, made.endpoint.id);
+        jobs = await jobsOf(org.id);
+        expect(await run(jobs[jobs.length - 1])).toBeNull();
+        expect(JSON.parse(received[received.length - 1].body)).toMatchObject({
+            id: ping.id,
+            type: "ping",
+        });
+        endpoint = await prisma.webhookEndpoint.findUniqueOrThrow({
+            where: { id: made.endpoint.id },
+        });
+        expect(endpoint.disabledAt).toBeNull();
+        expect(endpoint.failureStreak).toBe(0);
+        const event = await prisma.auditEvent.findFirstOrThrow({
+            where: { organizationId: org.id, action: "webhook.on_after_test" },
+        });
+        expect(event.targetId).toBe(made.endpoint.id);
+
+        // On again: a real event is sent.
+        await newCustomer(org.id);
+        expect(await jobsOf(org.id)).toHaveLength(3);
+    });
+
+    it("refuses a test to a private address even when the address is off", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await service.update(owner, made.endpoint.id, { enabled: false });
+        await service.test(owner, made.endpoint.id);
+        const [job] = await jobsOf(org.id);
+        resolve = () => Promise.resolve([{ address: "10.0.0.5", family: 4 }]);
+        expect(await run(job)).toBeInstanceOf(Error);
+        expect(received).toHaveLength(0);
+    });
+
+    it("limits how many tests one address gets in a minute", async () => {
+        const { owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        for (let i = 0; i < 5; i++) {
+            await service.test(owner, made.endpoint.id);
+        }
+        await expect(
+            service.test(owner, made.endpoint.id),
+        ).rejects.toMatchObject({ status: 429 });
+    });
+
     it("signs with both secrets for a day after a roll", async () => {
         const { org, owner } = await business();
         const made = await service.create(owner, {

@@ -1,9 +1,11 @@
 import type {
     ApiKeyList,
+    ApiKeyListItem,
     ApiKeyView,
     ApiUsageView,
     CreateApiKeyBody,
     CreatedApiKey,
+    UpdateApiKeyBody,
 } from "@saroh/api-contract";
 import { cache } from "react";
 
@@ -17,7 +19,7 @@ import { getJson, mutate, orgBase } from "@/lib/api/http";
  */
 
 /** The business's keys, newest first; revoked and expired ones left out. */
-export async function listApiKeys(now = new Date()): Promise<ApiKeyView[]> {
+export async function listApiKeys(now = new Date()): Promise<ApiKeyListItem[]> {
     const base = await orgBase();
     if (!base) return [];
     const list = await getJson<ApiKeyList>(`${base}/api-keys`);
@@ -46,6 +48,19 @@ export function createApiKey(
         "POST",
         body,
         "We couldn't make that key. Try again.",
+    );
+}
+
+/** Renames a key; what it may do stays as made. */
+export function updateApiKey(
+    id: string,
+    body: UpdateApiKeyBody,
+): Promise<CrmResult<ApiKeyView>> {
+    return mutate(
+        `/api-keys/${encodeURIComponent(id)}`,
+        "PATCH",
+        body,
+        "We couldn't rename that key. Try again.",
     );
 }
 

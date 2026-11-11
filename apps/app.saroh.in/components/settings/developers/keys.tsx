@@ -2,6 +2,7 @@
 
 import type {
     ApiKeyKind,
+    ApiKeyListItem,
     ApiKeyView,
     CreateApiKeyBody,
 } from "@saroh/api-contract";
@@ -25,7 +26,12 @@ import { ChevronRight, ExternalLink, KeyRound, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { createApiKey, revokeApiKey, rollApiKey } from "@/lib/api-keys/actions";
+import {
+    createApiKey,
+    revokeApiKey,
+    rollApiKey,
+    updateApiKey,
+} from "@/lib/api-keys/actions";
 import type { ScopeLevel, ScopeLevels } from "@/lib/api-keys/scope";
 import {
     canDoLine,
@@ -55,9 +61,8 @@ const EXPIRY = [
 type Expiry = (typeof EXPIRY)[number]["value"];
 
 export interface KeysProps {
-    keys: ApiKeyView[];
-    /** The team's names by person; a maker missing from it has left. */
-    people: Record<string, string>;
+    /** Each with its maker, and whether they're still on the team. */
+    keys: ApiKeyListItem[];
     selfId: string;
     business: string;
     /** The actions the viewer holds: a key gets no more. */
@@ -77,6 +82,8 @@ interface Draft {
     origins: string;
     ai: boolean;
     expiry: Expiry;
+    /** Set when editing that key: its kind and expiry stay as made. */
+    editId?: string;
 }
 
 const draftFrom = (key: ApiKeyView | null, kind: ApiKeyKind): Draft =>
@@ -101,12 +108,13 @@ const draftFrom = (key: ApiKeyView | null, kind: ApiKeyKind): Draft =>
 /**
  * Settings › API and AI apps › Connections (API keys) ("API and AI apps"
  * boards 3 and 4): read-first rows, each opening its sheet (Replace key,
- * Revoke); New key in a sheet; the key shown once. A key whose maker has
- * left has stopped working: its row says so and its sheet offers to make
- * it again as the viewer.
+ * Revoke, Edit what it can do); New key and Edit in a sheet; the key
+ * shown once. A key whose
+ * maker has left or is paused has stopped working: its row says so and its
+ * sheet offers to make it again as the viewer.
  */
 export function Keys(props: KeysProps) {
-    const { keys, people, business, open, count, cap, docs, zone } = props;
+    const { keys, business, open, count, cap, docs, zone } = props;
     const router = useRouter();
     const [openId, setOpenId] = useState<string | null>(null);
     const [making, setMaking] = useState<Draft | null>(null);
@@ -114,9 +122,9 @@ export function Keys(props: KeysProps) {
         null,
     );
     const opened = keys.find((k) => k.id === openId) ?? null;
-    const gone = (k: ApiKeyView) => !(k.createdByUserId in people);
-    const maker = (k: ApiKeyView) =>
-        people[k.createdByUserId] ?? "Someone who left";
+    const gone = (k: ApiKeyListItem) => !k.madeBy.stillHere;
+    const maker = (k: ApiKeyListItem) =>
+        k.madeBy.name ?? (gone(k) ? "Someone who left" : "Someone");
     const now = new Date();
     const canMake = open.length > 0;
     const startNew = (from: ApiKeyView | null = null) =>
@@ -184,7 +192,7 @@ export function Keys(props: KeysProps) {
                                     size="sm"
                                     className="mt-1 w-fit"
                                 >
-                                    Stopped: its maker left
+                                    Stopped: its maker isn't on the team
                                 </Badge>
                             ) : k.graceUntil ? (
                                 <Badge
@@ -277,6 +285,10 @@ export function Keys(props: KeysProps) {
                     setOpenId(null);
                     startNew(k);
                 }}
+                onEdit={(k) => {
+                    setOpenId(null);
+                    setMaking({ ...draftFrom(k, k.kind), editId: k.id });
+                }}
                 onReplaced={(name, token) => {
                     setOpenId(null);
                     setShown({ name, token });
@@ -292,6 +304,13 @@ export function Keys(props: KeysProps) {
                 onMade={(name, token) => {
                     setMaking(null);
                     setShown({ name, token });
+                }}
+                onSaved={(name) => {
+                    setMaking(null);
+                    showSuccess(
+                        `${name} is saved. It changes on its next call.`,
+                    );
+                    router.refresh();
                 }}
             />
             <SecretOnce
@@ -321,6 +340,7 @@ function KeySheet({
     zone,
     onClose,
     onRemake,
+    onEdit,
     onReplaced,
 }: {
     apiKey: ApiKeyView | null;
@@ -330,6 +350,7 @@ function KeySheet({
     zone: string;
     onClose: () => void;
     onRemake: (k: ApiKeyView) => void;
+    onEdit: (k: ApiKeyView) => void;
     onReplaced: (name: string, token: string) => void;
 }) {
     const router = useRouter();
@@ -369,13 +390,20 @@ function KeySheet({
                 doneQuiet
                 doneLabel="Close"
                 extra={
-                    <Button
-                        variant="outline"
-                        className="text-destructive"
-                        onClick={() => setAsking(true)}
-                    >
-                        Revoke
-                    </Button>
+                    <>
+                        <Button
+                            variant="outline"
+                            className="text-destructive"
+                            onClick={() => setAsking(true)}
+                        >
+                            Revoke
+                        </Button>
+                        {k && !k.graceUntil && !gone ? (
+                            <Button variant="outline" onClick={() => onEdit(k)}>
+                                Edit what it can do
+                            </Button>
+                        ) : null}
+                    </>
                 }
             >
                 {k ? (
@@ -396,8 +424,9 @@ function KeySheet({
                                     ) : undefined
                                 }
                             >
-                                This key stopped working when they left. Make it
-                                again as you to keep {k.name} running.
+                                This key stopped working when they left or were
+                                paused. Make it again as you to keep {k.name}{" "}
+                                running.
                             </Notice>
                         ) : null}
                         <dl
@@ -506,6 +535,7 @@ function NewKeySheet({
     docs,
     onClose,
     onMade,
+    onSaved,
 }: {
     draft: Draft | null;
     open: ApiKeyKind[];
@@ -514,12 +544,18 @@ function NewKeySheet({
     docs: string;
     onClose: () => void;
     onMade: (name: string, token: string) => void;
+    onSaved: (name: string) => void;
 }) {
+    const editing = Boolean(start?.editId);
     return (
         <FormSheet
             open={start !== null}
-            title="New key"
-            description="Name it, choose what it may do, then copy it once."
+            title={editing ? "Edit what it can do" : "New key"}
+            description={
+                editing
+                    ? "Change its name and what it may do. The key stays the same."
+                    : "Name it, choose what it may do, then copy it once."
+            }
             onClose={onClose}
             // A fresh draft each opening.
             key={start ? JSON.stringify(start) : "closed"}
@@ -532,6 +568,7 @@ function NewKeySheet({
                     business={business}
                     docs={docs}
                     onMade={onMade}
+                    onSaved={onSaved}
                 />
             ) : null}
         </FormSheet>
@@ -545,6 +582,7 @@ function NewKeyFields({
     business,
     docs,
     onMade,
+    onSaved,
 }: {
     start: Draft;
     open: ApiKeyKind[];
@@ -552,7 +590,9 @@ function NewKeyFields({
     business: string;
     docs: string;
     onMade: (name: string, token: string) => void;
+    onSaved: (name: string) => void;
 }) {
+    const editId = start.editId;
     const [d, setD] = useState<Draft>(start);
     const [error, setError] = useState<string | null>(null);
     const may = (a: string) => actions.includes(a);
@@ -582,6 +622,22 @@ function NewKeyFields({
         if (d.kind === "PUBLISHABLE" && !body.allowedOrigins?.length) {
             return setError("Add the website it works on.");
         }
+        if (editId) {
+            const { name, scope, aiEnabled, allowedOrigins } = body;
+            const saved = await runAction(
+                () =>
+                    updateApiKey(editId, {
+                        name,
+                        scope,
+                        aiEnabled,
+                        allowedOrigins,
+                    }),
+                { setBusy },
+            );
+            if (!saved) return;
+            if (!saved.ok) return setError(saved.error);
+            return onSaved(saved.data.name);
+        }
         const res = await runAction(() => createApiKey(body), { setBusy });
         if (!res) return;
         if (!res.ok) return setError(res.error);
@@ -599,7 +655,10 @@ function NewKeyFields({
                         options={(["PUBLISHABLE", "SECRET"] as const).map(
                             (kind) => ({
                                 value: kind,
-                                disabled: !open.includes(kind),
+                                // An edit keeps the key's kind.
+                                disabled: editId
+                                    ? kind !== d.kind
+                                    : !open.includes(kind),
                                 label: (
                                     <>
                                         <b>{KIND_WORDS[kind].name}</b>
@@ -731,13 +790,15 @@ function NewKeyFields({
                         </CheckRow>
                     </>
                 )}
-                <Field label="Stops working">
-                    <OptionSelect
-                        value={d.expiry}
-                        onValueChange={(expiry) => set({ expiry })}
-                        options={EXPIRY}
-                    />
-                </Field>
+                {editId ? null : (
+                    <Field label="Stops working">
+                        <OptionSelect
+                            value={d.expiry}
+                            onValueChange={(expiry) => set({ expiry })}
+                            options={EXPIRY}
+                        />
+                    </Field>
+                )}
                 <p
                     className="text-[12.5px] text-muted-foreground"
                     data-ph-mask=""
@@ -752,8 +813,8 @@ function NewKeyFields({
                 ) : null}
             </FormSheetBody>
             <FormSheetFoot
-                saveLabel="Create key"
-                savingLabel="Creating…"
+                saveLabel={editId ? "Save" : "Create key"}
+                savingLabel={editId ? "Saving…" : "Creating…"}
                 pending={busy}
                 onSubmit={() => submit()}
             />

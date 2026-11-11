@@ -22,6 +22,7 @@ import { SitesService } from "../../sites/sites.service";
 import { TestReleasesService } from "../../sites/test-releases.service";
 import { McpActivityService } from "../activity.service";
 import { actionsForScopes, NEVER_FOR_AI } from "../ai-apps";
+import { AiConnectionsService } from "../ai-connections.service";
 import { RestorePointService } from "../restore-point.service";
 import type { McpCall } from "../tool-registry";
 import { McpToolRegistry } from "../tool-registry";
@@ -545,5 +546,135 @@ describe("MCP website tools (U11)", () => {
             expect(r.isError).toBeFalsy();
             expect(textOf(r).length / 4).toBeLessThan(5_000);
         }
+    });
+});
+
+/**
+ * Settings › API and AI apps › AI assistants: one connection's changes, and
+ * rolling back its website draft from the connection's sheet, through the
+ * same restore as `restore_site_draft`.
+ */
+describe("a connection's changes and roll back from Settings", () => {
+    const connections = new AiConnectionsService(new AuditService());
+
+    /** `connect()`, with the grant row Settings reads. */
+    async function connected(role: "OWNER" | "MEMBER" = "OWNER") {
+        const c = await connect(role);
+        if (c.as.connection.kind !== "oauth") throw new Error("oauth");
+        await prisma.oauthConsent.create({
+            data: {
+                id: c.as.connection.id,
+                clientId: c.as.connection.clientId,
+                userId: c.as.connection.userId,
+                scopes: c.as.connection.scopes,
+                organizationIds: [c.org.id],
+                createdAt: new Date(),
+            },
+        });
+        return c;
+    }
+
+    it("lists what the connection changed, newest first and paged, with the draft it can roll back", async () => {
+        const { siteId, homeId, as, ownerCtx } = await connected();
+        for (const title of ["One", "Two", "Three"]) {
+            await call(as, "update_page", {
+                site_id: siteId,
+                page_id: homeId,
+                title,
+            });
+        }
+        const first = await connections.activity(ownerCtx, as.connection.id, {
+            limit: 2,
+        });
+        expect(first.data).toHaveLength(2);
+        expect(first.data.every((r) => r.tool === "update_page")).toBe(true);
+        expect(first.nextCursor).toBe(first.data[1].id);
+        expect(first.siteDrafts).toEqual([
+            expect.objectContaining({ siteId, since: expect.any(String) }),
+        ]);
+        const rest = await connections.activity(ownerCtx, as.connection.id, {
+            limit: 2,
+            cursor: first.nextCursor ?? undefined,
+        });
+        expect(rest.data).toHaveLength(1);
+        expect(rest.nextCursor).toBeNull();
+        expect(rest.siteDrafts).toEqual([]);
+    });
+
+    it("rolls the draft back, leaves the live site alone, and audits it", async () => {
+        const { org, siteId, homeId, as, ownerCtx } = await connected();
+        const before = await sectionsOf(homeId);
+        await call(as, "remove_section", {
+            site_id: siteId,
+            page_id: homeId,
+            section_key: before[0].key,
+        });
+        const out = await connections.rollBack(
+            ownerCtx,
+            as.connection.id,
+            siteId,
+        );
+        expect(out.siteId).toBe(siteId);
+        expect(await sectionsOf(homeId)).toEqual(before);
+        expect(
+            await prisma.auditEvent.count({
+                where: {
+                    organizationId: org.id,
+                    action: "ai_connection.site_rolled_back",
+                    targetId: as.connection.id,
+                },
+            }),
+        ).toBe(1);
+        // On the connection's own list, so the assistant's own restore counts it as its own.
+        const listed = await connections.activity(ownerCtx, as.connection.id);
+        expect(listed.data[0].tool).toBe("rollback_from_settings");
+    });
+
+    it("refuses when the draft was changed outside the connection since", async () => {
+        const { siteId, homeId, as, ownerCtx } = await connected();
+        await call(as, "update_page", {
+            site_id: siteId,
+            page_id: homeId,
+            title: "Welcome",
+        });
+        const draft = await sites.getPageDraft(ownerCtx, siteId, homeId);
+        await sites.replaceDraftSections(ownerCtx, siteId, homeId, {
+            sections: draft.sections.slice(1),
+            revision: draft.revision,
+        });
+        await expect(
+            connections.rollBack(ownerCtx, as.connection.id, siteId),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(await sectionsOf(homeId)).toHaveLength(
+            draft.sections.length - 1,
+        );
+    });
+
+    it("lets only the person or an Owner see and roll back a connection", async () => {
+        const { org, siteId, as } = await connected();
+        const other = await prisma.user.create({
+            data: { email: `${uniq("a")}@example.com`, name: "Admin" },
+        });
+        await prisma.membership.create({
+            data: { organizationId: org.id, userId: other.id, role: "ADMIN" },
+        });
+        const admin = await new OrganizationContextService().resolve(
+            other.id,
+            org.id,
+        );
+        await expect(
+            connections.activity(admin, as.connection.id),
+        ).rejects.toMatchObject({ status: 403 });
+        await expect(
+            connections.rollBack(admin, as.connection.id, siteId),
+        ).rejects.toMatchObject({ status: 403 });
+        // The person themselves may: nothing changed yet, so nothing to roll back.
+        const self = { ...as.ctx, actions: new Set([...as.ctx.actions]) };
+        expect(
+            (await connections.activity(self, as.connection.id)).data,
+        ).toEqual([]);
+        await expect(
+            connections.rollBack(self, as.connection.id, siteId),
+        ).rejects.toMatchObject({ status: 404 });
     });
 });

@@ -415,6 +415,119 @@ describe("the audit trail", () => {
     });
 });
 
+describe("editing a key", () => {
+    it("changes only the name, and audits the name before", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        const view = await service.update(
+            owner,
+            "key_1",
+            { name: "Stock sync" },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { name: "Stock sync" },
+        });
+        expect(view.name).toBe("Stock sync");
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "apikey.renamed",
+                targetId: "key_1",
+                metadata: expect.objectContaining({ previousName: "Server" }),
+            }),
+        );
+    });
+
+    it("refuses an admin with 403 and another business's key with 404", async () => {
+        await expect(
+            service.update(ctxOf("ADMIN"), "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 403 });
+        db.apiKey.findFirst.mockResolvedValue(null);
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(db.apiKey.update).not.toHaveBeenCalled();
+    });
+
+    it("changes what a secret key can do, clamped to the editor, and audits before and after", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        const admin = ctxOf("OWNER", ["apikey:manage", "order:read"]);
+        await service.update(
+            admin,
+            "key_1",
+            {
+                scope: ["order:read", "customer:write", "org:delete"],
+                aiEnabled: false,
+            },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { scope: ["order:read"], aiEnabled: false },
+        });
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "apikey.updated",
+                metadata: expect.objectContaining({
+                    scopeBefore: "order:read order:write",
+                }),
+            }),
+        );
+    });
+
+    it("refuses a secret key left with nothing it may do", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        await expect(
+            service.update(owner, "key_1", { scope: ["nope"] }, NOW),
+        ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("keeps a website key read-only: only its websites change", async () => {
+        db.apiKey.findFirst.mockResolvedValue(
+            stored({
+                kind: "PUBLISHABLE",
+                scope: [...STOREFRONT_SCOPE],
+                aiEnabled: false,
+                allowedOrigins: ["https://a.example.com"],
+            }),
+        );
+        await service.update(
+            owner,
+            "key_1",
+            {
+                scope: ["order:write"],
+                aiEnabled: true,
+                allowedOrigins: ["https://b.example.com"],
+            },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { allowedOrigins: ["https://b.example.com"] },
+        });
+    });
+
+    it("refuses a revoked or replaced key with 409", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored({ revokedAt: NOW }));
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 409 });
+        db.apiKey.findFirst.mockResolvedValue(
+            stored({ graceUntil: new Date(NOW.getTime() + HOUR) }),
+        );
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("writes nothing when the name is the same", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        await service.update(owner, "key_1", { name: "Server" }, NOW);
+        expect(db.apiKey.update).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
+    });
+});
+
 describe("clampScope", () => {
     it("keeps only what the creator holds now", () => {
         const narrow = ctxOf("OWNER", ["order:read"]);

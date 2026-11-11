@@ -6,6 +6,7 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
+import { LimitsModule } from "../rate-limits/limits.module";
 import { WebhookDeliverHandler } from "./deliver.handler";
 import { WEBHOOK_DELIVER_TYPE } from "./emitter";
 import { WebhookEndpointsController } from "./endpoints.controller";
@@ -22,6 +23,7 @@ import { WebhookEndpointsService } from "./endpoints.service";
         AuditModule,
         FeatureFlagModule,
         JobsModule,
+        LimitsModule,
     ],
     controllers: [WebhookEndpointsController],
     providers: [WebhookEndpointsService, WebhookDeliverHandler],

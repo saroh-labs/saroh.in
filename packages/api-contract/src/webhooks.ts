@@ -34,8 +34,16 @@ export const webhookUrl = z
         message: "Must be an https address",
     });
 
+/** A name the business gives an address, like "Order sync". Empty clears it. */
+export const webhookName = z
+    .string()
+    .trim()
+    .max(80)
+    .transform((v) => v || null);
+
 export const createWebhookEndpointBody = z.strictObject({
     url: webhookUrl,
+    name: webhookName.nullable().optional(),
     events: z.array(webhookEvent).min(1).max(WEBHOOK_EVENTS.length),
 });
 export type CreateWebhookEndpointBody = z.infer<
@@ -44,6 +52,7 @@ export type CreateWebhookEndpointBody = z.infer<
 
 export const updateWebhookEndpointBody = z.strictObject({
     url: webhookUrl.optional(),
+    name: webhookName.nullable().optional(),
     events: z.array(webhookEvent).min(1).max(WEBHOOK_EVENTS.length).optional(),
     /** false switches it off; true switches it back on and clears its failure count. */
     enabled: z.boolean().optional(),
@@ -54,6 +63,7 @@ export type UpdateWebhookEndpointBody = z.infer<
 
 export const webhookEndpointView = z.object({
     id,
+    name: z.string().nullable(),
     url: z.string(),
     events: z.array(z.string()),
     enabled: z.boolean(),
@@ -62,6 +72,13 @@ export const webhookEndpointView = z.object({
     createdByUserId: id,
     /** Until when the secret a roll replaced still signs too. */
     previousSecretUntil: z.string().nullable(),
+    /** When Saroh last tried to send to it, and how that went; null before the first try. */
+    lastSent: z
+        .object({
+            at: z.string(),
+            status: z.enum(["PENDING", "DELIVERED", "FAILED"]),
+        })
+        .nullable(),
     createdAt: z.string(),
 });
 export type WebhookEndpointView = z.infer<typeof webhookEndpointView>;
