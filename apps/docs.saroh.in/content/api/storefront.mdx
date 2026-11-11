@@ -1,0 +1,67 @@
+---
+title: "Storefront keys"
+---
+
+import { API_URL, Sample } from "../../components/api-reference";
+
+## Storefront keys
+
+A publishable key (`pk_live_…`) lets your website show the business's
+products, services, open slots, posts and plans. It is safe to put in a
+web page: it only reads what the business's Saroh website already shows.
+
+### The key goes in the address
+
+Put the key in the path, right after `/v1/storefront/`:
+
+<Sample>{`fetch("${API_URL}/v1/storefront/pk_live_…/products")
+  .then((res) => res.json())
+  .then(({ data }) => console.log(data));`}</Sample>
+
+There's no `Authorization` header and no cookie. Because the key is in the
+address, Saroh knows which websites may call it before the browser sends
+the real request.
+
+### Allowed origins
+
+When you make a publishable key, list the websites that may use it, like
+`https://shop.in`. Each entry is an origin: `https://`, the domain, and a
+port if it has one, but no path. For building locally, `http://localhost`
+and `http://127.0.0.1` (any port) work too. A key takes up to 20.
+
+- A browser on a listed website gets the answer.
+- A browser on any other website is refused. The browser blocks it, and
+  Saroh answers `403`.
+- A call with no `Origin` header, such as one from your own server, is
+  answered.
+
+A key's list can't be edited. To change it, make a new key with the new
+list, swap it into your website, then revoke the old one.
+
+### What it reads
+
+| Path                                   | What                                              |
+| -------------------------------------- | ------------------------------------------------- |
+| `/{key}/products`, `/{key}/products/{slug}` | Products, with prices, photos and options    |
+| `/{key}/stock`                         | Which products are sold out, and how many are left when only a few are |
+| `/{key}/services`                      | Services that can be booked                        |
+| `/{key}/services/{serviceId}/availability` | Open slots between two times                   |
+| `/{key}/services/{serviceId}/days`     | The next two weeks, day by day                     |
+| `/{key}/services/{serviceId}/staff`    | Who does the service, by name                      |
+| `/{key}/posts`, `/{key}/posts/{slug}`  | The website's published posts                      |
+| `/{key}/plans`                         | Membership plans on sale                           |
+
+Every field is in the [storefront reference](/api/storefront-reference).
+
+Products, services, staff, posts and plans may be kept by the browser and
+the network for up to 30 seconds. Stock, open slots and days are never
+kept, so a slot that goes stops being offered at once.
+
+Most items carry a `hostedUrl`: the page for it on the business's Saroh
+website. Link to it when you'd rather Saroh took the booking or the order.
+
+### It never writes
+
+A publishable key can't book, order or send anything. Any write with it
+gets `403`. To take bookings and orders from your website, see
+[Bookings and orders from your site](/api/bookings-and-orders).

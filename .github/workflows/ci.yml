@@ -232,6 +232,14 @@ jobs:
       - name: Hard-coded domains
         run: pnpm run check:domains
 
+      # The OpenAPI files the docs serve match the contract (plan U16)
+      - name: OpenAPI up to date
+        run: pnpm run check:openapi
+
+      # Every link inside the docs site reaches a page or a file (plan U16)
+      - name: Docs links
+        run: pnpm run check:docs-links
+
       # Every model has a business, or is listed as shared (DEC-204)
       - name: Shared data
         run: pnpm run check:shared-data

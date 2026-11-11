@@ -10,14 +10,15 @@ Runs at `https://docs.saroh.localhost` under portless · package name `docs` (`p
 
 MDX pages under [`content/`](content/), served by Nextra 4 on the App Router:
 
-| Page              | Covers                                                 |
-| ----------------- | ------------------------------------------------------ |
-| `index`           | Overview and how to navigate the docs                  |
-| `getting-started` | Clone, install, env, first run                         |
-| `architecture`    | Apps, packages, and the API-as-single-backend boundary |
-| `authentication`  | Better Auth: where it runs and how sessions flow       |
-| `database`        | Prisma schema, client, migrations                      |
-| `contributing`    | Working in the monorepo                                |
+| Page              | Covers                                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index`           | Overview and how to navigate the docs                                                                                                          |
+| `getting-started` | Clone, install, env, first run                                                                                                                 |
+| `architecture`    | Apps, packages, and the API-as-single-backend boundary                                                                                         |
+| `authentication`  | Better Auth: where it runs and how sessions flow                                                                                               |
+| `database`        | Prisma schema, client, migrations                                                                                                              |
+| `contributing`    | Working in the monorepo                                                                                                                        |
+| `api/*`           | The public API: guides, and the reference drawn from `public/api/*.json` (`pnpm openapi` writes them; `pnpm check:openapi` keeps them in step) |
 
 Add a page by dropping an `.mdx` file into `content/` — Nextra builds the
 navigation from the page map.

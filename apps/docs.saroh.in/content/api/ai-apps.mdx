@@ -1,0 +1,58 @@
+{/* verify against U9-U12 */}
+
+import { MCP_URL, Sample } from "../../components/api-reference";
+
+# Claude and ChatGPT
+
+Connect Claude or ChatGPT to your business, and ask it to do your Saroh
+work: draft a page on your website, add a product, look up today's
+bookings, or move one. It connects through Saroh's MCP server at:
+
+<Sample>{MCP_URL}</Sample>
+
+Anyone in a business can connect an AI app. It acts as you, with your
+role, so it can do only what you can do in Saroh.
+
+## Connecting
+
+1. In Claude or ChatGPT, add a custom connector and paste the address
+   above.
+2. Sign in to Saroh when it asks.
+3. Pick the businesses it may use: one, several or all of yours.
+4. Read what it may do, and agree.
+
+What the app reads from Saroh goes to the company that runs it, under its
+own terms.
+
+## What it can do
+
+- **Website:** build and change pages, sections, the look, the menu and the
+  footer, and add images. Every change is a draft, with a link to preview
+  it. Publishing asks you first, and goes to a reviewer when the business
+  needs one. You can put the draft back as it was before the AI app's
+  changes.
+- **Catalogue:** products, services, prices, stock and hours.
+- **Day to day:** read, make and move bookings; read, make and change the
+  status of orders; read and change customers; read enquiries.
+
+It can't cancel bookings, refund, touch billing or payment settings,
+change the team, or close the business. It never sees sensitive customer
+details.
+
+Every change it makes is in **Settings › Activity**.
+
+## Staying in control
+
+- Owners see every connection in the business in
+  **Settings › API and AI apps › AI apps**, and can disconnect any of them.
+  You can disconnect your own.
+- A connection ends after 90 days without use.
+- If you leave the business, or your role changes, the connection follows
+  at once.
+- ChatGPT asks you to sign in again about once a month.
+
+## Other tools
+
+Tools that sign in with a key instead, like n8n or Cursor, use a secret
+key with **AI apps** turned on. Send it as a Bearer token to the same
+address. See [Getting a key](/api/keys).

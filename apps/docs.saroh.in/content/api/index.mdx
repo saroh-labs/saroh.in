@@ -1,0 +1,55 @@
+---
+title: "Public API"
+---
+
+import { API_URL, MCP_URL, Sample } from "../../components/api-reference";
+
+## The Saroh API
+
+The API lets your own code work with a Saroh business: its products,
+services, bookings, orders, customers and enquiries. It has two parts.
+
+- **Secret key**, at <code>{API_URL}/v1</code>. For your server. It reads
+  and changes the business's records, as far as the key allows. Send it in
+  the `Authorization` header.
+- **Storefront**, at <code>{API_URL}/v1/storefront</code>. For your
+  website. A publishable key reads what the business's Saroh website
+  already shows. It never changes anything.
+
+AI apps such as Claude and ChatGPT connect at <code>{MCP_URL}</code>
+instead. See [Claude and ChatGPT](/api/ai-apps).
+
+<Sample>{`curl ${API_URL}/v1/products \\
+  -H "Authorization: Bearer sk_live_…"`}</Sample>
+
+## Start here
+
+1. [Get a key](/api/keys).
+2. Building a website? Read [Storefront keys](/api/storefront) and
+   [Bookings and orders from your site](/api/bookings-and-orders).
+3. Before you go live, read [Retrying safely](/api/idempotency),
+   [Errors](/api/errors) and [Limits](/api/limits).
+
+## How it behaves
+
+- Answers and request bodies are JSON.
+- Money is a whole number in the currency's smallest unit, with its code:
+  `{ "amountMinor": 4500, "currency": "INR" }` is ₹45.00. Never a decimal.
+- Ids are text. Don't read anything into them.
+- Times are ISO 8601.
+- Lists come a page at a time. Pass `limit` (1 to 100, default 20) and the
+  `nextCursor` from the last page as `cursor`. A `nextCursor` of `null`
+  means you have them all.
+- Some fields have a fixed set of values, like a booking's `status`. More
+  values may be added later, so handle one you don't know.
+- `/v1` only grows. A change that would break your code goes to a new
+  version instead.
+
+## Reference and downloads
+
+- [Reference: secret key](/api/reference), and its OpenAPI file:
+  <a href="/api/v1.json" download>v1.json</a>
+- [Reference: storefront](/api/storefront-reference), and its OpenAPI file:
+  <a href="/api/storefront.json" download>storefront.json</a>
+
+Both are OpenAPI 3.1. Most API tools can import them to make a client.

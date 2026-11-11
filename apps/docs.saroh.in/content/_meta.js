@@ -5,4 +5,5 @@ export default {
     database: "Database",
     authentication: "Authentication",
     contributing: "Contributing",
+    api: "Public API",
 };
