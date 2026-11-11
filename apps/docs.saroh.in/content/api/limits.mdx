@@ -1,0 +1,43 @@
+---
+title: "Limits"
+---
+
+## Limits
+
+Each business can make a set number of calls a minute. The number depends
+on its plan. Owners see the business's own limits in
+**Settings › API and AI apps › Usage**.
+
+### How they count
+
+Calls are counted over a rolling minute, in more than one place at once.
+A call must fit them all.
+
+- **Secret key:** per key, and per business across all its keys.
+- **Storefront:** per publishable key, per business, and per visitor. One
+  visitor can use only part of the business's limit, so one page left
+  open can't use it all.
+- **Visitor tokens:** per token, per visitor, and per business. These count
+  toward the business's storefront limit.
+- **AI apps** have a limit of their own.
+
+### Headers on every answer
+
+| Header                | Means                                       |
+| --------------------- | ------------------------------------------- |
+| `RateLimit-Limit`     | Calls allowed in the window                 |
+| `RateLimit-Remaining` | Calls left in it                            |
+| `RateLimit-Reset`     | Seconds until the window frees up           |
+
+### When you go over
+
+The call gets `429` with the code `rate_limited`, and a `Retry-After`
+header with the seconds to wait. Wait that long, then try again. Nothing
+was done, so retrying is safe.
+
+To stay under:
+
+- Keep what you read for a while instead of asking again. Products,
+  services and posts change rarely.
+- Spread big jobs, like a stock sync, over time.
+- On a website, read once per page view, not on a timer.
