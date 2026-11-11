@@ -140,6 +140,7 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -316,6 +317,7 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -376,6 +378,7 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -442,6 +445,7 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -657,6 +661,7 @@ jobs:
       # Cloudflare does, so one run's customers don't share the rate limits.
       TRUST_PROXY: private
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted
       # list defaults to the *.saroh.in production origins, so a return-to on

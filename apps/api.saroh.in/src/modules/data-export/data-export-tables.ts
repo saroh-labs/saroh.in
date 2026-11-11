@@ -71,6 +71,7 @@ export const EXPORT_PAGE_SIZE = 500;
 
 const OMITTED_NAMES = new Set([
     "checkoutKey",
+    "storefrontTokenId",
     "idempotencyKey",
     "encryptedCredentials",
     "credentialsIv",

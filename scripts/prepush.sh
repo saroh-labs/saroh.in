@@ -324,6 +324,7 @@ e2e_stack() {
     export TRUST_PROXY=private
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
+    export APIKEY_ENC_KEY=ci-placeholder-apikey-digest-key-32-chars # gitleaks:allow (CI placeholder)
     export BETTER_AUTH_URL=http://localhost:3333
     export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3333
     export APP_URL=http://localhost:3003
