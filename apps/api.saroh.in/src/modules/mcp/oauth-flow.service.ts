@@ -7,6 +7,8 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import {
+    businessSetKey,
+    businessSetOf,
     mcpAddressesOf,
     OAUTH_PICK_SECONDS,
     oauthPickIdentifier,
@@ -23,7 +25,7 @@ import { FlagKey } from "../feature-flags/flags";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { membersMayOpen } from "../organizations/organization-lifecycle.policy";
 import { isKnownClient, refusedClient, SCOPE_WORDS } from "./ai-apps";
-import { AiConnectionsService } from "./ai-connections.service";
+import { AiConnectionsService, endConnection } from "./ai-connections.service";
 
 /** Who is signing in: the session, the request's address and its cookies. */
 export interface FlowCaller {
@@ -41,7 +43,8 @@ export interface PickableBusiness {
 export interface ConsentDetails {
     app: { name: string | null; known: boolean };
     redirectHost: string | null;
-    business: PickableBusiness | null;
+    /** The businesses ticked on the pick page; empty when none stand. */
+    businesses: PickableBusiness[];
     can: string[];
     /** The app imitates Saroh, Claude, ChatGPT or OpenAI: no Allow. */
     refused: boolean;
@@ -53,11 +56,14 @@ export interface ConsentDetails {
  * and consent endpoints are closed from outside (`oauth-gate.ts`); only
  * these call them, after their checks:
  *
- * - pick: only a business of this address's edition that the person may
- *   open, never a demo; stored for the session for {@link OAUTH_PICK_SECONDS}
- *   and read by Better Auth as the consent's business;
+ * - pick: one or more ticked businesses, each of this address's edition and
+ *   one the person may open, never a demo ("All my businesses" is the list
+ *   they have now, sent as ids). Stored for the session for
+ *   {@link OAUTH_PICK_SECONDS} as a {@link businessSetKey}, which Better Auth
+ *   reads as the consent's reference: another set is another consent;
  * - consent: an app wearing a known name it doesn't own is refused; an
- *   Allow is recorded on the business's activity.
+ *   Allow puts the set on the grant (`organizationIds`) and is recorded on
+ *   each business's activity.
  *
  * Every answer is 404 while `API_MCP` is off.
  */
@@ -97,26 +103,48 @@ export class OAuthFlowService {
             .map(({ organization: { id, name } }) => ({ id, name }));
     }
 
-    /** Store the pick, then let Better Auth go on to consent or the app. */
+    /** Store the ticked set, then let Better Auth go on to consent or the app. */
     async pick(
         caller: FlowCaller,
-        organizationId: string,
+        organizationIds: string[],
         oauthQuery: string,
     ): Promise<{ url: string }> {
-        const offered = await this.businesses(caller);
-        if (!offered.some((b) => b.id === organizationId)) {
+        const ids = businessSetOf(businessSetKey(organizationIds));
+        if (ids.length === 0) {
+            throw new BadRequestException("Tick at least one business.");
+        }
+        const offered = new Set(
+            (await this.businesses(caller)).map((b) => b.id),
+        );
+        if (ids.some((id) => !offered.has(id))) {
             throw new ForbiddenException(
-                "You can't connect an app to that business.",
+                "You can't connect an app to one of those businesses.",
             );
         }
         // Their role, live: a paused or removed person is refused here.
-        await this.organizations.resolve(caller.userId, organizationId);
+        for (const id of ids) {
+            await this.organizations.resolve(caller.userId, id);
+        }
+        const referenceId = businessSetKey(ids);
+        // This set's grant, if it lost a business since (a disconnect), is
+        // ended, so the person sees the consent page again instead of
+        // Better Auth reusing a grant that no longer covers the set.
+        const clientId = new URLSearchParams(oauthQuery).get("client_id") ?? "";
+        const earlier = await prisma.oauthConsent.findFirst({
+            where: { clientId, userId: caller.userId, referenceId },
+        });
+        if (
+            earlier &&
+            businessSetKey(earlier.organizationIds) !== referenceId
+        ) {
+            await endConnection(earlier);
+        }
         const now = Date.now();
         await prisma.verification.create({
             data: {
                 id: randomUUID(),
                 identifier: oauthPickIdentifier(caller.sessionId),
-                value: organizationId,
+                value: referenceId,
                 expiresAt: new Date(now + OAUTH_PICK_SECONDS * 1000),
             },
         });
@@ -139,13 +167,14 @@ export class OAuthFlowService {
         });
         if (!client)
             throw new NotFoundException("This app isn't known to Saroh.");
-        const picked = await readOAuthPick(caller.sessionId);
-        const business = picked
-            ? await prisma.organization.findUnique({
-                  where: { id: picked },
+        const picked = businessSetOf(await readOAuthPick(caller.sessionId));
+        const businesses = picked.length
+            ? await prisma.organization.findMany({
+                  where: { id: { in: picked } },
                   select: { id: true, name: true },
+                  orderBy: { name: "asc" },
               })
-            : null;
+            : [];
         let redirectHost: string | null = null;
         try {
             redirectHost = new URL(query.get("redirect_uri") ?? "").host;
@@ -156,7 +185,7 @@ export class OAuthFlowService {
         return {
             app: { name: client.name, known: isKnownClient(client.clientId) },
             redirectHost,
-            business,
+            businesses,
             can: scopes.flatMap((s) =>
                 SCOPE_WORDS[s] ? [SCOPE_WORDS[s]] : [],
             ),
@@ -176,7 +205,7 @@ export class OAuthFlowService {
                 "Saroh doesn't connect this app: its name copies another company's.",
             );
         }
-        if (accept && !details.business) {
+        if (accept && details.businesses.length === 0) {
             throw new BadRequestException(
                 "Pick a business first. Go back to the app and connect again.",
             );
@@ -185,16 +214,21 @@ export class OAuthFlowService {
             accept,
             oauth_query: oauthQuery,
         });
-        if (accept && details.business) {
+        if (accept && details.businesses.length > 0) {
             const clientId =
                 new URLSearchParams(oauthQuery).get("client_id") ?? "";
-            const grant = await prisma.oauthConsent.findFirst({
-                where: {
-                    clientId,
-                    userId: caller.userId,
-                    referenceId: details.business.id,
-                },
+            const organizationIds = details.businesses.map((b) => b.id);
+            const referenceId = businessSetKey(organizationIds);
+            const found = await prisma.oauthConsent.findFirst({
+                where: { clientId, userId: caller.userId, referenceId },
             });
+            // Before the app gets its code: the grant reaches the whole set.
+            const grant =
+                found &&
+                (await prisma.oauthConsent.update({
+                    where: { id: found.id },
+                    data: { organizationIds: businessSetOf(referenceId) },
+                }));
             if (grant) {
                 await this.connections
                     .recordConnected(grant, details.app.name)

@@ -143,6 +143,8 @@ async function connect(role: "OWNER" | "MEMBER" = "OWNER") {
             clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
             clientName: "Claude",
             scopes,
+            userId: user.id,
+            businesses: [org.id],
         },
     };
     const home = await prisma.page.findFirstOrThrow({

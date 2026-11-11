@@ -22,7 +22,7 @@ import type {
 import { OAuthFlowService } from "./oauth-flow.service";
 
 const pickBody = z.object({
-    organizationId: z.string().min(1).max(64),
+    organizationIds: z.array(z.string().min(1).max(64)).min(1).max(200),
     oauthQuery: z.string().min(1).max(8192),
 });
 const consentBody = z.object({
@@ -67,7 +67,7 @@ export class OAuthFlowController {
     ): Promise<{ url: string }> {
         return this.flow.pick(
             callerOf(req),
-            body.organizationId,
+            body.organizationIds,
             body.oauthQuery,
         );
     }

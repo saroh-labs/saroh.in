@@ -6646,3 +6646,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the spec grants `local-network-access` for its website's origin (`page.context().grantPermissions([...], { origin })`). No API change: a real merchant site and the API are both public addresses.
 - **Rule:** a browser spec whose page is served by `page.route` at a made-up origin and calls the stack on localhost grants `local-network-access` for that origin. When a browser `fetch` fails with no server log, read the page's console before the API's CORS code.
 - **Category:** e2e · browser
+
+## AI connections were built for one business though the plan's requirement said several (11 Nov 2026)
+
+- **Symptom:** a review of the MCP build found the sign-in pick page offered one business, where the plan's requirement (owner decision) says a connection covers the businesses ticked at consent, with a `business` argument on every tool and a `list_businesses` tool.
+- **Cause:** the plan's unit text for the sign-in unit still said "one business" from an earlier draft. The build briefs were written from the unit text, and every unit after it built on that.
+- **Fix:** tick boxes at pick and consent; the business set on the grant and in the token; the guard checks the set and the tool registry resolves the target business per call against the person's live role there; `list_businesses`; disconnect takes one business off the set.
+- **Rule:** a build brief starts from the plan's Requirements and Key Decisions, then the unit; where the unit text and a requirement disagree, the requirement wins and the brief says so. Before calling a unit done, check its report against the requirements it traces to.
+- **Category:** process · planning

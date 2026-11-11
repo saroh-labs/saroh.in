@@ -138,7 +138,13 @@ describe("module gating", () => {
     };
     const call = {
         ctx,
-        connection: { kind: "key", id: "k1", clientName: null },
+        connection: {
+            kind: "key",
+            id: "k1",
+            clientName: null,
+            businesses: ["org_1"],
+            context: ctx,
+        },
     } as McpCall;
     const before = process.env.MODULE_ENFORCEMENT;
     afterEach(() => {

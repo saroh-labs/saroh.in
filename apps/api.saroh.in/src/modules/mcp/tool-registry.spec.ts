@@ -8,8 +8,16 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 
+import type { McpActivityService } from "./activity.service";
+import type { McpConnection } from "./mcp-auth.guard";
 import { withBodyVersion } from "./mcp.controller";
-import { defineTool, READ_ONLY, ToolError, toolError } from "./tool-registry";
+import {
+    defineTool,
+    McpToolRegistry,
+    READ_ONLY,
+    ToolError,
+    toolError,
+} from "./tool-registry";
 
 const textOf = (r: ReturnType<typeof toolError>) => r.content[0].text;
 
@@ -105,5 +113,80 @@ describe("MCP tool framework (U10)", () => {
                 params: { protocolVersion: "2025-11-25" },
             }),
         ).toBe(init);
+    });
+
+    it("adds a business argument to every tool, reads it, and hands the tool only its own input", async () => {
+        const registry = new McpToolRegistry({} as McpActivityService);
+        const run = jest.fn((input: unknown) =>
+            Promise.resolve({ text: "ok", data: { seen: input } }),
+        );
+        const tool = defineTool({
+            name: "get_thing",
+            title: "T",
+            description: "Use this when x",
+            contract: {
+                input: z.object({ id: z.string() }).strict(),
+                output: z.object({ seen: z.unknown() }),
+            },
+            capability: null,
+            hints: READ_ONLY,
+            run,
+        });
+        registry.register(tool);
+        expect(() =>
+            registry.register(
+                defineTool({
+                    ...tool,
+                    name: "own_business",
+                    contract: {
+                        input: z.object({ business: z.string() }),
+                        output: z.object({}),
+                    },
+                }),
+            ),
+        ).toThrow(/registry adds it/);
+
+        const ctx = { organizationId: "b", userId: "u", role: "OWNER" };
+        const connection = {
+            kind: "oauth",
+            id: "g",
+            clientId: "c",
+            clientName: null,
+            scopes: [],
+            userId: "u",
+            businesses: ["a", "b"],
+        } as McpConnection;
+        const contextIn = (id: string) =>
+            Promise.resolve(id === "b" ? { ...ctx, organizationId: id } : null);
+
+        const none = await registry.target(
+            connection,
+            tool,
+            undefined,
+            contextIn,
+        );
+        expect(none).toBeInstanceOf(ToolError);
+        expect((none as ToolError).nextStep).toMatch(/list_businesses/);
+        // Ticked, but the person can't reach it now.
+        expect(
+            await registry.target(connection, tool, "a", contextIn),
+        ).toBeInstanceOf(ToolError);
+        const inB = await registry.target(connection, tool, "b", contextIn);
+        expect(inB).toMatchObject({
+            ctx: { organizationId: "b" },
+            named: true,
+        });
+
+        const answer = await registry.call(
+            tool,
+            { id: "1", business: "b" },
+            inB as never,
+            null,
+        );
+        expect(answer).toMatchObject({
+            structuredContent: { seen: { id: "1" } },
+        });
+        const listed = registry.serverFor({ listing: [] });
+        expect(listed).toBeDefined();
     });
 });

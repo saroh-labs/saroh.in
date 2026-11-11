@@ -22,7 +22,7 @@ const PAGE = "/oauth/pick-business";
 /**
  * An AI app's sign-in, step one (U9): Better Auth sends the person here
  * first (its login and post-login page). Signed out, they sign in and come
- * back. Then they pick which business the app works with: only this
+ * back. Then they tick the businesses the app works with: only this
  * edition's, never a demo. 404 while the AI apps switch (`API_MCP`) is off.
  */
 export default async function PickBusinessPage({

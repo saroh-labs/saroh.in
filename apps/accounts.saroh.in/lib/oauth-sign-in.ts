@@ -32,7 +32,8 @@ export interface PickableBusiness {
 export interface ConsentDetails {
     app: { name: string | null; known: boolean };
     redirectHost: string | null;
-    business: PickableBusiness | null;
+    /** The businesses ticked on the pick page; empty once that lapsed. */
+    businesses: PickableBusiness[];
     can: string[];
     refused: boolean;
 }
@@ -45,26 +46,32 @@ export function appName(details: Pick<ConsentDetails, "app">): string {
 }
 
 export const OAUTH_WORDS = {
-    pickTitle: (app: string) => `Which business should ${app} work with?`,
+    pickTitle: (app: string) => `Which businesses should ${app} work with?`,
     pickDescription:
-        "It works with one business at a time. To connect another, add the app again and pick that one.",
+        "Tick one or more. In each, it can only do what you can do there.",
+    allBusinesses: "All my businesses",
+    allBusinessesNote:
+        "The ones you have now. A business you add later isn't included.",
     noBusinessTitle: "You don't have a business on Saroh yet",
     noBusinessDescription:
         "Set one up first, then come back to the app and connect again.",
     continue: "Continue",
     continuing: "Continuing…",
-    consentTitle: (app: string, business: string) =>
-        `Let ${app} work with ${business}?`,
+    consentTitle: (app: string, businesses: readonly string[]) =>
+        businesses.length === 1
+            ? `Let ${app} work with ${businesses[0]}?`
+            : `Let ${app} work with ${businesses.length} businesses?`,
     unverified: "Unverified app",
     unverifiedNote:
         "Saroh doesn't know who makes this app. Only allow it if you added it yourself.",
     canHeading: "It will be able to",
     roleNote:
-        "Never more than you can do yourself. It can't see sensitive customer notes, change billing or manage API keys.",
+        "Never more than you can do yourself in each business. It can't see sensitive customer notes, change billing or manage API keys.",
     dataLine: (app: string) =>
         `What ${app} reads from Saroh is sent to ${app}'s provider, and their terms apply to it.`,
     returnsTo: (host: string) => `After this you go back to ${host}.`,
-    disconnect: "You can disconnect it any time in Settings › API and AI apps.",
+    disconnect:
+        "You can disconnect it from any business any time in Settings › API and AI apps.",
     allow: "Allow",
     allowing: "Allowing…",
     deny: "Don't allow",
@@ -73,7 +80,7 @@ export const OAUTH_WORDS = {
         "Its name copies Saroh or another AI company's, so it may not be what it says. Nothing was shared.",
     noPickTitle: "Pick a business first",
     noPickDescription:
-        "This sign-in lost track of the business. Go back to the app and connect again.",
+        "This sign-in lost track of the businesses you ticked. Go back to the app and connect again.",
     unreachableTitle: "Couldn't reach Saroh",
     unreachableDescription:
         "Nothing has been shared. It's usually back in a moment.",

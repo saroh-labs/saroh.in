@@ -7,16 +7,16 @@ export type OAuthStepResult =
     { ok: true; url: string } | { ok: false; error: string };
 
 /**
- * The person picked a business for an AI app (U9). The API checks it is one
- * they may connect, keeps it for this sign-in and asks Better Auth where to
- * go next: the consent page, or straight back to the app.
+ * The person ticked the businesses an AI app may work with (U9). The API
+ * checks each is one they may connect, keeps the set for this sign-in and
+ * asks Better Auth where to go next: the consent page, or back to the app.
  */
 export async function pickBusinessAction(
-    organizationId: string,
+    organizationIds: string[],
     oauthQuery: string,
 ): Promise<OAuthStepResult> {
     const answer = await apiWrite<{ url: string }>("POST", "/oauth/pick", {
-        organizationId,
+        organizationIds,
         oauthQuery,
     });
     return answer.ok

@@ -9,10 +9,18 @@ import {
 } from "../audit/audit.service";
 import type { McpConnection } from "./mcp-auth.guard";
 
-/** Who is calling a tool: the guard's context and connection. */
+/** Who is calling a tool: the connection, and the business the call works in. */
 export interface McpCall {
+    /** The business this call works in, with the person's live role there. */
     ctx: OrganizationContext;
     connection: McpConnection;
+    /**
+     * False only for a `wide` tool called without `business` on a
+     * connection with several: `ctx` is then just the first of {@link reach}.
+     */
+    named?: boolean;
+    /** For a `wide` tool: every business the connection reaches now. */
+    reach?: OrganizationContext[];
 }
 
 /** What one write tool did, for the business's activity list. */

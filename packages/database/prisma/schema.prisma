@@ -2857,6 +2857,9 @@ model OauthConsent {
   createdAt               DateTime?
   updatedAt               DateTime?
   lastUsedAt              DateTime?
+  /// The businesses this AI connection reaches now: those ticked at consent
+  /// (`referenceId` names that set), less any one disconnected since.
+  organizationIds         String[]  @default([])
 
   @@index([clientId])
   @@index([userId])

@@ -4,7 +4,8 @@
  * as a client would, over the 2025-11-25 protocol (stateless legacy path,
  * answered as SSE). The guard's own refusals (no token, wrong address,
  * edition, keys, flag off) are `mcp.db.spec.ts`; here the request arrives
- * with the context the guard would have put on it.
+ * with the connection the guard would have put on it, and the guard's
+ * per-business check (`contextIn`) runs for real.
  *
  * better-auth is ESM, which ts-jest can't load: the guard's imports are
  * stood in for, as in `mcp.db.spec.ts`.
@@ -26,7 +27,9 @@ import { z } from "zod";
 
 import { untrustedText } from "@saroh/api-contract";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { ApiKeyGuard } from "../api-keys/api-key.guard";
 import { AuditService } from "../audit/audit.service";
+import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import type { CapsService } from "../rate-limits/caps";
@@ -34,6 +37,7 @@ import { LimitsService } from "../rate-limits/limits.service";
 import { McpActivityService, siteTarget } from "./activity.service";
 import { actionsForScopes, NEVER_FOR_AI } from "./ai-apps";
 import type { McpConnection, McpRequest } from "./mcp-auth.guard";
+import { McpAuthGuard } from "./mcp-auth.guard";
 import { McpController } from "./mcp.controller";
 import { RestorePointService, SESSION_GAP_MS } from "./restore-point.service";
 import type { McpCall } from "./tool-registry";
@@ -59,10 +63,16 @@ const restorePoints = new RestorePointService();
 let cap = 1000;
 const caps = { rpm: jest.fn(async () => cap) };
 let limits = new LimitsService(null);
+const flags = { isEnabled: jest.fn(async () => true) };
 const controller = new McpController(
     registry,
     caps as unknown as CapsService,
     limits,
+    new McpAuthGuard(
+        new OrganizationContextService(),
+        {} as ApiKeyGuard,
+        flags as unknown as FeatureFlagService,
+    ),
 );
 
 // Tools that stand in for U11's and U12's: a site write, a publish and a read
@@ -143,7 +153,6 @@ async function serve(req: IncomingMessage, res: ServerResponse) {
     const raw = Buffer.concat(chunks).toString();
     const r = req as unknown as McpRequest;
     (r as { body?: unknown }).body = raw ? JSON.parse(raw) : undefined;
-    r.organizationContext = current.ctx;
     r.mcpConnection = current.connection;
     try {
         await controller.serve(r, res as never);
@@ -196,8 +205,9 @@ const callTool = (name: string, args: Record<string, unknown> = {}) =>
     rpc("tools/call", { name, arguments: args });
 
 async function connectAs(
-    role: "OWNER" | "MEMBER",
+    role: "OWNER" | "MEMBER" | "ADMIN",
     scopes = ["saroh:read", "saroh:write", "site:publish"],
+    also: { role: "OWNER" | "MEMBER" | "ADMIN"; ticked?: boolean }[] = [],
 ) {
     const org = await prisma.organization.create({
         data: { name: uniq("Rye Bakery"), slug: uniq("rye") },
@@ -208,6 +218,20 @@ async function connectAs(
     await prisma.membership.create({
         data: { organizationId: org.id, userId: user.id, role },
     });
+    const others = [];
+    for (const more of also) {
+        const other = await prisma.organization.create({
+            data: { name: uniq("Pulse Gym"), slug: uniq("pulse") },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: other.id,
+                userId: user.id,
+                role: more.role,
+            },
+        });
+        others.push({ ...other, ticked: more.ticked ?? true });
+    }
     const site = await prisma.site.create({
         data: { organizationId: org.id, name: "Main site", slug: uniq("main") },
     });
@@ -229,9 +253,14 @@ async function connectAs(
             clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
             clientName: "Claude",
             scopes,
+            userId: user.id,
+            businesses: [
+                org.id,
+                ...others.filter((o) => o.ticked).map((o) => o.id),
+            ],
         },
     };
-    return { org, site, user };
+    return { org, site, user, others };
 }
 
 describe("/mcp (U10)", () => {
@@ -254,6 +283,7 @@ describe("/mcp (U10)", () => {
         const tools = list.body?.result?.tools ?? [];
         expect(tools.map((t) => t.name).sort()).toEqual([
             "get_job",
+            "list_businesses",
             "publish_site",
             "read_enquiry",
             "rename_site",
@@ -278,6 +308,7 @@ describe("/mcp (U10)", () => {
         expect(text).toMatch(/publish the website: yes/);
         expect(start.body?.result?.structuredContent).toMatchObject({
             business: { business_id: org.id, edition: "india" },
+            businesses: [{ business_id: org.id, slug: org.slug }],
             your_role: "OWNER",
             connection: { kind: "app_sign_in", app_name: "Claude" },
             may: { read: true, change: true, publish_website: true },
@@ -470,6 +501,147 @@ describe("/mcp (U10)", () => {
         expect({ status: res.status, text }).toMatchObject({ status: 200 });
         expect(JSON.parse(text).result.structuredContent.your_role).toBe(
             "OWNER",
+        );
+    });
+});
+
+describe("/mcp over several businesses (R1)", () => {
+    beforeEach(() => {
+        cap = 1000;
+    });
+
+    const textOf = (r: Awaited<ReturnType<typeof rpc>>) =>
+        r.body?.result?.content?.[0]?.text ?? "";
+
+    it("lists both ticked businesses with the role in each, and says to pass business", async () => {
+        const { org, others } = await connectAs("OWNER", undefined, [
+            { role: "MEMBER" },
+        ]);
+        const b = others[0];
+        const list = await callTool("list_businesses");
+        expect(list.body?.result?.isError).toBeFalsy();
+        const rows = (
+            list.body?.result?.structuredContent as {
+                businesses: {
+                    business_id: string;
+                    your_role: string;
+                    may: { change: boolean };
+                }[];
+            }
+        ).businesses;
+        expect(
+            Object.fromEntries(rows.map((r) => [r.business_id, r.your_role])),
+        ).toEqual({ [org.id]: "OWNER", [b.id]: "MEMBER" });
+        expect(textOf(list)).toContain(b.id);
+
+        const start = await callTool("saroh_start");
+        expect(start.body?.result?.isError).toBeFalsy();
+        expect(start.body?.result?.structuredContent).toMatchObject({
+            business: null,
+            may: null,
+        });
+        expect(textOf(start)).toMatch(/covers 2 Saroh businesses/);
+        expect(textOf(start)).toMatch(/business argument/);
+
+        const one = await callTool("saroh_start", { business: b.id });
+        expect(one.body?.result?.structuredContent).toMatchObject({
+            business: { business_id: b.id },
+            your_role: "MEMBER",
+        });
+    });
+
+    it("works in the business named, with the role there; by slug too", async () => {
+        const { others } = await connectAs("MEMBER", undefined, [
+            { role: "OWNER" },
+        ]);
+        const b = others[0];
+        const site = await prisma.site.create({
+            data: { organizationId: b.id, name: "B site", slug: uniq("b") },
+        });
+        // A Member may not rename in A; as Owner of B it may.
+        const renamed = await callTool("rename_site", {
+            site_id: site.id,
+            name: "Renamed",
+            business: b.id,
+        });
+        expect(renamed.body?.result?.isError).toBeFalsy();
+        expect(
+            (await prisma.site.findUniqueOrThrow({ where: { id: site.id } }))
+                .name,
+        ).toBe("Renamed");
+        const activity = await prisma.mcpActivity.findMany({
+            where: { connectionId: current.connection.id },
+        });
+        expect(activity.map((a) => a.organizationId)).toEqual([b.id]);
+        const bySlug = await callTool("saroh_start", { business: b.slug });
+        expect(bySlug.body?.result?.structuredContent).toMatchObject({
+            business: { business_id: b.id },
+        });
+    });
+
+    it("refuses a call with no business when there are several, and a business not ticked", async () => {
+        const { org, others } = await connectAs("OWNER", undefined, [
+            { role: "OWNER" },
+            { role: "OWNER", ticked: false },
+        ]);
+        const omitted = await callTool("read_enquiry", { text: "hi" });
+        expect(omitted.body?.result?.isError).toBe(true);
+        expect(textOf(omitted)).toMatch(/several businesses.*list_businesses/);
+
+        const outside = await callTool("read_enquiry", {
+            text: "hi",
+            business: others[1].id,
+        });
+        expect(outside.body?.result?.isError).toBe(true);
+        expect(textOf(outside)).toMatch(/doesn't reach the business/);
+
+        const named = await callTool("read_enquiry", {
+            text: "hi",
+            business: org.id,
+        });
+        expect(named.body?.result?.isError).toBeFalsy();
+    });
+
+    it("refuses only the business the person was removed from", async () => {
+        const { org, others, user } = await connectAs("OWNER", undefined, [
+            { role: "MEMBER" },
+        ]);
+        const b = others[0];
+        await prisma.membership.deleteMany({
+            where: { userId: user.id, organizationId: b.id },
+        });
+        const inB = await callTool("read_enquiry", {
+            text: "x",
+            business: b.id,
+        });
+        expect(inB.body?.result?.isError).toBe(true);
+        expect(textOf(inB)).toMatch(/can't work with that business/);
+        const inA = await callTool("read_enquiry", {
+            text: "x",
+            business: org.id,
+        });
+        expect(inA.body?.result?.isError).toBeFalsy();
+        const list = await callTool("list_businesses");
+        expect(textOf(list)).toMatch(/One more business/);
+    });
+
+    it("lists the union of tools usable in any ticked business", async () => {
+        await connectAs("MEMBER", undefined, [{ role: "OWNER" }]);
+        const names = ((await rpc("tools/list")).body?.result?.tools ?? []).map(
+            (t) => t.name,
+        );
+        // Owner of B: rename and publish, though a Member of A can't.
+        expect(names).toEqual(
+            expect.arrayContaining(["rename_site", "publish_site"]),
+        );
+        const tools = (await rpc("tools/list")).body?.result?.tools ?? [];
+        const rename = tools.find(
+            (t) => t.name === "rename_site",
+        ) as unknown as {
+            inputSchema: { properties: Record<string, unknown> };
+        };
+        expect(Object.keys(rename.inputSchema.properties)).toEqual(
+            expect.arrayContaining(["site_id", "name", "business"]),
         );
     });
 });

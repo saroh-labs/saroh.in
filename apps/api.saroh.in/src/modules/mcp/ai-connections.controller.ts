@@ -20,6 +20,8 @@ import { AiConnectionsService } from "./ai-connections.service";
  * Settings › API and AI apps › AI apps (U9; the screen is U14): the AI apps
  * signed in to this business. Everyone sees and ends their own; ending
  * someone else's needs `apikey:manage` (the Owner), checked in the service.
+ * Ending one here takes only this business off it; an app that also works
+ * with the person's other businesses keeps those.
  */
 @Controller("organizations/:organizationId/ai-connections")
 @UseGuards(BetterAuthGuard, OrganizationGuard)

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Checkbox } from "@saroh/ui/checkbox";
 import { useState, useTransition } from "react";
 
 import type { OAuthStepResult } from "@/app/(auth)/oauth/actions";
@@ -27,7 +28,10 @@ function StepError({ error }: { error: string | null }) {
     return error ? <AuthError>{error}</AuthError> : null;
 }
 
-/** One business, picked from this person's, then Continue. */
+/**
+ * The businesses the app may work with: tick one or more, or "All my
+ * businesses" (the ones listed now, sent as ids), then Continue.
+ */
 export function PickBusinessForm({
     businesses,
     oauthQuery,
@@ -35,31 +39,59 @@ export function PickBusinessForm({
     businesses: PickableBusiness[];
     oauthQuery: string;
 }) {
-    const [picked, setPicked] = useState(
-        businesses.length === 1 ? businesses[0].id : "",
+    const [ticked, setTicked] = useState<ReadonlySet<string>>(
+        () => new Set(businesses.length === 1 ? [businesses[0].id] : []),
     );
+    const all = ticked.size === businesses.length;
+    const toggle = (id: string) =>
+        setTicked((now) => {
+            const next = new Set(now);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     const { pending, error, run } = useStep();
+    const row =
+        "border-border has-[[data-state=checked]]:border-foreground flex cursor-pointer items-center gap-3 rounded-[9px] border px-[13px] py-[11px] text-[13.5px]";
     return (
         <form
             onSubmit={(event) => {
                 event.preventDefault();
-                if (picked) run(() => pickBusinessAction(picked, oauthQuery));
+                if (ticked.size > 0) {
+                    run(() => pickBusinessAction([...ticked], oauthQuery));
+                }
             }}
         >
             <StepError error={error} />
             <fieldset className="mb-[18px] flex flex-col gap-2">
-                <legend className="sr-only">Business</legend>
+                <legend className="sr-only">Businesses</legend>
+                {businesses.length > 1 ? (
+                    <label className={row}>
+                        <Checkbox
+                            checked={all}
+                            onCheckedChange={() =>
+                                setTicked(
+                                    new Set(
+                                        all ? [] : businesses.map((b) => b.id),
+                                    ),
+                                )
+                            }
+                        />
+                        <span>
+                            <span className="block font-semibold">
+                                {OAUTH_WORDS.allBusinesses}
+                            </span>
+                            <span className="text-muted-foreground block text-[12px]">
+                                {OAUTH_WORDS.allBusinessesNote}
+                            </span>
+                        </span>
+                    </label>
+                ) : null}
                 {businesses.map((b) => (
-                    <label
-                        key={b.id}
-                        className="border-border has-[:checked]:border-foreground flex cursor-pointer items-center gap-3 rounded-[9px] border px-[13px] py-[11px] text-[13.5px]"
-                    >
-                        <input
-                            type="radio"
-                            name="business"
-                            value={b.id}
-                            checked={picked === b.id}
-                            onChange={() => setPicked(b.id)}
+                    <label key={b.id} className={row}>
+                        <Checkbox
+                            checked={ticked.has(b.id)}
+                            onCheckedChange={() => toggle(b.id)}
                         />
                         {b.name}
                     </label>
@@ -68,7 +100,7 @@ export function PickBusinessForm({
             <Button
                 type="submit"
                 className="sa-cta h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
-                disabled={pending || !picked}
+                disabled={pending || ticked.size === 0}
             >
                 {pending ? OAUTH_WORDS.continuing : OAUTH_WORDS.continue}
             </Button>

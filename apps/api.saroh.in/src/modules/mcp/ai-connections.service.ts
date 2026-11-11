@@ -19,15 +19,19 @@ export interface AiConnectionView {
     app: { name: string | null; known: boolean };
     person: { id: string; name: string | null };
     scopes: string[];
+    /** How many other businesses the same connection reaches (a count, so no other business's name leaks). */
+    otherBusinesses: number;
     connectedAt: string | null;
     lastUsedAt: string | null;
 }
 
 /**
  * The business's AI connections (U9): each a person's sign-in grant to an AI
- * app for this business (`OauthConsent` with `referenceId` = the business).
- * Everyone sees their own; whoever holds `apikey:manage` (the Owner) sees
- * and ends everyone's. Read and ended only by the business in the context.
+ * app that reaches this business (`OauthConsent` whose `organizationIds`
+ * holds it; one grant may reach several, and shows under each). Everyone
+ * sees their own; whoever holds `apikey:manage` (the Owner) sees and ends
+ * everyone's. Ending one here takes only this business off the grant; the
+ * grant itself ends when no business is left on it.
  */
 @Injectable()
 export class AiConnectionsService {
@@ -36,7 +40,7 @@ export class AiConnectionsService {
     async list(ctx: OrganizationContext): Promise<AiConnectionView[]> {
         const grants = await prisma.oauthConsent.findMany({
             where: {
-                referenceId: ctx.organizationId,
+                organizationIds: { has: ctx.organizationId },
                 ...(allows(ctx, "apikey:manage") ? {} : { userId: ctx.userId }),
             },
             orderBy: { createdAt: "desc" },
@@ -73,67 +77,98 @@ export class AiConnectionsService {
                 name: personOf.get(g.userId ?? "") ?? null,
             },
             scopes: g.scopes,
+            otherBusinesses: g.organizationIds.filter(
+                (id) => id !== ctx.organizationId,
+            ).length,
             connectedAt: g.createdAt?.toISOString() ?? null,
             lastUsedAt: g.lastUsedAt?.toISOString() ?? null,
         }));
     }
 
-    /** End one: someone else's needs `apikey:manage`. */
+    /**
+     * Take this business off a connection: someone else's needs
+     * `apikey:manage`. The app keeps its other businesses; with none left,
+     * the connection ends ({@link endConnection}).
+     */
     async disconnect(ctx: OrganizationContext, id: string): Promise<void> {
         const grant = await prisma.oauthConsent.findFirst({
-            where: { id, referenceId: ctx.organizationId },
+            where: { id, organizationIds: { has: ctx.organizationId } },
         });
         if (!grant)
             throw new NotFoundException("That connection isn't here any more.");
         if (grant.userId !== ctx.userId) authorize(ctx, "apikey:manage");
-        await endConnection(grant);
-        await this.recordEnded(grant, ctx.userId, "person", ctx.roleKey);
+        const left = grant.organizationIds.filter(
+            (o) => o !== ctx.organizationId,
+        );
+        if (left.length === 0) {
+            await endConnection(grant);
+        } else {
+            await prisma.oauthConsent.update({
+                where: { id: grant.id },
+                data: { organizationIds: left },
+            });
+        }
+        await this.recordEnded(
+            grant,
+            ctx.userId,
+            "person",
+            ctx.roleKey,
+            ctx.organizationId,
+        );
     }
 
+    /** On each business the grant reaches. */
     async recordConnected(grant: OauthConsent, appName: string | null) {
-        if (!grant.userId || !grant.referenceId) return;
-        await this.audit.record({
-            action: AuditAction.AiConnectionConnected,
-            actorUserId: grant.userId,
-            organizationId: grant.referenceId,
-            targetType: "ai-connection",
-            targetId: grant.id,
-            outcome: AuditOutcome.Success,
-            metadata: {
-                app: appName,
-                known: isKnownClient(grant.clientId),
-                scopes: grant.scopes,
-            },
-        });
+        if (!grant.userId) return;
+        for (const organizationId of grant.organizationIds) {
+            await this.audit.record({
+                action: AuditAction.AiConnectionConnected,
+                actorUserId: grant.userId,
+                organizationId,
+                targetType: "ai-connection",
+                targetId: grant.id,
+                outcome: AuditOutcome.Success,
+                metadata: {
+                    app: appName,
+                    known: isKnownClient(grant.clientId),
+                    scopes: grant.scopes,
+                },
+            });
+        }
     }
 
+    /** On `only`, or on every business the grant reached. */
     async recordEnded(
         grant: OauthConsent,
         actorUserId: string,
         reason: "person" | "idle",
         actorRoleKey?: string,
+        only?: string,
     ) {
-        if (!grant.referenceId) return;
+        const businesses = only ? [only] : grant.organizationIds;
+        if (businesses.length === 0) return;
         const app = await prisma.oauthClient.findUnique({
             where: { clientId: grant.clientId },
             select: { name: true },
         });
-        await this.audit.record({
-            action: AuditAction.AiConnectionDisconnected,
-            actorUserId,
-            organizationId: grant.referenceId,
-            targetType: "ai-connection",
-            targetId: grant.id,
-            outcome: AuditOutcome.Success,
-            metadata: { app: app?.name ?? null, of: grant.userId, reason },
-            actorRoleKey,
-        });
+        for (const organizationId of businesses) {
+            await this.audit.record({
+                action: AuditAction.AiConnectionDisconnected,
+                actorUserId,
+                organizationId,
+                targetType: "ai-connection",
+                targetId: grant.id,
+                outcome: AuditOutcome.Success,
+                metadata: { app: app?.name ?? null, of: grant.userId, reason },
+                actorRoleKey,
+            });
+        }
     }
 }
 
 /**
  * Ends a connection: the grant goes, and with it every refresh token for
- * that person, app and business (Better Auth revokes nothing when a consent
+ * that person, app and business set (Better Auth revokes nothing when a consent
  * is deleted). A still-unexpired access token is then refused by
  * `McpAuthGuard`, which finds no grant.
  */

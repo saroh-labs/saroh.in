@@ -5,6 +5,8 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    businessSetKey,
+    businessSetOf,
     MCP_ACCESS_TOKEN_SECONDS,
     MCP_NO_REFRESH_TOKEN_SECONDS,
     mcpAddressesOf,
@@ -302,7 +304,7 @@ describe("sign-in for AI apps", () => {
         expect(claims).toMatchObject({
             sub: who.userId,
             azp: clientId,
-            org: "org_1",
+            orgs: ["org_1"],
             scopes: ["saroh:read", "saroh:write", "offline_access"],
         });
         // With a refresh token: an hour.
@@ -365,9 +367,35 @@ describe("sign-in for AI apps", () => {
         );
         const second = await connect(auth, who, clientId, "org_2");
         expect(second.consented).toBe(true);
-        expect((await verify(auth, second.tokens.access_token)).org).toBe(
+        expect((await verify(auth, second.tokens.access_token)).orgs).toEqual([
             "org_2",
+        ]);
+    });
+
+    it("puts every ticked business in the token; another set is another consent", async () => {
+        const { auth, codes } = build();
+        const who = await signIn(auth, codes, "owner@example.com");
+        const clientId = await register(auth);
+        const both = businessSetKey(["org_2", "org_1", "org_2"]);
+        expect(both).toBe("org_1,org_2");
+        const first = await connect(auth, who, clientId, both);
+        expect(first.consented).toBe(true);
+        expect((await verify(auth, first.tokens.access_token)).orgs).toEqual([
+            "org_1",
+            "org_2",
+        ]);
+        expect(db.oauthConsent[0]).toMatchObject({
+            referenceId: "org_1,org_2",
+        });
+        // The same set again: no new consent. One of them alone: a new one.
+        expect((await connect(auth, who, clientId, both)).consented).toBe(
+            false,
         );
+        expect((await connect(auth, who, clientId, "org_1")).consented).toBe(
+            true,
+        );
+        expect(businessSetOf("org_1,org_2")).toEqual(["org_1", "org_2"]);
+        expect(businessSetOf(null)).toEqual([]);
     });
 
     it("asks which business on every new sign-in, even with a pick on file", async () => {

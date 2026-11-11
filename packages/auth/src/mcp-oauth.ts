@@ -41,12 +41,24 @@ export const MCP_NO_REFRESH_TOKEN_SECONDS = 30 * 24 * 60 * 60;
 /** A connection unused this long ends (refresh refused, guard refuses). */
 export const MCP_IDLE_SECONDS = 90 * 24 * 60 * 60;
 
-/** How long a business picked on the pick page stands for the flow. */
+/** How long the businesses ticked on the pick page stand for the flow. */
 export const OAUTH_PICK_SECONDS = 10 * 60;
 
-/** The Verification row holding a session's picked business. */
+/** The Verification row holding a session's ticked businesses. */
 export const oauthPickIdentifier = (sessionId: string) =>
     `oauth-pick:${sessionId}`;
+
+/**
+ * A set of businesses as one string: sorted ids joined by commas. It is the
+ * consent's reference (person + app + this set: another set is another
+ * consent) and is what the pick stores. Ids never hold a comma.
+ */
+export const businessSetKey = (organizationIds: readonly string[]) =>
+    [...new Set(organizationIds)].sort().join(",");
+
+/** The ids in a {@link businessSetKey}. */
+export const businessSetOf = (key: string | null | undefined): string[] =>
+    (key ?? "").split(",").filter(Boolean);
 
 export interface McpAddresses {
     /** What signs the tokens: `iss`. */
@@ -80,7 +92,7 @@ export function mcpAddressesOf(
     };
 }
 
-/** The business a session picked on the pick page, while it stands. */
+/** The businesses a session ticked ({@link businessSetKey}), while they stand. */
 export async function readOAuthPick(sessionId: string): Promise<string | null> {
     const row = await prisma.verification.findFirst({
         where: {
@@ -125,7 +137,7 @@ export function mcpOAuthPlugins(
             grantTypes: ["authorization_code", "refresh_token"],
             postLogin: {
                 page: `${at.accounts}/oauth/pick-business`,
-                // Every flow asks which business. A continuation comes from
+                // Every flow asks which businesses. A continuation comes from
                 // the pick page only after the API stored the pick, but the
                 // client sends it, so the pick is checked again.
                 shouldRedirect: async ({ session, isContinuation }) =>
@@ -136,15 +148,16 @@ export function mcpOAuthPlugins(
                         // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see server.ts
                         throw new APIError("BAD_REQUEST", {
                             error: "invalid_request",
-                            error_description: "No business was picked.",
+                            error_description: "No business was ticked.",
                         });
                     }
                     return org;
                 },
             },
-            // The business rides in the token; the API checks it every call.
+            // The businesses ride in the token; the API checks the grant's
+            // live set, and the person's role in the one named, every call.
             customAccessTokenClaims: ({ referenceId }) =>
-                referenceId ? { org: referenceId } : {},
+                referenceId ? { orgs: businessSetOf(referenceId) } : {},
         }),
         cimd({
             fetchClientMetadataResource,
@@ -159,8 +172,8 @@ export interface McpTokenClaims {
     sub: string;
     /** The app (`azp`, its client id). */
     clientId: string;
-    /** The business picked at sign-in. */
-    org: string;
+    /** The businesses ticked at sign-in. */
+    orgs: string[];
     scopes: string[];
     exp?: number;
 }
@@ -195,13 +208,17 @@ export async function verifyMcpAccessToken(
         },
     });
     if (claims.cnf) throw new Error("sender-bound token");
-    if (typeof claims.org !== "string" || !claims.org) {
-        throw new Error("token names no business");
-    }
+    // A single `org` is what tokens said before a connection held several.
+    const orgs = Array.isArray(claims.orgs)
+        ? claims.orgs.filter((o): o is string => typeof o === "string" && !!o)
+        : typeof claims.org === "string" && claims.org
+          ? [claims.org]
+          : [];
+    if (orgs.length === 0) throw new Error("token names no business");
     return {
         sub: String(claims.sub),
         clientId: String(claims.azp),
-        org: claims.org,
+        orgs,
         scopes:
             typeof claims.scope === "string"
                 ? claims.scope.split(" ").filter(Boolean)

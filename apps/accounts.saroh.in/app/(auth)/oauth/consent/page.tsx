@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 const PAGE = "/oauth/consent";
 
 /**
- * An AI app's sign-in, last step (U9): the app, whether Saroh knows it, the
- * business, what it may do, where the person goes back to, and that what it
+ * An AI app's sign-in, last step (U9): the app, whether Saroh knows it, every
+ * business ticked, what it may do, where the person goes back to, and that what it
  * reads goes to the app's provider. An app wearing Saroh's, Claude's,
  * ChatGPT's or OpenAI's name without being theirs gets no Allow. 404 while
  * the AI apps switch (`API_MCP`) is off.
@@ -52,7 +52,7 @@ export default async function ConsentPage({
             </SplitShell>
         );
     }
-    if (!details.business) {
+    if (details.businesses.length === 0) {
         return (
             <SplitShell>
                 <AuthHeading
@@ -71,11 +71,21 @@ export default async function ConsentPage({
                 </p>
             )}
             <AuthHeading
-                title={OAUTH_WORDS.consentTitle(app, details.business.name)}
+                title={OAUTH_WORDS.consentTitle(
+                    app,
+                    details.businesses.map((b) => b.name),
+                )}
                 blurb={
                     details.app.known ? undefined : OAUTH_WORDS.unverifiedNote
                 }
             />
+            {details.businesses.length > 1 ? (
+                <ul className="sa-rise mt-3 flex flex-col gap-1 text-[13px] font-semibold">
+                    {details.businesses.map((b) => (
+                        <li key={b.id}>{b.name}</li>
+                    ))}
+                </ul>
+            ) : null}
             <div className="sa-rise bg-muted mb-4 mt-4 rounded-[9px] px-[13px] py-[11px]">
                 <p className="text-[12.5px] font-semibold">
                     {OAUTH_WORDS.canHeading}

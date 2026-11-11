@@ -13,30 +13,22 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 
-import type { ModuleKey } from "../capabilities/module-keys";
 import { CapsService } from "../rate-limits/caps";
 import { LimitsService } from "../rate-limits/limits.service";
 import type { McpRequest } from "./mcp-auth.guard";
 import { McpAuthGuard } from "./mcp-auth.guard";
-import type { McpCall, McpLimit } from "./tool-registry";
+import type { ContextIn, McpLimit, McpServe } from "./tool-registry";
 import { McpToolRegistry } from "./tool-registry";
 
 const PROTOCOL_VERSION_KEY = "io.modelcontextprotocol/protocolVersion";
 
-/** What the controller hands the per-request server factory. */
-interface McpExtra {
-    call: McpCall;
-    listAll: boolean;
-    limited: McpLimit | null;
-    modulesOff?: ReadonlySet<ModuleKey>;
-}
-
 /**
  * `/mcp` (plan 2026-11-10-001, U10): Saroh's MCP server, stateless, in
  * process. `McpAuthGuard` answers 404 off `mcp.<edition>` or with `API_MCP`
- * off, 401 without a good token or AI key, and puts the business's context
- * and the connection on the request. Each request then gets a fresh server
- * holding the tools that context may use (`McpToolRegistry`).
+ * off, 401 without a good token or AI key, and puts the connection (and the
+ * businesses it reaches) on the request. A `tools/call` is then worked out
+ * for the business it names (`McpToolRegistry.target`), and a `tools/list`
+ * shows the tools usable in any of them. Each request gets a fresh server.
  *
  * Every method reaches the SDK (`@All`): it answers GET and DELETE with 405
  * itself, which clients read as "POST only". 2026-07-28 traffic is served
@@ -50,8 +42,8 @@ export class McpController {
 
     private readonly handler = createMcpHandler(
         ({ authInfo }) => {
-            const extra = authInfo?.extra as unknown as McpExtra;
-            return this.registry.serverFor(extra.call, extra);
+            const serve = authInfo?.extra as unknown as McpServe;
+            return this.registry.serverFor(serve);
         },
         {
             onerror: (error) =>
@@ -71,21 +63,41 @@ export class McpController {
         private readonly registry: McpToolRegistry,
         private readonly caps: CapsService,
         private readonly limits: LimitsService,
+        private readonly guard: McpAuthGuard,
     ) {}
 
     @All()
     async serve(@Req() req: McpRequest, @Res() res: Response): Promise<void> {
-        const ctx = req.organizationContext;
         const connection = req.mcpConnection;
-        // McpAuthGuard sets both or refuses; never reached without them.
-        if (!ctx || !connection) throw new HttpException("", 401);
+        // McpAuthGuard sets it or refuses; never reached without it.
+        if (!connection) throw new HttpException("", 401);
         const body: unknown = req.body;
-        const isToolCall = methodOf(body) === "tools/call";
+        const method = methodOf(body);
+        const isToolCall = method === "tools/call";
+        const contextIn: ContextIn = (organizationId) =>
+            this.guard.contextIn(connection, organizationId, req.headers.host);
+
+        const params = (body as { params?: Record<string, unknown> } | null)
+            ?.params;
+        const target = isToolCall
+            ? await this.registry.target(
+                  connection,
+                  this.registry.get(String(params?.name)),
+                  (params?.arguments as Record<string, unknown> | undefined)
+                      ?.business,
+                  contextIn,
+              )
+            : undefined;
+        const business =
+            target && !(target instanceof Error) && target.named !== false
+                ? target.ctx.organizationId
+                : undefined;
 
         const limited = await this.limit(
             res,
-            ctx.organizationId,
+            business ?? connection.businesses[0],
             connection.id,
+            business,
         );
         // A tool call over the limit gets a tool error the model can act on;
         // anything else, the plain 429.
@@ -102,13 +114,12 @@ export class McpController {
             );
         }
 
-        const extra: McpExtra = {
-            call: { ctx, connection },
-            listAll: isToolCall,
+        const extra: McpServe = {
+            target,
             limited,
-            // Only a listing hides by module; a call checks its own tool's.
-            ...(methodOf(body) === "tools/list"
-                ? { modulesOff: await this.registry.modulesOff(ctx) }
+            // Only a listing hides tools; a call checks its own.
+            ...(method === "tools/list"
+                ? { listing: await this.registry.reach(connection, contextIn) }
                 : {}),
         };
         (req as McpRequest & { auth?: AuthInfo }).auth = {
@@ -124,17 +135,21 @@ export class McpController {
     }
 
     /**
-     * One call off the connection's and the business's MCP cap (U4's
-     * durable window). Null when allowed, else how long to wait.
+     * One call off the connection's MCP cap and, for a call in a business,
+     * that business's (U4's durable window); the cap is `capOf`'s. Null when
+     * allowed, else how long to wait.
      */
     private async limit(
         res: Response,
-        organizationId: string,
+        capOf: string,
         connectionId: string,
+        business: string | undefined,
     ): Promise<McpLimit | null> {
-        const cap = await this.caps.rpm(organizationId, "mcp");
+        const cap = await this.caps.rpm(capOf, "mcp");
         const now = Date.now();
-        for (const id of [`conn:${connectionId}`, `org:${organizationId}`]) {
+        const ids = [`conn:${connectionId}`];
+        if (business) ids.push(`org:${business}`);
+        for (const id of ids) {
             const decision = await this.limits.take("mcp", id, cap, now);
             const wait = Math.max(
                 1,

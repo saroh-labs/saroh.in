@@ -30,7 +30,12 @@ jest.mock("@saroh/auth", () => {
         };
     };
     const pickId = (sessionId: string) => `oauth-pick:${sessionId}`;
+    const setKey = (ids: readonly string[]) =>
+        [...new Set(ids)].sort().join(",");
     return {
+        businessSetKey: setKey,
+        businessSetOf: (key: string | null | undefined) =>
+            (key ?? "").split(",").filter(Boolean),
         MCP_IDLE_SECONDS: 90 * 24 * 60 * 60,
         OAUTH_PICK_SECONDS: 600,
         mcpAddressesOf: addresses,
@@ -137,20 +142,32 @@ async function client(name = "Test app", clientId = uniq("client")) {
 
 const SCOPES = ["saroh:read", "saroh:write", "offline_access"];
 
-/** A connection as Better Auth leaves it: a grant and a live refresh token. */
+/**
+ * A connection as the sign-in leaves it: a grant reaching the ticked
+ * businesses (`organizationIds`, which Better Auth leaves empty and the
+ * Allow fills), a live refresh token, and a token naming the set.
+ */
 async function connect(
     userId: string,
-    org: string,
+    orgs: string | string[],
     clientId: string,
-    options: { scopes?: string[]; lastUsedAt?: Date; createdAt?: Date } = {},
+    options: {
+        scopes?: string[];
+        lastUsedAt?: Date;
+        createdAt?: Date;
+        organizationIds?: string[];
+    } = {},
 ) {
+    const set = [...new Set([orgs].flat())].sort();
+    const referenceId = set.join(",");
     const scopes = options.scopes ?? SCOPES;
     const grant = await prisma.oauthConsent.create({
         data: {
             id: randomUUID(),
             clientId,
             userId,
-            referenceId: org,
+            referenceId,
+            organizationIds: options.organizationIds ?? set,
             scopes,
             createdAt: options.createdAt ?? new Date(),
             lastUsedAt: options.lastUsedAt,
@@ -163,7 +180,7 @@ async function connect(
                 token: uniq("rt"),
                 clientId,
                 userId,
-                referenceId: org,
+                referenceId,
                 scopes,
                 createdAt: new Date(),
                 expiresAt: new Date(Date.now() + 30 * DAY),
@@ -174,7 +191,7 @@ async function connect(
         iss: "https://api.saroh.in/api/auth",
         sub: userId,
         clientId,
-        org,
+        orgs: set,
         scopes,
     });
     return { grant, token };
@@ -196,6 +213,8 @@ function call(token: string | null, host = "mcp.saroh.in") {
         req,
         headers,
         run: () => guard.canActivate(context),
+        /** After `run`: the context a tool call in `org` gets, or null. */
+        in: (org: string) => guard.contextIn(req.mcpConnection!, org, host),
     };
 }
 
@@ -249,7 +268,7 @@ describe("McpAuthGuard (U9)", () => {
         const { grant, token } = await connect(org.owner, org.id, app);
         const c = call(token);
         await expect(c.run()).resolves.toBe(true);
-        const ctx = c.req.organizationContext!;
+        const ctx = (await c.in(org.id))!;
         expect(ctx).toMatchObject({
             organizationId: org.id,
             userId: org.owner,
@@ -271,6 +290,7 @@ describe("McpAuthGuard (U9)", () => {
             kind: "oauth",
             id: grant.id,
             clientId: app,
+            businesses: [org.id],
         });
         // lastUsedAt is written without holding the call up: read until it lands.
         let touched = await prisma.oauthConsent.findUniqueOrThrow({
@@ -293,15 +313,13 @@ describe("McpAuthGuard (U9)", () => {
                 .token,
         );
         await read.run();
-        const actions = read.req.organizationContext!.actions!;
+        const actions = (await read.in(org.id))!.actions!;
         expect(actions.has("order:read")).toBe(true);
         expect([...actions].some((a) => !/:read(-own)?$/.test(a))).toBe(false);
 
         const both = call((await connect(member, org.id, app)).token);
         await both.run();
-        expect(both.req.organizationContext!.actions!.has("org:update")).toBe(
-            false,
-        );
+        expect((await both.in(org.id))!.actions!.has("org:update")).toBe(false);
     });
 
     it("answers no token with 401 and where to sign in", async () => {
@@ -334,11 +352,51 @@ describe("McpAuthGuard (U9)", () => {
         const org = await business();
         const member = await person(org.id, "MEMBER");
         const { token } = await connect(member, org.id, await client());
-        expect(await statusOf(call(token).run())).toBe(200);
+        const c = call(token);
+        expect(await statusOf(c.run())).toBe(200);
+        expect(await c.in(org.id)).not.toBeNull();
         await prisma.membership.deleteMany({
             where: { userId: member, organizationId: org.id },
         });
-        expect(await statusOf(call(token).run())).toBe(401);
+        expect(await c.in(org.id)).toBeNull();
+    });
+
+    it("reaches every ticked business with the person's role in each, and no other", async () => {
+        const a = await business();
+        const b = await business();
+        const untouched = await business();
+        const member = await person(b.id, "MEMBER");
+        await prisma.membership.create({
+            data: { organizationId: a.id, userId: member, role: "ADMIN" },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: untouched.id,
+                userId: member,
+                role: "ADMIN",
+            },
+        });
+        const { token } = await connect(member, [b.id, a.id], await client());
+        const c = call(token);
+        expect(await statusOf(c.run())).toBe(200);
+        expect(c.req.mcpConnection?.businesses).toEqual([a.id, b.id].sort());
+        expect((await c.in(a.id))?.role).toBe("ADMIN");
+        expect((await c.in(b.id))?.role).toBe("MEMBER");
+        // Not ticked: never, whatever the person's role there.
+        expect(await c.in(untouched.id)).toBeNull();
+
+        // Removed from B only: B refused, A still works.
+        await prisma.membership.deleteMany({
+            where: { userId: member, organizationId: b.id },
+        });
+        expect(await c.in(b.id)).toBeNull();
+        expect(await c.in(a.id)).not.toBeNull();
+
+        // AI apps off for A alone.
+        flags.isEnabled.mockImplementation((_k: string, org?: string) =>
+            Promise.resolve(org !== a.id),
+        );
+        expect(await c.in(a.id)).toBeNull();
     });
 
     it("refuses a grant idle for 90 days", async () => {
@@ -377,10 +435,12 @@ describe("McpAuthGuard (U9)", () => {
         keys.contextFor.mockResolvedValue(key("SECRET", true));
         const c = call(token);
         expect(await statusOf(c.run())).toBe(200);
-        expect(c.req.mcpConnection?.kind).toBe("key");
-        expect(c.req.organizationContext!.actions!.has("apikey:manage")).toBe(
-            false,
-        );
+        expect(c.req.mcpConnection).toMatchObject({
+            kind: "key",
+            businesses: [org.id],
+        });
+        expect((await c.in(org.id))!.actions!.has("apikey:manage")).toBe(false);
+        expect(await c.in((await business()).id)).toBeNull();
     });
 });
 
@@ -430,6 +490,50 @@ describe("AI connections (U9)", () => {
             actorUserId: org.owner,
             targetId: grant.id,
         });
+    });
+
+    it("shows a connection under each business it reaches; an Owner of A ends it for A only", async () => {
+        const a = await business();
+        const b = await business();
+        const member = await person(a.id, "MEMBER");
+        await prisma.membership.create({
+            data: { organizationId: b.id, userId: member, role: "MEMBER" },
+        });
+        const { grant, token } = await connect(
+            member,
+            [a.id, b.id],
+            await client(),
+        );
+        expect(
+            (await connections.list(ownerCtx(a.id, a.owner))).map((c) => c.id),
+        ).toEqual([grant.id]);
+        expect(
+            (await connections.list(memberCtx(b.id, member))).map((c) => c.id),
+        ).toEqual([grant.id]);
+
+        await connections.disconnect(ownerCtx(a.id, a.owner), grant.id);
+        expect(await connections.list(ownerCtx(a.id, a.owner))).toEqual([]);
+        const c = call(token);
+        expect(await statusOf(c.run())).toBe(200);
+        expect(c.req.mcpConnection?.businesses).toEqual([b.id]);
+        expect(await c.in(a.id)).toBeNull();
+        expect(await c.in(b.id)).not.toBeNull();
+        expect(
+            await prisma.oauthRefreshToken.count({
+                where: { referenceId: grant.referenceId, revoked: null },
+            }),
+        ).toBe(1);
+        const ended = await prisma.auditEvent.findMany({
+            where: { targetId: grant.id, action: "ai_connection.disconnected" },
+        });
+        expect(ended.map((e) => e.organizationId)).toEqual([a.id]);
+
+        // The person ends it for B, the last one: the connection is gone.
+        await connections.disconnect(memberCtx(b.id, member), grant.id);
+        expect(
+            await prisma.oauthConsent.findUnique({ where: { id: grant.id } }),
+        ).toBeNull();
+        expect(await statusOf(call(token).run())).toBe(401);
     });
 
     it("never reaches another business's connection", async () => {
@@ -518,14 +622,29 @@ describe("OAuthFlowService (U9)", () => {
         expect(offered.map((b) => b.id)).toEqual([india.id]);
         const tech = await flow.businesses(caller(userId, "api.saroh.tech"));
         expect(tech.map((b) => b.id)).toEqual([global.id]);
-        expect(await statusOf(flow.pick(caller(userId), demo.id, "q=1"))).toBe(
-            403,
-        );
+        expect(
+            await statusOf(flow.pick(caller(userId), [demo.id], "q=1")),
+        ).toBe(403);
+        // One not offered spoils the set.
+        expect(
+            await statusOf(
+                flow.pick(caller(userId), [india.id, global.id], "q=1"),
+            ),
+        ).toBe(403);
+        expect(await statusOf(flow.pick(caller(userId), [], "q=1"))).toBe(400);
         expect(mockHandler).not.toHaveBeenCalled();
     });
 
-    it("stores the pick for the session, then continues the sign-in", async () => {
+    it("stores the ticked set for the session, then continues the sign-in", async () => {
         const org = await business();
+        const second = await business();
+        await prisma.membership.create({
+            data: {
+                organizationId: second.id,
+                userId: org.owner,
+                role: "MEMBER",
+            },
+        });
         const who = caller(org.owner);
         mockHandler.mockResolvedValue(
             Response.json({
@@ -533,7 +652,11 @@ describe("OAuthFlowService (U9)", () => {
                 url: "https://accounts.saroh.in/oauth/consent?x=1",
             }),
         );
-        const next = await flow.pick(who, org.id, "client_id=c&sig=s");
+        const next = await flow.pick(
+            who,
+            [second.id, org.id],
+            "client_id=c&sig=s",
+        );
         expect(next.url).toBe("https://accounts.saroh.in/oauth/consent?x=1");
         const sent = mockHandler.mock.calls[0][0] as Request;
         expect(sent.url).toBe("https://api.saroh.in/api/auth/oauth2/continue");
@@ -544,7 +667,38 @@ describe("OAuthFlowService (U9)", () => {
         const pick = await prisma.verification.findFirst({
             where: { identifier: `oauth-pick:${who.sessionId}` },
         });
-        expect(pick?.value).toBe(org.id);
+        expect(pick?.value).toBe([org.id, second.id].sort().join(","));
+    });
+
+    it("ends this set's grant when it lost a business, so consent is asked again", async () => {
+        const a = await business();
+        const b = await business();
+        await prisma.membership.create({
+            data: { organizationId: b.id, userId: a.owner, role: "OWNER" },
+        });
+        const app = await client();
+        const { grant } = await connect(a.owner, [a.id, b.id], app, {
+            organizationIds: [b.id],
+        });
+        const whole = await connect(a.owner, a.id, app);
+        mockHandler.mockImplementation(() =>
+            Promise.resolve(
+                Response.json({
+                    url: "https://accounts.saroh.in/oauth/consent",
+                }),
+            ),
+        );
+        await flow.pick(caller(a.owner), [a.id, b.id], `client_id=${app}`);
+        expect(
+            await prisma.oauthConsent.findUnique({ where: { id: grant.id } }),
+        ).toBeNull();
+        // A grant still whole is left for Better Auth to reuse.
+        await flow.pick(caller(a.owner), [a.id], `client_id=${app}`);
+        expect(
+            await prisma.oauthConsent.findUnique({
+                where: { id: whole.grant.id },
+            }),
+        ).not.toBeNull();
     });
 
     it("refuses an unknown app wearing a known name, and shows a known one as known", async () => {
@@ -581,25 +735,32 @@ describe("OAuthFlowService (U9)", () => {
         expect(known).toMatchObject({
             refused: false,
             app: { known: true },
-            business: { id: org.id },
+            businesses: [{ id: org.id }],
         });
     });
 
-    it("records the connection on the business when the person allows it", async () => {
+    it("puts the ticked set on the grant and records it on each business when the person allows it", async () => {
         const org = await business();
+        const other = await business();
         const who = caller(org.owner);
+        const set = [org.id, other.id].sort().join(",");
         await prisma.verification.create({
             data: {
                 id: randomUUID(),
                 identifier: `oauth-pick:${who.sessionId}`,
-                value: org.id,
+                value: set,
                 expiresAt: new Date(Date.now() + 60_000),
             },
         });
         const app = await client("Cursor");
+        let made = "";
         mockHandler.mockImplementation(async () => {
-            // What Better Auth does on Allow: the grant, then the redirect.
-            await connect(org.owner, org.id, app);
+            // What Better Auth does on Allow: the grant (no set), the redirect.
+            made = (
+                await connect(org.owner, [org.id, other.id], app, {
+                    organizationIds: [],
+                })
+            ).grant.id;
             return Response.json({
                 redirect: true,
                 url: "http://127.0.0.1:9/cb?code=c",
@@ -614,13 +775,17 @@ describe("OAuthFlowService (U9)", () => {
             }).toString(),
         );
         expect(next.url).toContain("code=c");
+        const grant = await prisma.oauthConsent.findUniqueOrThrow({
+            where: { id: made },
+        });
+        expect(grant.organizationIds.sort()).toEqual(set.split(","));
         const events = await prisma.auditEvent.findMany({
             where: {
-                organizationId: org.id,
+                organizationId: { in: [org.id, other.id] },
                 action: "ai_connection.connected",
             },
         });
-        expect(events).toHaveLength(1);
+        expect(events).toHaveLength(2);
         expect(events[0].metadata).toMatchObject({
             app: "Cursor",
             known: false,

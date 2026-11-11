@@ -21,25 +21,42 @@ export const untrustedText = z
     );
 export type UntrustedText = z.infer<typeof untrustedText>;
 
+/** What a connection may do in one business, after the person's role there. */
+const may = z.object({
+    read: z.boolean(),
+    change: z.boolean(),
+    publish_website: z.boolean(),
+});
+
+/** One business a connection reaches. */
+const reachedBusiness = z.object({
+    business_id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    edition: z.enum(["india", "global"]),
+    your_role: z.string(),
+});
+
 export const sarohStartTool = {
     input: z.object({}).strict(),
     output: z.object({
-        business: z.object({
-            business_id: z.string(),
-            name: z.string(),
-            edition: z.enum(["india", "global"]),
-            currency: z.string().nullable(),
-        }),
-        your_role: z.string(),
+        /** Null when the connection covers several and none was named. */
+        business: z
+            .object({
+                business_id: z.string(),
+                name: z.string(),
+                edition: z.enum(["india", "global"]),
+                currency: z.string().nullable(),
+            })
+            .nullable(),
+        your_role: z.string().nullable(),
+        /** Every business this connection reaches now. */
+        businesses: z.array(reachedBusiness),
         connection: z.object({
             kind: z.enum(["app_sign_in", "api_key"]),
             app_name: z.string().nullable(),
         }),
-        may: z.object({
-            read: z.boolean(),
-            change: z.boolean(),
-            publish_website: z.boolean(),
-        }),
+        may: may.nullable(),
         modules_on: z.array(z.string()),
         sites: z.array(
             z.object({
@@ -49,6 +66,18 @@ export const sarohStartTool = {
             }),
         ),
         drafts_and_publish: z.string(),
+    }),
+};
+
+export const listBusinessesTool = {
+    input: z.object({}).strict(),
+    output: z.object({
+        businesses: z.array(
+            reachedBusiness.extend({
+                may,
+                modules_on: z.array(z.string()),
+            }),
+        ),
     }),
 };
 

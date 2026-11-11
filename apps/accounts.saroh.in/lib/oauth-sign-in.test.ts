@@ -43,6 +43,16 @@ describe("an AI app's sign-in pages (U9)", () => {
         expect(OAUTH_WORDS.unverified).toBe("Unverified app");
     });
 
+    it("names one ticked business, and counts several", () => {
+        expect(OAUTH_WORDS.consentTitle("Claude", ["Rye Bakery"])).toBe(
+            "Let Claude work with Rye Bakery?",
+        );
+        expect(
+            OAUTH_WORDS.consentTitle("Claude", ["Rye Bakery", "Pulse Gym"]),
+        ).toBe("Let Claude work with 2 businesses?");
+        expect(OAUTH_WORDS.allBusinesses).toBe("All my businesses");
+    });
+
     it("keeps the pages out of error tracking", () => {
         expect(untrackedPage("/oauth/consent?client_id=x&sig=y")).toBe(true);
         expect(untrackedPage("/oauthish")).toBe(false);

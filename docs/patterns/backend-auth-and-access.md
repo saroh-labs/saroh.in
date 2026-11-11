@@ -390,22 +390,32 @@ what the API allows.
 
 ## Rules
 
-- **Current** (11 Nov 2026, plan 2026-11-10-001 U9) — **An AI app acts as
-  the person, for one business, through `McpAuthGuard`.** Better Auth's
-  `mcp()`, `jwt()` and `cimd()` plugins (`packages/auth/src/mcp-oauth.ts`)
-  sign tokens on `api.<edition>` for the resource `mcp.<edition>/mcp`; the
-  person picks the business on accounts `/oauth/pick-business` and it rides
-  as the consent's `referenceId` and the token's `org` claim. The guard
-  (`modules/mcp/mcp-auth.guard.ts`) never reads the cookie, verifies issuer
-  and audience, and loads the grant on **every** call (a signed token can't
-  be revoked): gone, idle 90 days, its app disabled or its refresh tokens
-  revoked is 401. `actions` = granted scopes (`saroh:read`, `saroh:write`,
-  `site:publish`) ∩ the person's live actions, minus `NEVER_FOR_AI`
-  (`OWNER_ONLY_ACTIONS`, `apikey:manage`, `webhook:manage`,
-  `customer:sensitive`). A disconnect deletes the grant **and** revokes its
-  refresh tokens (Better Auth revokes nothing on a consent delete). The
-  OAuth tables are auth-owned (no org RLS); read them only by the context's
-  business. `API_MCP` off makes every OAuth route, document and page 404.
+- **Current** (11 Nov 2026, plan 2026-11-10-001 U9, R1) — **An AI app acts
+  as the person, in the businesses ticked at consent, through
+  `McpAuthGuard`.** Better Auth's `mcp()`, `jwt()` and `cimd()` plugins
+  (`packages/auth/src/mcp-oauth.ts`) sign tokens on `api.<edition>` for the
+  resource `mcp.<edition>/mcp`; the person ticks one, several or all their
+  businesses on accounts `/oauth/pick-business` ("all" is stored as the ids
+  they have then, never a wildcard). The set rides as the consent's
+  `referenceId` (`businessSetKey`: sorted ids, so another set is another
+  consent) and the token's `orgs` claim; the grant's `organizationIds` is
+  the set it reaches **now**. The guard (`modules/mcp/mcp-auth.guard.ts`)
+  never reads the cookie, verifies issuer and audience, and loads the grant
+  on **every** request (a signed token can't be revoked): gone, idle 90
+  days, its app disabled, its refresh tokens revoked or no business left is 401. It fixes no business: each tool call names one in its `business`
+  argument (the registry adds it to every tool; the only one is assumed),
+  and `contextIn` builds that business's context then: `actions` = granted
+  scopes (`saroh:read`, `saroh:write`, `site:publish`) ∩ the person's live
+  actions **there**, minus `NEVER_FOR_AI` (`OWNER_ONLY_ACTIONS`,
+  `apikey:manage`, `webhook:manage`, `customer:sensitive`). A business not
+  in the set, one the person left, one of another edition or one with
+  `API_MCP` off is a tool error for that business only. A secret key stays
+  one business. Disconnecting in a business takes only it off the grant; the
+  last one deletes the grant **and** revokes its refresh tokens (Better Auth
+  revokes nothing on a consent delete). The OAuth tables are auth-owned (no
+  org RLS); read them only by the context's business
+  (`organizationIds has`). `API_MCP` off makes every OAuth route, document
+  and page 404.
 
 - **Current** (10 Oct 2026) — **A refusal by role is a sentence, with the
   permission in `details`.** `authorize()` throws a 403 whose message is

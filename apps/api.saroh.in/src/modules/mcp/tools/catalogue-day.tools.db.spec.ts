@@ -180,6 +180,8 @@ async function connect(
             clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
             clientName: "Claude",
             scopes: ["saroh:read", "saroh:write"],
+            userId,
+            businesses: [orgId],
         },
     };
 }
