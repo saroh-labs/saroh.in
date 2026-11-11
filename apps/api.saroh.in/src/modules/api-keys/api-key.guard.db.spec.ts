@@ -487,17 +487,18 @@ describe("ApiKeyGuard: publishable keys and storefront CORS", () => {
         expect(unlisted.headers["access-control-allow-origin"]).toBeUndefined();
     });
 
-    it("reads from a listed origin, and refuses an unlisted origin's POST with 403", async () => {
+    it("reads from a listed origin, and refuses any POST with 403: the key only reads", async () => {
         const org = await business();
         const pk = await keyFor(org, "PUBLISHABLE");
         const ok = await call("GET", path(pk.token), { origin: SITE });
         expect(ok.status).toBe(200);
         expect(ok.body).toEqual({ organizationId: org.id });
         expect(ok.headers["access-control-allow-origin"]).toBe(SITE);
-        // OriginGuard lets the storefront through; the key's list decides.
-        expect(
-            (await call("POST", path(pk.token), { origin: SITE })).status,
-        ).toBe(201);
+        // OriginGuard lets the storefront through; the key is read-only
+        // even from a listed origin (U7).
+        const post = await call("POST", path(pk.token), { origin: SITE });
+        expect(post.status).toBe(403);
+        expect(post.body.error?.code).toBe("forbidden");
         expect(
             (
                 await call("POST", path(pk.token), {

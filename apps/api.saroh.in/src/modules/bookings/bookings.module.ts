@@ -94,7 +94,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         WaitlistOfferHandler,
         OrganizationGuard,
     ],
-    exports: [BookingsService],
+    exports: [BookingsService, PublicBookingsService],
 })
 export class BookingsModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;

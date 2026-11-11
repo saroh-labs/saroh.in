@@ -235,6 +235,8 @@ module.exports = {
         "<rootDir>/src/modules/rate-limits/**/*.spec.ts",
         // U5: API keys' rules with a jest-mocked Prisma; rows in api-keys.db.spec.ts.
         "<rootDir>/src/modules/api-keys/**/*.spec.ts",
+        // U7/U8: the public API's pure specs; rows in public-api *.db.spec.ts.
+        "<rootDir>/src/modules/public-api/**/*.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",

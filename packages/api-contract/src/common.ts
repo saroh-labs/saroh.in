@@ -13,6 +13,8 @@ export const ERROR_CODES = [
     "forbidden",
     "not_found",
     "conflict",
+    // The business takes no online payment: no provider connected, or Payments off.
+    "payments_unavailable",
     "rate_limited",
     "internal",
 ] as const;

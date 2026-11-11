@@ -33,8 +33,11 @@ import { fromCents, withGstRates } from "./order-pricing";
 
 /** The signed-in site account a checkout is for (ADR-011). */
 export interface SiteAccount {
-    /** The account itself, named on the order it places (A7). */
-    accountId: string;
+    /**
+     * The account itself, named on the order it places (A7); null for a
+     * storefront API guest (U7), whose order is found by its contact.
+     */
+    accountId: string | null;
     email: string;
     contactId: string;
     firstName: string | null;

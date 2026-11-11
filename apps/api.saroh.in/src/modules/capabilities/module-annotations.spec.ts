@@ -106,6 +106,13 @@ const METHOD_LEVEL: Record<string, string> = {
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
     "class-packs/class-packs.controller.ts": "CLASS_PACKS",
     "courses/courses.controller.ts": "COURSES",
+    // Plan 2026-11-10-001 U8: `/v1` gates what the app's own routes gate
+    // (catalogue and services, making and moving a booking, taking and
+    // moving an order); history reads and a booking's cancel stay open.
+    // The catalogue file gates services on APPOINTMENTS too.
+    "public-api/catalogue.v1.controller.ts": "COMMERCE",
+    "public-api/bookings.v1.controller.ts": "APPOINTMENTS",
+    "public-api/orders.v1.controller.ts": "COMMERCE",
 };
 
 /**
@@ -403,6 +410,15 @@ const NEVER: Record<string, string> = {
     // kill switches and plan rows, not by a module.
     "api-keys/api-keys.controller.ts":
         "the owner's API keys — the API's own flags and plan rows gate them, no module holds them",
+    // Plan 2026-11-10-001 U7: the storefront API calls the same services
+    // as `/public/*`, which close with their module (a shop off is a 404).
+    "public-api/storefront.controller.ts":
+        "the storefront API — its services close with their module, as /public/* does",
+    // Plan 2026-11-10-001 U8: as the app's customers and enquiry reads.
+    "public-api/customers.v1.controller.ts":
+        "customers on /v1 — the app's customer workspace is never gated",
+    "public-api/enquiries.v1.controller.ts":
+        "enquiries and form entries on /v1 — read-only history",
 };
 
 /** Controllers with a test of their own below, not a row above. */

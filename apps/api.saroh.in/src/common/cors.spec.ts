@@ -74,6 +74,14 @@ describe("the keyed public API's CORS (plan 2026-11-10-001, U6)", () => {
         ).toEqual({ origin: [], credentials: false });
     });
 
+    it("answers a storefront write's preflight for any origin, without credentials (U7)", () => {
+        // The token is in Authorization, which no preflight carries; the
+        // token's guard refuses an origin outside its list.
+        expect(
+            corsOptionsFor("/v1/storefront/write/bookings", TRUSTED),
+        ).toEqual({ origin: true, credentials: false });
+    });
+
     it("gives secret routes no CORS, and /mcp no credentials", () => {
         expect(corsOptionsFor("/v1/products", TRUSTED)).toEqual({
             origin: false,

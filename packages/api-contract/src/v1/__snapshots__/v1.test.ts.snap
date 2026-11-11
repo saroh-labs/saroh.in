@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`v1 contract (plan 2026-11-10-001, U8) > documents every secret route, each with a capability 1`] = `
+[
+  "GET /bookings",
+  "GET /bookings/{bookingId}",
+  "GET /customers",
+  "GET /customers/{customerId}",
+  "GET /enquiries",
+  "GET /enquiries/{enquiryId}",
+  "GET /form-entries",
+  "GET /orders",
+  "GET /orders/{orderId}",
+  "GET /posts",
+  "GET /products",
+  "GET /products/{productId}",
+  "GET /products/{productId}/stock",
+  "GET /services",
+  "GET /services/{serviceId}",
+  "GET /services/{serviceId}/hours",
+  "GET /subscription-plans",
+  "PATCH /customers/{customerId}",
+  "PATCH /products/{productId}",
+  "PATCH /products/{productId}/stock",
+  "PATCH /products/{productId}/variants/{variantId}",
+  "PATCH /services/{serviceId}",
+  "POST /bookings",
+  "POST /bookings/{bookingId}/cancel",
+  "POST /bookings/{bookingId}/move",
+  "POST /customers",
+  "POST /orders",
+  "POST /orders/{orderId}/status",
+  "POST /products",
+  "POST /products/{productId}/variants",
+  "POST /services",
+  "PUT /services/{serviceId}/hours",
+]
+`;
