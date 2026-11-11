@@ -28,6 +28,7 @@
     "apps/app.saroh.in/next.config.js": 1,
     "apps/saroh.app/lib/api-url.ts": 2,
     "apps/saroh.app/lib/images/resize.ts": 1,
+    "packages/api-contract/scripts/openapi.ts": 1,
     "packages/auth/src/auth-status.tsx": 1,
     "packages/auth/src/next.ts": 1,
     "packages/auth/src/origins.ts": 4,
