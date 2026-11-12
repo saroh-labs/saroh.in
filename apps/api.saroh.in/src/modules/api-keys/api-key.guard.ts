@@ -274,7 +274,7 @@ export class ApiKeyGuard implements CanActivate {
             })
             .catch((error: unknown) => {
                 this.logger.warn(
-                    `api_key_touch_failed: ${error instanceof Error ? error.message : String(error)}`,
+                    `api_key_touch_failed: ${error instanceof Error ? error.name : "unknown"}`,
                 );
             });
     }

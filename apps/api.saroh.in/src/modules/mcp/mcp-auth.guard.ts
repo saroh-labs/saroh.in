@@ -308,7 +308,7 @@ export class McpAuthGuard implements CanActivate {
             .update({ where: { id: consentId }, data: { lastUsedAt: now } })
             .catch((error: unknown) => {
                 this.logger.warn(
-                    `ai_connection_touch_failed: ${error instanceof Error ? error.message : String(error)}`,
+                    `ai_connection_touch_failed: ${error instanceof Error ? error.name : "unknown"}`,
                 );
             });
     }

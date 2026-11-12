@@ -305,9 +305,13 @@ export class WebhookEndpointsService {
         const old = await this.find(ctx, endpointId);
         const turningOn = body.enabled === true && old.disabledAt !== null;
         if (turningOn) await this.included(ctx.organizationId, now);
-        const events = body.events
-            ? this.subscribable(ctx, body.events)
-            : undefined;
+        // The editor becomes the one each send is checked against, so every
+        // event the address keeps must be one they may read.
+        const kept = this.subscribable(
+            ctx,
+            body.events ?? (old.events as WebhookEvent[]),
+        );
+        const events = body.events ? kept : undefined;
         const url = body.url ? await this.vetted(body.url) : undefined;
         const endpoint = await prisma.webhookEndpoint.update({
             where: { id: old.id },

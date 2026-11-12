@@ -316,6 +316,27 @@ describe("webhook endpoints (U13)", () => {
             service.create(developer, { url: URL_, events: ["order.paid"] }),
         ).resolves.toBeDefined();
     });
+
+    it("an edit by someone who can't read the address's events is refused, even a rename", async () => {
+        const { owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        const developer: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "developer",
+            userId: owner.userId,
+            actions: new Set<OrgAction>(["webhook:manage", "order:read"]),
+        };
+        await expect(
+            service.update(developer, made.endpoint.id, { enabled: true }),
+        ).rejects.toMatchObject({ status: 403 });
+        await expect(
+            service.update(developer, made.endpoint.id, { name: "Mine now" }),
+        ).rejects.toMatchObject({ status: 403 });
+    });
 });
 
 // ── The outbox ──────────────────────────────────────────────────────────────

@@ -68,9 +68,17 @@ export const STOREFRONT_SCOPE: readonly OrgAction[] = [
 ];
 
 /** Never on a key, whoever makes it (R7). */
-const NEVER_ON_A_KEY: ReadonlySet<OrgAction> = new Set([
+// As an AI app's (`NEVER_FOR_AI`), plus managing the team: a key never holds
+// a power only a person signed in to Settings uses.
+const NEVER_ON_A_KEY: ReadonlySet<OrgAction> = new Set<OrgAction>([
     ...OWNER_ONLY_ACTIONS,
     "apikey:manage",
+    "webhook:manage",
+    "customer:sensitive",
+    "member:invite",
+    "member:remove",
+    "member:role:update",
+    "project:access:manage",
 ]);
 
 const KNOWN_ACTIONS: ReadonlySet<string> = new Set(ORG_ACTIONS);
