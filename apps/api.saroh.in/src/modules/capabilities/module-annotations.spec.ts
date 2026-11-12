@@ -57,6 +57,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    "share-posts/share-posts.controller.ts": "WEBSITE",
     // A look's starter content copied into the draft, and its Undo (DEC-182).
     "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
@@ -307,6 +308,11 @@ const NEVER: Record<string, string> = {
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // #1375: a published site's share picture. Each kind is read through
+    // its own public read (the shop, the booking page), which answers 404
+    // when its module is off.
+    "share-posts/public-share.controller.ts":
+        "a published site's share picture — each kind's own read checks its module",
     // U23: "Tell me when it's back" and its stop page on a published site.
     "stock/stock-watch.controller.ts":
         "a published site's back-in-stock sign-up and stop page — Commerce checked by the service",

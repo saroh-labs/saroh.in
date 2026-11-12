@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ShareCard from "@/lib/share-card";
 import { shareCard } from "@/lib/share-card";
 
-import { GET } from "./route";
+import { GET } from "./parked-route";
 
 /**
  * The share picture's route (#1375 U1): a live product or service on this

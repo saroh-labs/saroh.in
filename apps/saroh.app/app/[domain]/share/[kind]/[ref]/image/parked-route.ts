@@ -1,10 +1,12 @@
+// Parked: the API draws share pictures now (Takumi, apps/api.saroh.in/src/modules/share-posts/cards); next/og can't shape Indic scripts.
 import { formatAmount } from "@saroh/site-blocks";
 
 import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { getSiteForHost } from "@/lib/publication";
-import type { ShareCardInput } from "@/lib/share-card";
-import { photoData, shareCard } from "@/lib/share-card";
+import { shareCard } from "@/lib/share-card";
+import type { ShareCardInput } from "@/lib/share-card-model";
+import { photoData } from "@/lib/share-photo";
 
 /**
  * A live product's or service's share picture (#1375, plan 2026-11-12-002
