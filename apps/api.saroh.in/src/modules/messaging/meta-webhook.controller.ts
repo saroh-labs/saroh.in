@@ -24,6 +24,7 @@ export const META_SIGNATURE_HEADER = "x-hub-signature-256";
 
 /** The parts of Meta's `messages` webhook we read; each is checked as read. */
 interface MetaValue {
+    metadata?: { phone_number_id?: unknown };
     statuses?: unknown;
     messages?: unknown;
 }
@@ -116,13 +117,19 @@ export class MetaWebhookController {
     }
 }
 
-/** Every `entry[].changes[].value` of the `messages` field. */
+/**
+ * Every `entry[].changes[].value` of the `messages` field for Saroh's own
+ * number: the account may hold other numbers, whose messages must not open
+ * our reply window.
+ */
 function values(body: unknown): MetaValue[] {
     const entry = (body as { entry?: unknown } | null)?.entry;
+    const ours = env.META_WA_PHONE_NUMBER_ID;
     return list<{ changes?: unknown }>(entry)
         .flatMap((e) => list<{ field?: unknown; value?: unknown }>(e.changes))
         .filter((c) => c.field === "messages")
-        .flatMap((c) => list<MetaValue>([c.value]));
+        .flatMap((c) => list<MetaValue>([c.value]))
+        .filter((v) => !ours || v.metadata?.phone_number_id === ours);
 }
 
 /** The objects in `value` when it is an array; anything else is none. */

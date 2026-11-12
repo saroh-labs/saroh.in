@@ -257,4 +257,28 @@ describe("Meta delivery reports", () => {
         const rows = await prisma.messagingContactWindow.findMany();
         expect(JSON.stringify(rows)).not.toContain(from);
     });
+
+    it("a message to another number on the account opens no window", async () => {
+        const was = env.META_WA_PHONE_NUMBER_ID;
+        env.META_WA_PHONE_NUMBER_ID = "5550001111";
+        try {
+            const from = "919811144455";
+            await post(
+                envelope({
+                    messages: [
+                        {
+                            from,
+                            id: `wamid.${uniq("other")}`,
+                            timestamp: String(Math.floor(Date.now() / 1000)),
+                            type: "text",
+                            text: { body: "Hi" },
+                        },
+                    ],
+                }),
+            );
+            expect(await inReplyWindow(numberHash(`+${from}`))).toBe(false);
+        } finally {
+            env.META_WA_PHONE_NUMBER_ID = was;
+        }
+    });
 });
