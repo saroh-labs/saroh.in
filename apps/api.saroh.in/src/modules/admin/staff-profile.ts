@@ -6,7 +6,7 @@ import type { EncryptedSecret, EncryptionKey } from "../../common/crypto";
 import {
     decryptWithKey,
     encryptWithKey,
-    keyedDigest,
+    keyedDigests,
 } from "../../common/crypto";
 import { env } from "../../env";
 
@@ -52,7 +52,7 @@ export function generateManagerCode(): string {
     return code;
 }
 
-function staffPiiKey(): EncryptionKey {
+export function staffPiiKey(): EncryptionKey {
     return {
         name: "STAFF_PII_ENC_KEY",
         value: env.STAFF_PII_ENC_KEY,
@@ -94,8 +94,10 @@ export function taxIdLast4(sealed: EncryptedSecret): string {
 
 /**
  * What an idempotent save fingerprints in place of the tax id: a keyed
- * digest, so the stored fingerprint can't be brute-forced back to it.
+ * digest, so the stored fingerprint can't be brute-forced back to it. One
+ * per key on the ring, newest first, so a retry made before a key change
+ * still matches.
  */
-export function taxIdFingerprint(taxId: string): string {
-    return withStaffKey((key) => keyedDigest(taxId, "staff-tax-id", key));
+export function taxIdFingerprints(taxId: string): string[] {
+    return withStaffKey((key) => keyedDigests(taxId, "staff-tax-id", key));
 }

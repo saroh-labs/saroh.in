@@ -2873,3 +2873,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **The other entry points keep DEC-068's minimum**: Home's first run, the module picker and "Also sell" still ask for it.
 - The API accepts each module's setup with any field blank or absent, makes nothing it wasn't asked for, and still takes the full payload the sheet sent before.
 - Known limit: Bookings' hours live on its services, so hours set in the sheet with no first service are not kept. They are set again on the first service.
+
+## DEC-214 Encryption keys are key rings in the server settings
+
+**Status: Accepted — 2026-11-12** · owner
+
+- Decision (owner, 12 Nov 2026, "keep it simple"): each of the API's five encryption keys (`PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`, `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY`) is a key ring in the server settings. The variable holds one key, as before (id `v1`), or several, newest first: `v2:<key>,v1:<key>`.
+- New values are sealed and fingerprinted with the newest key and carry its id at the front of the stored ciphertext or fingerprint (`v2:...`), with no schema change. A value with no id is `v1`, so everything stored before the ring still opens, and values under `v1` are still stored with no id.
+- A lookup by fingerprint matches under any key on the ring. An API key's fingerprint moves to the newest key the next time the key is used; it can't be redone otherwise, as the token isn't kept.
+- After a new key is added, `keys-reseal` moves every sealed value onto it, and the old id is then removed (`docs/architecture/runbooks/KEY_ROTATION.md`).
+- A managed key service (Google Cloud KMS or AWS KMS) may come later. It fits the ring as another key id whose entry names it, so stored values don't change. Nothing is built for it now.
+- Why: any key can be replaced, routinely or after a leak, without breaking stored data; it stays simple, with no new service.
+- Rules: `apps/api.saroh.in/src/common/crypto.ts`, `src/cli/keys-reseal.ts`.

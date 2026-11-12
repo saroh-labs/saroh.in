@@ -382,7 +382,56 @@ describe("when a key opens anything", () => {
         await expect(
             service.findUsableByToken("Bearer nonsense"),
         ).resolves.toBeNull();
-        expect(db.apiKey.findUnique).not.toHaveBeenCalled();
+        expect(db.apiKey.findFirst).not.toHaveBeenCalled();
+    });
+
+    describe("after APIKEY_ENC_KEY gains a newer key", () => {
+        const token = `sk_live_${"a".repeat(43)}`;
+        let older: string;
+        beforeEach(() => {
+            older = tokenDigest(token); // made under today's single key (v1)
+            mutableEnv.APIKEY_ENC_KEY = `v2:${randomBytes(32).toString("base64")},v1:${mutableEnv.APIKEY_ENC_KEY}`;
+        });
+        afterEach(() => {
+            mutableEnv.APIKEY_ENC_KEY =
+                mutableEnv.APIKEY_ENC_KEY!.split(",v1:")[1];
+        });
+
+        it("finds the key by its old fingerprint and moves it to the newest", async () => {
+            expect(TOKEN_PATTERN.test(token)).toBe(true);
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: older }),
+            );
+            db.apiKey.updateMany.mockResolvedValue({ count: 1 });
+            const found = await service.findUsableByToken(token, NOW);
+            expect(found?.id).toBe("key_1");
+            const newest = tokenDigest(token);
+            expect(newest.startsWith("v2:")).toBe(true);
+            expect(db.apiKey.findFirst).toHaveBeenCalledWith({
+                where: { tokenDigest: { in: [newest, older] } },
+            });
+            expect(db.apiKey.updateMany).toHaveBeenCalledWith({
+                where: { id: "key_1", tokenDigest: older },
+                data: { tokenDigest: newest },
+            });
+        });
+
+        it("still answers when the move fails", async () => {
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: older }),
+            );
+            db.apiKey.updateMany.mockRejectedValue(new Error("db down"));
+            const found = await service.findUsableByToken(token, NOW);
+            expect(found?.id).toBe("key_1");
+        });
+
+        it("leaves a key already on the newest alone", async () => {
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: tokenDigest(token) }),
+            );
+            await service.findUsableByToken(token, NOW);
+            expect(db.apiKey.updateMany).not.toHaveBeenCalled();
+        });
     });
 });
 

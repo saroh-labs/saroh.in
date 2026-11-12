@@ -5,6 +5,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
     Optional,
     ServiceUnavailableException,
@@ -21,7 +22,7 @@ import type { ApiKey, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { EncryptionKey } from "../../common/crypto";
-import { keyedDigest } from "../../common/crypto";
+import { keyedDigest, keyedDigests } from "../../common/crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import {
@@ -126,7 +127,7 @@ export function displayPrefix(token: string): string {
     return token.slice(0, "sk_live_".length + 4);
 }
 
-function apiKeyEncKey(): EncryptionKey {
+export function apiKeyEncKey(): EncryptionKey {
     return {
         name: "APIKEY_ENC_KEY",
         value: env.APIKEY_ENC_KEY,
@@ -134,15 +135,11 @@ function apiKeyEncKey(): EncryptionKey {
     };
 }
 
-/**
- * The stored form of a token: a keyed digest, so a copy of the table can't
- * be walked back to a working key. A missing or malformed key is a 503 that
- * names the variable, never its value.
- */
-export function tokenDigest(token: string): string {
+/** A missing or malformed key is a 503 that names the variable, never its value. */
+function withApiKeyKey<T>(run: (key: EncryptionKey) => T): T {
     const key = apiKeyEncKey();
     try {
-        return keyedDigest(token, "apikey", key);
+        return run(key);
     } catch (error) {
         if (error instanceof Error && error.message.startsWith(key.name)) {
             throw new ServiceUnavailableException(
@@ -151,6 +148,19 @@ export function tokenDigest(token: string): string {
         }
         throw error;
     }
+}
+
+/**
+ * The stored form of a token: a keyed digest under the ring's newest key, so
+ * a copy of the table can't be walked back to a working key.
+ */
+export function tokenDigest(token: string): string {
+    return withApiKeyKey((key) => keyedDigest(token, "apikey", key));
+}
+
+/** The token's digest under every key on the ring, newest first, for a lookup. */
+export function tokenDigests(token: string): string[] {
+    return withApiKeyKey((key) => keyedDigests(token, "apikey", key));
 }
 
 type KeyState = Pick<ApiKey, "revokedAt" | "expiresAt" | "graceUntil">;
@@ -232,6 +242,8 @@ function toView(key: ApiKey): ApiKeyView {
  */
 @Injectable()
 export class ApiKeysService {
+    private readonly logger = new Logger(ApiKeysService.name);
+
     constructor(
         private readonly audit: AuditService,
         @Optional()
@@ -519,10 +531,28 @@ export class ApiKeysService {
         now: Date = new Date(),
     ): Promise<ApiKey | null> {
         if (!TOKEN_PATTERN.test(token)) return null;
-        const key = await prisma.apiKey.findUnique({
-            where: { tokenDigest: tokenDigest(token) },
+        const digests = tokenDigests(token);
+        const key = await prisma.apiKey.findFirst({
+            where: { tokenDigest: { in: digests } },
         });
-        return key && isUsable(key, now) ? key : null;
+        if (!key || !isUsable(key, now)) return null;
+        // Made under an older key: move it to the newest, since the token is
+        // only ever seen here. The context cache is keyed by the newest
+        // digest already, so nothing cached goes stale.
+        const [newest] = digests;
+        if (newest && key.tokenDigest !== newest) {
+            try {
+                await prisma.apiKey.updateMany({
+                    where: { id: key.id, tokenDigest: key.tokenDigest },
+                    data: { tokenDigest: newest },
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `api_key_digest_upgrade_failed: ${error instanceof Error ? error.name : "error"}`,
+                );
+            }
+        }
+        return key;
     }
 
     private async find(ctx: OrganizationContext, keyId: string) {

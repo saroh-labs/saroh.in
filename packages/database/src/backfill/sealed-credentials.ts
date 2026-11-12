@@ -7,6 +7,9 @@
  * integration suite runs the backfill with the API's own decrypt, and this
  * package's test seals a blob the API's way and opens it here.
  *
+ * It opens only values sealed before the key ring (DEC-214): one key, no id
+ * on the ciphertext. After a key change, run it with the API's own crypto.
+ *
  * Nothing here logs the key, the plaintext or the key bytes; its errors
  * describe only the shape of what is wrong.
  */

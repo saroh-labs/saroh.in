@@ -45,6 +45,7 @@ module.exports = {
     testMatch: [
         "<rootDir>/src/modules/**/*.spec.ts",
         "<rootDir>/src/common/**/*.db.spec.ts",
+        "<rootDir>/src/cli/**/*.db.spec.ts",
     ],
     // The organizations module specs mock Prisma (pure unit tests) and run in
     // the default/unit project — keep them out of the DB-backed run.

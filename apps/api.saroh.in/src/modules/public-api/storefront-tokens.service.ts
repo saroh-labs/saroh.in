@@ -10,7 +10,12 @@ import type { ApiKey, StorefrontToken } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { base62, isUsable, tokenDigest } from "../api-keys/api-keys.service";
+import {
+    base62,
+    isUsable,
+    tokenDigest,
+    tokenDigests,
+} from "../api-keys/api-keys.service";
 import { authorize } from "../organizations/organization-policy";
 
 /** How long one visitor's token lasts (plan 2026-11-10-001, U7). */
@@ -81,8 +86,9 @@ export class StorefrontTokensService {
         now: Date = new Date(),
     ): Promise<(StorefrontToken & { apiKey: ApiKey }) | null> {
         if (!STOREFRONT_TOKEN_PATTERN.test(token)) return null;
-        const row = await prisma.storefrontToken.findUnique({
-            where: { tokenDigest: tokenDigest(token) },
+        // Any key on the ring: a token lives 30 minutes, so none is moved forward.
+        const row = await prisma.storefrontToken.findFirst({
+            where: { tokenDigest: { in: tokenDigests(token) } },
             include: { apiKey: true },
         });
         if (!row || row.expiresAt.getTime() <= now.getTime()) return null;
