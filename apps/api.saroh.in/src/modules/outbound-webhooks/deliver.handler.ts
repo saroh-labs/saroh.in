@@ -120,7 +120,11 @@ export class WebhookDeliverHandler {
         if (delivery?.status !== "PENDING") return;
         const { endpoint } = delivery;
 
-        const refusal = await this.refusal(endpoint, delivery.event);
+        const refusal = await this.refusal(
+            endpoint,
+            delivery.event,
+            delivery.createdAt,
+        );
         if (refusal) {
             await prisma.webhookDelivery.update({
                 where: { id: delivery.id },
@@ -169,10 +173,16 @@ export class WebhookDeliverHandler {
     private async refusal(
         endpoint: WebhookEndpoint,
         event: string,
+        madeAt: Date,
     ): Promise<string | null> {
         const { organizationId } = endpoint;
-        // A test goes to an address that is off, to check it before it's turned on.
-        if (endpoint.disabledAt && event !== WEBHOOK_PING) {
+        // Only a test made after the address went off reaches it (to check it
+        // before it's on again); an older one still retrying would turn it on.
+        const testWhileOff =
+            event === WEBHOOK_PING &&
+            endpoint.disabledAt !== null &&
+            madeAt >= endpoint.disabledAt;
+        if (endpoint.disabledAt && !testWhileOff) {
             return "The endpoint is switched off.";
         }
         if (

@@ -647,6 +647,29 @@ describe("delivering (U13)", () => {
         expect(await jobsOf(org.id)).toHaveLength(3);
     });
 
+    it("a test sent before the address went off doesn't turn it back on", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await service.test(owner, made.endpoint.id);
+        // Turned off while that test waits for its retry.
+        await prisma.webhookEndpoint.update({
+            where: { id: made.endpoint.id },
+            data: { disabledAt: new Date(Date.now() + 1000) },
+        });
+        answer = { status: 200, body: "thanks" };
+        const jobs = await jobsOf(org.id);
+        await run(jobs[jobs.length - 1]);
+        const endpoint = await prisma.webhookEndpoint.findUniqueOrThrow({
+            where: { id: made.endpoint.id },
+        });
+        expect(endpoint.disabledAt).not.toBeNull();
+        // Refused before sending: nothing reached the receiver.
+        expect(received).toHaveLength(0);
+    });
+
     it("refuses a test to a private address even when the address is off", async () => {
         const { org, owner } = await business();
         const made = await service.create(owner, {
