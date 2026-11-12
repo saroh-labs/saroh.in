@@ -9,7 +9,8 @@ import { untrustedText } from "./core";
  * The MCP day-to-day tools (plan 2026-11-10-001, U12): bookings, free
  * times, orders, customers and enquiries. Times go in as ISO 8601 with an
  * offset and come back both as ISO and as readable text in the service's
- * time zone. What customers wrote (enquiries, order notes) is
+ * time zone. What customers wrote (enquiries, order notes, their names,
+ * companies and addresses) is
  * {@link untrustedText}; nothing `customer:sensitive` is in any result.
  * Lean, as `catalogue.ts` says: the tools check against `/v1`'s contract.
  */
@@ -31,7 +32,7 @@ export const bookingItem = z.object({
     when: z.string(),
     status: z.string(),
     customer_id: z.string().nullable(),
-    customer_name: z.string().nullable(),
+    customer_name: untrustedText.nullable(),
     customer_email: z.string().nullable(),
     customer_phone: z.string().nullable(),
     staff_id: z.string().nullable(),
@@ -189,13 +190,13 @@ export const updateOrderStatusTool = {
 
 export const customerItem = z.object({
     customer_id: z.string(),
-    name: z.string().nullable(),
+    name: untrustedText.nullable(),
     email: z.string(),
     phone: z.string().nullable(),
-    company: z.string().nullable(),
+    company: untrustedText.nullable(),
 });
 const oneCustomer = z.object({
-    customer: customerItem.extend({ address: z.string().nullable() }),
+    customer: customerItem.extend({ address: untrustedText.nullable() }),
 });
 
 export const listCustomersTool = {

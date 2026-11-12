@@ -10,13 +10,16 @@ import { imitatesKnownName } from "./ai-apps";
  * - `/oauth2/continue` and `/oauth2/consent` are only ever called by the
  *   API itself (`oauth-flow.service.ts`), which checks the business and the
  *   app's name and writes the audit event first, so from outside they 404;
- * - a dynamic registration whose name imitates Saroh, Claude, ChatGPT or
- *   OpenAI is refused.
+ * - a registration, a signed-in create or a rename whose name imitates
+ *   Saroh, Claude, ChatGPT or OpenAI is refused.
  *
  * Null: let Better Auth answer.
  */
 const OAUTH_PATH = /^\/api\/auth\/(oauth2\/|jwks$|\.well-known\/)/;
 const INTERNAL_ONLY = /^\/api\/auth\/oauth2\/(continue|consent)$/;
+/** Where an app gets or changes its name: dynamic registration, or by a signed-in person. */
+const NAMES_A_CLIENT =
+    /^\/api\/auth\/oauth2\/(register|create-client|update-client)$/;
 
 const notFound = () =>
     Response.json({ statusCode: 404, message: "Not found" }, { status: 404 });
@@ -29,11 +32,14 @@ export async function oauthGate(
     if (!OAUTH_PATH.test(path)) return null;
     if (!(await flags.isEnabled(FlagKey.API_MCP))) return notFound();
     if (INTERNAL_ONLY.test(path)) return notFound();
-    if (path === "/api/auth/oauth2/register" && request.method === "POST") {
+    if (NAMES_A_CLIENT.test(path) && request.method === "POST") {
         let name: unknown;
         try {
-            name = ((await request.clone().json()) as { client_name?: unknown })
-                .client_name;
+            const body = (await request.clone().json()) as {
+                client_name?: unknown;
+                update?: { client_name?: unknown };
+            };
+            name = body.client_name ?? body.update?.client_name;
         } catch {
             return null; // Better Auth refuses a body it can't read.
         }

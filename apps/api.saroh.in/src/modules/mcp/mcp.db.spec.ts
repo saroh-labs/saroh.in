@@ -156,8 +156,12 @@ async function connect(
         lastUsedAt?: Date;
         createdAt?: Date;
         organizationIds?: string[];
+        /** The token's issued-at, in seconds; default now. */
+        iat?: number;
     } = {},
 ) {
+    // Better Auth stamps the grant and the token in whole seconds.
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const set = [...new Set([orgs].flat())].sort();
     const referenceId = set.join(",");
     const scopes = options.scopes ?? SCOPES;
@@ -169,7 +173,7 @@ async function connect(
             referenceId,
             organizationIds: options.organizationIds ?? set,
             scopes,
-            createdAt: options.createdAt ?? new Date(),
+            createdAt: options.createdAt ?? new Date(nowSeconds * 1000),
             lastUsedAt: options.lastUsedAt,
         },
     });
@@ -193,6 +197,7 @@ async function connect(
         clientId,
         orgs: set,
         scopes,
+        iat: options.iat ?? nowSeconds,
     });
     return { grant, token };
 }
@@ -509,6 +514,32 @@ describe("AI connections (U9)", () => {
             actorUserId: org.owner,
             targetId: grant.id,
         });
+    });
+
+    it("keeps a disconnected app's old token refused after the same app is connected again", async () => {
+        const org = await business();
+        const app = await client();
+        const minuteAgo = Date.now() - 60_000;
+        const first = await connect(org.owner, org.id, app, {
+            scopes: ["saroh:read"],
+            createdAt: new Date(Math.floor(minuteAgo / 1000) * 1000),
+            iat: Math.floor(minuteAgo / 1000),
+        });
+        expect(await statusOf(call(first.token).run())).toBe(200);
+
+        await connections.disconnect(
+            ownerCtx(org.id, org.owner),
+            first.grant.id,
+        );
+        expect(await statusOf(call(first.token).run())).toBe(401);
+
+        // Reconnecting to the same business makes a new grant.
+        const again = await connect(org.owner, org.id, app, {
+            scopes: ["saroh:read"],
+        });
+        expect(again.grant.id).not.toBe(first.grant.id);
+        expect(await statusOf(call(first.token).run())).toBe(401);
+        expect(await statusOf(call(again.token).run())).toBe(200);
     });
 
     it("shows a connection under each business it reaches; an Owner of A ends it for A only", async () => {

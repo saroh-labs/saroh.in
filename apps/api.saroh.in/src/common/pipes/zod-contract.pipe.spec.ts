@@ -114,4 +114,29 @@ describe("ZodContractPipe", () => {
             },
         });
     });
+    it("refuses a NUL character anywhere with invalid_request, before the schema", () => {
+        const { status, response } = refusal(() =>
+            new ZodContractPipe(body).transform(
+                {
+                    name: "Rose\u0000oil",
+                    price: { amountMinor: 1, currency: "INR" },
+                },
+                { type: "body" },
+            ),
+        );
+        expect(status).toBe(400);
+        expect(response).toEqual({
+            error: {
+                code: "invalid_request",
+                message: "body.name: Must not contain a NUL character",
+            },
+        });
+        expect(
+            refusal(() =>
+                new ZodContractPipe(z.string()).transform("x\u0000", {
+                    type: "param",
+                }),
+            ).response,
+        ).toMatchObject({ error: { code: "invalid_request" } });
+    });
 });

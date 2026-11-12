@@ -60,14 +60,28 @@ export function isKnownClient(clientId: string): boolean {
 const IMITATED = ["saroh", "claude", "anthropic", "chatgpt", "openai"];
 
 /**
+ * Cyrillic and Greek letters drawn like Latin ones ("Сlaude" with a Cyrillic
+ * С), by case: an uppercase Greek Η reads as H, its lowercase η as n.
+ * shortcut: the common look-alikes only, not Unicode's full confusables list;
+ * widen it if a name gets past.
+ */
+const LOOK_ALIKE_FROM = "АВЕКМНОРСТХІЈЅаеорсухіјѕһӏԁΑΒΕΖΗΙΚΜΝΟΡΤΥΧαορικνυ";
+const LOOK_ALIKE_TO = "ABEKMHOPCTXIJSaeopcyxijshldABEZHIKMNOPTYXaopikvu";
+export const LOOK_ALIKES = new Map(
+    [...LOOK_ALIKE_FROM].map((c, i) => [c, LOOK_ALIKE_TO[i]] as const),
+);
+
+/**
  * Whether a name imitates Saroh, Claude, ChatGPT or OpenAI. Spacing,
  * punctuation and case don't hide it ("Chat GPT", "s.a.r.o.h"), nor do the
- * digits that pass for letters.
+ * digits, styled letters (𝐂laude) and Cyrillic or Greek letters that pass
+ * for Latin ones.
  */
 export function imitatesKnownName(name: string | null | undefined): boolean {
     if (!name) return false;
-    const plain = name
-        .normalize("NFKD")
+    const plain = [...name.normalize("NFKD")]
+        .map((c) => LOOK_ALIKES.get(c) ?? c)
+        .join("")
         .toLowerCase()
         .replace(/0/g, "o")
         .replace(/1/g, "l")

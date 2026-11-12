@@ -77,7 +77,8 @@ export interface McpRequest extends Request {
  *   business taken off it), idle 90 days, its app disabled, or, for an app
  *   with refresh, its refresh tokens all revoked or expired (a reused
  *   refresh token, a disconnect). A signed token can't be revoked, so this
- *   is what ends a still-unexpired one.
+ *   is what ends a still-unexpired one. A token issued before its grant was
+ *   made (an earlier connection, since disconnected) is refused too.
  *
  * Refusals are 401 with a `WWW-Authenticate` naming the protected-resource
  * document, so a client signs in again. The guard fixes no business: each
@@ -214,6 +215,16 @@ export class McpAuthGuard implements CanActivate {
             },
         });
         if (!grant || isIdle(grant, now)) return null;
+        // A token from before this grant was made belongs to an earlier,
+        // disconnected one: a reconnect to the same set must not revive it.
+        // Better Auth stamps both in whole seconds.
+        if (
+            claims.iat === undefined ||
+            !grant.createdAt ||
+            claims.iat * 1000 < grant.createdAt.getTime()
+        ) {
+            return null;
+        }
         const client = await prisma.oauthClient.findUnique({
             where: { clientId: claims.clientId },
             select: { name: true, disabled: true },

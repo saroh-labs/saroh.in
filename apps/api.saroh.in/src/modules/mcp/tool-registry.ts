@@ -4,6 +4,7 @@ import type { Job } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 import { z } from "zod";
 
+import { nulPath } from "../../common/pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { moduleEnforcementMode } from "../capabilities/module-enforcement.guard";
@@ -282,12 +283,14 @@ export class McpToolRegistry {
         if (typeof business === "string" && business) {
             id = ids.includes(business)
                 ? business
-                : (
-                      await prisma.organization.findFirst({
-                          where: { slug: business, id: { in: ids } },
-                          select: { id: true },
-                      })
-                  )?.id;
+                : business.includes("\0") // Postgres refuses it in text.
+                  ? undefined
+                  : (
+                        await prisma.organization.findFirst({
+                            where: { slug: business, id: { in: ids } },
+                            select: { id: true },
+                        })
+                    )?.id;
             if (!id) {
                 return new ToolError(
                     `This connection doesn't reach the business ${JSON.stringify(business.slice(0, 128))}.`,
@@ -378,6 +381,13 @@ export class McpToolRegistry {
             const call = target;
             // The tool's own input: `business` was the registry's to read.
             const { business: _business, ...own } = input;
+            const nul = nulPath(own);
+            if (nul) {
+                throw new ToolError(
+                    `${nul.join(".") || "The input"} contains a NUL character, which Saroh doesn't take.`,
+                    "Remove it and call again.",
+                );
+            }
             if (limited) {
                 throw new ToolError(
                     "Too many requests from this connection right now.",

@@ -176,6 +176,8 @@ export interface McpTokenClaims {
     orgs: string[];
     scopes: string[];
     exp?: number;
+    /** Issued at, in seconds. */
+    iat?: number;
 }
 
 /**
@@ -224,5 +226,6 @@ export async function verifyMcpAccessToken(
                 ? claims.scope.split(" ").filter(Boolean)
                 : [],
         exp: claims.exp,
+        iat: claims.iat,
     };
 }

@@ -32,11 +32,13 @@ import {
     formSubmitBody,
     holdBody,
     holdTokenBody,
+    id,
     mintStorefrontTokenBody,
     orderBody,
     pageQuery,
 } from "@saroh/api-contract";
 import type { StorefrontToken } from "@saroh/database";
+import { z } from "zod";
 
 import { hashClientIp, visitorAddress } from "../../common/client-ip";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -52,6 +54,10 @@ import { StorefrontTokenGuard } from "./storefront-token.guard";
 import { StorefrontTokensService } from "./storefront-tokens.service";
 import { StorefrontService } from "./storefront.service";
 import { once } from "./v1-support";
+
+const anId = new ZodContractPipe(id);
+/** A slug: any text, but never a NUL character (the pipe refuses it). */
+const aSlug = new ZodContractPipe(z.string());
 
 /**
  * What the edge and a browser may keep of a catalogue read (U17): the
@@ -177,7 +183,7 @@ export class StorefrontWriteController {
     submit(
         @OrgContext() ctx: OrganizationContext,
         @Req() req: TokenRequest,
-        @Param("formId") formId: string,
+        @Param("formId", anId) formId: string,
         @Body(new ZodContractPipe(formSubmitBody)) body: FormSubmitBody,
     ) {
         authorize(ctx, "storefront:mint");
@@ -222,7 +228,7 @@ export class StorefrontController {
     product(
         @OrgContext() ctx: OrganizationContext,
         @Req() req: KeyedRequest,
-        @Param("slug") slug: string,
+        @Param("slug", aSlug) slug: string,
     ) {
         authorize(ctx, "store:read");
         return this.storefront.product(
@@ -257,7 +263,7 @@ export class StorefrontController {
     @Header("Cache-Control", "no-store")
     availability(
         @OrgContext() ctx: OrganizationContext,
-        @Param("serviceId") serviceId: string,
+        @Param("serviceId", anId) serviceId: string,
         @Query(new ZodContractPipe(availabilityQuery)) query: AvailabilityQuery,
     ) {
         authorize(ctx, "service:read");
@@ -272,7 +278,7 @@ export class StorefrontController {
     @Header("Cache-Control", "no-store")
     days(
         @OrgContext() ctx: OrganizationContext,
-        @Param("serviceId") serviceId: string,
+        @Param("serviceId", anId) serviceId: string,
         @Query(new ZodContractPipe(daysQuery)) query: DaysQuery,
     ) {
         authorize(ctx, "service:read");
@@ -283,7 +289,7 @@ export class StorefrontController {
     @Header("Cache-Control", CATALOGUE_CACHE)
     staff(
         @OrgContext() ctx: OrganizationContext,
-        @Param("serviceId") serviceId: string,
+        @Param("serviceId", anId) serviceId: string,
         @Query(new ZodContractPipe(pageQuery)) query: PageQuery,
     ) {
         authorize(ctx, "service:read");
@@ -302,7 +308,10 @@ export class StorefrontController {
 
     @Get("posts/:slug")
     @Header("Cache-Control", CATALOGUE_CACHE)
-    post(@OrgContext() ctx: OrganizationContext, @Param("slug") slug: string) {
+    post(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("slug", aSlug) slug: string,
+    ) {
         authorize(ctx, "site:read");
         return this.storefront.post(ctx.organizationId, slug);
     }

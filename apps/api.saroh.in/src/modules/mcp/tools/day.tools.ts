@@ -102,7 +102,7 @@ async function bookingItems(organizationId: string, views: BookingView[]) {
         when: when(b.startAt, b.timezone),
         status: b.status,
         customer_id: b.contactId,
-        customer_name: b.booker.name,
+        customer_name: b.booker.name ? untrusted(b.booker.name) : null,
         customer_email: b.booker.email,
         customer_phone: b.booker.phone,
         staff_id: b.staffId,
@@ -111,7 +111,7 @@ async function bookingItems(organizationId: string, views: BookingView[]) {
 
 type BookingItem = Awaited<ReturnType<typeof bookingItems>>[number];
 const bookingLine = (b: BookingItem) =>
-    `${b.when}: ${JSON.stringify(b.service)} for ${customer(b.customer_name ?? b.customer_email)} (booking_id ${b.booking_id}, ${b.status})`;
+    `${b.when}: ${JSON.stringify(b.service)} for ${customer(b.customer_name?.text ?? b.customer_email)} (booking_id ${b.booking_id}, ${b.status})`;
 
 // ── Orders ──────────────────────────────────────────────────────────────────
 
@@ -168,19 +168,26 @@ function orderText(
 
 const nameOf = (c: CustomerView) =>
     [c.firstName, c.lastName].filter(Boolean).join(" ") || null;
-const customerItem = (c: CustomerView) => ({
-    customer_id: c.id,
-    name: nameOf(c),
-    email: c.email,
-    phone: c.phone,
-    company: c.company,
-});
-const customerDetail = (c: CustomerView) => ({
-    ...customerItem(c),
-    address: c.address
-        ? Object.values(c.address).filter(Boolean).join(", ") || null
-        : null,
-});
+/** Name, company and address are typed by the customer or for them: labelled. */
+const customerItem = (c: CustomerView) => {
+    const name = nameOf(c);
+    return {
+        customer_id: c.id,
+        name: name ? untrusted(name) : null,
+        email: c.email,
+        phone: c.phone,
+        company: c.company ? untrusted(c.company) : null,
+    };
+};
+const customerDetail = (c: CustomerView) => {
+    const address = c.address
+        ? Object.values(c.address).filter(Boolean).join(", ")
+        : "";
+    return {
+        ...customerItem(c),
+        address: address ? untrusted(address) : null,
+    };
+};
 const customerLine = (c: CustomerView) =>
     `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`;
 
@@ -672,7 +679,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                 const view = await d.customersV1.get(ctx, customer_id);
                 const customer = customerDetail(view);
                 return {
-                    text: `${customerLine(view)}${customer.address ? `. Address: ${customer.address}` : ""}.`,
+                    text: `${customerLine(view)}${customer.address ? `. ${quoteUntrusted("Address", customer.address.text)}` : ""}.`,
                     data: { customer },
                 };
             },

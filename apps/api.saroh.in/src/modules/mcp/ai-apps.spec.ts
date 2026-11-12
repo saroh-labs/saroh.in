@@ -3,6 +3,7 @@ import {
     actionsForScopes,
     imitatesKnownName,
     isKnownClient,
+    LOOK_ALIKES,
     NEVER_FOR_AI,
     refusedClient,
 } from "./ai-apps";
@@ -59,6 +60,13 @@ describe("AI apps' names (U9)", () => {
         expect(isKnownClient("a1b2c3")).toBe(false);
     });
 
+    it("maps each look-alike letter to one Latin letter", () => {
+        expect(LOOK_ALIKES.size).toBe(48);
+        for (const latin of LOOK_ALIKES.values()) {
+            expect(latin).toMatch(/^[A-Za-z]$/);
+        }
+    });
+
     it("catches imitations through spacing, case and digits", () => {
         for (const name of [
             "Claude",
@@ -69,7 +77,17 @@ describe("AI apps' names (U9)", () => {
         ]) {
             expect(imitatesKnownName(name)).toBe(true);
         }
-        for (const name of ["Cursor", "MCP Inspector", "", null]) {
+        for (const name of [
+            "\u0421laude", // Cyrillic С
+            "Ch\u0430tGPT", // Cyrillic а
+            "\u039fpenAI", // Greek Ο
+            "SAR\u039fH", // Greek Ο
+            "\u{1d402}laude", // mathematical bold C
+            "Ｃｌａｕｄｅ", // fullwidth
+        ]) {
+            expect(imitatesKnownName(name)).toBe(true);
+        }
+        for (const name of ["Cursor", "MCP Inspector", "Курсор", "", null]) {
             expect(imitatesKnownName(name)).toBe(false);
         }
     });
@@ -138,5 +156,30 @@ describe("oauthGate (U9)", () => {
             error: "invalid_client_metadata",
         });
         expect(await oauthGate(register("Cursor"), on)).toBeNull();
+        const signedIn = (path: string, body: unknown) =>
+            req(`/api/auth/oauth2/${path}`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+            });
+        expect(
+            (
+                await oauthGate(
+                    signedIn("create-client", { client_name: "Claude" }),
+                    on,
+                )
+            )?.status,
+        ).toBe(400);
+        expect(
+            (
+                await oauthGate(
+                    signedIn("update-client", {
+                        client_id: "x",
+                        update: { client_name: "\u0421laude" },
+                    }),
+                    on,
+                )
+            )?.status,
+        ).toBe(400);
     });
 });

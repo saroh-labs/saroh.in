@@ -358,6 +358,8 @@ describe("MCP day-to-day tools (U12)", () => {
             service: "Haircut",
             status: "confirmed",
             starts_at: at(day, 10),
+            // The name the customer gave is data, labelled so.
+            customer_name: { untrusted: true, text: "Priya Shah" },
         });
         const second = await book(12, `${uniq("asha")}@example.com`);
         const secondId = (second.data.booking as { booking_id: string })
@@ -397,6 +399,7 @@ describe("MCP day-to-day tools (U12)", () => {
             email: `${uniq("meera")}@example.com`,
             first_name: "Meera",
             last_name: "Iyer",
+            company: "Iyer Studio",
         });
         const id = (made.data.customer as { customer_id: string }).customer_id;
         const MARKER = `zq-sensitive-${tag}`;
@@ -436,7 +439,11 @@ describe("MCP day-to-day tools (U12)", () => {
             ].sort(),
         );
         expect(list.data.customers).toEqual([
-            expect.objectContaining({ customer_id: id, name: "Meera Iyer" }),
+            expect.objectContaining({
+                customer_id: id,
+                name: { untrusted: true, text: "Meera Iyer" },
+                company: { untrusted: true, text: "Iyer Studio" },
+            }),
         ]);
     });
 

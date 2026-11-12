@@ -186,6 +186,20 @@ describe("MCP tool framework (U10)", () => {
         expect(answer).toMatchObject({
             structuredContent: { seen: { id: "1" } },
         });
+        // A NUL character never reaches the tool or Postgres.
+        const nul = await registry.call(
+            tool,
+            { id: "a\u0000b" },
+            inB as never,
+            null,
+        );
+        expect(nul).toMatchObject({ isError: true });
+        expect(textOf(nul as never)).toMatch(/^id contains a NUL character/);
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(
+            await registry.target(connection, tool, "slug\u0000", contextIn),
+        ).toBeInstanceOf(ToolError);
+
         const listed = registry.serverFor({ listing: [] });
         expect(listed).toBeDefined();
     });
