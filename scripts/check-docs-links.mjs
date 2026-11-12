@@ -15,7 +15,8 @@ export function linksIn(text) {
 
 export function resolves(link) {
     const path = link.split(/[#?]/)[0].replace(/\/$/, "");
-    if (path === "") return existsSync(join(content, "index.mdx"));
+    // The Worker sends / to the API overview (worker/index.mjs).
+    if (path === "") return existsSync(join(content, "api", "index.mdx"));
     return [
         join(app, "public", path),
         join(content, `${path}.mdx`),
@@ -33,8 +34,9 @@ function* pages(dir) {
 
 // Self-check: both link forms are found, anchors are ignored, a gap fails.
 console.assert(
-    linksIn('[a](/api/keys#x) <a href="/api/v1.json">b</a> [c](https://x.y)')
-        .join() === "/api/keys#x,/api/v1.json",
+    linksIn(
+        '[a](/api/keys#x) <a href="/api/v1.json">b</a> [c](https://x.y)',
+    ).join() === "/api/keys#x,/api/v1.json",
 );
 console.assert(resolves("/api/keys#x") && !resolves("/api/no-such-page"));
 

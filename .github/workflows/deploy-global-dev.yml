@@ -27,6 +27,7 @@ jobs:
                     - apps/accounts.saroh.in
                     - apps/admin.saroh.in
                     - apps/saroh.tech
+                    - apps/docs.saroh.in
         env:
             CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
             CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

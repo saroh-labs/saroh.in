@@ -1,32 +1,38 @@
 {
-  "name": "docs",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "portless docs.saroh next dev",
-    "dev:app": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "next typegen && tsc --noEmit"
-  },
-  "portless": "docs.saroh",
-  "dependencies": {
-    "@saroh/ui": "workspace:*",
-    "next": "^16.4.2",
-    "nextra": "^4.6.1",
-    "nextra-theme-docs": "^4.6.1",
-    "react": "catalog:react19",
-    "react-dom": "catalog:react19"
-  },
-  "devDependencies": {
-    "@next/eslint-plugin-next": "^16.4.2",
-    "@saroh/eslint-config": "workspace:*",
-    "@saroh/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
-    "@types/react": "19.2.15",
-    "@types/react-dom": "catalog:react19",
-    "eslint": "catalog:",
-    "typescript": "catalog:"
-  }
+    "name": "docs",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "portless docs.saroh next dev",
+        "dev:app": "next dev",
+        "build": "next build",
+        "postbuild": "pagefind --site out --output-path out/_pagefind",
+        "lint": "eslint .",
+        "typecheck": "next typegen && tsc --noEmit",
+        "test": "node --test worker/index.test.mjs",
+        "cf:build": "pnpm -w run openapi && pnpm build",
+        "cf:preview": "wrangler dev",
+        "cf:deploy": "wrangler deploy"
+    },
+    "portless": "docs.saroh",
+    "dependencies": {
+        "@saroh/ui": "workspace:*",
+        "next": "^16.4.2",
+        "nextra": "^4.6.1",
+        "nextra-theme-docs": "^4.6.1",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19"
+    },
+    "devDependencies": {
+        "@next/eslint-plugin-next": "^16.4.2",
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tsconfig": "workspace:*",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "eslint": "catalog:",
+        "pagefind": "1.4.0",
+        "typescript": "catalog:",
+        "wrangler": "4.148.0"
+    }
 }

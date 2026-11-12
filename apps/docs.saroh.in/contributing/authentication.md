@@ -29,7 +29,7 @@ back to sign-in forever.
 `createAuth()` runs when the auth module is imported, before Nest's
 `ConfigModule` has loaded `.env`. Running the built output directly therefore
 throws before it can explain itself. Source the environment first — see
-[Getting started](/getting-started).
+[Getting started](./getting-started.md).
 
 ### Trusted origins exclude localhost
 
@@ -51,5 +51,5 @@ code out of the log, and carry on without wiring a mail provider.
 ## Roles
 
 Authentication answers _who_; the organization policy answers _what they may
-do_. See [Architecture](/architecture#tenancy) for the role table, and note that
+do_. See [Architecture](./architecture.md#tenancy) for the role table, and note that
 CRM data is deliberately outside the read-only floor.

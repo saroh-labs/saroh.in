@@ -23,7 +23,7 @@
     "apps/app.saroh.in/components/shared/shell/user-menu.tsx": 2,
     "apps/app.saroh.in/lib/accounts.ts": 1,
     "apps/app.saroh.in/lib/api/http.ts": 1,
-    "apps/app.saroh.in/lib/help/links.ts": 2,
+    "apps/app.saroh.in/lib/help/links.ts": 1,
     "apps/app.saroh.in/lib/sites/search-tracking.ts": 1,
     "apps/app.saroh.in/next.config.js": 1,
     "apps/saroh.app/lib/api-url.ts": 2,
