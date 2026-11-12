@@ -223,6 +223,11 @@ export const AuditAction = {
     // Settings, with the connection as the target. Metadata: the site and
     // the time the draft went back to.
     AiConnectionSiteRolledBack: "ai_connection.site_rolled_back",
+    // A person confirmed or declined, in Saroh, a publish an AI app
+    // prepared (DEC-215 as amended 12 Nov 2026), with the connection as
+    // the target and the person as the actor. Metadata: the site, the
+    // outcome, the app's name and whose connection asked.
+    AiPublishRequestAnswered: "ai_connection.publish_request_answered",
     // A webhook endpoint made, changed, deleted or its secret rolled by
     // someone with `webhook:manage`, and switched off by Saroh after
     // repeated failed deliveries (plan 2026-11-10-001, U13; actor

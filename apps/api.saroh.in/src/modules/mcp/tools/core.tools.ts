@@ -22,7 +22,7 @@ import {
 import { quoteUntrusted } from "../untrusted";
 
 const DRAFTS_AND_PUBLISH =
-    "Website changes go to the site's draft; visitors see nothing until it is published. Publishing is a separate step that needs the person's go-ahead: preview_publish says what goes live and gives the code publish_site needs. Some sites need a reviewer's approval first. The first website change in a session saves the draft as it was, so it can be put back.";
+    "Website changes go to the site's draft; visitors see nothing until it is published. Only the person can publish, in Saroh: preview_publish says what goes live and gives the link where they confirm; no AI app can publish. Some sites need a reviewer's approval first. The first website change in a session saves the draft as it was, so it can be put back.";
 
 const isRead = (a: OrgAction) => /:read(-own)?$/.test(a);
 

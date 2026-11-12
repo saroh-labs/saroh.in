@@ -19,6 +19,8 @@ import { McpAuthGuard } from "./mcp-auth.guard";
 import { McpController } from "./mcp.controller";
 import { OAuthFlowController } from "./oauth-flow.controller";
 import { OAuthFlowService } from "./oauth-flow.service";
+import { PublishRequestsController } from "./publish-requests.controller";
+import { PublishRequestsService } from "./publish-requests.service";
 import { RestorePointService } from "./restore-point.service";
 import { McpToolRegistry } from "./tool-registry";
 import { CoreTools } from "./tools/core.tools";
@@ -72,6 +74,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AiConnectionsController,
         McpController,
         OAuthFlowController,
+        // A person answers an AI app's publish request in Saroh (DEC-215).
+        PublishRequestsController,
         WellKnownController,
     ],
     providers: [
@@ -81,6 +85,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OAuthFlowService,
         McpActivityService,
         McpToolRegistry,
+        PublishRequestsService,
         RestorePointService,
         // Tool providers.
         CoreTools,
