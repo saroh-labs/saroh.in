@@ -21,6 +21,7 @@ import type {
     OrganizationSettings,
     SetupFacts,
 } from "@/lib/organizations/settings-service";
+import { asksTradeOf } from "@/lib/organizations/trade";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
@@ -128,6 +129,7 @@ export function providersTabNote(
 }
 
 export type ReadyStepKey =
+    | "trade"
     | "payments"
     | "howToPay"
     | "address"
@@ -470,6 +472,29 @@ function businessType(
     };
 }
 
+/**
+ * The kind of place (DEC-216), for a business made before setup asked it
+ * (owner, 12 Nov 2026): left until it is said, then ticked like the other
+ * steps, so the count moves. Only a business is asked (`asksTradeOf`).
+ * Absent from an API older than the trade: unknown, not a step.
+ */
+function trade(
+    settings: Partial<Pick<OrganizationSettings, "trade" | "kind">>,
+): Check | null {
+    if (settings.trade === undefined || !asksTradeOf(settings.kind))
+        return null;
+    return {
+        key: "trade",
+        label: "Say what kind of place this is",
+        why: "So Saroh suggests the right website templates and samples for you.",
+        cta: "Choose",
+        // The Identity tab, with the Kind of place sheet open.
+        href: businessEditHref("trade"),
+        broken: false,
+        left: settings.trade === null,
+    };
+}
+
 function tax(
     settings: Pick<OrganizationSettings, "tax" | "profile">,
 ): Check | null {
@@ -633,7 +658,7 @@ export function readyChecklist({
         OrganizationSettings,
         "tax" | "profile" | "registeredAddress" | "setup" | "kind"
     > &
-        Partial<Pick<OrganizationSettings, "payInstructions">>;
+        Partial<Pick<OrganizationSettings, "payInstructions" | "trade">>;
     modules: readonly ModuleView[] | null;
     /** The plan that takes payment online, when the catalogue names one. */
     onlineUpgrade?: UpgradeTo | null;
@@ -642,6 +667,7 @@ export function readyChecklist({
     const modules = all ? rolledOut(all) : null;
     const money = handlesMoney(modules, settings.setup) !== false;
     const checks = [
+        trade(settings),
         modules ? payments(modules, settings.setup) : null,
         // On a plan without online payments, How to pay us is how the
         // business gets paid (UX-007): a step where connecting would be.
@@ -680,6 +706,20 @@ export function readyChecklist({
               ].filter((a): a is ReadyAside => a !== null)
             : [],
     };
+}
+
+/**
+ * Whether "Finish setup" is this person's (F8): its steps are owner and
+ * admin work (`org:update`). The role's name only for a response that
+ * predates permissions.
+ */
+export function mayFinishSetup(
+    business: { actions?: readonly string[]; role?: string } | null,
+): boolean {
+    if (!business) return false;
+    return business.actions
+        ? business.actions.includes("org:update")
+        : business.role === "OWNER" || business.role === "ADMIN";
 }
 
 /** The steps that are about money, rather than getting the site live. */

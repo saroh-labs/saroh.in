@@ -36,6 +36,7 @@ import {
     checklistSubject,
     firstSteps,
     firstStepsLead,
+    mayFinishSetup,
 } from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
 import { shareLink } from "@/lib/sites/share-links";
@@ -208,10 +209,7 @@ async function loadSetup(
     business: Organization | null,
     modules: ModuleView[] | null,
 ): Promise<HomeSetup | null> {
-    const may = business?.actions
-        ? business.actions.includes("org:update")
-        : business?.role === "OWNER" || business?.role === "ADMIN";
-    if (!business || !may) return null;
+    if (!business || !mayFinishSetup(business)) return null;
     const settings = await getOrganizationSettings().catch(() => null);
     if (!settings) return null;
     // The 4 first steps lead until done (#1194); the money card then.
