@@ -124,7 +124,7 @@ export class PublishRequestsService {
         const nameOf = (id: string | null) => {
             const user = people.find((p) => p.id === id);
             if (!user) return null;
-            return user.name.trim() ? user.name : user.email;
+            return user.name?.trim() ? user.name : user.email;
         };
         const status = statusOf(row, now);
         return {
