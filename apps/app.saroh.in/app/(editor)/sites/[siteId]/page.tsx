@@ -3,9 +3,14 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { notFound, unstable_rethrow } from "next/navigation";
 
 import { SiteEditorHost } from "@/components/sites/editor/site-editor-host";
+import type { TemplateRowSource } from "@/components/sites/templates/template-row";
+import { modulesOrUnknown } from "@/lib/modules/guard";
+import { kindDefaults } from "@/lib/organizations/kind";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
+import { tradeOf } from "@/lib/organizations/trade";
 import type { Section } from "@/lib/sites/service";
 import {
     getPageDraft,
@@ -14,12 +19,15 @@ import {
     getSite,
     getSiteFlags,
     listComments,
+    listTemplates,
 } from "@/lib/sites/service";
 import { siteAddressOf } from "@/lib/sites/share-links";
 import {
     readWebAddressLinks,
     RENDERER_APEX,
 } from "@/lib/sites/share-links-read";
+import { moduleStates } from "@/lib/sites/template-picker";
+import { templateChoiceOn } from "@/lib/sites/templates-switch";
 import { readTestReleases } from "@/lib/sites/test-releases-api";
 
 /** The tab's title (UX-081): without one it read the bare "Saroh". */
@@ -68,9 +76,16 @@ export default async function SiteEditorPage({
     const activePage =
         site.pages.find((page) => page.id === requestedPageId) ?? homePage;
 
-    const load = readOnly
-        ? await loadForReviewer(siteId, activePage.id)
-        : await loadForEditor(siteId, activePage.id);
+    const [load, templateRow] = await Promise.all([
+        readOnly
+            ? loadForReviewer(siteId, activePage.id)
+            : loadForEditor(siteId, activePage.id),
+        // The Brand tab's Template row (DEC-216), while the choice is on
+        // (DEC-135).
+        templateChoiceOn()
+            ? readTemplateRow(site.template?.id ?? null)
+            : Promise.resolve(null),
+    ]);
     if (load === "failed") {
         // RVD4: the read failed, said with the house's words (RVD4's "The
         // draft couldn't be loaded." in the shared grammar), with a Try
@@ -169,6 +184,7 @@ export default async function SiteEditorPage({
             // Owner-only from here: never sent to a Reviewer's page (DEC-200).
             styleAccess={readOnly ? null : (site.styleAccess ?? null)}
             templateId={readOnly ? null : (site.template?.id ?? null)}
+            templateRow={templateRow}
             address={
                 siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
             }
@@ -206,6 +222,31 @@ export default async function SiteEditorPage({
 }
 
 const NO_FLAGS = { flags: [], awaitingNavigation: [] };
+
+/**
+ * What the Template row reads: the catalogue (null when it couldn't be
+ * read, said in the row), the site's template, and what suggests one.
+ */
+async function readTemplateRow(
+    current: string | null,
+): Promise<TemplateRowSource> {
+    const [templates, organization, modules] = await Promise.all([
+        listTemplates().catch(() => null),
+        resolveActiveOrganization(),
+        modulesOrUnknown(),
+    ]);
+    const kind = organization?.kind;
+    return {
+        templates,
+        current,
+        basis: {
+            trade: tradeOf(organization?.trade),
+            kind,
+            modules: moduleStates(modules),
+            defaultId: kindDefaults(kind).starterTemplate,
+        },
+    };
+}
 
 /** An owner's, admin's or member's load: the editable draft and the checks. */
 async function loadForEditor(siteId: string, pageId: string) {

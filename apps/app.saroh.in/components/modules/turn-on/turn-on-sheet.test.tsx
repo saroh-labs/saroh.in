@@ -15,6 +15,8 @@ import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
+import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
+
 import { TurnOnSheet } from "./turn-on-sheet";
 
 const readSetupDefaultsAction =
@@ -28,6 +30,11 @@ vi.mock("@/lib/modules/turn-on-actions", () => ({
     readSetupDefaultsAction: (keys: string[]) => readSetupDefaultsAction(keys),
     enableModuleAction: (key: string, setup: object) =>
         enableModuleAction(key, setup),
+}));
+
+/** The business's own details for a template's preview (DEC-216). */
+vi.mock("@/lib/sites/actions", () => ({
+    readTemplatePreview: () => Promise.resolve(null),
 }));
 
 /** The template choice's switch (DEC-135); on, as local dev, by default. */
@@ -134,6 +141,8 @@ let hiddenKeys: string[] = [];
 let websiteTemplate: { id: string; name: string } | null = null;
 /** The templates the API says it could start from instead (U12). */
 let websiteTemplates: SetupDefaults["templates"] = [];
+/** The setup-defaults read for Website failed. */
+let websiteUnread = false;
 let websiteKind: string | null = null;
 
 /** jsdom has no layout, so nothing to observe. */
@@ -161,6 +170,7 @@ beforeEach(() => {
     websiteTemplate = null;
     locks = { payments: null, messaging: null };
     websiteTemplates = [];
+    websiteUnread = false;
     websiteKind = null;
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
@@ -172,7 +182,7 @@ beforeEach(() => {
                 defaults: DEFAULTS[key] ?? null,
                 dependencies: NEEDS[key] ?? [],
                 hidden: hiddenKeys.includes(key),
-                read: true,
+                read: !(key === "WEBSITE" && websiteUnread),
                 template: key === "WEBSITE" ? websiteTemplate : null,
                 templates: key === "WEBSITE" ? websiteTemplates : [],
                 kind: key === "WEBSITE" ? websiteKind : null,
@@ -264,6 +274,15 @@ function typeInto(el: HTMLInputElement, value: string) {
         )?.set?.call(el, value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
     });
+}
+
+/** A radio by its text: a colourway. */
+function radioNamed(name: string): HTMLButtonElement {
+    const hit = Array.from(
+        sheet().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+    ).find((r) => r.textContent.trim() === name);
+    if (!hit) throw new Error(`No radio ${name}`);
+    return hit;
 }
 
 async function press(b: HTMLButtonElement) {
@@ -536,25 +555,42 @@ describe("Website", () => {
         });
     });
 
-    it("offers the templates suggested for the business, and sends one chosen (U12)", async () => {
+    it("offers the template picker, the suggested first, and sends the one chosen with its colourway (DEC-216)", async () => {
         websiteTemplate = { id: "starter", name: "Starter" };
         websiteKind = "BUSINESS";
         websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
-            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+            {
+                id: "portfolio",
+                version: 1,
+                name: "Portfolio",
+                kinds: [],
+                uses: [],
+            },
             {
                 id: "bakery",
+                version: 1,
                 name: "Bakery",
                 kinds: ["food"],
                 uses: ["COMMERCE"],
+                colourways: [
+                    { id: "crust", name: "Crust", chips: ["0 0% 100%"] },
+                    { id: "night", name: "Night", chips: ["0 0% 0%"] },
+                ],
             },
-            { id: "gym", name: "Gym", kinds: ["gym"], uses: ["APPOINTMENTS"] },
+            {
+                id: "gym",
+                version: 1,
+                name: "Gym",
+                kinds: ["gym"],
+                uses: ["APPOINTMENTS"],
+            },
         ];
         // Sell is turned on with the website, so a shop's template suits.
         await open(["COMMERCE", "WEBSITE"]);
         const group = () => {
             const label = Array.from(sheet().querySelectorAll("span")).find(
-                (el) => el.textContent === "Starts from",
+                (el) => el.textContent === "Template",
             );
             const el = sheet().querySelector(
                 `[role="radiogroup"][aria-labelledby="${label?.id}"]`,
@@ -564,22 +600,101 @@ describe("Website", () => {
         };
         const radios = () =>
             Array.from(
-                group().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+                group().querySelectorAll<HTMLButtonElement>(
+                    ':scope [role="radio"][aria-labelledby]',
+                ),
+            ).filter((r) => r.closest("[data-template-card]"));
+        const names = () =>
+            radios().map(
+                (r) =>
+                    document.getElementById(
+                        r.getAttribute("aria-labelledby") ?? "",
+                    )?.textContent,
             );
-        const names = radios().map((r) => r.closest("label")?.textContent);
         // The kind's first; Bookings is off, so not the gym's; Portfolio
         // is not a business's.
-        expect(names).toEqual(["Starter", "BakeryUses Products"]);
+        expect(text()).toContain("Suggested");
+        expect(names()).toEqual(["Starter", "Bakery"]);
         expect(radios()[0]?.getAttribute("aria-checked")).toBe("true");
         expect(text()).toContain("Uses Products");
 
+        // All is one press away, the gym's saying why it waits.
+        await press(button(/^All 4$/));
+        expect(names()).toEqual(["Starter", "Bakery", "Portfolio", "Gym"]);
+        expect(text()).toContain("Uses Bookings: turn it on to use this");
+
         await press(radios()[1]);
+        await press(radioNamed("Night"));
         await press(button(/^Turn on/));
         expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
             siteName: "Northwind",
             address: "northwind",
             templateId: "bakery",
+            styleId: "night",
         });
+    });
+
+    it("starts on the template picked in the gallery, and sends it (DEC-216)", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+            {
+                id: "salon",
+                version: 1,
+                name: "Salon",
+                kinds: ["salon"],
+                uses: [],
+            },
+        ];
+        act(() => {
+            root.render(
+                <BusinessTradeProvider trade="salon" startTemplate="salon">
+                    <TurnOnSheet
+                        picked={["WEBSITE"]}
+                        modules={ALL_OFF}
+                        onOpenChange={onOpenChange}
+                    />
+                </BusinessTradeProvider>,
+            );
+        });
+        await settle();
+        expect(text()).toContain("Suggested for salons");
+        await press(button(/^Turn on with Salon$/));
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+            templateId: "salon",
+        });
+    });
+
+    it("names the template on the button when Website is turned on alone", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+        ];
+        await open(["WEBSITE"]);
+        // One template is still a picture card, never a sentence alone.
+        expect(
+            sheet().querySelector('[data-template-card="starter"]'),
+        ).not.toBeNull();
+        expect(button(/^Turn on with Starter$/)).toBeTruthy();
+    });
+
+    it("says templates that couldn't be read, and reads them again (board D7)", async () => {
+        websiteUnread = true;
+        await open(["WEBSITE"]);
+        expect(text()).toContain("Couldn't load the templates.");
+        websiteUnread = false;
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+        ];
+        await press(button(/^Try again$/));
+        expect(
+            sheet().querySelector('[data-template-card="starter"]'),
+        ).not.toBeNull();
     });
 
     it("with the template choice switched off, names and offers no template and sends none (DEC-135)", async () => {
@@ -587,9 +702,10 @@ describe("Website", () => {
         websiteTemplate = { id: "starter", name: "Starter" };
         websiteKind = "BUSINESS";
         websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
             {
                 id: "bakery",
+                version: 1,
                 name: "Bakery",
                 kinds: ["food"],
                 uses: ["COMMERCE"],
@@ -606,19 +722,6 @@ describe("Website", () => {
             siteName: "Northwind",
             address: "northwind",
         });
-    });
-
-    it("keeps the sentence when only the kind's template suits", async () => {
-        websiteTemplate = { id: "portfolio", name: "Portfolio" };
-        websiteKind = "WORK";
-        websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
-            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
-        ];
-        await open(["WEBSITE"]);
-        expect(text()).toContain(
-            "Starts from the Portfolio template. Change its pages any time.",
-        );
     });
 
     it("says a refusal it can't place at the top of the sheet", async () => {

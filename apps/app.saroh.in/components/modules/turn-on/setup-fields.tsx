@@ -14,10 +14,13 @@ import type {
     WebsiteTemplateChoice,
 } from "@/lib/modules/turn-on-schema";
 import { providerName } from "@/lib/payments/providers";
-import { usesLine } from "@/lib/sites/template-picker";
+import type { SuggestionBasis } from "@/lib/sites/template-picker";
 
+import { useCanSetTrade } from "@/components/sites/templates/business-trade";
+import { TemplateChoice } from "@/components/sites/templates/template-choice";
 import { CheckRow } from "@saroh/ui/check-row";
 import { RadioCards } from "@saroh/ui/choice-group";
+import { PartialRead } from "@saroh/ui/failed-read";
 import { TextLink } from "@saroh/ui/text-link";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
@@ -152,9 +155,10 @@ export function SellFields({
  * Website's minimum: the site's name and its address, with the
  * `.saroh.app` it lives on shown beside what is typed. An address that is
  * taken or reserved comes back from the API on the field. Below them, the
- * template the new site starts from, which follows what is being set up
- * (DEC-070, K15): said, and when other templates suit the business (U12),
- * a short choice of them, the kind's picked to start with.
+ * template the new site starts from (DEC-216): the one template choice
+ * (`TemplateChoice`), the trade's suggested first and the kind's picked to
+ * start with, each with its preview; or, when the templates couldn't be
+ * read, said with Try again, and the site still starts from the kind's.
  */
 export function WebsiteFields({
     draft,
@@ -162,7 +166,10 @@ export function WebsiteFields({
     errors,
     suggestion = null,
     template = null,
-    choices = [],
+    templates = [],
+    basis = null,
+    unread = false,
+    onRetry,
     addressFixed = false,
 }: {
     draft: TurnOnDraft;
@@ -177,10 +184,17 @@ export function WebsiteFields({
     suggestion?: string | null;
     /** The template a new site starts from; null says nothing. */
     template?: { id: string; name: string } | null;
-    /** The templates suggested for the business, the kind's first. */
-    choices?: readonly WebsiteTemplateChoice[];
+    /** Every template it could start from (DEC-216). */
+    templates?: readonly WebsiteTemplateChoice[];
+    /** What the suggestions are worked out from; null offers no choice. */
+    basis?: SuggestionBasis | null;
+    /** The templates couldn't be read. */
+    unread?: boolean;
+    /** Read them again. */
+    onRetry?: () => void;
 }) {
     const id = useId();
+    const canSetTrade = useCanSetTrade();
     const w = draft.WEBSITE;
     return (
         <>
@@ -285,16 +299,31 @@ export function WebsiteFields({
                     Use {suggestion}.saroh.app
                 </TextLink>
             ) : null}
-            {template && choices.length > 1 ? (
+            {template && basis && templates.length > 0 ? (
                 <TemplateChoice
-                    choices={choices}
+                    templates={templates}
+                    basis={basis}
+                    canSetTrade={canSetTrade}
                     value={w.templateId ?? template.id}
-                    onChange={(templateId) =>
+                    onChange={(templateId, styleId) =>
                         update((d) => ({
                             ...d,
-                            WEBSITE: { ...d.WEBSITE, templateId },
+                            WEBSITE: { ...d.WEBSITE, templateId, styleId },
                         }))
                     }
+                    styleId={w.styleId ?? ""}
+                    onStyleChange={(styleId) =>
+                        update((d) => ({
+                            ...d,
+                            WEBSITE: { ...d.WEBSITE, styleId },
+                        }))
+                    }
+                />
+            ) : unread ? (
+                <PartialRead
+                    things="the templates"
+                    so="Your site can still start from the one for what you're setting up."
+                    onRetry={onRetry}
                 />
             ) : template ? (
                 <p className="text-[12.5px] leading-normal text-muted-foreground">
@@ -303,50 +332,6 @@ export function WebsiteFields({
                 </p>
             ) : null}
         </>
-    );
-}
-
-/**
- * Which template the new site starts from (U12): the few suggested for the
- * business, each with what it uses. The rest are a site's to change later,
- * page by page.
- */
-function TemplateChoice({
-    choices,
-    value,
-    onChange,
-}: {
-    choices: readonly WebsiteTemplateChoice[];
-    value: string;
-    onChange: (id: string) => void;
-}) {
-    const id = useId();
-    return (
-        <div className="grid min-w-0 gap-2">
-            <span
-                data-ph-unmask=""
-                id={`${id}-label`}
-                className="text-[13px] font-medium"
-            >
-                Starts from
-            </span>
-            <RadioCards
-                labelledBy={`${id}-label`}
-                value={value}
-                onChange={onChange}
-                options={choices.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    aside: usesLine(c),
-                }))}
-            />
-            <p
-                data-ph-unmask=""
-                className="text-[12.5px] leading-normal text-muted-foreground"
-            >
-                Change its pages any time.
-            </p>
-        </div>
     );
 }
 

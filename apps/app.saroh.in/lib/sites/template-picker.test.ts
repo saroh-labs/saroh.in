@@ -5,12 +5,14 @@ import type { Template } from "@/lib/sites/service";
 
 import {
     isSuggested,
-    moduleNote,
     moduleStates,
     moduleStatesWith,
+    offReason,
     shapeWord,
     startingTemplate,
     suggestedTemplates,
+    suggestedTitle,
+    templateGroups,
     usesLine,
 } from "./template-picker";
 
@@ -160,24 +162,152 @@ describe("what a card says", () => {
             mod("CLASS_PACKS", false),
             mod("CRM", false),
         ]);
-        expect(moduleNote(of("bakery"), states)).toBe(
-            "Its products show once Sell is on.",
+        expect(offReason(of("bakery"), states)).toBe(
+            "Uses Sell: turn it on to use this",
         );
         // Class packs aren't offered (DEC-099), so they are never named.
-        expect(moduleNote(of("gym"), states)).toBe(
-            "Its plans show once Payments is on.",
+        expect(offReason(of("gym"), states)).toBe(
+            "Uses Payments: turn it on to use this",
         );
         // Contacts off holds nothing back: enquiries still arrive.
-        expect(moduleNote(of("developer"), states)).toBeNull();
+        expect(offReason(of("developer"), states)).toBeNull();
     });
 
     it("never names a module Saroh hasn't offered the business (DEC-057)", () => {
         const states = moduleStates([mod("COMMERCE", false, true)]);
-        expect(moduleNote(of("bakery"), states)).toBeNull();
+        expect(offReason(of("bakery"), states)).toBeNull();
     });
 
     it("says nothing when the modules couldn't be read", () => {
-        expect(moduleNote(of("bakery"), moduleStates(null))).toBeNull();
+        expect(offReason(of("bakery"), moduleStates(null))).toBeNull();
+    });
+
+    it("names every module off, once", () => {
+        const states = moduleStates([
+            mod("APPOINTMENTS", false),
+            mod("PAYMENTS", false),
+        ]);
+        expect(offReason(of("gym"), states)).toBe(
+            "Uses Bookings and Payments: turn them on to use this",
+        );
+    });
+});
+
+describe("the trade (DEC-216)", () => {
+    it("names who the suggestions are for", () => {
+        expect(suggestedTitle("salon")).toBe("Suggested for salons");
+        expect(suggestedTitle("other")).toBe("Suggested");
+        expect(suggestedTitle(null)).toBe("Suggested");
+    });
+});
+
+describe("the picker's groups (DEC-216)", () => {
+    const groups = (...args: Parameters<typeof templateGroups<Template>>) =>
+        templateGroups(...args).map((g) => [g.title, ids(g.templates)]);
+
+    it("puts the trade's own first, the default leading, then the rest, then those that need a module", () => {
+        const states = moduleStates([
+            mod("COMMERCE", false),
+            mod("APPOINTMENTS", true),
+            mod("PAYMENTS", true),
+        ]);
+        expect(
+            groups(CATALOGUE, {
+                trade: "coach",
+                kind: "BUSINESS",
+                modules: states,
+                defaultId: "starter",
+            }),
+        ).toEqual([
+            ["Suggested for coaches", ["starter", "blogs", "dietician"]],
+            [
+                "Made for other trades",
+                [
+                    "personal",
+                    "portfolio",
+                    "writing",
+                    "gym",
+                    "studio",
+                    "developer",
+                ],
+            ],
+            ["Need Sell", ["ceramics", "bakery"]],
+        ]);
+    });
+
+    it("suggests the trade's templates even with their module off, saying why on the card", () => {
+        const states = moduleStates([mod("APPOINTMENTS", false)]);
+        const [suggested] = templateGroups(CATALOGUE, {
+            trade: "clinic",
+            kind: "BUSINESS",
+            modules: states,
+            defaultId: "starter",
+        });
+        expect(ids(suggested.templates)).toEqual(["starter", "dietician"]);
+        expect(offReason(of("dietician"), states)).toBe(
+            "Uses Bookings: turn it on to use this",
+        );
+    });
+
+    it("falls back to the kind's rules with no trade", () => {
+        const states = moduleStates([mod("COMMERCE", false)]);
+        const [suggested] = templateGroups(CATALOGUE, {
+            trade: null,
+            kind: "WORK",
+            modules: states,
+            defaultId: "portfolio",
+        });
+        expect(suggested.title).toBe("Suggested");
+        expect(ids(suggested.templates)).toEqual(
+            ids(suggestedTemplates(CATALOGUE, "WORK", states, "portfolio")),
+        );
+    });
+
+    it("puts every template in exactly one group, and leaves out an empty one", () => {
+        const all = templateGroups(CATALOGUE, {
+            trade: "gym",
+            kind: "BUSINESS",
+            modules: null,
+            defaultId: "starter",
+        });
+        expect(all.flatMap((g) => ids(g.templates)).sort()).toEqual(
+            ids(CATALOGUE).sort(),
+        );
+        // Modules not known: none is said to be off.
+        expect(all.map((g) => g.title)).toEqual([
+            "Suggested for gyms",
+            "Made for other trades",
+        ]);
+    });
+
+    it("reads Something else as no trade: the kind's rules", () => {
+        const basis = {
+            kind: "BUSINESS",
+            modules: null,
+            defaultId: "starter",
+        };
+        expect(
+            ids(
+                templateGroups(CATALOGUE, { ...basis, trade: "other" })[0]
+                    .templates,
+            ),
+        ).toEqual(
+            ids(
+                templateGroups(CATALOGUE, { ...basis, trade: null })[0]
+                    .templates,
+            ),
+        );
+    });
+
+    it("is one group when there is one template", () => {
+        expect(
+            groups([t("personal")], {
+                trade: null,
+                kind: "SOLO",
+                modules: null,
+                defaultId: "personal",
+            }),
+        ).toEqual([["Suggested", ["personal"]]]);
     });
 });
 

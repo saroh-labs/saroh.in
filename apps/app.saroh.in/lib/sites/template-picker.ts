@@ -1,12 +1,15 @@
-import { moduleName } from "@/lib/modules/names";
-import { rolledOutKeys } from "@/lib/modules/rollout";
-import type { ModuleView } from "@/lib/modules/schema";
-import { listWords } from "@/lib/modules/switch-plan";
-import type { Template } from "@/lib/sites/service";
+import type { TemplateKind } from "@saroh/templates";
 import {
     gatingModules,
     isSuggested as sharedIsSuggested,
 } from "@saroh/templates";
+
+import { moduleName } from "@/lib/modules/names";
+import { rolledOutKeys } from "@/lib/modules/rollout";
+import type { ModuleView } from "@/lib/modules/schema";
+import { listWords } from "@/lib/modules/switch-plan";
+import { businessEditHref } from "@/lib/organizations/business-rows";
+import type { Template } from "@/lib/sites/service";
 
 /**
  * The template picker's rules (industry templates plan, U12): which
@@ -121,33 +124,165 @@ export function shapeWord(template: Pick<Template, "shape">): string | null {
     return (template.shape && SHAPE_WORD[template.shape]) ?? null;
 }
 
+/** A module a template reads that the business has off, as it is named. */
+interface OffModule {
+    /** As the rail names it: "Bookings". */
+    rail: string;
+}
+
 /**
- * What a template shows only once a module is on, said rather than
- * refused: "Its products show once Sell is on." Null when nothing it needs
- * is off, when modules are not known, or when what is off is a module
- * Saroh doesn't offer this business (never named, DEC-057).
+ * The modules a template reads that are off, each one Saroh offers this
+ * business (never naming one it doesn't, DEC-057). Empty when nothing it
+ * needs is off, or the modules are not known.
  */
-export function moduleNote(
+function offModules(
+    template: Pick<Template, "uses">,
+    modules: ModuleStates | null,
+): OffModule[] {
+    if (!modules) return [];
+    return gatingModules(template).flatMap((k) => {
+        // The module as the rail names it (`lib/modules/names.ts`).
+        const rail = moduleName(k);
+        return rail &&
+            USES_WORD[k] &&
+            !modules.on.includes(k) &&
+            modules.named.includes(k)
+            ? [{ rail }]
+            : [];
+    });
+}
+
+/** "Bookings", "Bookings and Sell": the modules off, once each. */
+function offNames(off: readonly OffModule[]): string[] {
+    return Array.from(new Set(off.map((o) => o.rail)));
+}
+
+/**
+ * Why a template's card is in the group of those that need a module
+ * (DEC-216), said rather than refused: "Uses Bookings: turn it on to use
+ * this". Null when nothing it needs is off, or modules are not known.
+ */
+export function offReason(
     template: Pick<Template, "uses">,
     modules: ModuleStates | null,
 ): string | null {
-    if (!modules) return null;
-    const off = gatingModules(template).flatMap((k) => {
-        // The module as the rail names it (`lib/modules/names.ts`).
-        const rail = moduleName(k);
-        const word = USES_WORD[k];
-        return rail &&
-            word &&
-            !modules.on.includes(k) &&
-            modules.named.includes(k)
-            ? [{ rail, word: word.toLowerCase() }]
-            : [];
-    });
-    if (off.length === 0) return null;
-    const what = listWords(off.map((o) => o.word));
-    const names = Array.from(new Set(off.map((o) => o.rail)));
-    const verb = names.length > 1 ? "are" : "is";
-    return `Its ${what} show once ${listWords(names)} ${verb} on.`;
+    const names = offNames(offModules(template, modules));
+    if (names.length === 0) return null;
+    const it = names.length > 1 ? "them" : "it";
+    return `Uses ${listWords(names)}: turn ${it} on to use this`;
+}
+
+/**
+ * Settings › Business with its Kind of place sheet open (DEC-216): where
+ * "Set it" beside an untraded "Suggested" goes.
+ */
+export const SET_TRADE_HREF = businessEditHref("trade");
+
+/** Who a trade's suggestions are for, as "Suggested for …" ends. */
+const TRADE_WORDS: Record<TemplateKind, string | null> = {
+    salon: "salons",
+    gym: "gyms",
+    clinic: "clinics",
+    coach: "coaches",
+    food: "food businesses",
+    shop: "shops",
+    creator: "creators",
+    other: null,
+};
+
+/** "Suggested for salons"; "Suggested" with no trade to name. */
+export function suggestedTitle(trade: TemplateKind | null): string {
+    const words = trade ? TRADE_WORDS[trade] : null;
+    return words ? `Suggested for ${words}` : "Suggested";
+}
+
+/** What the picker's suggestions are worked out from. */
+export interface SuggestionBasis {
+    /** The business's trade (DEC-216); null falls back to its kind's rules. */
+    trade: TemplateKind | null;
+    /** What is being set up (DEC-070). */
+    kind: unknown;
+    modules: ModuleStates | null;
+    /** The kind's template (`kindDefaults(kind).starterTemplate`). */
+    defaultId: string | null;
+}
+
+/**
+ * Whether a template is suggested (DEC-216): with a trade, the trade's own
+ * templates, the kind's default and its templates for anyone (Starter for a
+ * business); without one, {@link isSuggested}.
+ */
+export function isSuggestedFor(
+    template: Pick<Template, "id" | "kinds" | "uses">,
+    basis: SuggestionBasis,
+): boolean {
+    const { trade, kind, modules, defaultId } = basis;
+    // "Something else" names no trade's templates: the kind's rule.
+    if (!trade || trade === "other") {
+        return isSuggested(template, kind, modules, defaultId);
+    }
+    const kinds = template.kinds ?? [];
+    // The default and the kind's templates for anyone, as the shared rule
+    // says them, beside the trade's own.
+    if (template.id === defaultId || kinds.length === 0) {
+        return isSuggested(template, kind, modules, defaultId);
+    }
+    return kinds.includes(trade);
+}
+
+/** One heading of the picker and the templates under it. */
+export interface TemplateGroup<T> {
+    key: string;
+    title: string;
+    templates: T[];
+}
+
+/**
+ * The picker's groups (DEC-216, board D3): "Suggested for <trade>" first,
+ * the default leading; then the rest whose modules are on, "Made for other
+ * trades"; then those that need a module that is off, one group per set of
+ * modules ("Need Sell"), each card saying why. Every template is in exactly
+ * one group, in the catalogue's order within it; an empty group is left out.
+ */
+export function templateGroups<
+    T extends Pick<Template, "id" | "kinds" | "uses">,
+>(templates: readonly T[], basis: SuggestionBasis): TemplateGroup<T>[] {
+    const suggested = templates.filter((t) => isSuggestedFor(t, basis));
+    const first = suggested.findIndex((t) => t.id === basis.defaultId);
+    const lead =
+        first > 0
+            ? [suggested[first], ...suggested.filter((_, i) => i !== first)]
+            : suggested;
+    const rest = templates.filter((t) => !suggested.includes(t));
+    const needs = new Map<string, T[]>();
+    const others: T[] = [];
+    for (const t of rest) {
+        const names = offNames(offModules(t, basis.modules));
+        if (names.length === 0) {
+            others.push(t);
+            continue;
+        }
+        const key = listWords(names);
+        needs.set(key, [...(needs.get(key) ?? []), t]);
+    }
+    const groups: TemplateGroup<T>[] = [
+        {
+            key: "suggested",
+            title: suggestedTitle(basis.trade),
+            templates: lead,
+        },
+        {
+            key: "others",
+            title: "Made for other trades",
+            templates: others,
+        },
+        ...Array.from(needs, ([names, list]) => ({
+            key: `need:${names}`,
+            title: `Need ${names}`,
+            templates: list,
+        })),
+    ];
+    return groups.filter((g) => g.templates.length > 0);
 }
 
 /**

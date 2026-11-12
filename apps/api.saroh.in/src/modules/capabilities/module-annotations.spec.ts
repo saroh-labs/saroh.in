@@ -231,6 +231,10 @@ const NEVER: Record<string, string> = {
         "published sites, and the business's place and hours",
     // A QR code's short link, relayed by the site's server. It forwards
     // to a page that answers for its own module, so it carries none.
+    // DEC-216: the Turn on sheet previews a template with the business's
+    // own details before Website is on.
+    "sites/template-preview.controller.ts":
+        "previews a template before Website is on, to turn it on",
     "sites/public-qr.controller.ts":
         "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always

@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+} from "@nestjs/common";
 import {
     getSectionContract,
     parseSectionContent,
@@ -8,6 +12,7 @@ import {
 import type { BusinessFacts, FilledKind, LookId } from "@saroh/templates";
 import {
     fillBusinessDetails,
+    getTemplate,
     instantiateTemplate,
     lookShowcaseTemplate,
     starterCopyPlan,
@@ -27,7 +32,7 @@ import { registeredAddressText } from "../stores/pickup-place";
 import { lockSite } from "./live-pointer";
 import { sanitizeSectionContent } from "./sanitize";
 import { assertSiteInOrg } from "./site-access";
-import { newSectionKey } from "./site-create";
+import { newSectionKey, planTemplateStyle } from "./site-create";
 import { assertLookAllowed } from "./site-looks";
 import type { SiteStyle } from "./site-style";
 import { defaultSiteStyle, parseSiteStyle } from "./site-style";
@@ -144,6 +149,20 @@ function withLook(stored: unknown, look: LookId | null): SiteStyle {
     return parseSiteStyle(look ? { ...rest, look } : rest);
 }
 
+/**
+ * `base` in the colours of a template's colourway (DEC-216, "Use its
+ * colours too"): its six rows and its own palette, everything else as it
+ * was.
+ */
+function withColourway(base: SiteStyle, colourway: SiteStyle): SiteStyle {
+    const { palette: _old, ...rest } = base;
+    return parseSiteStyle({
+        ...rest,
+        colours: colourway.colours,
+        ...(colourway.palette ? { palette: colourway.palette } : {}),
+    });
+}
+
 /** A section's type, contract and content, wherever it came from. */
 interface SectionParts {
     type: string;
@@ -179,7 +198,7 @@ function ready(
  * (`fillBusinessDetails`): its staff in diary order, its registered address
  * in one line, and its town as the template context says it.
  */
-async function businessFacts(
+export async function businessFacts(
     tx: Tx,
     organizationId: string,
     town: string | undefined,
@@ -208,19 +227,32 @@ async function businessFacts(
     };
 }
 
-/** Copy the look's showcase template into the site's draft. */
+/**
+ * Copy the look's showcase template into the site's draft; or, `chosen`
+ * (DEC-216, the editor's Template row), that template, in the look sent
+ * (the draft's own), its colourway's colours only when one is named.
+ */
 export async function copyStarterContent(
     ctx: OrganizationContext,
     siteId: string,
     choice: LookId | "classic",
     /** "Fill in my details": the business's own in place of samples. */
     fill = false,
+    chosen?: { templateId: string; styleId?: string },
 ): Promise<StarterContentResult> {
     authorize(ctx, "site:update");
     authorize(ctx, "section:write");
     await assertSiteInOrg(ctx, siteId);
     const look = lookOf(choice);
-    const template = lookShowcaseTemplate(look);
+    const template = chosen
+        ? getTemplate(chosen.templateId)
+        : lookShowcaseTemplate(look);
+    if (!template) {
+        throw new BadRequestException({
+            message: "Choose one of the templates offered.",
+            details: { field: "templateId" },
+        });
+    }
 
     // The look first, under a style save's rules: refused before anything
     // is written.
@@ -228,7 +260,11 @@ export async function copyStarterContent(
         where: { id: siteId, organizationId: ctx.organizationId },
         select: { style: true },
     });
-    const style = withLook(current?.style, look);
+    const colourway = chosen?.styleId
+        ? planTemplateStyle(template, chosen.styleId)
+        : undefined;
+    const kept = withLook(current?.style, look);
+    const style = colourway ? withColourway(kept, colourway.value) : kept;
     await assertSiteLookOffered(ctx.organizationId, siteId, style);
     await assertLookAllowed(ctx.organizationId, siteId, style);
     await assertStyleChoicesAllowed(ctx.organizationId, siteId, style);
@@ -249,10 +285,9 @@ export async function copyStarterContent(
             db: tx,
             siteId,
         });
-        const made = withLookShowcase(
-            look,
-            instantiateTemplate(template, context),
-        );
+        const built = instantiateTemplate(template, context);
+        // A look's board pages are its showcase's alone (DEC-182).
+        const made = chosen ? built : withLookShowcase(look, built);
         const copied = withGallerySamples(template.id, made);
         const facts = fill
             ? await businessFacts(tx, ctx.organizationId, context.area)

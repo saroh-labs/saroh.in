@@ -1337,12 +1337,16 @@ describe("Website starts from the kind's template (DEC-070, K15)", () => {
         const ctx = await business("Asha Rao", "WORK");
         const read = await setup.defaults(ctx, "WEBSITE");
         expect(read.kind).toBe("WORK");
-        expect(read.templates).toContainEqual({
-            id: "bakery",
-            name: "Bakery",
-            kinds: ["food"],
-            uses: ["COMMERCE"],
-        });
+        // The whole catalogue entry (DEC-216): pictures and colourways too.
+        expect(read.templates).toContainEqual(
+            expect.objectContaining({
+                id: "bakery",
+                name: "Bakery",
+                kinds: ["food"],
+                uses: ["COMMERCE"],
+                colourways: expect.any(Array),
+            }),
+        );
     });
 
     it("starts the site from the template chosen in the sheet (U12)", async () => {
