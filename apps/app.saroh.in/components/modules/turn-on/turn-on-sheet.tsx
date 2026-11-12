@@ -94,7 +94,7 @@ export function TurnOnSheet({
             // The template choice's picture cards need the room (DEC-216, board D3).
             className={
                 picked?.includes("WEBSITE") && templateChoiceOn()
-                    ? "sm:max-w-[620px]"
+                    ? "sm:max-w-[640px]"
                     : undefined
             }
             title={`Turn on ${listWords(names)}`}

@@ -418,7 +418,8 @@ export function ColourwayChoice({
                 value={chosen}
                 onValueChange={onChange}
                 disabled={disabled}
-                className="flex min-w-0 flex-wrap gap-2"
+                // Two even columns, so the names line up instead of wrapping ragged.
+                className="grid min-w-0 grid-cols-2 gap-2"
             >
                 {colourways.map((cw) => {
                     const active = cw.id === chosen;
@@ -427,7 +428,7 @@ export function ColourwayChoice({
                             key={cw.id}
                             value={cw.id}
                             className={cn(
-                                "flex min-h-9 cursor-pointer items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-sm transition-colors duration-fast coarse:min-h-11",
+                                "flex min-h-9 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-sm transition-colors duration-fast coarse:min-h-11",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:text-disabled-foreground",
                                 active
                                     ? "border-foreground ring-1 ring-foreground"
@@ -441,14 +442,17 @@ export function ColourwayChoice({
                                 {cw.chips.map((hsl, i) => (
                                     <span
                                         key={i}
-                                        className="h-5 w-3.5"
+                                        className="h-5 w-2.5"
                                         style={{ background: `hsl(${hsl})` }}
                                     />
                                 ))}
                             </span>
-                            {cw.name}
+                            <span className="min-w-0 truncate">{cw.name}</span>
                             {active ? (
-                                <Check aria-hidden className="size-3.5" />
+                                <Check
+                                    aria-hidden
+                                    className="ml-auto size-3.5 shrink-0"
+                                />
                             ) : null}
                         </RadioGroupPrimitive.Item>
                     );

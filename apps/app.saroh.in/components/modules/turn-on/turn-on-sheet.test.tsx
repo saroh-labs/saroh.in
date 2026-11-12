@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
+import type { WebAddressView } from "@/lib/organizations/web-address";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
 import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
@@ -30,6 +31,33 @@ vi.mock("@/lib/modules/turn-on-actions", () => ({
     readSetupDefaultsAction: (keys: string[]) => readSetupDefaultsAction(keys),
     enableModuleAction: (key: string, setup: object) =>
         enableModuleAction(key, setup),
+}));
+
+/**
+ * The web address read and its Change dialog (DEC-069): changing isn't
+ * rolled out by default, so the sheet says today's line.
+ */
+let webAddress: Partial<WebAddressView> = {
+    changeAvailable: false,
+    canChange: false,
+};
+const saveWebAddress = vi.fn();
+const addressView = (over: Partial<WebAddressView> = {}): WebAddressView => ({
+    address: "northwind",
+    origin: "https://northwind.saroh.app",
+    platformOrigin: "https://northwind.saroh.app",
+    customDomain: null,
+    links: { site: null, shop: null, book: null },
+    previous: [],
+    changeAvailable: false,
+    canChange: false,
+    ...over,
+});
+vi.mock("@/lib/organizations/web-address-actions", () => ({
+    readWebAddressAction: () =>
+        Promise.resolve({ ok: true, data: addressView(webAddress) }),
+    checkWebAddress: () => Promise.resolve(null),
+    saveWebAddress: (...args: unknown[]) => saveWebAddress(...args) as unknown,
 }));
 
 /** The business's own details for a template's preview (DEC-216). */
@@ -166,6 +194,8 @@ beforeEach(() => {
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
+    webAddress = { changeAvailable: false, canChange: false };
+    saveWebAddress.mockReset();
     templateChoice = true;
     websiteTemplate = null;
     locks = { payments: null, messaging: null };
@@ -534,6 +564,66 @@ describe("Website", () => {
         expect(showError).not.toHaveBeenCalled();
         expect(push).not.toHaveBeenCalled();
         expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
+
+    it("offers Change only to the owner, while changing is rolled out", async () => {
+        await open(["WEBSITE"]);
+        expect(() => button(/^Change$/)).toThrow();
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        webAddress = { changeAvailable: true, canChange: false };
+        await open(["WEBSITE"]);
+        expect(text()).toContain(
+            "You chose it when you set up. Only the owner can change it.",
+        );
+        expect(() => button(/^Change$/)).toThrow();
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        webAddress = { changeAvailable: true, canChange: true };
+        await open(["WEBSITE"]);
+        expect(text()).not.toContain("Settings › Business");
+        expect(text()).not.toContain("Only the owner");
+        expect(button(/^Change$/)).toBeDefined();
+    });
+
+    it("changes the web address on top of the sheet, which stays open with the new one", async () => {
+        webAddress = { changeAvailable: true, canChange: true };
+        saveWebAddress.mockResolvedValueOnce({
+            ok: true,
+            data: addressView({
+                ...webAddress,
+                address: "northwind-supply",
+                platformOrigin: "https://northwind-supply.saroh.app",
+            }),
+        });
+        await open(["WEBSITE"]);
+        await press(button(/^Change$/));
+        const dialog = Array.from(
+            document.querySelectorAll<HTMLElement>('[role="dialog"]'),
+        ).find((d) => d.textContent.includes("Change web address"));
+        if (!dialog) throw new Error("The Change dialog is not open");
+        const input = dialog.querySelector("input");
+        if (!input) throw new Error("No address field");
+        typeInto(input, "northwind-supply");
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 400));
+        });
+        await act(async () => {
+            dialog.querySelector("form")?.requestSubmit();
+            await Promise.resolve();
+        });
+        await settle();
+        expect(saveWebAddress).toHaveBeenLastCalledWith("northwind-supply");
+        expect(text()).toContain("northwind-supply.saroh.app");
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenLastCalledWith(
+            "WEBSITE",
+            expect.objectContaining({ address: "northwind-supply" }),
+        );
     });
 
     it("says which template the new site starts from, when the API names one (K15)", async () => {

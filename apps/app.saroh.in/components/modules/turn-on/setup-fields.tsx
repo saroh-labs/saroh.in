@@ -22,6 +22,7 @@ import { CheckRow } from "@saroh/ui/check-row";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { PartialRead } from "@saroh/ui/failed-read";
 import { TextLink } from "@saroh/ui/text-link";
+import { FixedWebAddress } from "./fixed-web-address";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
 
@@ -222,21 +223,15 @@ export function WebsiteFields({
             </Field>
             {addressFixed ? (
                 // Chosen when the business was set up: said, not asked again.
-                <dl className="grid gap-1">
-                    <dt data-ph-unmask="" className="text-[12.5px] font-medium">
-                        Web address
-                    </dt>
-                    <dd className="break-all font-mono text-[13px]">
-                        {w.address}.saroh.app
-                    </dd>
-                    <dd
-                        data-ph-unmask=""
-                        className="text-pretty text-[11.5px] leading-normal text-muted-foreground"
-                    >
-                        You chose it when you set up. It can be changed in
-                        Settings › Business.
-                    </dd>
-                </dl>
+                <FixedWebAddress
+                    address={w.address}
+                    onChanged={(address) =>
+                        update((d) => ({
+                            ...d,
+                            WEBSITE: { ...d.WEBSITE, address },
+                        }))
+                    }
+                />
             ) : (
                 <Field
                     holdsData
