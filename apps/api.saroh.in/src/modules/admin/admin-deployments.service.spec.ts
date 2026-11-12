@@ -15,7 +15,7 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { validationPipeOptions } from "../../common/validation";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { AdminAuditService } from "./admin-audit.service";
-import { jobName } from "./admin-deployments";
+import { DEPLOY_APPS, jobName } from "./admin-deployments";
 import { AdminDeploymentsService } from "./admin-deployments.service";
 import {
     AdminPermission,
@@ -303,7 +303,7 @@ describe("AdminDeploymentsService.list", () => {
             readError: null,
         });
         // The production console shows production only.
-        expect(view.rows).toHaveLength(5);
+        expect(view.rows).toHaveLength(DEPLOY_APPS.length);
         expect(view.rows.every((r) => r.environment === "production")).toBe(
             true,
         );

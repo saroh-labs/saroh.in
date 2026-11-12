@@ -6,7 +6,8 @@ import { getJson } from "./control-plane";
  * words for them live in `deployment-words.ts`.
  */
 
-export type DeployApp = "web" | "application" | "auth" | "admin" | "sites";
+export type DeployApp =
+    "web" | "application" | "auth" | "admin" | "sites" | "docs";
 export type DeployEnvironment = "development" | "production";
 
 export type RunState =
