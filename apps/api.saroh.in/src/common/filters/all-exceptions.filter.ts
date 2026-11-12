@@ -123,6 +123,9 @@ function isDeliberateUnavailable(exception: unknown): boolean {
     );
 }
 
+/** Refusals a route's own Cache-Control may still cover (see `catch`). */
+const CACHEABLE_REFUSALS: ReadonlySet<number> = new Set([404, 410]);
+
 /**
  * Global catch-all filter. Converts any thrown error into the standard error
  * envelope, maps Nest `HttpException`s to their status, and collapses anything
@@ -203,6 +206,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         if (!res.headersSent) {
             res.setHeader(RESPONSE_ID_HEADER, correlationId);
+            // A route's `@Header("Cache-Control", "public, …")` is set
+            // before its handler throws. "Not there" (404, 410) is the same
+            // for every visitor and may be kept like a success (the launch
+            // offer's 404 is, on purpose); any other refusal, a 429 above
+            // all, kept at the edge would be served to every visitor.
+            if (!CACHEABLE_REFUSALS.has(statusCode)) {
+                res.setHeader("Cache-Control", "no-store");
+            }
             if (
                 keyed &&
                 statusCode === Number(HttpStatus.TOO_MANY_REQUESTS) &&
@@ -225,7 +236,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
                       ? {
                             error: {
                                 code: contractCode(statusCode),
-                                message,
+                                message: keyRefusal(details) ?? message,
                                 requestId: correlationId,
                             },
                         }
@@ -233,6 +244,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
             );
         }
     }
+}
+
+/**
+ * A key refused by what it may do reads about the key: the role sentence
+ * ("Your role can't do this…") would send the developer to Settings › Team.
+ */
+export const KEY_DENIED_MESSAGE =
+    "This key can't do this. Change what it may do in Settings › API and AI apps.";
+
+function keyRefusal(details: unknown): string | undefined {
+    const code = (details as { code?: unknown } | undefined)?.code;
+    return code === "ROLE_DENIED" ? KEY_DENIED_MESSAGE : undefined;
 }
 
 /** The public contract's code for a status (plan 2026-11-10-001, U8). */

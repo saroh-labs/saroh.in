@@ -237,6 +237,11 @@ module.exports = {
         "<rootDir>/src/modules/api-keys/**/*.spec.ts",
         // U7/U8: the public API's pure specs; rows in public-api *.db.spec.ts.
         "<rootDir>/src/modules/public-api/**/*.spec.ts",
+        // U9: AI apps' scopes, names and the OAuth gate — pure; rows in mcp.db.spec.ts.
+        "<rootDir>/src/modules/mcp/**/*.spec.ts",
+        // U13: outbound webhooks' signing, emit inventory and handler, mocked;
+        // rows in outbound-webhooks *.db.spec.ts.
+        "<rootDir>/src/modules/outbound-webhooks/**/*.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",

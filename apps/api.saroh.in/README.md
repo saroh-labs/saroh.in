@@ -207,8 +207,9 @@ checks silently fail. `BETTER_AUTH_URL` is this service's own origin;
 - `EMAIL_FROM`, `SMTP_*` (legacy `SENDER_EMAIL_ID`, `SMTP_HOSTNAME`,
   `USER_ACCOUNT`, `USER_PASSWORD` still honoured as fallbacks)
 - `PAYMENTS_ENC_KEY` — 32-byte AES-256-GCM key (base64 or 64-hex) for merchant
-  credential encryption at rest. Optional in the schema so dev boots without
-  payments; validated **at use time** and never logged
+  credential encryption at rest, or a key ring `v2:<key>,v1:<key>` (DEC-214;
+  the other encryption keys take the same form). Optional in the schema so dev
+  boots without payments; validated **at use time** and never logged
 - `JOB_WORKER_POLL_MS`, `JOB_WORKER_BATCH`, `JOB_VISIBILITY_MS` — the durable
   job outbox worker. The poll loop is disabled under `NODE_ENV=test` regardless
 - `ADMIN_ALLOWLIST` — break-glass only, see above

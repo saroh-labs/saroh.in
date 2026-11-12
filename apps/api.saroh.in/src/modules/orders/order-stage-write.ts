@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { emitOrderWebhook } from "../outbound-webhooks/emitter";
 import {
     cancelOrderStepNotice,
     enqueueOrderStepNotice,
@@ -154,6 +155,7 @@ export async function writeStageMove(
                 : {}),
         },
     });
+    await emitOrderWebhook(tx, "order.status_changed", order.id);
     const event = await tx.orderEvent.create({
         data: {
             organizationId: actor.organizationId,
@@ -239,6 +241,7 @@ export async function writeStageUndo(
         where: { id: order.id },
         data: { stage: back.stage, status: back.status },
     });
+    await emitOrderWebhook(tx, "order.status_changed", order.id);
     await tx.orderEvent.update({
         where: { id: event.id },
         data: { undoneAt: now },

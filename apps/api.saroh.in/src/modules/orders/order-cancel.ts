@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { cancelTreatmentVisitsInTx } from "../bookings/treatment-cancel";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import type { OrderStage } from "./dto";
 import { isHandedOver, typeOf } from "./fulfilment";
 import { leftToRefundCents } from "./hand-payments";
@@ -128,6 +129,11 @@ export async function completeCancelInTx(
         data: { status: "CANCELLED" },
     });
     if (count === 0) return false;
+    await emitWebhook(tx, {
+        organizationId: order.organizationId,
+        type: "order.status_changed",
+        id: order.id,
+    });
     await retireOrderPayLinkInTx(tx, order.id);
     if (order.organizationId) {
         await cancelTreatmentVisitsInTx(tx, {

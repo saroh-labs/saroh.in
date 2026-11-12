@@ -6,7 +6,7 @@ import { API_URL } from "../../components/api-reference";
 
 ## Getting a key
 
-Owners make keys in **Settings › API and AI apps › Keys**. Other people in
+Owners make keys in **Settings › API and AI apps › Connections**. Other people in
 the business can't make, see or change keys. Keys come with some plans,
 not all.
 
@@ -43,6 +43,22 @@ Authorization: Bearer sk_live_…
 
 Keep it on your server, in an environment variable, and out of your code
 and your website.
+
+### Changing a key
+
+You can change a key's name and what it can do, without making a new one.
+
+- **Secret keys:** change the name, what the key may do, and whether
+  **AI apps** is on. As when you make one, you can only choose what your
+  own role allows.
+- **Publishable keys:** change the name and the websites that may use it.
+  What it can do stays the same: it only ever reads.
+
+A key's kind and expiry stay as they were made. A key that has been
+rolled, revoked or has expired can't be changed.
+
+The list shows who made each key. When that person has left the business
+or is paused, the list says so: the key has stopped working.
 
 ### Rolling and revoking
 

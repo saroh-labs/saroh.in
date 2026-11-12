@@ -68,7 +68,8 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrderStageBatchService,
         OrderStageBatchCommitHandler,
     ],
-    exports: [OrdersService, PublicCheckoutService],
+    // The kitchen: the MCP's update_order_status moves an order's step.
+    exports: [OrdersService, PublicCheckoutService, OrderKitchenService],
 })
 export class OrdersModule implements OnModuleInit {
     constructor(

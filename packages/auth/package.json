@@ -19,6 +19,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/cimd": "1.7.19",
+    "@better-auth/mcp": "1.7.19",
+    "@better-auth/oauth-provider": "1.7.19",
     "@saroh/database": "workspace:*",
     "@saroh/edition": "workspace:*",
     "better-auth": "1.7.19",

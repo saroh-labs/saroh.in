@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free unit tests: the database package is mocked so nothing touches a real
 // Postgres. `$transaction` runs its callback against a tx stub whose delegates
 // are the same jest mocks, so we can assert the atomic move (stage update +

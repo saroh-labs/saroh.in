@@ -85,5 +85,76 @@ export type ApiKeyView = z.infer<typeof apiKeyView>;
 export const createdApiKey = z.object({ key: apiKeyView, token: z.string() });
 export type CreatedApiKey = z.infer<typeof createdApiKey>;
 
-export const apiKeyList = z.object({ data: z.array(apiKeyView) });
+/**
+ * Editing a key: its name and what it can do, in create's shape. A secret
+ * key's scope is clamped to the editor's own powers; a publishable key's
+ * stays fixed (only its websites change). Its kind and expiry stay as made.
+ */
+export const updateApiKeyBody = z
+    .strictObject({
+        name: z.string().trim().min(1).max(80).optional(),
+        scope: z.array(z.string().max(64)).max(200).optional(),
+        allowedOrigins: z.array(allowedOrigin).max(20).optional(),
+        aiEnabled: z.boolean().optional(),
+    })
+    .refine((b) => Object.keys(b).length > 0, {
+        message: "Nothing to change",
+    });
+export type UpdateApiKeyBody = z.infer<typeof updateApiKeyBody>;
+
+/** A key as the list shows it: with who made it and whether they're still on the team. */
+export const apiKeyListItem = apiKeyView.extend({
+    madeBy: z.object({
+        id,
+        name: z.string().nullable(),
+        /** False once the maker has left or is paused: the key has stopped working. */
+        stillHere: z.boolean(),
+    }),
+});
+export type ApiKeyListItem = z.infer<typeof apiKeyListItem>;
+
+export const apiKeyList = z.object({ data: z.array(apiKeyListItem) });
 export type ApiKeyList = z.infer<typeof apiKeyList>;
+
+/**
+ * Settings › API and AI apps › Usage (U14): this business's own caps and
+ * this minute's calls, as the limiter counts them, and whether keys and
+ * webhooks are open to it. Never a plan's numbers in the repo: every cap
+ * here is the business's, read from its plan. A part the reader may not
+ * manage is null (a Member sees the AI row only).
+ */
+export const apiUsageScope = z.enum(["mcp", "secret", "storefront"]);
+export type ApiUsageScope = z.infer<typeof apiUsageScope>;
+
+export const apiUsageView = z.object({
+    at: z.string(),
+    /** Requests in the rolling minute, the whole business, per surface whose switch is on. */
+    minute: z.array(
+        z.object({
+            scope: apiUsageScope,
+            used: z.number().int(),
+            cap: z.number().int(),
+        }),
+    ),
+    /** Null for someone who may not manage keys. */
+    keys: z
+        .object({
+            /** Kinds whose switch is on: none, and the tab is hidden. */
+            kinds: z.array(apiKeyKind),
+            /** Kinds the plan has too: none, and the tab is locked. */
+            open: z.array(apiKeyKind),
+            /** Keys that work now, those in a roll's grace included. */
+            count: z.number().int(),
+            cap: z.number().int().nullable(),
+        })
+        .nullable(),
+    /** Null for someone who may not manage webhooks, or with its switch off. */
+    webhooks: z
+        .object({
+            open: z.boolean(),
+            count: z.number().int(),
+            cap: z.number().int().nullable(),
+        })
+        .nullable(),
+});
+export type ApiUsageView = z.infer<typeof apiUsageView>;

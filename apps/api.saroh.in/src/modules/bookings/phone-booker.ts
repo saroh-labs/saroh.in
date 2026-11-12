@@ -3,6 +3,7 @@ import { outsideOrgContext, prisma } from "@saroh/database";
 
 import { reservedPhoneEmail } from "../contacts/contact-email";
 import { contactByPhone, lockWalkInPhone } from "../orders/walk-in-customer";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 
 /**
  * This phone's contact was made after the reservation's snapshot: the
@@ -47,7 +48,7 @@ export async function phoneContactInTx(
         });
     }
     const words = (input.name ?? "").trim().split(/\s+/).filter(Boolean);
-    return tx.contact.create({
+    const made = await tx.contact.create({
         data: {
             organizationId,
             email: reservedPhoneEmail(),
@@ -58,6 +59,12 @@ export async function phoneContactInTx(
         },
         select: { id: true, email: true },
     });
+    await emitWebhook(tx, {
+        organizationId,
+        type: "customer.created",
+        id: made.id,
+    });
+    return made;
 }
 
 /**

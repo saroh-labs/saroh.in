@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { retrySerializable } from "../../common/serializable-retry";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace } from "./booking-hold";
@@ -286,6 +287,12 @@ export async function moveFoundBooking(
                     // The place it left is free for the old session's line,
                     // and a place they were in line for here is taken (A12).
                     if (booking.startAt.getTime() !== startAt.getTime()) {
+                        // Outbound webhooks (U13): a new time, not only a new person.
+                        await emitWebhook(tx, {
+                            organizationId: actor.organizationId,
+                            type: "booking.moved",
+                            id: booking.id,
+                        });
                         await offerFreedPlaceInTx(tx, {
                             organizationId: actor.organizationId,
                             serviceId: service.id,

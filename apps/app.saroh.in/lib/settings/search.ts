@@ -235,8 +235,8 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },
     {
-        label: "API and AI apps: AI assistants, keys and webhooks",
-        page: "/settings/api",
+        label: "API and AI apps: AI assistants, keys and notifications",
+        page: "/settings/developers",
         words: [
             "API",
             "Key",

@@ -242,7 +242,7 @@ describe("searchSettings", () => {
         ]) {
             expect(
                 searchSettings(q, member, { byPage: false }).map((h) => h.href),
-            ).toContain("/settings/api");
+            ).toContain("/settings/developers");
         }
         expect(searchSettings("claude", { role: "REVIEWER" })).toEqual([]);
     });

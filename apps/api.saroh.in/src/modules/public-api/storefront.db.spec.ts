@@ -145,14 +145,16 @@ describe("storefront reads (publishable key)", () => {
             id: sourdough.id,
             hostedUrl: `${shop}/sourdough`,
         });
-        expect(
-            (
-                await call(
-                    "GET",
-                    `/v1/storefront/${pk.token}/products/draft-loaf`,
-                )
-            ).status,
-        ).toBe(404);
+        // A catalogue read the edge may keep briefly, and check again by ETag.
+        expect(one.headers["cache-control"]).toBe(
+            "public, max-age=30, s-maxage=30",
+        );
+        expect(one.headers.etag).toBeTruthy();
+        const gone = await call(
+            "GET",
+            `/v1/storefront/${pk.token}/products/draft-loaf`,
+        );
+        expect(gone.status).toBe(404);
     });
 
     it("reads a service's slots, and 404s another business's service", async () => {

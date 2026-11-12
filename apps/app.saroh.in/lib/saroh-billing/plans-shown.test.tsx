@@ -218,7 +218,7 @@ describe.each([
             "/settings/share",
             "/settings/activity",
             "/settings/providers",
-            "/settings/api",
+            "/settings/developers",
             "/settings/data",
         ]);
     });

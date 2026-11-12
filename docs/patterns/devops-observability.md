@@ -180,6 +180,43 @@ Analytics. What is sent and how to switch it on:
   A conversion that happens on another host is counted the way sign-up is:
   by passing through a page on saroh.in (`lib/welcome.ts`).
 
+## State in one process, and a second replica — **Current** (U17, 11 Nov)
+
+Audited before the public API opens (plan 2026-11-10-001, U17): what each
+API process keeps to itself, and what happens with two replicas. Add a row
+here when you add a `Map`, a cache or a timer that outlives a request.
+
+- **Jobs are replica-safe.** The worker claims with `FOR UPDATE SKIP LOCKED`
+  and a lease (`jobs/prisma-job-queue.ts`), so two workers never run one job.
+  Every recurring chain (`setInterval` → `ensureScheduled` in each module's
+  `onModuleInit`) is held to one pending job by a partial unique index
+  (`Job_one_pending_*`) or a `pg_advisory_xact_lock` on `job-chain:<type>`,
+  so two replicas starting both chains still leave one.
+- **Start-up checks run once per replica**, and may: `HeldStockWatch` only
+  reads and logs; `AdminOperationsService` resumes an interrupted bulk
+  operation, claiming each item with a conditional update. A replica that
+  starts while another runs the same operation puts its RUNNING items back
+  to PENDING, so one item can run twice; every executor skips work already
+  done, which keeps that safe. Keep it so for any new operation kind.
+- **Durable across replicas:** the public API's limits (`rate-limits/`, Redis;
+  without it each replica limits at the cap ÷ `API_REPLICAS`, so set
+  `API_REPLICAS` when you scale), sessions, jobs, idempotency and everything
+  else in Postgres. MCP is stateless (no session to pin).
+- **Per process, and fine to differ for a few seconds:** the key-context cache
+  (`api-keys/key-context.cache.ts`; a membership, role or pause change clears
+  it on the replica that made it, the others within its TTL), the per-business
+  caps (`rate-limits/caps.ts`, a minute), `LiveReadCache` reads, the plan and
+  over-limit caches in `billing/`, link previews, analytics labels and facts,
+  parsed catalogue versions (immutable), auth instances per host, and the
+  last-used throttles (`touched`) on keys and AI connections.
+- **Per process, and N times looser with N replicas** (each also starts empty
+  on every deploy): every `FixedWindowRateLimiter` (public booking, enquiry,
+  payments, reviews, tools, shop reads, …), Better Auth's own sign-in and code
+  limits (its default memory store), the site-account email-change cap
+  (`site-accounts/email-change.service.ts`) and the sign-in code failure
+  alert (`code-delivery.ts`). Acceptable at two replicas behind the Cloudflare
+  edge rules; move one to `LimitsService` (Redis) the day it's abused.
+
 ## After a deploy — **Current** (#1192)
 
 The post-deploy watch list (sign-in pages, a merchant site, a booking, a

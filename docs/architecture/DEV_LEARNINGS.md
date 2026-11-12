@@ -6646,3 +6646,27 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the spec grants `local-network-access` for its website's origin (`page.context().grantPermissions([...], { origin })`). No API change: a real merchant site and the API are both public addresses.
 - **Rule:** a browser spec whose page is served by `page.route` at a made-up origin and calls the stack on localhost grants `local-network-access` for that origin. When a browser `fetch` fails with no server log, read the page's console before the API's CORS code.
 - **Category:** e2e · browser
+
+## AI connections were built for one business though the plan's requirement said several (11 Nov 2026)
+
+- **Symptom:** a review of the MCP build found the sign-in pick page offered one business, where the plan's requirement (owner decision) says a connection covers the businesses ticked at consent, with a `business` argument on every tool and a `list_businesses` tool.
+- **Cause:** the plan's unit text for the sign-in unit still said "one business" from an earlier draft. The build briefs were written from the unit text, and every unit after it built on that.
+- **Fix:** tick boxes at pick and consent; the business set on the grant and in the token; the guard checks the set and the tool registry resolves the target business per call against the person's live role there; `list_businesses`; disconnect takes one business off the set.
+- **Rule:** a build brief starts from the plan's Requirements and Key Decisions, then the unit; where the unit text and a requirement disagree, the requirement wins and the brief says so. Before calling a unit done, check its report against the requirements it traces to.
+- **Category:** process · planning
+
+## Storefront catalogue reads sent their refusals with a public Cache-Control (11 Nov 2026)
+
+- **Symptom:** the load test (U17) found that a storefront catalogue read (`GET /v1/storefront/{pk}/products…`) refused by the shop's per-visitor limiter answered 429 with `Cache-Control: public, max-age=30, s-maxage=30`, as would a 500: Cloudflare could keep one visitor's refusal and serve it to every visitor for 30 seconds.
+- **Cause:** Nest sets a route's `@Header(...)` once its guards pass, before the handler runs, so the header is already on the response when the handler throws, and the exception filter wrote its error body under it. The live public reads avoid this by keeping `no-store` on the route and marking only a success (`common/live-read-headers.ts`); U7's catalogue routes put the public value on the route.
+- **Fix:** `AllExceptionsFilter` sets `Cache-Control: no-store` on every error except 404 and 410, which are the same for every visitor and may be kept like a success (the launch offer keeps its 404 on purpose). Unit test in the filter's spec; the storefront db spec checks a 200's header and ETag.
+- **Rule:** a `public` Cache-Control on a route covers its success and its "not there"; any other refusal is `no-store` (the filter enforces it). Pattern: `docs/patterns/backend-nestjs.md` → Responses and errors.
+- **Category:** api · caching
+
+## The webhook browser specs failed because the test stack had no WEBHOOK_SECRET_KEY (12 Nov 2026)
+
+- **Symptom:** in the full gate, "an Owner makes a key" and "Send a test" in `settings-api-and-ai-apps.spec.ts` failed: no signing secret was shown, and the key's sheet stayed open after "I've saved it". The same gap had stopped keys and webhooks on the local stack and on the development API, each found by hand.
+- **Cause:** `WEBHOOK_SECRET_KEY` was added to the API's env (U3) and its specs set it themselves, but no stack had it: not `scripts/prepush.sh`'s browser stack, not CI, not local `.env`, not development. The spec, written with the screens, was never run before the gate. Separately, the spec pressed "Copy key" without the clipboard permission, so the copy failed and "I've saved it" asked first.
+- **Fix:** a test `WEBHOOK_SECRET_KEY` beside `APIKEY_ENC_KEY` in the gate's stack and every CI job; the spec grants the clipboard like the other copy specs; development got its keys made on the box.
+- **Rule:** a new API env variable that a feature can't work without lands in the same commit as: its test value in `scripts/prepush.sh` and `ci.yml`, its name in `.env.example`, and a line in the batch's PR body naming each environment that needs it set. A new browser spec runs once (`pnpm prepush --e2e`) before its batch's gate.
+- **Category:** process · environments

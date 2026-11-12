@@ -410,6 +410,12 @@ const NEVER: Record<string, string> = {
     // kill switches and plan rows, not by a module.
     "api-keys/api-keys.controller.ts":
         "the owner's API keys — the API's own flags and plan rows gate them, no module holds them",
+    // U14: this minute's calls and the caps, for Settings › API and AI apps › Usage.
+    "api-keys/api-usage.controller.ts":
+        "the API's usage read — gated by the API's own flags and plan rows, no module holds it",
+    // Plan 2026-11-10-001 U13: webhook endpoints, gated like the keys.
+    "outbound-webhooks/endpoints.controller.ts":
+        "webhook endpoints — the API_WEBHOOKS flag and the webhooks plan row gate them, no module holds them",
     // Plan 2026-11-10-001 U7: the storefront API calls the same services
     // as `/public/*`, which close with their module (a shop off is a 404).
     "public-api/storefront.controller.ts":
@@ -419,6 +425,17 @@ const NEVER: Record<string, string> = {
         "customers on /v1 — the app's customer workspace is never gated",
     "public-api/enquiries.v1.controller.ts":
         "enquiries and form entries on /v1 — read-only history",
+    // Plan 2026-11-10-001 U9: AI apps' sign-in and connections, gated by
+    // the API_MCP switch, not by a module.
+    "mcp/ai-connections.controller.ts":
+        "a person's AI app connections — the API_MCP switch gates them, no module holds them",
+    "mcp/oauth-flow.controller.ts":
+        "the accounts pages' half of an AI app's sign-in, before any business is in context",
+    "mcp/well-known.controller.ts":
+        "Saroh's OAuth discovery documents, not a tenant surface",
+    // U10: `/mcp` — each tool is authorized by its own capability.
+    "mcp/mcp.controller.ts":
+        "the MCP endpoint — the API_MCP switch gates it, each tool checks its own capability",
 };
 
 /** Controllers with a test of their own below, not a row above. */

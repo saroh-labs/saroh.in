@@ -16,6 +16,7 @@ import {
     reservedAccountEmail,
 } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import type { UnlinkMove, UnlinkMover, UnlinkScope } from "./unlink-plan";
 import {
     applyUnlinkMoves,
@@ -166,6 +167,11 @@ export class AccountUnlinkService {
             await tx.contact.update({
                 where: { id: separate.id },
                 data: { email: reservedAccountEmail(separate.id) },
+            });
+            await emitWebhook(tx, {
+                organizationId: organizationId,
+                type: "customer.created",
+                id: separate.id,
             });
 
             const moved = await applyUnlinkMoves(

@@ -297,6 +297,7 @@ const envSchema = z.object({
     // Public API keys and webhook signing secrets (plan 2026-11-10-001, U3/U5):
     // each its own 32-byte AES-256-GCM key (base64 or 64-hex), checked at use
     // like PAYMENTS_ENC_KEY. Never logged, never in an example file with a value.
+    // All five encryption keys may be a ring, `v2:<key>,v1:<key>` (DEC-214).
     APIKEY_ENC_KEY: z.string().optional(),
     WEBHOOK_SECRET_KEY: z.string().optional(),
     // Durable public-API rate limits (U4, `modules/rate-limits/`). Unset, or

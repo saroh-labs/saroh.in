@@ -512,9 +512,10 @@ function kept(
  * Each page's draft sections put back as a snapshot holds them (keys and
  * all, so notes find their sections again), each draft's revision moved on
  * so an editor still open on it reloads (#285). A page gone since is
- * skipped. The revisions after, by page.
+ * skipped. The revisions after, by page. Also an AI connection's restore
+ * point (`mcp/tools/site.tools.ts`).
  */
-async function restorePages(
+export async function restorePages(
     tx: Tx,
     organizationId: string,
     pages: SnapshotBefore["pages"],

@@ -14,6 +14,7 @@ import { priceTermsOf } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { fromCents } from "../orders/order-pricing";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { commerceOpen, effectiveStorefront } from "../sites/sells-from";
 import { storefrontCurrency } from "../stores/currency";
 import { isValidSlotStart } from "./availability";
@@ -318,6 +319,11 @@ export async function startTreatmentInTx(
         where: { id: booking.id },
         data: { orderId: order.id, visitNumber: 1 },
         select: { id: true },
+    });
+    await emitWebhook(tx, {
+        organizationId,
+        type: "order.created",
+        id: order.id,
     });
     const orderItemId = order.items[0]?.id ?? "";
     return { orderId: order.id, orderItemId, orderNumber };

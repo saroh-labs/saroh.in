@@ -45,6 +45,7 @@ module.exports = {
     testMatch: [
         "<rootDir>/src/modules/**/*.spec.ts",
         "<rootDir>/src/common/**/*.db.spec.ts",
+        "<rootDir>/src/cli/**/*.db.spec.ts",
     ],
     // The organizations module specs mock Prisma (pure unit tests) and run in
     // the default/unit project — keep them out of the DB-backed run.
@@ -96,6 +97,8 @@ module.exports = {
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/api-keys/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/public-api/(?!.*\\.db\\.spec\\.ts$)",
+        "<rootDir>/src/modules/mcp/(?!.*\\.db\\.spec\\.ts$)",
+        "<rootDir>/src/modules/outbound-webhooks/(?!.*\\.db\\.spec\\.ts$)",
         // DB-free specs that mock @saroh/database and run in the unit project:
         // the discount redemption core and the storefront settings spec.
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",

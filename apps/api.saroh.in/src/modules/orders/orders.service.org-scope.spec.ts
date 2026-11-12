@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free regression tests for organization stamping on create (#173).
 //
 // `20260719184929_commerce_org_scope` added a NULLABLE `organizationId` to the

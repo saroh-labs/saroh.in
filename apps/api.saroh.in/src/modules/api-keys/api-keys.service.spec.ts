@@ -382,7 +382,56 @@ describe("when a key opens anything", () => {
         await expect(
             service.findUsableByToken("Bearer nonsense"),
         ).resolves.toBeNull();
-        expect(db.apiKey.findUnique).not.toHaveBeenCalled();
+        expect(db.apiKey.findFirst).not.toHaveBeenCalled();
+    });
+
+    describe("after APIKEY_ENC_KEY gains a newer key", () => {
+        const token = `sk_live_${"a".repeat(43)}`;
+        let older: string;
+        beforeEach(() => {
+            older = tokenDigest(token); // made under today's single key (v1)
+            mutableEnv.APIKEY_ENC_KEY = `v2:${randomBytes(32).toString("base64")},v1:${mutableEnv.APIKEY_ENC_KEY}`;
+        });
+        afterEach(() => {
+            mutableEnv.APIKEY_ENC_KEY =
+                mutableEnv.APIKEY_ENC_KEY!.split(",v1:")[1];
+        });
+
+        it("finds the key by its old fingerprint and moves it to the newest", async () => {
+            expect(TOKEN_PATTERN.test(token)).toBe(true);
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: older }),
+            );
+            db.apiKey.updateMany.mockResolvedValue({ count: 1 });
+            const found = await service.findUsableByToken(token, NOW);
+            expect(found?.id).toBe("key_1");
+            const newest = tokenDigest(token);
+            expect(newest.startsWith("v2:")).toBe(true);
+            expect(db.apiKey.findFirst).toHaveBeenCalledWith({
+                where: { tokenDigest: { in: [newest, older] } },
+            });
+            expect(db.apiKey.updateMany).toHaveBeenCalledWith({
+                where: { id: "key_1", tokenDigest: older },
+                data: { tokenDigest: newest },
+            });
+        });
+
+        it("still answers when the move fails", async () => {
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: older }),
+            );
+            db.apiKey.updateMany.mockRejectedValue(new Error("db down"));
+            const found = await service.findUsableByToken(token, NOW);
+            expect(found?.id).toBe("key_1");
+        });
+
+        it("leaves a key already on the newest alone", async () => {
+            db.apiKey.findFirst.mockResolvedValue(
+                stored({ tokenDigest: tokenDigest(token) }),
+            );
+            await service.findUsableByToken(token, NOW);
+            expect(db.apiKey.updateMany).not.toHaveBeenCalled();
+        });
     });
 });
 
@@ -410,6 +459,119 @@ describe("the audit trail", () => {
     it("revoking a revoked key writes nothing", async () => {
         db.apiKey.findFirst.mockResolvedValue(stored({ revokedAt: NOW }));
         await service.revoke(owner, "key_1", NOW);
+        expect(db.apiKey.update).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
+    });
+});
+
+describe("editing a key", () => {
+    it("changes only the name, and audits the name before", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        const view = await service.update(
+            owner,
+            "key_1",
+            { name: "Stock sync" },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { name: "Stock sync" },
+        });
+        expect(view.name).toBe("Stock sync");
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "apikey.renamed",
+                targetId: "key_1",
+                metadata: expect.objectContaining({ previousName: "Server" }),
+            }),
+        );
+    });
+
+    it("refuses an admin with 403 and another business's key with 404", async () => {
+        await expect(
+            service.update(ctxOf("ADMIN"), "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 403 });
+        db.apiKey.findFirst.mockResolvedValue(null);
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 404 });
+        expect(db.apiKey.update).not.toHaveBeenCalled();
+    });
+
+    it("changes what a secret key can do, clamped to the editor, and audits before and after", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        const admin = ctxOf("OWNER", ["apikey:manage", "order:read"]);
+        await service.update(
+            admin,
+            "key_1",
+            {
+                scope: ["order:read", "customer:write", "org:delete"],
+                aiEnabled: false,
+            },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { scope: ["order:read"], aiEnabled: false },
+        });
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "apikey.updated",
+                metadata: expect.objectContaining({
+                    scopeBefore: "order:read order:write",
+                }),
+            }),
+        );
+    });
+
+    it("refuses a secret key left with nothing it may do", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        await expect(
+            service.update(owner, "key_1", { scope: ["nope"] }, NOW),
+        ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("keeps a website key read-only: only its websites change", async () => {
+        db.apiKey.findFirst.mockResolvedValue(
+            stored({
+                kind: "PUBLISHABLE",
+                scope: [...STOREFRONT_SCOPE],
+                aiEnabled: false,
+                allowedOrigins: ["https://a.example.com"],
+            }),
+        );
+        await service.update(
+            owner,
+            "key_1",
+            {
+                scope: ["order:write"],
+                aiEnabled: true,
+                allowedOrigins: ["https://b.example.com"],
+            },
+            NOW,
+        );
+        expect(db.apiKey.update).toHaveBeenCalledWith({
+            where: { id: "key_1" },
+            data: { allowedOrigins: ["https://b.example.com"] },
+        });
+    });
+
+    it("refuses a revoked or replaced key with 409", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored({ revokedAt: NOW }));
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 409 });
+        db.apiKey.findFirst.mockResolvedValue(
+            stored({ graceUntil: new Date(NOW.getTime() + HOUR) }),
+        );
+        await expect(
+            service.update(owner, "key_1", { name: "x" }, NOW),
+        ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("writes nothing when the name is the same", async () => {
+        db.apiKey.findFirst.mockResolvedValue(stored());
+        await service.update(owner, "key_1", { name: "Server" }, NOW);
         expect(db.apiKey.update).not.toHaveBeenCalled();
         expect(audit.record).not.toHaveBeenCalled();
     });

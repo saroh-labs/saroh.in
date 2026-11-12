@@ -6,7 +6,7 @@ import type Redis from "ioredis";
 
 import type { LimitScope } from "./caps";
 import type { LimitDecision } from "./memory-window";
-import { MemoryWindow } from "./memory-window";
+import { gcraUsed, MemoryWindow } from "./memory-window";
 import { redisTake } from "./redis-window";
 
 /** At most one `rate_limit_open` WARN a minute; the rest are counted into it. */
@@ -22,12 +22,15 @@ const WARN_EVERY_MS = 60_000;
  * this replica limited in process. At most one line a minute, carrying how
  * many calls fell back since the last; any steady stream means Redis is down
  * or unreachable from this replica and limits are per replica until it's back.
+ * `reason=recovered calls=N` marks the first call Redis answered again.
  */
 export class LimitsService implements OnModuleDestroy {
     private readonly logger = new Logger(LimitsService.name);
     private readonly memory = new MemoryWindow();
     private lastWarnAt = Number.NEGATIVE_INFINITY;
     private unwarned = 0;
+    /** Whether the last Redis call failed: the next success says so. */
+    private open = false;
     /** Calls that fell back to the in-process window since boot. */
     openCount = 0;
 
@@ -43,7 +46,8 @@ export class LimitsService implements OnModuleDestroy {
     }
 
     async take(
-        scope: LimitScope,
+        // `webhook-test` / `webhook-resend`: "Send a test" and Resend, per webhook address.
+        scope: LimitScope | "webhook-test" | "webhook-resend",
         id: string,
         cap: number,
         now: number = Date.now(),
@@ -51,7 +55,9 @@ export class LimitsService implements OnModuleDestroy {
         const key = `rl:${scope}:${id}`;
         if (this.redis) {
             try {
-                return await redisTake(this.redis, key, cap, now);
+                const decision = await redisTake(this.redis, key, cap, now);
+                if (this.open) this.closed();
+                return decision;
             } catch (error) {
                 this.opened(error, now);
             }
@@ -59,6 +65,35 @@ export class LimitsService implements OnModuleDestroy {
         const share =
             cap <= 0 ? 0 : Math.max(1, Math.floor(cap / this.replicas));
         return this.memory.take(key, share, now);
+    }
+
+    /**
+     * How many calls the window holds now, taking none (Usage, U14). Read
+     * from Redis, or from this replica's window when Redis fails, where it
+     * counts this replica's share only.
+     */
+    async used(
+        scope: LimitScope,
+        id: string,
+        cap: number,
+        now: number = Date.now(),
+    ): Promise<number> {
+        const key = `rl:${scope}:${id}`;
+        if (this.redis) {
+            try {
+                const stored = (await this.redis.eval(
+                    "return redis.call('GET', KEYS[1])",
+                    1,
+                    key,
+                )) as string | null;
+                return gcraUsed(stored ? Number(stored) : null, now, cap);
+            } catch (error) {
+                this.opened(error, now);
+            }
+        }
+        const share =
+            cap <= 0 ? 0 : Math.max(1, Math.floor(cap / this.replicas));
+        return this.memory.used(key, share, now);
     }
 
     /**
@@ -96,7 +131,22 @@ export class LimitsService implements OnModuleDestroy {
         await this.redis?.quit().catch(() => undefined);
     }
 
+    /**
+     * Redis answered again: the calls that fell back since the last WARN,
+     * which no later WARN would carry (an outage shorter than a minute
+     * otherwise logs only its first call).
+     */
+    private closed(): void {
+        this.logger.warn(
+            `rate_limit_open reason=recovered calls=${this.unwarned}`,
+        );
+        this.unwarned = 0;
+        this.open = false;
+        this.lastWarnAt = Number.NEGATIVE_INFINITY;
+    }
+
     private opened(error: unknown, now: number): void {
+        this.open = true;
         this.openCount += 1;
         this.unwarned += 1;
         if (now - this.lastWarnAt < WARN_EVERY_MS) return;

@@ -5,6 +5,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
     Optional,
     ServiceUnavailableException,
@@ -15,12 +16,13 @@ import type {
     ApiKeyView,
     CreateApiKeyBody,
     CreatedApiKey,
+    UpdateApiKeyBody,
 } from "@saroh/api-contract";
 import type { ApiKey, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { EncryptionKey } from "../../common/crypto";
-import { keyedDigest } from "../../common/crypto";
+import { keyedDigest, keyedDigests } from "../../common/crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import {
@@ -30,6 +32,7 @@ import {
 } from "../audit/audit.service";
 import type { BusinessAccess } from "../billing/catalogue-access.service";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { overLimit } from "../billing/over-limit.service";
 import {
     MODULE_LOCKED,
     moduleLocked,
@@ -65,9 +68,17 @@ export const STOREFRONT_SCOPE: readonly OrgAction[] = [
 ];
 
 /** Never on a key, whoever makes it (R7). */
-const NEVER_ON_A_KEY: ReadonlySet<OrgAction> = new Set([
+// As an AI app's (`NEVER_FOR_AI`), plus managing the team: a key never holds
+// a power only a person signed in to Settings uses.
+const NEVER_ON_A_KEY: ReadonlySet<OrgAction> = new Set<OrgAction>([
     ...OWNER_ONLY_ACTIONS,
     "apikey:manage",
+    "webhook:manage",
+    "customer:sensitive",
+    "member:invite",
+    "member:remove",
+    "member:role:update",
+    "project:access:manage",
 ]);
 
 const KNOWN_ACTIONS: ReadonlySet<string> = new Set(ORG_ACTIONS);
@@ -124,7 +135,7 @@ export function displayPrefix(token: string): string {
     return token.slice(0, "sk_live_".length + 4);
 }
 
-function apiKeyEncKey(): EncryptionKey {
+export function apiKeyEncKey(): EncryptionKey {
     return {
         name: "APIKEY_ENC_KEY",
         value: env.APIKEY_ENC_KEY,
@@ -132,15 +143,11 @@ function apiKeyEncKey(): EncryptionKey {
     };
 }
 
-/**
- * The stored form of a token: a keyed digest, so a copy of the table can't
- * be walked back to a working key. A missing or malformed key is a 503 that
- * names the variable, never its value.
- */
-export function tokenDigest(token: string): string {
+/** A missing or malformed key is a 503 that names the variable, never its value. */
+function withApiKeyKey<T>(run: (key: EncryptionKey) => T): T {
     const key = apiKeyEncKey();
     try {
-        return keyedDigest(token, "apikey", key);
+        return run(key);
     } catch (error) {
         if (error instanceof Error && error.message.startsWith(key.name)) {
             throw new ServiceUnavailableException(
@@ -149,6 +156,19 @@ export function tokenDigest(token: string): string {
         }
         throw error;
     }
+}
+
+/**
+ * The stored form of a token: a keyed digest under the ring's newest key, so
+ * a copy of the table can't be walked back to a working key.
+ */
+export function tokenDigest(token: string): string {
+    return withApiKeyKey((key) => keyedDigest(token, "apikey", key));
+}
+
+/** The token's digest under every key on the ring, newest first, for a lookup. */
+export function tokenDigests(token: string): string[] {
+    return withApiKeyKey((key) => keyedDigests(token, "apikey", key));
 }
 
 type KeyState = Pick<ApiKey, "revokedAt" | "expiresAt" | "graceUntil">;
@@ -164,7 +184,7 @@ export function isUsable(key: KeyState, now: Date = new Date()): boolean {
 }
 
 /** Live (and in-grace) keys: what counts toward the cap. */
-const liveWhere = (now: Date): Prisma.ApiKeyWhereInput => ({
+export const liveWhere = (now: Date): Prisma.ApiKeyWhereInput => ({
     revokedAt: null,
     AND: [
         { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
@@ -190,6 +210,9 @@ export function clampScope(
     }
     return [...out];
 }
+
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((x) => b.includes(x));
 
 function toView(key: ApiKey): ApiKeyView {
     const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -227,6 +250,8 @@ function toView(key: ApiKey): ApiKeyView {
  */
 @Injectable()
 export class ApiKeysService {
+    private readonly logger = new Logger(ApiKeysService.name);
+
     constructor(
         private readonly audit: AuditService,
         @Optional()
@@ -242,7 +267,117 @@ export class ApiKeysService {
             orderBy: { createdAt: "desc" },
             take: 200,
         });
-        return { data: rows.map(toView) };
+        const makers = [...new Set(rows.map((k) => k.createdByUserId))];
+        const [people, members, paused] = await Promise.all([
+            prisma.user.findMany({
+                where: { id: { in: makers } },
+                select: { id: true, name: true },
+            }),
+            prisma.membership.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    userId: { in: makers },
+                },
+                select: { id: true, userId: true },
+            }),
+            overLimit.pausedNow(ctx.organizationId),
+        ]);
+        const nameOf = new Map(people.map((p) => [p.id, p.name]));
+        // On the team and not paused: a key made by anyone else has stopped.
+        const here = new Set(
+            members
+                .filter((m) => !paused?.memberIds.has(m.id))
+                .map((m) => m.userId),
+        );
+        return {
+            data: rows.map((k) => ({
+                ...toView(k),
+                madeBy: {
+                    id: k.createdByUserId,
+                    name: nameOf.get(k.createdByUserId) ?? null,
+                    stillHere: here.has(k.createdByUserId),
+                },
+            })),
+        };
+    }
+
+    /**
+     * Edits a key: its name and what it can do. A secret key's scope is
+     * clamped to the editor's own powers, as on create, so nobody gives a
+     * key more than they hold; a publishable key stays read-only (its
+     * fixed scope, no AI switch), only its websites change. The change
+     * bites on the key's next call: the cached contexts are dropped. A
+     * revoked, expired or replaced key is a 409.
+     */
+    async update(
+        ctx: OrganizationContext,
+        keyId: string,
+        body: UpdateApiKeyBody,
+        now: Date = new Date(),
+    ): Promise<ApiKeyView> {
+        authorize(ctx, "apikey:manage");
+        const old = await this.find(ctx, keyId);
+        await this.assertKindOpen(ctx.organizationId, old.kind, now);
+        if (old.graceUntil !== null || !isUsable(old, now)) {
+            throw new ConflictException(
+                "This key can't be changed: it has been replaced, revoked or has expired.",
+            );
+        }
+        const secret = old.kind === "SECRET";
+        const data: Prisma.ApiKeyUpdateInput = {};
+        if (body.name !== undefined && body.name !== old.name) {
+            data.name = body.name;
+        }
+        if (secret && body.scope !== undefined) {
+            const scope = clampScope(ctx, body.scope);
+            if (scope.length === 0) {
+                throw new BadRequestException(
+                    "Choose at least one thing this key may do.",
+                );
+            }
+            if (!sameSet(scope, old.scope)) data.scope = scope;
+        }
+        if (
+            secret &&
+            body.aiEnabled !== undefined &&
+            body.aiEnabled !== old.aiEnabled
+        ) {
+            data.aiEnabled = body.aiEnabled;
+        }
+        if (
+            !secret &&
+            body.allowedOrigins !== undefined &&
+            !sameSet(body.allowedOrigins, old.allowedOrigins)
+        ) {
+            if (body.allowedOrigins.length === 0) {
+                throw new BadRequestException("Add the website it works on.");
+            }
+            data.allowedOrigins = body.allowedOrigins;
+        }
+        if (Object.keys(data).length === 0) return toView(old);
+        const key = await prisma.apiKey.update({
+            where: { id: old.id },
+            data,
+        });
+        keyContextCache.forgetOrganization(ctx.organizationId);
+        const nameOnly = Object.keys(data).length === 1 && "name" in data;
+        await this.record(
+            ctx,
+            nameOnly ? AuditAction.ApiKeyRenamed : AuditAction.ApiKeyUpdated,
+            key,
+            nameOnly
+                ? { previousName: old.name }
+                : {
+                      previousName: old.name,
+                      scopeBefore: old.scope.join(" "),
+                      scopeAfter: key.scope.join(" "),
+                      originsBefore: old.allowedOrigins.join(" "),
+                      originsAfter: key.allowedOrigins.join(" "),
+                      aiBefore: String(old.aiEnabled),
+                      aiAfter: String(key.aiEnabled),
+                  },
+        );
+        return toView(key);
     }
 
     async create(
@@ -405,10 +540,28 @@ export class ApiKeysService {
         now: Date = new Date(),
     ): Promise<ApiKey | null> {
         if (!TOKEN_PATTERN.test(token)) return null;
-        const key = await prisma.apiKey.findUnique({
-            where: { tokenDigest: tokenDigest(token) },
+        const digests = tokenDigests(token);
+        const key = await prisma.apiKey.findFirst({
+            where: { tokenDigest: { in: digests } },
         });
-        return key && isUsable(key, now) ? key : null;
+        if (!key || !isUsable(key, now)) return null;
+        // Made under an older key: move it to the newest, since the token is
+        // only ever seen here. The context cache is keyed by the newest
+        // digest already, so nothing cached goes stale.
+        const [newest] = digests;
+        if (newest && key.tokenDigest !== newest) {
+            try {
+                await prisma.apiKey.updateMany({
+                    where: { id: key.id, tokenDigest: key.tokenDigest },
+                    data: { tokenDigest: newest },
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `api_key_digest_upgrade_failed: ${error instanceof Error ? error.name : "error"}`,
+                );
+            }
+        }
+        return key;
     }
 
     private async find(ctx: OrganizationContext, keyId: string) {

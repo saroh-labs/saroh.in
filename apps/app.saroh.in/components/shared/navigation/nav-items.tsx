@@ -1180,7 +1180,7 @@ export function isNavSectionActive(
 
 /** Settings › Plan and billing, hidden while plans aren't shown. */
 const PLAN_PAGE_HREF = "/settings/billing";
-const API_AREA_HREF = "/settings/api";
+const API_AREA_HREF = "/settings/developers";
 
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
@@ -1273,9 +1273,9 @@ export const SETTINGS_PAGES = [
         // Every member connects their own AI assistant (plan 2026-11-10-001,
         // R9); keys and webhooks inside ask `apikey:manage` and
         // `webhook:manage`. Not a Reviewer's (owner, v1).
-        href: "/settings/api",
+        href: "/settings/developers",
         label: "API and AI apps",
-        description: "AI assistants, keys and webhooks",
+        description: "AI assistants, keys and notifications",
         icon: Plug,
         notForReviewer: true,
     },

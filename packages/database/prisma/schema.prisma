@@ -2704,6 +2704,174 @@ model Verification {
 }
 
 // ============================================================================
+// SIGN-IN FOR AI APPS (plan 2026-11-10-001, U9). Better Auth's jwt() and
+// mcp() (oauth-provider) tables, fields copied from the plugins' own schema.
+// Auth-owned like Session and Account: no organization RLS; the business is
+// the consent's `referenceId`, and McpAuthGuard enforces it on every call.
+// Plain id columns, no Prisma relations: Better Auth does its own joins.
+// Optional arrays are Json: Prisma has no nullable String[] and Better Auth
+// writes null.
+// ============================================================================
+
+model Jwks {
+  id         String    @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime
+  expiresAt  DateTime?
+  alg        String?
+  crv        String?
+}
+
+model OauthClient {
+  id                               String    @id
+  clientId                         String    @unique
+  clientSecret                     String?
+  clientDiscoveryId                String?
+  disabled                         Boolean?  @default(false)
+  skipConsent                      Boolean?
+  enableEndSession                 Boolean?
+  subjectType                      String?
+  scopes                           Json?
+  clientCredentialsScopes          Json?
+  userId                           String?
+  createdAt                        DateTime?
+  updatedAt                        DateTime?
+  name                             String?
+  uri                              String?
+  icon                             String?
+  contacts                         Json?
+  tos                              String?
+  policy                           String?
+  softwareId                       String?
+  softwareVersion                  String?
+  softwareStatement                String?
+  redirectUris                     String[]
+  postLogoutRedirectUris           Json?
+  backchannelLogoutUri             String?
+  backchannelLogoutSessionRequired Boolean?
+  tokenEndpointAuthMethod          String?
+  applicationType                  String?
+  jwks                             String?
+  jwksUri                          String?
+  grantTypes                       Json?
+  responseTypes                    Json?
+  requirePKCE                      Boolean?
+  dpopBoundAccessTokens            Boolean?  @default(false)
+  referenceId                      String?
+  metadata                         Json?
+
+  @@index([userId])
+}
+
+model OauthResource {
+  id                            String    @id
+  identifier                    String    @unique
+  name                          String
+  accessTokenTtl                Int?
+  refreshTokenTtl               Int?
+  signingAlgorithm              String?
+  signingKeyId                  String?
+  allowedScopes                 Json?
+  customClaims                  Json?
+  dpopBoundAccessTokensRequired Boolean?  @default(false)
+  disabled                      Boolean?  @default(false)
+  createdAt                     DateTime?
+  updatedAt                     DateTime?
+  policyVersion                 Int?      @default(1)
+  metadata                      Json?
+}
+
+model OauthClientResource {
+  id         String    @id
+  clientId   String
+  resourceId String
+  metadata   Json?
+  createdAt  DateTime?
+
+  @@index([clientId])
+  @@index([resourceId])
+}
+
+model OauthRefreshToken {
+  id                      String    @id
+  token                   String    @unique
+  clientId                String
+  sessionId               String?
+  userId                  String
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               Json?
+  requestedUserInfoClaims Json?
+  expiresAt               DateTime?
+  createdAt               DateTime?
+  revoked                 DateTime?
+  rotatedAt               DateTime?
+  rotationReplayResponse  String?
+  rotationReplayExpiresAt DateTime?
+  authTime                DateTime?
+  confirmation            Json?
+  scopes                  String[]
+
+  @@index([clientId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([authorizationCodeId])
+}
+
+model OauthAccessToken {
+  id                      String    @id
+  token                   String?   @unique
+  clientId                String
+  sessionId               String?
+  userId                  String?
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               Json?
+  requestedUserInfoClaims Json?
+  refreshId               String?
+  expiresAt               DateTime?
+  createdAt               DateTime?
+  revoked                 DateTime?
+  confirmation            Json?
+  scopes                  String[]
+
+  @@index([clientId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([authorizationCodeId])
+  @@index([refreshId])
+}
+
+/// A person's grant to an AI app for one business (`referenceId`): the
+/// connection. Deleting it disconnects; `lastUsedAt` is Saroh's own column,
+/// written by `McpAuthGuard`, for the 90-day idle end.
+model OauthConsent {
+  id                      String    @id
+  clientId                String
+  userId                  String?
+  referenceId             String?
+  resources               Json?
+  requestedUserInfoClaims Json?
+  scopes                  String[]
+  createdAt               DateTime?
+  updatedAt               DateTime?
+  lastUsedAt              DateTime?
+  /// The businesses this AI connection reaches now: those ticked at consent
+  /// (`referenceId` names that set), less any one disconnected since.
+  organizationIds         String[]  @default([])
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([referenceId])
+}
+
+model OauthClientAssertion {
+  id        String   @id
+  expiresAt DateTime
+}
+
+// ============================================================================
 // FEATURE FLAGS (S1-012)
 // ============================================================================
 
@@ -9508,11 +9676,19 @@ model WebhookEndpoint {
   organizationId   String
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUserId  String
+  // A name the business gives the address ("Order sync"); null shows the host.
+  name             String?
   url              String
   events           String[]
   secretCiphertext String
   secretIv         String
   secretAuthTag    String
+  // The secret a roll replaced, still signing beside the new one until
+  // `previousSecretUntil` (24 hours), so a receiver can switch over.
+  previousSecretCiphertext String?
+  previousSecretIv         String?
+  previousSecretAuthTag    String?
+  previousSecretUntil      DateTime?
   disabledAt       DateTime?
   failureStreak    Int          @default(0)
   createdAt        DateTime     @default(now())
@@ -9541,6 +9717,9 @@ model WebhookDelivery {
   attempts       Int                   @default(0)
   lastStatusCode Int?
   lastError      String?
+  // The first 2 KB of the receiver's last answer, for the delivery log.
+  responseSnippet String?
+  lastAttemptAt   DateTime?
   deliveredAt    DateTime?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
@@ -9558,6 +9737,10 @@ model McpActivity {
   userId         String?
   apiKeyId       String?
   apiKey         ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  // The connection it came through: the OAuth grant's id or the API key's.
+  // What a restore point's session is measured by (U10). Null on rows
+  // written before it was kept.
+  connectionId   String?
   clientName     String
   tool           String
   target         String?
@@ -9567,6 +9750,7 @@ model McpActivity {
   @@index([organizationId])
   @@index([organizationId, createdAt])
   @@index([apiKeyId])
+  @@index([organizationId, connectionId, createdAt])
 }
 
 // A site as it was when an AI connection's session started editing it.

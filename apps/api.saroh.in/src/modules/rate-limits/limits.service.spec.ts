@@ -79,6 +79,17 @@ describe("LimitsService with Redis (the Lua window)", () => {
         expect((await limits.take("mcp", "k", 3, later)).allowed).toBe(false);
     });
 
+    it("counts the window's calls without taking one (Usage)", async () => {
+        const limits = new LimitsService(redis as never);
+        expect(await limits.used("secret", "org-u", 6, T0)).toBe(0);
+        for (let i = 0; i < 4; i++) await limits.take("secret", "org-u", 6, T0);
+        expect(await limits.used("secret", "org-u", 6, T0)).toBe(4);
+        expect(await limits.used("secret", "org-u", 6, T0)).toBe(4);
+        // One interval (10 s at 6 a minute) frees one; a minute frees all.
+        expect(await limits.used("secret", "org-u", 6, T0 + 10_000)).toBe(3);
+        expect(await limits.used("secret", "org-u", 6, T0 + 60_000)).toBe(0);
+    });
+
     it("refuses everything at a cap of 0", async () => {
         const limits = new LimitsService(redis as never);
         expect((await limits.take("storefront", "o", 0, T0)).allowed).toBe(
@@ -114,6 +125,36 @@ describe("LimitsService failing open", () => {
         expect(warn).toHaveBeenLastCalledWith(
             expect.stringContaining("calls=4"),
         );
+    });
+
+    it("counts this replica's calls when Redis fails", async () => {
+        const broken = {
+            eval: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+            quit: jest.fn(),
+        };
+        const limits = new LimitsService(broken as never);
+        await limits.take("mcp", "org", 5, T0);
+        await limits.take("mcp", "org", 5, T0);
+        expect(await limits.used("mcp", "org", 5, T0)).toBe(2);
+    });
+
+    it("says how many calls fell back when Redis answers again", async () => {
+        const flaky = {
+            eval: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+            quit: jest.fn(),
+        };
+        const limits = new LimitsService(flaky as never);
+        for (let i = 0; i < 3; i++) await limits.take("secret", "org", 6, T0);
+        flaky.eval.mockImplementation((...args: unknown[]) =>
+            new RedisMock().eval(...(args as [string, number, ...string[]])),
+        );
+        await limits.take("secret", "org", 6, T0 + 1);
+        // The first fallback warned; the two after it are counted here.
+        expect(warn).toHaveBeenLastCalledWith(
+            "rate_limit_open reason=recovered calls=2",
+        );
+        await limits.take("secret", "org", 6, T0 + 2);
+        expect(warn).toHaveBeenCalledTimes(2);
     });
 
     it("with no REDIS_URL limits in process and says so once", async () => {

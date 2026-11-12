@@ -18,6 +18,10 @@
  * no longer matches the code.
  */
 export const RAW_ALLOWED = {
+    // button: a connection, key or address row that is one button, opening its sheet (U14)
+    "components/settings/developers/ai-apps.tsx": ["button"],
+    "components/settings/developers/keys.tsx": ["button"],
+    "components/settings/developers/webhooks.tsx": ["button"],
     // button: a row or card that is one button; input: a hidden form value
     "app/choose/page.tsx": ["button", "input"],
     // button: a bar of a chart, pressed to read it

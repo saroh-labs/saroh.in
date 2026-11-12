@@ -322,7 +322,9 @@ export async function mutate<T>(
         );
         return {
             ok: false,
-            error: readError(data, fallback),
+            // An API 5xx says only "Internal server error": the action's own sentence reads better.
+            error:
+                res.status >= 500 && !by ? fallback : readError(data, fallback),
             ...(field ? { field } : {}),
             ...(missing ? { missing } : {}),
             ...(plan ? { plan } : {}),
@@ -377,7 +379,9 @@ export async function destroy<T>(
         const { denied } = toFailure(data, fallback);
         return {
             ok: false,
-            error: readError(data, fallback),
+            // An API 5xx says only "Internal server error": the action's own sentence reads better.
+            error:
+                res.status >= 500 && !by ? fallback : readError(data, fallback),
             ...(denied ? { denied } : {}),
             ...(by === "signed-out" ? { expired: true as const } : {}),
             ...(by === "unreached" ? { unreached: true as const } : {}),

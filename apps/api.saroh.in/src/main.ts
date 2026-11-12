@@ -31,6 +31,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { mcpHostOnly } from "./common/mcp-host";
 import { merchantApiOnly } from "./common/merchant-api";
 import {
     flushTelemetry,
@@ -114,6 +115,9 @@ async function bootstrap() {
 
     // Merchant sites' address serves its own short list of routes (DEC-204).
     app.use(merchantApiOnly);
+
+    // The MCP address serves `/mcp` and its discovery documents only (U10).
+    app.use(mcpHostOnly);
 
     app.use(helmet());
 

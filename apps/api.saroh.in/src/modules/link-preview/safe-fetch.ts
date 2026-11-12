@@ -1,15 +1,17 @@
-import http from "node:http";
-import https from "node:https";
-import type { Readable } from "node:stream";
-import zlib from "node:zlib";
-
 import type {
     GuardFailure,
     GuardReason,
-    PinnedAddress,
     Resolver,
-} from "./ssrf-guard";
-import { checkUrl, pinnedLookup, resolveTarget } from "./ssrf-guard";
+    Transport,
+} from "../../common/net/ssrf";
+import { checkUrl, resolveTarget } from "../../common/net/ssrf";
+
+export { nodeTransport } from "../../common/net/ssrf";
+export type {
+    Transport,
+    TransportRequest,
+    TransportResponse,
+} from "../../common/net/ssrf";
 
 /**
  * One guarded GET (resources plan U2, KTD-3): every hop checked by
@@ -20,28 +22,6 @@ import { checkUrl, pinnedLookup, resolveTarget } from "./ssrf-guard";
  */
 
 export const MAX_REDIRECTS = 3;
-
-/** One request as the transport makes it. */
-export interface TransportRequest {
-    url: URL;
-    pinned: PinnedAddress;
-    headers: Record<string, string>;
-    maxBytes: number;
-    signal: AbortSignal;
-}
-
-/** What came back. A redirect's body is never read. */
-export interface TransportResponse {
-    status: number;
-    headers: Record<string, string | undefined>;
-    body: Buffer;
-    /** The body was longer than `maxBytes`; reading stopped there. */
-    truncated: boolean;
-}
-
-export type Transport = (
-    request: TransportRequest,
-) => Promise<TransportResponse>;
 
 export interface FetchDeps {
     resolve: Resolver;
@@ -167,106 +147,3 @@ export async function guardedFetch(
         clearTimeout(timer);
     }
 }
-
-/** The body as sent, or decoded when the server compressed it anyway. */
-function decoded(stream: Readable, encoding: string | undefined): Readable {
-    switch ((encoding ?? "").trim().toLowerCase()) {
-        case "gzip":
-        case "x-gzip":
-            return stream.pipe(zlib.createGunzip());
-        case "deflate":
-            return stream.pipe(zlib.createInflate());
-        case "br":
-            return stream.pipe(zlib.createBrotliDecompress());
-        default:
-            return stream;
-    }
-}
-
-function flatHeaders(
-    headers: http.IncomingHttpHeaders,
-): Record<string, string | undefined> {
-    const out: Record<string, string | undefined> = {};
-    for (const [key, value] of Object.entries(headers)) {
-        out[key.toLowerCase()] = Array.isArray(value)
-            ? value.join(", ")
-            : value;
-    }
-    return out;
-}
-
-/**
- * Node's own http and https, connecting only to the pinned address. No
- * shared agent: a pooled socket is never handed to another request.
- */
-export const nodeTransport: Transport = (request) =>
-    new Promise<TransportResponse>((resolve, reject) => {
-        const client = request.url.protocol === "https:" ? https : http;
-        const req = client.request(
-            request.url,
-            {
-                method: "GET",
-                headers: request.headers,
-                lookup: pinnedLookup(request.pinned),
-                agent: false,
-                signal: request.signal,
-            },
-            (res) => {
-                const status = res.statusCode ?? 0;
-                const headers = flatHeaders(res.headers);
-                if (status >= 300 && status < 400) {
-                    res.destroy();
-                    resolve({
-                        status,
-                        headers,
-                        body: Buffer.alloc(0),
-                        truncated: false,
-                    });
-                    return;
-                }
-                const body = decoded(res, headers["content-encoding"]);
-                const chunks: Buffer[] = [];
-                let size = 0;
-                let settled = false;
-                const finish = (truncated: boolean) => {
-                    if (settled) return;
-                    settled = true;
-                    res.destroy();
-                    if (body !== res) body.destroy();
-                    resolve({
-                        status,
-                        headers,
-                        body: Buffer.concat(chunks).subarray(
-                            0,
-                            request.maxBytes,
-                        ),
-                        truncated,
-                    });
-                };
-                body.on("data", (chunk: Buffer) => {
-                    chunks.push(chunk);
-                    size += chunk.length;
-                    if (size > request.maxBytes) finish(true);
-                });
-                body.on("end", () => finish(false));
-                body.on("error", (error) => {
-                    if (settled) return;
-                    // A body cut short still has what arrived; a stream that
-                    // failed before anything did is a failure.
-                    if (size > 0) finish(false);
-                    else {
-                        settled = true;
-                        reject(error);
-                    }
-                });
-                res.on("error", (error) => {
-                    if (!settled) {
-                        settled = true;
-                        reject(error);
-                    }
-                });
-            },
-        );
-        req.on("error", reject);
-        req.end();
-    });

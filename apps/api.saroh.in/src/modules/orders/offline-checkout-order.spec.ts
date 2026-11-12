@@ -9,6 +9,9 @@
  * The database is mocked; the real rows are in `public-checkout.db.spec.ts`.
  * Amounts are made up.
  */
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
+
 jest.mock("../invoices/order-invoicing", () => ({
     loadTaxProfile: jest.fn().mockResolvedValue({
         registered: false,
