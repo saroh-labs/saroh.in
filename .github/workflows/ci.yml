@@ -141,6 +141,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -326,6 +327,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -387,6 +389,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -454,6 +457,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -670,6 +674,7 @@ jobs:
       TRUST_PROXY: private
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted
       # list defaults to the *.saroh.in production origins, so a return-to on

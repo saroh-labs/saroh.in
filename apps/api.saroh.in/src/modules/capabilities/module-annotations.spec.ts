@@ -410,6 +410,9 @@ const NEVER: Record<string, string> = {
     // kill switches and plan rows, not by a module.
     "api-keys/api-keys.controller.ts":
         "the owner's API keys — the API's own flags and plan rows gate them, no module holds them",
+    // U14: this minute's calls and the caps, for Settings › API and AI apps › Usage.
+    "api-keys/api-usage.controller.ts":
+        "the API's usage read — gated by the API's own flags and plan rows, no module holds it",
     // Plan 2026-11-10-001 U13: webhook endpoints, gated like the keys.
     "outbound-webhooks/endpoints.controller.ts":
         "webhook endpoints — the API_WEBHOOKS flag and the webhooks plan row gate them, no module holds them",

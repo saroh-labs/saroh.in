@@ -6662,3 +6662,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `AllExceptionsFilter` sets `Cache-Control: no-store` on every error except 404 and 410, which are the same for every visitor and may be kept like a success (the launch offer keeps its 404 on purpose). Unit test in the filter's spec; the storefront db spec checks a 200's header and ETag.
 - **Rule:** a `public` Cache-Control on a route covers its success and its "not there"; any other refusal is `no-store` (the filter enforces it). Pattern: `docs/patterns/backend-nestjs.md` → Responses and errors.
 - **Category:** api · caching
+
+## The webhook browser specs failed because the test stack had no WEBHOOK_SECRET_KEY (12 Nov 2026)
+
+- **Symptom:** in the full gate, "an Owner makes a key" and "Send a test" in `settings-api-and-ai-apps.spec.ts` failed: no signing secret was shown, and the key's sheet stayed open after "I've saved it". The same gap had stopped keys and webhooks on the local stack and on the development API, each found by hand.
+- **Cause:** `WEBHOOK_SECRET_KEY` was added to the API's env (U3) and its specs set it themselves, but no stack had it: not `scripts/prepush.sh`'s browser stack, not CI, not local `.env`, not development. The spec, written with the screens, was never run before the gate. Separately, the spec pressed "Copy key" without the clipboard permission, so the copy failed and "I've saved it" asked first.
+- **Fix:** a test `WEBHOOK_SECRET_KEY` beside `APIKEY_ENC_KEY` in the gate's stack and every CI job; the spec grants the clipboard like the other copy specs; development got its keys made on the box.
+- **Rule:** a new API env variable that a feature can't work without lands in the same commit as: its test value in `scripts/prepush.sh` and `ci.yml`, its name in `.env.example`, and a line in the batch's PR body naming each environment that needs it set. A new browser spec runs once (`pnpm prepush --e2e`) before its batch's gate.
+- **Category:** process · environments

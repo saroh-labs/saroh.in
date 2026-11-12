@@ -6,7 +6,7 @@ import { grantNorthwindApi, switchOnNorthwind } from "../fixtures/api-grant";
 import { stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG } from "../playwright.config";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Settings › API and AI apps (plan 2026-11-10-001, U14), desk and phone:
@@ -20,6 +20,13 @@ import { NORTHWIND_ORG } from "../playwright.config";
  * @serial: it switches the API's surfaces on for Northwind and grants its
  * plan rows, which every API spec reads; afterEach ends the grant.
  */
+
+// "Copy key" / "Copy secret" must succeed, or "I've saved it" asks first.
+test.beforeEach(async ({ context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+        origin: new URL(urls.APP_URL).origin,
+    });
+});
 
 const isPhone = (testInfo: TestInfo) =>
     testInfo.project.name.startsWith("phone");
