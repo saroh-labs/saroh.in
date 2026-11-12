@@ -88,9 +88,19 @@ export const listTemplatesTool = {
                 for_kinds: z.array(z.string()),
                 pages: z.array(z.string()),
                 colourway_ids: z.array(z.string()),
+                /** For this business first: its trade's, or its kind's (DEC-216). */
+                suggested: z.boolean(),
+                /** Why it sits where it does; null for a plain suggestion. */
+                why: z.string().nullable(),
             }),
         ),
         next_cursor: z.string().nullable(),
+        /** The business's trade (DEC-216); null when never said. */
+        trade: z.string().nullable(),
+        /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+        trade_other: z.string().nullable(),
+        /** False while templates aren't chosen yet: a new site starts from the default. */
+        template_choice: z.boolean(),
     }),
 };
 
@@ -155,7 +165,9 @@ export const createSiteFromTemplateTool = {
                 .string()
                 .max(120)
                 .optional()
-                .describe("From list_templates; the starter when left out."),
+                .describe(
+                    "From list_templates; the business's default when left out, or while templates aren't chosen yet.",
+                ),
             colourway_id: z.string().max(60).optional(),
             subdomain: z
                 .string()

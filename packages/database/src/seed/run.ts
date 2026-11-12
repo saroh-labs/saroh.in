@@ -276,6 +276,23 @@ export async function seed(): Promise<void> {
         },
     });
 
+    /*
+     * Choosing a website template from an AI app (DEC-216): on in local
+     * development, CI and the gate, as on the development environment (set
+     * in its admin). Production has no row until templates open (DEC-135).
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_TEMPLATE_CHOICE" },
+        update: {},
+        create: {
+            id: "flag_SITE_TEMPLATE_CHOICE",
+            key: "SITE_TEMPLATE_CHOICE",
+            description:
+                "An AI app's website starts from the template it chose (DEC-216). On in development, off in production until templates open.",
+            enabledByDefault: true,
+        },
+    });
+
     await prisma.featureFlag.upsert({
         where: { key: "WEB_ADDRESS_CHANGE" },
         update: {},

@@ -33,6 +33,7 @@ import { SiteTrackingService } from "./site-tracking.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
 import { StarterContentController } from "./starter-content.controller";
+import { TemplatePreviewController } from "./template-preview.controller";
 import { TestReleasesController } from "./test-releases.controller";
 import { TestReleasesService } from "./test-releases.service";
 
@@ -73,6 +74,7 @@ import { TestReleasesService } from "./test-releases.service";
         BookingPageController,
         // A look's starter content copied into the draft (DEC-182).
         StarterContentController,
+        TemplatePreviewController,
     ],
     providers: [
         SitesService,

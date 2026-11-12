@@ -11,6 +11,7 @@ import { mayAddWebsite } from "@/lib/business-limits";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { kindDefaults } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { tradeOf } from "@/lib/organizations/trade";
 import { requireSession } from "@/lib/session";
 import type { Template } from "@/lib/sites/service";
 import {
@@ -18,11 +19,7 @@ import {
     listSites,
     listTemplates,
 } from "@/lib/sites/service";
-import {
-    moduleStates,
-    startingTemplate,
-    suggestedTemplates,
-} from "@/lib/sites/template-picker";
+import { moduleStates, startingTemplate } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
 export const metadata = { title: "New website" };
@@ -30,8 +27,9 @@ export const metadata = { title: "New website" };
 /**
  * New-site page (S2-004). Mirrors the create-store page: a back link, a
  * heading, and the client CreateSiteForm. Templates are fetched server-side
- * and handed to the form so the author can pick one to seed the site (U12:
- * suggested for the business first, from its kind and its modules).
+ * and handed to the form so the author can pick one to seed the site
+ * (DEC-216: suggested for the business's trade first, else from its kind
+ * and its modules).
  *
  * `?template=<id or slug>` starts the picker on that template, as the
  * gallery's "Use this template" will link.
@@ -129,8 +127,12 @@ export default async function NewSitePage({
     const kindTemplate = kindDefaults(kind).starterTemplate;
     const states = moduleStates(modules);
     const listed = templates ?? [];
-    const asked =
-        choice && typeof params.template === "string" ? params.template : null;
+    // `?template=`, else the one picked in the gallery at sign-up (DEC-216).
+    const asked = !choice
+        ? null
+        : typeof params.template === "string"
+          ? params.template
+          : (organization?.startTemplate ?? null);
 
     return (
         <PageContainer width="form">
@@ -154,13 +156,12 @@ export default async function NewSitePage({
                 defaults={defaults}
                 defaultTemplateId={kindTemplate}
                 startTemplateId={startingTemplate(listed, asked, kindTemplate)}
-                suggested={suggestedTemplates(
-                    listed,
-                    kind,
-                    states,
-                    kindTemplate,
-                ).map((t) => t.id)}
+                // The business's trade (DEC-216) suggests first.
+                trade={tradeOf(organization?.trade)}
+                tradeOther={organization?.tradeOther ?? null}
+                kind={kind}
                 modules={states}
+                canSetTrade={organization?.actions?.includes("org:update")}
             />
         </PageContainer>
     );

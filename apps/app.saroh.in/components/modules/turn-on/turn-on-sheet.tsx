@@ -23,6 +23,8 @@ import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { Refusal } from "@/components/shared/states/refusal";
+import { TemplatePickerSkeleton } from "@/components/sites/templates/template-picker";
+import { templateChoiceOn } from "@/lib/sites/templates-switch";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
@@ -89,6 +91,12 @@ export function TurnOnSheet({
         <FormSheet
             id="turn-on-form"
             open={open}
+            // The template choice's picture cards need the room (DEC-216, board D3).
+            className={
+                picked?.includes("WEBSITE") && templateChoiceOn()
+                    ? "sm:max-w-[640px]"
+                    : undefined
+            }
             title={`Turn on ${listWords(names)}`}
             description={
                 says ??
@@ -150,6 +158,15 @@ function TurnOnBody({
     const connectButtons =
         connecting.length > 0 && fielded.length === 0 ? connecting : null;
     const titled = plan.order.length > 1;
+    // Website alone, from a template: the button names it (board D3).
+    const startsFrom =
+        single === "WEBSITE" && plan.order.length === 1
+            ? t.websiteTemplates.find(
+                  (x) =>
+                      x.id ===
+                      (draft?.WEBSITE.templateId ?? t.websiteTemplate?.id),
+              )
+            : undefined;
     const errorsOf = (k: string) => t.errors[k] ?? {};
 
     const comes = [
@@ -214,6 +231,10 @@ function TurnOnBody({
                         <Skeleton className="h-[38px] w-full" />
                         <Skeleton className="h-4 w-40" />
                         <Skeleton className="h-[38px] w-full" />
+                        {/* Card-shaped while the templates load (board D7). */}
+                        {picked.includes("WEBSITE") && templateChoiceOn() ? (
+                            <TemplatePickerSkeleton />
+                        ) : null}
                     </div>
                 ) : (
                     <>
@@ -254,7 +275,10 @@ function TurnOnBody({
                                             errors={errorsOf(k)}
                                             suggestion={t.suggestion}
                                             template={t.websiteTemplate}
-                                            choices={t.websiteChoices}
+                                            templates={t.websiteTemplates}
+                                            basis={t.websiteBasis}
+                                            unread={t.websiteUnread}
+                                            onRetry={t.retryWebsite}
                                             addressFixed={t.websiteAddressFixed}
                                         />
                                     </Section>
@@ -311,7 +335,9 @@ function TurnOnBody({
                 <Refusal>{t.failure}</Refusal>
             </FormSheetBody>
             <FormSheetFoot
-                saveLabel="Turn on"
+                saveLabel={
+                    startsFrom ? `Turn on with ${startsFrom.name}` : "Turn on"
+                }
                 savingLabel="Turning on…"
                 pending={t.saving}
                 saveOff={off}

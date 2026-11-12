@@ -4,6 +4,7 @@ import { PRICE_MODE_ROW, PRICE_MODE_SAVED } from "@/lib/gst/price-mode";
 
 import type { BusinessSheet } from "./business-rows";
 import { kindOf, kindWords } from "./kind";
+import { TRADE_ROW_LABEL, TRADE_SETTINGS_NOTE } from "./trade";
 
 /**
  * What each of Settings › Business's sheets is called, the line under its
@@ -36,6 +37,11 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
             return {
                 title: "What this is",
                 description: "What you're setting up with Saroh.",
+            };
+        case "trade":
+            return {
+                title: TRADE_ROW_LABEL,
+                description: TRADE_SETTINGS_NOTE,
             };
         case "name":
             return {

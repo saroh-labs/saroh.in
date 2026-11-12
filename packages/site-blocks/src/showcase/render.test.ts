@@ -218,6 +218,57 @@ describe("templateRender", () => {
         expect(templateRender("personal", undefined, "/")).toBeNull();
     });
 
+    it("draws a business's own name, services and place instead of the sample's (DEC-216)", () => {
+        const sample = templateRender("salon", undefined, "/");
+        const own = templateRender("salon", undefined, "/", undefined, {
+            context: {
+                organizationName: "Meher Hair Studio",
+                modules: ["WEBSITE", "APPOINTMENTS"],
+            },
+            services: [
+                {
+                    id: "s1",
+                    name: "Haircut and blow-dry",
+                    description: null,
+                    durationMinutes: 60,
+                    priceCents: 90000,
+                    currency: "INR",
+                },
+            ],
+            visit: {
+                source: "business",
+                storeId: null,
+                name: "Meher Hair Studio",
+                address: "14 MG Road, Indiranagar",
+                phone: null,
+                hours: null,
+                timezone: "Asia/Kolkata",
+            },
+            facts: { team: [{ name: "Farah" }] },
+        });
+        expect(sample).not.toBeNull();
+        expect(own?.name).toBe("Meher Hair Studio");
+        expect(own?.fixtures.services?.map((s) => s.name)).toEqual([
+            "Haircut and blow-dry",
+        ]);
+        expect(own?.fixtures.visit?.address).toBe("14 MG Road, Indiranagar");
+        // The sample's own people's free times are never the business's.
+        expect(own?.fixtures.today).toBeUndefined();
+        expect(own?.action).toEqual({ label: "Book", href: "/book" });
+    });
+
+    it("draws the sample's services while the business has none", () => {
+        const own = templateRender("salon", undefined, "/", undefined, {
+            context: { organizationName: "Meher", modules: ["WEBSITE"] },
+            services: [],
+            visit: null,
+            facts: { team: [] },
+        });
+        const sample = templateRender("salon", undefined, "/");
+        expect(own?.fixtures.services).toEqual(sample?.fixtures.services);
+        expect(own?.fixtures.visit).toBeUndefined();
+    });
+
     it("fills the dietician's practitioner from the template's gallery sample", () => {
         const render = templateRender("dietician", undefined, "/");
         const person = render?.sections.find((s) => s.type === "person")

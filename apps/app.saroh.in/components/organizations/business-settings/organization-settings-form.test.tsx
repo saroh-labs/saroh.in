@@ -14,6 +14,10 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    openOptions,
+    pickOption,
+} from "@/components/class-packs/pack-detail/pick-option.test-kit";
+import {
     address,
     card,
     draw,
@@ -360,6 +364,108 @@ describe("What is this? (DEC-070, K5)", () => {
         draw(settings({ kind: undefined }));
         expect(card("Identity")?.textContent).toContain("A business");
         expect(card("Identity")?.textContent).toContain("Business name");
+    });
+});
+
+const typed = () =>
+    sheet()?.querySelector<HTMLInputElement>("[data-trade-other]") ?? null;
+
+describe("Kind of place (DEC-216, TPLD2)", () => {
+    it("is a business's row under What this is; Just me has none", () => {
+        draw(settings({ trade: "salon" }));
+        expect(row("business-trade")?.textContent).toContain("Kind of place");
+        expect(row("business-trade")?.textContent).toContain("Salon");
+        unmount();
+        mount();
+        draw(settings({ kind: "SOLO", trade: "coach" }));
+        expect(row("business-trade")).toBeNull();
+    });
+
+    it("says when none is saved", () => {
+        draw(settings({ trade: null }));
+        expect(row("business-trade")?.textContent).toContain("Not marked yet");
+    });
+
+    it("Change opens its sheet; Save sends only the trade, and Undo puts it back", async () => {
+        const before = settings({ trade: "salon" });
+        const after = settings({ trade: "gym" });
+        save.mockResolvedValue({ ok: true, data: after });
+        undoSettings.mockResolvedValue({ ok: true, data: before });
+        draw(before);
+
+        await press(edit("Change the kind of place"));
+        expect(sheetName()).toBe("Kind of place");
+        expect(sheet()?.textContent).toContain(
+            "What Saroh suggests first: your starter website and sample services. It never limits what you can use.",
+        );
+        expect(openOptions("Kind of place")).toEqual([
+            "Salon",
+            "Gym or studio",
+            "Clinic",
+            "Dietician or coach",
+            "Bakery or food",
+            "Shop",
+            "Other",
+        ]);
+        pickOption("Kind of place", "Gym or studio");
+        await settle();
+        await press(item("Save"));
+
+        expect(save).toHaveBeenCalledWith({ trade: "gym" });
+        const [message, onUndo] = showUndo.mock.calls[0] as [
+            string,
+            () => void,
+        ];
+        expect(message).toBe("Kind of place saved.");
+        expect(row("business-trade")?.textContent).toContain("Gym or studio");
+
+        await act(async () => {
+            onUndo();
+            await Promise.resolve();
+        });
+        await settle();
+        expect(undoSettings).toHaveBeenCalledWith(
+            expect.objectContaining({
+                input: { trade: "salon" },
+                expect: { trade: "gym", tradeOther: null },
+            }),
+        );
+    });
+
+    it("says the typed trade for Other", () => {
+        draw(settings({ trade: "other", tradeOther: "Bakery" }));
+        expect(row("business-trade")?.textContent).toContain("Bakery");
+        expect(row("business-trade")?.textContent).not.toContain("Other");
+    });
+
+    it("Other needs the trade in words before Save, and sends it", async () => {
+        const after = settings({ trade: "other", tradeOther: "Tailor" });
+        save.mockResolvedValue({ ok: true, data: after });
+        draw(settings({ trade: "salon" }));
+
+        await press(edit("Change the kind of place"));
+        expect(typed()).toBeNull();
+        pickOption("Kind of place", "Other");
+        await settle();
+        expect(typed()?.placeholder).toBe("Bakery, tailor, tuition…");
+        expect(sheet()?.textContent).toContain("Your trade");
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain("Say what your trade is.");
+
+        await type(typed(), " Tailor ");
+        await press(item("Save"));
+        expect(save).toHaveBeenCalledWith({
+            trade: "other",
+            tradeOther: "Tailor",
+        });
+        expect(row("business-trade")?.textContent).toContain("Tailor");
+    });
+
+    it("a read-only role sees it without Change", () => {
+        draw(settings({ trade: "salon" }), { canEdit: false });
+        expect(row("business-trade")?.textContent).toContain("Salon");
+        expect(row("business-trade")?.querySelector("button")).toBeNull();
     });
 });
 

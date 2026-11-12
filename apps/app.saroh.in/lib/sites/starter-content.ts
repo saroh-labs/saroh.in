@@ -1,6 +1,8 @@
 import type { LookId } from "@saroh/block-contract";
 import { sampleContext } from "@saroh/site-blocks/showcase";
+import type { TemplateManifest } from "@saroh/templates";
 import {
+    getTemplate,
     instantiateTemplate,
     lookShowcaseTemplate,
     starterCopyPlan,
@@ -37,14 +39,31 @@ export interface StarterPlanView {
  * this business, so a page that depends on a module can differ: the toast
  * says what was done.
  */
+type PlanPage = Pick<SitePage, "id" | "path" | "title" | "isHome" | "kind">;
+
 export function starterPlanFor(
     look: LookId | null,
-    pages: readonly Pick<
-        SitePage,
-        "id" | "path" | "title" | "isHome" | "kind"
-    >[],
+    pages: readonly PlanPage[],
 ): StarterPlanView {
-    const template = lookShowcaseTemplate(look);
+    return planOf(lookShowcaseTemplate(look), pages);
+}
+
+/**
+ * The same plan for a template chosen in the editor's Template row
+ * (DEC-216); null for one this build doesn't have.
+ */
+export function templatePlanFor(
+    templateId: string,
+    pages: readonly PlanPage[],
+): StarterPlanView | null {
+    const template = getTemplate(templateId);
+    return template ? planOf(template, pages) : null;
+}
+
+function planOf(
+    template: TemplateManifest,
+    pages: readonly PlanPage[],
+): StarterPlanView {
     const made = instantiateTemplate(template, sampleContext(template));
     const plan = starterCopyPlan(made.pages, pages);
     return {
@@ -52,6 +71,35 @@ export function starterPlanFor(
         replace: plan.replace.map((r) => r.title),
         create: plan.create.map((c) => c.title),
     };
+}
+
+/**
+ * The Template row's confirm (DEC-216, board D6): the pages replaced, those
+ * added, and the site's others by name, which stay.
+ */
+export function templateConfirmText(
+    plan: StarterPlanView,
+    pages: readonly Pick<SitePage, "title">[],
+): string {
+    const parts: string[] = [];
+    if (plan.replace.length > 0) {
+        parts.push(
+            `Your draft of ${listOf(plan.replace)} is replaced with ${plan.templateName}'s.`,
+        );
+    }
+    if (plan.create.length > 0) {
+        parts.push(
+            plan.create.length === 1
+                ? `${listOf(plan.create)} is added as a new page.`
+                : `${listOf(plan.create)} are added as new pages.`,
+        );
+    }
+    const stay = pages
+        .map((p) => p.title)
+        .filter((title) => !plan.replace.includes(title));
+    if (stay.length === 1) parts.push(`${stay[0]} stays as it is.`);
+    if (stay.length > 1) parts.push(`${listOf(stay)} stay as they are.`);
+    return parts.join(" ");
 }
 
 /** "Home", "Home and About", "Home, About and Classes". */

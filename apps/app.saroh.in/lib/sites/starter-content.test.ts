@@ -11,6 +11,8 @@ import {
     starterConfirmText,
     starterDoneMessage,
     starterPlanFor,
+    templateConfirmText,
+    templatePlanFor,
     versionSectionName,
     versionTitle,
     versionWhen,
@@ -63,6 +65,41 @@ describe("starterPlanFor", () => {
             expect(plan.create).toEqual([]);
         }
         expect(starterPlanFor(null, home).templateName).toBe("Bakery");
+    });
+});
+
+describe("a template from the Template row (DEC-216)", () => {
+    it("plans the template's own pages, and names the pages that stay", () => {
+        const pages = [
+            page("h", "/", "Home"),
+            page("a", "/about", "About"),
+            page("c", "/contact", "Contact"),
+        ];
+        const plan = templatePlanFor("salon", pages);
+        expect(plan?.templateName).toBe("Salon");
+        expect(plan?.replace).toContain("Home");
+        const text = templateConfirmText(
+            { templateName: "Salon", replace: ["Home"], create: [] },
+            pages,
+        );
+        expect(text).toBe(
+            "Your draft of Home is replaced with Salon's. About and Contact stay as they are.",
+        );
+    });
+
+    it("says one page that stays, and the pages it adds", () => {
+        expect(
+            templateConfirmText(
+                { templateName: "Gym", replace: ["Home"], create: ["Classes"] },
+                [page("h", "/", "Home"), page("a", "/about", "About")],
+            ),
+        ).toBe(
+            "Your draft of Home is replaced with Gym's. Classes is added as a new page. About stays as it is.",
+        );
+    });
+
+    it("is null for a template this build doesn't have", () => {
+        expect(templatePlanFor("no-such", [page("h", "/", "Home")])).toBeNull();
     });
 });
 

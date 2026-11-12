@@ -348,16 +348,26 @@ describe("OrganizationContextService.getSummary", () => {
             name: "Acme",
             slug: "acme",
             kind: "SOLO",
+            trade: "coach",
         });
         expect(await service.getSummary("org_1")).toEqual({
             id: "org_1",
             name: "Acme",
             slug: "acme",
             kind: "SOLO",
+            trade: "coach",
+            tradeOther: null,
         });
         expect(organizationFindUnique).toHaveBeenCalledWith({
             where: { id: "org_1" },
-            select: { id: true, name: true, slug: true, kind: true },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                kind: true,
+                trade: true,
+                tradeOther: true,
+            },
         });
     });
 

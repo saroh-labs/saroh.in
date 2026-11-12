@@ -305,20 +305,6 @@
         {
             "lines": 10,
             "files": [
-                "apps/saroh.in/components/customers/report-form.tsx",
-                "apps/saroh.tech/components/customers/report-form.tsx"
-            ],
-            "windows": [
-                "6efc3ef4072a",
-                "2c0295ebd939",
-                "cf32d27e03dd",
-                "dc5f825c6019",
-                "0c0ca782f0e2"
-            ]
-        },
-        {
-            "lines": 10,
-            "files": [
                 "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
                 "apps/saroh.tech/components/shared/phone-menu.tsx"
             ],
@@ -738,17 +724,6 @@
             "windows": [
                 "68d033ae10af",
                 "bba5b834bdb9"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "5dfb8297a0c4",
-                "b836fcc9c2dc"
             ]
         },
         {

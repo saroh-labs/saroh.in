@@ -253,6 +253,9 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
             await openBrand(page, phone);
+            // A phone's sheet opens on its first tab, Template (DEC-216):
+            // the faces are the Type tab.
+            if (phone) await brandTab(page, "Type");
             await expect(page.locator("[data-typeface-current]")).toBeVisible();
             await expect(lookCard(page)).toHaveCount(0);
         } finally {
