@@ -269,6 +269,38 @@ const RATE_COUNT =
     "1 thing to fix before publishing: choose a GST rate. Pick 0% if it's exempt or nil-rated.";
 
 describe("the Plan Editor", () => {
+    it("typing a new plan's name and line doesn't turn its untouched price red, after autosave too", async () => {
+        // 11 Nov 2026: the Memberships demo showed "Add the price" in red
+        // under an empty price nobody had reached yet.
+        const draft = record({
+            status: "DRAFT",
+            revision: 1,
+            values: { ...values, price: null, description: null },
+            published: null,
+            canDelete: true,
+        });
+        actions.createPlanDraft.mockResolvedValue({ ok: true, data: draft });
+        actions.savePlanDraft.mockResolvedValue({
+            ok: true,
+            data: { ...draft, revision: 2 },
+        });
+        render(null);
+        type(field("Name"), "Personal training");
+        await wait(800);
+        type(field("What's included"), "One-to-one sessions");
+        await wait(800);
+        expect(field("Price").getAttribute("aria-invalid")).not.toBe("true");
+        expect(text()).not.toContain("Add the price");
+        expect(text()).toContain(
+            "1 thing to fix before publishing: add the price.",
+        );
+        // Typed and cleared: now it is said under the price.
+        type(field("Price"), "6");
+        type(field("Price"), "");
+        expect(field("Price").getAttribute("aria-invalid")).toBe("true");
+        expect(text()).toContain("Add the price");
+    });
+
     it("a new plan autosaves as a Draft, and Publish opens it", async () => {
         const draft = record({
             status: "DRAFT",
@@ -721,7 +753,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
         expect(button("Publish changes").disabled).toBe(false);
     });
 
-    it("says a new plan's missing rate at once, as before", async () => {
+    it("names a new plan's missing rate beside Publish, and marks the rate only once it is left", async () => {
         actions.createPlanDraft.mockResolvedValue({
             ok: true,
             data: record({
@@ -740,11 +772,15 @@ describe("a plan's GST (12 Oct 2026)", () => {
 
         type(field("Name"), "Monthly");
         type(field("Price"), "1200");
-        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
+        // The rate hasn't been reached: typing the name and price doesn't
+        // turn it red (11 Nov 2026). The line beside Publish names it.
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(text()).not.toContain("has no GST rate yet");
         await wait(800);
         expect(button("Publish").disabled).toBe(true);
         expect(text()).toContain(RATE_COUNT);
+        leave(rateRow());
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
     });
 
     it("says a draft's missing rate at once when it is opened: it was never published", () => {
