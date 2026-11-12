@@ -2894,3 +2894,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The code is single-use, lasts 10 minutes, and is bound to the connection, the business, the site and the exact draft the summary described. A draft changed since is refused, and the app is told to ask again.
 - Why: the tool's description and its destructive hint only ask the AI app to check with the person; a misbehaving app could skip that. The code makes Saroh, not the app, enforce that the person saw what goes live.
 - Rules: `apps/api.saroh.in/src/modules/mcp/publish-codes.ts`, `tools/site.tools.ts`.
+
+## DEC-216 A business has a trade, and the website template choice is pictures, a preview of your own site, and the trade's suggestions first
+
+**Status: Accepted — 2026-11-12** · owner · after the website templates UX audit (NOT DONE 4.3/10)
+
+- Decision (owner, 12 Nov 2026, "it should store the trade" and "a mix of A, B and C"):
+    - **A business stores its trade**, one of the template kinds (`salon`, `gym`, `clinic`, `coach`, `food`, `shop`, `creator`, `other`), or none. Setup asks "What kind of place is it?" on its first step for every business, not only under Bookings, and a template picked in the public gallery (`?template=`) carries through sign-up into setup. Settings › Business shows it and lets the Owner change it. This takes up DEC-189's deferred "picking the trade at signup".
+    - **The template choice is one pattern in every place it appears** (Turn on Website, New site, the editor's Template row): picture cards, "Suggested for <trade>" first, then the templates that need a module the business has off, with the reason, and All one press away.
+    - **Pressing a card opens a full preview**, desk and phone with its colourways, drawn with the business's own name and details, and says what goes in. Choosing is a separate press.
+    - **In the editor**, changing template opens the same preview, then asks before replacing any pages.
+    - **An AI app's `list_templates` suggests the same way** (the trade first, the rest "also available"); while the app's template choice is off (`NEXT_PUBLIC_TEMPLATES`, DEC-135), an AI app starts a site from the trade's default template, as the app does.
+- Rollout: templates stay off in production (DEC-135) until MCP testing ends; on in development.
+- Designs: canvas "Saroh App Designs 2", page "Website templates: audit and previews", row D.
