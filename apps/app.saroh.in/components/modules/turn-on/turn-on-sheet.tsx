@@ -91,6 +91,12 @@ export function TurnOnSheet({
         <FormSheet
             id="turn-on-form"
             open={open}
+            // The template choice's picture cards need the room (DEC-216, board D3).
+            className={
+                picked?.includes("WEBSITE") && templateChoiceOn()
+                    ? "sm:max-w-[620px]"
+                    : undefined
+            }
             title={`Turn on ${listWords(names)}`}
             description={
                 says ??
