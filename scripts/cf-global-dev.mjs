@@ -19,6 +19,7 @@ export const SUBDOMAIN = {
     "apps/app.saroh.in": "app",
     "apps/accounts.saroh.in": "accounts",
     "apps/admin.saroh.in": "admin",
+    "apps/docs.saroh.in": "docs",
 };
 
 export const SITE = "apps/saroh.tech";

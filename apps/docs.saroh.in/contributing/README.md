@@ -34,7 +34,7 @@ Next.js app, the feature belongs behind an endpoint.
 | `apps/admin.saroh.in`    | Internal control plane (staff only).               |
 | `apps/saroh.in`          | Marketing site.                                    |
 | `apps/saroh.app`         | Renders merchants' published sites.                |
-| `apps/docs.saroh.in`     | This site.                                         |
+| `apps/docs.saroh.in`     | The public API docs (docs.saroh.in).               |
 | `apps/help.saroh.in`     | Merchant help centre.                              |
 | `packages/database`      | Prisma schema, client, migrations, seed.           |
 | `packages/ui`            | Shared components and the design tokens.           |
@@ -42,16 +42,16 @@ Next.js app, the feature belongs behind an endpoint.
 
 ## Where to go next
 
-- [Getting started](/getting-started) — run the whole thing locally.
-- [Architecture](/architecture) — how the pieces fit, and why.
-- [Database](/database) — migrations, the target guard, seeding.
-- [Authentication](/authentication) — the single-identity model.
-- [Contributing](/contributing) — the checks that must pass.
+- [Getting started](./getting-started.md) — run the whole thing locally.
+- [Architecture](./architecture.md) — how the pieces fit, and why.
+- [Database](./database.md) — migrations, the target guard, seeding.
+- [Authentication](./authentication.md) — the single-identity model.
+- [Contributing](./contributing.md) — the checks that must pass.
 
 ## Status, honestly
 
 This is under active development and the schema still moves. Read
-[Contributing](/contributing) before relying on any of it in production.
+[Contributing](./contributing.md) before relying on any of it in production.
 
 ## Licence
 

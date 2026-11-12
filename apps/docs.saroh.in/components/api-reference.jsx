@@ -11,6 +11,9 @@ const api = new URL(v1.servers[0].url);
 /** `https://api.<edition>`, with no path. */
 export const API_URL = api.origin;
 
+/** The edition's own site, whose help and pages the footer links. */
+export const SITE_URL = `https://${api.host.replace(/^api\./, "")}`;
+
 /** The MCP address AI apps connect to: `https://mcp.<edition>/mcp`. */
 export const MCP_URL = `https://${api.host.replace(/^api\./, "mcp.")}/mcp`;
 

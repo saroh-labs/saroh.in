@@ -106,7 +106,7 @@ describe("stateOf", () => {
 describe("deploymentRows", () => {
     it("has a row per app and environment, empty when nothing was read", () => {
         const rows = deploymentRows([], new Map());
-        expect(rows).toHaveLength(10);
+        expect(rows).toHaveLength(DEPLOY_APPS.length * 2);
         expect(row(rows, "web", "production")).toMatchObject({
             label: "Marketing site",
             worker: "saroh-web",

@@ -27,10 +27,10 @@ pnpm --filter @saroh/database generate            # regenerate the client
 It parses `DATABASE_URL`, reads the database **name**, and refuses to continue
 unless that name is one this `NODE_ENV` is allowed to touch:
 
-| `NODE_ENV`    | Allowed database names     |
-| ------------- | -------------------------- |
-| `development` | `saroh-dev`                |
-| `test`        | `saroh-test`, `saroh-dev`  |
+| `NODE_ENV`    | Allowed database names    |
+| ------------- | ------------------------- |
+| `development` | `saroh-dev`               |
+| `test`        | `saroh-test`, `saroh-dev` |
 
 Anything else — production included — has no entry, so the guard refuses by
 default rather than by omission.
@@ -73,7 +73,7 @@ than updating in place.
 
 So a health check that flags "any row with `rolled_back_at IS NOT NULL`" reports
 a permanently unhealthy database after a single retried migration. The readiness
-check groups by name and asks whether *any* attempt succeeded:
+check groups by name and asks whether _any_ attempt succeeded:
 
 ```sql
 SELECT migration_name FROM _prisma_migrations

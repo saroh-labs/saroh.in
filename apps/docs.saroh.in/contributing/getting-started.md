@@ -82,7 +82,7 @@ pnpm --filter @saroh/database db:migrate:deploy
 ```
 
 This runs a guard before Prisma touches anything — see
-[Database](/database#the-target-guard). If it refuses, read the message: it is
+[Database](./database.md#the-target-guard). If it refuses, read the message: it is
 telling you the connection string points somewhere it was not expecting.
 
 ## 4. Seed a business worth looking at

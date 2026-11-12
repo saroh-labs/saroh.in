@@ -18,6 +18,20 @@
   the database, content publications are tenant-specific and code releases
   are shared. The API deploys on its own (below). ADR-009 and DEC-025 (Vercel)
   are superseded.
+- **A content-only site is a static export, not OpenNext** (2026-11-12).
+  saroh.tech and the public API docs (`apps/docs.saroh.in`, `docs` in
+  `scripts/cf-plan.mjs`) build with `output: "export"` and deploy as Workers
+  static assets (`out/`) behind a small `worker/` for what must happen at the
+  edge: the dev access key, `X-Robots-Tag: noindex` off the production host,
+  the security headers. The docs ship on the same pushes as the other apps
+  (`docs.saroh.io` / `docs.saroh.in`), Global's through the same converters
+  (`docs-global` → `docs.saroh.tech` once `GLOBAL_ROUTES` is on; Global dev in
+  `deploy-global-dev.yml`, its domain added by hand as for the other Global
+  dev apps). Their hosts are Worker custom domains (`custom_domain: true`), so
+  the deploy makes the DNS record. The docs' `cf:build` first writes that
+  edition's and environment's OpenAPI files in the deploy's own checkout
+  (`pnpm openapi` reads `NEXT_PUBLIC_EDITION` and `VERCEL_ENV`); the committed
+  copy stays India's production, which `check:openapi` compares.
 - **A cache kept between builds holds code, never data.** The deploy keeps
   `.next/cache` so a build recompiles only what changed, and drops its
   `fetch-cache` before building: a static page that reads the API as it is

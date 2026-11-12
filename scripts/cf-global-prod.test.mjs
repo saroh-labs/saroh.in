@@ -110,12 +110,15 @@ test("routes only with GLOBAL_ROUTES on, and exactly each Worker's saroh.tech on
         "apps/accounts.saroh.in": "accounts.saroh.tech/*",
         "apps/admin.saroh.in": "admin.saroh.tech/*",
         "apps/saroh.tech": "saroh.tech/*",
+        "apps/docs.saroh.in": "docs.saroh.tech",
     };
     assert.deepEqual(Object.keys(expected).sort(), [...GLOBAL_DIRS].sort());
     for (const [dir, pattern] of Object.entries(expected)) {
         assert.deepEqual(convert(dir, false).routes, [], dir);
         assert.deepEqual(convert(dir, true).routes, [
-            { pattern, zone_name: "saroh.tech" },
+            pattern.endsWith("/*")
+                ? { pattern, zone_name: "saroh.tech" }
+                : { pattern, custom_domain: true },
         ]);
     }
 });

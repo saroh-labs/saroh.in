@@ -257,6 +257,16 @@ export function environmentOfHost(host: string): DeployEnvironment | null {
     return null;
 }
 
+/**
+ * The public API docs (apps/docs.saroh.in). Production's for every
+ * environment: the dev docs sit behind the access key, and say the same.
+ */
+const DOCS_HOSTS: Record<Edition, string> = {
+    INDIA: "docs.saroh.in",
+    GLOBAL: "docs.saroh.tech",
+};
+export const docsUrlOf = (edition: Edition) => urlOf(DOCS_HOSTS[edition]);
+
 /** The marketing site people are sent to. Its pages exist only in production. */
 export const siteUrlOf = (edition: Edition) =>
     urlOf(hostsFor(edition, "production").site);

@@ -4,6 +4,8 @@ import { Footer, Layout, Navbar } from "nextra-theme-docs";
 import "nextra-theme-docs/style.css";
 import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
+
+import { SITE_URL } from "../components/api-reference";
 // Must load AFTER nextra-theme-docs/style.css above, never before: this file
 // restyles Nextra by overriding the variables that stylesheet declares, and
 // CSS import order is what decides which wins. The lint rule sorts imports
@@ -42,8 +44,8 @@ const fontMono = localFont({
 
 export const metadata = {
     title: {
-        default: "Saroh.in Documentation",
-        template: "%s – Saroh.in",
+        default: "Saroh API",
+        template: "%s – Saroh API",
     },
 };
 
@@ -55,13 +57,13 @@ const navbar = (
 );
 
 // Developers ARE the audience with a licensing question, so unlike the help
-// centre this footer links the terms directly. The Introduction covers them in
-// full: source-available, free to evaluate and modify, paid for commercial use.
+// centre this footer links the terms directly. The site and its help are the
+// edition's own, read from the OpenAPI file as every host here is.
 const footer = (
     <Footer>
         © {new Date().getFullYear()} Saroh ·{" "}
-        <a href="https://saroh.in">saroh.in</a> ·{" "}
-        <a href="https://help.saroh.in">Help centre</a> ·{" "}
+        <a href={SITE_URL}>{new URL(SITE_URL).host}</a> ·{" "}
+        <a href={`${SITE_URL}/help`}>Help centre</a> ·{" "}
         <a href="https://github.com/saroh-labs/saroh.in/blob/main/LICENSE.md">
             Licence
         </a>

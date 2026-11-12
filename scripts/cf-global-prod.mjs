@@ -33,6 +33,7 @@ export const HOSTS = {
     "accounts.saroh.in": "accounts.saroh.tech",
     "admin.saroh.in": "admin.saroh.tech",
     "api.saroh.in": "api.saroh.tech",
+    "docs.saroh.in": "docs.saroh.tech",
     "p.saroh.in": "p.saroh.in",
 };
 
@@ -101,10 +102,26 @@ export function globalProductionConfig(
                 ...dark,
                 name,
                 ...(routes && {
-                    routes: (indiaRoutes ?? []).map((route) => ({
-                        pattern: globalValue(route.pattern, "a route"),
-                        zone_name: globalValue(route.zone_name, "a route"),
-                    })),
+                    routes: (indiaRoutes ?? []).map((route) =>
+                        route.custom_domain
+                            ? {
+                                  pattern: globalValue(
+                                      route.pattern,
+                                      "a route",
+                                  ),
+                                  custom_domain: true,
+                              }
+                            : {
+                                  pattern: globalValue(
+                                      route.pattern,
+                                      "a route",
+                                  ),
+                                  zone_name: globalValue(
+                                      route.zone_name,
+                                      "a route",
+                                  ),
+                              },
+                    ),
                 }),
                 services: production.services?.map((service) =>
                     service.binding === "WORKER_SELF_REFERENCE"

@@ -1,4 +1,7 @@
+import { docsUrlOf } from "@saroh/edition";
 import { SAROH_SITE_URL } from "@saroh/ui/lib/saroh-links";
+
+import { EDITION } from "@/lib/edition";
 
 /**
  * Where help lives, in one place.
@@ -128,5 +131,5 @@ export function helpUrl(topic: HelpTopic, now: Date = new Date()): string {
     return article ? helpArticleUrl(article) : helpHomeUrl(now);
 }
 
-/** Developer documentation — a different audience and a different site. */
-export const DOCS_URL = "https://docs.saroh.in";
+/** The edition's public API docs — a different audience and a different site. */
+export const DOCS_URL = docsUrlOf(EDITION);
