@@ -45,7 +45,7 @@ const CHOICES: { days: PreviewLinkDays; label: string }[] = [
 ];
 
 /** Where previews are served: the renderer's apex, never a tenant host. */
-function previewUrl(token: string): string {
+export function previewUrl(token: string): string {
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
     return `https://${root}/preview/${encodeURIComponent(token)}`;
 }
