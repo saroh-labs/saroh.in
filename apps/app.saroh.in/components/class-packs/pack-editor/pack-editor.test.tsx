@@ -551,7 +551,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
         expect(button("Publish").disabled).toBe(true);
     });
 
-    it("says a new pack's missing rate at once, as before", () => {
+    it("names a new pack's missing rate beside Publish, and marks the rate only once it is left", () => {
         actions.createPackDraft.mockResolvedValue(ok(rec()));
         render(null, 0, undefined, ASKED);
         // Nothing typed: nothing is wrong yet, and there is no note.
@@ -560,8 +560,13 @@ describe("a pack's GST (12 Oct 2026)", () => {
 
         type(input("Name"), "Ten classes");
         type(input("Price"), "4500");
-        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
+        // The rate hasn't been reached: typing the name and price doesn't
+        // turn it red (11 Nov 2026). The line beside Publish names it.
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(text()).not.toContain("has no GST rate yet");
+        expect(text()).toContain(RATE_COUNT);
+        leave(rateRow());
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
     });
 
     it("says the missing rate as an error once Publish is pressed, and goes to it, until one is chosen", async () => {

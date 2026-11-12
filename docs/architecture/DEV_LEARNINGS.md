@@ -6623,6 +6623,14 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Rule:** a "name already taken" list for an editor that creates its record on the first save carries ids, and the check leaves out the record's own id. A list keyed on names alone breaks the moment the record exists.
 - **Category:** app · editors
 
+## A new plan's untouched price turned red while its name was typed (11 Nov 2026)
+
+- **Symptom:** on Payments → Plans → New plan, typing the name and the "What's included" line showed "Add the price" in red under the empty price, before anyone had reached it. Caught by OCR on the gym demo's Memberships re-film (laptop and phone, about 0:21), and present in the 9 Nov take too.
+- **Cause:** the editor shell drew every field's problem under its field as soon as anything was typed or the record existed. The page-form rule (`PAGE_FORM` is `onTouched`) says nothing of a field until it is left; the shell kept that only for problems a published record was opened with.
+- **Fix:** `fieldErrors` (`lib/editor-shell/state.ts`) draws a problem only for a field changed or left, after Publish is pressed, or on a never-published draft opened again. The line beside Publish names what is left, and says "They're marked below" only when they are. Tests: `state.test.ts` (which fields say their problem), `plan-editor.test.tsx` (an untouched price stays quiet after autosave) and the two GST tests that had pinned the old behaviour.
+- **Rule:** an autosaving editor says a field's problem once that field has been reached, like any page form; the Publish line carries the rest.
+- **Category:** app · editors
+
 ## The dark Global Workers failed their first production deploy: "routes assigned to another worker" (9 Nov 2026)
 
 - **Symptom:** release #1337's frontend deploy failed `Deploy application-global`, `admin-global` and `auth-global` (production): wrangler refused routes held by `saroh-app-dev`, `saroh-admin-dev` and `saroh-accounts-dev` on the dev zone. India's Workers and saroh.tech deployed.
@@ -6670,3 +6678,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a test `WEBHOOK_SECRET_KEY` beside `APIKEY_ENC_KEY` in the gate's stack and every CI job; the spec grants the clipboard like the other copy specs; development got its keys made on the box.
 - **Rule:** a new API env variable that a feature can't work without lands in the same commit as: its test value in `scripts/prepush.sh` and `ci.yml`, its name in `.env.example`, and a line in the batch's PR body naming each environment that needs it set. A new browser spec runs once (`pnpm prepush --e2e`) before its batch's gate.
 - **Category:** process · environments
+
+## Every server render of the workspace logged use-intl's ENVIRONMENT_FALLBACK (12 Nov 2026)
+
+- **Symptom:** `[WebServer] Error: ENVIRONMENT_FALLBACK: There is no timeZone configured…` in the app's server log on page loads, seen while filming demos.
+- **Cause:** `app/providers.tsx` gave `IntlProvider` a locale and messages but no `timeZone`. use-intl checks for one on the server, the first time a component asks for a translator, and reports the fallback through `onError` (a console error). No date was wrong: every date is formatted with its business's own zone, never through intl.
+- **Fix:** `timeZone={PROFILE.defaultZone}`, the edition's default, which is India's until a business saves its own (the time zone decision in DECISIONS.md). `lib/language/intl-time-zone.test.tsx` server-renders the providers and fails on the report.
+- **Rule:** an intl provider always gets a `timeZone`; a test of it renders on the server, because use-intl only checks there.
+- **Category:** app · i18n

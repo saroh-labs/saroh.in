@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RecordFacts, SaveEvent, SaveState } from "./state";
 import {
+    fieldErrors,
     heldAtOpen,
     initialSave,
     isSettled,
@@ -418,6 +419,72 @@ describe("the header's actions", () => {
 
     it("turns Publish off while another action is out", () => {
         expect(act(saved, DRAFT, [], true).publishOn).toBe(false);
+    });
+});
+
+describe("which fields say their problem", () => {
+    const PRICE = { field: "price", message: "Add the price" };
+    const RATE = { field: "gstRate", message: "Choose a GST rate" };
+    const quiet = initialSave(0);
+    const errorsOf = (
+        touched: string[],
+        tried = false,
+        refused: { field: string; message: string } | null = null,
+        save: SaveState = quiet,
+    ) =>
+        fieldErrors({
+            problems: [PRICE, RATE],
+            touched: new Set(touched),
+            tried,
+            save,
+            refused,
+        });
+
+    it("says nothing of a field nobody has reached: typing the name doesn't turn the price red", () => {
+        expect(errorsOf(["name", "description"])).toEqual({});
+    });
+
+    it("says a field's problem once it has been changed or left", () => {
+        expect(errorsOf(["name", "price"])).toEqual({ price: "Add the price" });
+    });
+
+    it("says every problem once Publish is pressed", () => {
+        expect(errorsOf([], true)).toEqual({
+            price: "Add the price",
+            gstRate: "Choose a GST rate",
+        });
+    });
+
+    it("always says a refused publish on its field", () => {
+        expect(
+            errorsOf([], false, {
+                field: "name",
+                message: "There's already a plan called Gold",
+            }),
+        ).toEqual({ name: "There's already a plan called Gold" });
+    });
+
+    it("names what is left beside Publish when some of it isn't marked yet", () => {
+        const a = shellActions({
+            save: run([{ type: "edit" }]),
+            record: DRAFT,
+            problems: [PRICE, RATE],
+            busy: false,
+            marked: new Set(["price"]),
+        });
+        expect(a.publishWhy).toBe(
+            "2 things to fix before publishing: add the price and choose a GST rate.",
+        );
+        const all = shellActions({
+            save: run([{ type: "edit" }]),
+            record: DRAFT,
+            problems: [PRICE, RATE],
+            busy: false,
+            marked: new Set(["price", "gstRate"]),
+        });
+        expect(all.publishWhy).toBe(
+            "2 things to fix before publishing. They're marked below.",
+        );
     });
 });
 
