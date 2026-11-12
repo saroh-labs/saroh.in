@@ -528,6 +528,7 @@ model Organization {
   webhookDeliveries             WebhookDelivery[]
   mcpActivities                 McpActivity[]
   siteRestorePoints             SiteRestorePoint[]
+  mcpPublishCodes               McpPublishCode[]
 
   @@index([referredByOrganizationId])
   @@index([billingProfileId])
@@ -4097,6 +4098,8 @@ model Site {
 
   // What an AI connection's session started from, to undo it (U3).
   restorePoints SiteRestorePoint[]
+  // An AI app's pending "publish this?" summaries (U11).
+  mcpPublishCodes McpPublishCode[]
 
   // The storefront this site sells from (G11): what `/shop`, the Product
   // grid and checkout read. Set on its own only when the business has
@@ -9768,5 +9771,28 @@ model SiteRestorePoint {
 
   @@index([organizationId])
   @@index([organizationId, siteId, createdAt])
+  @@index([siteId])
+}
+
+// A publish an AI app showed the person and may now confirm (U11): the
+// code preview_publish handed out, kept only as its digest, for this
+// connection, site and draft. publish_site takes it once, within 10 minutes.
+model McpPublishCode {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId           String
+  site             Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  // The OAuth grant or API key id that asked.
+  connectionId     String
+  // sha256 of the code; the code itself is never stored.
+  codeDigest       String       @unique
+  // The draft the summary described (`draftFingerprint`).
+  draftFingerprint String
+  expiresAt        DateTime
+  usedAt           DateTime?
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId, expiresAt])
   @@index([siteId])
 }
