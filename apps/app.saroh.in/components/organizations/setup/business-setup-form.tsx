@@ -396,10 +396,27 @@ function SetupSteps({
                                 name="trade"
                                 render={({ field }) => (
                                     <FormItem data-ph-unmask="">
-                                        <SetupTradeChoice
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            hint={TRADE_SETUP_HINT}
+                                        <FormField
+                                            control={form.control}
+                                            name="tradeOther"
+                                            render={({
+                                                field: other,
+                                                fieldState,
+                                            }) => (
+                                                <SetupTradeChoice
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    other={other.value ?? ""}
+                                                    onOtherChange={
+                                                        other.onChange
+                                                    }
+                                                    otherError={
+                                                        fieldState.error
+                                                            ?.message
+                                                    }
+                                                    hint={TRADE_SETUP_HINT}
+                                                />
+                                            )}
                                         />
                                     </FormItem>
                                 )}

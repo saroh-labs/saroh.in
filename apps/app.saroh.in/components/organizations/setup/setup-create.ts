@@ -8,7 +8,11 @@ import { createOrganization } from "@/lib/organizations/actions";
 import type { BillingField } from "@/lib/organizations/setup-billing";
 import { billingFieldOf, billingSent } from "@/lib/organizations/setup-billing";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
-import { tradeSent, tradeStored } from "@/lib/organizations/setup-steps";
+import {
+    tradeOtherStored,
+    tradeSent,
+    tradeStored,
+} from "@/lib/organizations/setup-steps";
 import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
@@ -89,6 +93,9 @@ export async function createFromSetup(
         kind: values.kind,
         // The kind of place (DEC-216), and the gallery's template.
         ...(tradeStored(values) ? { trade: tradeStored(values) } : {}),
+        ...(tradeOtherStored(values)
+            ? { tradeOther: tradeOtherStored(values) }
+            : {}),
         ...(startTemplate ? { startTemplate } : {}),
         address: values.address,
         // What they chose to do first: the welcome email leads with it.

@@ -20,7 +20,7 @@ import { kindRead } from "./organization-kind";
 import { assertMembersMayOpen } from "./organization-lifecycle.gate";
 import { membersMayOpen } from "./organization-lifecycle.policy";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
-import { tradeRead } from "./organization-trade";
+import { tradeOtherRead, tradeRead } from "./organization-trade";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
 export interface UserOrganization {
@@ -59,6 +59,8 @@ export interface UserOrganization {
      * when never said. The website picker suggests its templates first.
      */
     trade: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther: string | null;
     /**
      * The template picked in the public gallery before sign-up (DEC-216),
      * a template id; the website picker starts on it. Null for most.
@@ -99,6 +101,8 @@ export interface OrganizationSummary {
      * when never said. The website picker suggests its templates first.
      */
     trade: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther: string | null;
 }
 
 /**
@@ -212,6 +216,7 @@ export class OrganizationContextService {
                         lifecycleStatus: true,
                         kind: true,
                         trade: true,
+                        tradeOther: true,
                         startTemplate: true,
                         edition: true,
                         currency: true,
@@ -297,6 +302,10 @@ export class OrganizationContextService {
                 currency: membership.organization.currency,
                 kind: kindRead(membership.organization.kind),
                 trade: tradeRead(membership.organization.trade),
+                tradeOther: tradeOtherRead(
+                    membership.organization.trade,
+                    membership.organization.tradeOther,
+                ),
                 startTemplate: membership.organization.startTemplate,
                 timeZone:
                     membership.organization.businessProfile?.timezone ?? null,
@@ -333,6 +342,7 @@ export class OrganizationContextService {
                 slug: true,
                 kind: true,
                 trade: true,
+                tradeOther: true,
             },
         });
         if (!organization) {
@@ -342,6 +352,10 @@ export class OrganizationContextService {
             ...organization,
             kind: kindRead(organization.kind),
             trade: tradeRead(organization.trade),
+            tradeOther: tradeOtherRead(
+                organization.trade,
+                organization.tradeOther,
+            ),
         };
     }
 

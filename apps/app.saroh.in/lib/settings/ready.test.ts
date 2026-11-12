@@ -1403,7 +1403,9 @@ describe("the kind of place, for a business made before setup asked it", () => {
         });
         expect(r.left.map((s) => s.key)).toEqual(["trade"]);
         expect(r.left[0]?.href).toContain("trade");
-        expect(r.left[0]?.why).toMatch(/website templates and samples/);
+        expect(r.left[0]?.why).toBe(
+            "So Saroh can suggest the right samples and setup for you.",
+        );
     });
 
     it("is ticked once said, so the count moves on", () => {

@@ -37,6 +37,9 @@ export const VALUE_FIELDS = [
     "kind",
     // The kind of place (DEC-216): salon, gym, clinic, …
     "trade",
+    // The trade typed beside Other (12 Nov 2026): "Bakery", the business's
+    // own words about itself, not a person's.
+    "tradeOther",
     "legalName",
     "type",
     "country",

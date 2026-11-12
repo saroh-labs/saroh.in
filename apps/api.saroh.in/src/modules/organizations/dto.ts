@@ -47,7 +47,12 @@ import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
 import { ORGANIZATION_KINDS } from "./organization-kind";
 import type { OrganizationTrade } from "./organization-trade";
-import { ORGANIZATION_TRADES, startTemplateOf } from "./organization-trade";
+import {
+    ORGANIZATION_TRADES,
+    startTemplateOf,
+    TRADE_OTHER_MAX,
+    TRADE_OTHER_MIN,
+} from "./organization-trade";
 import { referralCodeOf } from "./referral";
 import type { SignupSource } from "./signup-source";
 import { signupSourceOf } from "./signup-source";
@@ -55,6 +60,7 @@ import { signupSourceOf } from "./signup-source";
 export { BUSINESS_TYPES, type BusinessType } from "./business-type";
 
 const TRADE_MESSAGE = `trade must be one of ${ORGANIZATION_TRADES.join(", ")}`;
+const TRADE_OTHER_MESSAGE = `Your trade must be ${TRADE_OTHER_MIN} to ${TRADE_OTHER_MAX} characters`;
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -209,6 +215,17 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsIn(ORGANIZATION_TRADES, { message: TRADE_MESSAGE })
     trade?: OrganizationTrade;
+
+    /**
+     * The trade typed beside Other (DEC-216, 12 Nov 2026): "Bakery". Kept
+     * only when trade is "other"; ignored otherwise.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(TRADE_OTHER_MIN, { message: TRADE_OTHER_MESSAGE })
+    @MaxLength(TRADE_OTHER_MAX, { message: TRADE_OTHER_MESSAGE })
+    tradeOther?: string;
 
     /**
      * The template picked in the public gallery before sign-up
@@ -626,6 +643,18 @@ export class UpdateOrganizationDto {
     @IsOptional()
     @IsIn(ORGANIZATION_TRADES, { message: TRADE_MESSAGE })
     trade?: OrganizationTrade | null;
+
+    /**
+     * The trade typed beside Other (DEC-216, 12 Nov 2026): "Bakery". Kept
+     * only while trade is "other"; a trade changed to anything else clears
+     * it. Absent, it is left as it is.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(TRADE_OTHER_MIN, { message: TRADE_OTHER_MESSAGE })
+    @MaxLength(TRADE_OTHER_MAX, { message: TRADE_OTHER_MESSAGE })
+    tradeOther?: string | null;
 
     /** The business's social links (DEC-128), a field per network. */
     @IsOptional()

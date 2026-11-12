@@ -37,7 +37,7 @@ import type {
     OrganizationSettings,
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
-import { tradeOf } from "@/lib/organizations/trade";
+import { tradeOf, tradeOtherProblem } from "@/lib/organizations/trade";
 
 /**
  * What Settings › Business's sheets hold and send: the one schema every
@@ -58,6 +58,8 @@ export const formSchema = z
         kind: z.enum(ORGANIZATION_KINDS),
         // The kind of place (DEC-216): suggestions only; null is none said.
         trade: z.enum(TEMPLATE_KINDS).nullable(),
+        // The trade typed beside Other (12 Nov 2026); checked below.
+        tradeOther: z.string(),
         legalName: z.string().optional(),
         type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
@@ -105,6 +107,14 @@ export const formSchema = z
         ...registeredAddressShape,
     })
     .superRefine((v, ctx) => {
+        const typed = tradeOtherProblem(v.trade, v.tradeOther);
+        if (typed) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["tradeOther"],
+                message: typed,
+            });
+        }
         // A tax line needs both: one alone prints nothing on an invoice.
         if (v.taxName && !(Number(v.taxRate) > 0)) {
             ctx.addIssue({
@@ -171,6 +181,7 @@ export const FIELD_OF: Record<string, FormField> = {
     name: "name",
     kind: "kind",
     trade: "trade",
+    tradeOther: "tradeOther",
     timezone: "timezone",
     phone: "phone",
 };
@@ -191,7 +202,7 @@ const ADDRESS_FIELDS = [...ADDRESS_KEYS, "gstState", "country"] as const;
  */
 const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
     kind: ["kind"],
-    trade: ["trade"],
+    trade: ["trade", "tradeOther"],
     name: ["name"],
     legalName: ["legalName"],
     type: ["type"],
@@ -238,6 +249,7 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         name: settings.name,
         kind: kindOf(settings.kind),
         trade: tradeOf(settings.trade),
+        tradeOther: settings.tradeOther ?? "",
         legalName: settings.profile?.legalName ?? "",
         type: businessTypeOf(settings.profile?.type),
         country: settings.profile?.country ?? "",
@@ -368,6 +380,10 @@ export function settingsPatch(
         ...(dirty.name ? { name: values.name.trim() } : {}),
         ...(dirty.kind ? { kind: values.kind } : {}),
         ...(dirty.trade ? { trade: values.trade } : {}),
+        // The typed trade only beside Other; the API clears it otherwise.
+        ...((dirty.trade || dirty.tradeOther) && values.trade === "other"
+            ? { tradeOther: values.tradeOther.trim() }
+            : {}),
         ...(Object.keys(profile).length > 0 ? { profile } : {}),
         ...(Object.keys(tax).length > 0 ? { tax } : {}),
         ...(Object.keys(registeredAddress).length > 0

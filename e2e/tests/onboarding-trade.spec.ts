@@ -14,8 +14,9 @@ import { ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
  * The kind of place at setup (DEC-216, TPLD1; DEC-189): setup's first step
- * asks a business "What kind of place is it?" with the gallery's trades,
- * and the business keeps the answer. Bookings reads it rather than asking
+ * asks a business "What kind of place is it?", a dropdown of the gallery's
+ * trades with Other last, and Other asks the trade in words (owner, 12 Nov
+ * 2026); the business keeps the answer. Bookings reads it rather than asking
  * again: Salon or Gym starts the business with sample services, prices and
  * hours to edit, in place of the first service; another trade is Bookings
  * as before. A template picked in the gallery (`?template=`) starts setup
@@ -74,7 +75,13 @@ const TRADE_LINE =
     "Saroh suggests a website for it. A salon or gym also gets sample services to edit.";
 
 const trades = (page: Page) =>
-    page.getByRole("radiogroup", { name: TRADE_QUESTION });
+    page.getByRole("combobox", { name: TRADE_QUESTION });
+
+/** Choose a trade from the dropdown. */
+async function pickTrade(page: Page, trade: string) {
+    await trades(page).click();
+    await page.getByRole("option", { name: trade, exact: true }).click();
+}
 
 function pickGoal(page: Page, goal: RegExp) {
     return page
@@ -98,7 +105,10 @@ async function toFirst(
     trade: string,
 ) {
     await openSetup(page);
-    await trades(page).getByRole("radio", { name: trade }).click();
+    await pickTrade(page, trade);
+    if (trade === "Other") {
+        await page.getByLabel("Your trade").fill("Tailor");
+    }
     await answerKind(page);
     const name = `${prefix} ${stamp(testInfo)}`;
     await answerName(page, { name });
@@ -108,24 +118,31 @@ async function toFirst(
 test.describe("setup asks a business its kind of place (DEC-216)", () => {
     test("the first step asks a business, Just me isn't asked, and Back keeps the answer", async ({
         page,
-    }, testInfo) => {
+    }) => {
         await openSetup(page);
-        await expect(trades(page).getByRole("radio")).toHaveText([
+        await expect(page.getByText(TRADE_LINE)).toBeVisible();
+        await trades(page).click();
+        await expect(page.getByRole("option")).toHaveText([
             "Salon",
             "Gym or studio",
             "Clinic",
             "Dietician or coach",
             "Bakery or food",
             "Shop",
-            "Something else",
+            "Other",
         ]);
-        await expect(page.getByText(TRADE_LINE)).toBeVisible();
+        await page.keyboard.press("Escape");
 
-        // 44px under a thumb on the phone.
-        const box = await trades(page).getByRole("radio").first().boundingBox();
-        if (testInfo.project.name.startsWith("phone")) {
-            expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-        }
+        // Other asks the trade in words, and Continue waits for it.
+        await pickTrade(page, "Other");
+        await expect(page.getByLabel("Your trade")).toHaveAttribute(
+            "placeholder",
+            "Bakery, tailor, tuition…",
+        );
+        await page
+            .getByRole("button", { name: "Continue", exact: true })
+            .click();
+        await expect(page.getByText("Say what your trade is.")).toBeVisible();
 
         await page
             .getByRole("radiogroup", { name: SETUP_QUESTIONS.kind })
@@ -137,12 +154,10 @@ test.describe("setup asks a business its kind of place (DEC-216)", () => {
             .getByRole("radio", { name: /^A business/ })
             .click();
 
-        await trades(page).getByRole("radio", { name: "Clinic" }).click();
+        await pickTrade(page, "Clinic");
         await answerKind(page);
         await page.getByRole("button", { name: "Back", exact: true }).click();
-        await expect(
-            trades(page).getByRole("radio", { name: "Clinic" }),
-        ).toHaveAttribute("aria-checked", "true");
+        await expect(trades(page)).toHaveText("Clinic");
 
         // The page never scrolls sideways.
         const width = page.viewportSize()?.width ?? 0;
@@ -160,9 +175,7 @@ test.describe("setup asks a business its kind of place (DEC-216)", () => {
         await expect(
             page.getByText(/You picked the Salon template/),
         ).toBeVisible();
-        await expect(
-            trades(page).getByRole("radio", { name: "Salon" }),
-        ).toHaveAttribute("aria-checked", "true");
+        await expect(trades(page)).toHaveText("Salon");
     });
 
     test(
@@ -190,12 +203,12 @@ test.describe("setup asks a business its kind of place (DEC-216)", () => {
     );
 
     test(
-        "Something else: Bookings as before, a new service to make",
+        "Other, with a typed trade: Bookings as before, a new service to make",
         { tag: "@serial" },
         async ({ page, browser }, testInfo) => {
             const putBack = await rollOutForEveryone(browser, testInfo);
             try {
-                await toFirst(page, testInfo, "Trade Other", "Something else");
+                await toFirst(page, testInfo, "Trade Other", "Other");
                 await pickGoal(page, /^Take bookings/);
                 await answerFirst(page);
                 await expect(page).toHaveURL(/\/services\/new/);

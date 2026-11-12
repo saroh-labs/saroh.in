@@ -5,6 +5,7 @@ import {
     galleryTemplateOf,
     tradeLabel,
     tradeOfTemplate,
+    tradeOtherProblem,
 } from "./trade";
 
 const TEMPLATES = [
@@ -24,6 +25,24 @@ describe("the kind of place (DEC-216)", () => {
         expect(tradeLabel("creator")).toBe("Creator");
         expect(tradeLabel("SALON")).toBeNull();
         expect(tradeLabel(null)).toBeNull();
+    });
+
+    it("words Other as the trade typed beside it (12 Nov 2026)", () => {
+        expect(tradeLabel("other", " Bakery ")).toBe("Bakery");
+        expect(tradeLabel("other", null)).toBe("Other");
+        expect(tradeLabel("shop", "Bakery")).toBe("Shop");
+    });
+
+    it("needs Other's trade in words, 2 to 60 characters", () => {
+        expect(tradeOtherProblem("other", "")).toBe("Say what your trade is.");
+        expect(tradeOtherProblem("other", " B ")).toBe(
+            "Use at least 2 characters.",
+        );
+        expect(tradeOtherProblem("other", "x".repeat(61))).toBe(
+            "Keep it to 60 characters.",
+        );
+        expect(tradeOtherProblem("other", "Tailor")).toBeNull();
+        expect(tradeOtherProblem("shop", "")).toBeNull();
     });
 
     it("gives Bookings' samples to a salon or a gym only (DEC-189)", () => {

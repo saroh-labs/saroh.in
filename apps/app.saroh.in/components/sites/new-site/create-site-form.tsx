@@ -100,6 +100,7 @@ export function CreateSiteForm({
     defaultTemplateId = null,
     startTemplateId = null,
     trade = null,
+    tradeOther = null,
     kind,
     modules = null,
     canSetTrade = false,
@@ -118,6 +119,8 @@ export function CreateSiteForm({
     startTemplateId?: string | null;
     /** The business's trade (DEC-216); null suggests by its kind. */
     trade?: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"), for the Suggested heading. */
+    tradeOther?: string | null;
     /** What is being set up (DEC-070). */
     kind?: unknown;
     /** The business's modules, for "shows once Sell is on". */
@@ -269,6 +272,7 @@ export function CreateSiteForm({
                                     templates={listed}
                                     basis={{
                                         trade,
+                                        tradeOther,
                                         kind,
                                         modules,
                                         defaultId: defaultTemplateId,

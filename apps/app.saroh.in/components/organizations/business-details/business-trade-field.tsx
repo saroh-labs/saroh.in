@@ -1,6 +1,6 @@
 "use client";
 
-import { FormField, FormItem, FormLabel, FormMessage } from "@saroh/ui/form";
+import { FormField, FormItem } from "@saroh/ui/form";
 import type { Control } from "react-hook-form";
 
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
@@ -10,8 +10,8 @@ import { SetupTradeChoice } from "@/components/organizations/setup/setup-trade-c
 
 /**
  * "Kind of place" in Settings › Business › Identity (DEC-216, TPLD2): the
- * same chips setup asked with, in the row's own sheet. The sheet's line
- * under its title says what it changes.
+ * same dropdown setup asked with, and Other's typed trade, in the row's own
+ * sheet. The sheet's line under its title says what it changes.
  */
 export function BusinessTradeField({
     control,
@@ -29,15 +29,21 @@ export function BusinessTradeField({
             name="trade"
             render={({ field }) => (
                 <FormItem {...at("100%")}>
-                    <FormLabel id="business-trade-label" className="sr-only">
-                        {TRADE_ROW_LABEL}
-                    </FormLabel>
-                    <SetupTradeChoice
-                        value={field.value}
-                        onChange={field.onChange}
-                        labelledBy="business-trade-label"
+                    <FormField
+                        control={control}
+                        name="tradeOther"
+                        render={({ field: other, fieldState }) => (
+                            <SetupTradeChoice
+                                value={field.value}
+                                onChange={field.onChange}
+                                other={other.value}
+                                onOtherChange={other.onChange}
+                                otherError={fieldState.error?.message}
+                                label={TRADE_ROW_LABEL}
+                                labelHidden
+                            />
+                        )}
                     />
-                    <FormMessage />
                 </FormItem>
             )}
         />

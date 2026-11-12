@@ -363,6 +363,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                                 {/* Its trade: the templates suggested first (DEC-216). */}
                                 <BusinessTradeProvider
                                     trade={tradeOf(activeOrg?.trade)}
+                                    tradeOther={activeOrg?.tradeOther ?? null}
                                     startTemplate={
                                         activeOrg?.startTemplate ?? null
                                     }

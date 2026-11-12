@@ -49,7 +49,10 @@ import { OBJECT_STORAGE } from "../../media/object-storage.provider";
 import { IMAGE_TOO_BIG_MESSAGE } from "../../media/upload-checks";
 import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
-import { tradeRead } from "../../organizations/organization-trade";
+import {
+    tradeOtherRead,
+    tradeRead,
+} from "../../organizations/organization-trade";
 import { pageList } from "../../public-api/v1-support";
 import { lockSite } from "../../sites/live-pointer";
 import { approvalApplies } from "../../sites/publish-approval";
@@ -240,13 +243,14 @@ async function businessFit(organizationId: string) {
     const [org, on] = await Promise.all([
         prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { trade: true },
+            select: { trade: true, tradeOther: true },
         }),
         modulesOn(prisma, organizationId),
     ]);
     const kind = await organizationKind(prisma, organizationId);
     return {
         trade: tradeRead(org?.trade),
+        tradeOther: tradeOtherRead(org?.trade, org?.tradeOther),
         kind,
         modulesOn: on,
         defaultId: KIND_TEMPLATE[kind],
@@ -257,10 +261,14 @@ async function businessFit(organizationId: string) {
 function whyOf(
     template: { kinds: readonly string[]; uses: readonly string[] },
     fit: TemplateFit,
-    business: { trade: string | null; modulesOn: readonly string[] },
+    business: {
+        trade: string | null;
+        tradeOther: string | null;
+        modulesOn: readonly string[];
+    },
 ): string | null {
     if (fit === "trade")
-        return `Made for ${business.trade}, the business's trade.`;
+        return `Made for ${business.tradeOther ?? business.trade}, the business's trade.`;
     if (fit === "suggested") return null;
     const off = gatingModules(template).filter(
         (k) => !business.modulesOn.includes(k),
@@ -385,7 +393,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 choice
                     ? null
                     : `Templates aren't chosen yet: create_site_from_template starts every new site from ${fallback.name} (template_id ${fallback.id}), whatever template_id it is given.`,
-                `${page.data.length} templates${page.nextCursor ? `; more with cursor ${page.nextCursor}` : ""}${fit.trade ? `, ${fit.trade}'s first` : ""}.`,
+                `${page.data.length} templates${page.nextCursor ? `; more with cursor ${page.nextCursor}` : ""}${fit.trade ? `, ${fit.tradeOther ?? fit.trade}'s first` : ""}.`,
                 ...page.data.map(
                     (t) =>
                         `- ${t.name} (template_id ${t.template_id})${t.suggested ? "" : " [also available]"}${t.description ? `: ${t.description}` : ""} ${t.why ?? ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}.`,
@@ -399,6 +407,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                     templates: page.data,
                     next_cursor: page.nextCursor,
                     trade: fit.trade,
+                    trade_other: fit.tradeOther,
                     template_choice: choice,
                 },
             };

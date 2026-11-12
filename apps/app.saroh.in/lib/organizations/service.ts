@@ -64,6 +64,8 @@ export interface Organization {
      * none: read it through `tradeOf`.
      */
     trade?: Trade | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther?: string | null;
     /**
      * The template picked in the public gallery before sign-up (DEC-216),
      * a template id: Turn on Website and New site start on it. Null for
@@ -127,6 +129,8 @@ export interface CreateOrganizationInput {
     kind?: OrganizationKind;
     /** "What kind of place is it?" (DEC-216). Absent: not said. */
     trade?: Trade;
+    /** The trade typed beside Other, sent only with trade "other". */
+    tradeOther?: string;
     /**
      * The gallery template carried through sign-up (`?template=`, DEC-216),
      * by id or slug. The API keeps it only when it knows it.

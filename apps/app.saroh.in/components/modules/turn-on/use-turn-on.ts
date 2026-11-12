@@ -9,6 +9,7 @@ import { useStartingCurrency } from "@/components/shared/fields/business-country
 import {
     useBusinessStartTemplate,
     useBusinessTrade,
+    useBusinessTradeOther,
 } from "@/components/sites/templates/business-trade";
 import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
@@ -69,6 +70,7 @@ export function useTurnOn({
     const router = useRouter();
     const currency = useStartingCurrency();
     const trade = useBusinessTrade();
+    const tradeOther = useBusinessTradeOther();
     const startTemplate = useBusinessStartTemplate();
     const [loaded, setLoaded] = useState<SetupDefaults[] | null>(null);
     const [draft, setDraft] = useState<TurnOnDraft | null>(null);
@@ -319,6 +321,7 @@ export function useTurnOn({
         website && websiteTemplate ? website.templates : [];
     const websiteBasis: SuggestionBasis = {
         trade,
+        tradeOther,
         kind: website?.kind ?? null,
         modules: moduleStatesWith(modules, plan.order),
         defaultId: websiteTemplate?.id ?? null,

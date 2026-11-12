@@ -97,6 +97,8 @@ export const listTemplatesTool = {
         next_cursor: z.string().nullable(),
         /** The business's trade (DEC-216); null when never said. */
         trade: z.string().nullable(),
+        /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+        trade_other: z.string().nullable(),
         /** False while templates aren't chosen yet: a new site starts from the default. */
         template_choice: z.boolean(),
     }),

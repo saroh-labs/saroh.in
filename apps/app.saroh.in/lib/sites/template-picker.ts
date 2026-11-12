@@ -190,9 +190,17 @@ const TRADE_WORDS: Record<TemplateKind, string | null> = {
     other: null,
 };
 
-/** "Suggested for salons"; "Suggested" with no trade to name. */
-export function suggestedTitle(trade: TemplateKind | null): string {
-    const words = trade ? TRADE_WORDS[trade] : null;
+/**
+ * "Suggested for salons"; for Other, the trade typed beside it ("Suggested
+ * for Bakery"); "Suggested" with no trade to name.
+ */
+export function suggestedTitle(
+    trade: TemplateKind | null,
+    tradeOther?: string | null,
+): string {
+    const typed =
+        trade === "other" && tradeOther?.trim() ? tradeOther.trim() : null;
+    const words = typed ?? (trade ? TRADE_WORDS[trade] : null);
     return words ? `Suggested for ${words}` : "Suggested";
 }
 
@@ -200,6 +208,8 @@ export function suggestedTitle(trade: TemplateKind | null): string {
 export interface SuggestionBasis {
     /** The business's trade (DEC-216); null falls back to its kind's rules. */
     trade: TemplateKind | null;
+    /** The trade typed beside Other: words only, never matched (DEC-216). */
+    tradeOther?: string | null;
     /** What is being set up (DEC-070). */
     kind: unknown;
     modules: ModuleStates | null;
@@ -217,7 +227,7 @@ export function isSuggestedFor(
     basis: SuggestionBasis,
 ): boolean {
     const { trade, kind, modules, defaultId } = basis;
-    // "Something else" names no trade's templates: the kind's rule.
+    // "Other" names no trade's templates: the kind's rule.
     if (!trade || trade === "other") {
         return isSuggested(template, kind, modules, defaultId);
     }
@@ -268,7 +278,7 @@ export function templateGroups<
     const groups: TemplateGroup<T>[] = [
         {
             key: "suggested",
-            title: suggestedTitle(basis.trade),
+            title: suggestedTitle(basis.trade, basis.tradeOther),
             templates: lead,
         },
         {

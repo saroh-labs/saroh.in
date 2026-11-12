@@ -198,6 +198,9 @@ describe("the trade (DEC-216)", () => {
         expect(suggestedTitle("salon")).toBe("Suggested for salons");
         expect(suggestedTitle("other")).toBe("Suggested");
         expect(suggestedTitle(null)).toBe("Suggested");
+        // Other says the trade typed beside it (12 Nov 2026).
+        expect(suggestedTitle("other", "Bakery")).toBe("Suggested for Bakery");
+        expect(suggestedTitle("shop", "Bakery")).toBe("Suggested for shops");
     });
 });
 

@@ -11,6 +11,7 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 
+import { pickOption } from "@/components/class-packs/pack-detail/pick-option.test-kit";
 import { stepFromQuery } from "@/lib/organizations/setup-steps";
 
 import { BusinessSetupForm } from "./business-setup-form";
@@ -127,6 +128,23 @@ export const checked = (labelledBy: string) =>
 
 export function choose(name: string) {
     act(() => radio(name).click());
+}
+
+/** Setup's trade dropdown (DEC-216, 12 Nov 2026). */
+export const TRADE_LABEL = "What kind of place is it?";
+
+/** Choose a trade from the dropdown: "Clinic", "Other". */
+export function pickTrade(name: string) {
+    pickOption(TRADE_LABEL, name);
+}
+
+/** The trade the dropdown shows; null when it isn't on the step. */
+export function tradeShown(): string | null {
+    return (
+        host
+            .querySelector(`[role="combobox"][aria-label="${TRADE_LABEL}"]`)
+            ?.textContent.trim() ?? null
+    );
 }
 
 export function typeInto(el: HTMLInputElement, value: string) {

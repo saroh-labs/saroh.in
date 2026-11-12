@@ -486,7 +486,7 @@ function trade(
     return {
         key: "trade",
         label: "Say what kind of place this is",
-        why: "So Saroh suggests the right website templates and samples for you.",
+        why: "So Saroh can suggest the right samples and setup for you.",
         cta: "Choose",
         // The Identity tab, with the Kind of place sheet open.
         href: businessEditHref("trade"),

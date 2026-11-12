@@ -253,7 +253,7 @@ describe("which step may be shown", () => {
 
 describe("the kind of place (DEC-216, DEC-189)", () => {
     it("is part of the first step, so its gate and the draft carry it", () => {
-        expect(fieldsOfStep("kind")).toEqual(["kind", "trade"]);
+        expect(fieldsOfStep("kind")).toEqual(["kind", "trade", "tradeOther"]);
         expect(fieldsOfStep("first")).toEqual(["goal"]);
         expect(stepOfField("trade")).toBe("kind");
     });

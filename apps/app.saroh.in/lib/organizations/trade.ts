@@ -14,9 +14,10 @@ export type Trade = TemplateKind;
 export { tradeOf };
 
 /**
- * The chips a business picks from, in the boards' order (TPLD1, TPLD2).
- * "Creator" isn't offered to a business: Just me and A site for my work
- * keep the kind alone.
+ * The categories a business picks from, in the boards' order (TPLD1,
+ * TPLD2), Other last: choosing it asks the trade in words (owner, 12 Nov
+ * 2026). "Creator" isn't offered to a business: Just me and A site for my
+ * work keep the kind alone.
  */
 export const TRADE_CHOICES: readonly { value: Trade; label: string }[] = [
     { value: "salon", label: "Salon" },
@@ -25,15 +26,42 @@ export const TRADE_CHOICES: readonly { value: Trade; label: string }[] = [
     { value: "coach", label: "Dietician or coach" },
     { value: "food", label: "Bakery or food" },
     { value: "shop", label: "Shop" },
-    { value: "other", label: "Something else" },
+    { value: "other", label: "Other" },
 ];
 
-/** The trade as a row says it: "Salon", "Creator"; null for none. */
-export function tradeLabel(trade: unknown): string | null {
+/**
+ * The trade as a row says it: "Salon", "Creator", or for Other the trade
+ * typed beside it ("Bakery"); null for none.
+ */
+export function tradeLabel(
+    trade: unknown,
+    typed?: string | null,
+): string | null {
     const t = tradeOf(trade);
     if (!t) return null;
     if (t === "creator") return "Creator";
+    if (t === "other" && typed?.trim()) return typed.trim();
     return TRADE_CHOICES.find((c) => c.value === t)?.label ?? null;
+}
+
+/** The field Other shows: the trade in the merchant's own words. */
+export const TRADE_OTHER_LABEL = "Your trade";
+export const TRADE_OTHER_PLACEHOLDER = "Bakery, tailor, tuition…";
+/** The typed trade's length, as the API checks it. */
+export const TRADE_OTHER_MIN = 2;
+export const TRADE_OTHER_MAX = 60;
+
+/** What is wrong with the typed trade beside Other; null when it's fine. */
+export function tradeOtherProblem(
+    trade: unknown,
+    typed: string | null | undefined,
+): string | null {
+    if (tradeOf(trade) !== "other") return null;
+    const text = (typed ?? "").trim();
+    if (text.length === 0) return "Say what your trade is.";
+    if (text.length < TRADE_OTHER_MIN) return "Use at least 2 characters.";
+    if (text.length > TRADE_OTHER_MAX) return "Keep it to 60 characters.";
+    return null;
 }
 
 /** Only a business is asked its trade (TPLD1, TPLD2). */
@@ -47,7 +75,7 @@ export const TRADE_SETUP_HINT =
 
 /** Settings' line under the sheet's title (TPLD2). */
 export const TRADE_SETTINGS_NOTE =
-    "What Saroh suggests first: website templates, sample services. It never limits what you can use.";
+    "What Saroh suggests first: your starter website and sample services. It never limits what you can use.";
 
 /** The row's label in Settings › Business › Identity (TPLD2). */
 export const TRADE_ROW_LABEL = "Kind of place";

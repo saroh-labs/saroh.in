@@ -12,7 +12,7 @@ import type { OrganizationKind } from "./kind";
 import { kindOf, ORGANIZATION_KINDS } from "./kind";
 import { managerCodeProblem } from "./referral-carry";
 import type { Trade } from "./trade";
-import { asksTradeOf, bookingsPreset } from "./trade";
+import { asksTradeOf, bookingsPreset, tradeOtherProblem } from "./trade";
 
 import type { SetupBilling } from "./setup-billing";
 import { BILLING_FIELDS, billingProblems } from "./setup-billing";
@@ -86,6 +86,8 @@ export function setupSchema(
             // The kind of place (DEC-216): asked of a business on the
             // first step. None chosen is none said.
             trade: z.enum(TEMPLATE_KINDS).optional(),
+            // The trade typed beside Other (12 Nov 2026); checked below.
+            tradeOther: z.string().optional(),
             // Who Saroh bills (DEC-167): a profile's id, or "new" with its
             // fields below. Checked only when asked.
             billingChoice: z.string().optional(),
@@ -112,6 +114,17 @@ export function setupSchema(
                     code: "custom",
                     path: ["timezone"],
                     message: "Choose your business's time zone",
+                });
+            }
+            // Only a business is asked its trade: Other needs it in words.
+            const typed = asksTradeOf(values.kind)
+                ? tradeOtherProblem(values.trade, values.tradeOther)
+                : null;
+            if (typed) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["tradeOther"],
+                    message: typed,
                 });
             }
             const codeProblem = managerCodeProblem(values.managerCode);
@@ -141,6 +154,16 @@ export function tradeStored(values: {
     trade?: Trade;
 }): Trade | undefined {
     return asksTradeOf(values.kind) ? values.trade : undefined;
+}
+
+/** The trade typed beside Other, sent only when the stored trade is Other. */
+export function tradeOtherStored(values: {
+    kind: string;
+    trade?: Trade;
+    tradeOther?: string;
+}): string | undefined {
+    const typed = values.tradeOther?.trim();
+    return tradeStored(values) === "other" && typed ? typed : undefined;
 }
 
 /**
@@ -176,7 +199,7 @@ export interface SetupStep {
 }
 
 const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
-    kind: ["kind", "trade"],
+    kind: ["kind", "trade", "tradeOther"],
     name: [
         "yourName",
         "name",
@@ -453,6 +476,7 @@ const draftSchema = z.object({
         goal: z.string().min(1).max(40),
         // A draft from before DEC-216 held SALON or GYM: dropped, not the draft.
         trade: z.enum(TEMPLATE_KINDS).optional().catch(undefined),
+        tradeOther: z.string().max(200).optional().catch(undefined),
         managerCode: z.string().max(20).optional(),
     }),
     edited: z.boolean(),

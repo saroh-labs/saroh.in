@@ -14,6 +14,10 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    openOptions,
+    pickOption,
+} from "@/components/class-packs/pack-detail/pick-option.test-kit";
+import {
     address,
     card,
     draw,
@@ -363,6 +367,9 @@ describe("What is this? (DEC-070, K5)", () => {
     });
 });
 
+const typed = () =>
+    sheet()?.querySelector<HTMLInputElement>("[data-trade-other]") ?? null;
+
 describe("Kind of place (DEC-216, TPLD2)", () => {
     it("is a business's row under What this is; Just me has none", () => {
         draw(settings({ trade: "salon" }));
@@ -389,21 +396,19 @@ describe("Kind of place (DEC-216, TPLD2)", () => {
         await press(edit("Change the kind of place"));
         expect(sheetName()).toBe("Kind of place");
         expect(sheet()?.textContent).toContain(
-            "What Saroh suggests first: website templates, sample services. It never limits what you can use.",
+            "What Saroh suggests first: your starter website and sample services. It never limits what you can use.",
         );
-        const chips = Array.from(
-            sheet()?.querySelectorAll<HTMLButtonElement>("[data-trade]") ?? [],
-        );
-        expect(chips.map((c) => c.textContent)).toEqual([
+        expect(openOptions("Kind of place")).toEqual([
             "Salon",
             "Gym or studio",
             "Clinic",
             "Dietician or coach",
             "Bakery or food",
             "Shop",
-            "Something else",
+            "Other",
         ]);
-        await press(chips.find((c) => c.textContent === "Gym or studio"));
+        pickOption("Kind of place", "Gym or studio");
+        await settle();
         await press(item("Save"));
 
         expect(save).toHaveBeenCalledWith({ trade: "gym" });
@@ -422,9 +427,39 @@ describe("Kind of place (DEC-216, TPLD2)", () => {
         expect(undoSettings).toHaveBeenCalledWith(
             expect.objectContaining({
                 input: { trade: "salon" },
-                expect: { trade: "gym" },
+                expect: { trade: "gym", tradeOther: null },
             }),
         );
+    });
+
+    it("says the typed trade for Other", () => {
+        draw(settings({ trade: "other", tradeOther: "Bakery" }));
+        expect(row("business-trade")?.textContent).toContain("Bakery");
+        expect(row("business-trade")?.textContent).not.toContain("Other");
+    });
+
+    it("Other needs the trade in words before Save, and sends it", async () => {
+        const after = settings({ trade: "other", tradeOther: "Tailor" });
+        save.mockResolvedValue({ ok: true, data: after });
+        draw(settings({ trade: "salon" }));
+
+        await press(edit("Change the kind of place"));
+        expect(typed()).toBeNull();
+        pickOption("Kind of place", "Other");
+        await settle();
+        expect(typed()?.placeholder).toBe("Bakery, tailor, tuition…");
+        expect(sheet()?.textContent).toContain("Your trade");
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain("Say what your trade is.");
+
+        await type(typed(), " Tailor ");
+        await press(item("Save"));
+        expect(save).toHaveBeenCalledWith({
+            trade: "other",
+            tradeOther: "Tailor",
+        });
+        expect(row("business-trade")?.textContent).toContain("Tailor");
     });
 
     it("a read-only role sees it without Change", () => {

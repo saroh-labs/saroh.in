@@ -180,6 +180,9 @@ export class OrganizationOnboardingService {
                     kind,
                     // The kind of place and the gallery's template (DEC-216).
                     ...(dto.trade ? { trade: dto.trade } : {}),
+                    ...(dto.trade === "other" && dto.tradeOther
+                        ? { tradeOther: dto.tradeOther }
+                        : {}),
                     ...(dto.startTemplate
                         ? { startTemplate: dto.startTemplate }
                         : {}),
@@ -295,6 +298,9 @@ export class OrganizationOnboardingService {
                 slug: onboarded.slug,
                 kind,
                 ...(dto.trade ? { trade: dto.trade } : {}),
+                ...(dto.trade === "other" && dto.tradeOther
+                    ? { tradeOther: dto.tradeOther }
+                    : {}),
                 // How its account manager was proved, never who: the
                 // link itself is the record (DEC-169).
                 ...(managerSource ? { accountManager: managerSource } : {}),

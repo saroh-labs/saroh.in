@@ -241,6 +241,7 @@ async function readTemplateRow(
         current,
         basis: {
             trade: tradeOf(organization?.trade),
+            tradeOther: organization?.tradeOther ?? null,
             kind,
             modules: moduleStates(modules),
             defaultId: kindDefaults(kind).starterTemplate,

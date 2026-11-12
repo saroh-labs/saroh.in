@@ -122,7 +122,9 @@ export function BusinessDetailRows({
                         )}
                     >
                         <Saved
-                            text={tradeLabel(saved.trade) ?? ""}
+                            text={
+                                tradeLabel(saved.trade, saved.tradeOther) ?? ""
+                            }
                             empty="Not marked yet"
                         />
                     </Row>

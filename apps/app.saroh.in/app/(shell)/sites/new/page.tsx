@@ -158,6 +158,7 @@ export default async function NewSitePage({
                 startTemplateId={startingTemplate(listed, asked, kindTemplate)}
                 // The business's trade (DEC-216) suggests first.
                 trade={tradeOf(organization?.trade)}
+                tradeOther={organization?.tradeOther ?? null}
                 kind={kind}
                 modules={states}
                 canSetTrade={organization?.actions?.includes("org:update")}

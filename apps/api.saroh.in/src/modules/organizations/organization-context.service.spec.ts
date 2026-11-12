@@ -356,6 +356,7 @@ describe("OrganizationContextService.getSummary", () => {
             slug: "acme",
             kind: "SOLO",
             trade: "coach",
+            tradeOther: null,
         });
         expect(organizationFindUnique).toHaveBeenCalledWith({
             where: { id: "org_1" },
@@ -365,6 +366,7 @@ describe("OrganizationContextService.getSummary", () => {
                 slug: true,
                 kind: true,
                 trade: true,
+                tradeOther: true,
             },
         });
     });

@@ -144,6 +144,8 @@ export interface OrganizationSettings {
      * an older API. Read it through `tradeOf`.
      */
     trade?: Trade | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther?: string | null;
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
@@ -255,6 +257,8 @@ export interface OrganizationSettingsInput {
     kind?: OrganizationKind;
     /** The kind of place (DEC-216); null says none. Needs `org:update`. */
     trade?: Trade | null;
+    /** The trade typed beside Other; the API keeps it only with "other". */
+    tradeOther?: string | null;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
     tax?: TaxSettingsInput;
     /** "" clears a line; the state goes as `tax.state`. */

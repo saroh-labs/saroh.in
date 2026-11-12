@@ -164,6 +164,147 @@ describe("Organization.trade (real database, DEC-216)", () => {
         expect((await context.getSummary(org.id)).trade).toBe("salon");
     });
 
+    describe("the trade typed beside Other (12 Nov 2026)", () => {
+        it("is kept at setup with Other only, and said beside the trade", async () => {
+            const userId = await person();
+            const { dto, errors } = await onboardDto({
+                name: "Crumb & Co",
+                address: uniq("crumb-"),
+                trade: "other",
+                tradeOther: "  Bakery  ",
+            });
+            expect(errors).toEqual([]);
+            const org = await onboarding.onboard(userId, dto);
+            const listed = (await context.listForUser(userId)).find(
+                (o) => o.id === org.id,
+            );
+            expect(listed).toMatchObject({
+                trade: "other",
+                tradeOther: "Bakery",
+            });
+            expect(await context.getSummary(org.id)).toMatchObject({
+                trade: "other",
+                tradeOther: "Bakery",
+            });
+            expect((await settings.get(as(org.id, userId))).tradeOther).toBe(
+                "Bakery",
+            );
+
+            const salon = await onboarding.onboard(userId, {
+                name: "Not a bakery",
+                address: uniq("nab-"),
+                trade: "salon",
+                tradeOther: "Bakery",
+            });
+            const row = await prisma.organization.findUniqueOrThrow({
+                where: { id: salon.id },
+                select: { tradeOther: true },
+            });
+            expect(row.tradeOther).toBeNull();
+        });
+
+        it("must be 2 to 60 characters, trimmed", async () => {
+            for (const tradeOther of ["B", " B ", "x".repeat(61)]) {
+                const update = plainToInstance(UpdateOrganizationDto, {
+                    trade: "other",
+                    tradeOther,
+                });
+                expect(
+                    (await validate(update)).map((e) => e.property),
+                ).toContain("tradeOther");
+            }
+            const { errors } = await onboardDto({
+                name: "X",
+                address: uniq("x-"),
+                trade: "other",
+                tradeOther: "x".repeat(61),
+            });
+            expect(errors.map((e) => e.property)).toContain("tradeOther");
+            const ok = plainToInstance(UpdateOrganizationDto, {
+                trade: "other",
+                tradeOther: "x".repeat(60),
+            });
+            expect(await validate(ok)).toEqual([]);
+        });
+
+        it("the Owner sets it, audited; changing the trade away clears it", async () => {
+            const userId = await person();
+            const org = await onboarding.onboard(userId, {
+                name: "Stitch",
+                address: uniq("stitch-"),
+                trade: "shop",
+            });
+            const ctx = as(org.id, userId);
+
+            const set = await settings.update(ctx, {
+                trade: "other",
+                tradeOther: "Tailor",
+            });
+            expect(set).toMatchObject({ trade: "other", tradeOther: "Tailor" });
+            const audited = await prisma.auditEvent.findFirst({
+                where: {
+                    organizationId: org.id,
+                    action: AuditAction.ProfileUpdate,
+                },
+                orderBy: { createdAt: "desc" },
+                select: { metadata: true },
+            });
+            expect(audited?.metadata).toEqual({
+                fields: ["trade", "tradeOther"],
+                changes: [
+                    { field: "trade", before: "shop", after: "other" },
+                    { field: "tradeOther", before: null, after: "Tailor" },
+                ],
+            });
+
+            // The typed trade alone, while the trade is Other.
+            expect(
+                (await settings.update(ctx, { tradeOther: "Tailoring" }))
+                    .tradeOther,
+            ).toBe("Tailoring");
+
+            const away = await settings.update(ctx, { trade: "food" });
+            expect(away).toMatchObject({ trade: "food", tradeOther: null });
+            const row = await prisma.organization.findUniqueOrThrow({
+                where: { id: org.id },
+                select: { tradeOther: true },
+            });
+            expect(row.tradeOther).toBeNull();
+
+            // Typed without Other: nothing kept.
+            expect(
+                (await settings.update(ctx, { tradeOther: "Tailor" }))
+                    .tradeOther,
+            ).toBeNull();
+        });
+
+        it("a Member can't set it", async () => {
+            const ownerId = await person();
+            const org = await onboarding.onboard(ownerId, {
+                name: "Tuition Point",
+                address: uniq("tuition-"),
+                trade: "other",
+                tradeOther: "Tuition",
+            });
+            const memberId = await person();
+            await prisma.membership.create({
+                data: {
+                    organizationId: org.id,
+                    userId: memberId,
+                    role: "MEMBER",
+                },
+            });
+            await expect(
+                settings.update(as(org.id, memberId, "MEMBER"), {
+                    tradeOther: "Coaching",
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect((await context.getSummary(org.id)).tradeOther).toBe(
+                "Tuition",
+            );
+        });
+    });
+
     it("refuses a trade that isn't one at the column (the migration's CHECK)", async () => {
         const [has] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
             `SELECT count(*) AS n FROM pg_constraint WHERE conname = 'Organization_trade_check'`,

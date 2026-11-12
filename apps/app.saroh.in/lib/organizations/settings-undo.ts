@@ -105,6 +105,8 @@ export function touchedFields(
     if (sent.name !== undefined) out.name = settings.name;
     if (sent.kind !== undefined) out.kind = kindOf(settings.kind);
     if (sent.trade !== undefined) out.trade = tradeOf(settings.trade);
+    if (sent.trade !== undefined || sent.tradeOther !== undefined)
+        out.tradeOther = settings.tradeOther ?? null;
     for (const key of keysOf(sent.profile)) {
         out[`profile.${key}`] = settings.profile?.[key] ?? null;
     }
@@ -151,7 +153,12 @@ export function settingsUndo(
     if (sent.name !== undefined) input.name = before.name;
     // An API older than DEC-070 sent none: it was a business.
     if (sent.kind !== undefined) input.kind = kindOf(before.kind);
-    if (sent.trade !== undefined) input.trade = tradeOf(before.trade);
+    // The typed trade goes back with its trade (DEC-216).
+    if (sent.trade !== undefined || sent.tradeOther !== undefined) {
+        input.trade = tradeOf(before.trade);
+        if (input.trade === "other" && before.tradeOther)
+            input.tradeOther = before.tradeOther;
+    }
     if (sent.profile) {
         input.profile = Object.fromEntries(
             keysOf(sent.profile).map((key) => [
