@@ -10,6 +10,8 @@ import { loadEditorContext } from "@/lib/services/editor-data";
 import { listRules, readService } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
+import { readShareSetup } from "@/lib/share-item/read";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
 // One read for the tab's title and the page.
 const readOne = cache((serviceId: string) => readService(serviceId));
@@ -45,16 +47,20 @@ export default async function ServiceEditorPage({
     const { serviceId } = await params;
     await requireSession();
 
-    const [read, context, rules, access, priceHistory] = await Promise.all([
-        readOne(serviceId),
-        loadEditorContext(),
-        listRules(serviceId),
-        // Deposits are taken online: locked on a plan without it.
-        billingAccessOrNull(),
-        // What it has cost (12 Oct 2026). Optional: a read that fails is
-        // said in its place.
-        readPriceHistory("services", serviceId).catch(() => null),
-    ]);
+    const [read, context, rules, access, priceHistory, web] = await Promise.all(
+        [
+            readOne(serviceId),
+            loadEditorContext(),
+            listRules(serviceId),
+            // Deposits are taken online: locked on a plan without it.
+            billingAccessOrNull(),
+            // What it has cost (12 Oct 2026). Optional: a read that fails is
+            // said in its place.
+            readPriceHistory("services", serviceId).catch(() => null),
+            // Share as a post (#1375): the booking page's live address.
+            readWebAddressLinks(),
+        ],
+    );
     if (!read.ok) {
         return (
             <ServiceEditorState
@@ -84,7 +90,11 @@ export default async function ServiceEditorPage({
         timezone,
         currency,
     } = context.context;
-    const usage = await readServiceUsage([service.id], timezone);
+    const bookUrl = web?.links.book ?? null;
+    const [usage, shareSetup] = await Promise.all([
+        readServiceUsage([service.id], timezone),
+        bookUrl ? readShareSetup(web) : Promise.resolve(null),
+    ]);
 
     return (
         <ServiceEditor
@@ -107,6 +117,9 @@ export default async function ServiceEditorPage({
             // A name another service already has says so, with the way to it.
             others={services.map((s) => ({ id: s.id, name: s.name }))}
             priceHistory={priceHistory}
+            share={
+                shareSetup && bookUrl ? { setup: shareSetup, bookUrl } : null
+            }
         />
     );
 }

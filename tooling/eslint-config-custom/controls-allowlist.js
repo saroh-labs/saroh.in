@@ -246,6 +246,8 @@ export const RAW_ALLOWED = {
     "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/import/csv-import.tsx": ["input"],
+    // button: a post picture that is one button, picked from a row or swiped to (#1375)
+    "components/shared/share-item/card-picker.tsx": ["button"],
     // input: a native radio inside its card; label: a radio card with a timeline in it
     "components/subscriptions/plans/timing-card.tsx": ["input", "label"],
 };
