@@ -45,6 +45,8 @@ const CLASS_LEVEL: Record<string, string> = {
     // Each person's own booking rules and their requests (#1038).
     "staff/staff-rules.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
+    // An AI app's publish request, answered by a person (DEC-215).
+    "mcp/publish-requests.controller.ts": "WEBSITE",
     // "Your booking page" in Bookings (DEC-175): published from Bookings.
     "sites/booking-page.controller.ts": "APPOINTMENTS",
     // DEC-071 T2: a site's test releases and their links.

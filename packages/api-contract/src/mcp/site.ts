@@ -344,42 +344,55 @@ const publishChanged = z
         'What goes live: section changes, site settings changed, or "first publish: the whole site".',
     );
 
+const publishWill = z.enum(["go_live", "go_to_reviewers"]);
+
 export const previewPublishTool = {
     input: z.object({ site_id: siteId }).strict(),
     output: z.object({
         site_id: z.string(),
-        will: z.enum(["go_live", "go_to_reviewers"]),
+        will: publishWill,
         changed: publishChanged,
         preview_url: z.string().nullable(),
         editor_url: z.string(),
-        confirm_code: z
+        request_id: z
             .string()
             .describe(
-                "Pass to publish_site only after the person says yes. Single use; lasts 10 minutes.",
+                "This publish request, for get_publish_request. It publishes nothing by itself.",
+            ),
+        confirm_url: z
+            .string()
+            .describe(
+                "Where the person publishes, in Saroh. Show it to them; only they can publish.",
             ),
         expires_at: z.string(),
     }),
 };
 
-export const publishSiteTool = {
+export const getPublishRequestTool = {
     input: z
         .object({
             site_id: siteId,
-            confirm_code: z
+            request_id: z
                 .string()
                 .min(1)
                 .max(64)
-                .describe(
-                    "The confirm_code from preview_publish, once the person has seen its summary and said yes.",
-                ),
+                .describe("The request_id from preview_publish."),
         })
         .strict(),
     output: z.object({
         site_id: z.string(),
-        outcome: z.enum(["published", "sent_for_approval"]),
-        changed: publishChanged,
+        status: z.enum([
+            "waiting",
+            "published",
+            "sent_for_approval",
+            "declined",
+            "expired",
+        ]),
+        will: publishWill,
+        confirm_url: z.string().nullable(),
         live_url: z.string().nullable(),
-        editor_url: z.string(),
+        expires_at: z.string(),
+        answered_at: z.string().nullable(),
     }),
 };
 

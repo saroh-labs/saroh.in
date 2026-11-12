@@ -1,6 +1,7 @@
 /**
  * The MCP website tools against a real Postgres (plan 2026-11-10-001, U11):
- * draft-only edits with preview links, publish and its approval route, the
+ * draft-only edits with preview links, the publish request a person answers
+ * in Saroh (DEC-215 as amended 12 Nov 2026) and its approval route, the
  * session restore point, role filtering, the image fetch's guard and the
  * template job. Each call goes through `McpToolRegistry.call`, so the
  * framework's authorize, write check and activity rows run as on `/mcp`.
@@ -23,6 +24,7 @@ import { TestReleasesService } from "../../sites/test-releases.service";
 import { McpActivityService } from "../activity.service";
 import { actionsForScopes, NEVER_FOR_AI } from "../ai-apps";
 import { AiConnectionsService } from "../ai-connections.service";
+import { PublishRequestsService } from "../publish-requests.service";
 import { RestorePointService } from "../restore-point.service";
 import type { McpCall } from "../tool-registry";
 import { McpToolRegistry } from "../tool-registry";
@@ -48,7 +50,6 @@ const fetchImage = jest.fn();
 const deps: SiteToolDeps = {
     sites,
     previews: new SitePreviewLinksService(sites),
-    releases: new TestReleasesService(sites, new FeatureFlagService()),
     media: new MediaService(createMemoryStorage({})),
     storage: createMemoryStorage({}),
     restorePoints: new RestorePointService(),
@@ -64,17 +65,18 @@ const deps: SiteToolDeps = {
             }),
     },
 };
+const requests = new PublishRequestsService(
+    sites,
+    new TestReleasesService(sites, new FeatureFlagService()),
+    new AuditService(),
+);
 // The media service and the tool share one store, as in Nest.
 deps.media = new MediaService(deps.storage);
 
 const registry = new McpToolRegistry(
     new McpActivityService(new AuditService()),
 );
-/** The clock publish codes expire by; null is the real one. */
-let clock: Date | null = null;
-registry.register(
-    ...siteTools({ ...deps, fetchImage, now: () => clock ?? new Date() }),
-);
+registry.register(...siteTools({ ...deps, fetchImage }));
 registry.registerJobKind(SITE_FROM_TEMPLATE_JOB, describeSiteJob);
 new CoreTools(registry).onModuleInit();
 
@@ -173,12 +175,28 @@ const sectionsOf = async (pageId: string) =>
         })
     ).sections;
 
-/** preview_publish's confirm_code, as an app gets it before asking the person. */
-async function codeFor(as: McpCall, siteId: string): Promise<string> {
+/** preview_publish's request, as an app gets it before the person answers. */
+async function requestFor(as: McpCall, siteId: string) {
     const r = await call(as, "preview_publish", { site_id: siteId });
     if (r.isError) throw new Error(textOf(r));
-    return data<{ confirm_code: string }>(r).confirm_code;
+    return data<{ request_id: string; confirm_url: string }>(r);
 }
+
+/** What a refused answer said: its code, or the exception's name. */
+const refusal = (p: Promise<unknown>) =>
+    p.then(
+        () => "answered",
+        (e: { response?: { details?: { code?: string } }; name?: string }) =>
+            e.response?.details?.code ?? e.name ?? String(e),
+    );
+
+const liveOf = async (siteId: string) =>
+    (
+        await prisma.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { currentPublicationId: true },
+        })
+    ).currentPublicationId;
 
 const PNG = Buffer.from(
     "89504e470d0a1a0a0000000d4948445200000001000000010806000000" +
@@ -279,50 +297,32 @@ describe("MCP website tools (U11)", () => {
         expect(textOf(bad)).toContain("Next: Call get_page");
     });
 
-    it("publishes, saying what changed", async () => {
-        const { siteId, as } = await connect();
-        const r = await call(as, "publish_site", {
-            site_id: siteId,
-            confirm_code: await codeFor(as, siteId),
-        });
-        expect(textOf(r)).toContain("Published the website");
-        expect(data(r)).toMatchObject({ outcome: "published" });
-        const site = await prisma.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { currentPublicationId: true },
-        });
-        expect(site.currentPublicationId).not.toBeNull();
-        expect(
-            await prisma.mcpActivity.count({
-                where: { tool: "publish_site", connectionId: as.connection.id },
-            }),
-        ).toBe(1);
-    });
-
-    it("summarises without publishing: what goes live, preview, where it goes, a code kept only as a digest", async () => {
-        const { siteId, as } = await connect();
+    it("prepares a publish without publishing: what goes live, preview, a link into Saroh, the token kept only as a digest", async () => {
+        const { org, siteId, as } = await connect();
         const r = await call(as, "preview_publish", { site_id: siteId });
         expect(r.isError).toBeFalsy();
         const out = data<{
             will: string;
             changed: string[];
             preview_url: string;
-            confirm_code: string;
+            request_id: string;
+            confirm_url: string;
         }>(r);
         expect(out).toMatchObject({
             will: "go_live",
             changed: ["first publish: the whole site"],
         });
         expect(out.preview_url).toMatch(/\/preview\/[\w-]+$/);
+        const link = new URL(out.confirm_url);
+        expect(link.pathname).toBe(`/open/${org.id}`);
+        expect(link.searchParams.get("to")).toBe(
+            `/sites/${siteId}/publish-requests/${out.request_id}`,
+        );
         expect(textOf(r)).toContain("Not published.");
-        expect(textOf(r)).toContain(out.confirm_code);
-        expect(textOf(r)).toContain("Only after they say yes");
+        expect(textOf(r)).toContain(out.confirm_url);
+        expect(textOf(r)).toContain("you can't publish");
 
-        const site = await prisma.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { currentPublicationId: true },
-        });
-        expect(site.currentPublicationId).toBeNull();
+        expect(await liveOf(siteId)).toBeNull();
         expect(
             await prisma.mcpActivity.count({
                 where: { connectionId: as.connection.id },
@@ -332,43 +332,122 @@ describe("MCP website tools (U11)", () => {
             where: { siteId },
         });
         expect(rows).toHaveLength(1);
-        expect(JSON.stringify(rows)).not.toContain(out.confirm_code);
+        expect(rows[0]).toMatchObject({
+            clientName: "Claude",
+            requestedByUserId: as.ctx.userId,
+            usedAt: null,
+        });
+        expect(JSON.stringify(rows)).not.toContain(out.request_id);
+        expect(
+            rows[0].expiresAt.getTime() - rows[0].createdAt.getTime(),
+        ).toBeGreaterThan(23 * 60 * 60 * 1000);
     });
 
-    it("refuses a used code, an expired one, and one from another connection, business or site", async () => {
-        const { org, siteId, as } = await connect();
-        const publish = (who: McpCall, site_id: string, confirm_code: string) =>
-            call(who, "publish_site", { site_id, confirm_code });
-        const live = async () =>
-            (
-                await prisma.site.findUniqueOrThrow({
-                    where: { id: siteId },
-                    select: { currentPublicationId: true },
-                })
-            ).currentPublicationId;
-
-        // Another connection to the same business.
-        const other: McpCall = {
-            ...as,
-            connection: { ...as.connection, id: uniq("grant") },
-        };
-        const code = await codeFor(as, siteId);
-        const theirs = await publish(other, siteId, code);
-        expect(theirs.isError).toBe(true);
-        expect(textOf(theirs)).toContain("isn't one Saroh gave");
-
-        // The same connection in another business.
-        const b = await connect();
-        const elsewhere = await publish(
-            { ...b.as, connection: as.connection },
-            b.siteId,
-            code,
+    it("gives an AI app no tool that publishes", () => {
+        const tools = registry.all();
+        const names = tools.map((t) => t.name);
+        expect(names).not.toContain("publish_site");
+        expect(names).toEqual(
+            expect.arrayContaining(["preview_publish", "get_publish_request"]),
         );
-        expect(elsewhere.isError).toBe(true);
-        expect(textOf(elsewhere)).toContain("isn't one Saroh gave");
+        // Every tool that needs the publish right only reads.
+        const publishing = tools.filter((t) => t.capability === "site:publish");
+        expect(publishing.map((t) => t.name).sort()).toEqual([
+            "get_publish_request",
+            "preview_publish",
+        ]);
+        for (const t of publishing) expect(t.hints.readOnlyHint).toBe(true);
+    });
 
+    it("publishes when a person confirms in Saroh, as them, noting the app", async () => {
+        const { org, siteId, as, ownerCtx } = await connect();
+        const { request_id } = await requestFor(as, siteId);
+
+        const read = await requests.read(ownerCtx, siteId, request_id);
+        expect(read).toMatchObject({
+            app: "Claude",
+            connectedBy: "Asha",
+            status: "open",
+            will: "go_live",
+            draftChanged: false,
+            neverPublished: true,
+        });
+        // Reading never answers it.
+        expect(await liveOf(siteId)).toBeNull();
+
+        const answer = await requests.confirm(ownerCtx, siteId, request_id);
+        expect(answer.outcome).toBe("published");
+        expect(await liveOf(siteId)).not.toBeNull();
+
+        const audit = await prisma.auditEvent.findFirstOrThrow({
+            where: {
+                organizationId: org.id,
+                action: "ai_connection.publish_request_answered",
+            },
+        });
+        expect(audit).toMatchObject({
+            actorUserId: ownerCtx.userId,
+            targetId: as.connection.id,
+        });
+        expect(audit.metadata).toMatchObject({
+            outcome: "PUBLISHED",
+            app: "Claude",
+            siteId,
+        });
+        expect(
+            await prisma.mcpActivity.count({
+                where: {
+                    tool: "publish_request_answered",
+                    connectionId: as.connection.id,
+                    userId: ownerCtx.userId,
+                },
+            }),
+        ).toBe(1);
+
+        const status = await call(as, "get_publish_request", {
+            site_id: siteId,
+            request_id,
+        });
+        expect(data(status)).toMatchObject({
+            status: "published",
+            confirm_url: null,
+        });
+        expect(
+            (await requests.read(ownerCtx, siteId, request_id)).decidedBy,
+        ).toBe("Asha");
+    });
+
+    it("doesn't publish when the person declines, and says so to the app", async () => {
+        const { siteId, as, ownerCtx } = await connect();
+        const { request_id } = await requestFor(as, siteId);
+        expect(
+            (await requests.decline(ownerCtx, siteId, request_id)).outcome,
+        ).toBe("declined");
+        expect(await liveOf(siteId)).toBeNull();
+        const status = await call(as, "get_publish_request", {
+            site_id: siteId,
+            request_id,
+        });
+        expect(data(status)).toMatchObject({ status: "declined" });
+        expect(
+            await refusal(requests.confirm(ownerCtx, siteId, request_id)),
+        ).toBe("PUBLISH_REQUEST_USED");
+        expect(await liveOf(siteId)).toBeNull();
+    });
+
+    it("refuses a used, expired or replaced request, and one for another business or site", async () => {
+        const { org, siteId, as, ownerCtx } = await connect();
+        const { request_id } = await requestFor(as, siteId);
+
+        // Another business, with its own owner, can't reach it.
+        const b = await connect();
+        expect(
+            await refusal(requests.confirm(b.ownerCtx, siteId, request_id)),
+        ).toBe("NotFoundException");
+        expect(
+            await refusal(requests.confirm(b.ownerCtx, b.siteId, request_id)),
+        ).toBe("NotFoundException");
         // Another website of the same business.
-        // Made directly: a business normally has one website.
         const { id: second } = await prisma.site.create({
             data: {
                 organizationId: org.id,
@@ -376,36 +455,103 @@ describe("MCP website tools (U11)", () => {
                 slug: uniq("rye-two"),
             },
         });
-        const wrongSite = await publish(as, second, code);
-        expect(wrongSite.isError).toBe(true);
-        expect(textOf(wrongSite)).toContain("isn't one Saroh gave");
-        expect(await live()).toBeNull();
+        expect(
+            await refusal(requests.confirm(ownerCtx, second, request_id)),
+        ).toBe("NotFoundException");
+        expect(await liveOf(siteId)).toBeNull();
 
-        // None of those spent it.
-        expect((await publish(as, siteId, code)).isError).toBeFalsy();
-        const published = await live();
+        // None of those spent it; it takes once.
+        await requests.confirm(ownerCtx, siteId, request_id);
+        const published = await liveOf(siteId);
         expect(published).not.toBeNull();
-        const again = await publish(as, siteId, code);
-        expect(again.isError).toBe(true);
-        expect(textOf(again)).toContain("already used");
+        expect(
+            await refusal(requests.confirm(ownerCtx, siteId, request_id)),
+        ).toBe("PUBLISH_REQUEST_USED");
 
-        clock = new Date();
-        const old = await codeFor(as, siteId);
-        clock = new Date(clock.getTime() + 10 * 60 * 1000 + 1);
-        try {
-            const late = await publish(as, siteId, old);
-            expect(late.isError).toBe(true);
-            expect(textOf(late)).toContain("expired");
-        } finally {
-            clock = null;
-        }
-        expect(await live()).toBe(published);
-        expect(org.id).not.toBe(b.org.id);
+        // After 24 hours.
+        const late = await requestFor(as, siteId);
+        const dayOn = new Date(Date.now() + 24 * 60 * 60 * 1000 + 1000);
+        expect(
+            await refusal(
+                requests.confirm(ownerCtx, siteId, late.request_id, dayOn),
+            ),
+        ).toBe("PUBLISH_REQUEST_EXPIRED");
+
+        // A newer preview of the site replaces it.
+        const newer = await requestFor(as, siteId);
+        expect(
+            await refusal(requests.confirm(ownerCtx, siteId, late.request_id)),
+        ).toBe("PUBLISH_REQUEST_EXPIRED");
+        const replaced = await call(as, "get_publish_request", {
+            site_id: siteId,
+            request_id: late.request_id,
+        });
+        expect(data(replaced)).toMatchObject({ status: "expired" });
+        expect(
+            data(
+                await call(as, "get_publish_request", {
+                    site_id: siteId,
+                    request_id: newer.request_id,
+                }),
+            ),
+        ).toMatchObject({ status: "waiting" });
+        expect(await liveOf(siteId)).toBe(published);
     });
 
-    it("refuses when the draft changed after the summary, and says to get a new one", async () => {
-        const { siteId, homeId, as } = await connect();
-        const code = await codeFor(as, siteId);
+    it("refuses someone without site:publish", async () => {
+        const { org, siteId, as } = await connect();
+        const { request_id } = await requestFor(as, siteId);
+        const member = await prisma.user.create({
+            data: { email: `${uniq("m")}@example.com`, name: "Ravi" },
+        });
+        await prisma.membership.create({
+            data: { organizationId: org.id, userId: member.id, role: "MEMBER" },
+        });
+        const memberCtx = await new OrganizationContextService().resolve(
+            member.id,
+            org.id,
+        );
+        expect(
+            await refusal(requests.read(memberCtx, siteId, request_id)),
+        ).toBe("ROLE_DENIED");
+        expect(
+            await refusal(requests.confirm(memberCtx, siteId, request_id)),
+        ).toBe("ROLE_DENIED");
+        expect(
+            await refusal(requests.decline(memberCtx, siteId, request_id)),
+        ).toBe("ROLE_DENIED");
+        expect(await liveOf(siteId)).toBeNull();
+    });
+
+    it("lets anyone with site:publish confirm another person's request", async () => {
+        const { org, siteId, as } = await connect();
+        const { request_id } = await requestFor(as, siteId);
+        const admin = await prisma.user.create({
+            data: { email: `${uniq("a")}@example.com`, name: "Meera" },
+        });
+        await prisma.membership.create({
+            data: { organizationId: org.id, userId: admin.id, role: "ADMIN" },
+        });
+        const adminCtx = await new OrganizationContextService().resolve(
+            admin.id,
+            org.id,
+        );
+        await requests.confirm(adminCtx, siteId, request_id);
+        expect(await liveOf(siteId)).not.toBeNull();
+        expect(
+            await prisma.mcpPublishCode.findFirstOrThrow({
+                where: { siteId },
+                select: { decidedByUserId: true, requestedByUserId: true },
+            }),
+        ).toEqual({
+            decidedByUserId: admin.id,
+            requestedByUserId: as.ctx.userId,
+        });
+    });
+
+    it("refuses when the draft changed after the app prepared it, and keeps the request open", async () => {
+        const { siteId, homeId, as, ownerCtx } = await connect();
+        const { request_id } = await requestFor(as, siteId);
         const edit = await call(as, "edit_page", {
             site_id: siteId,
             page_id: homeId,
@@ -422,24 +568,21 @@ describe("MCP website tools (U11)", () => {
             ],
         });
         expect(edit.isError).toBeFalsy();
-        const r = await call(as, "publish_site", {
-            site_id: siteId,
-            confirm_code: code,
-        });
-        expect(r.isError).toBe(true);
-        expect(textOf(r)).toBe(
-            "The draft changed since you showed the person what goes live. Next: Call preview_publish to get the new summary and code, show it to the person, and publish only once they say yes.",
+        expect(
+            (await requests.read(ownerCtx, siteId, request_id)).draftChanged,
+        ).toBe(true);
+        expect(
+            await refusal(requests.confirm(ownerCtx, siteId, request_id)),
+        ).toBe("DRAFT_CHANGED");
+        expect(await liveOf(siteId)).toBeNull();
+        expect((await requests.read(ownerCtx, siteId, request_id)).status).toBe(
+            "open",
         );
-        const site = await prisma.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { currentPublicationId: true },
-        });
-        expect(site.currentPublicationId).toBeNull();
     });
 
     it("refuses a save that lands after publish read the draft, under the site's lock", async () => {
-        const { siteId, homeId, as } = await connect();
-        const code = await codeFor(as, siteId);
+        const { siteId, homeId, as, ownerCtx } = await connect();
+        const { request_id } = await requestFor(as, siteId);
         const real = sites.loadDraftSite.bind(sites);
         // publish's own read of the draft, then a save before it writes.
         const spy = jest
@@ -453,32 +596,23 @@ describe("MCP website tools (U11)", () => {
                 return draft;
             });
         try {
-            const r = await call(as, "publish_site", {
-                site_id: siteId,
-                confirm_code: code,
-            });
+            expect(
+                await refusal(requests.confirm(ownerCtx, siteId, request_id)),
+            ).toBe("DRAFT_CHANGED");
             expect(spy).toHaveBeenCalled();
-            expect(r.isError).toBe(true);
-            expect(textOf(r)).toContain(
-                "The draft changed since you showed the person what goes live.",
-            );
         } finally {
             spy.mockRestore();
         }
-        const site = await prisma.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { currentPublicationId: true },
-        });
-        expect(site.currentPublicationId).toBeNull();
+        expect(await liveOf(siteId)).toBeNull();
         expect(
-            await prisma.mcpActivity.count({
-                where: { tool: "publish_site", connectionId: as.connection.id },
+            await prisma.mcpPublishCode.count({
+                where: { siteId, usedAt: { not: null } },
             }),
         ).toBe(0);
     });
 
-    it("with a reviewer required, says so in the summary and asks for approval only with a valid code", async () => {
-        const { org, siteId, as } = await connect();
+    it("with a reviewer required, says so and makes the approval request when the person confirms", async () => {
+        const { org, siteId, as, ownerCtx } = await connect();
         await prisma.featureFlag.upsert({
             where: { key: "SITE_TEST_RELEASES" },
             create: { key: "SITE_TEST_RELEASES", enabledByDefault: false },
@@ -503,33 +637,27 @@ describe("MCP website tools (U11)", () => {
         const summary = await call(as, "preview_publish", { site_id: siteId });
         expect(data(summary)).toMatchObject({ will: "go_to_reviewers" });
         expect(textOf(summary)).toContain("reviewers");
-        const code = data<{ confirm_code: string }>(summary).confirm_code;
-
-        const forged = await call(as, "publish_site", {
-            site_id: siteId,
-            confirm_code: `${code.slice(0, -2)}xx`,
-        });
-        expect(forged.isError).toBe(true);
+        const { request_id } = data<{ request_id: string }>(summary);
         expect(await requested()).toBe(0);
-        expect(await prisma.siteTestRelease.count({ where: { siteId } })).toBe(
-            0,
+        expect((await requests.read(ownerCtx, siteId, request_id)).will).toBe(
+            "go_to_reviewers",
         );
 
-        const r = await call(as, "publish_site", {
-            site_id: siteId,
-            confirm_code: code,
-        });
-        expect(r.isError).toBeFalsy();
-        expect(data(r)).toMatchObject({ outcome: "sent_for_approval" });
-        const site = await prisma.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { currentPublicationId: true },
-        });
-        expect(site.currentPublicationId).toBeNull();
+        const answer = await requests.confirm(ownerCtx, siteId, request_id);
+        expect(answer.outcome).toBe("sent_for_approval");
+        expect(await liveOf(siteId)).toBeNull();
         expect(await requested()).toBe(1);
         expect(await prisma.siteTestRelease.count({ where: { siteId } })).toBe(
             1,
         );
+        expect(
+            data(
+                await call(as, "get_publish_request", {
+                    site_id: siteId,
+                    request_id,
+                }),
+            ),
+        ).toMatchObject({ status: "sent_for_approval" });
     });
 
     it("restores the draft to before the session after three edits", async () => {

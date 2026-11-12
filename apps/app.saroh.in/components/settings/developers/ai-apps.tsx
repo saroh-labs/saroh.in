@@ -32,7 +32,7 @@ import { relativeWhen } from "@/lib/notifications/when";
 
 const CAN = [
     "Build and edit pages as a draft, and show you a preview",
-    "Publish only after asking you",
+    "Prepare a publish that you confirm in Saroh",
     "Add and update products, services, prices and hours",
     "See, create and move bookings and orders",
 ];
@@ -252,10 +252,10 @@ export function AiApps(props: AiAppsProps) {
                     </h3>
                     <CanAndCant />
                     <Notice tone="neutral" icon={<Lock />}>
-                        Website changes stay a draft until you say publish, and
-                        you can roll the draft back. An assistant can do only
-                        what you can do here. What it reads is sent to the
-                        company behind that app.
+                        Website changes stay a draft until you publish them
+                        yourself in Saroh, and you can roll the draft back. An
+                        assistant can do only what you can do here. What it
+                        reads is sent to the company behind that app.
                     </Notice>
                     <McpAddress mcp={mcp} />
                     <a
