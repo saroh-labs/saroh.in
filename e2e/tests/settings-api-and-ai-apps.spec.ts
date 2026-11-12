@@ -154,6 +154,8 @@ test(
         await detail.getByText("Sending", { exact: true }).click();
         await detail.getByRole("button", { name: "Save" }).click();
         await expect(detail).toBeHidden();
+        // The list refreshes from the API after the save: reopen once it says Off.
+        await expect(row).toContainText("Off");
         await row.click();
         await expect(
             detail.getByText("Off. Turns on once a test gets through."),
