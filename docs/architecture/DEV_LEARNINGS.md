@@ -6670,3 +6670,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a test `WEBHOOK_SECRET_KEY` beside `APIKEY_ENC_KEY` in the gate's stack and every CI job; the spec grants the clipboard like the other copy specs; development got its keys made on the box.
 - **Rule:** a new API env variable that a feature can't work without lands in the same commit as: its test value in `scripts/prepush.sh` and `ci.yml`, its name in `.env.example`, and a line in the batch's PR body naming each environment that needs it set. A new browser spec runs once (`pnpm prepush --e2e`) before its batch's gate.
 - **Category:** process · environments
+
+## Every server render of the workspace logged use-intl's ENVIRONMENT_FALLBACK (12 Nov 2026)
+
+- **Symptom:** `[WebServer] Error: ENVIRONMENT_FALLBACK: There is no timeZone configured…` in the app's server log on page loads, seen while filming demos.
+- **Cause:** `app/providers.tsx` gave `IntlProvider` a locale and messages but no `timeZone`. use-intl checks for one on the server, the first time a component asks for a translator, and reports the fallback through `onError` (a console error). No date was wrong: every date is formatted with its business's own zone, never through intl.
+- **Fix:** `timeZone={PROFILE.defaultZone}`, the edition's default, which is India's until a business saves its own (the time zone decision in DECISIONS.md). `lib/language/intl-time-zone.test.tsx` server-renders the providers and fails on the report.
+- **Rule:** an intl provider always gets a `timeZone`; a test of it renders on the server, because use-intl only checks there.
+- **Category:** app · i18n
