@@ -1,3 +1,4 @@
+import { TEMPLATE_KINDS } from "@saroh/templates";
 import { z } from "zod";
 
 import {
@@ -36,6 +37,7 @@ import type {
     OrganizationSettings,
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
+import { tradeOf } from "@/lib/organizations/trade";
 
 /**
  * What Settings › Business's sheets hold and send: the one schema every
@@ -54,6 +56,8 @@ export const formSchema = z
         name: z.string().trim().min(1, { error: "Add a name." }),
         // What is being set up (DEC-070): words and defaults only.
         kind: z.enum(ORGANIZATION_KINDS),
+        // The kind of place (DEC-216): suggestions only; null is none said.
+        trade: z.enum(TEMPLATE_KINDS).nullable(),
         legalName: z.string().optional(),
         type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
@@ -166,6 +170,7 @@ export const FIELD_OF: Record<string, FormField> = {
     region: "region",
     name: "name",
     kind: "kind",
+    trade: "trade",
     timezone: "timezone",
     phone: "phone",
 };
@@ -186,6 +191,7 @@ const ADDRESS_FIELDS = [...ADDRESS_KEYS, "gstState", "country"] as const;
  */
 const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
     kind: ["kind"],
+    trade: ["trade"],
     name: ["name"],
     legalName: ["legalName"],
     type: ["type"],
@@ -231,6 +237,7 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
     return {
         name: settings.name,
         kind: kindOf(settings.kind),
+        trade: tradeOf(settings.trade),
         legalName: settings.profile?.legalName ?? "",
         type: businessTypeOf(settings.profile?.type),
         country: settings.profile?.country ?? "",
@@ -360,6 +367,7 @@ export function settingsPatch(
     return {
         ...(dirty.name ? { name: values.name.trim() } : {}),
         ...(dirty.kind ? { kind: values.kind } : {}),
+        ...(dirty.trade ? { trade: values.trade } : {}),
         ...(Object.keys(profile).length > 0 ? { profile } : {}),
         ...(Object.keys(tax).length > 0 ? { tax } : {}),
         ...(Object.keys(registeredAddress).length > 0

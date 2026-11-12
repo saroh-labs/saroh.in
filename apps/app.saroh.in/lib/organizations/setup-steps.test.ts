@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SetupDraft, SetupValues } from "./setup-steps";
 import {
-    asksTrade,
     clearSetupDraft,
     fieldsOfStep,
     firstUnanswered,
@@ -24,8 +23,8 @@ import {
     stepOfField,
     stepPosition,
     stepPrimary,
-    tradeLine,
     tradeSent,
+    tradeStored,
     writeSetupDraft,
 } from "./setup-steps";
 
@@ -252,45 +251,38 @@ describe("which step may be shown", () => {
     });
 });
 
-describe("Bookings' trade (#1193, DEC-189)", () => {
-    it("is part of the last step, so its gate and the draft carry it", () => {
-        expect(fieldsOfStep("first")).toEqual(["goal", "trade"]);
-        expect(stepOfField("trade")).toBe("first");
+describe("the kind of place (DEC-216, DEC-189)", () => {
+    it("is part of the first step, so its gate and the draft carry it", () => {
+        expect(fieldsOfStep("kind")).toEqual(["kind", "trade"]);
+        expect(fieldsOfStep("first")).toEqual(["goal"]);
+        expect(stepOfField("trade")).toBe("kind");
     });
 
-    it("is asked only when the goal is Bookings", () => {
-        expect(asksTrade("APPOINTMENTS")).toBe(true);
-        for (const goal of ["COMMERCE", "WEBSITE", "CRM", "INVOICE", "LATER"]) {
-            expect(asksTrade(goal)).toBe(false);
-        }
-    });
-
-    it("Salon or Gym replaces the first service with a line about samples", () => {
-        expect(tradeLine("APPOINTMENTS", "SALON")).toContain("Sample services");
-        expect(tradeLine("APPOINTMENTS", "GYM")).toContain("Sample services");
-        // Something else, or nothing chosen: the first service as before.
-        expect(tradeLine("APPOINTMENTS", "OTHER")).toBeNull();
-        expect(tradeLine("APPOINTMENTS", undefined)).toBeNull();
-        expect(tradeLine("COMMERCE", "SALON")).toBeNull();
-    });
-
-    it("is sent only for Salon or Gym with Bookings", () => {
-        expect(tradeSent({ goal: "APPOINTMENTS", trade: "SALON" })).toBe(
-            "SALON",
+    it("is stored only for a business", () => {
+        expect(tradeStored({ kind: "BUSINESS", trade: "clinic" })).toBe(
+            "clinic",
         );
-        expect(tradeSent({ goal: "APPOINTMENTS", trade: "GYM" })).toBe("GYM");
-        expect(tradeSent({ goal: "APPOINTMENTS", trade: "OTHER" })).toBe(
-            undefined,
-        );
-        expect(tradeSent({ goal: "APPOINTMENTS" })).toBe(undefined);
-        expect(tradeSent({ goal: "COMMERCE", trade: "SALON" })).toBe(undefined);
+        expect(tradeStored({ kind: "SOLO", trade: "clinic" })).toBe(undefined);
+    });
+
+    it("sends Bookings' samples from the stored trade, only for a salon or gym", () => {
+        const at = (trade?: "salon" | "gym" | "other", goal = "APPOINTMENTS") =>
+            tradeSent({ kind: "BUSINESS", goal, trade });
+        expect(at("salon")).toBe("SALON");
+        expect(at("gym")).toBe("GYM");
+        expect(at("other")).toBe(undefined);
+        expect(at()).toBe(undefined);
+        expect(at("salon", "COMMERCE")).toBe(undefined);
+        expect(
+            tradeSent({ kind: "SOLO", goal: "APPOINTMENTS", trade: "salon" }),
+        ).toBe(undefined);
     });
 
     it("an answer without one still passes, as before", () => {
         expect(firstUnanswered(ANSWERED, false)).toBeNull();
         expect(
             firstUnanswered(
-                { ...ANSWERED, goal: "APPOINTMENTS", trade: "GYM" },
+                { ...ANSWERED, goal: "APPOINTMENTS", trade: "gym" },
                 false,
             ),
         ).toBeNull();
@@ -302,12 +294,27 @@ describe("the draft's trade", () => {
 
     it("comes back after a reload", () => {
         const withTrade: SetupDraft = {
-            values: { ...ANSWERED, goal: "APPOINTMENTS", trade: "SALON" },
+            values: { ...ANSWERED, goal: "APPOINTMENTS", trade: "salon" },
             edited: false,
             goalPicked: true,
         };
         writeSetupDraft("asha@example.com", withTrade);
-        expect(readSetupDraft("asha@example.com")?.values.trade).toBe("SALON");
+        expect(readSetupDraft("asha@example.com")?.values.trade).toBe("salon");
+    });
+
+    it("drops a trade from before DEC-216, and keeps the rest of the draft", () => {
+        window.sessionStorage.setItem(
+            SETUP_DRAFT_KEY,
+            JSON.stringify({
+                for: "asha@example.com",
+                values: { ...ANSWERED, trade: "SALON" },
+                edited: false,
+                goalPicked: false,
+            }),
+        );
+        const read = readSetupDraft("asha@example.com");
+        expect(read?.values.name).toBe(ANSWERED.name);
+        expect(read?.values.trade).toBeUndefined();
     });
 });
 

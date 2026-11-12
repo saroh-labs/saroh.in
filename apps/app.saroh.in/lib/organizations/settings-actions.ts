@@ -55,8 +55,9 @@ export async function saveOrganizationSettings(
         ) {
             revalidatePath("/sites", "layout");
         }
-        if (input.kind !== undefined) revalidatePath("/", "layout");
-        else revalidatePath("/");
+        if (input.kind !== undefined || input.trade !== undefined) {
+            revalidatePath("/", "layout");
+        } else revalidatePath("/");
     }
     return result;
 }

@@ -46,11 +46,15 @@ import type { AcceptedBusinessType } from "./business-type";
 import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
 import { ORGANIZATION_KINDS } from "./organization-kind";
+import type { OrganizationTrade } from "./organization-trade";
+import { ORGANIZATION_TRADES, startTemplateOf } from "./organization-trade";
 import { referralCodeOf } from "./referral";
 import type { SignupSource } from "./signup-source";
 import { signupSourceOf } from "./signup-source";
 
 export { BUSINESS_TYPES, type BusinessType } from "./business-type";
+
+const TRADE_MESSAGE = `trade must be one of ${ORGANIZATION_TRADES.join(", ")}`;
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -197,6 +201,27 @@ export class OnboardOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /**
+     * The kind of place it is (DEC-216): one of the template kinds. Absent,
+     * it is not said, as for every business before it.
+     */
+    @IsOptional()
+    @IsIn(ORGANIZATION_TRADES, { message: TRADE_MESSAGE })
+    trade?: OrganizationTrade;
+
+    /**
+     * The template picked in the public gallery before sign-up
+     * (`?template=`, DEC-216), by id or slug. Never refused: one Saroh
+     * doesn't know is dropped, so a bad link can't stop a business being
+     * made. The website picker starts on it.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => startTemplateOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    startTemplate?: string;
 
     /**
      * What they chose to do first on the setup screen (UX audit, 10 Oct):
@@ -593,6 +618,14 @@ export class UpdateOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /**
+     * The kind of place it is (DEC-216): one of the template kinds, or null
+     * to say none. Absent, it is left as it is.
+     */
+    @IsOptional()
+    @IsIn(ORGANIZATION_TRADES, { message: TRADE_MESSAGE })
+    trade?: OrganizationTrade | null;
 
     /** The business's social links (DEC-128), a field per network. */
     @IsOptional()

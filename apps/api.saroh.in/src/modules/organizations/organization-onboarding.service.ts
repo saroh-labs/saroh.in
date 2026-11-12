@@ -178,6 +178,11 @@ export class OrganizationOnboardingService {
                     name: dto.name,
                     slug,
                     kind,
+                    // The kind of place and the gallery's template (DEC-216).
+                    ...(dto.trade ? { trade: dto.trade } : {}),
+                    ...(dto.startTemplate
+                        ? { startTemplate: dto.startTemplate }
+                        : {}),
                     ...(currency !== undefined ? { edition, currency } : {}),
                     ...(billingProfileId ? { billingProfileId } : {}),
                     ...(referredBy
@@ -289,6 +294,7 @@ export class OrganizationOnboardingService {
             metadata: {
                 slug: onboarded.slug,
                 kind,
+                ...(dto.trade ? { trade: dto.trade } : {}),
                 // How its account manager was proved, never who: the
                 // link itself is the record (DEC-169).
                 ...(managerSource ? { accountManager: managerSource } : {}),

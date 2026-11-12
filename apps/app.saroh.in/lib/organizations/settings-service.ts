@@ -14,6 +14,7 @@ import type {
 
 import type { OrganizationKind } from "./kind";
 import type { PayInstructionsSettings, PayValues } from "./pay-instructions";
+import type { Trade } from "./trade";
 
 /**
  * Organization settings access (name + business profile).
@@ -138,6 +139,11 @@ export interface OrganizationSettings {
      * an API older than it — read it through `kindOf`.
      */
     kind?: OrganizationKind;
+    /**
+     * The kind of place it is (DEC-216); null when never said, absent from
+     * an older API. Read it through `tradeOf`.
+     */
+    trade?: Trade | null;
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
@@ -247,6 +253,8 @@ export interface OrganizationSettingsInput {
      * `org:update`, as the name does.
      */
     kind?: OrganizationKind;
+    /** The kind of place (DEC-216); null says none. Needs `org:update`. */
+    trade?: Trade | null;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
     tax?: TaxSettingsInput;
     /** "" clears a line; the state goes as `tax.state`. */

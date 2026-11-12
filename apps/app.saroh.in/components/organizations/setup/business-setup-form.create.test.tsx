@@ -245,55 +245,84 @@ describe("What will you do first?", () => {
         },
     );
 
-    describe("Bookings' trade (#1193, DEC-189)", () => {
-        const SAMPLES = "Sample services, prices and hours will be ready";
+    describe("the kind of place (DEC-216), and Bookings' samples from it (DEC-189)", () => {
         const tradeChips = () =>
             Array.from(host.querySelectorAll("[data-trade]")).map(
                 (b) => b.textContent,
             );
 
-        it("is asked only for Bookings", async () => {
+        it("is asked of a business on the first step, with the gallery's trades", () => {
+            expect(stepOnShow()).toBe("kind");
+            expect(text()).toContain("What kind of place is it?");
+            expect(tradeChips()).toEqual([
+                "Salon",
+                "Gym or studio",
+                "Clinic",
+                "Dietician or coach",
+                "Bakery or food",
+                "Shop",
+                "Something else",
+            ]);
+            expect(text()).toContain(
+                "A salon or gym also gets sample services to edit.",
+            );
+            choose("Just me");
+            expect(tradeChips()).toEqual([]);
+        });
+
+        it("is stored with the business", async () => {
+            choose("Clinic");
             await toFirst();
-            expect(tradeChips()).toEqual([]);
-            choose("Take bookings");
-            expect(tradeChips()).toEqual(["Salon", "Gym", "Something else"]);
             choose("Sell things");
-            expect(tradeChips()).toEqual([]);
+            await press();
+            expect(createOrganization.mock.calls[0]?.[0]).toMatchObject({
+                kind: "BUSINESS",
+                trade: "clinic",
+            });
+        });
+
+        it("isn't stored for Just me, whatever was picked before", async () => {
+            choose("Salon");
+            choose("Just me");
+            await toFirst("Asha Rao");
+            await press();
+            expect(createOrganization.mock.calls[0]?.[0]).not.toHaveProperty(
+                "trade",
+            );
         });
 
         it.each([
             ["Salon", "SALON"],
-            ["Gym", "GYM"],
+            ["Gym or studio", "GYM"],
         ] as const)(
-            "%s says samples are coming and sends the trade",
-            async (label, trade) => {
+            "%s starts Bookings with samples, read from the stored trade",
+            async (label, preset) => {
                 startWithGoalAction.mockResolvedValue({
                     href: "/services",
                     turnedOn: ["CRM", "APPOINTMENTS"],
                 });
-                await toFirst();
-                choose("Take bookings");
                 choose(label);
-                expect(text()).toContain(SAMPLES);
+                await toFirst();
+                expect(tradeChips()).toEqual([]);
+                choose("Take bookings");
                 await press();
                 expect(startWithGoalAction).toHaveBeenCalledWith(
                     "APPOINTMENTS",
                     "BUSINESS",
-                    trade,
+                    preset,
                 );
                 expect(push).toHaveBeenCalledWith("/services");
             },
         );
 
-        it("Something else, or none, is Bookings as before", async () => {
+        it("another trade, or none, is Bookings as before", async () => {
             startWithGoalAction.mockResolvedValue({
                 href: "/services/new",
                 turnedOn: ["APPOINTMENTS"],
             });
+            choose("Clinic");
             await toFirst();
             choose("Take bookings");
-            choose("Something else");
-            expect(text()).not.toContain(SAMPLES);
             await press();
             expect(startWithGoalAction).toHaveBeenCalledWith(
                 "APPOINTMENTS",
@@ -301,29 +330,55 @@ describe("What will you do first?", () => {
             );
         });
 
-        it("Back and Continue keep the choice", async () => {
-            await toFirst();
-            choose("Take bookings");
-            choose("Gym");
-            await pressBack();
-            expect(stepOnShow()).toBe("name");
-            await press();
-            expect(stepOnShow()).toBe("first");
-            const on = host.querySelector('[data-trade="GYM"]');
-            expect(on?.getAttribute("aria-checked")).toBe("true");
-            expect(text()).toContain(SAMPLES);
-        });
-
-        it("a trade left behind with Bookings is not sent", async () => {
-            await toFirst();
-            choose("Take bookings");
+        it("a salon that sells first gets no samples", async () => {
             choose("Salon");
+            await toFirst();
             choose("Sell things");
             await press();
             expect(startWithGoalAction).toHaveBeenCalledWith(
                 "COMMERCE",
                 "BUSINESS",
             );
+        });
+
+        it("Back keeps the choice", async () => {
+            choose("Bakery or food");
+            await toName();
+            await pressBack();
+            expect(stepOnShow()).toBe("kind");
+            expect(
+                host
+                    .querySelector('[data-trade="food"]')
+                    ?.getAttribute("aria-checked"),
+            ).toBe("true");
+        });
+    });
+
+    describe("a template picked in the gallery (DEC-216)", () => {
+        beforeEach(() => {
+            unmount();
+            mount({
+                gallery: { id: "salon", name: "Salon", trade: "salon" },
+            });
+        });
+
+        it("is named on the first step and starts on its trade", () => {
+            expect(text()).toContain("You picked the Salon template");
+            expect(
+                host
+                    .querySelector('[data-trade="salon"]')
+                    ?.getAttribute("aria-checked"),
+            ).toBe("true");
+        });
+
+        it("is kept with the business", async () => {
+            await toFirst();
+            choose("Sell things");
+            await press();
+            expect(createOrganization.mock.calls[0]?.[0]).toMatchObject({
+                trade: "salon",
+                startTemplate: "salon",
+            });
         });
     });
 

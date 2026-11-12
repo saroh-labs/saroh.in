@@ -363,6 +363,77 @@ describe("What is this? (DEC-070, K5)", () => {
     });
 });
 
+describe("Kind of place (DEC-216, TPLD2)", () => {
+    it("is a business's row under What this is; Just me has none", () => {
+        draw(settings({ trade: "salon" }));
+        expect(row("business-trade")?.textContent).toContain("Kind of place");
+        expect(row("business-trade")?.textContent).toContain("Salon");
+        unmount();
+        mount();
+        draw(settings({ kind: "SOLO", trade: "coach" }));
+        expect(row("business-trade")).toBeNull();
+    });
+
+    it("says when none is saved", () => {
+        draw(settings({ trade: null }));
+        expect(row("business-trade")?.textContent).toContain("Not said yet");
+    });
+
+    it("Change opens its sheet; Save sends only the trade, and Undo puts it back", async () => {
+        const before = settings({ trade: "salon" });
+        const after = settings({ trade: "gym" });
+        save.mockResolvedValue({ ok: true, data: after });
+        undoSettings.mockResolvedValue({ ok: true, data: before });
+        draw(before);
+
+        await press(edit("Change the kind of place"));
+        expect(sheetName()).toBe("Kind of place");
+        expect(sheet()?.textContent).toContain(
+            "What Saroh suggests first: website templates, sample services. It never limits what you can use.",
+        );
+        const chips = Array.from(
+            sheet()?.querySelectorAll<HTMLButtonElement>("[data-trade]") ?? [],
+        );
+        expect(chips.map((c) => c.textContent)).toEqual([
+            "Salon",
+            "Gym or studio",
+            "Clinic",
+            "Dietician or coach",
+            "Bakery or food",
+            "Shop",
+            "Something else",
+        ]);
+        await press(chips.find((c) => c.textContent === "Gym or studio"));
+        await press(item("Save"));
+
+        expect(save).toHaveBeenCalledWith({ trade: "gym" });
+        const [message, onUndo] = showUndo.mock.calls[0] as [
+            string,
+            () => void,
+        ];
+        expect(message).toBe("Kind of place saved.");
+        expect(row("business-trade")?.textContent).toContain("Gym or studio");
+
+        await act(async () => {
+            onUndo();
+            await Promise.resolve();
+        });
+        await settle();
+        expect(undoSettings).toHaveBeenCalledWith(
+            expect.objectContaining({
+                input: { trade: "salon" },
+                expect: { trade: "gym" },
+            }),
+        );
+    });
+
+    it("a read-only role sees it without Change", () => {
+        draw(settings({ trade: "salon" }), { canEdit: false });
+        expect(row("business-trade")?.textContent).toContain("Salon");
+        expect(row("business-trade")?.querySelector("button")).toBeNull();
+    });
+});
+
 describe("the addresses named apart (DEC-069, L12)", () => {
     it("draws no address row in Identity: the Web address card is its one place", () => {
         draw(settings());

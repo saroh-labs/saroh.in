@@ -1,52 +1,71 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useId } from "react";
 
-import type { SetupTrade } from "@/lib/organizations/setup-steps";
-import { TRADE_CHOICES, tradeLine } from "@/lib/organizations/setup-steps";
+import type { Trade } from "@/lib/organizations/trade";
+import { TRADE_CHOICES } from "@/lib/organizations/trade";
 import { ChipGroup } from "@saroh/ui/choice-group";
 
 /**
- * Bookings' trade at setup (#1193, DEC-189), under the goals when Bookings
- * is picked: Salon, Gym or Something else, as chips (44px under a thumb).
- * Salon or Gym starts the business with sample services, prices and hours
- * to edit, in place of the first service it would otherwise make.
+ * "What kind of place is it?" (DEC-216, TPLD1 and TPLD2): the gallery's
+ * trades as chips (44px under a thumb), with one line under them. Setup asks
+ * it of a business on its first step, and Settings › Business changes it in
+ * its sheet. A salon or a gym starts Bookings with sample services (DEC-189).
  */
 export function SetupTradeChoice({
     value,
     onChange,
+    hint,
+    label = "What kind of place is it?",
+    labelledBy,
 }: {
-    value: SetupTrade | undefined;
-    onChange: (trade: SetupTrade) => void;
+    value: Trade | null | undefined;
+    onChange: (trade: Trade) => void;
+    /** The line under the chips. */
+    hint?: string;
+    /** Drawn above the chips, unless the caller names them (`labelledBy`). */
+    label?: string;
+    labelledBy?: string;
 }) {
     const id = useId();
-    const line = tradeLine("APPOINTMENTS", value);
     return (
-        <div className="mt-5" data-trade-choice="">
-            <div
-                data-ph-unmask=""
-                className="mb-1.5 text-[12px] font-medium"
-                id={`${id}-label`}
-            >
-                What kind of place is it?
-            </div>
+        <div data-trade-choice="">
+            {labelledBy ? null : (
+                <div
+                    data-ph-unmask=""
+                    className="mb-2 text-[12px] font-medium"
+                    id={`${id}-label`}
+                >
+                    {label}
+                </div>
+            )}
             <ChipGroup
-                labelledBy={`${id}-label`}
-                describedBy={line ? `${id}-line` : undefined}
+                labelledBy={labelledBy ?? `${id}-label`}
+                describedBy={hint ? `${id}-line` : undefined}
+                className="gap-2"
                 value={value ?? null}
                 onChange={onChange}
                 choices={TRADE_CHOICES.map((c) => ({
                     value: c.value,
-                    label: c.label,
+                    label: (
+                        <>
+                            {c.value === value ? (
+                                <Check aria-hidden className="size-3.5" />
+                            ) : null}
+                            {c.label}
+                        </>
+                    ),
                     data: { "data-trade": c.value },
                 }))}
             />
-            {line ? (
+            {hint ? (
                 <p
                     id={`${id}-line`}
+                    data-ph-unmask=""
                     className="mt-2 text-pretty text-[12px] leading-snug text-muted-foreground"
                 >
-                    {line}
+                    {hint}
                 </p>
             ) : null}
         </div>

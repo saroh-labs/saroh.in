@@ -748,6 +748,104 @@ describe("MCP website tools (U11)", () => {
         expect(textOf(failed)).toContain("already has its website");
     });
 
+    /** Template choice for one business (DEC-216): on or off by its override. */
+    async function templateChoice(organizationId: string, enabled: boolean) {
+        await prisma.featureFlag.upsert({
+            where: { key: "SITE_TEMPLATE_CHOICE" },
+            create: { key: "SITE_TEMPLATE_CHOICE", enabledByDefault: false },
+            update: {},
+        });
+        await prisma.featureFlagOverride.create({
+            data: { flagKey: "SITE_TEMPLATE_CHOICE", organizationId, enabled },
+        });
+    }
+
+    type Listed = {
+        templates: {
+            template_id: string;
+            suggested: boolean;
+            why: string | null;
+        }[];
+        trade: string | null;
+        template_choice: boolean;
+    };
+
+    it("lists the business's trade's templates first, then the suggested, then the rest as also available (DEC-216)", async () => {
+        const { org, as } = await connect();
+        await prisma.organization.update({
+            where: { id: org.id },
+            data: { trade: "salon" },
+        });
+        await templateChoice(org.id, true);
+
+        const listed = await call(as, "list_templates", {});
+        expect(listed.isError).toBeFalsy();
+        const body = data<Listed>(listed);
+        expect(body).toMatchObject({ trade: "salon", template_choice: true });
+        expect(body.templates[0]).toMatchObject({
+            template_id: "salon",
+            suggested: true,
+        });
+        expect(body.templates[0].why).toContain("salon");
+        // Once the also-available start, nothing suggested follows.
+        const firstAlso = body.templates.findIndex((t) => !t.suggested);
+        expect(firstAlso).toBeGreaterThan(0);
+        expect(body.templates.slice(firstAlso).every((t) => !t.suggested)).toBe(
+            true,
+        );
+        expect(body.templates[firstAlso].why).toMatch(/^Also available/);
+        expect(textOf(listed)).toContain("[also available]");
+        expect(textOf(listed)).not.toContain("aren't chosen yet");
+    });
+
+    it("while templates aren't chosen yet, says so and starts from the kind's default whatever is asked (DEC-216)", async () => {
+        const { org, as } = await connect();
+        await templateChoice(org.id, false);
+
+        const listed = await call(as, "list_templates", {});
+        expect(data<Listed>(listed).template_choice).toBe(false);
+        expect(textOf(listed)).toContain("aren't chosen yet");
+
+        const started = await call(as, "create_site_from_template", {
+            name: "Asha's Salon",
+            template_id: "salon",
+            colourway_id: "anything",
+        });
+        expect(started.isError).toBeFalsy();
+        expect(textOf(started)).toContain("aren't chosen yet");
+        const job = await prisma.job.findUniqueOrThrow({
+            where: { id: data<{ job_id: string }>(started).job_id },
+        });
+        expect(
+            (job.payload as { request: Record<string, unknown> }).request,
+        ).toMatchObject({ templateId: "starter" });
+        expect(
+            (job.payload as { request: Record<string, unknown> }).request
+                .styleId,
+        ).toBeUndefined();
+    });
+
+    it("with templates on, starts from the template asked for", async () => {
+        const { org, as } = await connect();
+        await templateChoice(org.id, true);
+        const started = await call(as, "create_site_from_template", {
+            name: "Asha's Salon",
+            template_id: "salon",
+        });
+        expect(textOf(started)).not.toContain("aren't chosen yet");
+        const job = await prisma.job.findUniqueOrThrow({
+            where: { id: data<{ job_id: string }>(started).job_id },
+        });
+        expect(
+            (job.payload as { request: Record<string, unknown> }).request,
+        ).toMatchObject({ templateId: "salon" });
+        const unknown = await call(as, "create_site_from_template", {
+            name: "Nope",
+            template_id: "no-such-template",
+        });
+        expect(unknown.isError).toBe(true);
+    });
+
     it("keeps every tool's definition and its default reads within budget", async () => {
         const { siteId, homeId, as } = await connect();
         const defs = JSON.stringify(

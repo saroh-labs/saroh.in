@@ -11,6 +11,7 @@ import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 import { pickActive } from "./choose";
 import type { OrganizationKind } from "./kind";
 import type { NewBillingProfileInput } from "./setup-billing";
+import type { Trade } from "./trade";
 
 /**
  * Organization data access for app.saroh.in. Organization is the tenant root
@@ -57,6 +58,18 @@ export interface Organization {
      * business.
      */
     kind?: OrganizationKind;
+    /**
+     * The kind of place it is (DEC-216), one of the template kinds; null
+     * when never said. Absent from an API older than it, which reads as
+     * none: read it through `tradeOf`.
+     */
+    trade?: Trade | null;
+    /**
+     * The template picked in the public gallery before sign-up (DEC-216),
+     * a template id: Turn on Website and New site start on it. Null for
+     * most; absent from an older API.
+     */
+    startTemplate?: string | null;
     /**
      * The IANA zone the business keeps time in (UX-008). Null when never
      * set, absent from an older API: read it through `businessZone`, which
@@ -112,6 +125,13 @@ export interface CreateOrganizationInput {
     name: string;
     /** "What are you setting up?" (DEC-070). Absent, the API stores BUSINESS. */
     kind?: OrganizationKind;
+    /** "What kind of place is it?" (DEC-216). Absent: not said. */
+    trade?: Trade;
+    /**
+     * The gallery template carried through sign-up (`?template=`, DEC-216),
+     * by id or slug. The API keeps it only when it knows it.
+     */
+    startTemplate?: string;
     /** A Global business's one currency (DEC-204). */
     currency?: string;
     profile?: OrganizationProfileInput;

@@ -35,6 +35,8 @@ export const VALUE_FIELDS = [
     "name",
     // What is being set up (DEC-070): BUSINESS, SOLO or WORK.
     "kind",
+    // The kind of place (DEC-216): salon, gym, clinic, …
+    "trade",
     "legalName",
     "type",
     "country",

@@ -8,7 +8,7 @@ import { createOrganization } from "@/lib/organizations/actions";
 import type { BillingField } from "@/lib/organizations/setup-billing";
 import { billingFieldOf, billingSent } from "@/lib/organizations/setup-billing";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
-import { tradeSent } from "@/lib/organizations/setup-steps";
+import { tradeSent, tradeStored } from "@/lib/organizations/setup-steps";
 import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
@@ -42,9 +42,12 @@ export async function createFromSetup(
         needsName,
         checkout,
         invite,
+        startTemplate,
         billing = false,
         onMade,
     }: {
+        /** The gallery template carried through sign-up (DEC-216). */
+        startTemplate?: string;
         /** The account has no name yet: it is saved first. */
         needsName: boolean;
         /** Who Saroh bills was asked (DEC-167): the answer is sent. */
@@ -84,6 +87,9 @@ export async function createFromSetup(
     const res = await createOrganization({
         name: businessName,
         kind: values.kind,
+        // The kind of place (DEC-216), and the gallery's template.
+        ...(tradeStored(values) ? { trade: tradeStored(values) } : {}),
+        ...(startTemplate ? { startTemplate } : {}),
         address: values.address,
         // What they chose to do first: the welcome email leads with it.
         ...(values.goal === GOAL_LATER ? {} : { goal: values.goal }),
@@ -112,8 +118,8 @@ export async function createFromSetup(
     // Turn its first goal on with the defaults and learn where to land. A
     // goal that can't be turned on lands on Home with the reason: the
     // business is set up either way.
-    // Bookings' trade (DEC-189): Salon or Gym writes its samples. Without
-    // one, the call is as it always was.
+    // Bookings' trade (DEC-189), read from the stored one (DEC-216): Salon
+    // or Gym writes its samples. Without one, the call is as it always was.
     const trade = tradeSent(values);
     const start = await (
         trade

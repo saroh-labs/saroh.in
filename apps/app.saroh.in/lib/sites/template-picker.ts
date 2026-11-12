@@ -2,9 +2,11 @@ import { moduleName } from "@/lib/modules/names";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
-import type { OrganizationKind } from "@/lib/organizations/kind";
-import { kindOf } from "@/lib/organizations/kind";
 import type { Template } from "@/lib/sites/service";
+import {
+    gatingModules,
+    isSuggested as sharedIsSuggested,
+} from "@saroh/templates";
 
 /**
  * The template picker's rules (industry templates plan, U12): which
@@ -15,34 +17,6 @@ import type { Template } from "@/lib/sites/service";
  * first, and "All" always lists every template; nothing here refuses one.
  * Pure and client-safe, so `/sites/new` and the Turn on sheet share it.
  */
-
-/**
- * The waitlist kinds (`TEMPLATE_KINDS` in `@saroh/templates`) a kind of
- * Organization is offered first. A business may be any trade; "Just me" a
- * coach, a practitioner or a creator; "A site for my work" a creator.
- */
-const TRADES: Record<OrganizationKind, readonly string[]> = {
-    BUSINESS: ["salon", "gym", "clinic", "coach", "food", "shop", "other"],
-    SOLO: ["coach", "clinic", "creator"],
-    WORK: ["creator"],
-};
-
-/**
- * The templates for anyone (no `kinds`) a kind is offered first, beside its
- * default (`kindDefaults(kind).starterTemplate`).
- */
-const GENERAL: Record<OrganizationKind, readonly string[]> = {
-    BUSINESS: ["starter"],
-    SOLO: ["personal", "writing"],
-    WORK: ["portfolio", "writing"],
-};
-
-/**
- * Modules a template reads whose sections are laid down only while the
- * module is on. Website is the site itself; Contacts takes the enquiries a
- * form sends whether or not it is on, so neither holds a section back.
- */
-const NOT_GATING = new Set(["WEBSITE", "CRM"]);
 
 /** What a template's sections show from a module, as a card says it. */
 const USES_WORD: Partial<Record<string, string>> = {
@@ -101,15 +75,10 @@ export function moduleStatesWith(
     };
 }
 
-/** The modules whose being off holds some of a template's sections back. */
-function gating(template: Pick<Template, "uses">): string[] {
-    return (template.uses ?? []).filter((k) => !NOT_GATING.has(k));
-}
-
 /**
- * Whether a template is suggested for this business: the kind's default,
- * a general template for the kind, or one for a trade the kind covers
- * whose modules are not all off. Unknown modules suggest on the kind alone.
+ * Whether a template is suggested for this business: the shared rule
+ * (`@saroh/templates`, DEC-216), which an AI app's `list_templates` reads
+ * too. Unknown modules suggest on the kind alone.
  */
 export function isSuggested(
     template: Pick<Template, "id" | "kinds" | "uses">,
@@ -117,14 +86,7 @@ export function isSuggested(
     modules: ModuleStates | null,
     defaultId: string | null,
 ): boolean {
-    const k = kindOf(kind);
-    if (template.id === defaultId) return true;
-    const kinds = template.kinds ?? [];
-    if (kinds.length === 0) return GENERAL[k].includes(template.id);
-    if (!kinds.some((t) => TRADES[k].includes(t))) return false;
-    const needs = gating(template);
-    if (!modules || needs.length === 0) return true;
-    return needs.some((key) => modules.on.includes(key));
+    return sharedIsSuggested(template, kind, modules?.on ?? null, defaultId);
 }
 
 /** The suggested templates, the default first, then the catalogue's order. */
@@ -170,7 +132,7 @@ export function moduleNote(
     modules: ModuleStates | null,
 ): string | null {
     if (!modules) return null;
-    const off = gating(template).flatMap((k) => {
+    const off = gatingModules(template).flatMap((k) => {
         // The module as the rail names it (`lib/modules/names.ts`).
         const rail = moduleName(k);
         const word = USES_WORD[k];

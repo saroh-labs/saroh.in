@@ -34,6 +34,17 @@ export type {
     TemplateStylePreset,
 } from "./manifest";
 
+// Which templates a business is offered first (DEC-216): the workspace's
+// picker and an AI app's list_templates share this one rule.
+export {
+    gatingModules,
+    isSuggested,
+    templateFit,
+    templatesByFit,
+    tradeOf,
+} from "./suggest";
+export type { SuggestTemplate, TemplateFit } from "./suggest";
+
 // The font pairs a site (and a template's style) may name (KTD-2). Re-exported
 // so the API, which depends on this package and not on the contract directly,
 // validates `Site.style.fontPair` against the same list the renderer loads.
