@@ -230,6 +230,26 @@ describe("MCP catalogue tools (U12)", () => {
             await prisma.product.count({ where: { organizationId: org.id } }),
         ).toBe(1);
 
+        // One connection, a second business, the same request_id: made there too.
+        const other = await business();
+        await prisma.membership.create({
+            data: {
+                organizationId: other.id,
+                userId: org.ownerId,
+                role: "OWNER",
+            },
+        });
+        const there = await connect(other.id, org.ownerId);
+        there.connection = {
+            ...call.connection,
+            businesses: [org.id, other.id],
+        };
+        const inOther = await use(there, "create_product", args);
+        expect(inOther.isError).toBe(false);
+        expect(
+            await prisma.product.count({ where: { organizationId: other.id } }),
+        ).toBe(1);
+
         const list = await use(call, "list_products", { query: "sour" });
         expect(list.data.products).toEqual([
             expect.objectContaining({

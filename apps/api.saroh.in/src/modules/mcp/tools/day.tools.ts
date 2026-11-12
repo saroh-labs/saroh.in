@@ -74,6 +74,9 @@ const TELLS_CUSTOMER: ToolHints = { ...CREATE, openWorldHint: true };
 const more = (next: string | null) =>
     next ? `More: call again with cursor ${next}.` : "That's all.";
 const quoted = (s: string | null) => (s ? JSON.stringify(s) : "someone");
+/** A customer typed their own name, so it is labelled like any outside text. */
+const customer = (s: string | null) =>
+    s ? quoteUntrusted("Customer", s) : "someone";
 const gone = (what: string, id: string, list: string) =>
     new ToolError(
         `There is no ${what} ${id} in this business.`,
@@ -108,7 +111,7 @@ async function bookingItems(organizationId: string, views: BookingView[]) {
 
 type BookingItem = Awaited<ReturnType<typeof bookingItems>>[number];
 const bookingLine = (b: BookingItem) =>
-    `${b.when}: ${JSON.stringify(b.service)} for ${quoted(b.customer_name ?? b.customer_email)} (booking_id ${b.booking_id}, ${b.status})`;
+    `${b.when}: ${JSON.stringify(b.service)} for ${customer(b.customer_name ?? b.customer_email)} (booking_id ${b.booking_id}, ${b.status})`;
 
 // ── Orders ──────────────────────────────────────────────────────────────────
 
@@ -179,7 +182,7 @@ const customerDetail = (c: CustomerView) => ({
         : null,
 });
 const customerLine = (c: CustomerView) =>
-    `${quoted(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`;
+    `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`;
 
 // ── Enquiries ───────────────────────────────────────────────────────────────
 

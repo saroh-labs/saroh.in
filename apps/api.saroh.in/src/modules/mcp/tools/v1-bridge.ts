@@ -27,7 +27,8 @@ export function viaV1(
         headers: requestId ? { "idempotency-key": requestId } : {},
         method: "MCP",
         path: tool,
-        apiKey: { id: `mcp:${call.connection.id}` },
+        // One connection reaches several businesses: a request_id is per business.
+        apiKey: { id: `mcp:${call.connection.id}:${call.ctx.organizationId}` },
     } as unknown as KeyedRequest;
 }
 
