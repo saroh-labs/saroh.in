@@ -184,6 +184,22 @@ model Organization {
   // values.
   kind String @default("BUSINESS")
 
+  // The kind of place it is (DEC-216): one of the template kinds (salon, gym,
+  // clinic, coach, food, shop, creator, other), or null when never said.
+  // Setup asks it, Settings › Business changes it. Words and suggestions
+  // only: the templates and sample services offered first, never a gate.
+  // The API reads it through `organizations/organization-trade.ts`. A CHECK
+  // constraint holds the values.
+  trade String?
+  // The trade a business typed when it picked Other (DEC-216, 12 Nov 2026):
+  // "Bakery", "Tailor". Set only while trade is "other"; the API clears it
+  // when the trade changes away. Words only, never matched to templates.
+  tradeOther String?
+  // The template a visitor picked in the public gallery before signing up
+  // (`?template=`, DEC-216): the website picker starts on it. A template
+  // id, kept by setup only; null for everyone else.
+  startTemplate String?
+
   suspendedAt         DateTime?
   suspendedByUserId   String?
   suspensionReason    String?

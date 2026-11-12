@@ -624,12 +624,26 @@ export class ScheduleGoLiveDto {
 /**
  * "Use this look with its starter content" (DEC-182): the look, or
  * `classic` for none, whose showcase template is copied into the draft.
+ * With `templateId` (DEC-216, the editor's Template row): that template's
+ * pages instead, the look kept, and its colourway only when `styleId` names
+ * one.
  */
 export class CopyStarterContentDto {
     @IsIn(["quiet", "live", "folio", "classic"], {
         message: "look must be quiet, live, folio or classic",
     })
     look!: "quiet" | "live" | "folio" | "classic";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    templateId?: string;
+
+    /** One of the template's colourways; absent: the site's colours stay. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    styleId?: string;
 
     /** "Fill in my details": the business's own in place of samples. */
     @IsOptional()

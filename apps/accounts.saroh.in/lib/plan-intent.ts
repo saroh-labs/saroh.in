@@ -48,3 +48,23 @@ export function onboardingForInvite(
     if (!token || !INVITE_TOKEN.test(token)) return null;
     return `${getOnboardingUrl()}?${new URLSearchParams({ invite: token }).toString()}`;
 }
+
+/** A template id or slug's shape; anything else isn't one. */
+const TEMPLATE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * A template picked in the public gallery (`?template=`, DEC-216) carried
+ * to onboarding beside a plan or an invite, or alone, so setup starts on
+ * its trade and the business keeps it for its website. Only carried, never
+ * trusted: onboarding looks it up, and the API keeps only one it knows.
+ */
+export function withTemplate(
+    onboarding: string | null,
+    template: string | string[] | undefined,
+): string | null {
+    const asked = first(template)?.trim();
+    if (!asked || !TEMPLATE_ID.test(asked)) return onboarding;
+    const url = new URL(onboarding ?? getOnboardingUrl());
+    url.searchParams.set("template", asked);
+    return url.toString();
+}

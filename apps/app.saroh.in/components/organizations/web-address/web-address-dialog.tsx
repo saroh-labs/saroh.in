@@ -56,12 +56,15 @@ export function WebAddressDialog({
     onOpenChange,
     view,
     zone,
+    onChanged,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     view: WebAddressView;
     /** The business's time zone, which the release date is a day in. */
     zone: string;
+    /** Told the new address once saved, for a caller that stays open. */
+    onChanged?: (view: WebAddressView) => void;
 }) {
     return (
         <FormDialog
@@ -76,6 +79,7 @@ export function WebAddressDialog({
                 <ChangeForm
                     view={view}
                     zone={zone}
+                    onChanged={onChanged}
                     onDone={() => onOpenChange(false)}
                 />
             ) : null}
@@ -86,10 +90,12 @@ export function WebAddressDialog({
 function ChangeForm({
     view,
     zone,
+    onChanged,
     onDone,
 }: {
     view: WebAddressView;
     zone: string;
+    onChanged?: (view: WebAddressView) => void;
     onDone: () => void;
 }) {
     const router = useRouter();
@@ -145,6 +151,7 @@ function ChangeForm({
             "Web address changed.",
             `It is now ${hostOf(res.data.platformOrigin)}.`,
         );
+        onChanged?.(res.data);
         onDone();
         router.refresh();
     }

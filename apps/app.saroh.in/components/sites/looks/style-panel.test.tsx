@@ -244,3 +244,27 @@ describe("the preview's resolver", () => {
         expect(activeColourway(own, [GREEN, OXBLOOD])).toBeUndefined();
     });
 });
+
+describe("StylePanel on a phone", () => {
+    it("gives the Template row its own first tab, not a Look tab (board TPLEditorPhone)", () => {
+        act(() =>
+            root.render(
+                <StylePanel
+                    style={GREEN.style}
+                    options={options}
+                    onChange={vi.fn()}
+                    onReset={vi.fn()}
+                    saving={false}
+                    phoneTabs
+                    templateRow={<p data-row="">the template</p>}
+                />,
+            ),
+        );
+        const tabs = Array.from(
+            host.querySelectorAll<HTMLElement>('[role="tab"]'),
+        ).map((t) => t.textContent.trim());
+        // No look to offer: no Look tab, and the sheet opens on Template.
+        expect(tabs).toEqual(["Template", "Colour", "Spacing"]);
+        expect(host.querySelector("[data-row]")).not.toBeNull();
+    });
+});

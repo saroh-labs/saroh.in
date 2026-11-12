@@ -165,6 +165,16 @@ export const FlagKey = {
     SAROH_BILLING_GLOBAL: "SAROH_BILLING_GLOBAL",
 
     /**
+     * Choosing a website template (DEC-216, DEC-135): the API half of the
+     * workspace's `NEXT_PUBLIC_TEMPLATES`. On in local development, CI and
+     * the development environment; off in production until MCP testing
+     * ends. Off, an AI app's `create_site_from_template` starts from the
+     * kind's default template whatever it asked for, and `list_templates`
+     * says templates aren't chosen yet. Readers: `mcp/tools/site.tools.ts`.
+     */
+    SITE_TEMPLATE_CHOICE: "SITE_TEMPLATE_CHOICE",
+
+    /**
      * The public API's kill switches (plan 2026-11-10-001), one per surface,
      * each off for everyone until the release turns it on (U18); a business's
      * override turns one on or off for it alone. Off, that surface answers
@@ -380,6 +390,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Saroh's plans have been on for every Global business for a release, and SarohBillsService no longer asks it.",
+    },
+    SITE_TEMPLATE_CHOICE: {
+        shownAs: "Website templates",
+        group: "feature",
+        purpose:
+            "Lets an AI app start a website from the template it chose (DEC-216). Turn it on in production with the workspace's NEXT_PUBLIC_TEMPLATES, once MCP testing ends; off, an AI app's new site starts from the default template for what the business is, as the workspace's does.",
+        owner: "Owner",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Templates have been on in production for a release, NEXT_PUBLIC_TEMPLATES is gone, and site.tools.ts no longer asks it.",
     },
     API_MCP: API_SURFACE(
         "AI apps (MCP)",

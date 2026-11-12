@@ -486,6 +486,9 @@ async function prepareWebsite(
             name: siteName,
             // The sheet's choice; absent, the kind's (planSiteFromTemplate).
             ...(setup.templateId ? { templateId: setup.templateId } : {}),
+            ...(setup.templateId && setup.styleId
+                ? { styleId: setup.styleId }
+                : {}),
         },
         entitlements,
     );

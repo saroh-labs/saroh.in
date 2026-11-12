@@ -37,7 +37,7 @@ import {
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 @RequireModule("WEBSITE")
 export class StarterContentController {
-    /** Copy the look's showcase template into the draft. */
+    /** Copy the look's showcase template, or the one named, into the draft. */
     @Post()
     @HttpCode(201)
     copy(
@@ -45,7 +45,18 @@ export class StarterContentController {
         @Param("siteId") siteId: string,
         @Body() dto: CopyStarterContentDto,
     ) {
-        return copyStarterContent(ctx, siteId, dto.look, dto.fill ?? false);
+        return copyStarterContent(
+            ctx,
+            siteId,
+            dto.look,
+            dto.fill ?? false,
+            dto.templateId
+                ? {
+                      templateId: dto.templateId,
+                      ...(dto.styleId ? { styleId: dto.styleId } : {}),
+                  }
+                : undefined,
+        );
     }
 
     /** "Bring in my details": sample words filled with the business's own. */

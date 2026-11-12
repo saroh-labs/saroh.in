@@ -311,7 +311,7 @@ export function setupFor(key: string, draft: TurnOnDraft): object {
         } satisfies Partial<AppointmentsSetup>;
     }
     if (key === "WEBSITE") {
-        const { templateId } = draft.WEBSITE;
+        const { templateId, styleId } = draft.WEBSITE;
         const siteName = draft.WEBSITE.siteName.trim();
         const address = draft.WEBSITE.address.trim();
         return {
@@ -319,6 +319,7 @@ export function setupFor(key: string, draft: TurnOnDraft): object {
             ...(address ? { address } : {}),
             // Only a choice made in the sheet; else the API picks the kind's.
             ...(templateId ? { templateId } : {}),
+            ...(templateId && styleId ? { styleId } : {}),
         } satisfies Partial<WebsiteSetup>;
     }
     return {};

@@ -102,6 +102,31 @@ describe("starterContentActions", () => {
         );
     });
 
+    it("copies a template's pages in the draft's look, its colours only when asked (DEC-216)", async () => {
+        actions.copyStarterContent.mockResolvedValue({
+            ok: true,
+            data: COPIED,
+        });
+        const { s, reloadDraft } = starter();
+        await expect(
+            s.copyTemplate("salon", null, "quiet", true),
+        ).resolves.toEqual({ ok: true });
+        expect(actions.copyStarterContent).toHaveBeenLastCalledWith(
+            "site-1",
+            "quiet",
+            true,
+            { templateId: "salon" },
+        );
+        expect(reloadDraft).toHaveBeenCalledWith("p-home");
+        await s.copyTemplate("salon", "kesar", null, false);
+        expect(actions.copyStarterContent).toHaveBeenLastCalledWith(
+            "site-1",
+            "classic",
+            false,
+            { templateId: "salon", styleId: "kesar" },
+        );
+    });
+
     it("puts the draft back on Undo and starts the editor afresh", async () => {
         actions.copyStarterContent.mockResolvedValue({
             ok: true,
