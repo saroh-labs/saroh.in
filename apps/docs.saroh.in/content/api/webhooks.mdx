@@ -1,5 +1,3 @@
-{/* verify against U13 */}
-
 # Webhooks
 
 A webhook tells your server the moment something happens in the business,
@@ -7,8 +5,9 @@ so you don't have to keep asking.
 
 ## Setting one up
 
-In **Settings › API and AI apps › Webhooks**, add your address and pick
-the events you want. The address must be `https://` on the standard port,
+In **Settings › API and AI apps › Notifications to your systems**, add
+your address and pick the events you want. You can give the address a
+name, like "Order sync", to tell it apart from others. The address must be `https://` on the standard port,
 on the public internet. Owners can add webhooks, and can let others do it
 too. Webhooks come with some plans, not all.
 
@@ -30,7 +29,8 @@ You can only pick an event whose records you may read. For example,
 | `customer.created`     | A customer is added (not by a file import)    |
 | `enquiry.received`     | An enquiry comes in                           |
 
-**Send a test** sends a `ping` event, so you can check your end.
+**Send a test** sends a `ping` event, so you can check your end. You can
+send five tests a minute to each address.
 
 More events may be added later. Ignore any you don't know.
 
@@ -116,8 +116,11 @@ swap in the new secret.
 - Every try is signed again with the time it's sent, so a retry has a new
   `t`.
 - After many failures in a row, Saroh turns the webhook off and tells the
-  business's owners. Fix your end, then turn it back on.
-- Settings shows each delivery and can send one again.
+  business's owners. Fix your end, then turn it back on, or send a test:
+  a test still goes to an address that is off. If it gets through, the
+  address turns back on. If it fails, the address stays off.
+- The list of addresses shows when Saroh last sent to each one, and how
+  it went. Open an address to see each delivery and send one again.
 
 ## What it never contains
 

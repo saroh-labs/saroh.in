@@ -1,5 +1,3 @@
-{/* verify against U9-U12 */}
-
 import { MCP_URL, Sample } from "../../components/api-reference";
 
 # Claude and ChatGPT
@@ -20,6 +18,11 @@ role, so it can do only what you can do in Saroh.
 2. Sign in to Saroh when it asks.
 3. Pick the businesses it may use: one, several or all of yours.
 4. Read what it may do, and agree.
+
+One connection covers every business you ticked. When it covers more than
+one, the AI app asks Saroh for the list of them (the `list_businesses`
+tool) and names the business on each thing it does (the `business`
+argument every tool takes). With one business, it doesn't need to.
 
 What the app reads from Saroh goes to the company that runs it, under its
 own terms.
@@ -43,9 +46,16 @@ Every change it makes is in **Settings › Activity**.
 
 ## Staying in control
 
-- Owners see every connection in the business in
-  **Settings › API and AI apps › AI apps**, and can disconnect any of them.
-  You can disconnect your own.
+- **Settings › API and AI apps › AI assistants** lists the connections.
+  You see your own. Owners see every connection in the business.
+- Open a connection to see each change it made in this business.
+- If it changed a website, **Roll back site draft** puts that website's draft back as
+  it was before the connection's latest session. The live site doesn't
+  change. If someone else has changed the draft since, Saroh won't roll it
+  back, so their work isn't lost.
+- Disconnect your own connection, or, as an owner, anyone's. This takes
+  the business off the connection. The AI app keeps any other businesses
+  it covers.
 - A connection ends after 90 days without use.
 - If you leave the business, or your role changes, the connection follows
   at once.
