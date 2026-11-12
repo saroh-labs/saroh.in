@@ -3,7 +3,8 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind } from "../fixtures/own-data";
-import { openFromPill } from "../fixtures/phone-editor";
+import { brandTab, openFromPill } from "../fixtures/phone-editor";
+import { pressUntil } from "../fixtures/press";
 import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -25,10 +26,24 @@ interface SiteRow {
     id: string;
 }
 
-/** Website › Brand: the rail's tab on a desk, its pill on a phone. */
-async function openBrand(page: Page, phone: boolean) {
+/**
+ * Website › Brand: the rail's tab on a desk, its pill on a phone. A
+ * Reviewer's phone pill has no Brand: it is a tab in the Blocks sheet
+ * (DEC-200, RVD2Phone).
+ */
+async function openBrand(page: Page, phone: boolean, reviewer = false) {
+    if (phone && !reviewer) {
+        // The Brand sheet's own Template tab (board TPLEditorPhone).
+        await brandTab(page, "Template");
+        return;
+    }
     if (phone) {
-        await openFromPill(page, "Brand");
+        const sheet = await openFromPill(page, "Blocks");
+        const tab = sheet.getByRole("tab", { name: "Brand" });
+        await pressUntil(
+            tab,
+            async () => (await tab.getAttribute("aria-selected")) === "true",
+        );
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });
@@ -85,7 +100,7 @@ test.describe("the editor's Template row (DEC-216)", () => {
         const phone = testInfo.project.name.startsWith("phone");
         await useSession(page, "reviewer");
         await openReviewedSite(page);
-        await openBrand(page, phone);
+        await openBrand(page, phone, true);
         const brand = page.getByRole("region", { name: "Template" });
         // Northwind's seeded site records no template (KTD-7).
         await expect(brand.filter({ visible: true }).first()).toContainText(

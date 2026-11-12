@@ -89,10 +89,10 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
             await expect(
                 sheet.getByRole("term").filter({ hasText: "Web address" }),
             ).toBeVisible();
+            // Beside it, the owner's Change (DEC-069), which opens
+            // Settings' dialog over the sheet.
             await expect(
-                sheet
-                    .getByRole("definition")
-                    .filter({ hasText: /^[a-z0-9-]+\.saroh\.app$/ }),
+                sheet.getByText(/^[a-z0-9-]+\.saroh\.app$/),
             ).toBeVisible();
             await expect(sheet.getByLabel("Web address")).toHaveCount(0);
         });

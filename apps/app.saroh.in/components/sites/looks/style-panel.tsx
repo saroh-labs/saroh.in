@@ -120,7 +120,7 @@ export function StylePanel({
     /** The page's hero draws in the text colour: the Hero row moves nothing. */
     heroInText?: boolean;
     /**
-     * The phone's Brand sheet (DEC-185): Look · Type · Colour · Spacing as
+     * The phone's Brand sheet (DEC-185): Template · Look · Type · Colour · Spacing as
      * tabs, each showing its options; Saved and Reset are in the sheet's
      * head (`BrandSheetActions`).
      */
@@ -231,9 +231,9 @@ export function StylePanel({
     }
 
     const savedNow = useSavedNow(saving, dirty);
-    const [tab, setTab] = useState<"look" | "type" | "colour" | "spacing">(
-        "look",
-    );
+    const [tab, setTab] = useState<
+        "template" | "look" | "type" | "colour" | "spacing"
+    >("look");
 
     /*
      * Each colour the panel offers, as a part: its name, its colour now,
@@ -477,7 +477,12 @@ export function StylePanel({
     if (phoneTabs) {
         // The phone's Brand sheet (DEC-185): one tab at a time.
         const tabs = [
-            ...(lookTab ? [{ key: "look" as const, label: "Look" }] : []),
+            // Template is the sheet's first tab (board TPLEditorPhone); it
+            // opens on Look, as before, when there is one.
+            ...(templateRow
+                ? [{ key: "template" as const, label: "Template" }]
+                : []),
+            ...(lookPart ? [{ key: "look" as const, label: "Look" }] : []),
             ...(typePart ? [{ key: "type" as const, label: "Type" }] : []),
             { key: "colour" as const, label: "Colour" },
             { key: "spacing" as const, label: "Spacing" },
@@ -498,7 +503,8 @@ export function StylePanel({
                         }))}
                     />
                     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                        {shown === "look" ? lookTab : null}
+                        {shown === "template" ? templateRow : null}
+                        {shown === "look" ? lookPart : null}
                         {shown === "type" ? typePart : null}
                         {shown === "colour" ? (
                             <>
