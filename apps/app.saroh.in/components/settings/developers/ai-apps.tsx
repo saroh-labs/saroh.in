@@ -525,6 +525,9 @@ function ConnectionSheet({
                         {c && c.otherBusinesses > 0
                             ? ` It keeps working with the ${count(c.otherBusinesses, "other business", "other businesses")} it reaches.`
                             : null}
+                        {
+                            " Roll back its website changes first if you want them gone."
+                        }
                     </>
                 }
                 confirmLabel="Disconnect from this business"

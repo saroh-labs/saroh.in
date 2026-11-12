@@ -403,6 +403,7 @@ export class WebhookEndpointsService {
         await this.open(ctx);
         const endpoint = await this.find(ctx, endpointId);
         this.assertOn(endpoint);
+        await this.throttle("webhook-resend", endpoint.id);
         const delivery = await prisma.$transaction(async (tx) => {
             const found = await tx.webhookDelivery.findFirst({
                 where: {
@@ -412,10 +413,17 @@ export class WebhookEndpointsService {
                 },
             });
             if (!found) throw new NotFoundException("Delivery not found");
-            const again = await tx.webhookDelivery.update({
-                where: { id: found.id },
+            // One live job per delivery: a second click on one still being
+            // sent queues nothing.
+            const moved = await tx.webhookDelivery.updateMany({
+                where: { id: found.id, status: { not: "PENDING" } },
                 data: { status: "PENDING" },
             });
+            if (moved.count === 0) {
+                throw new ConflictException(
+                    "This delivery is already being sent. Wait for it to finish before sending it again.",
+                );
+            }
             await tx.job.create({
                 data: {
                     organizationId: ctx.organizationId,
@@ -424,7 +432,9 @@ export class WebhookEndpointsService {
                     maxAttempts: WEBHOOK_DELIVER_ATTEMPTS,
                 },
             });
-            return again;
+            return tx.webhookDelivery.findUniqueOrThrow({
+                where: { id: found.id },
+            });
         });
         return deliveryView(delivery);
     }
@@ -432,26 +442,23 @@ export class WebhookEndpointsService {
     /**
      * "Send a test": a `ping` to this endpoint, whatever it subscribes to,
      * and whether it is on or off. To an address that is off, one that
-     * gets through turns it back on (the deliver job does). At most
-     * {@link TESTS_PER_MINUTE} a minute per address, shared by replicas.
+     * gets through turns it back on (the deliver job does), so testing one
+     * that is off needs what switching it on needs: the plan, and read
+     * access to every event it sends. At most {@link TESTS_PER_MINUTE} a
+     * minute per address, shared by replicas.
      */
     async test(
         ctx: OrganizationContext,
         endpointId: string,
+        now: Date = new Date(),
     ): Promise<WebhookDeliveryView> {
         await this.open(ctx);
         const endpoint = await this.find(ctx, endpointId);
-        const turn = await this.limits.take(
-            "webhook-test",
-            endpoint.id,
-            TESTS_PER_MINUTE,
-        );
-        if (!turn.allowed) {
-            throw new HttpException(
-                "That's a lot of tests in a minute. Wait a moment and send another.",
-                HttpStatus.TOO_MANY_REQUESTS,
-            );
+        if (endpoint.disabledAt) {
+            await this.included(ctx.organizationId, now);
+            this.subscribable(ctx, endpoint.events as WebhookEvent[]);
         }
+        await this.throttle("webhook-test", endpoint.id);
         const id = await prisma.$transaction((tx) =>
             queueDelivery(tx, {
                 organizationId: ctx.organizationId,
@@ -463,6 +470,24 @@ export class WebhookEndpointsService {
         return deliveryView(
             await prisma.webhookDelivery.findUniqueOrThrow({ where: { id } }),
         );
+    }
+
+    /** {@link TESTS_PER_MINUTE} sends a minute per address and kind, shared by replicas. */
+    private async throttle(
+        bucket: "webhook-test" | "webhook-resend",
+        endpointId: string,
+    ) {
+        const turn = await this.limits.take(
+            bucket,
+            endpointId,
+            TESTS_PER_MINUTE,
+        );
+        if (!turn.allowed) {
+            throw new HttpException(
+                "That's a lot of sends in a minute. Wait a moment and try again.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
     }
 
     /** `webhook:manage`, then the kill switch: a business with it off sees nothing. */

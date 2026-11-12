@@ -37,6 +37,9 @@ const BATCH = 500;
 export class AiConnectionsSweepJob {
     private readonly logger = new Logger(AiConnectionsSweepJob.name);
 
+    /** Rows read at a time; tests make it small. */
+    batch = BATCH;
+
     constructor(private readonly connections: AiConnectionsService) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
@@ -70,10 +73,20 @@ export class AiConnectionsSweepJob {
                     { lastUsedAt: null, createdAt: { lte: idleBefore } },
                 ],
             },
-            take: BATCH,
+            take: this.batch,
         });
+        let ended = 0;
         for (const grant of idle) {
-            await endConnection(grant);
+            // One that won't end is logged and left for tomorrow; the rest go on.
+            try {
+                await endConnection(grant);
+                ended += 1;
+            } catch (error) {
+                this.logger.warn(
+                    `ai_connections_sweep could not end an idle connection: ${errorName(error)}`,
+                );
+                continue;
+            }
             await this.connections
                 .recordEnded(grant, AI_CONNECTIONS_ACTOR, "idle")
                 .catch((error: unknown) =>
@@ -83,14 +96,34 @@ export class AiConnectionsSweepJob {
                 );
         }
 
-        const old = await prisma.oauthClient.findMany({
-            where: {
-                createdAt: { lte: new Date(now.getTime() - UNUSED_CLIENT_MS) },
-            },
-            select: { clientId: true },
-            take: BATCH,
-        });
-        const ids = old.map((c) => c.clientId);
+        // Paged by id to the end, so clients in use never crowd out the rest.
+        let forgotten = 0;
+        let after: string | undefined;
+        for (;;) {
+            const page = await prisma.oauthClient.findMany({
+                where: {
+                    createdAt: {
+                        lte: new Date(now.getTime() - UNUSED_CLIENT_MS),
+                    },
+                    ...(after ? { clientId: { gt: after } } : {}),
+                },
+                orderBy: { clientId: "asc" },
+                select: { clientId: true },
+                take: this.batch,
+            });
+            if (page.length === 0) break;
+            after = page[page.length - 1].clientId;
+            forgotten += await this.forgetUnused(
+                page.map((c) => c.clientId),
+                now,
+            );
+            if (page.length < this.batch) break;
+        }
+        return { ended, forgotten };
+    }
+
+    /** Deletes those of `ids` with no connection and no live refresh token. */
+    private async forgetUnused(ids: string[], now: Date): Promise<number> {
         const [granted, refreshing] = await Promise.all([
             prisma.oauthConsent.findMany({
                 where: { clientId: { in: ids } },
@@ -121,7 +154,7 @@ export class AiConnectionsSweepJob {
                 }),
             ]);
         }
-        return { ended: idle.length, forgotten: unused.length };
+        return unused.length;
     }
 
     /** Leave one run waiting at `runAt`, unless one is. Never throws. */

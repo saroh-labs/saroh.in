@@ -4,6 +4,7 @@
  * job files the legal-hold and job-consumer scans read stay small: this job
  * creates a site and deletes nothing.
  */
+import { Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
@@ -50,12 +51,16 @@ export interface SiteFromTemplatePayload {
     outcome?: { site_id: string; editor_url: string } | { error: string };
 }
 
+const logger = new Logger("SiteFromTemplateJob");
+
 /** Runs `SITE_FROM_TEMPLATE_JOB`: the site, as the person who asked. */
 export function siteFromTemplateHandler(d: { sites: SitesService }) {
     return async (job: Job): Promise<void> => {
         const payload = job.payload as unknown as SiteFromTemplatePayload;
         const organizationId = job.organizationId;
         if (!organizationId) return;
+        // Made already (a retry after the outcome was written): never a second site.
+        if (payload.outcome && "site_id" in payload.outcome) return;
         const { actor, request } = payload;
         const ctx: OrganizationContext = {
             organizationId,
@@ -77,20 +82,29 @@ export function siteFromTemplateHandler(d: { sites: SitesService }) {
                     select: { id: true },
                 }),
             );
+        let created: { siteId: string };
         try {
-            const created = await runInOrgContext(organizationId, () =>
+            created = await runInOrgContext(organizationId, () =>
                 d.sites.createFromTemplate(ctx, request),
             );
-            await record({
-                site_id: created.siteId,
-                editor_url: await editorUrl(organizationId, created.siteId),
-            });
         } catch (error) {
             // A refusal the person can act on is kept for get_job; the job
             // still fails, so it reads "failed".
             const said = toolError(error, "create_site_from_template");
             await record({ error: said.content[0].text });
             throw error;
+        }
+        // The site exists: a failure to write that down never retries into
+        // a second one. The job completes; get_job reads it as still making.
+        try {
+            await record({
+                site_id: created.siteId,
+                editor_url: await editorUrl(organizationId, created.siteId),
+            });
+        } catch (error) {
+            logger.error(
+                `site_from_template_outcome_not_recorded job=${job.id} site=${created.siteId} ${error instanceof Error ? error.name : "error"}`,
+            );
         }
     };
 }
@@ -107,6 +121,13 @@ export function describeSiteJob(job: Job) {
     if (outcome) {
         return {
             summary: `Couldn't make the website. ${outcome.error}`,
+            result: null,
+        };
+    }
+    if (job.status === "DONE") {
+        return {
+            summary:
+                "Made the website. Call get_site without a site_id to find it.",
             result: null,
         };
     }

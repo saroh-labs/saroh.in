@@ -236,6 +236,15 @@ describe("API keys (U5)", () => {
         ).rejects.toMatchObject({ status: 404 });
     });
 
+    it("refuses an edit while that kind of key is switched off", async () => {
+        const { owner } = await business();
+        const made = await service.create(owner, secret(), NOW);
+        flags.isEnabled.mockResolvedValueOnce(false);
+        await expect(
+            service.update(owner, made.key.id, { aiEnabled: true }, NOW),
+        ).rejects.toMatchObject({ status: 404 });
+    });
+
     it("changes what a key can do on its next call, and audits before and after", async () => {
         const { org, owner } = await business();
         const made = await service.create(owner, secret(), NOW);

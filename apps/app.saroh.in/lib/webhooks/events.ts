@@ -1,4 +1,5 @@
 import type { WebhookEndpointView, WebhookEvent } from "@saroh/api-contract";
+import { WEBHOOK_AUTO_OFF_AFTER } from "@saroh/api-contract";
 
 /**
  * Notifications to your systems (webhooks): each event in the merchant's
@@ -42,7 +43,9 @@ export type EndpointState = "working" | "off" | "turned-off";
 /** Working, switched off by a person, or turned off by Saroh after failures. */
 export function endpointState(endpoint: WebhookEndpointView): EndpointState {
     if (endpoint.enabled) return "working";
-    return endpoint.disabledAt && endpoint.failureStreak > 0
+    // Saroh switches off only at the limit; fewer failures means a person did.
+    return endpoint.disabledAt &&
+        endpoint.failureStreak >= WEBHOOK_AUTO_OFF_AFTER
         ? "turned-off"
         : "off";
 }

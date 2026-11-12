@@ -480,6 +480,18 @@ describe("MCP website tools (U11)", () => {
             where: { id: jobId },
         });
         await siteFromTemplateHandler(deps)(job as Job);
+        // A retry of a job that made its site makes no second one.
+        const sitesMade = () =>
+            prisma.site.count({
+                where: { organizationId: as.ctx.organizationId },
+            });
+        const before = await sitesMade();
+        await siteFromTemplateHandler(deps)(
+            (await prisma.job.findUniqueOrThrow({
+                where: { id: jobId },
+            })) as Job,
+        );
+        expect(await sitesMade()).toBe(before);
         await prisma.job.update({
             where: { id: jobId },
             data: { status: "DONE" },
@@ -648,6 +660,99 @@ describe("a connection's changes and roll back from Settings", () => {
         expect(await sectionsOf(homeId)).toHaveLength(
             draft.sections.length - 1,
         );
+    });
+
+    it("still shows and rolls back a connection's changes after it is disconnected", async () => {
+        const { org, siteId, homeId, as, ownerCtx } = await connected();
+        const before = await sectionsOf(homeId);
+        await call(as, "remove_section", {
+            site_id: siteId,
+            page_id: homeId,
+            section_key: before[0].key,
+        });
+        await connections.disconnect(ownerCtx, as.connection.id);
+        const other = await prisma.user.create({
+            data: { email: `${uniq("a")}@example.com`, name: "Admin" },
+        });
+        await prisma.membership.create({
+            data: { organizationId: org.id, userId: other.id, role: "ADMIN" },
+        });
+        const admin = await new OrganizationContextService().resolve(
+            other.id,
+            org.id,
+        );
+        await expect(
+            connections.activity(admin, as.connection.id),
+        ).rejects.toMatchObject({ status: 403 });
+        const listed = await connections.activity(ownerCtx, as.connection.id);
+        expect(listed.siteDrafts).toEqual([
+            expect.objectContaining({ siteId }),
+        ]);
+        await connections.rollBack(ownerCtx, as.connection.id, siteId);
+        expect(await sectionsOf(homeId)).toEqual(before);
+        await expect(
+            connections.activity(ownerCtx, uniq("never")),
+        ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("re-checks outside changes under the site's lock, and keeps no restore point when refused", async () => {
+        const { siteId, homeId, as, ownerCtx } = await connected();
+        await call(as, "update_page", {
+            site_id: siteId,
+            page_id: homeId,
+            title: "Welcome",
+        });
+        // A teammate's save lands after the first check, before the lock.
+        const points = new RestorePointService();
+        const take = points.beforeSiteWrite.bind(points);
+        points.beforeSiteWrite = async (c, id, now) => {
+            const draft = await sites.getPageDraft(ownerCtx, siteId, homeId);
+            await sites.replaceDraftSections(ownerCtx, siteId, homeId, {
+                sections: draft.sections.slice(1),
+                revision: draft.revision,
+            });
+            return take(c, id, now);
+        };
+        const racing = new AiConnectionsService(new AuditService(), points);
+        const pointsBefore = await prisma.siteRestorePoint.count({
+            where: { siteId },
+        });
+        await expect(
+            racing.rollBack(ownerCtx, as.connection.id, siteId),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(await prisma.siteRestorePoint.count({ where: { siteId } })).toBe(
+            pointsBefore,
+        );
+    });
+
+    it("two businesses disconnecting one connection at once each take only themselves off", async () => {
+        const { as, ownerCtx } = await connected();
+        const b = await prisma.organization.create({
+            data: { name: uniq("Pulse"), slug: uniq("pulse") },
+        });
+        const bOwner = await prisma.user.create({
+            data: { email: `${uniq("b")}@example.com`, name: "Ravi" },
+        });
+        await prisma.membership.create({
+            data: { organizationId: b.id, userId: bOwner.id, role: "OWNER" },
+        });
+        await prisma.oauthConsent.update({
+            where: { id: as.connection.id },
+            data: { organizationIds: { push: b.id } },
+        });
+        const bCtx = await new OrganizationContextService().resolve(
+            bOwner.id,
+            b.id,
+        );
+        await Promise.all([
+            connections.disconnect(ownerCtx, as.connection.id),
+            connections.disconnect(bCtx, as.connection.id),
+        ]);
+        expect(
+            await prisma.oauthConsent.findUnique({
+                where: { id: as.connection.id },
+            }),
+        ).toBeNull();
     });
 
     it("lets only the person or an Owner see and roll back a connection", async () => {

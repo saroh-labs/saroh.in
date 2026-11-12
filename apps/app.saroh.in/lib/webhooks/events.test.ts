@@ -52,6 +52,16 @@ describe("webhook events", () => {
                 }),
             ),
         ).toBe("off");
+        // Switched off by hand after a couple of failures: just off.
+        expect(
+            endpointState(
+                endpoint({
+                    enabled: false,
+                    disabledAt: "2026-11-08T00:00:00.000Z",
+                    failureStreak: 2,
+                }),
+            ),
+        ).toBe("off");
     });
 
     it("shows an address without its scheme", () => {

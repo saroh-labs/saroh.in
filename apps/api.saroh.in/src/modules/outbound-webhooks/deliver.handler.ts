@@ -1,6 +1,6 @@
 import { HttpException, Injectable, Logger, Optional } from "@nestjs/common";
 import type { WebhookEvent } from "@saroh/api-contract";
-import { WEBHOOK_PING } from "@saroh/api-contract";
+import { WEBHOOK_AUTO_OFF_AFTER, WEBHOOK_PING } from "@saroh/api-contract";
 import type { Job, Prisma, WebhookEndpoint } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -37,7 +37,7 @@ export const DELIVERY_TIMEOUT_MS = 10_000;
 /** How much of the answer the log keeps. */
 export const SNIPPET_BYTES = 2048;
 /** Deliveries in a row that run out of tries before the endpoint is switched off. */
-export const AUTO_OFF_AFTER = 5;
+export const AUTO_OFF_AFTER = WEBHOOK_AUTO_OFF_AFTER;
 
 export const WEBHOOK_DISABLED_NOTIFICATION_TYPE = "webhook.disabled";
 const SYSTEM_ACTOR = "system:webhooks";
@@ -133,10 +133,32 @@ export class WebhookDeliverHandler {
             return;
         }
 
-        const body = await this.bodyOf(delivery, endpoint.organizationId);
         const now = new Date();
-        const attempt = await this.send(endpoint, delivery.id, body, now);
         const last = job.attempts + 1 >= job.maxAttempts;
+        const off = endpoint.disabledAt !== null;
+        let attempt: Attempt;
+        try {
+            const body = await this.bodyOf(delivery, endpoint.organizationId);
+            attempt = await this.send(endpoint, delivery.id, body, now);
+        } catch (error) {
+            // Building, signing or sending threw (a key off the ring, a DB
+            // blip). The worker backs off; on the last try the log says it
+            // failed, in words that never carry the error's own text.
+            if (last) {
+                await prisma.webhookDelivery.update({
+                    where: { id: delivery.id },
+                    data: {
+                        status: "FAILED",
+                        attempts: { increment: 1 },
+                        lastAttemptAt: now,
+                        lastError:
+                            "Saroh couldn't prepare this delivery. Send it again later.",
+                    },
+                });
+                if (!off) await this.countFailure(endpoint, now);
+            }
+            throw error;
+        }
         await prisma.webhookDelivery.update({
             where: { id: delivery.id },
             data: {
@@ -154,7 +176,6 @@ export class WebhookDeliverHandler {
         });
         // Only a test reaches an address that is off. One that gets through
         // turns it back on; one that fails leaves it off, its count as it was.
-        const off = endpoint.disabledAt !== null;
         if (attempt.ok) {
             if (off) await this.onAfterTest(endpoint, delivery.id);
             else if (endpoint.failureStreak !== 0) {

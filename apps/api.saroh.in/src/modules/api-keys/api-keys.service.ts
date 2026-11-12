@@ -309,6 +309,7 @@ export class ApiKeysService {
     ): Promise<ApiKeyView> {
         authorize(ctx, "apikey:manage");
         const old = await this.find(ctx, keyId);
+        await this.assertKindOpen(ctx.organizationId, old.kind, now);
         if (old.graceUntil !== null || !isUsable(old, now)) {
             throw new ConflictException(
                 "This key can't be changed: it has been replaced, revoked or has expired.",

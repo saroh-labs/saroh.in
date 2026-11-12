@@ -263,6 +263,15 @@ export class McpAuthGuard implements CanActivate {
         if (found?.key.kind !== "SECRET" || !found.key.aiEnabled) {
             return null;
         }
+        // The secret-key kill switch bites here as it does on /v1.
+        if (
+            !(await this.flags.isEnabled(
+                FlagKey.API_SECRET,
+                found.context.organizationId,
+            ))
+        ) {
+            return null;
+        }
         return {
             kind: "key",
             id: found.key.id,

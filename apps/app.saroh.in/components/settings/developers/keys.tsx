@@ -623,14 +623,20 @@ function NewKeyFields({
             return setError("Add the website it works on.");
         }
         if (editId) {
+            // Only what changed: a rename never rewrites what the key may do.
             const { name, scope, aiEnabled, allowedOrigins } = body;
+            const levelsChanged =
+                JSON.stringify(d.levels) !== JSON.stringify(start.levels);
+            const originsChanged =
+                originsFrom(d.origins).join("\n") !==
+                originsFrom(start.origins).join("\n");
             const saved = await runAction(
                 () =>
                     updateApiKey(editId, {
                         name,
-                        scope,
-                        aiEnabled,
-                        allowedOrigins,
+                        ...(levelsChanged ? { scope } : {}),
+                        ...(d.ai !== start.ai ? { aiEnabled } : {}),
+                        ...(originsChanged ? { allowedOrigins } : {}),
                     }),
                 { setBusy },
             );

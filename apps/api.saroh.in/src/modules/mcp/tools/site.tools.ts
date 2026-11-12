@@ -994,8 +994,36 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
             }
             // A new session's restore point is the draft as it is now, so
             // this restore can itself be undone.
-            await d.restorePoints.beforeSiteWrite(call, site_id);
-            const result = await restoreSnapshot(ctx, site_id, point.snapshot);
+            const taken = await d.restorePoints.beforeSiteWrite(call, site_id);
+            let result: Awaited<ReturnType<typeof restoreSnapshot>>;
+            try {
+                // Checked again under the site's lock, so a save that
+                // landed since the check above is never rolled over.
+                result = await restoreSnapshot(ctx, site_id, point.snapshot, {
+                    before: async (tx) => {
+                        if (confirm_outside_changes) return;
+                        const late = await changedOutside(
+                            call,
+                            site_id,
+                            point,
+                            tx,
+                        );
+                        if (late.length) {
+                            throw new ToolError(
+                                `The draft was just changed outside this conversation: ${late.join("; ")}. Restoring would undo those changes too.`,
+                                "Ask the person; if they agree, call restore_site_draft again with confirm_outside_changes true.",
+                            );
+                        }
+                    },
+                });
+            } catch (error) {
+                if (taken) {
+                    await prisma.siteRestorePoint.deleteMany({
+                        where: { id: taken.id },
+                    });
+                }
+                throw error;
+            }
             const links = await linksFor(d, call, site_id);
             const changed = [
                 `put back ${point.snapshot.pages.length} pages`,
@@ -1130,9 +1158,10 @@ export async function changedOutside(
     { ctx, connection }: McpCall,
     siteId: string,
     point: { sessionStartedAt: Date; snapshot: RestoreSnapshot },
+    db: Prisma.TransactionClient = prisma,
 ): Promise<string[]> {
     const [ours, site, pages] = await Promise.all([
-        prisma.mcpActivity.findMany({
+        db.mcpActivity.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 connectionId: connection.id,
@@ -1141,11 +1170,11 @@ export async function changedOutside(
             },
             select: { target: true, createdAt: true },
         }),
-        prisma.site.findFirstOrThrow({
+        db.site.findFirstOrThrow({
             where: { id: siteId, organizationId: ctx.organizationId },
             select: { updatedAt: true },
         }),
-        prisma.page.findMany({
+        db.page.findMany({
             where: { siteId, organizationId: ctx.organizationId },
             select: {
                 id: true,
@@ -1207,17 +1236,20 @@ const jsonOrNull = (value: Prisma.JsonValue | null) =>
  * under the site's lock: pages added since are removed, pages deleted since
  * come back with their ids (the menu names pages by id), every page's
  * place and sections are put back, then the style, menu, footer and search
- * text. The live site is never touched.
+ * text. The live site is never touched. `before` runs under the lock,
+ * first, and may refuse by throwing.
  */
 export async function restoreSnapshot(
     ctx: OrganizationContext,
     siteId: string,
     snap: RestoreSnapshot,
+    opts: { before?: (tx: Prisma.TransactionClient) => Promise<void> } = {},
 ) {
     const organizationId = ctx.organizationId;
     return prisma.$transaction(
         async (tx) => {
             await lockSite(tx, siteId);
+            await opts.before?.(tx);
             const current = await tx.page.findMany({
                 where: { siteId, organizationId },
                 select: { id: true, path: true, isHome: true },

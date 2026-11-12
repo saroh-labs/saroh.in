@@ -442,6 +442,25 @@ describe("McpAuthGuard (U9)", () => {
         expect((await c.in(org.id))!.actions!.has("apikey:manage")).toBe(false);
         expect(await c.in((await business()).id)).toBeNull();
     });
+
+    it("refuses a secret key while secret keys are switched off for its business", async () => {
+        const org = await business();
+        keys.contextFor.mockResolvedValue({
+            key: {
+                id: uniq("key"),
+                kind: "SECRET",
+                aiEnabled: true,
+                name: "Server",
+            },
+            context: ownerCtx(org.id, org.owner),
+        });
+        flags.isEnabled.mockImplementation((k: string) =>
+            Promise.resolve(k !== "API_SECRET"),
+        );
+        expect(await statusOf(call(`sk_live_${"a".repeat(43)}`).run())).toBe(
+            401,
+        );
+    });
 });
 
 describe("AI connections (U9)", () => {
@@ -550,6 +569,35 @@ describe("AI connections (U9)", () => {
 });
 
 describe("AiConnectionsSweepJob (U9)", () => {
+    it("pages through every old app, so ones in use never hide unused ones", async () => {
+        const org = await business();
+        const old = new Date(Date.now() - UNUSED_CLIENT_MS - DAY);
+        // In use, and first in id order: a single page would hold only these.
+        const used = [
+            await client("A", `aaaa-${uniq("c")}`),
+            await client("A", `aaab-${uniq("c")}`),
+        ];
+        for (const id of used) await connect(org.owner, org.id, id);
+        const unused = await client("Z", `zzzz-${uniq("c")}`);
+        await prisma.oauthClient.updateMany({
+            where: { clientId: { in: [...used, unused] } },
+            data: { createdAt: old },
+        });
+        const job = new AiConnectionsSweepJob(connections);
+        job.batch = 2;
+        await job.sweep(new Date());
+        expect(
+            await prisma.oauthClient.findUnique({
+                where: { clientId: unused },
+            }),
+        ).toBeNull();
+        expect(
+            await prisma.oauthClient.count({
+                where: { clientId: { in: used } },
+            }),
+        ).toBe(2);
+    });
+
     it("ends idle connections and forgets apps nobody connected", async () => {
         const org = await business();
         const used = await client();

@@ -50,6 +50,8 @@ minutes and are never moved.
 The same steps for every key, on development first, then production. Do one
 variable at a time.
 
+Before rotating `PAYMENTS_ENC_KEY`: `packages/database/src/backfill/sealed-credentials.ts` reads only a single v1 key, so finish or retire that backfill first.
+
 ### 1. Make the key on the server, never printed
 
 On the server, generate the key into a file only you can read, build the new

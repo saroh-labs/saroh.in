@@ -74,7 +74,7 @@ export class AiConnectionsService {
         id: string,
         query: AiConnectionActivityQuery = {},
     ): Promise<AiConnectionActivity> {
-        const grant = await this.grantFor(ctx, id);
+        const grant = await this.connectionFor(ctx, id);
         const take = query.limit ?? CHANGES_PAGE;
         const where = {
             organizationId: ctx.organizationId,
@@ -113,7 +113,7 @@ export class AiConnectionsService {
         id: string,
         siteId: string,
     ): Promise<AiConnectionRollback> {
-        const grant = await this.grantFor(ctx, id);
+        const grant = await this.connectionFor(ctx, id);
         authorize(ctx, "section:write");
         await assertSiteInOrg(ctx, siteId);
         const call: McpCall = {
@@ -121,7 +121,7 @@ export class AiConnectionsService {
             connection: {
                 kind: "oauth",
                 id: grant.id,
-                clientId: grant.clientId,
+                clientId: grant.clientId ?? "",
                 clientName: null,
                 scopes: grant.scopes,
                 userId: grant.userId ?? ctx.userId,
@@ -138,22 +138,42 @@ export class AiConnectionsService {
             call,
             siteId,
         );
-        const outside = await changedOutside(call, siteId, point);
-        if (outside.length > 0) {
+        const refuseOutside = (outside: string[]) => {
+            if (outside.length === 0) return;
             throw new ConflictException({
                 message: `The draft was also changed outside this assistant since then (${outside.join(", ")}). Rolling back would undo that too, so it wasn't rolled back. Use the website editor's history instead.`,
                 details: { changedOutside: outside },
             });
-        }
+        };
+        refuseOutside(await changedOutside(call, siteId, point));
         // As the tool does: the draft as it is now becomes a restore point,
         // so this roll back can itself be undone.
-        await this.restorePoints.beforeSiteWrite(call, siteId);
-        const result = await restoreSnapshot(ctx, siteId, point.snapshot);
+        const taken = await this.restorePoints.beforeSiteWrite(call, siteId);
+        let result: Awaited<ReturnType<typeof restoreSnapshot>>;
+        try {
+            // Checked again under the site's lock: a save that landed since
+            // the check above is never rolled over.
+            result = await restoreSnapshot(ctx, siteId, point.snapshot, {
+                before: async (tx) =>
+                    refuseOutside(
+                        await changedOutside(call, siteId, point, tx),
+                    ),
+            });
+        } catch (error) {
+            if (taken) {
+                await prisma.siteRestorePoint.deleteMany({
+                    where: { id: taken.id },
+                });
+            }
+            throw error;
+        }
         const restoredTo = point.sessionStartedAt.toISOString();
-        const app = await prisma.oauthClient.findUnique({
-            where: { clientId: grant.clientId },
-            select: { name: true },
-        });
+        const app = grant.clientId
+            ? await prisma.oauthClient.findUnique({
+                  where: { clientId: grant.clientId },
+                  select: { name: true },
+              })
+            : { name: grant.clientName };
         // On the connection's own list, with the revisions it left, so the
         // assistant's next restore counts this as its own.
         await prisma.mcpActivity.create({
@@ -178,6 +198,67 @@ export class AiConnectionsService {
             metadata: { siteId, restoredTo, of: grant.userId },
         });
         return { siteId, restoredTo };
+    }
+
+    /**
+     * The connection, live or ended, as far as its changes here go. Once it
+     * is disconnected (or ended for being idle) its activity and restore
+     * points stay, so its changes can still be seen and rolled back: by the
+     * person it was, found from its own activity or the audit, or anyone
+     * with `apikey:manage`. Never an API key's activity.
+     */
+    private async connectionFor(ctx: OrganizationContext, id: string) {
+        const live = await prisma.oauthConsent.findFirst({
+            where: { id, organizationIds: { has: ctx.organizationId } },
+        });
+        if (live) {
+            if (live.userId !== ctx.userId) authorize(ctx, "apikey:manage");
+            return { ...live, clientName: null as string | null };
+        }
+        const own = {
+            organizationId: ctx.organizationId,
+            connectionId: id,
+            apiKeyId: null,
+        };
+        const row =
+            (await prisma.mcpActivity.findFirst({
+                where: {
+                    ...own,
+                    userId: { not: null },
+                    tool: { not: "rollback_from_settings" },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { userId: true, clientName: true },
+            })) ??
+            (await prisma.mcpActivity.findFirst({
+                where: own,
+                orderBy: { createdAt: "desc" },
+                select: { userId: true, clientName: true },
+            }));
+        if (!row) {
+            throw new NotFoundException("That connection isn't here any more.");
+        }
+        let userId = row.userId;
+        if (!userId) {
+            const connected = await prisma.auditEvent.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    action: AuditAction.AiConnectionConnected,
+                    targetType: "ai-connection",
+                    targetId: id,
+                },
+                select: { actorUserId: true },
+            });
+            userId = connected?.actorUserId ?? null;
+        }
+        if (!userId || userId !== ctx.userId) authorize(ctx, "apikey:manage");
+        return {
+            id,
+            clientId: null as string | null,
+            clientName: row.clientName,
+            scopes: [] as string[],
+            userId,
+        };
     }
 
     /** The connection, if it reaches this business and the viewer may see it. */
@@ -268,16 +349,13 @@ export class AiConnectionsService {
      */
     async disconnect(ctx: OrganizationContext, id: string): Promise<void> {
         const grant = await this.grantFor(ctx, id);
-        const left = grant.organizationIds.filter(
-            (o) => o !== ctx.organizationId,
-        );
-        if (left.length === 0) {
+        // One statement, so two businesses disconnecting at once each take
+        // only themselves off.
+        const after = await prisma.$queryRaw<
+            { organizationIds: string[] }[]
+        >`UPDATE "OauthConsent" SET "organizationIds" = array_remove("organizationIds", ${ctx.organizationId}) WHERE id = ${grant.id} RETURNING "organizationIds"`;
+        if (after.some((g) => g.organizationIds.length === 0)) {
             await endConnection(grant);
-        } else {
-            await prisma.oauthConsent.update({
-                where: { id: grant.id },
-                data: { organizationIds: left },
-            });
         }
         await this.recordEnded(
             grant,

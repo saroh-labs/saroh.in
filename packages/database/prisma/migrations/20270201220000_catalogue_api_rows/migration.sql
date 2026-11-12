@@ -5,6 +5,8 @@
 -- a new version alone would leave every existing business ungrantable.
 -- Hidden on every plan, so no business gains anything until staff grant it
 -- or a later version includes it. Idempotent: a row already there is kept.
+-- Only a catalogue with the "usage" group gets them: a row in a group the
+-- catalogue lacks would stop it parsing.
 CREATE TEMP TABLE "_api_rows" ("id" TEXT, "name" TEXT, "what" TEXT);
 INSERT INTO "_api_rows" VALUES
     ('api-storefront', 'Storefront API', 'Your own website reads your catalogue and takes bookings with a publishable key.'),
@@ -24,6 +26,8 @@ FROM "PricingCatalogVersion" v
 CROSS JOIN "_api_rows" r
 WHERE jsonb_typeof(v."catalog"->'modules') = 'array'
   AND jsonb_typeof(v."catalog"->'plans') = 'array'
+  AND jsonb_typeof(v."catalog"->'groups') = 'array'
+  AND EXISTS (SELECT 1 FROM jsonb_array_elements(v."catalog"->'groups') g WHERE g->>'id' = 'usage')
   AND NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v."catalog"->'modules') m WHERE m->>'id' = r."id"
 )
@@ -43,9 +47,13 @@ SET "catalog" = jsonb_set(d."catalog", '{modules}', (d."catalog"->'modules') || 
         'cells', (SELECT coalesce(jsonb_object_agg(p->>'id', '{"inc":false,"off":"hidden"}'::jsonb), '{}'::jsonb)
                   FROM jsonb_array_elements(d."catalog"->'plans') p)))
     FROM "_api_rows" r
-    WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d."catalog"->'modules') m WHERE m->>'id' = r."id")))
+    WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d."catalog"->'modules') m WHERE m->>'id' = r."id"))),
+    -- An editor holding the draft from before must reload, not save over these.
+    "revision" = d."revision" + 1
 WHERE jsonb_typeof(d."catalog"->'modules') = 'array'
   AND jsonb_typeof(d."catalog"->'plans') = 'array'
+  AND jsonb_typeof(d."catalog"->'groups') = 'array'
+  AND EXISTS (SELECT 1 FROM jsonb_array_elements(d."catalog"->'groups') g WHERE g->>'id' = 'usage')
   AND EXISTS (
     SELECT 1 FROM "_api_rows" r
     WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d."catalog"->'modules') m WHERE m->>'id' = r."id"));

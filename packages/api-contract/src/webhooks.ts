@@ -22,6 +22,9 @@ export const WEBHOOK_EVENTS = [
 export const webhookEvent = z.enum(WEBHOOK_EVENTS);
 export type WebhookEvent = z.infer<typeof webhookEvent>;
 
+/** Deliveries in a row that run out of tries before Saroh switches an address off. */
+export const WEBHOOK_AUTO_OFF_AFTER = 5;
+
 /** What "Send a test" sends. Never subscribed to: every endpoint gets it on request. */
 export const WEBHOOK_PING = "ping";
 

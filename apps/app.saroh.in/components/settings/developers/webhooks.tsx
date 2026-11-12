@@ -522,7 +522,7 @@ function EndpointFields({
         );
         if (!res) return;
         if (!res.ok) return setError(res.error);
-        showSuccess("Saved.");
+        showSuccess(`${title(res.data)} saved.`);
         onClose();
         router.refresh();
     }

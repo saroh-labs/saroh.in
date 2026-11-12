@@ -698,6 +698,98 @@ describe("delivering (U13)", () => {
         ).rejects.toMatchObject({ status: 429 });
     });
 
+    it("a resend of one still being sent queues nothing more, and resends are limited a minute", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await newCustomer(org.id);
+        const delivery = await prisma.webhookDelivery.findFirstOrThrow({
+            where: { organizationId: org.id },
+        });
+        await expect(
+            service.resend(owner, made.endpoint.id, delivery.id),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(await jobsOf(org.id)).toHaveLength(1);
+
+        await prisma.webhookDelivery.update({
+            where: { id: delivery.id },
+            data: { status: "FAILED" },
+        });
+        // The refused one above took a turn too: four more fill the minute.
+        for (let i = 0; i < 4; i++) {
+            await service.resend(owner, made.endpoint.id, delivery.id);
+            await prisma.webhookDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "FAILED" },
+            });
+        }
+        await expect(
+            service.resend(owner, made.endpoint.id, delivery.id),
+        ).rejects.toMatchObject({ status: 429 });
+    });
+
+    it("a delivery that can't be signed is FAILED on its last try and counts toward off", async () => {
+        const { org, owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await prisma.webhookEndpoint.update({
+            where: { id: made.endpoint.id },
+            data: { secretAuthTag: randomBytes(16).toString("base64") },
+        });
+        await newCustomer(org.id);
+        const [job] = await jobsOf(org.id);
+        // Rethrown, so the worker backs off (a crypto error, not this realm's Error).
+        expect(await run(job, 1)).not.toBeNull();
+        let delivery = await prisma.webhookDelivery.findFirstOrThrow({
+            where: { organizationId: org.id },
+        });
+        expect(delivery.status).toBe("PENDING");
+        expect(await run(job, job.maxAttempts)).not.toBeNull();
+        delivery = await prisma.webhookDelivery.findFirstOrThrow({
+            where: { organizationId: org.id },
+        });
+        expect(delivery.status).toBe("FAILED");
+        expect(delivery.lastError).toMatch(/couldn't prepare/);
+        const endpoint = await prisma.webhookEndpoint.findUniqueOrThrow({
+            where: { id: made.endpoint.id },
+        });
+        expect(endpoint.failureStreak).toBe(1);
+        expect(received).toHaveLength(0);
+    });
+
+    it("a test to an address that is off needs what switching it on needs", async () => {
+        const { owner } = await business();
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await service.update(owner, made.endpoint.id, { enabled: false });
+        const developer: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "developer",
+            actions: new Set<OrgAction>(["webhook:manage", "order:read"]),
+        };
+        await expect(
+            service.test(developer, made.endpoint.id),
+        ).rejects.toMatchObject({ status: 403 });
+        access.resolve.mockResolvedValueOnce({
+            source: "catalogue",
+            entitlements: {},
+            modules: [],
+        });
+        await expect(
+            service.test(owner, made.endpoint.id),
+        ).rejects.toMatchObject({ status: 403 });
+        await expect(
+            service.test(owner, made.endpoint.id),
+        ).resolves.toBeDefined();
+    });
+
     it("signs with both secrets for a day after a roll", async () => {
         const { org, owner } = await business();
         const made = await service.create(owner, {
