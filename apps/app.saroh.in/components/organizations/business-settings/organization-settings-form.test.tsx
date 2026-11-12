@@ -376,7 +376,7 @@ describe("Kind of place (DEC-216, TPLD2)", () => {
 
     it("says when none is saved", () => {
         draw(settings({ trade: null }));
-        expect(row("business-trade")?.textContent).toContain("Not said yet");
+        expect(row("business-trade")?.textContent).toContain("Not marked yet");
     });
 
     it("Change opens its sheet; Save sends only the trade, and Undo puts it back", async () => {

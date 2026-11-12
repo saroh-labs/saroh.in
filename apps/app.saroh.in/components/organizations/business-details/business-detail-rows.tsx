@@ -123,7 +123,7 @@ export function BusinessDetailRows({
                     >
                         <Saved
                             text={tradeLabel(saved.trade) ?? ""}
-                            empty="Not said yet"
+                            empty="Not marked yet"
                         />
                     </Row>
                 ) : null}
