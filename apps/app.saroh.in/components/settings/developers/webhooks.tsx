@@ -57,7 +57,7 @@ const host = (url: string) => addressLine(url).split("/")[0] ?? url;
 const title = (e: WebhookEndpointView) => e.name ?? host(e.url);
 
 /** "Last sent 4 minutes ago", with how it went when it didn't get through. */
-function lastSentLine(
+export function lastSentLine(
     e: WebhookEndpointView,
     now: Date,
     zone: string,
@@ -65,6 +65,9 @@ function lastSentLine(
     if (!e.lastSent) return null;
     const when = relativeWhen(e.lastSent.at, now, zone).toLowerCase();
     if (e.lastSent.status === "FAILED") return `Last try failed ${when}`;
+    // A tried message still pending didn't get through, and is being tried again.
+    if (e.lastSent.status === "PENDING")
+        return `Trying again, last try ${when}`;
     return `Last sent ${when}`;
 }
 

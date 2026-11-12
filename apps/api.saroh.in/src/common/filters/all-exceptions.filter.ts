@@ -236,7 +236,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
                       ? {
                             error: {
                                 code: contractCode(statusCode),
-                                message,
+                                message: keyRefusal(details) ?? message,
                                 requestId: correlationId,
                             },
                         }
@@ -244,6 +244,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
             );
         }
     }
+}
+
+/**
+ * A key refused by what it may do reads about the key: the role sentence
+ * ("Your role can't do this…") would send the developer to Settings › Team.
+ */
+export const KEY_DENIED_MESSAGE =
+    "This key can't do this. Change what it may do in Settings › API and AI apps.";
+
+function keyRefusal(details: unknown): string | undefined {
+    const code = (details as { code?: unknown } | undefined)?.code;
+    return code === "ROLE_DENIED" ? KEY_DENIED_MESSAGE : undefined;
 }
 
 /** The public contract's code for a status (plan 2026-11-10-001, U8). */

@@ -14,7 +14,10 @@ import type { Request } from "express";
 import { authorize } from "../../modules/organizations/organization-policy";
 import { logHttpRequestOnce } from "../logging/http-request-log";
 import { structuredLogger } from "../logging/structured-logger";
-import { AllExceptionsFilter } from "./all-exceptions.filter";
+import {
+    AllExceptionsFilter,
+    KEY_DENIED_MESSAGE,
+} from "./all-exceptions.filter";
 
 interface CapturedResponse {
     statusCode?: number;
@@ -481,6 +484,23 @@ describe("AllExceptionsFilter on the public API (review #8)", () => {
         [new InternalServerErrorException(), "internal"],
     ])("gives %p the code %s", (exception, code) => {
         expect(codeOf(onV1(exception))).toBe(code);
+    });
+
+    it("a key refused by what it may do reads about the key, not a role", () => {
+        let refused: unknown;
+        try {
+            authorize(
+                { organizationId: "org_1", userId: "user_1", role: "MEMBER" },
+                "store:create",
+            );
+        } catch (error) {
+            refused = error;
+        }
+        const res = onV1(refused);
+        expect(codeOf(res)).toBe("forbidden");
+        expect((res.body as { error: { message: string } }).error.message).toBe(
+            KEY_DENIED_MESSAGE,
+        );
     });
 
     it("names a wait on a 429 that set none, and keeps one that did", () => {
