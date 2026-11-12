@@ -258,6 +258,25 @@ and blocked real deploys. So work reaches GitHub in batches:
    up instead; its tree must equal `development`'s, because an auto-merge can
    leave a stale copy behind (5 Nov 2026).
 
+### How the gate stays out of the way — **Current** (2026-11-12)
+
+The gate shares the laptop with the person working on it (owner, 12 Nov 2026:
+the full gate froze everything else). So `scripts/prepush.sh`, always and
+with no opt-out:
+
+- **Runs at low priority.** It re-execs itself under `nice -n 10` and, on
+  macOS, `taskpolicy -c utility`; everything it starts inherits both. Idle
+  cores are still used; anything interactive goes first.
+- **Builds two at a time.** Every turbo build it runs (the browser run's
+  production builds, the Global ones, the integration build) takes
+  `--concurrency=2`; the rest queue. A Next production build takes 2-3 GB.
+- **Recycles Jest workers past 1 GB** (`--workerIdleMemoryLimit=1GB`), unit
+  and integration.
+- **Waits for memory** before the production builds, the integration shards
+  and the browser specs: under 4 GB free, it waits (up to 10 minutes)
+  instead of piling on. macOS has no per-process-group memory cap, so the
+  limits are how much runs at once.
+
 ### How the gate stays fast — **Current** (2026-09-29)
 
 `scripts/prepush.sh` never does the same work twice:

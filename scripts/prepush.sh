@@ -80,6 +80,18 @@
 # needs E2E_DATABASE_URL, another), and
 # PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION set for the reset. It never prints
 # any of them. bash 3 compatible (macOS): no mapfile, no associative arrays.
+# Always low priority, so the laptop stays usable (owner, 12 Nov 2026): the
+# full gate runs builds, browsers, Jest and Vitest at once, which held a load
+# of ~15 on a 12-core Mac and froze everything else. nice 10, and on macOS the
+# utility QoS clamp (children inherit both): idle cores are still used, but
+# anything the person is doing goes first. No opt-out.
+if [ -z "${PREPUSH_LOWERED:-}" ]; then
+    export PREPUSH_LOWERED=1
+    if command -v taskpolicy >/dev/null 2>&1; then
+        exec taskpolicy -c utility nice -n 10 bash "$0" "$@"
+    fi
+    exec nice -n 10 bash "$0" "$@"
+fi
 set -o pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
@@ -233,6 +245,26 @@ affected() {
     [ "$AFFECTED_LIST" = "(all)" ] || echo "$AFFECTED_LIST" | grep -x "$1" >/dev/null
 }
 TURBO="pnpm -s exec turbo run --output-logs=errors-only $TURBO_FORCE"
+# Builds two at a time, the rest queued (owner, 12 Nov 2026): a Next
+# production build takes 2-3 GB, and seven at once pushed the laptop into swap.
+BUILD_CONC="--concurrency=2"
+# free_gb: memory the system can hand out now, in whole GB.
+free_gb() {
+    if command -v vm_stat >/dev/null 2>&1; then
+        vm_stat | awk '/page size of/ {ps=$8} /Pages (free|inactive|speculative)/ {gsub(/\./, "", $NF); n += $NF} END {printf "%d", n * ps / 1073741824}'
+    else
+        awk '/MemAvailable/ {printf "%d", $2 / 1048576}' /proc/meminfo
+    fi
+}
+# wait_for_memory <what>: before a heavy step, wait (up to 10 minutes) while
+# under 4 GB is free, instead of piling on and pushing the laptop into swap.
+wait_for_memory() {
+    local i=0
+    while [ "$(free_gb)" -lt 4 ] && [ $i -lt 60 ]; do
+        [ $i = 0 ] && echo "    waiting for memory before $1 (under 4 GB free)"
+        sleep 10; i=$((i + 1))
+    done
+}
 # Builds what the affected packages' tests import: the packages they depend
 # on, and @saroh/database's own build (its prisma generate) when it is one of
 # them. Done apart, and the tests then run with --only, because turbo hashes a
@@ -248,7 +280,7 @@ test_deps() {
     affected @saroh/database && f="$f --filter=@saroh/database"
     [ -n "$f" ] || return 0
     # shellcheck disable=SC2086
-    $TURBO build $f
+    $TURBO build $BUILD_CONC $f
 }
 
 # ---------------------------------------------------------------------------
@@ -429,7 +461,8 @@ e2e_stack() {
         echo "    copied in $(( $(date +%s) - s ))s"
         echo "--- build"
         # shellcheck disable=SC2086
-        pnpm turbo run build --log-order=grouped \
+        wait_for_memory "the production builds"
+        pnpm turbo run build --log-order=grouped $BUILD_CONC \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
             --filter=application --filter=sites $web_filter $admin_filter
     else
@@ -444,7 +477,8 @@ e2e_stack() {
         # a build replays from turbo's cache either way.
         echo "--- seed and build"
         # shellcheck disable=SC2086
-        pnpm turbo run db:seed:showcase build --log-order=grouped \
+        wait_for_memory "the production builds"
+        pnpm turbo run db:seed:showcase build --log-order=grouped $BUILD_CONC \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
             --filter=application --filter=sites $web_filter $admin_filter
         echo "    migrated, seeded and built in $(( $(date +%s) - s ))s"
@@ -459,7 +493,7 @@ e2e_stack() {
     if [ -n "$global" ]; then
         echo "--- build the Global app and accounts"
         NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
-            pnpm turbo run build:global --log-order=grouped \
+            pnpm turbo run build:global --log-order=grouped $BUILD_CONC \
             --filter=application --filter=auth
     fi
 
@@ -508,6 +542,7 @@ e2e_stack() {
     echo "--- specs:$specs"
     cd e2e
     # shellcheck disable=SC2086
+    wait_for_memory "the browser specs"
     PW_WORKERS=${PW_WORKERS:-4} node run.mjs $specs
 }
 # What the seeded template depends on: the migrations and schema, the seed
@@ -967,7 +1002,7 @@ since() {
 # and Jest workers crashed (DEV_LEARNINGS, 5 Oct 2026). CI runs each job on
 # its own machine and is unchanged.
 GATE_TURBO="$TURBO --concurrency=${PREPUSH_TURBO_CONCURRENCY:-3}"
-JEST_WORKERS="--maxWorkers=${PREPUSH_JEST_WORKERS:-4}"
+JEST_WORKERS="--maxWorkers=${PREPUSH_JEST_WORKERS:-4} --workerIdleMemoryLimit=1GB"
 VITEST_WORKERS="--maxWorkers=${PREPUSH_VITEST_WORKERS:-2}"
 if [ "$QUICK" = 1 ]; then
     API_UNIT=api-unit:changed; VITEST=vitest:changed; SEEDS=seeds:changed
@@ -1103,6 +1138,7 @@ int_worker() {
                 ( cd apps/api.saroh.in && TEST_DATABASE_URL=$url TEST_RLS=$INT_RLS TMPDIR=$tmp \
                     SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
                     --shard="$k/$INT_GROUPS" --cacheDirectory="$JEST_CACHE" --ci --no-watchman \
+                    --workerIdleMemoryLimit=1GB \
                     ${INT_RUN_PATHS:+--runTestsByPath $INT_RUN_PATHS} ) \
                     >"$W/$INT_TAG-$k.log" 2>&1
                 rc=$?
@@ -1150,6 +1186,7 @@ int_run() {
         i=$((i + 1))
     done
     say "$INT_TAG" "$INT_GROUPS shards on $n test databases, $name-1 to $name-$n"
+    wait_for_memory "the integration shards"
     i=1
     while [ $i -le "$n" ]; do
         url=$(echo "$TEST_DATABASE_URL" | sed -E "s#/([^/?]+)(\\?.*)?\$#/\\1-$i\\2#")
@@ -1260,7 +1297,7 @@ if [ "$INT" = 1 ]; then
         # Prisma client is generated into node_modules, outside turbo's
         # cached outputs, so a cache hit after a schema merge left it stale
         # (DEV_LEARNINGS, 6 Oct): generate it first, every time (~1s).
-        step int-build sh -c "pnpm --filter @saroh/database exec prisma generate >/dev/null && $TURBO build --filter='@saroh/api^...'"
+        step int-build sh -c "pnpm --filter @saroh/database exec prisma generate >/dev/null && $TURBO build $BUILD_CONC --filter='@saroh/api^...'"
         if [ "$INT_STEP" = int ] || int_select; then
             say int "$INT_WHY"
             # One mode after the other, never side by side (int_worker).
