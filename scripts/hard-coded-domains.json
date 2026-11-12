@@ -10,7 +10,7 @@
     "apps/admin.saroh.in/next.config.mjs": 2,
     "apps/api.saroh.in/src/common/app-url.ts": 1,
     "apps/api.saroh.in/src/common/email.ts": 2,
-    "apps/api.saroh.in/src/modules/admin/admin-deployments.ts": 3,
+    "apps/api.saroh.in/src/modules/admin/admin-deployments.ts": 4,
     "apps/api.saroh.in/src/modules/link-preview/link-preview.service.ts": 1,
     "apps/api.saroh.in/src/modules/link-preview/report-email.ts": 3,
     "apps/api.saroh.in/src/modules/organizations/legal-hold.ts": 1,
