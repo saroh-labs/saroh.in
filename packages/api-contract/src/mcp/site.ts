@@ -328,12 +328,46 @@ export const uploadImageTool = {
     }),
 };
 
-export const publishSiteTool = {
+const publishChanged = z
+    .array(z.string())
+    .describe(
+        'What goes live: section changes, site settings changed, or "first publish: the whole site".',
+    );
+
+export const previewPublishTool = {
     input: z.object({ site_id: siteId }).strict(),
     output: z.object({
         site_id: z.string(),
+        will: z.enum(["go_live", "go_to_reviewers"]),
+        changed: publishChanged,
+        preview_url: z.string().nullable(),
+        editor_url: z.string(),
+        confirm_code: z
+            .string()
+            .describe(
+                "Pass to publish_site only after the person says yes. Single use; lasts 10 minutes.",
+            ),
+        expires_at: z.string(),
+    }),
+};
+
+export const publishSiteTool = {
+    input: z
+        .object({
+            site_id: siteId,
+            confirm_code: z
+                .string()
+                .min(1)
+                .max(64)
+                .describe(
+                    "The confirm_code from preview_publish, once the person has seen its summary and said yes.",
+                ),
+        })
+        .strict(),
+    output: z.object({
+        site_id: z.string(),
         outcome: z.enum(["published", "sent_for_approval"]),
-        changed: z.array(z.string()),
+        changed: publishChanged,
         live_url: z.string().nullable(),
         editor_url: z.string(),
     }),

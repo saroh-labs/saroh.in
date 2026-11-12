@@ -42,7 +42,7 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
-import { putLive, readReviewStanding } from "./live-pointer";
+import { lockSite, putLive, readReviewStanding } from "./live-pointer";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
 import {
@@ -755,7 +755,19 @@ const draftSiteSelect = {
 } satisfies Prisma.SiteSelect;
 
 /** A site as {@link draftSiteSelect} loads it. */
-type DraftSite = Prisma.SiteGetPayload<{ select: typeof draftSiteSelect }>;
+export type DraftSite = Prisma.SiteGetPayload<{
+    select: typeof draftSiteSelect;
+}>;
+
+/**
+ * A caller's last word before a draft is frozen (an AI app's publish code,
+ * U11): run first in the write's transaction, under the site's lock, with
+ * the draft about to be written. A throw refuses the write.
+ */
+export type ConfirmDraft = (
+    tx: Prisma.TransactionClient,
+    draft: DraftSite,
+) => Promise<void>;
 
 /** What publishing a site would change (#190, #282). */
 interface PendingChanges {
@@ -1935,12 +1947,14 @@ export class SitesService {
 
     /**
      * The draft as a snapshot would see it, or null when the site does not
-     * match `where`. Shared by publish and by draft previews (#198).
+     * match `where`. Shared by publish and by draft previews (#198). `db`
+     * is a transaction when the read must see what its lock holder sees.
      */
     async loadDraftSite(
         where: Prisma.SiteWhereInput,
+        db: Pick<Prisma.TransactionClient, "site"> = prisma,
     ): Promise<DraftSite | null> {
-        return prisma.site.findFirst({ where, select: draftSiteSelect });
+        return db.site.findFirst({ where, select: draftSiteSelect });
     }
 
     /**
@@ -2139,7 +2153,7 @@ export class SitesService {
          * unless an owner overrides, and the override is recorded. 403
          * from anyone else.
          */
-        options: { override?: boolean } = {},
+        options: { override?: boolean; confirm?: ConfirmDraft } = {},
     ): Promise<PublishResult> {
         authorize(ctx, "site:publish");
         assertOverrideAllowed(ctx, options.override);
@@ -2178,6 +2192,10 @@ export class SitesService {
         const fingerprint = draftFingerprint(snapshot);
 
         const published = await prisma.$transaction(async (tx) => {
+            if (options.confirm) {
+                await lockSite(tx, site.id);
+                await options.confirm(tx, site);
+            }
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
              * flag that blocks (`checkAddress`). Asked here, beside the

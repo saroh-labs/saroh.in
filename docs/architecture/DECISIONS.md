@@ -2885,3 +2885,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A managed key service (Google Cloud KMS or AWS KMS) may come later. It fits the ring as another key id whose entry names it, so stored values don't change. Nothing is built for it now.
 - Why: any key can be replaced, routinely or after a leak, without breaking stored data; it stays simple, with no new service.
 - Rules: `apps/api.saroh.in/src/common/crypto.ts`, `src/cli/keys-reseal.ts`.
+
+## DEC-215 An AI app publishes a website in two steps
+
+**Status: Accepted — 2026-11-12** · owner
+
+- Decision (owner, 12 Nov 2026, "to let the users know what is happening"): an AI app can't publish in one call. `preview_publish` answers with what will go live, the preview link, whether it goes live or to the reviewers, and a confirmation code; `publish_site` publishes only with that code.
+- The code is single-use, lasts 10 minutes, and is bound to the connection, the business, the site and the exact draft the summary described. A draft changed since is refused, and the app is told to ask again.
+- Why: the tool's description and its destructive hint only ask the AI app to check with the person; a misbehaving app could skip that. The code makes Saroh, not the app, enforce that the person saw what goes live.
+- Rules: `apps/api.saroh.in/src/modules/mcp/publish-codes.ts`, `tools/site.tools.ts`.

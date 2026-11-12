@@ -11,6 +11,7 @@ import {
     getSiteTool,
     listSectionTypesTool,
     listTemplatesTool,
+    previewPublishTool,
     publishSiteTool,
     removeSectionTool,
     restoreSiteDraftTool,
@@ -56,6 +57,11 @@ import { templateCatalogue } from "../../sites/template-catalogue";
 import { TestReleasesService } from "../../sites/test-releases.service";
 import type { McpCall } from "../activity.service";
 import { siteTarget } from "../activity.service";
+import {
+    confirmPublish,
+    issuePublishCode,
+    publishFingerprint,
+} from "../publish-codes";
 import type { RestoreSnapshot } from "../restore-point.service";
 import { RestorePointService } from "../restore-point.service";
 import type { McpTool, ToolHints } from "../tool-registry";
@@ -96,7 +102,7 @@ const WRITE: ToolHints = {
 const DESTRUCTIVE: ToolHints = { ...WRITE, destructiveHint: true };
 
 const DRAFT_ONLY =
-    "Visitors see nothing until the site is published with publish_site.";
+    "Visitors see nothing until the site is published (preview_publish, then publish_site).";
 
 /** What the site tools call; the class below wires them from Nest. */
 export interface SiteToolDeps {
@@ -109,6 +115,8 @@ export interface SiteToolDeps {
     queue: Pick<JobQueue, "enqueue">;
     /** The SSRF-guarded fetch; tests stand in a server. */
     fetchImage?: typeof strictFetch;
+    /** The clock publish codes expire by; tests move it. */
+    now?: () => Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +212,7 @@ const join = (items: string[]) => (items.length ? items.join("; ") : "none");
 // ---------------------------------------------------------------------------
 
 export function siteTools(d: SiteToolDeps): McpTool[] {
+    const now = d.now ?? (() => new Date());
     const getSite = defineTool({
         name: "get_site",
         title: "Get a website",
@@ -904,33 +913,106 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         },
     });
 
+    /** What publishing `site` would put live, in the summary's words. */
+    const whatGoesLive = (site: {
+        currentPublicationId: string | null;
+        pendingSectionChanges: number | null;
+        pendingSiteChanges: string[] | null;
+    }) =>
+        site.currentPublicationId
+            ? [
+                  `${site.pendingSectionChanges ?? 0} section changes`,
+                  ...(site.pendingSiteChanges ?? []).map((k) => `${k} changed`),
+              ]
+            : ["first publish: the whole site"];
+
+    const previewPublish = defineTool({
+        name: "preview_publish",
+        title: "Check what publishing would put live",
+        description:
+            "Use this when the person wants the website published: it publishes nothing, and says what would go live, gives a preview link, says whether it goes live or to reviewers, and gives a confirm_code. Show that to the person; only once they say yes, call publish_site with the confirm_code. Don't use it to save edits: every edit is already saved in the draft.",
+        contract: previewPublishTool,
+        capability: "site:publish",
+        module: "WEBSITE",
+        hints: { ...READ_ONLY, idempotentHint: false },
+        async run({ site_id }, call: McpCall) {
+            const { ctx } = call;
+            const site = await d.sites.getSite(ctx, site_id);
+            const changed = whatGoesLive(site);
+            const toReviewers = await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            );
+            const links = await linksFor(d, call, site_id);
+            // After the links: the summary binds the draft as it is now.
+            const draft = await d.sites.loadDraftSite({
+                id: site_id,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            });
+            if (!draft) throw new ToolError(`Website ${site_id} isn't found.`);
+            const { code, expiresAt } = await issuePublishCode(
+                call,
+                site_id,
+                publishFingerprint(toReviewers, draft),
+                now(),
+            );
+            return {
+                text: [
+                    `Not published. ${toReviewers ? "Publishing sends this draft to the site's reviewers; it goes live once they approve it." : "Publishing puts this draft live for everyone."} What goes live: ${changes(changed)}.`,
+                    linksText(links),
+                    `confirm_code: ${code} (works once, for 10 minutes).`,
+                    "Show the person what goes live and the preview link, and ask whether to publish. Only after they say yes, call publish_site with this confirm_code. If they ask for changes first, make them, then call preview_publish again.",
+                ].join("\n"),
+                data: {
+                    site_id,
+                    will: toReviewers
+                        ? ("go_to_reviewers" as const)
+                        : ("go_live" as const),
+                    changed,
+                    ...links,
+                    confirm_code: code,
+                    expires_at: expiresAt.toISOString(),
+                },
+            };
+        },
+    });
+
     const publishSite = defineTool({
         name: "publish_site",
         title: "Publish a website",
         description:
-            "Use this when the person has seen the preview and clearly said to publish: it puts the website's draft live for everyone, or, when the site needs a reviewer's approval, sends it to the reviewers instead. Always ask the person first. Don't use it to save edits: every edit is already saved in the draft. Example: after \"looks good, put it live\", publish_site with the site_id.",
+            "Use this when the person has seen preview_publish's summary and clearly said yes: with its confirm_code it puts the website's draft live for everyone, or, when the site needs a reviewer's approval, sends it to the reviewers instead. Without a confirm_code from preview_publish it can't run; if the draft changed since, it refuses and you call preview_publish again. Example: after \"looks good, put it live\", publish_site with the site_id and confirm_code.",
         contract: publishSiteTool,
         capability: "site:publish",
         module: "WEBSITE",
         hints: { ...DESTRUCTIVE, openWorldHint: true },
-        async run({ site_id }, { ctx }: McpCall) {
+        async run({ site_id, confirm_code }, call: McpCall) {
+            const { ctx } = call;
             const site = await d.sites.getSite(ctx, site_id);
-            const changed = site.currentPublicationId
-                ? [
-                      `${site.pendingSectionChanges ?? 0} section changes`,
-                      ...(site.pendingSiteChanges ?? []).map(
-                          (k) => `${k} changed`,
-                      ),
-                  ]
-                : ["first publish: the whole site"];
+            const changed = whatGoesLive(site);
+            const toReviewers = await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            );
+            // Checked and taken in the write's own transaction, under the
+            // site's lock, against the draft it freezes.
+            const confirm = confirmPublish(
+                call,
+                site_id,
+                confirm_code,
+                toReviewers,
+                now(),
+                d.sites,
+            );
             const editor = await editorUrl(ctx.organizationId, site_id);
-            if (
-                await approvalApplies(
-                    ctx.organizationId,
-                    site.publishNeedsApproval,
-                )
-            ) {
-                const made = await d.releases.create(ctx, site_id, {});
+            if (toReviewers) {
+                const made = await d.releases.create(
+                    ctx,
+                    site_id,
+                    {},
+                    { confirm },
+                );
                 await d.sites.requestReview(ctx, site_id, made.release.id);
                 return {
                     text: `Not published yet: this website needs a reviewer's approval first. Saroh saved the draft as ${made.release.name} and asked the site's reviewers to approve it; it goes live from the editor once approved. Changes in it: ${changes(changed)}. Editor: ${editor}`,
@@ -950,7 +1032,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
             }
             // Never `override`: going live past approval is an owner's call
             // in the app.
-            await d.sites.publishSite(ctx, site_id);
+            await d.sites.publishSite(ctx, site_id, { confirm });
             const live = await siteOriginOf(ctx.organizationId, {
                 siteId: site_id,
             });
@@ -1067,6 +1149,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         deletePage,
         updateSettings,
         uploadImage,
+        previewPublish,
         publishSite,
         restoreDraft,
     ] as McpTool[];
