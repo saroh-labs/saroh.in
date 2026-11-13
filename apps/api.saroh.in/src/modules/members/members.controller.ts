@@ -19,8 +19,8 @@ import { MembersService } from "./members.service";
 
 /**
  * Store team endpoints. The caller is always the authenticated session user
- * (BetterAuthGuard → @CurrentUser); the service enforces owner-only management
- * and the email-match rule on accept.
+ * (BetterAuthGuard → @CurrentUser); the service asks the business's
+ * `member:*` permissions and the email-match rule on accept.
  */
 @Controller()
 @UseGuards(BetterAuthGuard, StoreLifecycleGuard)

@@ -35,6 +35,10 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
             action !== "org:address:update" &&
             action !== "billing:manage" &&
             action !== "apikey:manage" &&
+            // Labels only: the approval override and the full export are
+            // decided by the Owner role where used (audit 2026-11-12).
+            action !== "site:approval:override" &&
+            action !== "org:export" &&
             action !== "webhook:manage",
     ),
     // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
@@ -100,6 +104,8 @@ describe("organization-policy: can()", () => {
             "org:address:update",
             "billing:manage",
             "apikey:manage",
+            "site:approval:override",
+            "org:export",
         ];
         expect([...OWNER_ONLY_ACTIONS].sort()).toEqual([...ownerOnly].sort());
         expect(can("ADMIN", "org:delete")).toBe(false);
@@ -475,6 +481,8 @@ describe("reach (F19): nobody grants what they don't hold", () => {
                 "billing:manage",
                 "org:address:update",
                 "org:delete",
+                "org:export",
+                "site:approval:override",
                 "webhook:manage",
             ].sort(),
         );

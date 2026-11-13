@@ -23,6 +23,11 @@ export type OrgAction =
     // the business — every change holds an address, and it moves every link
     // the business has shared.
     | "org:address:update"
+    // Download everything the business holds (DEC-131 closing notice, data
+    // export). The Owner's alone, by their role, as closing is. Listed so
+    // the Roles screen shows it as Owner only (audit 2026-11-12 #15); the
+    // export still asks the Owner role, not this key.
+    | "org:export"
     | "member:read"
     | "member:invite"
     | "member:remove"
@@ -52,6 +57,12 @@ export type OrgAction =
     // leaving a note is not a read, and signing a site off is not an edit.
     | "site:comment"
     | "site:approve"
+    // Publish without the approval "Publishing needs approval" asks for, and
+    // switch that setting: the Owner's alone (separation of duties, the
+    // gate can't be given to whoever it gates). Listed so the Roles screen
+    // shows it as Owner only (audit 2026-11-12 #14); publishing still asks
+    // the Owner role, not this key.
+    | "site:approval:override"
     | "domain:manage"
     | "form:read"
     | "form:write"
@@ -193,6 +204,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "org:update",
     "org:delete",
     "org:address:update",
+    "org:export",
     "member:read",
     "member:invite",
     "member:remove",
@@ -214,6 +226,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "site:publish",
     "site:comment",
     "site:approve",
+    "site:approval:override",
     "domain:manage",
     "form:read",
     "form:write",

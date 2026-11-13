@@ -82,6 +82,9 @@ const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
 } as const;
 
+/** The step a staff-taken order starts its timeline with. */
+export const ORDER_TAKEN_NOTE = "Order taken";
+
 /** What a store-scoped order write says to a role without its power (B16). */
 const ORDER_WRITE_REFUSAL = {
     "order:create": "Your role can't take new orders.",
@@ -456,6 +459,22 @@ export class OrdersService {
                             "RELEASED",
                             "RESERVED",
                         );
+                        // Who took it, on its timeline (owner, 13 Nov
+                        // 2026): every change names its person, and so
+                        // does taking it.
+                        if (organizationId) {
+                            await tx.orderEvent.create({
+                                data: {
+                                    organizationId,
+                                    orderId: order.id,
+                                    kind: "STATUS",
+                                    actorUserId: userId,
+                                    fromStatus: null,
+                                    toStatus: null,
+                                    note: ORDER_TAKEN_NOTE,
+                                },
+                            });
+                        }
                         if (applied) {
                             await recordRedemptionInTx(
                                 tx,

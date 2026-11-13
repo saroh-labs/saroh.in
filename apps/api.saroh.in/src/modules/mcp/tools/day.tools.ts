@@ -517,11 +517,15 @@ export function dayTools(d: DayDeps): McpTool[] {
             capability: "order:read",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const page = await ordersPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
-                    status: input.status,
-                });
+                const page = await ordersPage(
+                    ctx.organizationId,
+                    {
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                        status: input.status,
+                    },
+                    ctx,
+                );
                 return {
                     text: [
                         `${page.data.length} orders.`,
@@ -617,7 +621,11 @@ export function dayTools(d: DayDeps): McpTool[] {
             writeClass: "wind-down",
             hints: { ...UPDATE, openWorldHint: true },
             async run({ order_id, stage }, { ctx }: McpCall) {
-                const before = await orderById(ctx.organizationId, order_id);
+                const before = await orderById(
+                    ctx.organizationId,
+                    order_id,
+                    ctx,
+                );
                 if (!before) throw gone("order", order_id, "list_orders");
                 // Already there: nothing to do, so a retry is harmless.
                 if (before.stage !== stage) {
@@ -626,7 +634,8 @@ export function dayTools(d: DayDeps): McpTool[] {
                     });
                 }
                 const after =
-                    (await orderById(ctx.organizationId, order_id)) ?? before;
+                    (await orderById(ctx.organizationId, order_id, ctx)) ??
+                    before;
                 const order = {
                     order_id,
                     number: after.number,

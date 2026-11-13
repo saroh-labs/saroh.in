@@ -10,7 +10,7 @@ import { sendTeamAlertEmail } from "../../common/email";
 import { moneyWords, moneyWordsMinor } from "../../common/words-format";
 import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
-import { resolveCapabilities } from "../organizations/organization-policy";
+import { teamPowers } from "../organizations/team-powers";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
@@ -86,6 +86,8 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     request: "Data removal requests",
     mine: "Bookings with you",
     member: "Members",
+    enquiry: "New enquiry",
+    message: "Customer messages",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -141,8 +143,8 @@ export interface AlertEmail {
  *     reads it and who has email on for it — by default, a failed payment
  *     and a scheduled go-live. Whoever scheduled a go-live is emailed
  *     whatever they chose. Two alerts widen who is emailed: a new
- *     website order reaches the owners and admins unless they turned the
- *     New order email off, as an enquiry does (UX-042); a review asked for,
+ *     website order reaches whoever reads the whole order (`order:read`)
+ *     unless they turned the New order email off, as an enquiry does (UX-042); a review asked for,
  *     or a new test release, reaches the site's reviewers, who have no
  *     bell (UX-043). Handed to Saroh's sender once the transaction has
  *     committed, so a rolled-back run sends nothing; at most once.
@@ -258,20 +260,9 @@ async function whoToEmail(
     const event = alert.event;
     // A request has no row to choose from: it names who is emailed.
     if (event === "ask") return [];
-    const [members, roles, choices, org] = await Promise.all([
-        tx.membership.findMany({
-            where: { organizationId },
-            select: {
-                userId: true,
-                role: true,
-                user: { select: { email: true } },
-            },
-            orderBy: { userId: "asc" },
-        }),
-        tx.organizationRole.findMany({
-            where: { organizationId },
-            select: { key: true, actions: true },
-        }),
+    const [members, choices, org] = await Promise.all([
+        // Each person's role row plus their own extras (F17).
+        teamPowers(organizationId, tx),
         tx.notificationPreference.findMany({
             where: { organizationId, event, channel: "email" },
             select: {
@@ -288,24 +279,21 @@ async function whoToEmail(
     ]);
 
     const recipients = members.filter((m) => {
-        if (!m.user.email.trim()) return false;
+        if (!m.email) return false;
         if (m.userId === alert.skipUserId) return false;
         // A personal alert (#1138) is emailed to its one person alone.
         if (alert.forUserId && m.userId !== alert.forUserId) return false;
         if (m.userId === alert.alwaysUserId) return true;
-        const actions = resolveCapabilities(
-            m.role,
-            roles.find((r) => r.key === m.role)?.actions ?? null,
-        );
-        if (!mayHearAbout(event, (a) => actions.has(a), m.role)) {
+        if (!mayHearAbout(event, (a) => m.actions.has(a), m.role)) {
             return false;
         }
         const own = choices.filter((c) => c.userId === m.userId);
-        // A website order: an owner or admin hears of the sale as of an
-        // enquiry, on unless they turned this row's email off (UX-042).
+        // A website order: whoever reads the whole order hears of the sale
+        // as of an enquiry, on unless they turned this row's email off
+        // (UX-042).
         if (
-            alert.ownersAdminsByDefault &&
-            (m.role === "OWNER" || m.role === "ADMIN") &&
+            alert.emailOnByDefaultFor &&
+            m.actions.has(alert.emailOnByDefaultFor) &&
             own.length === 0
         ) {
             return true;
@@ -321,7 +309,7 @@ async function whoToEmail(
     );
     return recipients.map((m) => ({
         userId: m.userId,
-        to: m.user.email.trim(),
+        to: m.email,
         mail,
     }));
 }
@@ -550,7 +538,7 @@ async function wordOrder(
         // admins are emailed unless they turned it off, as of an enquiry
         // (UX-042). One taken at the counter has someone there already.
         ...(order.placedOnline
-            ? { ownersAdminsByDefault: true, cta: "Open the order" }
+            ? { emailOnByDefaultFor: "order:read", cta: "Open the order" }
             : {}),
     };
 }

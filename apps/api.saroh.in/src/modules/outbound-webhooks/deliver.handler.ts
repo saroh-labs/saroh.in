@@ -18,6 +18,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { noticeOf } from "../notifications/notice-target";
 import { OrganizationContextService } from "../organizations/organization-context.service";
+import { teamHolding } from "../organizations/team-powers";
 import {
     bookingById,
     customerById,
@@ -384,15 +385,13 @@ export class WebhookDeliverHandler {
                 body,
             },
         });
-        const [owners, edition] = await Promise.all([
-            prisma.membership.findMany({
-                where: { organizationId, role: "OWNER" },
-                select: { user: { select: { email: true } } },
-            }),
+        // Whoever may manage webhooks: the Owner by default, and anyone
+        // they gave it to (a permission, never the role's name).
+        const [holders, edition] = await Promise.all([
+            teamHolding(organizationId, "webhook:manage"),
             editionOf(organizationId),
         ]);
-        for (const owner of owners) {
-            const to = owner.user.email.trim();
+        for (const to of new Set(holders.map((m) => m.email))) {
             if (!to) continue;
             // Best effort: the inbox has it either way.
             await sendTeamAlertEmail(
@@ -403,7 +402,7 @@ export class WebhookDeliverHandler {
                     body,
                     url: `${appBase(edition)}/settings/developers/webhooks`,
                     cta: "Open Webhooks",
-                    footer: "You get this because you own this business on Saroh.",
+                    footer: "You get this because you manage webhooks for this business on Saroh.",
                 },
                 edition,
             ).catch((error: unknown) =>

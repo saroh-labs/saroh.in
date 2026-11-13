@@ -117,7 +117,7 @@ test.describe("someone on a location's team", () => {
         await expectDenied(page, "/bookings", { thing: "Bookings" });
     });
 
-    test("sees the orders of their location only, without money or a way to take one", async ({
+    test("sees the orders of their location only, with their money, and may take one", async ({
         page,
         browser,
     }, testInfo) => {
@@ -136,13 +136,19 @@ test.describe("someone on a location's team", () => {
                     .getByRole("listitem")
                     .filter({ hasText: `#${mine.orderId}` }),
             ).toBeVisible();
-            await expectNotOffered(page, "New order");
+            // Taking orders (owner, 13 Nov 2026); never exporting them.
+            await expect(
+                page
+                    .getByRole("button", { name: "New order" })
+                    .or(page.getByRole("link", { name: "New order" }))
+                    .first(),
+            ).toBeVisible();
             await expectNotOffered(page, "Export");
             await page.goto(`/commerce/orders?q=${theirs.orderId}`);
             await expect(page.getByText(/No orders match/)).toBeVisible();
             await expect(page.getByText(`#${theirs.orderId}`)).toHaveCount(0);
 
-            // Hers opens as the kitchen sees it: the stage to move, no money.
+            // Hers opens whole: the stage to move, and its money.
             await page.goto(`/commerce/orders/${mine.id}`);
             await expect(
                 page.getByRole("group", { name: /Preparing, step 2 of 4/ }),
@@ -150,10 +156,7 @@ test.describe("someone on a location's team", () => {
             await expect(
                 page.getByRole("button", { name: "Mark ready", exact: true }),
             ).toBeEnabled();
-            await expect(
-                page.getByRole("region", { name: "Money" }),
-            ).toHaveCount(0);
-            await expect(page.getByText(/₹/)).toHaveCount(0);
+            await expect(page.getByText(/₹/).first()).toBeVisible();
 
             // Online's isn't there for her, even by its address.
             await page.goto(`/commerce/orders/${theirs.id}`);

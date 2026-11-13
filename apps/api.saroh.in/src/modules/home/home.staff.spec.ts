@@ -1,6 +1,6 @@
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
-import { can } from "../organizations/organization-policy";
+import { can, ORG_ACTIONS } from "../organizations/organization-policy";
 import type { HomeInput } from "./home-model";
 import {
     diaryWhere,
@@ -137,6 +137,45 @@ describe("isStaffView", () => {
                 }),
             ).toBe(false);
         }
+    });
+
+    // Permissions, never the role's name (audit 2026-11-12 #8).
+    it("gives a custom role with every power the business's Home", () => {
+        expect(
+            isStaffView({
+                ...member(),
+                organizationRoleKey: "manager",
+                organizationActions: new Set(ORG_ACTIONS),
+            }),
+        ).toBe(false);
+    });
+
+    it("gives an Admin narrowed to the front desk the staff view", () => {
+        expect(
+            isStaffView({
+                organizationId: ORG,
+                userId: "u",
+                organizationRole: "ADMIN",
+                organizationActions: new Set([
+                    "org:read",
+                    "booking:read",
+                    "booking:write",
+                ] as const),
+            }),
+        ).toBe(true);
+    });
+
+    it("gives a Member given order:read as an extra the business's Home", () => {
+        expect(
+            isStaffView({
+                ...member(),
+                organizationActions: new Set([
+                    "org:read",
+                    "booking:read",
+                    "order:read",
+                ] as const),
+            }),
+        ).toBe(false);
     });
 
     it("has no staff view without a viewer to narrow to", () => {

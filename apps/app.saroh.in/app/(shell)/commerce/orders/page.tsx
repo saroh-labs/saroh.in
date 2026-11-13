@@ -30,6 +30,7 @@ import {
 import { sellsProducts } from "@/lib/orders/sells-products";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
@@ -104,9 +105,12 @@ export default async function OrdersPage({
     // Someone the business role gives no order to take may still take
     // them at a location they were invited to (a location Admin, Manager
     // or Editor): each of their locations says so in its own read.
-    const placesRead = powers.create
-        ? Promise.resolve(undefined)
-        : storesRead.then((all) => readOrderPlaces(all.map((s) => s.id)));
+    // A location's team (DEC-074) takes orders only where it works, with no
+    // payment: its locations' reads say where, as for a location role.
+    const placesRead =
+        powers.create && !isLocationScopedRole(organization?.roleKey)
+            ? Promise.resolve(undefined)
+            : storesRead.then((all) => readOrderPlaces(all.map((s) => s.id)));
     const sells = placesRead.then((places) =>
         powers.create || places?.length ? sellsProducts() : false,
     );

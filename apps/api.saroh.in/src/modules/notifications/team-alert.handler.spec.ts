@@ -1297,6 +1297,37 @@ describe("a new website order (UX-042)", () => {
         expect(recipients(out)).toEqual(["u_owner", "u_kitchen"]);
     });
 
+    // Permissions, never role names (audit 2026-11-12 #10).
+    it("emails by default whoever reads the whole order, a custom role or an extra included", async () => {
+        const tx = makeTx();
+        tx.membership.findMany.mockResolvedValue([
+            member("u_owner", "OWNER"),
+            { ...member("u_kitchen", "MEMBER"), extraActions: ["order:read"] },
+            member("u_manager", "manager"),
+        ]);
+        tx.organizationRole.findMany.mockResolvedValue([
+            { key: "manager", actions: ["order:read", "order:create"] },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "order",
+            orderId: "ord_1",
+        });
+        expect(recipients(out)).toEqual(["u_owner", "u_kitchen", "u_manager"]);
+    });
+
+    it("leaves out an Admin whose role row reads no orders", async () => {
+        const tx = makeTx();
+        tx.membership.findMany.mockResolvedValue([member("u_admin", "ADMIN")]);
+        tx.organizationRole.findMany.mockResolvedValue([
+            { key: "ADMIN", actions: ["org:read"] },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "order",
+            orderId: "ord_1",
+        });
+        expect(recipients(out)).toEqual([]);
+    });
+
     it("the job sends once the claim commits, and a retry sends nothing", async () => {
         const tx = makeTx();
         (prisma.$transaction as jest.Mock).mockImplementation(

@@ -8,12 +8,22 @@ import {
 
 /**
  * The "Storefront team" role (F16, DEC-048 amended 2026-09-27): enough to
- * appear on Team and open the storefronts, the kitchen's view of their
- * storefronts' orders (DEC-074), and nothing about customers, bookings or
- * money — narrower than Member and the read-only floor.
+ * appear on Team and open the storefronts, and to take, change and move
+ * their storefronts' orders and take their payments (DEC-074; owner 13 Nov
+ * 2026), which reads them whole. No customers or bookings, no refunds or
+ * cancels, no export, no payment settings. The narrowing to their own
+ * storefronts is `orders/order-location.ts`'s (its spec and the db specs).
  */
 describe("the Storefront team role", () => {
-    it("holds exactly the six reads the matrix names, and order:stage", () => {
+    /** What it holds of orders: taking, changing, moving, and the read they imply. */
+    const ORDER_HOLDS = new Set([
+        "order:stage",
+        "order:create",
+        "order:edit",
+        "order:read",
+    ]);
+
+    it("holds exactly the six reads the matrix names, and taking, changing and moving orders", () => {
         expect([...STOREFRONT_TEAM_ACTIONS].sort()).toEqual(
             [
                 "org:read",
@@ -23,6 +33,8 @@ describe("the Storefront team role", () => {
                 "store:read",
                 "product-review:read",
                 "order:stage",
+                "order:create",
+                "order:edit",
             ].sort(),
         );
     });
@@ -34,10 +46,10 @@ describe("the Storefront team role", () => {
         }
     });
 
-    it("reads no customers, bookings or money, and of orders only the kitchen's view", () => {
+    it("no customers, bookings, invoices or payment settings; no refunds, cancels or export", () => {
         const holds = storefrontTeamCapabilities(null);
         for (const action of ORG_ACTIONS) {
-            if (action === "order:stage") continue;
+            if (ORDER_HOLDS.has(action)) continue;
             if (
                 /^(contact|booking|service|order|payment|invoice|subscription|pack|lead|pipeline|customer|message|audit):/.test(
                     action,
@@ -46,13 +58,19 @@ describe("the Storefront team role", () => {
                 expect([action, holds.has(action)]).toEqual([action, false]);
             }
         }
-        // DEC-074: moving its storefronts' orders, with no money.
-        expect(holds.has("order:stage")).toBe(true);
-        expect(holds.has("order:read")).toBe(false);
+        for (const action of ORDER_HOLDS) {
+            expect([action, holds.has(action as never)]).toEqual([
+                action,
+                true,
+            ]);
+        }
+        expect(holds.has("order:refund")).toBe(false);
+        expect(holds.has("order:export")).toBe(false);
     });
 
-    it("is narrower than Member: everything it holds, a Member holds", () => {
+    it("beyond taking and changing orders, holds nothing a Member doesn't", () => {
         for (const action of STOREFRONT_TEAM_ACTIONS) {
+            if (action === "order:create" || action === "order:edit") continue;
             expect(can("MEMBER", action)).toBe(true);
         }
         expect(can("MEMBER", "contact:read")).toBe(true);
@@ -61,9 +79,9 @@ describe("the Storefront team role", () => {
         );
     });
 
-    it("writes nothing but an order's stage", () => {
+    it("writes nothing but its orders", () => {
         for (const action of storefrontTeamCapabilities(null)) {
-            if (action === "order:stage") continue;
+            if (ORDER_HOLDS.has(action)) continue;
             expect(action.endsWith(":read")).toBe(true);
         }
     });
@@ -80,5 +98,15 @@ describe("the Storefront team role", () => {
                 ...STOREFRONT_TEAM_ACTIONS,
             ]),
         ).toEqual(storefrontTeamCapabilities(null));
+    });
+
+    it("a business's role made before 13 Nov, without order-taking, still reads no money", () => {
+        const before = storefrontTeamCapabilities(
+            STOREFRONT_TEAM_ACTIONS.filter(
+                (a) => a !== "order:create" && a !== "order:edit",
+            ),
+        );
+        expect(before.has("order:stage")).toBe(true);
+        expect(before.has("order:read")).toBe(false);
     });
 });

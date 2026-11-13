@@ -184,7 +184,11 @@ module.exports = {
         // they last bought — is pure serialization over rows handed to it.
         "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
+        // Storefront team routes ask business permissions (audit 2026-11-12 #4).
+        "<rootDir>/src/modules/members/members.permissions.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        // DEC-074: a location's team's orders, narrowed, and no payments.
+        "<rootDir>/src/modules/orders/order-location.spec.ts",
         // ADR-008 kitchen flow (U6): the pure stage machine, refund-by-line
         // arithmetic, the order read's money hiding, and the kitchen service
         // with a jest-mocked Prisma.

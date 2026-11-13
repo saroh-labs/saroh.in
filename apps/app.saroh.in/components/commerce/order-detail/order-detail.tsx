@@ -76,6 +76,11 @@ export interface OrderPermissions {
     edit: boolean;
     /** Make or replace its payment link (`order:create` or `order:edit`). */
     payLink: boolean;
+    /**
+     * Record a payment by hand (`order:edit`); not a location's team's
+     * (owner, 13 Nov 2026). Absent, `edit` decides.
+     */
+    record?: boolean;
     /** Refund and cancel (`order:refund`, B16). */
     refund: boolean;
     /**
@@ -284,7 +289,7 @@ export function OrderDetail({
                     pending={menu}
                     onPendingChange={setMenu}
                     withCancel={change.cancel === undefined}
-                    canRecord={can.edit}
+                    canRecord={can.record ?? can.edit}
                     canRefund={can.refund}
                     refundLeft={
                         order.money
@@ -396,7 +401,7 @@ export function OrderDetail({
                                 : null
                         }
                         first={first}
-                        canRecord={can.edit}
+                        canRecord={can.record ?? can.edit}
                         onCash={() =>
                             setMenu({
                                 kind: "payment",
@@ -567,7 +572,9 @@ export function OrderDetail({
                                 }
                                 busy={busy}
                                 onRecordPayment={
-                                    can.edit ? kitchen.recordPayment : undefined
+                                    (can.record ?? can.edit)
+                                        ? kitchen.recordPayment
+                                        : undefined
                                 }
                                 payLink={
                                     linkable ? (
@@ -585,7 +592,7 @@ export function OrderDetail({
                         ) : (
                             <KitchenPaymentCard
                                 order={order}
-                                canRecord={can.edit}
+                                canRecord={can.record ?? can.edit}
                             />
                         )}
                         {aside}

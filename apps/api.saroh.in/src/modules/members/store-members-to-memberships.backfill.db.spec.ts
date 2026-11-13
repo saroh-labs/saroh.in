@@ -195,15 +195,24 @@ describe("storefront members to memberships (DB, F16 backfill)", () => {
         expect(await prisma.auditEvent.count()).toBe(entriesBefore);
     });
 
-    it("gives the people it added no customers, bookings or money", async () => {
+    it("gives the people it added their storefront's orders, and no customers, bookings or payments", async () => {
         const ctx = await contexts.resolve(users.RAVI!, orgs.NORTHWIND!);
-        // DEC-074: their storefront's orders, the kitchen's view.
-        expect(ctx.actions?.has("order:stage")).toBe(true);
+        // DEC-074, and order-taking (owner, 13 Nov 2026): taking, changing
+        // and moving their storefront's orders, which reads them whole.
+        for (const action of [
+            "order:stage",
+            "order:create",
+            "order:edit",
+            "order:read",
+        ] as const) {
+            expect(ctx.actions?.has(action)).toBe(true);
+        }
         for (const action of [
             "contact:read",
             "booking:read",
             "service:read",
-            "order:read",
+            "order:refund",
+            "order:export",
             "payment:read",
             "invoice:read",
         ] as const) {

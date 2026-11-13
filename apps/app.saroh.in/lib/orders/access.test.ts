@@ -14,6 +14,7 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
         create: false,
         edit: false,
         payLink: false,
+        record: false,
         refund: false,
         export: false,
     };
@@ -22,6 +23,7 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
         create: true,
         edit: true,
         payLink: true,
+        record: true,
         refund: true,
         export: true,
     };
@@ -38,7 +40,28 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
     it("order:edit changes orders and replaces payment links; no refund, no export", () => {
         expect(
             orderPowers({ role: "MEMBER", actions: ["order:edit"] }),
-        ).toEqual({ ...none, edit: true, payLink: true });
+        ).toEqual({ ...none, edit: true, payLink: true, record: true });
+    });
+
+    it("a location's team takes, changes and takes payment for orders, and never refunds (owner, 13 Nov 2026)", () => {
+        expect(
+            orderPowers({
+                role: "MEMBER",
+                actions: [
+                    "order:stage",
+                    "order:create",
+                    "order:edit",
+                    "order:read",
+                ],
+            }),
+        ).toEqual({
+            ...none,
+            stage: true,
+            create: true,
+            edit: true,
+            payLink: true,
+            record: true,
+        });
     });
 
     it("refund and export are their own", () => {

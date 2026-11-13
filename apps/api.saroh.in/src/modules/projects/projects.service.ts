@@ -70,11 +70,7 @@ export class ProjectsService {
         if (!project) {
             throw new NotFoundException("Project not found");
         }
-        const role = await this.access.resolveProjectRole(
-            ctx.userId,
-            projectId,
-            ctx.role,
-        );
+        const role = await this.access.resolveProjectRole(ctx, projectId);
         if (role === null) {
             throw new NotFoundException("Project not found");
         }

@@ -45,6 +45,7 @@ jest.mock("@saroh/database", () => {
         discount: { findUnique: jest.fn() },
         category: { findMany: jest.fn() },
         discountRedemption: { count: jest.fn(), create: jest.fn() },
+        orderEvent: { create: jest.fn() },
     };
     return {
         ...actual,

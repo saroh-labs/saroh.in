@@ -7,9 +7,10 @@
  * a Member — a Member reads every customer's contact details and the whole
  * diary, so a Viewer of one shop would gain the business's customer list
  * without anyone choosing it — but in the narrow **"Storefront team"** role:
- * the org, team, module, media, storefront and review reads, their own
- * storefronts' orders without the money (DEC-074), and nothing about
- * customers, bookings or money. What they do inside their
+ * the org, team, module, media, storefront and review reads, and taking
+ * and changing their own storefronts' orders and taking their payments
+ * (DEC-074; owner, 13 Nov 2026), and nothing about customers, bookings,
+ * refunds or payment settings. What they do inside their
  * storefront still comes from their storefront role, exactly as before.
  *
  * `joinTeamFromStorefront` is the one rule. The API runs it when a
@@ -37,17 +38,22 @@ export const STOREFRONT_TEAM_ROLE_KEY = "storefront-team";
 /** What Team calls it until the owner renames it. */
 export const STOREFRONT_TEAM_ROLE_LABEL = "Storefront team";
 /**
- * What the role holds when it is made: enough to appear on Team and open the
- * storefronts, and nothing about customers, bookings or money. No
- * `contact:read`, `booking:read` or `service:read` — the read-only floor's
- * diary — so it is narrower than Member. The API's
+ * What the role holds when it is made: enough to appear on Team, open the
+ * storefronts and work their orders, and nothing about customers, bookings,
+ * refunds, export or payment settings. No `contact:read`, `booking:read` or `service:read`
+ * — the read-only floor's diary. The API's
  * `organizations/storefront-team-role.ts` checks each is a real action.
  *
- * `order:stage` (DEC-074): the kitchen's view of an order, with no money,
- * and moving its stage — which the API narrows to the orders of the
- * storefronts the person works on (`orders/order-location.ts`). The
- * migration `20261019120000_storefront_team_orders` gave it to every
- * business's role made before.
+ * `order:stage` (DEC-074): moving an order's stage. `order:create` and
+ * `order:edit` (owner, 13 Nov 2026): taking and changing orders at the
+ * counter, which counter staff did as storefront Editors until the business
+ * role won over storefront roles (DEC-048 amended). Both imply `order:read`,
+ * the whole order with its money. The API narrows all of it to the
+ * storefronts the person works on (`orders/order-location.ts`), payments at
+ * the counter included; no refunds or cancels. Migrations `20261019120000_storefront_team_orders`
+ * and `20270204000000_storefront_team_take_orders` gave them to every
+ * business's role made before; the backfill below still treats a role
+ * holding only part of this list as the untouched built-in.
  */
 export const STOREFRONT_TEAM_ACTIONS: readonly string[] = [
     "org:read",
@@ -57,6 +63,8 @@ export const STOREFRONT_TEAM_ACTIONS: readonly string[] = [
     "store:read",
     "product-review:read",
     "order:stage",
+    "order:create",
+    "order:edit",
 ];
 /** The Activity entry each membership made this way writes. */
 export const STOREFRONT_JOIN_AUDIT_ACTION = "membership.storefront-join";

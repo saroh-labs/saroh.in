@@ -10,6 +10,7 @@ import {
     entryMeta,
     fieldOf,
     hiddenText,
+    maySeeSensitive,
     pickKind,
     picksAllergen,
     rolesThatSeeSensitive,
@@ -473,6 +474,23 @@ describe("booking-page notes (C12)", () => {
         expect(tagTitle({ ...added, label: "Takes amlodipine" })).toBe(
             `${rahul.detail} · from the booking page`,
         );
+    });
+});
+
+describe("who is offered the sensitive tick (audit A1)", () => {
+    it("follows customer:sensitive, never the role's name", () => {
+        // An Admin whose role lost customer:sensitive.
+        const admin = { role: "ADMIN", actions: ["contact:write"] };
+        expect(maySeeSensitive(admin)).toBe(false);
+        const custom = {
+            role: "MEMBER",
+            actions: ["contact:write", "customer:sensitive"],
+        };
+        expect(maySeeSensitive(custom)).toBe(true);
+        // No permissions came back: not offered, whatever the role.
+        expect(
+            maySeeSensitive({ role: "OWNER" } as { actions?: string[] }),
+        ).toBe(false);
     });
 });
 

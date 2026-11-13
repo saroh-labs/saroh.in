@@ -28,9 +28,10 @@
  * storefronts its holder works on: every read and move above for their
  * storefront's orders; another storefront's read is a 404, its move a 403.
  *
- * A storefront role (Admin, Manager, Editor) still takes and changes its
- * storefront's orders (DEC-048), but records, takes and refunds no money
- * by its name: that follows the business role's permissions only (DEC-106).
+ * A storefront role (Admin, Manager, Editor) adds nothing to the business
+ * role on this path (owner, 12 Nov 2026, amending DEC-048): taking,
+ * changing, recording and refunding all follow the business role's
+ * permissions only (DEC-106).
  */
 jest.mock("../../env", () => ({
     env: {
@@ -701,15 +702,16 @@ describe("a location's team: the Storefront team role (DEC-074)", () => {
         return made.id;
     }
 
-    it("reads and moves Hill Road's orders as the kitchen does", async () => {
+    it("reads Hill Road's orders whole, and moves them", async () => {
         const clerk = await contexts.resolve(clerkId, orgId);
         const id = await freshOrder();
         await paid(id);
         expect(await gate(() => controller.list(clerk))).toBe("allowed");
         expect(await gate(() => controller.filters(clerk))).toBe("allowed");
         expect(await gate(() => controller.products(clerk))).toBe("allowed");
+        // Taking and changing an order shows it whole (owner, 13 Nov 2026).
         const read = await controller.read(clerk, id);
-        expect(read.money).toBeNull();
+        expect(read.money).not.toBeNull();
         expect(
             await gate(() =>
                 controller.moveStage(clerk, id, { to: "PREPARING" }),
@@ -722,7 +724,7 @@ describe("a location's team: the Storefront team role (DEC-074)", () => {
         ).toBe("allowed");
     });
 
-    it("Market's order: a 404 to read, a 403 to move, and not listed", async () => {
+    it("Market's order: a 404 to read, a 403 to move or change, and not listed", async () => {
         const clerk = await contexts.resolve(clerkId, orgId);
         const id = await marketOrder();
         await expect(controller.read(clerk, id)).rejects.toBeInstanceOf(
@@ -731,20 +733,54 @@ describe("a location's team: the Storefront team role (DEC-074)", () => {
         await expect(
             controller.moveStage(clerk, id, { to: "PREPARING" }),
         ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+            controller.edit(clerk, id, { notes: "Hi" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        // Nor its payment: no pay link, nor marked paid.
+        await expect(controller.payLink(clerk, id)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        expect(
+            await storeGate(() =>
+                orders.updateStatus(marketId, id, clerkId, {
+                    paymentStatus: "PAID",
+                }),
+            ),
+        ).toBe("refused");
         const listed = await controller.list(clerk);
         expect(listed.rows.some((r) => r.id === id)).toBe(false);
+        // Nor taken there.
+        expect(
+            await storeGate(() =>
+                orders.create(marketId, clerkId, {
+                    items: [{ productId: marketBread, quantity: 1 }],
+                    fulfilment: "PICKUP",
+                    walkIn: { name: "Asha" },
+                    payment: { kind: "LATER" },
+                } as CreateOrderDto),
+            ),
+        ).toBe("refused");
     });
 
-    it("takes, changes, refunds, pays and exports nothing", async () => {
+    it("takes and changes Hill Road's orders (owner, 13 Nov 2026)", async () => {
+        const clerk = await contexts.resolve(clerkId, orgId);
+        expect(
+            await storeGate(() =>
+                orders.create(storeId, clerkId, newOrderDto()),
+            ),
+        ).toBe("allowed");
+        const id = await freshOrder();
+        expect(
+            await gate(() => controller.edit(clerk, id, { notes: "Hi" })),
+        ).toBe("allowed");
+    });
+
+    it("refunds, cancels and exports nothing", async () => {
         const clerk = await contexts.resolve(clerkId, orgId);
         const id = await freshOrder();
         expect(
             await gate(() => controller.list(clerk, { export: "true" })),
         ).toBe("refused");
-        expect(
-            await gate(() => controller.edit(clerk, id, { notes: "Hi" })),
-        ).toBe("refused");
-        expect(await gate(() => controller.payLink(clerk, id))).toBe("refused");
         expect(
             await gate(() =>
                 controller.cancel(clerk, id, {
@@ -754,16 +790,21 @@ describe("a location's team: the Storefront team role (DEC-074)", () => {
         ).toBe("refused");
         expect(
             await storeGate(() =>
-                orders.create(storeId, clerkId, newOrderDto()),
+                orders.updateStatus(storeId, id, clerkId, {
+                    status: "CANCELLED",
+                }),
             ),
         ).toBe("refused");
     });
 });
 
 /**
- * A storefront Manager (DEC-106): the storefront role takes and moves this
- * storefront's orders, and records no payment unless a role carrying the
- * payment permission (`order:edit`) says so.
+ * A storefront Manager (DEC-106, and the business role wins since 12 Nov
+ * 2026): the storefront role adds nothing to their Storefront team role,
+ * which takes, changes and moves this storefront's orders and takes their
+ * payments (owner, 13 Nov 2026), and refunds and cancels nothing; a business
+ * role carrying the permission (`order:edit`, not narrowed to a location)
+ * records payments anywhere.
  */
 describe("a storefront Manager and money (DEC-106)", () => {
     const contexts = new OrganizationContextService();
@@ -809,7 +850,7 @@ describe("a storefront Manager and money (DEC-106)", () => {
         });
     });
 
-    it("stages orders and takes them, but records no payment and is told why", async () => {
+    it("stages and takes orders and their payments, and cancels none", async () => {
         const manager = await contexts.resolve(managerId, orgId);
         const id = await freshOrder();
         expect(
@@ -817,31 +858,34 @@ describe("a storefront Manager and money (DEC-106)", () => {
                 controller.moveStage(manager, id, { to: "PREPARING" }),
             ),
         ).toBe("allowed");
-        // Taking an order to pay later is the storefront role's (DEC-048).
+        // Storefront team takes orders here (owner, 13 Nov 2026).
         expect(
             await storeGate(() =>
                 orders.create(storeId, managerId, newOrderDto()),
             ),
         ).toBe("allowed");
 
-        await expect(
-            orders.updateStatus(storeId, id, managerId, {
-                paymentStatus: "PAID",
-            }),
-        ).rejects.toThrow(
-            "Your role can't record payments. Ask the owner or an admin to mark it paid.",
-        );
+        // Payments at their storefront (owner, 13 Nov 2026).
+        expect(
+            await storeGate(() =>
+                orders.updateStatus(storeId, id, managerId, {
+                    paymentStatus: "PAID",
+                }),
+            ),
+        ).toBe("allowed");
         expect(
             (await prisma.order.findUniqueOrThrow({ where: { id } }))
                 .paymentStatus,
-        ).not.toBe("PAID");
-        // Nor taken at the counter with a new order, nor handed back.
-        await expect(
-            orders.create(storeId, managerId, {
-                ...newOrderDto(),
-                payment: { kind: "UPI" },
-            } as CreateOrderDto),
-        ).rejects.toThrow(/can't take payments/);
+        ).toBe("PAID");
+        expect(
+            await storeGate(() =>
+                orders.create(storeId, managerId, {
+                    ...newOrderDto(),
+                    payment: { kind: "UPI" },
+                } as CreateOrderDto),
+            ),
+        ).toBe("allowed");
+        // Never handed back.
         expect(
             await storeGate(() =>
                 orders.updateStatus(storeId, id, managerId, {
@@ -849,9 +893,9 @@ describe("a storefront Manager and money (DEC-106)", () => {
                 }),
             ),
         ).toBe("refused");
-        // And reads no amounts: the store-scoped list sends totals.
+        // Their storefront's orders whole: the store-scoped list's totals.
         expect(await storeGate(() => orders.list(storeId, managerId))).toBe(
-            "refused",
+            "allowed",
         );
     });
 
