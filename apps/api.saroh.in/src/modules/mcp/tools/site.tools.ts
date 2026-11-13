@@ -33,7 +33,12 @@ import { Prisma, prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@saroh/object-storage";
 import type { TemplateFit } from "@saroh/templates";
-import { gatingModules, templatesByFit } from "@saroh/templates";
+import {
+    gatingModules,
+    getTemplate,
+    templateModulePageKinds,
+    templatesByFit,
+} from "@saroh/templates";
 import { z } from "zod";
 
 import { appBaseOf } from "../../../common/app-url";
@@ -56,6 +61,7 @@ import {
 } from "../../organizations/organization-trade";
 import { pageList } from "../../public-api/v1-support";
 import { lockSite } from "../../sites/live-pointer";
+import { MODULE_PAGE_DEFAULTS } from "../../sites/page-kinds";
 import { approvalApplies } from "../../sites/publish-approval";
 import { assertSiteInOrg } from "../../sites/site-access";
 import { parseSiteFooter } from "../../sites/site-footer";
@@ -63,6 +69,7 @@ import { parseSiteNavigation } from "../../sites/site-navigation";
 import { rendererBase, siteOriginOf } from "../../sites/site-origin";
 import { SitePreviewLinksService } from "../../sites/site-preview-links.service";
 import {
+    buildTemplateContext,
     KIND_TEMPLATE,
     kindTemplate,
     modulesOn,
@@ -382,6 +389,18 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
             const fit = await businessFit(ctx.organizationId);
             const choice = await templateChoiceOn(ctx.organizationId);
             const app = await appBaseOf(ctx.organizationId);
+            const context = await buildTemplateContext(ctx.organizationId);
+            // Its own pages, then the Shop, Book, Prices or Contact page it
+            // adds for this business, as create_site_from_template makes them.
+            const pagesOf = (t: { id: string; pages: string[] }) => {
+                const template = getTemplate(t.id);
+                const added = template
+                    ? templateModulePageKinds(template, context).map(
+                          (k) => MODULE_PAGE_DEFAULTS[k].title,
+                      )
+                    : [];
+                return [...new Set([...t.pages, ...added])];
+            };
             const page = pageList(
                 templatesByFit(templateCatalogue(), fit),
                 { cursor, limit: 20 },
@@ -391,7 +410,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                     name: t.name,
                     description: t.description ?? null,
                     for_kinds: [...t.kinds],
-                    pages: t.pages,
+                    pages: pagesOf(t),
                     colourway_ids: t.colourways.map((c) => c.id),
                     suggested: where !== "also",
                     why: whyOf(t, where, fit),
@@ -414,6 +433,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                     (t) =>
                         `- ${t.name} (template_id ${t.template_id})${t.suggested ? "" : " [also available]"}${t.description ? `: ${t.description}` : ""} ${t.why ?? ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}. ${t.preview_url ? `Preview with the business's own details: ${t.preview_url}` : ""}${t.picture_url ? ` Picture: ${t.picture_url}` : ""}`,
                 ),
+                "Every site can have pages added later (add_page, then sections from list_section_types), and each section's layout changed.",
                 choice
                     ? "Share a preview link so the person sees the template with their own business in it before choosing."
                     : null,
