@@ -12,6 +12,7 @@ import { Input } from "@saroh/ui/input";
 import type { Control } from "react-hook-form";
 
 import { BusinessKindField } from "@/components/organizations/business-details/business-kind-field";
+import { BusinessTradeField } from "@/components/organizations/business-details/business-trade-field";
 import { fieldWidth } from "@/components/organizations/business-details/registered-address-fields";
 import { TimeZoneSelect } from "@/components/organizations/business-details/time-zone-select";
 import { BusinessPriceModeField } from "@/components/organizations/price-mode/business-price-mode-field";
@@ -73,6 +74,8 @@ export function BusinessSheetFields({
     switch (sheet) {
         case "kind":
             return <BusinessKindField control={control} name="kind" at={at} />;
+        case "trade":
+            return <BusinessTradeField control={control} at={at} />;
         case "name":
             return (
                 <FormField

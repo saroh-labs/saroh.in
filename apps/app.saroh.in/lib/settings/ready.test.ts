@@ -15,6 +15,7 @@ import {
     firstSteps,
     firstStepsLead,
     handlesMoney,
+    mayFinishSetup,
     providersTabNote,
     readSetupHidden,
     readyChecklist,
@@ -1379,5 +1380,58 @@ describe("firstSteps: Home's 4 steps, then the money card (#1194, R12)", () => {
             expect.arrayContaining(["payments", "address", "tax", "catalogue"]),
         );
         expect(settingsKeys).toEqual(moneyKeys);
+    });
+});
+
+describe("the kind of place, for a business made before setup asked it", () => {
+    const base = {
+        tax: null,
+        profile: null,
+        registeredAddress: null,
+        setup: null,
+    } as unknown as Parameters<typeof readyChecklist>[0]["settings"];
+    const keys = (over: Record<string, unknown>) =>
+        readyChecklist({
+            settings: { ...base, ...over },
+            modules: null,
+        }).steps.map((s) => s.key);
+
+    it("asks a business with no trade, pointing at the Kind of place sheet", () => {
+        const r = readyChecklist({
+            settings: { ...base, kind: "BUSINESS", trade: null },
+            modules: null,
+        });
+        expect(r.left.map((s) => s.key)).toEqual(["trade"]);
+        expect(r.left[0]?.href).toContain("trade");
+        expect(r.left[0]?.why).toBe(
+            "So Saroh can suggest the right samples and setup for you.",
+        );
+    });
+
+    it("is ticked once said, so the count moves on", () => {
+        const r = readyChecklist({
+            settings: { ...base, kind: "BUSINESS", trade: "salon" },
+            modules: null,
+        });
+        expect(r.steps).toEqual([
+            expect.objectContaining({ key: "trade", done: true }),
+        ]);
+        expect(r.done).toBe(1);
+        expect(r.total).toBe(1);
+    });
+
+    it("is not a step for other kinds, nor from an API without it", () => {
+        expect(keys({ kind: "SOLO", trade: null })).not.toContain("trade");
+        expect(keys({ kind: "BUSINESS" })).not.toContain("trade");
+    });
+
+    it("is shown only to someone who may change the business", () => {
+        expect(mayFinishSetup({ actions: ["org:update"] })).toBe(true);
+        expect(
+            mayFinishSetup({ actions: ["orders:read"], role: "OWNER" }),
+        ).toBe(false);
+        expect(mayFinishSetup({ role: "ADMIN" })).toBe(true);
+        expect(mayFinishSetup({ role: "MEMBER" })).toBe(false);
+        expect(mayFinishSetup(null)).toBe(false);
     });
 });

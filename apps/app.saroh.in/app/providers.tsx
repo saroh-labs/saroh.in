@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import { IntlProvider } from "use-intl";
 
 import { isRoleRefusal } from "@/lib/api/role-denied";
+import { PROFILE } from "@/lib/edition";
 import en from "@/lib/language/en.json";
 
 /*
@@ -39,7 +40,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
         // shortcut: English only, until a person can choose (DEC-204). Text moves
         // into en.json as it's touched; a screen's words needn't all move at once.
-        <IntlProvider locale="en" messages={en}>
+        // No date is formatted through intl: each one uses its business's own
+        // zone. The edition's default only stops use-intl falling back to the
+        // server's or browser's zone and reporting ENVIRONMENT_FALLBACK.
+        <IntlProvider locale="en" messages={en} timeZone={PROFILE.defaultZone}>
             <Toaster
                 position="bottom-center"
                 offset={offset}

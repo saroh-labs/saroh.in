@@ -23,4 +23,8 @@ export {
     templateRender,
     templateRenderIndex,
 } from "./render";
-export type { TemplateRender, TemplateRenderEntry } from "./render";
+export type {
+    TemplateBusiness,
+    TemplateRender,
+    TemplateRenderEntry,
+} from "./render";

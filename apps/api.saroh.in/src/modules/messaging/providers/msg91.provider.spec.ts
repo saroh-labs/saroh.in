@@ -179,6 +179,10 @@ describe("createMessagingProvider", () => {
         MSG91_WHATSAPP_NUMBER: undefined,
         MSG91_WHATSAPP_TEMPLATE: undefined,
         MSG91_BASE_URL: undefined,
+        META_WA_PHONE_NUMBER_ID: undefined,
+        META_WA_TOKEN: undefined,
+        META_WA_TEMPLATE_LANG: undefined,
+        META_GRAPH_BASE_URL: undefined,
     };
     it("uses the fake only in a declared dev or test run without credentials", () => {
         expect(createMessagingProvider(none, "test")).toBeInstanceOf(

@@ -55,6 +55,7 @@ import {
     updateSiteStyle as updateSiteStyleApi,
     withdrawReview as withdrawReviewApi,
 } from "./service";
+import { readTemplatePreviewDetails } from "./template-preview-read";
 
 /**
  * Server Actions for CMS Sites. Thin wrappers that forward the session cookie
@@ -147,8 +148,15 @@ export async function copyStarterContent(
     siteId: string,
     look: LookId | "classic",
     fill: boolean,
+    /** A template's pages instead (DEC-216), its colours when `styleId`. */
+    chosen?: { templateId: string; styleId?: string },
 ) {
-    return copyStarterContentApi(siteId, look, fill);
+    return copyStarterContentApi(siteId, look, fill, chosen);
+}
+
+/** The business's own details a template's preview draws (DEC-216). */
+export async function readTemplatePreview() {
+    return readTemplatePreviewDetails();
 }
 
 /** "Bring in my details" (DEC-182): sample words filled with the business's. */

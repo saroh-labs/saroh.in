@@ -1,12 +1,14 @@
 import type { LookId } from "@saroh/block-contract";
 import { inPageNavigation, siteStyleVariables } from "@saroh/block-contract";
 import type {
+    BusinessFacts,
     InstantiatedTemplate,
     TemplateContext,
     TemplateManifest,
     TemplateModulePageKind,
 } from "@saroh/templates";
 import {
+    fillBusinessDetails,
     getTemplate,
     instantiateTemplate,
     listTemplates,
@@ -26,6 +28,8 @@ import type { FrontDoor } from "../blocks/look-front";
 import type { PacksFeed } from "../blocks/packs";
 import type { PlansFeed } from "../blocks/plans";
 import type { ProductGridFeed } from "../blocks/product-grid";
+import type { PublicService } from "../blocks/service-words";
+import type { PublicVisit } from "../lib/public-visit";
 import type { ShopListingCard } from "../product/shop-listing";
 import type { Section } from "../section-renderer";
 import type { SiteFooterContent } from "../site-chrome";
@@ -153,6 +157,20 @@ export interface TemplateRender {
     fixtures: SiteFixtures;
 }
 
+/**
+ * The business a template's preview is drawn for (DEC-216) in place of its
+ * sample: the context a site made now would be instantiated with, its own
+ * services, place and hours, and the facts "Fill in my details" puts in
+ * (`GET …/template-preview`). The words the template leaves to its owner
+ * stay the sample's, as a site made from it starts.
+ */
+export interface TemplateBusiness {
+    context: TemplateContext;
+    services: PublicService[];
+    visit: Omit<PublicVisit, "closedDates"> | null;
+    facts: BusinessFacts;
+}
+
 /** What a render is drawn from: a template, and the business it is for. */
 interface RenderSample {
     template: TemplateManifest;
@@ -261,10 +279,14 @@ export function templateRender(
     styleId: string | undefined,
     path: string,
     look?: LookId,
+    /** Drawn for this business instead of the sample (DEC-216). */
+    business?: TemplateBusiness,
 ): TemplateRender | null {
     const sample = renderSample(templateId);
     if (!sample) return null;
-    const { template, fixture, context } = sample;
+    const { template, fixture } = sample;
+    const context = business?.context ?? sample.context;
+    const name = business?.context.organizationName ?? sample.name;
     const preset = templateStylePreset(template, styleId);
     if (preset === null) return null;
 
@@ -306,23 +328,36 @@ export function templateRender(
         if (s.type === "enquiry" && !content.formId) {
             content.formId = "sample-form";
         }
+        // The business's staff, address and town in the samples' places,
+        // as "Fill in my details" puts them in (DEC-182).
+        const own = business
+            ? fillBusinessDetails(s.type, content, business.facts).content
+            : content;
         return {
             type: s.type,
             content: sample.briefsAsPhotos
-                ? drawBriefs(content, colours, s.type)
-                : content,
+                ? drawBriefs(own, colours, s.type)
+                : own,
         };
     });
 
     // What the sample business has on: the template's own list, or, for the
-    // starter, the modules of the business it is drawn for.
-    const uses = template.uses ?? context.modules ?? [];
-    const services = fixture?.services ?? [];
+    // starter, the modules of the business it is drawn for. A business's
+    // own: what it has on, and its services (the sample's while it has none).
+    const uses = business
+        ? (context.modules ?? [])
+        : (template.uses ?? context.modules ?? []);
+    const ownServices = business?.services ?? [];
+    const services =
+        ownServices.length > 0 ? ownServices : (fixture?.services ?? []);
+    // The sample's free times and timetable are its own people's: never
+    // drawn as a business's.
+    const sampleDay = business ? undefined : fixture;
     const books = uses.includes("APPOINTMENTS") && services.length > 0;
     const sells =
         uses.includes("COMMERCE") && (fixture?.products ?? []).length > 0;
     const action: SiteHeaderAction | null =
-        books || (uses.includes("APPOINTMENTS") && fixture?.timetable)
+        books || (uses.includes("APPOINTMENTS") && sampleDay?.timetable)
             ? { label: "Book", href: "/book" }
             : sells
               ? { label: "Order", href: "/shop" }
@@ -331,7 +366,7 @@ export function templateRender(
     return {
         templateId: template.id,
         styleId: preset?.id ?? null,
-        name: sample.name,
+        name,
         styleVariables,
         look: look ?? null,
         // A gallery template's site has no menu of its own yet: what it
@@ -341,7 +376,7 @@ export function templateRender(
         navigation: [...inPageNavigation(home.sections), ...sample.menu(built)],
         action,
         shopServes: sells,
-        footer: footerOf(template, fixture, context),
+        footer: footerOf(template, business ? undefined : fixture, context),
         sections,
         frontDoor:
             action?.href === "/book" ? { kind: "book", href: "/book" } : null,
@@ -384,18 +419,20 @@ export function templateRender(
                 : undefined,
         ),
         fixtures: {
-            services: fixture?.services,
-            visit: fixture?.visit
-                ? {
-                      source: "business",
-                      storeId: null,
-                      name: sample.name,
-                      timezone: FIXTURE_TIME_ZONE,
-                      ...fixture.visit,
-                  }
-                : undefined,
-            timetable: fixture?.timetable,
-            today: fixture?.today,
+            services: ownServices.length > 0 ? ownServices : fixture?.services,
+            visit: business
+                ? (business.visit ?? undefined)
+                : fixture?.visit
+                  ? {
+                        source: "business",
+                        storeId: null,
+                        name,
+                        timezone: FIXTURE_TIME_ZONE,
+                        ...fixture.visit,
+                    }
+                  : undefined,
+            timetable: sampleDay?.timetable,
+            today: sampleDay?.today,
             // A fixed weekday morning, not the clock (`fixtures.ts`).
             now: FIXTURE_NOW,
         },

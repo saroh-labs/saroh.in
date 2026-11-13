@@ -32,17 +32,27 @@ import type { PageKind } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@saroh/object-storage";
+import type { TemplateFit } from "@saroh/templates";
+import { gatingModules, templatesByFit } from "@saroh/templates";
 import { z } from "zod";
 
 import { strictFetch } from "../../../common/net/ssrf";
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { isModuleKey, MODULE_BY_KEY } from "../../capabilities/module-registry";
+import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import { FlagKey } from "../../feature-flags/flags";
 import { JobHandlerRegistry } from "../../jobs/job-handler.registry";
 import type { JobQueue } from "../../jobs/job-queue.port";
 import { JOB_QUEUE } from "../../jobs/job-queue.port";
 import { MediaService } from "../../media/media.service";
 import { OBJECT_STORAGE } from "../../media/object-storage.provider";
 import { IMAGE_TOO_BIG_MESSAGE } from "../../media/upload-checks";
+import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
+import {
+    tradeOtherRead,
+    tradeRead,
+} from "../../organizations/organization-trade";
 import { pageList } from "../../public-api/v1-support";
 import { lockSite } from "../../sites/live-pointer";
 import { approvalApplies } from "../../sites/publish-approval";
@@ -51,6 +61,11 @@ import { parseSiteFooter } from "../../sites/site-footer";
 import { parseSiteNavigation } from "../../sites/site-navigation";
 import { rendererBase, siteOriginOf } from "../../sites/site-origin";
 import { SitePreviewLinksService } from "../../sites/site-preview-links.service";
+import {
+    KIND_TEMPLATE,
+    kindTemplate,
+    modulesOn,
+} from "../../sites/site-template";
 import { SitesService } from "../../sites/sites.service";
 import { restorePages } from "../../sites/starter-content";
 import { templateCatalogue } from "../../sites/template-catalogue";
@@ -212,6 +227,64 @@ const join = (items: string[]) => (items.length ? items.join("; ") : "none");
 // The tools
 // ---------------------------------------------------------------------------
 
+// Stateless (it reads the flag rows on every call), as `site-template.ts`.
+const flags = new FeatureFlagService();
+
+/** Whether an AI app may choose a website's template (DEC-216). */
+function templateChoiceOn(organizationId: string): Promise<boolean> {
+    return flags.isEnabled(FlagKey.SITE_TEMPLATE_CHOICE, organizationId);
+}
+
+/**
+ * What the shared suggestion rule reads about the business (DEC-216): its
+ * trade, its kind, its modules that are on and the kind's default.
+ */
+async function businessFit(organizationId: string) {
+    const [org, on] = await Promise.all([
+        prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { trade: true, tradeOther: true },
+        }),
+        modulesOn(prisma, organizationId),
+    ]);
+    const kind = await organizationKind(prisma, organizationId);
+    return {
+        trade: tradeRead(org?.trade),
+        tradeOther: tradeOtherRead(org?.trade, org?.tradeOther),
+        kind,
+        modulesOn: on,
+        defaultId: KIND_TEMPLATE[kind],
+    };
+}
+
+/** Why a template sits where it does, in a line an AI app can repeat. */
+function whyOf(
+    template: { kinds: readonly string[]; uses: readonly string[] },
+    fit: TemplateFit,
+    business: {
+        trade: string | null;
+        tradeOther: string | null;
+        modulesOn: readonly string[];
+    },
+): string | null {
+    if (fit === "trade")
+        return `Made for ${business.tradeOther ?? business.trade}, the business's trade.`;
+    if (fit === "suggested") return null;
+    const off = gatingModules(template).filter(
+        (k) => !business.modulesOn.includes(k),
+    );
+    if (off.length > 0) {
+        const names = off.map(
+            (k) =>
+                (isModuleKey(k) ? MODULE_BY_KEY.get(k)?.label : undefined) ?? k,
+        );
+        return `Also available: its sections need ${names.join(" and ")}, which ${off.length > 1 ? "are" : "is"} off.`;
+    }
+    return template.kinds.length > 0
+        ? `Also available: made for ${template.kinds.join(", ")}.`
+        : "Also available.";
+}
+
 export function siteTools(d: SiteToolDeps): McpTool[] {
     const now = d.now ?? (() => new Date());
     const getSite = defineTool({
@@ -292,36 +365,52 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         name: "list_templates",
         title: "List website templates",
         description:
-            "Use this when the person wants a new website and you need a template_id (and colourway) for create_site_from_template. Don't use it to change an existing site. Example: a salon asks for a site; pick the template whose kinds include salons.",
+            "Use this when the person wants a new website and you need a template_id (and colourway) for create_site_from_template. Don't use it to change an existing site. It lists the business's own trade's templates first, then the others it suggests, then the rest as also available, with why.",
         contract: listTemplatesTool,
         capability: "site:read",
         module: "WEBSITE",
         hints: READ_ONLY,
-        run({ cursor }) {
+        async run({ cursor }, { ctx }: McpCall) {
+            const fit = await businessFit(ctx.organizationId);
+            const choice = await templateChoiceOn(ctx.organizationId);
             const page = pageList(
-                templateCatalogue(),
+                templatesByFit(templateCatalogue(), fit),
                 { cursor, limit: 20 },
-                (t) => t.id,
-                (t) => ({
+                (t) => t.template.id,
+                ({ template: t, fit: where }) => ({
                     template_id: t.id,
                     name: t.name,
                     description: t.description ?? null,
                     for_kinds: [...t.kinds],
                     pages: t.pages,
                     colourway_ids: t.colourways.map((c) => c.id),
+                    suggested: where !== "also",
+                    why: whyOf(t, where, fit),
                 }),
             );
+            const fallback = kindTemplate(fit.kind);
             const text = [
-                `${page.data.length} templates${page.nextCursor ? `; more with cursor ${page.nextCursor}` : ""}.`,
+                choice
+                    ? null
+                    : `Templates aren't chosen yet: create_site_from_template starts every new site from ${fallback.name} (template_id ${fallback.id}), whatever template_id it is given.`,
+                `${page.data.length} templates${page.nextCursor ? `; more with cursor ${page.nextCursor}` : ""}${fit.trade ? `, ${fit.tradeOther ?? fit.trade}'s first` : ""}.`,
                 ...page.data.map(
                     (t) =>
-                        `- ${t.name} (template_id ${t.template_id})${t.description ? `: ${t.description}` : ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}.`,
+                        `- ${t.name} (template_id ${t.template_id})${t.suggested ? "" : " [also available]"}${t.description ? `: ${t.description}` : ""} ${t.why ?? ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}.`,
                 ),
-            ].join("\n");
-            return Promise.resolve({
+            ]
+                .filter(Boolean)
+                .join("\n");
+            return {
                 text,
-                data: { templates: page.data, next_cursor: page.nextCursor },
-            });
+                data: {
+                    templates: page.data,
+                    next_cursor: page.nextCursor,
+                    trade: fit.trade,
+                    trade_other: fit.tradeOther,
+                    template_choice: choice,
+                },
+            };
         },
     });
 
@@ -457,7 +546,16 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         module: "WEBSITE",
         hints: WRITE,
         async run(input, { ctx }: McpCall) {
+            // Templates not open yet (DEC-216, DEC-135): the kind's default,
+            // whatever was asked, as the workspace does.
+            const choice = await templateChoiceOn(ctx.organizationId);
+            const fallback = choice
+                ? null
+                : kindTemplate(
+                      await organizationKind(prisma, ctx.organizationId),
+                  );
             if (
+                choice &&
                 input.template_id &&
                 !templateCatalogue().some((t) => t.id === input.template_id)
             ) {
@@ -475,8 +573,8 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 },
                 request: {
                     name: input.name,
-                    templateId: input.template_id,
-                    styleId: input.colourway_id,
+                    templateId: fallback ? fallback.id : input.template_id,
+                    styleId: fallback ? undefined : input.colourway_id,
                     subdomain: input.subdomain,
                 },
             };
@@ -489,7 +587,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 maxAttempts: 1,
             });
             return {
-                text: `Started making the website ${quoteUntrusted("name", input.name)} (job_id ${job.id}). Call get_job with this job_id in a few seconds; when it is done it gives the site_id.`,
+                text: `${fallback && input.template_id ? `Templates aren't chosen yet, so it starts from ${fallback.name}, not ${input.template_id}. ` : ""}Started making the website ${quoteUntrusted("name", input.name)}${fallback ? ` from ${fallback.name}` : ""} (job_id ${job.id}). Call get_job with this job_id in a few seconds; when it is done it gives the site_id.`,
                 data: { job_id: job.id },
                 activity: {
                     summary: "Started making a website from a template.",

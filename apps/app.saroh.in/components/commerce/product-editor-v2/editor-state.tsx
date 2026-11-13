@@ -28,6 +28,12 @@ export interface SectionState {
     dirty: boolean;
     /** The first thing to fix before it can save; "" when it can. */
     problem: string;
+    /**
+     * The problem is about a field still being typed: it still stops Create
+     * and Save, but the header doesn't say it until the field is left or
+     * Create is pressed ("2" on the way to an MRP of 2,999 isn't a mistake).
+     */
+    quiet?: boolean;
     /** What saving will do, when it is more than "Saves …". */
     note?: string;
     /** The note is bad news even with nothing to fix (a failed save). */
@@ -161,6 +167,7 @@ export function ProductEditorProvider({
             if (
                 cur?.dirty === next.dirty &&
                 cur.problem === next.problem &&
+                cur.quiet === next.quiet &&
                 cur.note === next.note &&
                 cur.noteIsError === next.noteIsError &&
                 cur.saveLabel === next.saveLabel &&
@@ -331,6 +338,7 @@ export function useSection(
     const {
         dirty,
         problem,
+        quiet,
         note,
         noteIsError,
         saveLabel,
@@ -343,6 +351,7 @@ export function useSection(
         report(key, {
             dirty,
             problem,
+            quiet,
             note,
             noteIsError,
             saveLabel,
@@ -356,6 +365,7 @@ export function useSection(
         report,
         dirty,
         problem,
+        quiet,
         note,
         noteIsError,
         saveLabel,

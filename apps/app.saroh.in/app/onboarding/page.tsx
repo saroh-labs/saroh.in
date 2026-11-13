@@ -23,6 +23,7 @@ import {
     listOrganizations,
 } from "@/lib/organizations/service";
 import { stepFromQuery } from "@/lib/organizations/setup-steps";
+import { galleryTemplateOf } from "@/lib/organizations/trade";
 import { readInviteIntent } from "@/lib/saroh-billing/invite-intent";
 import { inviteNote, inviteToTake } from "@/lib/saroh-billing/launch-offer";
 import {
@@ -32,6 +33,8 @@ import {
 import { readPlanIntent } from "@/lib/saroh-billing/plan-intent";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { requireSession } from "@/lib/session";
+import { templateChoiceOn } from "@/lib/sites/templates-switch";
+import { listTemplates } from "@saroh/templates";
 import { Notice } from "@saroh/ui/notice";
 
 export const metadata: Metadata = { title: "Set up Saroh" };
@@ -71,6 +74,11 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  * On Global (Free only, DEC-211) the invite is still read: it names the
  * business and marks the waitlist entry joined, with no offer promised.
  *
+ * A template picked in the public gallery arrives as `?template=` (DEC-216),
+ * by id or slug. Setup names it on its first step and starts on its trade,
+ * and the business keeps it (`startTemplate`) so Turn on Website and New
+ * site start on it. Only while templates are offered (DEC-135).
+ *
  * An owner who has a billing profile already (DEC-167, R7) is asked who
  * Saroh bills for the new business, between its name and what to do
  * first. Someone with none isn't: their first is made from the business.
@@ -104,6 +112,11 @@ export default async function OnboardingPage({
             ? ({ kind: "none" } as const)
             : await readPlanIntent(query);
     const note = inviteNote(invite) ?? planIntentNote(intent);
+    // A template picked in the gallery (DEC-216), while templates are
+    // offered (DEC-135): it picks the trade and the business keeps it.
+    const gallery = templateChoiceOn()
+        ? galleryTemplateOf(query.template, listTemplates())
+        : null;
     // Removed from the business they were in: said, not set up as new.
     const jar = await cookies();
     const activeId = jar.get(ACTIVE_ORG_COOKIE)?.value;
@@ -152,7 +165,7 @@ export default async function OnboardingPage({
                     ) : (
                         // The plan the sign-up page started, with the
                         // account ticked and the step on show marked.
-                        <SetupPanel />
+                        <SetupPanel gallery={gallery} />
                     )
                 }
             >
@@ -165,6 +178,7 @@ export default async function OnboardingPage({
                     backTo={hasOrgs ? "/" : undefined}
                     checkout={checkoutIntent(intent)}
                     invite={inviteToTake(invite)}
+                    gallery={gallery}
                     defaultName={
                         invite.kind === "ready" || invite.kind === "free"
                             ? (invite.businessName ?? undefined)

@@ -236,6 +236,10 @@ const NEVER: Record<string, string> = {
         "published sites, and the business's place and hours",
     // A QR code's short link, relayed by the site's server. It forwards
     // to a page that answers for its own module, so it carries none.
+    // DEC-216: the Turn on sheet previews a template with the business's
+    // own details before Website is on.
+    "sites/template-preview.controller.ts":
+        "previews a template before Website is on, to turn it on",
     "sites/public-qr.controller.ts":
         "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always
@@ -346,6 +350,8 @@ const NEVER: Record<string, string> = {
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "messaging/msg91-webhook.controller.ts":
         "Saroh's own MSG91 delivery reports, across businesses",
+    "messaging/meta-webhook.controller.ts":
+        "Saroh's own WhatsApp delivery reports from Meta, across businesses",
     // P1: the buyer's browser reports a payment the moment the provider's
     // window closes. Never module-gated: a payment already taken is settled
     // whatever the business has switched off since.

@@ -225,9 +225,25 @@ const envSchema = z.object({
     // public client config the browser loads the widget with.
     MSG91_WIDGET_ID: z.string().optional(),
     MSG91_WIDGET_TOKEN: z.string().optional(),
-    // Which adapter sends: `msg91` or `fake` (the fake only in development
-    // and test). Unset, MSG91 when configured, else the fake in dev/test.
-    MESSAGING_PROVIDER: z.enum(["msg91", "fake"]).optional(),
+    // Which adapter sends: `msg91`, `meta` or `fake` (the fake only in
+    // development and test). Unset, MSG91 when configured, else the fake in
+    // dev/test. `meta` sends WhatsApp through Meta's Cloud API directly and
+    // keeps SMS and the OTP widget on MSG91 (DEC-213).
+    MESSAGING_PROVIDER: z.enum(["msg91", "meta", "fake"]).optional(),
+    // Saroh's own WhatsApp number on Meta's Cloud API (DEC-213), read only
+    // when MESSAGING_PROVIDER=meta: the number's phone number ID, a system
+    // user's access token, the app secret Meta signs webhooks with, the
+    // verify token typed into the app's webhook settings, and the templates'
+    // language (unset, en_US). Template names are MSG91_WHATSAPP_TEMPLATE and
+    // MSG91_WHATSAPP_UTILITY_TEMPLATES: the same WhatsApp account's names.
+    // The token and the secret are never logged.
+    META_WA_PHONE_NUMBER_ID: z.string().optional(),
+    META_WA_TOKEN: z.string().optional(),
+    META_APP_SECRET: z.string().optional(),
+    META_WA_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    META_WA_TEMPLATE_LANG: z.string().optional(),
+    // TEST ONLY in practice: where Graph API calls go, version included.
+    META_GRAPH_BASE_URL: z.url().optional(),
     // A 32-byte AES-256-GCM key (base64 or 64-hex) sealing a queued
     // WhatsApp send's number and words until the provider accepts it (a
     // retry). Its own key, never the payments one. Development and test

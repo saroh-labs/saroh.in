@@ -57,7 +57,7 @@ export async function openMore(page: Page): Promise<Locator> {
 /** A tab of the phone's Brand sheet, opened with the sheet if need be. */
 export async function brandTab(
     page: Page,
-    name: "Look" | "Type" | "Colour" | "Spacing",
+    name: "Template" | "Look" | "Type" | "Colour" | "Spacing",
 ): Promise<Locator> {
     const sheet = await openFromPill(page, "Brand");
     const tab = sheet.getByRole("tab", { name, exact: true });

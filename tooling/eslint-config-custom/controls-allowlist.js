@@ -18,6 +18,8 @@
  * no longer matches the code.
  */
 export const RAW_ALLOWED = {
+    // button: a template's row in its preview's list, pressed to show it (DEC-216)
+    "components/sites/templates/template-preview.tsx": ["button"],
     // button: a connection, key or address row that is one button, opening its sheet (U14)
     "components/settings/developers/ai-apps.tsx": ["button"],
     "components/settings/developers/keys.tsx": ["button"],

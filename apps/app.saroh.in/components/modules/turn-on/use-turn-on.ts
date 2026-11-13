@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useStartingCurrency } from "@/components/shared/fields/business-country";
+import {
+    useBusinessStartTemplate,
+    useBusinessTrade,
+    useBusinessTradeOther,
+} from "@/components/sites/templates/business-trade";
 import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -36,10 +41,8 @@ import { decodeSetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { connectLockFor } from "@/lib/providers/connect-lock";
-import {
-    moduleStatesWith,
-    suggestedTemplates,
-} from "@/lib/sites/template-picker";
+import type { SuggestionBasis } from "@/lib/sites/template-picker";
+import { moduleStatesWith } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
 /**
@@ -66,6 +69,9 @@ export function useTurnOn({
 }) {
     const router = useRouter();
     const currency = useStartingCurrency();
+    const trade = useBusinessTrade();
+    const tradeOther = useBusinessTradeOther();
+    const startTemplate = useBusinessStartTemplate();
     const [loaded, setLoaded] = useState<SetupDefaults[] | null>(null);
     const [draft, setDraft] = useState<TurnOnDraft | null>(null);
     const [errors, setErrors] = useState<Partial<Record<string, FieldErrors>>>(
@@ -103,7 +109,23 @@ export function useTurnOn({
             (defaults) => {
                 if (!live) return;
                 setLoaded(defaults);
-                setDraft(draftFrom(defaults));
+                const first = draftFrom(defaults);
+                // The template picked in the gallery is chosen to start
+                // with (DEC-216), when it is offered and the choice is on.
+                const offered = defaults
+                    .find((d) => d.key === "WEBSITE")
+                    ?.templates.some((t) => t.id === startTemplate);
+                setDraft(
+                    offered && templateChoiceOn()
+                        ? {
+                              ...first,
+                              WEBSITE: {
+                                  ...first.WEBSITE,
+                                  templateId: startTemplate ?? undefined,
+                              },
+                          }
+                        : first,
+                );
             },
             () => {
                 if (!live) return;
@@ -292,17 +314,33 @@ export function useTurnOn({
     // only when the API refuses it, so it can be fixed.
     const websiteAddressFixed =
         website?.read === true && !!draft?.WEBSITE.address && !addressUnlocked;
-    // The others suggested for this business (U12), what this sheet turns
-    // on counted as on: Sell turned on with Website suggests a shop's.
-    const websiteChoices =
-        website && websiteTemplate
-            ? suggestedTemplates(
-                  website.templates,
-                  website.kind,
-                  moduleStatesWith(modules, plan.order),
-                  websiteTemplate.id,
-              )
-            : [];
+    // Every template, suggested by the trade (DEC-216), else the kind, what
+    // this sheet turns on counted as on: Sell turned on with Website
+    // suggests a shop's.
+    const websiteTemplates =
+        website && websiteTemplate ? website.templates : [];
+    const websiteBasis: SuggestionBasis = {
+        trade,
+        tradeOther,
+        kind: website?.kind ?? null,
+        modules: moduleStatesWith(modules, plan.order),
+        defaultId: websiteTemplate?.id ?? null,
+    };
+    // The templates couldn't be read: said, with Try again (board D7).
+    const websiteUnread =
+        templateChoiceOn() && website !== undefined && !website.read;
+    const retryWebsite = () => {
+        readSetupDefaultsAction(["WEBSITE"]).then(
+            (read) => {
+                const again = read.at(0);
+                if (!again) return;
+                setLoaded((was) =>
+                    (was ?? []).map((d) => (d.key === "WEBSITE" ? again : d)),
+                );
+            },
+            () => undefined,
+        );
+    };
 
     // Bookings' booking page, when the API said one is coming (DEC-175).
     const bookingPage =
@@ -315,7 +353,10 @@ export function useTurnOn({
         plan,
         bookingPage,
         websiteTemplate,
-        websiteChoices,
+        websiteTemplates,
+        websiteBasis,
+        websiteUnread,
+        retryWebsite,
         websiteAddressFixed,
         apiDeps,
         hidden,

@@ -15,7 +15,6 @@ import {
     joinAnd,
     leaveCopy,
     publishState,
-    sayProblems,
     shellActions,
     statePill,
     statusLine,
@@ -34,6 +33,7 @@ import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
+import { useSaidProblems } from "./use-said-problems";
 
 /** What a record type's sections are handed to draw and change the record. */
 export interface EditorFields<V> {
@@ -158,25 +158,28 @@ export function EditorShell<V extends Record<string, unknown>>(
         message: string;
     } | null>(null);
 
-    const allProblems = problemsOf(values, record);
-    // What a published record was opened with is a note beside its field
-    // until that field is left or Publish is pressed: the page never opens
-    // in an error state over a rule newer than the record.
-    const [held] = useState(() =>
-        heldAtOpen(initial, initial ? problemsOf(initial.values, initial) : []),
-    );
-    const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set());
-    const [tried, setTried] = useState(false);
-    const { shown: problems, notes } = sayProblems({
-        problems: allProblems,
-        held,
-        left,
-        tried,
+    // Which problems are said, as notes or errors (`use-said-problems.ts`).
+    const said = useSaidProblems({
+        problems: problemsOf(values, record),
+        held: () =>
+            heldAtOpen(
+                initial,
+                initial ? problemsOf(initial.values, initial) : [],
+            ),
+        draftReopened: initial !== null && initial.published === null,
+        save,
+        refused,
     });
-    const holding = problems.length < allProblems.length;
+    const { problems, notes, errors } = said;
     const form = useRef<HTMLFieldSetElement>(null);
     const blocker = blockerOf(values);
-    const actions = shellActions({ save, record, problems, busy });
+    const actions = shellActions({
+        save,
+        record,
+        problems,
+        busy,
+        marked: said.marked,
+    });
     const pill = statePill(record, copy);
     const line = statusLine({
         save,
@@ -197,17 +200,6 @@ export function EditorShell<V extends Record<string, unknown>>(
               }`
             : null;
 
-    // Problems show once something is typed, or the record exists: a new,
-    // empty page isn't wrong yet.
-    const errors: Partial<Record<string, string>> = {};
-    if (record || save.edits > 0) {
-        for (const p of problems) errors[p.field] ??= p.message;
-    }
-    if (save.phase === "failed" && save.errorField && save.error) {
-        errors[save.errorField] = save.error;
-    }
-    if (refused) errors[refused.field] = refused.message;
-
     const settled = isSettled(save);
     // It saves by itself, so Cmd/Ctrl+S saves what is waiting now.
     useSaveShortcut(() => void editor.flush(), canEdit);
@@ -226,19 +218,16 @@ export function EditorShell<V extends Record<string, unknown>>(
 
     const set = (patch: Partial<V>) => {
         setRefused(null);
+        said.touch(Object.keys(patch));
         editor.edit(patch);
     };
-
-    const leave = (field: string) => {
-        if (!held.includes(field)) return;
-        setLeft((was) => (was.has(field) ? was : new Set(was).add(field)));
-    };
+    const leave = said.leave;
 
     async function publish() {
         if (!actions.publishOn) return;
-        if (holding) {
+        if (said.holding) {
             // Say what is missing, under its field, and go to the first.
-            setTried(true);
+            said.sayAll();
             focusFirstError(form.current);
             return;
         }

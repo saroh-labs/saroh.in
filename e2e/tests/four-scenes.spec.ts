@@ -69,9 +69,15 @@ async function overlappingControls(page: Page) {
             return r.width > 0 && r.height > 0;
         });
 
-        // The phone tab bar is fixed, and the page scrolls beneath it by
-        // design; what must not end up under it is checked on its own below.
-        const bar = document.querySelector('nav[aria-label="Main"]');
+        // The phone tab bar and Home's + float over the page, which scrolls
+        // beneath them by design (a setup line at Home's foot sits under
+        // the + until scrolled); what must not end up under them at the
+        // foot of the page is checked on its own below.
+        const fixed = [
+            ...document.querySelectorAll<HTMLElement>(
+                'nav[aria-label="Main"], button[aria-label="New"]',
+            ),
+        ];
         const hits: string[] = [];
         for (let i = 0; i < els.length; i++) {
             for (let j = i + 1; j < els.length; j++) {
@@ -79,7 +85,9 @@ async function overlappingControls(page: Page) {
                 const b = els[j];
                 // Containment is the stretched-link pattern, not a collision.
                 if (a.contains(b) || b.contains(a)) continue;
-                if (bar && bar.contains(a) !== bar.contains(b)) continue;
+                if (fixed.some((f) => f.contains(a) !== f.contains(b))) {
+                    continue;
+                }
                 const ra = a.getBoundingClientRect();
                 const rb = b.getBoundingClientRect();
                 if (
@@ -201,19 +209,34 @@ test.describe("the phone tab bar", () => {
                                 );
                                 if (!nav) return ["no tab bar"];
                                 const top = nav.getBoundingClientRect().top;
+                                // Home's + floats over the bar's right end:
+                                // nothing may stay under it either.
+                                const plus = document.querySelector(
+                                    'button[aria-label="New"]',
+                                );
+                                const fab = plus?.getBoundingClientRect();
                                 return [
                                     ...document.querySelectorAll<HTMLElement>(
                                         "button, a[href], [role=button], input",
                                     ),
                                 ]
                                     .filter((el) => !nav.contains(el))
+                                    .filter((el) => el !== plus)
                                     .filter((el) => {
                                         const r = el.getBoundingClientRect();
+                                        if (r.width === 0 || r.height === 0) {
+                                            return false;
+                                        }
+                                        const underFab =
+                                            fab !== undefined &&
+                                            r.left < fab.right - 1 &&
+                                            fab.left < r.right - 1 &&
+                                            r.top < fab.bottom - 1 &&
+                                            fab.top < r.bottom - 1;
                                         return (
-                                            r.width > 0 &&
-                                            r.height > 0 &&
-                                            r.bottom > top + 1 &&
-                                            r.top < window.innerHeight
+                                            underFab ||
+                                            (r.bottom > top + 1 &&
+                                                r.top < window.innerHeight)
                                         );
                                     })
                                     .map((el) =>
