@@ -49,6 +49,7 @@ describe("PublicShareController", () => {
         expect(headers).toEqual({
             "Cache-Control": SHARE_IMAGE_CACHE,
             "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "X-Content-Type-Options": "nosniff",
         });
         expect(SHARE_IMAGE_CACHE).toBe("public, max-age=300");

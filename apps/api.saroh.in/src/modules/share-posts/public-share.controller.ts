@@ -63,6 +63,8 @@ const visitor = (ip: string) => `share:${hashClientIp(ip) ?? "unknown"}`;
 function png(res: Response, bytes: Buffer): StreamableFile {
     res.setHeader("Cache-Control", SHARE_IMAGE_CACHE);
     res.setHeader("Access-Control-Allow-Origin", "*");
+    // Helmet's same-origin default stops <img> on app.saroh.in and other sites showing the card.
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("X-Content-Type-Options", "nosniff");
     return new StreamableFile(bytes, {
         type: "image/png",

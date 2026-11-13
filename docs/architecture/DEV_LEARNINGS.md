@@ -6712,3 +6712,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Then:** carried across, the editor at the new address took the draft for one opened again and said every problem at once: an untouched empty price turned red. It now reads `placeWaiting` on its first render (`continued`), so a record it carries on keeps the quiet rule (12 Nov) until its fields are reached or Publish is pressed.
 - **Rule:** an editor whose address moves from `/new` to the record's own page (the shell's plans and packs, and any page that follows) carries the page's place across; never write the address past Next's router to avoid the remount.
 - **Category:** app · editors
+
+## Share card thumbnails showed as broken pictures (13 Nov 2026)
+
+- **Symptom:** on saroh.io, Create post's style picker (Photo, Price tag, Simple, Colour) showed four broken images, while the large previews beside them drew. Fetching the same address answered 200 with a PNG.
+- **Cause:** Helmet adds `Cross-Origin-Resource-Policy: same-origin` to every API answer. The previews fetch the picture with CORS and show a blob, so they pass; the thumbnails are plain `<img>` tags on app.saroh.io, and the browser refuses a same-origin resource from api.saroh.io. Any other site showing the card (a post, a chat preview) would be refused the same way. The unit test checked the headers the handler set, never what Helmet adds.
+- **Fix:** `public-share.controller.ts` sends `Cross-Origin-Resource-Policy: cross-origin` with each public card; the controller spec asserts it.
+- **Rule:** an API answer meant to be shown on another site (a public picture, a file link) sets `Cross-Origin-Resource-Policy: cross-origin` itself; `Access-Control-Allow-Origin` alone covers `fetch`, not `<img>`.
+- **Category:** api · share
