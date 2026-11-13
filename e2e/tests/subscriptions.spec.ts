@@ -658,6 +658,11 @@ test.describe("the Plan Editor (D7)", () => {
         await expect(sessions.getByRole("radio", { name: "12" })).toBeVisible();
         const after = await page.evaluate(() => window.scrollY);
         expect(after).toBeGreaterThanOrEqual(Math.max(0, before - 80));
+        // It carries on the draft just made; it isn't a draft opened again,
+        // so the price nobody has reached yet still says nothing.
+        await expect(
+            page.getByText("Add the price", { exact: true }),
+        ).toHaveCount(0);
         await expect(
             sessions.getByRole("radio", { name: "12" }),
         ).toBeInViewport();

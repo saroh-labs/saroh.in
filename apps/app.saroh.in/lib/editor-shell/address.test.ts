@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 
-import { isTypingIn, leavePlace, takePlace } from "./address";
+import { isTypingIn, leavePlace, placeWaiting, takePlace } from "./address";
 
 /** A new record's address waits until nobody is typing (UX-080). */
 describe("isTypingIn", () => {
@@ -50,6 +50,18 @@ describe("leavePlace and takePlace", () => {
             focus: "plan-sessions",
         });
         expect(takePlace(HREF, store, 1600)).toBeNull();
+    });
+
+    it("says a place is waiting without taking it", () => {
+        const store = memory();
+        leavePlace(HREF, 487, null, store, 1000);
+        expect(placeWaiting(HREF, store, 1500)).toBe(true);
+        expect(placeWaiting("/billing/plans/other/edit", store, 1500)).toBe(
+            false,
+        );
+        expect(placeWaiting(HREF, store, 1000 + 6000)).toBe(false);
+        expect(takePlace(HREF, store, 1500)).not.toBeNull();
+        expect(placeWaiting(HREF, store, 1500)).toBe(false);
     });
 
     it("is not taken at another address", () => {

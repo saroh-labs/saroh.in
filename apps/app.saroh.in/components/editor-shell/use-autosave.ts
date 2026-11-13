@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isTypingIn, leavePlace, takePlace } from "@/lib/editor-shell/address";
+import {
+    isTypingIn,
+    leavePlace,
+    placeWaiting,
+    takePlace,
+} from "@/lib/editor-shell/address";
 import { Autosave } from "@/lib/editor-shell/autosave";
 import type { SaveState } from "@/lib/editor-shell/state";
 import { initialSave } from "@/lib/editor-shell/state";
@@ -42,6 +47,13 @@ export function useAutosave<V>({
     const [record, setRecord] = useState(initial);
     const [values, setValues] = useState<V>(initial?.values ?? emptyValues);
     const [firstSave, setFirstSave] = useState(false);
+    // Mounted where a record just made moved its address: this page carries
+    // that record on, it isn't a draft opened again (`lib/editor-shell/address.ts`).
+    const [continued] = useState(
+        () =>
+            typeof window !== "undefined" &&
+            placeWaiting(window.location.pathname + window.location.search),
+    );
     const [save, setSave] = useState<SaveState>(() =>
         initialSave(initial?.revision ?? null),
     );
@@ -227,6 +239,7 @@ export function useAutosave<V>({
         values,
         save,
         firstSave,
+        continued,
         edit,
         flush,
         retry,

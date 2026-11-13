@@ -69,6 +69,26 @@ export function leavePlace(
     }
 }
 
+/**
+ * Whether a place was left for this address, without taking it: read while
+ * the editor mounted there first renders, so it knows from that render that
+ * it carries on a record just made rather than opening one again.
+ */
+export function placeWaiting(
+    href: string,
+    store: Pick<Storage, "getItem"> | null = safeSession(),
+    now = Date.now(),
+): boolean {
+    try {
+        const raw = store?.getItem(PLACE_KEY);
+        if (!raw) return false;
+        const place = JSON.parse(raw) as PagePlace;
+        return place.href === href && now - place.at <= PLACE_FRESH_MS;
+    } catch {
+        return false;
+    }
+}
+
 /** The place left for this address, once; null when none or stale. */
 export function takePlace(
     href: string,
