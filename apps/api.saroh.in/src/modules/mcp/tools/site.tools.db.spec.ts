@@ -977,10 +977,13 @@ describe("MCP website tools (U11)", () => {
         const listed = await call(as, "list_templates", {});
         expect(data<Listed>(listed).template_choice).toBe(false);
         expect(textOf(listed)).toContain("aren't chosen yet");
-        // No preview of a template the app can't choose yet.
+        // No preview or picture of a template the app can't choose yet.
         expect(
-            data<Listed>(listed).templates.every((t) => t.preview_url === null),
+            data<Listed>(listed).templates.every(
+                (t) => t.preview_url === null && t.picture_url === null,
+            ),
         ).toBe(true);
+        expect(listed.content.some((c) => c.type === "image")).toBe(false);
 
         const started = await call(as, "create_site_from_template", {
             name: "Asha's Salon",

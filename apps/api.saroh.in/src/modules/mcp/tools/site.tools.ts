@@ -398,9 +398,10 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                     preview_url: choice
                         ? previewUrl(app, ctx.organizationId, t.id)
                         : null,
-                    picture_url: hasPicture(t.id)
-                        ? pictureUrl(app, t.id)
-                        : null,
+                    picture_url:
+                        choice && hasPicture(t.id)
+                            ? pictureUrl(app, t.id)
+                            : null,
                 }),
             );
             const fallback = kindTemplate(fit.kind);
