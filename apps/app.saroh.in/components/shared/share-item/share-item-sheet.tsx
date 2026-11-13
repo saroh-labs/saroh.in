@@ -14,10 +14,16 @@ import type {
     ShareItem,
     ShareSetup,
 } from "@/lib/share-item/share";
+import { Field } from "@saroh/ui/field";
+import { Input } from "@saroh/ui/input";
+
+import { PROFILE } from "@/lib/edition";
 import {
+    BOOK_HEADLINE,
     cardFileName,
     cardImageUrl,
     cardsFor,
+    HEADLINE_MAX,
     taggedLink,
     withLink,
 } from "@/lib/share-item/share";
@@ -32,6 +38,7 @@ import {
     PictureFailed,
     SizeSwitch,
 } from "./card-picker";
+import { ColourRow } from "./colour-row";
 import {
     DeskSchedule,
     ScheduleButton,
@@ -44,7 +51,8 @@ import { useCardImage } from "./use-card-image";
 
 /**
  * Share as a post (#1375 U2, boards SFBDesk and SFBPhone): "Share" beside
- * the QR button on a live product or service. Free on every plan.
+ * the QR button on a live product or service, in a live blog post's header
+ * (SGShareBlog*), and on the booking page's row. Free on every plan.
  *
  * The caller draws it only for a live item, with the live site read
  * (`readShareSetup`): nothing to share is no button, never a broken one.
@@ -97,32 +105,67 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
     const narrow = useNarrow();
     const cards = cardsFor(item);
     const [style, setStyle] = useState<CardStyle>(
-        item.price !== null ? "price" : "photo",
+        cards.includes("price") && item.price !== null
+            ? "price"
+            : (cards[0] ?? "photo"),
     );
     const [size, setSize] = useState<CardSize>("post");
+    // The booking page's headline, typed here and never stored.
+    const [headline, setHeadline] = useState(BOOK_HEADLINE);
+    const [bg, setBg] = useState<string | null>(null);
+    // Each picture is a render: wait for typing or a colour drag to settle.
+    const look = useSettled({ bg, headline }, 500);
     const link = taggedLink(item.url);
-    const kinds = captionKinds(item);
+    const named =
+        item.kind === "book"
+            ? { ...item, name: headline.trim() || BOOK_HEADLINE }
+            : item;
+    const kinds = captionKinds(item, PROFILE.hinglishCaptions);
     const [kind, setKind] = useState<CaptionKind>(
         kinds.includes("price") ? "price" : "short",
     );
-    const [text, setText] = useState(() => captionFor(kind, item, link));
+    const [text, setText] = useState(() => captionFor(kind, named, link));
     const [copiedNote, setCopiedNote] = useState(false);
     const [offer, setOffer] = useState(false);
     const offerRef = useRef<HTMLDivElement | null>(null);
 
-    const src = (s: CardStyle) => cardImageUrl(setup, item, s, size);
+    const src = (s: CardStyle, w?: number) =>
+        cardImageUrl(setup, item, s, size, { ...look, w });
     const { image, retry } = useCardImage(src(style));
     const parts: ShareParts = {
         caption: withLink(text, link),
         link,
         image,
-        fileName: cardFileName(item, style, size),
+        fileName: cardFileName(named, style, size),
     };
     const pickKind = (k: CaptionKind) => {
         setKind(k);
-        setText(captionFor(k, item, link));
+        setText(captionFor(k, named, link));
     };
-    const picker = cards.map((s) => ({ style: s, src: src(s) }));
+    // Thumbnails at twice the size they show: a small render, not a full one.
+    const picker = cards.map((s) => ({
+        style: s,
+        src: src(s, narrow ? 480 : 240),
+    }));
+    const extras = (
+        <>
+            {item.kind === "book" ? (
+                <Field label={SHARE_WORDS.headline}>
+                    <Input
+                        value={headline}
+                        maxLength={HEADLINE_MAX}
+                        onChange={(e) => setHeadline(e.target.value)}
+                        data-share-headline=""
+                    />
+                </Field>
+            ) : null}
+            <ColourRow
+                swatches={setup.swatches ?? []}
+                value={bg}
+                onChange={setBg}
+            />
+        </>
+    );
 
     // The phone's offer opens under the caption, scrolled to.
     useEffect(() => {
@@ -168,6 +211,7 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
                         />
                     )}
                     <SizeSwitch size={size} onSize={setSize} block />
+                    {extras}
                     {caption}
                     {offer ? (
                         <div
@@ -217,6 +261,7 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
                     size={size}
                     failed={image.state === "failed"}
                 />
+                {extras}
                 <div className="grid items-start gap-5 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
                     <CardPreview
                         image={image}
@@ -240,4 +285,15 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
             </div>
         </>
     );
+}
+
+/** `value`, once it has stayed the same for `ms`. */
+function useSettled<T>(value: T, ms: number): T {
+    const [settled, setSettled] = useState(value);
+    const key = JSON.stringify(value);
+    useEffect(() => {
+        const t = setTimeout(() => setSettled(JSON.parse(key) as T), ms);
+        return () => clearTimeout(t);
+    }, [key, ms]);
+    return settled;
 }

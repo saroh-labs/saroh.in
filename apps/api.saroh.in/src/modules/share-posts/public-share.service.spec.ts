@@ -226,19 +226,111 @@ describe("a live item's picture", () => {
         await missing(service.item("site_1", "book", "page", {}, "v"));
     });
 
-    it("draws a live blog post with Read more, and the booking page as Book now", async () => {
+    it("draws a live blog post with Read more, and the booking page as Book your slot", async () => {
         const { service } = setup();
         await service.item("site_1", "post", "diwali-hours", {}, "v");
         expect(drawn.mock.calls[0]?.[0]).toMatchObject({
             name: "Diwali hours",
-            unit: "Read more",
+            cta: "Read more",
+            kindLabel: "From the blog",
         });
         await missing(service.item("site_1", "post", "a-draft", {}, "v"));
         await service.item("site_1", "book", "page", {}, "v");
         expect(drawn.mock.calls[1]?.[0]).toMatchObject({
-            name: "Book now",
+            name: "Book your slot",
             price: null,
+            cta: "Book now",
+            kindLabel: "Bookings",
         });
+    });
+
+    it("never draws a headline from the public address", async () => {
+        const { service } = setup();
+        await service.item(
+            "site_1",
+            "book",
+            "page",
+            { headline: "Anything anyone types" },
+            "v",
+        );
+        expect(drawn.mock.calls[0]?.[0].name).toBe("Book your slot");
+        await service.item(
+            "site_1",
+            "product",
+            "bun",
+            { headline: "Anything" },
+            "v",
+        );
+        expect(drawn.mock.calls[1]?.[0].name).toBe("Cardamom bun box");
+    });
+});
+
+describe("the booking page's card for the business's own people", () => {
+    it("draws the sheet's headline on its own live site, as text, capped", async () => {
+        const { service } = setup();
+        db.site.findFirst.mockResolvedValue({ id: "site_1" });
+        await service.bookForOrganization(
+            ORG,
+            { headline: "  Cake consults\nopen <b>Saturday</b>  ", w: "240" },
+            "u",
+        );
+        expect(db.site.findFirst).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: ORG }),
+            }),
+        );
+        expect(drawn.mock.calls[0]?.[0]).toMatchObject({
+            name: "Cake consults open <b>Saturday</b>",
+            cta: "Book now",
+            width: 240,
+        });
+        await service.bookForOrganization(
+            ORG,
+            { headline: "a".repeat(200) },
+            "u",
+        );
+        expect(drawn.mock.calls[1]?.[0].name).toHaveLength(90);
+        for (const headline of ["   ", ["x"], 7]) {
+            await service.bookForOrganization(ORG, { headline }, "u");
+            expect(drawn.mock.calls.at(-1)?.[0].name).toBe("Book your slot");
+        }
+    });
+
+    it("is a 404 with no live site, or when bookings are off", async () => {
+        const { service, page } = setup();
+        db.site.findFirst.mockResolvedValueOnce(null);
+        await missing(service.bookForOrganization(ORG, {}, "u"));
+        db.site.findFirst.mockResolvedValue({ id: "site_1" });
+        page.open = false;
+        await missing(service.bookForOrganization(ORG, {}, "u"));
+        expect(drawn).not.toHaveBeenCalled();
+    });
+    it("passes valid card colours and a thumbnail width, and ignores anything else", async () => {
+        const { service } = setup();
+        await service.item(
+            "site_1",
+            "product",
+            "bun",
+            { bg: "#3E5A45", fg: "#f4ebdd", w: "240" },
+            "v",
+        );
+        expect(drawn.mock.calls[0]?.[0]).toMatchObject({
+            ground: "#3e5a45",
+            ink: "#f4ebdd",
+            width: 240,
+        });
+        for (const query of [
+            { bg: "red", fg: "#fff", w: "2000" },
+            { bg: "#3e5a45;x", fg: "url(x)", w: "abc" },
+            { bg: ["#000000"], w: "10" },
+        ]) {
+            await service.item("site_1", "product", "bun", query, "v");
+            expect(drawn.mock.calls.at(-1)?.[0]).toMatchObject({
+                ground: null,
+                ink: null,
+                width: null,
+            });
+        }
     });
 
     it("passes a curated font, and the site's own faces otherwise", async () => {
@@ -285,6 +377,43 @@ describe("an offer's picture", () => {
                 code: "BUN20",
             },
         });
+    });
+
+    it("draws the product being shared, and only one the discount is on", async () => {
+        const { service, catalogue } = setup();
+        db.discount.findFirst.mockResolvedValue(discount());
+        await service.item(
+            "site_1",
+            "offer",
+            "d_1",
+            { style: "offer", product: "bun" },
+            "v",
+        );
+        // The product asked for is looked for among the discount's own.
+        expect(db.discount.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                select: expect.objectContaining({
+                    products: expect.objectContaining({
+                        where: {
+                            product: { status: "PUBLISHED", slug: "bun" },
+                        },
+                    }),
+                }),
+            }),
+        );
+        expect(catalogue.product).toHaveBeenLastCalledWith(
+            "site_1",
+            "bun",
+            "v",
+        );
+        expect(drawn.mock.calls[0]?.[0]).toMatchObject({
+            name: "Cardamom bun box",
+        });
+        // A product the discount isn't on: its products come back empty.
+        db.discount.findFirst.mockResolvedValueOnce(discount({ products: [] }));
+        await missing(
+            service.item("site_1", "offer", "d_1", { product: "rye" }, "v"),
+        );
     });
 
     it("draws a discount on the whole shop only while the shop is open", async () => {

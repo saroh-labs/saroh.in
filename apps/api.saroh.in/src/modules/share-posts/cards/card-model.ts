@@ -3,14 +3,25 @@
  * worked out apart from drawing it (`card-tree.ts`), so the sizes, the
  * Story's safe zones and the colours are tested without a renderer.
  *
- * Four styles (Photo, Price tag, Offer, Simple) in three sizes (Post
+ * Five styles (Photo, Price tag, Offer, Simple, Colour) in three sizes (Post
  * 1080×1350, Square 1080×1080, Story 1080×1920), as the approved `SFCards`
  * board draws them, in the business's own look (its `--site-*` colours and
  * corner radius), never Saroh's. A Story keeps its top 13% and bottom 20%
  * free of text, tag and band; only the Price tag's photo runs under them.
+ *
+ * Colour (owner, 12 Nov 2026; board SGCards) is the Offer card's ground
+ * with a headline in place of a discount. A card may be given its own
+ * ground and ink (`#rrggbb`) over the site's; with a ground alone, the
+ * ink is white or black, whichever reads.
  */
 
-export const SHARE_STYLES = ["photo", "price", "offer", "simple"] as const;
+export const SHARE_STYLES = [
+    "photo",
+    "price",
+    "offer",
+    "simple",
+    "colour",
+] as const;
 export type ShareStyle = (typeof SHARE_STYLES)[number];
 
 export const SHARE_SIZES = {
@@ -32,6 +43,44 @@ export function shareSizeOf(value: string | null | undefined): ShareSize {
     return Object.keys(SHARE_SIZES).includes(value ?? "")
         ? (value as ShareSize)
         : "post";
+}
+
+/** `?w=`: a smaller picture (a thumbnail) this many pixels wide, or the full size. */
+export const THUMB_WIDTH = { min: 64, max: 540 } as const;
+
+export function shareWidthOf(value: unknown): number | null {
+    if (typeof value !== "string" || !/^\d{2,3}$/.test(value)) return null;
+    const w = Number(value);
+    return w >= THUMB_WIDTH.min && w <= THUMB_WIDTH.max ? w : null;
+}
+
+/** `#rrggbb` and nothing else, in lower case; anything else is none. */
+export function hexColourOf(value: unknown): string | null {
+    return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)
+        ? value.toLowerCase()
+        : null;
+}
+
+/** `#rrggbb` as an HSL triple (`24 10% 10%`), for the contrast sum. */
+function hexTriple(hex: string): string {
+    const [r, g, b] = [1, 3, 5].map(
+        (i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255,
+    );
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    const h =
+        d === 0
+            ? 0
+            : max === r
+              ? 60 * (((g - b) / d + 6) % 6)
+              : max === g
+                ? 60 * ((b - r) / d + 2)
+                : 60 * ((r - g) / d + 4);
+    const n = (v: number) => Math.round(v * 100) / 100;
+    return `${n(h)} ${n(s * 100)}% ${n(l * 100)}%`;
 }
 
 /** How long a browser or the app may keep the picture: a price change shows within it. */
@@ -68,6 +117,14 @@ export interface ShareCardInput {
     address?: string;
     /** The site's resolved look (`snapshot.site.styleVariables`). */
     variables?: Readonly<Record<string, string>> | null;
+    /** The button's words ("Book now", "Read more"): a pill on Colour, the line under the name elsewhere. */
+    cta?: string | null;
+    /** What kind of page it is, after the business in the label ("Bookings", "From the blog"). */
+    kindLabel?: string | null;
+    /** This card's own ground, `#rrggbb`, over the site's; else none. */
+    ground?: string | null;
+    /** This card's own text colour, `#rrggbb`; else picked for the ground. */
+    ink?: string | null;
 }
 
 /** Plain neutrals for a site with no look saved: not Saroh's palette. */
@@ -183,11 +240,18 @@ const fits = (px: number, width: number) =>
 /** How tall each line of text stands, by its size. */
 export const LEADING = { name: 1.08, big: 0.95, small: 1.3 };
 
+/** The pill's height for its text size (the board's 1.9em, and .25em above). */
+export const ctaHeight = (size: number) => Math.round(size * 2.15);
+
 /** A box on the card, top and bottom in pixels from its top edge. */
 export interface Box {
     top: number;
     bottom: number;
 }
+
+/** The line under the name: its own, else the button's words where no pill is drawn. */
+const unitOf = (input: ShareCardInput, style: ShareStyle) =>
+    input.unit ?? (style === "colour" ? null : (input.cta ?? null));
 
 /**
  * Where everything goes on one card, worked out apart from drawing it, so
@@ -214,14 +278,28 @@ export function shareCardLayout(input: ShareCardInput) {
     const line = (size: number, lines = 1, lead = LEADING.small) =>
         Math.round(size * lead) * lines;
 
-    const nameSize = px(
-        style === "simple" ? 1.6 : style === "offer" ? 1.1 : 1.35,
-    );
-    const nameLines = clipLines(input.name, fits(nameSize, textWidth), 2);
+    // Colour's headline is the card: three lines, then smaller in four or
+    // five before it is cut, so a 90-character headline fits whole.
+    const steps: [number, number][] =
+        style === "colour"
+            ? [
+                  [1.6, 3],
+                  [1.2, 4],
+                  [1, 5],
+              ]
+            : [[style === "simple" ? 1.6 : style === "offer" ? 1.1 : 1.35, 2]];
+    let nameSize = 0;
+    let nameLines: string[] = [];
+    for (const [k, lines] of steps) {
+        nameSize = px(k);
+        nameLines = clipLines(input.name, fits(nameSize, textWidth), lines);
+        if (!nameLines.join(" ").endsWith("…")) break;
+    }
     const nameHeight = line(nameSize, nameLines.length, LEADING.name);
     const content = { top: safe.top, bottom: height - safe.bottom };
+    const unit = unitOf(input, style);
     const hasPrice = Boolean(
-        input.offer?.now ?? input.price ?? (input.offer ? null : input.unit),
+        input.offer?.now ?? input.price ?? (input.offer ? null : unit),
     );
     const priceHeight = hasPrice ? line(small.price) : 0;
 
@@ -270,15 +348,24 @@ export function shareCardLayout(input: ShareCardInput) {
     const gap = px(0.45);
     const pad = px(0.9);
     const items =
-        style === "offer"
+        style === "colour"
             ? [
                   line(small.label),
-                  line(px(2.5), 1, LEADING.big),
                   nameHeight,
                   priceHeight,
+                  // The button, as the board's pill (.fcta).
+                  ...(input.cta ? [ctaHeight(px(0.6))] : []),
                   line(small.web),
               ]
-            : [px(1.92), nameHeight, priceHeight, line(small.web)];
+            : style === "offer"
+              ? [
+                    line(small.label),
+                    line(px(2.5), 1, LEADING.big),
+                    nameHeight,
+                    priceHeight,
+                    line(small.web),
+                ]
+              : [px(1.92), nameHeight, priceHeight, line(small.web)];
     const textHeight = items.reduce((sum, h) => sum + h, 0);
     const inner = content.bottom - content.top - 2 * pad;
     // A gap above each item and the circle, less one: n items + 1 circle.
@@ -289,13 +376,19 @@ export function shareCardLayout(input: ShareCardInput) {
             : { post: 0.36, square: 0.26, story: 0.46 }[size];
     const ring = Math.round(0.22 * em);
     // The photo gives way before any text does.
-    const circle = Math.max(
-        0,
-        Math.min(
-            Math.round(ratio * Math.min(width, content.bottom - content.top)),
-            room - 2 * ring,
-        ),
-    );
+    // Colour has no photo: the headline is the card.
+    const circle =
+        style === "colour"
+            ? 0
+            : Math.max(
+                  0,
+                  Math.min(
+                      Math.round(
+                          ratio * Math.min(width, content.bottom - content.top),
+                      ),
+                      room - 2 * ring,
+                  ),
+              );
     const used = textHeight + items.length * gap + circle + 2 * ring;
     const top = content.top + pad + Math.max(0, (inner - used) / 2);
     const column: Box = {
@@ -340,10 +433,15 @@ export function shareCardModel(input: ShareCardInput) {
     const bandInkText = inkOn(bandInk);
     const soft = triple(v["--site-accent-soft"]);
     const layout = shareCardLayout(input);
+    // The card's own colours, over the site's ground and text.
+    const ground = hexColourOf(input.ground);
+    const ink =
+        hexColourOf(input.ink) ?? (ground ? inkOn(hexTriple(ground)) : null);
     const offer = layout.style === "offer" ? input.offer : null;
     const was = input.offer?.was && input.offer.now ? input.offer.was : null;
     const label = [
         input.business,
+        input.kindLabel,
         layout.style === "offer" ? input.offer?.until : null,
     ]
         .filter(Boolean)
@@ -352,14 +450,14 @@ export function shareCardModel(input: ShareCardInput) {
     return {
         layout,
         colours: {
-            bg: hsl(bg),
-            fg: hsl(fg),
-            muted: hsl(pick("--site-muted", NEUTRAL.muted)),
-            surface: hsl(pick("--site-surface", bg)),
+            bg: ground ?? hsl(bg),
+            fg: ink ?? hsl(fg),
+            muted: ink ?? hsl(pick("--site-muted", NEUTRAL.muted)),
+            surface: ground ?? hsl(pick("--site-surface", bg)),
             accent: hsl(accent),
             accentFg: hsl(accentFg),
-            bandAccent: hsl(bandAccent),
-            bandAccentFg: hsl(pick("--site-band-accent-fg", accentFg)),
+            bandAccent: ground ?? hsl(bandAccent),
+            bandAccentFg: ink ?? hsl(pick("--site-band-accent-fg", accentFg)),
             bandInk: hsl(bandInk),
             bandInkText,
             // The label over the dark band: the look's soft accent when it
@@ -372,14 +470,15 @@ export function shareCardModel(input: ShareCardInput) {
         offer,
         price: input.offer?.now ?? input.price,
         was,
-        unit: input.unit ?? null,
+        unit: unitOf(input, layout.style),
+        cta: layout.style === "colour" ? (input.cta ?? null) : null,
         // One line each: an offer's code goes before the address, and its
         // price line keeps to the old and new price.
         priceLine:
             clipLines(
                 [
                     input.offer?.now ?? input.price,
-                    input.offer ? null : input.unit,
+                    input.offer ? null : unitOf(input, layout.style),
                 ]
                     .filter(Boolean)
                     .join(" · "),

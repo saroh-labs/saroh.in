@@ -1,13 +1,17 @@
+import { hostsFor, urlOf } from "@saroh/edition";
 import { cache } from "react";
 
 import { env } from "@/env";
+import { EDITION } from "@/lib/edition";
+import { siteColours } from "@/lib/qr/colours";
 import { pickShareSite } from "@/lib/qr/pick";
 import { planMoney } from "@/lib/saroh-billing/money";
 import { billingAccessOrNull, listAddons } from "@/lib/saroh-billing/service";
-import { listSites } from "@/lib/sites/service";
+import { getSite, listSites } from "@/lib/sites/service";
 import type { WebAddressLinks } from "@/lib/sites/share-links";
 
 import type { ScheduleLock, ShareSetup } from "./share";
+import { shareSwatches } from "./share";
 
 /** The catalogue's module id Saroh Social's add-on will carry. */
 const SOCIAL_MODULE = "social";
@@ -28,11 +32,14 @@ export const readShareSetup = cache(
         ]);
         const site = pickShareSite(sites, web.address);
         if (!site?.currentPublicationId) return null;
+        // The colour row's swatches; without the read, the site's colours only.
+        const detail = await getSite(site.id).catch(() => null);
         return {
+            swatches: shareSwatches(siteColours(detail)),
             apiOrigin:
                 env.NEXT_PUBLIC_API_URL ??
                 env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-                "https://api.saroh.in",
+                urlOf(hostsFor(EDITION, "production").api),
             siteId: site.id,
             schedule:
                 access?.plan?.id === "grow"

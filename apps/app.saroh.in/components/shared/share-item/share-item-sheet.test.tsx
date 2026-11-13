@@ -14,6 +14,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Edition } from "@saroh/edition";
+
 import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
 
 import { ShareItemButton } from "./share-item-sheet";
@@ -29,6 +31,16 @@ vi.mock("next/link", () => ({
         </a>
     ),
 }));
+const edition: { name: Edition } = vi.hoisted(() => ({ name: "INDIA" }));
+vi.mock("@/lib/edition", async (actual) => {
+    const { editionProfile } = await import("@saroh/edition");
+    return {
+        ...(await actual<object>()),
+        get PROFILE() {
+            return editionProfile(edition.name);
+        },
+    };
+});
 const toast = { showError: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
@@ -106,6 +118,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    edition.name = "INDIA";
     act(() => root.unmount());
     host.remove();
     document.body.innerHTML = "";
@@ -156,7 +169,8 @@ const caption = () => {
     if (!box) throw new Error("No caption");
     return box;
 };
-const last = () => new URL(fetched[fetched.length - 1] ?? "");
+const last = () =>
+    new URL(fetched[fetched.length - 1] ?? "", "https://app.example.com");
 
 async function press(el: HTMLElement) {
     await act(async () => {
@@ -338,7 +352,7 @@ describe("on a phone", () => {
     it("copies the caption first, then shares one PNG with the caption and link", async () => {
         const share = phoneShare();
         await openSheet();
-        expect(sheet().textContent).toContain("Price tag · 2 of 3");
+        expect(sheet().textContent).toContain("Price tag · 2 of 4");
         type("Fresh cardamom buns.");
         await press(button("Share now"));
 
@@ -387,5 +401,115 @@ describe("on a phone", () => {
         expect(offer?.textContent).toContain("Add Saroh Social to Grow");
         await press(button("Not now"));
         expect(sheet().querySelector("[data-social-offer]")).toBeNull();
+    });
+});
+
+/** Past the sheet's wait for typing or a colour drag to settle. */
+async function settle() {
+    await act(async () => {
+        await new Promise((r) => setTimeout(r, 550));
+    });
+    await flush();
+}
+
+function typeInto(el: HTMLInputElement, value: string) {
+    act(() => {
+        Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        )?.set?.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+}
+
+describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
+    it("asks for small thumbnails, and the chosen card at full size", async () => {
+        await openSheet();
+        const thumbs = Array.from(
+            sheet().querySelectorAll<HTMLImageElement>("[data-card] img"),
+        );
+        expect(thumbs.length).toBe(4);
+        expect(thumbs.every((i) => i.src.includes("w=240"))).toBe(true);
+        expect(last().searchParams.has("w")).toBe(false);
+    });
+
+    it("draws every card on a picked colour, and back on the site's", async () => {
+        await openSheet(BUNS, { ...FREE, swatches: ["#3e5a45", "#b5532a"] });
+        await press(button("Colour #3e5a45"));
+        await settle();
+        expect(last().searchParams.get("bg")).toBe("#3e5a45");
+        const thumbs = Array.from(
+            sheet().querySelectorAll<HTMLImageElement>("[data-card] img"),
+        );
+        expect(thumbs.every((i) => i.src.includes("bg=%233e5a45"))).toBe(true);
+        await press(button("Site colours"));
+        await settle();
+        expect(last().searchParams.has("bg")).toBe(false);
+    });
+
+    it("lets the booking page's headline be typed, Book your slot at first", async () => {
+        await openSheet({
+            kind: "book",
+            ref: "page",
+            name: "your booking page",
+            price: null,
+            url: "https://rye.example.com/book",
+            offerId: null,
+        });
+        // Through the app's signed-in route, never the public picture.
+        expect(last().pathname).toBe("/api/share/book/image");
+        expect(fetched.every((u) => !u.includes("/public/share/"))).toBe(true);
+        expect(last().searchParams.get("style")).toBe("colour");
+        expect(last().searchParams.get("headline")).toBe("Book your slot");
+        const input = sheet().querySelector<HTMLInputElement>(
+            "[data-share-headline]",
+        );
+        if (!input) throw new Error("No headline");
+        expect(input.maxLength).toBe(90);
+        typeInto(input, "Cake consults open this Saturday");
+        await settle();
+        expect(last().searchParams.get("headline")).toBe(
+            "Cake consults open this Saturday",
+        );
+        expect(caption().value).toContain("Book your slot. Book here:");
+    });
+
+    it("offers a blog post Photo only with a cover, and its summary caption", async () => {
+        const post: ShareItem = {
+            kind: "post",
+            ref: "how-we-shape-a-bun",
+            name: "How we shape a bun",
+            price: null,
+            url: "https://rye.example.com/blog/how-we-shape-a-bun",
+            offerId: null,
+            summary: "Four folds and a long rest.",
+        };
+        await openSheet(post);
+        const cards = () =>
+            Array.from(sheet().querySelectorAll("[data-card]")).map((c) =>
+                c.getAttribute("data-card"),
+            );
+        expect(cards()).toEqual(["colour", "simple"]);
+        expect(sheet().textContent).toContain("With summary");
+        expect(sheet().querySelector("[data-share-headline]")).toBeNull();
+        act(() => root.unmount());
+        root = createRoot(host);
+        document.body.innerHTML = "";
+        document.body.appendChild(host);
+        await openSheet({ ...post, hasPhoto: true });
+        expect(cards()).toEqual(["photo", "colour", "simple"]);
+    });
+
+    it("offers Hinglish only where the edition's profile does", async () => {
+        await openSheet();
+        expect(sheet().textContent).toContain("Hinglish");
+        act(() => root.unmount());
+        document.body.innerHTML = "";
+        host = document.createElement("div");
+        document.body.appendChild(host);
+        root = createRoot(host);
+        edition.name = "GLOBAL";
+        await openSheet();
+        expect(sheet().textContent).not.toContain("Hinglish");
     });
 });

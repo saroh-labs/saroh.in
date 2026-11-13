@@ -501,6 +501,8 @@ function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("hours:write")) set.add("service:read");
     if (set.has("pack:write")) set.add("pack:sell");
     if (set.has("pack:sell")) set.add("pack:read");
+    // Making a post means seeing the posts (#1378).
+    if (set.has("social:post")) set.add("social:read");
     if (set.has("order:write")) {
         for (const part of ORDER_WRITE_PARTS) set.add(part);
     }

@@ -5,6 +5,7 @@
 import type { ShareCardInput } from "./card-model";
 import {
     clipLines,
+    hexColourOf,
     initials,
     inkOn,
     SHARE_SIZES,
@@ -13,6 +14,7 @@ import {
     shareCardModel,
     shareSizeOf,
     shareStyleOf,
+    shareWidthOf,
 } from "./card-model";
 import type { CardNode } from "./card-tree";
 import { cardTree } from "./card-tree";
@@ -173,8 +175,8 @@ describe("what the card says", () => {
         expect(name({ "--site-band-ink": "48 90% 70%" })).toBe("#000000");
     });
 
-    it("keeps a long name to two lines in every style", () => {
-        for (const style of SHARE_STYLES) {
+    it("keeps a long name to two lines in every style but Colour", () => {
+        for (const style of SHARE_STYLES.filter((s) => s !== "colour")) {
             const m = shareCardModel({
                 ...input,
                 style,
@@ -253,5 +255,140 @@ describe("clipLines", () => {
         expect(clipLines("Supercalifragilistic", 10, 2)).toEqual([
             "Supercali…",
         ]);
+    });
+});
+
+describe("the Colour card and a card's own colours (owner, 12 Nov 2026)", () => {
+    it("draws the headline on the site's band accent, with no photo", () => {
+        const variables = {
+            "--site-band-accent": "135 18% 30%",
+            "--site-band-accent-fg": "36 50% 91%",
+        };
+        const m = shareCardModel({ ...input, style: "colour", variables });
+        expect(m.layout.style).toBe("colour");
+        expect(m.layout.circle).toBe(0);
+        const tree = cardTree({ ...input, style: "colour", variables }, FONTS);
+        expect(JSON.stringify(tree)).toContain("hsl(135, 18%, 30%)");
+        expect(
+            texts(tree).find((t) => t.text === input.name)?.style.color,
+        ).toBe("hsl(36, 50%, 91%)");
+        expect(JSON.stringify(tree)).not.toContain('"type":"image"');
+    });
+
+    it("fits a 90-character headline whole, smaller, and keeps a Story's safe zones", () => {
+        const name =
+            "New timings from Monday: 8 AM to 9 PM, and Sunday brunch from 10 AM to 2 PM, all welcome";
+        expect(name.length).toBeLessThanOrEqual(90);
+        const m = shareCardModel({ ...input, name, style: "colour" });
+        expect(m.nameLines.join(" ")).toBe(name);
+        const story = shareCardLayout({
+            ...input,
+            name,
+            style: "colour",
+            size: "story",
+        });
+        for (const box of story.text) {
+            expect(box.top).toBeGreaterThanOrEqual(story.safe.top);
+            expect(box.bottom).toBeLessThanOrEqual(
+                story.height - story.safe.bottom,
+            );
+        }
+    });
+
+    it("draws the button as a pill on Colour, and as the line under the name elsewhere", () => {
+        const book = {
+            ...input,
+            name: "Book your slot",
+            price: null,
+            unit: null,
+            cta: "Book now",
+            kindLabel: "Bookings",
+        };
+        const colour = shareCardModel({ ...book, style: "colour" });
+        expect(colour.cta).toBe("Book now");
+        expect(colour.priceLine).toBe("");
+        expect(colour.label).toBe("RYE & CO. · BOOKINGS");
+        const tree = cardTree({ ...book, style: "colour" }, FONTS);
+        expect(texts(tree).filter((t) => t.text === "Book now")).toHaveLength(
+            1,
+        );
+        expect(JSON.stringify(tree)).toContain("solid");
+        const photo = shareCardModel({ ...book, style: "photo" });
+        expect(photo.cta).toBeNull();
+        expect(photo.priceLine).toBe("Book now");
+        // Story: the pill stays inside the safe zones.
+        const story = shareCardLayout({
+            ...book,
+            style: "colour",
+            size: "story",
+        });
+        for (const box of story.text) {
+            expect(box.top).toBeGreaterThanOrEqual(story.safe.top);
+            expect(box.bottom).toBeLessThanOrEqual(
+                story.height - story.safe.bottom,
+            );
+        }
+    });
+
+    it("takes a valid #rrggbb ground and ink over the site's colours", () => {
+        const m = shareCardModel({
+            ...input,
+            style: "colour",
+            ground: "#3E5A45",
+            ink: "#F4EBDD",
+        });
+        expect(m.colours.bandAccent).toBe("#3e5a45");
+        expect(m.colours.bg).toBe("#3e5a45");
+        expect(m.colours.bandAccentFg).toBe("#f4ebdd");
+        expect(m.colours.fg).toBe("#f4ebdd");
+    });
+
+    it("ignores anything that isn't #rrggbb", () => {
+        const site = shareCardModel({ ...input, style: "colour" }).colours;
+        for (const bad of [
+            "red",
+            "#fff",
+            "#12345g",
+            "#1234567",
+            "url(x)",
+            "",
+        ]) {
+            expect(hexColourOf(bad)).toBeNull();
+            expect(
+                shareCardModel({
+                    ...input,
+                    style: "colour",
+                    ground: bad,
+                    ink: bad,
+                }).colours,
+            ).toEqual(site);
+        }
+    });
+
+    it("picks white or black text for a ground given alone", () => {
+        const on = (ground: string) =>
+            shareCardModel({ ...input, style: "colour", ground }).colours
+                .bandAccentFg;
+        expect(on("#111111")).toBe("#FFFFFF");
+        expect(on("#3e5a45")).toBe("#FFFFFF");
+        expect(on("#f4ebdd")).toBe("#000000");
+        expect(on("#ffd84d")).toBe("#000000");
+    });
+
+    it("takes a thumbnail width from 64 to 540 pixels, else the full size", () => {
+        expect(shareWidthOf("240")).toBe(240);
+        expect(shareWidthOf("540")).toBe(540);
+        for (const bad of [
+            "541",
+            "63",
+            "1080",
+            "-1",
+            "24.5",
+            "abc",
+            240,
+            null,
+        ]) {
+            expect(shareWidthOf(bad)).toBeNull();
+        }
     });
 });

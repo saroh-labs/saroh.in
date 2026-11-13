@@ -40,7 +40,7 @@ export class PublicShareController {
         return png(res, await this.share.own(id, query, visitor(ip)));
     }
 
-    /** `?style=photo|price|offer|simple&size=post|square|story&font=…` */
+    /** `?style=photo|price|offer|simple|colour&size=post|square|story&font=…&bg=&fg=&w=`, and `headline` (book) or `product` (offer). */
     @Get(":siteId/:kind/:ref/image")
     async item(
         @Param("siteId") siteId: string,

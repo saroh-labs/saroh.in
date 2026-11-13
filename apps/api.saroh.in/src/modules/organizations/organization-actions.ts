@@ -184,7 +184,14 @@ export type OrgAction =
     // Let a website take bookings, orders and enquiries through the public
     // API: a secret key with it mints a short-lived token for one visitor
     // (plan 2026-11-10-001, U7). Owner and Admin by default.
-    | "storefront:mint";
+    | "storefront:mint"
+    // Posts about the business (#1375, #1378; owner 12 Nov 2026): see the
+    // business's own posts, and make and share them. Owner and Admin by
+    // default, grantable to a role or a person. `social:post` implies
+    // `social:read`. Today they cover Create post's own posts; Saroh Social
+    // (channels, scheduling) asks the same two when it exists.
+    | "social:read"
+    | "social:post";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -282,4 +289,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "apikey:manage",
     "webhook:manage",
     "storefront:mint",
+    // Posts (#1378).
+    "social:read",
+    "social:post",
 ];

@@ -67,7 +67,8 @@ export class SharePostInputDto {
     @Transform(trim)
     @IsString()
     @MaxLength(CAPTION_MAX, {
-        message: `Keep the caption to ${CAPTION_MAX.toLocaleString("en-IN")} characters`,
+        // 2,200 groups the same in every edition's numbers.
+        message: `Keep the caption to ${CAPTION_MAX.toLocaleString("en-US")} characters`,
     })
     caption?: string;
 
@@ -79,4 +80,23 @@ export class SharePostInputDto {
         message: "Link to a page on your own website, such as /book",
     })
     linkPath?: string;
+}
+
+/** What the booking page's card says when the sheet sends no headline. */
+export const BOOK_HEADLINE = "Book your slot";
+
+/**
+ * `?headline=` on the booking page's card (owner, 12 Nov 2026): typed in
+ * the share sheet, never stored. Text only, drawn as text: control
+ * characters go, runs of space become one, and it is cut at
+ * {@link HEADLINE_MAX} characters. Anything else, or nothing left, is none.
+ */
+export function shareHeadlineOf(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const clean = value
+        .replace(/\p{Cc}/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!clean) return null;
+    return Array.from(clean).slice(0, HEADLINE_MAX).join("").trimEnd();
 }

@@ -10,6 +10,7 @@ import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { rolledOut } from "@/lib/modules/rollout";
+import { permits } from "@/lib/organizations/permits";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { startingCurrency } from "@/lib/organizations/starting-currency";
@@ -24,6 +25,8 @@ import {
 import { readServices } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
+import { readShareSetup } from "@/lib/share-item/read";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { readBookingPayment } from "@/lib/staff/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
@@ -75,6 +78,12 @@ export default async function ServicesPage() {
         // "Your booking page" (DEC-175); null leaves the row out.
         readBookingLink(),
     ]);
+    // Share as a post (#1375): the booking page's card, while it is live.
+    const shareSetup =
+        // The card is drawn for whoever may see posts (`social:read`).
+        bookingLink?.state === "live" && permits(organization, "social:read")
+            ? await readShareSetup(await readWebAddressLinks())
+            : null;
     // New course joins New service only while Courses is on here and this
     // role may add one: the same answers the Courses screen gives.
     const canNewCourse =
@@ -149,6 +158,7 @@ export default async function ServicesPage() {
                     missingRates={missingRates}
                     canNewCourse={canNewCourse}
                     bookingLink={bookingLink}
+                    shareSetup={shareSetup}
                 />
             </div>
         </PageContainer>

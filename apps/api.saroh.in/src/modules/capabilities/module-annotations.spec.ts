@@ -58,6 +58,8 @@ const CLASS_LEVEL: Record<string, string> = {
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
     "share-posts/share-posts.controller.ts": "WEBSITE",
+    // The booking page's card with the sheet's headline (#1375).
+    "share-posts/share-cards.controller.ts": "WEBSITE",
     // A look's starter content copied into the draft, and its Undo (DEC-182).
     "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",

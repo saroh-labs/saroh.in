@@ -1,5 +1,5 @@
 import type { ShareCardInput } from "./card-model";
-import { clipLines, LEADING, shareCardModel } from "./card-model";
+import { clipLines, ctaHeight, LEADING, shareCardModel } from "./card-model";
 
 /**
  * A share picture as Takumi's node tree (#1375, plan 2026-11-12-003 U4):
@@ -143,6 +143,36 @@ function address(m: Model, f: CardFonts, color: string): CardNode | null {
         color,
         opacity: 0.9,
     });
+}
+
+/** "Book now" as the board's outlined pill (.fcta), in the card's ink. */
+function cta(m: Model, f: CardFonts, color: string): CardNode | null {
+    if (!m.cta) return null;
+    const size = Math.round(0.6 * m.layout.em);
+    const height = ctaHeight(size) - Math.round(size * 0.25);
+    return box(
+        {
+            height,
+            marginTop: Math.round(size * 0.25),
+            padding: `0 ${Math.round(size * 0.8)}px`,
+            alignItems: "center",
+            borderRadius: Math.round(height / 2),
+            border: `${Math.max(2, Math.round(size * 0.09))}px solid ${color}`,
+        },
+        [
+            text(
+                m.cta,
+                size,
+                f.body,
+                {
+                    fontWeight: 700,
+                    letterSpacing: Math.round(size * 0.04),
+                    color,
+                },
+                1,
+            ),
+        ],
+    );
 }
 
 function circle(m: Model, f: CardFonts): CardNode | null {
@@ -316,41 +346,53 @@ function recolour(node: CardNode, color: string): CardNode {
     return node;
 }
 
-/** Offer and Simple: one centred column on a plain ground. */
+/** Offer, Colour and Simple: one centred column on a plain ground. */
 function columnCard(m: Model, f: CardFonts): CardNode {
     const L = m.layout;
     const c = m.colours;
     const offer = L.style === "offer";
-    const ink = offer ? c.bandAccentFg : c.fg;
-    const children = offer
-        ? [
-              label(m, f, ink),
-              text(
-                  m.offer?.headline ?? "",
-                  Math.round(2.5 * L.em),
-                  f.heading,
-                  { fontWeight: 700, color: ink },
-                  LEADING.big,
-              ),
-              circle(m, f),
-              recolour(name(m, f, true), ink),
-              priceLine(m, f, ink),
-              address(m, f, ink),
-          ]
-        : [
-              mark(m, f),
-              recolour(name(m, f, true), ink),
-              priceLine(m, f, c.muted),
-              circle(m, f),
-              address(m, f, c.muted),
-          ];
+    // Colour is the Offer card's ground with the headline in place of a
+    // discount (board SGCards).
+    const coloured = offer || L.style === "colour";
+    const ink = coloured ? c.bandAccentFg : c.fg;
+    const children =
+        L.style === "colour"
+            ? [
+                  label(m, f, ink),
+                  recolour(name(m, f, true), ink),
+                  priceLine(m, f, ink),
+                  cta(m, f, ink),
+                  address(m, f, ink),
+              ]
+            : offer
+              ? [
+                    label(m, f, ink),
+                    text(
+                        m.offer?.headline ?? "",
+                        Math.round(2.5 * L.em),
+                        f.heading,
+                        { fontWeight: 700, color: ink },
+                        LEADING.big,
+                    ),
+                    circle(m, f),
+                    recolour(name(m, f, true), ink),
+                    priceLine(m, f, ink),
+                    address(m, f, ink),
+                ]
+              : [
+                    mark(m, f),
+                    recolour(name(m, f, true), ink),
+                    priceLine(m, f, c.muted),
+                    circle(m, f),
+                    address(m, f, c.muted),
+                ];
     return box(
         {
             width: L.width,
             height: L.height,
             paddingTop: L.safe.top,
             paddingBottom: L.safe.bottom,
-            backgroundColor: offer ? c.bandAccent : c.bg,
+            backgroundColor: coloured ? c.bandAccent : c.bg,
         },
         [
             box(

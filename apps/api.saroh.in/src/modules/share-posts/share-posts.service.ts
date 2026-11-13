@@ -17,8 +17,9 @@ import type { SharePostInputDto } from "./dto";
  * "Your own post", a headline, its own photo or both, saved so the site
  * can draw its picture (`/public/share/own/<id>/image`).
  *
- * Who may: whoever may edit the website (`section:write`, Owner and Admin),
- * under the Website module, as the editor is. The words are the
+ * Who may: the Social permissions (owner, 12 Nov 2026): `social:read` to
+ * see them, `social:post` to make, change and remove them (Owner and Admin
+ * by default, grantable per role or person). The words are the
  * merchant's: capped here and in the database, and only ever drawn as text.
  */
 
@@ -71,7 +72,7 @@ export class SharePostsService {
     constructor(private readonly media: MediaService) {}
 
     async list(ctx: OrganizationContext): Promise<SharePostView[]> {
-        authorize(ctx, "section:write");
+        authorize(ctx, "social:read");
         const rows = await prisma.sharePost.findMany({
             where: { organizationId: ctx.organizationId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -82,7 +83,7 @@ export class SharePostsService {
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SharePostView> {
-        authorize(ctx, "section:write");
+        authorize(ctx, "social:read");
         return view(await this.row(ctx, id));
     }
 
@@ -90,7 +91,7 @@ export class SharePostsService {
         ctx: OrganizationContext,
         dto: SharePostInputDto,
     ): Promise<SharePostView> {
-        authorize(ctx, "section:write");
+        authorize(ctx, "social:post");
         const data = await this.checked(ctx, dto, null);
         const row = await prisma.sharePost.create({
             data: {
@@ -109,7 +110,7 @@ export class SharePostsService {
         id: string,
         dto: SharePostInputDto,
     ): Promise<SharePostView> {
-        authorize(ctx, "section:write");
+        authorize(ctx, "social:post");
         const current = await this.row(ctx, id);
         const data = await this.checked(ctx, dto, current);
         const updated = await prisma.sharePost.updateMany({
@@ -121,7 +122,7 @@ export class SharePostsService {
     }
 
     async remove(ctx: OrganizationContext, id: string): Promise<void> {
-        authorize(ctx, "section:write");
+        authorize(ctx, "social:post");
         const removed = await prisma.sharePost.deleteMany({
             where: { id, organizationId: ctx.organizationId },
         });

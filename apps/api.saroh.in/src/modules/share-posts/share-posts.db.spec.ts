@@ -1,8 +1,8 @@
 /**
  * A business's own posts against a real Postgres (#1378, plan
  * 2026-11-12-003 U6): made, listed, changed and deleted within the
- * business; another business reaches none of them; only who may edit the
- * website may; the caps and the link's rule hold; and the public picture
+ * business; another business reaches none of them; only who holds the
+ * Social permissions may (`social:read`, `social:post`); the caps and the link's rule hold; and the public picture
  * is drawn only on its own business's live site.
  *
  * The renderer is stood in for (its specs are `cards/`): here it would
@@ -23,6 +23,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 import { isRlsTestMode } from "../../../test/rls-mode";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
+import { resolveCapabilities } from "../organizations/organization-policy";
 import { renderCard } from "./cards/card-renderer";
 import { PublicShareService } from "./public-share.service";
 import { SharePostsService } from "./share-posts.service";
@@ -224,7 +225,7 @@ describe("own posts (DB)", () => {
         expect((await posts.get(a.owner, made.id)).headline).toBe("Open late");
     });
 
-    it("refuses a member, who may not edit the website", async () => {
+    it("refuses a member without the Social permissions, and lets one given social:post", async () => {
         const b = await business();
         const made = await posts.create(b.owner, { headline: "Open late" });
         for (const work of [
@@ -236,6 +237,25 @@ describe("own posts (DB)", () => {
         ]) {
             await expect(work()).rejects.toBeInstanceOf(ForbiddenException);
         }
+        // F17: the same Member given "Make and share posts" as their own
+        // extra permission, resolved as the context service resolves it.
+        await prisma.membership.update({
+            where: {
+                organizationId_userId: {
+                    organizationId: b.organizationId,
+                    userId: b.member.userId,
+                },
+            },
+            data: { extraActions: ["social:post"] },
+        });
+        const given = {
+            ...b.member,
+            actions: resolveCapabilities("MEMBER", null, ["social:post"]),
+        } as OrganizationContext;
+        const theirs = await posts.create(given, { headline: "Fresh today" });
+        expect((await posts.list(given)).map((p) => p.id)).toContain(theirs.id);
+        await posts.update(given, made.id, { headline: "Open later" });
+        await posts.remove(given, theirs.id);
     });
 });
 

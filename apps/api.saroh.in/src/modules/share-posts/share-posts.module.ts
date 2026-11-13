@@ -9,6 +9,7 @@ import { ProductsModule } from "../products/products.module";
 import { SitesModule } from "../sites/sites.module";
 import { PublicShareController } from "./public-share.controller";
 import { PublicShareService } from "./public-share.service";
+import { ShareCardsController } from "./share-cards.controller";
 import { SharePostsController } from "./share-posts.controller";
 import { SharePostsService } from "./share-posts.service";
 
@@ -26,7 +27,11 @@ import { SharePostsService } from "./share-posts.service";
         ProductsModule,
         BookingsModule,
     ],
-    controllers: [SharePostsController, PublicShareController],
+    controllers: [
+        SharePostsController,
+        ShareCardsController,
+        PublicShareController,
+    ],
     providers: [SharePostsService, PublicShareService, OrganizationGuard],
 })
 export class SharePostsModule {}

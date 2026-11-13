@@ -22,11 +22,12 @@ import { SharePostsService } from "./share-posts.service";
 
 /**
  * Create post's own posts (#1378): the business's own headline or photo,
- * saved for its share picture. Gated as editing the website is: the Website
- * module, and `section:write` in the service.
+ * saved for its share picture. The Social permissions in the service
+ * (`social:read`, `social:post`); the module gate is Website for now.
  */
 @Controller("organizations/:organizationId/share-posts")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Becomes SOCIAL when the Social module exists.
 @RequireModule("WEBSITE")
 export class SharePostsController {
     constructor(private readonly posts: SharePostsService) {}

@@ -59,6 +59,13 @@ describe("renderCard", () => {
         }
     }, 60_000);
 
+    it("draws a thumbnail as the whole card, scaled to the width asked", async () => {
+        const png = await renderCard({ ...base, style: "colour", width: 240 });
+        expect(pngSize(png)).toEqual({ width: 240, height: 300 });
+        const story = await renderCard({ ...base, size: "story", width: 270 });
+        expect(pngSize(story)).toEqual({ width: 270, height: 480 });
+    });
+
     it("sets Devanagari text in Noto Sans Devanagari, and draws it", async () => {
         const drawn = jest.spyOn(tree, "cardTree");
         const png = await renderCard({

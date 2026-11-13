@@ -8,7 +8,11 @@ import {
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 
-import { moneyWords, moneyWordsMinor } from "../../common/words-format";
+import {
+    dayWords,
+    moneyWords,
+    moneyWordsMinor,
+} from "../../common/words-format";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { PublicTimetableService } from "../bookings/public-timetable";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
@@ -21,9 +25,15 @@ import { PublicCatalogueService } from "../products/public-catalogue.service";
 import { SitesService } from "../sites/sites.service";
 import { curatedFont, siteFamilies } from "./cards/card-fonts";
 import type { ShareOffer } from "./cards/card-model";
-import { shareSizeOf, shareStyleOf } from "./cards/card-model";
+import {
+    hexColourOf,
+    shareSizeOf,
+    shareStyleOf,
+    shareWidthOf,
+} from "./cards/card-model";
 import type { CardRender } from "./cards/card-renderer";
 import { renderCard } from "./cards/card-renderer";
+import { BOOK_HEADLINE, shareHeadlineOf } from "./dto";
 
 /**
  * Share pictures (#1375, #1378; plan 2026-11-12-003 U5, U6), drawn here
@@ -62,10 +72,25 @@ export interface ShareQuery {
     style?: unknown;
     size?: unknown;
     font?: unknown;
+    /** The card's own ground and text colours, `#rrggbb` (anything else is ignored). */
+    bg?: unknown;
+    fg?: unknown;
+    /**
+     * The booking page card's headline, typed in the share sheet. Read only
+     * by the organization's own route; the public one ignores it.
+     */
+    headline?: unknown;
+    /** A thumbnail's width in pixels, up to 540. */
+    w?: unknown;
+    /** On an offer: the product being shared, by its slug. */
+    product?: unknown;
 }
 
 /** What a card says, before the site's look and fonts are added. */
-type Content = Pick<CardRender, "name" | "price" | "unit" | "offer"> & {
+type Content = Pick<
+    CardRender,
+    "name" | "price" | "unit" | "offer" | "cta" | "kindLabel"
+> & {
     photoUrl?: string | null;
     photoMediaId?: string | null;
 };
@@ -102,13 +127,7 @@ function coverOf(
 export function classWhen(date: string, time: string): string {
     const day = new Date(`${date}T00:00:00Z`);
     if (Number.isNaN(day.getTime())) return time;
-    const words = day.toLocaleDateString("en-IN", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        timeZone: "UTC",
-    });
-    return `${words.replace(",", "")}, ${time}`;
+    return `${dayWords(day, "UTC", { weekday: true })}, ${time}`;
 }
 
 /**
@@ -121,11 +140,7 @@ export function offerUntil(endsAt: Date | null, now: Date): string | null {
     if (endsAt.getTime() - now.getTime() <= 7 * 86_400_000) {
         return "this week only";
     }
-    return `until ${endsAt.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        timeZone: "UTC",
-    })}`;
+    return `until ${dayWords(endsAt, "UTC")}`;
 }
 
 @Injectable()
@@ -161,7 +176,32 @@ export class PublicShareService {
             kind as ShareKind,
             ref,
             visitor,
+            // The public picture never draws words from its address.
+            {
+                product:
+                    typeof query.product === "string" ? query.product : null,
+            },
         );
+        return this.draw(site, content, query);
+    }
+
+    /**
+     * The booking page's card with the headline typed in the share sheet
+     * (owner, 12 Nov 2026): for the business's own people only, through
+     * `organizations/:id/share/book/image`, never the public route, so
+     * nobody can draw their words in a business's look. Capped and
+     * cleaned (`shareHeadlineOf`), drawn as text, never stored.
+     */
+    async bookForOrganization(
+        organizationId: string,
+        query: ShareQuery,
+        visitor: string,
+    ): Promise<Buffer> {
+        this.take(visitor);
+        const site = await this.liveSite(await this.liveSiteId(organizationId));
+        const content = await this.content(site, "book", "page", visitor, {
+            headline: shareHeadlineOf(query.headline),
+        });
         return this.draw(site, content, query);
     }
 
@@ -182,17 +222,9 @@ export class PublicShareService {
             },
         });
         if (!post) notFound();
-        const live = await prisma.site.findFirst({
-            where: {
-                organizationId: post.organizationId,
-                deletedAt: null,
-                currentPublication: { kind: "LIVE" },
-            },
-            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-            select: { id: true },
-        });
-        if (!live) notFound();
-        const site = await this.liveSite(live.id);
+        const site = await this.liveSite(
+            await this.liveSiteId(post.organizationId),
+        );
         if (site.organizationId !== post.organizationId) notFound();
         return this.draw(
             site,
@@ -207,6 +239,21 @@ export class PublicShareService {
                 size: query.size ?? post.size,
             },
         );
+    }
+
+    /** The business's live site: its first, as the own post's picture reads it. */
+    private async liveSiteId(organizationId: string): Promise<string> {
+        const live = await prisma.site.findFirst({
+            where: {
+                organizationId,
+                deletedAt: null,
+                currentPublication: { kind: "LIVE" },
+            },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { id: true },
+        });
+        if (!live) notFound();
+        return live.id;
     }
 
     private take(visitor: string): void {
@@ -251,6 +298,17 @@ export class PublicShareService {
         kind: ShareKind,
         ref: string,
         visitor: string,
+        /**
+         * The booking page's headline (the organization's own route only),
+         * and on an offer the product being shared.
+         */
+        {
+            headline = null,
+            product = null,
+        }: {
+            headline?: string | null;
+            product?: string | null;
+        },
     ): Promise<Content> {
         switch (kind) {
             case "product": {
@@ -302,7 +360,8 @@ export class PublicShareService {
                 return {
                     name: title,
                     price: null,
-                    unit: "Read more",
+                    cta: "Read more",
+                    kindLabel: "From the blog",
                     photoUrl: text(post?.image),
                 };
             }
@@ -310,24 +369,31 @@ export class PublicShareService {
                 const page = await this.bookings.publicBookingPage(site.siteId);
                 if (!page.open) notFound();
                 return {
-                    name: "Book now",
+                    // The sheet's headline, never stored; else the default.
+                    name: headline ?? BOOK_HEADLINE,
                     price: null,
+                    cta: "Book now",
+                    kindLabel: "Bookings",
                     photoUrl: site.socialImage,
                 };
             }
             case "offer":
-                return this.offer(site, ref, visitor);
+                return this.offer(site, ref, visitor, product);
         }
     }
 
     /**
      * A live discount (in date and not used up) and what it applies to:
      * one product the shop sells, with its old and new price, else the shop.
+     * `product` (a slug) is the one being shared: a discount on several
+     * draws that one, and only if the discount is on it (else a 404); with
+     * none, the first it is on.
      */
     private async offer(
         site: LiveSite,
         id: string,
         visitor: string,
+        product: string | null,
     ): Promise<Content> {
         const discount = await prisma.discount.findFirst({
             where: { id, organizationId: site.organizationId },
@@ -343,7 +409,12 @@ export class PublicShareService {
                 endsAt: true,
                 usageLimit: true,
                 products: {
-                    where: { product: { status: "PUBLISHED" } },
+                    where: {
+                        product: {
+                            status: "PUBLISHED",
+                            ...(product ? { slug: product } : {}),
+                        },
+                    },
                     orderBy: { id: "asc" },
                     take: 1,
                     select: { product: { select: { slug: true } } },
@@ -373,37 +444,37 @@ export class PublicShareService {
         const slug = discount.products[0]?.product.slug;
         if (discount.appliesTo === "PRODUCT") {
             if (!slug) notFound();
-            const product = await this.catalogue.product(
+            const item = await this.catalogue.product(
                 site.siteId,
                 slug,
                 visitor,
             );
-            const was = Math.round(Number(product.price) * 100);
+            const was = Math.round(Number(item.price) * 100);
             const now =
                 discount.kind === "PERCENTAGE"
                     ? Math.round(
                           (was * (10_000 - (discount.percentBps ?? 0))) /
                               10_000,
                       )
-                    : discount.currency === product.currency
+                    : discount.currency === item.currency
                       ? Math.max(
                             0,
                             was - Math.round(Number(discount.amount) * 100),
                         )
                       : null;
             return {
-                name: product.name,
-                price: moneyWords(product.price, product.currency),
+                name: item.name,
+                price: moneyWords(item.price, item.currency),
                 offer: {
                     ...offer,
                     ...(now === null
                         ? {}
                         : {
-                              was: moneyWordsMinor(was, product.currency),
-                              now: moneyWordsMinor(now, product.currency),
+                              was: moneyWordsMinor(was, item.currency),
+                              now: moneyWordsMinor(now, item.currency),
                           }),
                 },
-                photoUrl: coverOf(product.images),
+                photoUrl: coverOf(item.images),
             };
         }
         // The whole shop, or a storefront or collection of it: the shop must
@@ -451,10 +522,15 @@ export class PublicShareService {
             name: content.name,
             price: content.price,
             unit: content.unit ?? null,
+            cta: content.cta ?? null,
+            kindLabel: content.kindLabel ?? null,
             offer: content.offer ?? null,
             business: site.name,
             address: site.address,
             variables: site.variables,
+            ground: hexColourOf(query.bg),
+            ink: hexColourOf(query.fg),
+            width: shareWidthOf(query.w),
             photo,
             logo,
             fonts: {

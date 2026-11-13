@@ -21,6 +21,8 @@ export interface CardRender extends Omit<ShareCardInput, "photo" | "logo"> {
     logo?: Uint8Array | null;
     /** Families to set the card in before the Noto chain; null: none. */
     fonts: { heading: string | null; body: string | null };
+    /** A smaller picture this many pixels wide (a thumbnail); none: full size. */
+    width?: number | null;
 }
 
 /** PNG, JPEG, WebP or GIF by its first bytes; AVIF and the rest are not drawn. */
@@ -68,6 +70,8 @@ function words(input: CardRender): string {
         input.business,
         input.price,
         input.unit,
+        input.cta,
+        input.kindLabel,
         input.address,
         input.offer?.headline,
         input.offer?.until,
@@ -103,7 +107,12 @@ export async function renderCard(input: CardRender): Promise<Buffer> {
         photo: photo ? "photo" : null,
         logo: logo ? "logo" : null,
     };
-    const { width, height } = SHARE_SIZES[input.size ?? "post"];
+    const full = SHARE_SIZES[input.size ?? "post"];
+    // A thumbnail is the same card, scaled: the layout stays in full-size
+    // pixels and the renderer draws it smaller.
+    const scale = input.width ? Math.min(1, input.width / full.width) : 1;
+    const width = Math.round(full.width * scale);
+    const height = Math.round(full.height * scale);
     const draw = (withImages: boolean) =>
         r.render(
             cardTree(
@@ -113,6 +122,7 @@ export async function renderCard(input: CardRender): Promise<Buffer> {
             {
                 width,
                 height,
+                devicePixelRatio: scale,
                 format: "png",
                 images: withImages ? images : [],
             },

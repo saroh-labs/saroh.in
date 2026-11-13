@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { noteShared } from "@/components/shared/share-link/note-shared";
 import { runAction } from "@/lib/api/run-action";
 import type { BookingLinkView } from "@/lib/services/booking-link";
@@ -28,6 +29,7 @@ import {
     makeBookingPage,
     publishBookingPage,
 } from "@/lib/services/booking-link-actions";
+import type { ShareSetup } from "@/lib/share-item/share";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Row } from "@saroh/ui/settings-rows";
 
@@ -44,9 +46,12 @@ import { Row } from "@saroh/ui/settings-rows";
  */
 export function BookingLinkRow({
     view: read,
+    shareSetup = null,
     className,
 }: {
     view: BookingLinkView;
+    /** Share as a post (#1375): the live site; null leaves Share out. */
+    shareSetup?: ShareSetup | null;
     className?: string;
 }) {
     const router = useRouter();
@@ -101,6 +106,19 @@ export function BookingLinkRow({
                         from: "Services screen",
                     }}
                 />
+                {shareSetup ? (
+                    <ShareItemButton
+                        setup={shareSetup}
+                        item={{
+                            kind: "book",
+                            ref: "page",
+                            name: "your booking page",
+                            price: null,
+                            url: row.url,
+                            offerId: null,
+                        }}
+                    />
+                ) : null}
             </span>
         ) : row.kind === "draft" && row.publish === "here" ? (
             <Button

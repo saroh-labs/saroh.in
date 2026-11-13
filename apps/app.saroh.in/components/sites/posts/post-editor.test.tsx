@@ -338,3 +338,69 @@ describe("PostEditor read-only, for a Reviewer (DEC-200 U8)", () => {
         expect(setCommentResolved).toHaveBeenCalledWith("s1", "n1", true);
     });
 });
+
+describe("PostEditor's Share (#1375, boards SGShareBlog*)", () => {
+    const post = {
+        id: "p1",
+        title: "Winter hours",
+        slug: "winter-hours",
+        excerpt: "We close early in December.",
+        content: "<p>From 1 December we close at 6.</p>",
+        categoryId: null,
+        featured: false,
+        image: null,
+        status: "PUBLISHED" as const,
+        publishedAt: "2026-11-01T00:00:00Z",
+        createdAt: "2026-10-07T00:00:00Z",
+        author: "Asha Rao",
+        live: true,
+        liveAt: "2026-11-01T00:00:00Z",
+    };
+    const share = {
+        setup: {
+            apiOrigin: "https://api.example.com",
+            siteId: "s1",
+            schedule: { tier: "free" as const },
+        },
+        url: "https://rye.example.com/blog/winter-hours",
+    };
+    const labels = () =>
+        Array.from(container.querySelectorAll("header button")).map((b) =>
+            b.textContent.trim(),
+        );
+
+    it("sits before Details while the post is live", () => {
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={post}
+                    share={share}
+                />,
+            ),
+        );
+        const at = labels();
+        expect(at).toContain("Share");
+        expect(at.indexOf("Share")).toBe(at.indexOf("Details") - 1);
+        expect(
+            container
+                .querySelector("[data-share-item]")
+                ?.getAttribute("data-share-item"),
+        ).toBe("post");
+    });
+
+    it("is not there for a draft", () => {
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={{ ...post, live: false, liveAt: null }}
+                    share={share}
+                />,
+            ),
+        );
+        expect(labels()).not.toContain("Share");
+    });
+});
