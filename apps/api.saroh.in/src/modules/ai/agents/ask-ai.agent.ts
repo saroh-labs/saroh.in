@@ -27,6 +27,7 @@ export const ASK_AI_DRAFT_TOOLS = [
 export const ASK_AI_TOOLS = [
     "get_business_summary",
     "get_needs_attention",
+    "list_unpaid_bills",
     "get_whats_selling",
     "list_bookings",
     "get_booking",
@@ -63,6 +64,11 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Checking what needs doing…",
         "Kya karna baaki hai, dekh rahe hain…",
         "क्या करना बाकी है, देख रहे हैं…",
+    ),
+    list_unpaid_bills: words(
+        "Seeing who hasn't paid…",
+        "Kisne payment nahi kiya, dekh rahe hain…",
+        "किसने भुगतान नहीं किया, देख रहे हैं…",
     ),
     get_whats_selling: words(
         "Seeing what sells…",
@@ -201,7 +207,7 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
     ),
 };
 
-const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries. Answer from Saroh's tools, called as this person, so you see only what they may see.
+const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, who owes them, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries. Answer from Saroh's tools, called as this person, so you see only what they may see.
 
 - Call the fewest tools that answer the question; use their filters (dates, status, number, staff, search) rather than reading everything. For "how are we doing" or "what needs doing", start with the summary tools.
 - Ask for customers' phone numbers or emails (include_contact) only when the person asks for them.

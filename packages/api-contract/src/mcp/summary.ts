@@ -16,6 +16,20 @@ import { includeContact } from "./day";
 /** Money as a person reads it, one entry per currency. */
 const amounts = z.array(z.string());
 
+/**
+ * What is owed now, as Home and Insights count it (owed by age, DEC-171):
+ * every issued bill not an order's own. Overdue is past its due date; not
+ * due yet is due later or has no due date. The two add up to `bills`.
+ */
+const owed = z.object({
+    totals: amounts.nullable(),
+    bills: z.number(),
+    overdue: z.number(),
+    overdue_totals: amounts.nullable(),
+    not_due: z.number(),
+    not_due_totals: amounts.nullable(),
+});
+
 export const SUMMARY_PERIODS = [
     "today",
     "this_week",
@@ -42,13 +56,7 @@ export const getBusinessSummaryTool = {
         no_show: z.number().nullable(),
         orders: z.number().nullable(),
         money_in: amounts.nullable(),
-        owed: z
-            .object({
-                totals: amounts.nullable(),
-                bills: z.number(),
-                overdue: z.number(),
-            })
-            .nullable(),
+        owed: owed.nullable(),
         not_shown: z.array(z.string()),
     }),
 };
@@ -128,7 +136,60 @@ export const getNeedsAttentionTool = {
                     .nullable(),
             }),
         ),
+        /** Unpaid bills, counted as get_business_summary counts them. */
+        owed: owed.nullable(),
+        /** Null when this person isn't shown stock, or it couldn't be read. */
+        stock: z
+            .object({
+                tracked: z.boolean(),
+                short: z.array(
+                    z.object({
+                        product_id: z.string(),
+                        name: z.string(),
+                        location: z.string(),
+                        on_hand: z.number(),
+                        promised: z.number(),
+                        short: z.number(),
+                    }),
+                ),
+                low: z.array(
+                    z.object({
+                        product_id: z.string(),
+                        name: z.string(),
+                        location: z.string(),
+                        left: z.number(),
+                        alert_at: z.number(),
+                    }),
+                ),
+            })
+            .nullable(),
+        not_shown: z.array(z.string()),
         unavailable: z.array(z.string()),
+    }),
+};
+
+export const listUnpaidBillsTool = {
+    input: z.object({ ...listInput }).strict(),
+    output: z.object({
+        /** Null when this person's role doesn't include bills. */
+        bills: z
+            .array(
+                z.object({
+                    invoice_id: z.string(),
+                    number: z.string().nullable(),
+                    customer: untrustedText.nullable(),
+                    /** What is left to pay; null without payment:read. */
+                    left_to_pay: z.string().nullable(),
+                    due_on: z.string().nullable(),
+                    /** 0 when not due yet or no due date. */
+                    days_late: z.number(),
+                }),
+            )
+            .nullable(),
+        /** Every unpaid bill, across pages. */
+        total: z.number().nullable(),
+        next_cursor: nextCursor,
+        not_shown: z.array(z.string()),
     }),
 };
 

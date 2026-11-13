@@ -225,6 +225,66 @@ describe("Ask AI's tool bridge (U4)", () => {
         );
     });
 
+    it("unpaid bills: the summary counts overdue and not due yet; list_unpaid_bills names them oldest first; a Member sees neither", async () => {
+        const org = await business();
+        const asha = await customer(org.id, "Asha");
+        const invoice = (
+            status: "ISSUED" | "DRAFT" | "VOID",
+            dueAt: Date | null,
+            more: { contactId?: string; paidCents?: number } = {},
+        ) =>
+            prisma.invoice.create({
+                data: {
+                    organizationId: org.id,
+                    status,
+                    number: status === "DRAFT" ? null : uniq("INV"),
+                    currency: "INR",
+                    subtotal: "1000.00",
+                    total: "1000.00",
+                    dueAt,
+                    ...(status === "DRAFT" ? {} : { issuedAt: new Date() }),
+                    ...more,
+                },
+            });
+        const now = Date.now();
+        const oldest = await invoice("ISSUED", new Date(now - 40 * DAY), {
+            contactId: asha.id,
+            paidCents: 40_000,
+        });
+        await invoice("ISSUED", new Date(now - 2 * DAY));
+        await invoice("ISSUED", new Date(now + 5 * DAY));
+        await invoice("DRAFT", new Date(now - 9 * DAY));
+        await invoice("VOID", new Date(now - 9 * DAY));
+        const ctx = await contextOf(org.id, org.ownerId);
+
+        const summary = await ask(ctx, "get_business_summary", {
+            period: "this_month",
+        });
+        expect(summary.output).toMatch(
+            /Unpaid bills: 3 \(INR 2600\.00\)\. Overdue, past their due date: 2 \(INR 1600\.00\)\. Not due yet: 1 \(INR 1000\.00\)\./,
+        );
+
+        const list = await ask(ctx, "list_unpaid_bills", { limit: 2 });
+        expect(list.isError).toBeUndefined();
+        expect(list.output).toMatch(/^3 unpaid bills, oldest due first/);
+        const lines = list.output.split("\n").filter((l) => l.startsWith("- "));
+        expect(lines).toHaveLength(2);
+        expect(lines[0]).toContain(`invoice_id ${oldest.id}`);
+        expect(lines[0]).toMatch(
+            /"Asha".*INR 600\.00 left to pay.*40 days late/,
+        );
+        expect(list.output).toMatch(/cursor 2/);
+
+        const { userId } = await person(org.id, "MEMBER");
+        const member = await ask(
+            await contextOf(org.id, userId),
+            "list_unpaid_bills",
+        );
+        expect(member.output).toBe(
+            "Not shown: your role doesn't include bills.",
+        );
+    });
+
     it("list_orders by number finds ORD-014; a date range leaves out older orders", async () => {
         const org = await business();
         const ctx = await contextOf(org.id, org.ownerId);

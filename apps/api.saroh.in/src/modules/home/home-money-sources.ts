@@ -406,7 +406,7 @@ export async function overdueInvoices(
 }
 
 /** Who an invoice is to: its bill-to name, else its contact's name. */
-function billedTo(inv: {
+export function billedTo(inv: {
     billToName: string | null;
     contact: {
         firstName: string | null;

@@ -7,12 +7,14 @@ import {
     getNeedsAttentionTool,
     getWhatsSellingTool,
     listStaffTool,
+    listUnpaidBillsTool,
 } from "@saroh/api-contract";
 import { prisma, Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
-import { readOwedByAge } from "../../analytics/owed-by-age";
+import type { OwedByAge } from "../../analytics/owed-by-age";
+import { foldOwedByAge, readOwedByAge } from "../../analytics/owed-by-age";
 import type { InsightsPeriod } from "../../analytics/period";
 import { DAY_PARTS } from "../../analytics/sells";
 import { SellsService } from "../../analytics/sells.service";
@@ -21,12 +23,19 @@ import { takingsByDaySql } from "../../analytics/takings.sql";
 import { ownBookingsWhere, ownDiaryOf } from "../../bookings/own-diary";
 import { businessTimezone } from "../../bookings/staff-availability";
 import { notRetired } from "../../customer-workspace/customers-list.sql";
-import type { HomeNeedKind } from "../../home/home-model";
+import type {
+    HomeInput,
+    HomeMoneyTotal,
+    HomeNeedKind,
+} from "../../home/home-model";
+import { billedTo } from "../../home/home-money-sources";
 import { HomeService } from "../../home/home.service";
+import { leftToPayCents, OWED_VIEW_WHERE } from "../../invoices/invoice-state";
 import { realOrderWhere } from "../../orders/open-orders";
 import { ts } from "../../orders/order-list-filters";
 import { orderLocationWhere } from "../../orders/order-location";
 import { allows } from "../../organizations/organization-policy";
+import { movable } from "../../stock/stock-words";
 import type { McpCall, McpTool } from "../tool-registry";
 import {
     defineTool,
@@ -104,6 +113,57 @@ const notShownLine = (nouns: readonly string[]) =>
         ? [`Not shown: your role doesn't include ${nouns.join(", ")}.`]
         : [];
 
+/** Two per-currency totals added together; null when either is. */
+function addTotals(
+    a: readonly HomeMoneyTotal[] | null,
+    b: readonly HomeMoneyTotal[] | null,
+): HomeMoneyTotal[] | null {
+    if (!a || !b) return null;
+    const by = new Map<string, number>();
+    for (const t of [...a, ...b]) {
+        by.set(t.currency, (by.get(t.currency) ?? 0) + t.amountMinor);
+    }
+    return [...by.entries()]
+        .sort(([x], [y]) => x.localeCompare(y))
+        .map(([currency, amountMinor]) => ({ currency, amountMinor }));
+}
+
+/**
+ * What is owed, by owed by age (DEC-171), the read Home's "How it's going"
+ * and Insights' Money tab fold: every issued bill not an order's own,
+ * overdue once past its due date. Both summary tools say it this way, so
+ * they never disagree on a count. A business that never billed owes none.
+ */
+async function readOwed(
+    org: string,
+    clock: { now: Date; zone: string },
+    money: boolean,
+) {
+    const o: OwedByAge =
+        (await readOwedByAge(prisma, org, clock, money)) ??
+        foldOwedByAge([], clock, money);
+    return {
+        totals: minorTotals(o.totals),
+        bills: o.bills,
+        overdue: o.overdue,
+        overdue_totals: minorTotals(
+            addTotals(o.byAge.late1to30.totals, o.byAge.lateOver30.totals),
+        ),
+        not_due: o.byAge.notDue.count,
+        not_due_totals: minorTotals(o.byAge.notDue.totals),
+    };
+}
+type OwedData = Awaited<ReturnType<typeof readOwed>>;
+
+const inBrackets = (totals: string[] | null) =>
+    totals ? ` (${totals.join(", ") || "nothing"})` : "";
+
+/** The one owed line both summary tools send. */
+export function owedLine(o: OwedData): string {
+    if (o.bills === 0) return "- Unpaid bills: none.";
+    return `- Unpaid bills: ${o.bills}${inBrackets(o.totals)}. Overdue, past their due date: ${o.overdue}${inBrackets(o.overdue_totals)}. Not due yet: ${o.not_due}${inBrackets(o.not_due_totals)}.`;
+}
+
 async function businessSummary(
     ctx: OrganizationContext,
     period: SummaryPeriod,
@@ -157,9 +217,7 @@ async function businessSummary(
                   takingsByDaySql(org, zone, w.from, w.to),
               )
             : null,
-        see.bills
-            ? readOwedByAge(prisma, org, { now, zone }, see.amounts)
-            : null,
+        see.bills ? readOwed(org, { now, zone }, see.amounts) : null,
     ]);
     const count = (outcome?: string) =>
         byOutcome
@@ -177,13 +235,7 @@ async function businessSummary(
         no_show: count("NO_SHOW"),
         orders,
         money_in: takings ? moneyOf(takings) : null,
-        owed: owed
-            ? {
-                  totals: minorTotals(owed.totals),
-                  bills: owed.bills,
-                  overdue: owed.overdue,
-              }
-            : null,
+        owed,
         not_shown: notShown,
     };
     const text = [
@@ -199,11 +251,7 @@ async function businessSummary(
                   `- Money in: ${data.money_in.length ? data.money_in.join(", ") : "none"}`,
               ]
             : []),
-        ...(data.owed
-            ? [
-                  `- Owed now: ${data.owed.totals ? `${data.owed.totals.join(", ") || "nothing"} on ` : ""}${data.owed.bills} unpaid bills, ${data.owed.overdue} overdue`,
-              ]
-            : []),
+        ...(owed ? [owedLine(owed)] : []),
         ...notShownLine(notShown),
     ].join("\n");
     return { text, data };
@@ -292,6 +340,79 @@ function lapsedSql(
           AND last.at < ${ts(cutoff)}
         ORDER BY last.at DESC, c.id
         LIMIT ${limit} OFFSET ${offset}`;
+}
+
+/** Home's read, as the person asking. */
+const homeInput = (ctx: OrganizationContext): HomeInput => ({
+    organizationId: ctx.organizationId,
+    userId: ctx.userId,
+    organizationRole: ctx.role,
+    organizationRoleKey: ctx.roleKey,
+    organizationActions: ctx.actions,
+    edition: ctx.edition,
+});
+
+/** A list's offset cursor, refused when it isn't one a tool gave. */
+function offsetOf(cursor: string | undefined): number {
+    const offset = cursor ? Number(cursor) : 0;
+    if (!Number.isInteger(offset) || offset < 0) {
+        throw new ToolError(
+            "That cursor isn't one this tool gave.",
+            "Call again without cursor, or with next_cursor from the last result.",
+        );
+    }
+    return offset;
+}
+
+const money_ = (currency: string, amountMinor: number) =>
+    money({ currency, amountMinor });
+
+/** Whole days past due, at least 1 once late, as Home's "Late · N days". */
+export function daysLate(dueAt: Date | null, now: Date): number {
+    if (!dueAt || dueAt >= now) return 0;
+    return Math.max(1, Math.floor((now.getTime() - dueAt.getTime()) / DAY_MS));
+}
+
+const shelfName = (product: string, variant: string | null) =>
+    variant ? `${product} · ${variant}` : product;
+
+/** How many shelves a stock line names before "and N more". */
+const STOCK_NAMED = 10;
+
+function named<T>(rows: readonly T[], say: (row: T) => string): string {
+    const shown = rows.slice(0, STOCK_NAMED).map(say).join("; ");
+    const more = rows.length - STOCK_NAMED;
+    return more > 0 ? `${shown}; and ${more} more` : shown;
+}
+
+/**
+ * The stock lines, always said: an empty one is "none", and a business
+ * that counts no stock is told so, so nobody guesses why there's no line.
+ */
+export function stockLines(stock: {
+    tracked: boolean;
+    short: {
+        name: string;
+        location: string;
+        on_hand: number;
+        promised: number;
+        short: number;
+    }[];
+    low: { name: string; location: string; left: number; alert_at: number }[];
+}): string[] {
+    if (!stock.tracked) {
+        return [
+            "- Stock: Stock isn't tracked for any product, so nothing shows as low or short.",
+        ];
+    }
+    return [
+        stock.short.length
+            ? `- Short for open orders: ${stock.short.length}: ${named(stock.short, (r) => `${JSON.stringify(r.name)} at ${JSON.stringify(r.location)}, ${r.short} short (${r.promised} promised, ${r.on_hand} on hand)`)}.`
+            : "- Short for open orders: none.",
+        stock.low.length
+            ? `- Low stock: ${stock.low.length}: ${named(stock.low, (r) => `${JSON.stringify(r.name)} at ${JSON.stringify(r.location)}, ${r.left} left (alert at ${r.alert_at})`)}.`
+            : "- Low stock: none.",
+    ];
 }
 
 export interface SummaryDeps {
@@ -407,20 +528,35 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             name: "get_needs_attention",
             title: "What needs doing",
             description:
-                'Use this when the person asks what needs doing or what they missed: orders to pack, unpaid bills, bookings waiting for payment, enquiries, failed payments and renewals, low stock. Example: "anything urgent?" Not for one list in full (list_orders, list_enquiries).',
+                'Use this when the person asks what needs doing or what they missed: orders to pack, unpaid bills, bookings waiting for payment, enquiries, failed payments and renewals, low or short stock. Example: "anything urgent?" Not for one list in full (list_orders, list_enquiries, list_unpaid_bills).',
             contract: getNeedsAttentionTool,
             // Home asks each source's own read.
             capability: null,
             hints: READ_ONLY,
             async run(_input, { ctx }: McpCall) {
-                const home = await d.home.build({
-                    organizationId: ctx.organizationId,
-                    userId: ctx.userId,
-                    organizationRole: ctx.role,
-                    organizationRoleKey: ctx.roleKey,
-                    organizationActions: ctx.actions,
-                    edition: ctx.edition,
-                });
+                const org = ctx.organizationId;
+                const see = {
+                    bills: allows(ctx, "invoice:read"),
+                    amounts: allows(ctx, "payment:read"),
+                    stock: allows(ctx, "store:read"),
+                };
+                const unavailable: string[] = [];
+                const [home, owed, stock] = await Promise.all([
+                    d.home.build(homeInput(ctx)),
+                    see.bills
+                        ? businessTimezone(prisma, org).then((zone) =>
+                              readOwed(
+                                  org,
+                                  { now: new Date(), zone },
+                                  see.amounts,
+                              ),
+                          )
+                        : null,
+                    d.home.stockWatch(homeInput(ctx)).catch(() => {
+                        unavailable.push("Stock");
+                        return null;
+                    }),
+                ]);
                 const groups = (home.needGroups ?? []).map((g) => ({
                     kind: g.kind,
                     what: NEED_WORDS[g.kind],
@@ -437,19 +573,74 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                           }
                         : null,
                 }));
+                const stockData = stock
+                    ? {
+                          tracked: stock.tracked,
+                          short: stock.short.map((c) => ({
+                              product_id: c.productId,
+                              name: shelfName(c.productName, c.variantTitle),
+                              location: c.storeName,
+                              on_hand: c.numbers.onHand,
+                              promised: c.numbers.promised,
+                              short: c.numbers.short,
+                          })),
+                          low: stock.low.map((r) => ({
+                              product_id: r.productId,
+                              name: shelfName(
+                                  r.product.name,
+                                  r.variant?.title ?? null,
+                              ),
+                              location: r.store.name,
+                              left: movable(r),
+                              alert_at: r.lowStockAlert,
+                          })),
+                      }
+                    : null;
+                const notShown = [
+                    ...(see.bills ? [] : ["bills"]),
+                    ...(see.bills && !see.amounts ? ["payments"] : []),
+                    ...(see.stock ? [] : ["stock"]),
+                ];
                 const data = {
                     total: home.needGroupsTotal ?? 0,
                     groups,
-                    unavailable: home.unavailable.map((u) => u.label),
+                    owed,
+                    stock: stockData,
+                    not_shown: notShown,
+                    unavailable: [
+                        ...home.unavailable.map((u) => u.label),
+                        ...unavailable,
+                    ],
                 };
+                // Bills and stock get their own fuller lines below.
+                const said = new Set<string>([
+                    ...(owed ? ["BILLS"] : []),
+                    ...(stockData ? ["STOCK"] : []),
+                ]);
+                const chase =
+                    groups.find((g) => g.kind === "BILLS")?.count ?? 0;
                 const text = [
                     groups.length
                         ? `${data.total} things need doing.`
                         : "Nothing needs doing now.",
-                    ...groups.map(
-                        (g) =>
-                            `- ${g.what}: ${g.count}${g.late ? `, ${g.late} late` : ""}${g.totals?.length ? `, ${g.totals.join(", ")}` : ""}.${g.oldest ? ` Oldest: ${quoteUntrusted("Item", g.oldest.title.text)}${g.oldest.who ? `, ${quoteUntrusted("Who", g.oldest.who.text)}` : ""}${g.oldest.at ? `, since ${g.oldest.at}` : ""}.` : ""}`,
-                    ),
+                    ...groups
+                        .filter((g) => !said.has(g.kind))
+                        .map(
+                            (g) =>
+                                `- ${g.what}: ${g.count}${g.late ? `, ${g.late} late` : ""}${g.totals?.length ? `, ${g.totals.join(", ")}` : ""}.${g.oldest ? ` Oldest: ${quoteUntrusted("Item", g.oldest.title.text)}${g.oldest.who ? `, ${quoteUntrusted("Who", g.oldest.who.text)}` : ""}${g.oldest.at ? `, since ${g.oldest.at}` : ""}.` : ""}`,
+                        ),
+                    ...(owed
+                        ? [
+                              owedLine(owed) +
+                                  (owed.overdue > chase
+                                      ? ` Of the overdue, Home lists ${owed.overdue - chase} under payments (a subscription's renewal, or a payment to refund) rather than as bills to chase. list_unpaid_bills names every one.`
+                                      : owed.bills > 0
+                                        ? " list_unpaid_bills names every one."
+                                        : ""),
+                          ]
+                        : []),
+                    ...(stockData ? stockLines(stockData) : []),
+                    ...notShownLine(notShown),
                     ...(data.unavailable.length
                         ? [
                               `Couldn't read just now: ${data.unavailable.join(", ")}; this may be incomplete.`,
@@ -457,6 +648,118 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                         : []),
                 ].join("\n");
                 return { text, data };
+            },
+        }),
+        defineTool({
+            name: "list_unpaid_bills",
+            title: "Unpaid bills",
+            description:
+                "Use this when the person asks who hasn't paid, who owes them, or which bills are overdue: every unpaid bill with who it's to, what is left to pay, its due date and how late, oldest due first. Example: \"who hasn't paid?\" Not for totals (get_business_summary).",
+            contract: listUnpaidBillsTool,
+            // Without invoice:read it says so rather than refusing.
+            capability: null,
+            hints: READ_ONLY,
+            async run(input, { ctx }: McpCall) {
+                if (!allows(ctx, "invoice:read")) {
+                    const notShown = ["bills"];
+                    return {
+                        text: notShownLine(notShown).join("\n"),
+                        data: {
+                            bills: null,
+                            total: null,
+                            next_cursor: null,
+                            not_shown: notShown,
+                        },
+                    };
+                }
+                const seesAmounts = allows(ctx, "payment:read");
+                const limit = input.limit ?? PAGE;
+                const offset = offsetOf(input.cursor);
+                const org = ctx.organizationId;
+                // Owed by age's bills, so the count is the summary's.
+                const where = { organizationId: org, ...OWED_VIEW_WHERE };
+                const now = new Date();
+                const [zone, total, rows] = await Promise.all([
+                    businessTimezone(prisma, org),
+                    prisma.invoice.count({ where }),
+                    prisma.invoice.findMany({
+                        where,
+                        orderBy: [
+                            { dueAt: { sort: "asc", nulls: "last" } },
+                            { id: "asc" },
+                        ],
+                        skip: offset,
+                        take: limit + 1,
+                        select: {
+                            id: true,
+                            number: true,
+                            total: true,
+                            paidCents: true,
+                            currency: true,
+                            dueAt: true,
+                            billToName: true,
+                            contact: {
+                                select: {
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    }),
+                ]);
+                const next =
+                    rows.length > limit ? String(offset + limit) : null;
+                const bills = rows.slice(0, limit).map((b) => {
+                    const who = billedTo(b);
+                    return {
+                        invoice_id: b.id,
+                        number: b.number,
+                        customer: who ? untrusted(who) : null,
+                        left_to_pay: seesAmounts
+                            ? money_(b.currency, leftToPayCents(b))
+                            : null,
+                        due_on: b.dueAt
+                            ? DateTime.fromJSDate(b.dueAt, {
+                                  zone,
+                              }).toISODate()
+                            : null,
+                        days_late: daysLate(b.dueAt, now),
+                    };
+                });
+                const notShown = seesAmounts ? [] : ["payments"];
+                const text = [
+                    total === 0
+                        ? "No unpaid bills."
+                        : `${total} unpaid bills, oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
+                    ...bills.map(
+                        (b) =>
+                            `- ${b.number ?? "Bill"} (invoice_id ${b.invoice_id}), ${b.customer ? quoteUntrusted("Customer", b.customer.text) : "no customer named"}${b.left_to_pay ? `, ${b.left_to_pay} left to pay` : ""}, ${
+                                b.days_late > 0
+                                    ? `due ${b.due_on}, ${b.days_late} day${b.days_late === 1 ? "" : "s"} late`
+                                    : b.due_on
+                                      ? `due ${b.due_on}, not due yet`
+                                      : "no due date"
+                            }`,
+                    ),
+                    ...(total > 0
+                        ? [
+                              next
+                                  ? `More: call again with cursor ${next}.`
+                                  : "That's all.",
+                          ]
+                        : []),
+                    ...notShownLine(notShown),
+                ].join("\n");
+                return {
+                    text,
+                    data: {
+                        bills,
+                        total,
+                        next_cursor: next,
+                        not_shown: notShown,
+                    },
+                };
             },
         }),
         defineTool({
@@ -470,13 +773,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             async run(input, call: McpCall) {
                 const days = input.days ?? 60;
                 const limit = input.limit ?? PAGE;
-                const offset = input.cursor ? Number(input.cursor) : 0;
-                if (!Number.isInteger(offset) || offset < 0) {
-                    throw new ToolError(
-                        "That cursor isn't one this tool gave.",
-                        "Call again without cursor, or with next_cursor from the last result.",
-                    );
-                }
+                const offset = offsetOf(input.cursor);
                 const rows = await prisma.$queryRaw<LapsedRow[]>(
                     lapsedSql(
                         call.ctx.organizationId,
