@@ -1,5 +1,6 @@
 import {
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -7,6 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { isLocationScoped } from "../orders/order-location";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
@@ -15,7 +17,10 @@ import { serializeCustomerListItem } from "./serialize";
 
 /**
  * Store customers. Authorization delegates to StoresService (read = store
- * access, less the kitchen's stage-only roles; write = canWrite). Email is
+ * access, less the kitchen's stage-only roles). Creating, changing and
+ * deleting ask `contact:write`, as Customer Detail on /contacts does (C13,
+ * DEC-042: a delete is of a record with no orders), never `store:write`
+ * (audit 2026-11-12 #6). Email is
  * unique per store, not globally (@@unique([storeId, email])).
  */
 @Injectable()
@@ -46,6 +51,7 @@ export class CustomersService {
         userId: string,
     ): Promise<CustomerListItemDto[]> {
         await requireOrderRead(this.stores, storeId, userId, "customers");
+        await this.refuseLocationTeam(storeId, userId);
         const customers = await prisma.customer.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
@@ -66,6 +72,7 @@ export class CustomersService {
     /** One store customer, with the same rule as the list. */
     async get(storeId: string, customerId: string, userId: string) {
         await requireOrderRead(this.stores, storeId, userId, "customers");
+        await this.refuseLocationTeam(storeId, userId);
         const customer = await prisma.customer.findFirst({
             where: { id: customerId, storeId },
         });
@@ -125,7 +132,7 @@ export class CustomersService {
     }
 
     /**
-     * Delete a customer who has never ordered. Store write access, as for an
+     * Delete a customer who has never ordered. `contact:write`, as for an
      * edit; a missing id or another store's customer 404s.
      *
      * A customer with orders is refused with a 409 rather than taken apart:
@@ -167,22 +174,39 @@ export class CustomersService {
     }
 
     /**
-     * Assert write access AND return the owning Organization id, so every
-     * create in this service can stamp `organizationId` (#173). Returning it
-     * here rather than looking it up at each call site makes the stamp hard to
-     * forget: the guard you must call already hands you the value.
+     * A location's team reads its storefronts' orders, money included, to
+     * take and change them (owner, 13 Nov 2026), but never the customer
+     * list: their emails and what each has spent (DEC-074).
+     */
+    private async refuseLocationTeam(
+        storeId: string,
+        userId: string,
+    ): Promise<void> {
+        if (isLocationScoped(await this.stores.roleKeyAt(storeId, userId))) {
+            throw new ForbiddenException("Your role can't see customers.");
+        }
+    }
+
+    /**
+     * Assert the caller may change this storefront's customers AND return
+     * the owning Organization id, so every create in this service can stamp
+     * `organizationId` (#173). A store they can't see is a 404; one they see
+     * without `contact:write` in its business is a 403 in words
+     * (`customer-access.ts`). `store:write` never decides it; with
+     * ORG_AUTHORIZATION off the storefront's write roles do, as before.
      */
     private async requireWrite(
         storeId: string,
         userId: string,
     ): Promise<string | null> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (writable === null) {
-            throw new NotFoundException("Location not found");
+        const store = await this.stores.getForUser(storeId, userId);
+        if (
+            !(await this.stores.writeAllows(storeId, userId, "contact:write"))
+        ) {
+            throw new ForbiddenException(
+                "Your role can't change customers' details.",
+            );
         }
-        return writable.organizationId;
+        return store.organizationId;
     }
 }

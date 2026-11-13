@@ -93,6 +93,13 @@ export const CAPABILITIES: readonly Capability[] = [
         ownerOnly: true,
     },
     {
+        action: "org:export",
+        group: "business",
+        label: "Download all the business's data",
+        note: "Every customer, order and record, in one download.",
+        ownerOnly: true,
+    },
+    {
         action: "audit:read",
         group: "business",
         label: "Read the activity log",
@@ -243,6 +250,13 @@ export const CAPABILITIES: readonly Capability[] = [
         note: "For someone checking the wording: they can comment without being able to change anything.",
     },
     { action: "site:approve", group: "website", label: "Sign a website off" },
+    {
+        action: "site:approval:override",
+        group: "website",
+        label: "Publish without approval",
+        note: "Goes live without a sign-off, and turns “Publishing needs approval” on or off.",
+        ownerOnly: true,
+    },
     { action: "section:write", group: "website", label: "Edit page sections" },
     { action: "media:read", group: "website", label: "See the media library" },
     {

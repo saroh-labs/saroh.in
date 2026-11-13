@@ -9,6 +9,7 @@ import {
     enquiryPreview,
     readableAnswers,
 } from "../forms/enquiry-entries";
+import { emailedAbout } from "./alert-recipients";
 import { noticeOf } from "./notice-target";
 
 /** The `type` this handler is registered under (matches the enquiry producer). */
@@ -31,8 +32,9 @@ export interface EnquiryNotifyPayload {
 
 /**
  * Consumer for the `enquiry.notify` job (S3-006): turn a committed enquiry Lead
- * into ONE durable in-app {@link Notification} for the org's owners/admins, plus
- * a best-effort email to each.
+ * into ONE durable in-app {@link Notification} for whoever may read leads
+ * (`lead:read`, the "New enquiry" row), plus a best-effort email to each of
+ * them who has that row's email on.
  *
  * Delivery is AT-LEAST-ONCE (the job worker may run this more than once), so the
  * handler is idempotent by construction:
@@ -104,10 +106,10 @@ export class EnquiryNotifyHandler {
             );
         }
 
-        // (2) Best-effort email to the org's owners/admins. Throwing here lets
-        // the worker retry the whole job; the unique above keeps that retry from
-        // duplicating the Notification.
-        const recipients = await this.ownerAdminEmails(lead.organizationId);
+        // (2) Best-effort email to whoever may read leads and has email on
+        // for it. Throwing here lets the worker retry the whole job; the
+        // unique above keeps that retry from duplicating the Notification.
+        const recipients = await emailedAbout(lead.organizationId, "enquiry");
         const edition = await editionOf(lead.organizationId);
         const leadUrl = `${appBase(edition)}/leads/${lead.id}`;
         for (const to of recipients) {
@@ -152,18 +154,4 @@ export class EnquiryNotifyHandler {
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         return full || contact.company || contact.email || "someone";
     }
-
-    /** Distinct OWNER/ADMIN member emails for the org (the notify recipients). */
-    private async ownerAdminEmails(organizationId: string): Promise<string[]> {
-        const memberships = await prisma.membership.findMany({
-            where: { organizationId, role: { in: ["OWNER", "ADMIN"] } },
-            include: { user: true },
-        });
-        const emails = memberships
-            .map((m) => m.user.email)
-            .filter((e): e is string => Boolean(e));
-        return Array.from(new Set(emails));
-    }
-
-    /** The app dashboard origin the lead link points at. */
 }

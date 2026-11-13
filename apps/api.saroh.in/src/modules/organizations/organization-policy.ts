@@ -175,6 +175,12 @@ export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
     "billing:manage",
     // API keys (R7): a key acts for the business with no person behind it.
     "apikey:manage",
+    // Labels only (audit 2026-11-12 #14, #15): both are decided by the
+    // Owner role where they are used (`publish-approval.ts`,
+    // `closing-notice.ts`), and listed here so the Roles screen shows them
+    // as Owner only, never grantable or an extra.
+    "site:approval:override",
+    "org:export",
 ];
 
 const OWNER_ONLY: ReadonlySet<OrgAction> = new Set(OWNER_ONLY_ACTIONS);

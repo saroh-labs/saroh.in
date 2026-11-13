@@ -518,6 +518,51 @@ describe("delivering (U13)", () => {
         expect(await jobsOf(org.id)).toHaveLength(1);
     });
 
+    // To whoever holds webhook:manage, not the Owners only (audit
+    // 2026-11-12 #12): an Admin given it as an extra hears; one without
+    // doesn't.
+    it("tells everyone who may manage webhooks that an endpoint was switched off", async () => {
+        const mail = jest
+            .spyOn(email, "sendTeamAlertEmail")
+            .mockResolvedValue(undefined);
+        const { org, owner } = await business();
+        const given = await prisma.user.create({
+            data: { email: `${uniq("given")}@example.com` },
+        });
+        const plain = await prisma.user.create({
+            data: { email: `${uniq("plain")}@example.com` },
+        });
+        await prisma.membership.createMany({
+            data: [
+                {
+                    organizationId: org.id,
+                    userId: given.id,
+                    role: "ADMIN",
+                    extraActions: ["webhook:manage"],
+                },
+                { organizationId: org.id, userId: plain.id, role: "ADMIN" },
+            ],
+        });
+        const made = await service.create(owner, {
+            url: URL_,
+            events: ["customer.created"],
+        });
+        await prisma.webhookEndpoint.update({
+            where: { id: made.endpoint.id },
+            data: { failureStreak: AUTO_OFF_AFTER - 1 },
+        });
+        await newCustomer(org.id);
+        const [job] = await jobsOf(org.id);
+        answer = { status: 503, body: "" };
+        await run(job, job.maxAttempts);
+
+        const to = mail.mock.calls.map(([address]) => address);
+        mail.mockRestore();
+        expect(to).toHaveLength(2);
+        expect(to).toContain(given.email);
+        expect(to).not.toContain(plain.email);
+    });
+
     it("refuses at send a name that now resolves to a private address", async () => {
         const { org, owner } = await business();
         await service.create(owner, {

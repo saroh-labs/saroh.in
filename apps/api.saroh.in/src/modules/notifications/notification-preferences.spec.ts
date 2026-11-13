@@ -98,6 +98,9 @@ describe("reading your alerts", () => {
             "request",
             // Members (#1150), with Payments on.
             "member",
+            // Who reads leads and messages (audit 2026-11-12).
+            "enquiry",
+            "message",
         ]);
         expect(view.alerts.find((a) => a.key === "request")?.channels).toEqual({
             bell: true,
@@ -180,6 +183,8 @@ describe("reading your alerts", () => {
             "team",
             "request",
             "member",
+            "enquiry",
+            "message",
         ]);
         // Payments off: no Payment failed row and no Members row.
         modules(["PAYMENTS"]);
@@ -199,6 +204,8 @@ describe("reading your alerts", () => {
             "site",
             "request",
             "member",
+            "enquiry",
+            "message",
         ]);
         // Email on by default: the site changed, or didn't, unwatched.
         expect(view.alerts.find((a) => a.key === "site")?.channels).toEqual({

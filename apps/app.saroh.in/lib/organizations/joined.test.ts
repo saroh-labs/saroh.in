@@ -47,7 +47,7 @@ describe("joinedLine: which business, as what, and what that opens", () => {
             roleLabel: "Storefront team",
         });
         expect(line).toBe(
-            "You've joined Rye & Co. as Location team. You can work the orders at the locations you were added to.",
+            "You've joined Rye & Co. as Location team. You can take, change and move orders at the locations you were added to, and take their payments.",
         );
         expect(line).not.toMatch(/storefront/i);
     });

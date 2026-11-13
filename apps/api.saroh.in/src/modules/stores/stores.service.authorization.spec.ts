@@ -2,8 +2,8 @@
  * S1-006 store authorization — cross-tenant regression suite (the security core
  * of the ticket). Pure unit tests: Prisma and FeatureFlagService are mocked, so
  * nothing touches a database. Proves that org-A principals cannot reach org-B
- * stores on either path, that legacy StoreMembers staff survive the transition
- * via dual-read, that denied roles are rejected, and that with the flag OFF the
+ * stores on either path, that a storefront role never widens what the
+ * business role allows (owner, 12 Nov 2026, amending DEC-048), that denied roles are rejected, and that with the flag OFF the
  * behavior is exactly the pre-S1-006 legacy path (org membership is ignored).
  */
 import { ConflictException, NotFoundException } from "@nestjs/common";
@@ -146,8 +146,9 @@ describe("StoresService authorization (S1-006)", () => {
             );
         });
 
-        it("DUAL-READ: a legacy StoreMembers staffer (not migrated to Membership) keeps access", async () => {
-            // No org membership at all, but a legacy write-capable member row.
+        // The business role always wins over a storefront role (owner,
+        // 12 Nov 2026, amending DEC-048): no fallback to the roster.
+        it("a storefront Editor with no business role reaches nothing", async () => {
             setupStore({
                 organizationId: ORG_B,
                 membershipRole: null,
@@ -155,32 +156,49 @@ describe("StoresService authorization (S1-006)", () => {
             });
             await expect(
                 service().getForUser(STORE_B_ID, USER),
-            ).resolves.toMatchObject({ id: STORE_B_ID });
+            ).rejects.toBeInstanceOf(NotFoundException);
             await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
-                true,
+                false,
             );
         });
 
-        it("DUAL-READ: a legacy StoreOwner keeps write access without a Membership", async () => {
+        it("a storefront Editor whose business role lacks store:write is refused the write", async () => {
             setupStore({
                 organizationId: ORG_B,
-                membershipRole: null,
-                legacyOwner: true,
+                membershipRole: "storefront-team",
+                legacyMemberRole: "EDITOR",
             });
-            await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
-                true,
-            );
-        });
-
-        it("DUAL-READ: a legacy VIEWER member can read but not write", async () => {
-            setupStore({
-                organizationId: ORG_B,
-                membershipRole: null,
-                legacyMemberRole: "VIEWER",
+            organizationRoleFindUnique.mockResolvedValue({
+                actions: ["store:read", "order:stage"],
             });
             await expect(
                 service().getForUser(STORE_B_ID, USER),
             ).resolves.toMatchObject({ id: STORE_B_ID });
+            await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
+                false,
+            );
+        });
+
+        it("a storefront Editor whose business role holds store:write writes", async () => {
+            setupStore({
+                organizationId: ORG_B,
+                membershipRole: "storefront-team",
+                legacyMemberRole: "EDITOR",
+            });
+            organizationRoleFindUnique.mockResolvedValue({
+                actions: ["store:read", "store:write"],
+            });
+            await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
+                true,
+            );
+        });
+
+        it("a StoreOwner row is no write access without the business permission", async () => {
+            setupStore({
+                organizationId: ORG_B,
+                membershipRole: "MEMBER",
+                legacyOwner: true,
+            });
             await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
                 false,
             );
@@ -282,12 +300,12 @@ describe("StoresService authorization (S1-006)", () => {
         const orgPath = () => new StoresService(flags(true));
         const legacyPath = () => new StoresService(flags(false));
 
-        it("a storefront Manager without the payment permission changes orders but records no payment", async () => {
+        it("a storefront Manager without order or payment permissions changes no order (the business role wins)", async () => {
             storefrontManager(["store:read", "order:stage"]);
             const stores = orgPath();
             await expect(
                 stores.orderWriteOrganization(STORE_B_ID, USER, "order:edit"),
-            ).resolves.toEqual({ organizationId: ORG_B });
+            ).resolves.toBeNull();
             await expect(
                 stores.orderWriteOrganization(STORE_B_ID, USER, "order:edit", {
                     money: true,

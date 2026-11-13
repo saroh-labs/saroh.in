@@ -21,6 +21,7 @@ import { renderReviewInvitation } from "../communications/transactional";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { PRODUCT_LINES } from "../orders/order-line";
+import { orderLocationWhere } from "../orders/order-location";
 import { rendererBase } from "../sites/site-origin";
 import { contactReviewsWhere } from "./contact-reviews";
 import type { IneligibleReason } from "./eligibility";
@@ -370,8 +371,9 @@ export class ProductReviewsService {
     async invitationState(
         organizationId: string,
         orderId: string,
+        viewer?: Pick<OrganizationContext, "roleKey" | "userId">,
     ): Promise<InvitationState> {
-        const order = await this.loadOrder(organizationId, orderId);
+        const order = await this.loadOrder(organizationId, orderId, viewer);
         if (!order) throw new NotFoundException("Order not found");
         const inv = order.reviewInvitation;
         const reviewed = inv?._count.reviews ?? 0;
@@ -668,9 +670,18 @@ export class ProductReviewsService {
         return review;
     }
 
-    private loadOrder(organizationId: string, orderId: string) {
+    private loadOrder(
+        organizationId: string,
+        orderId: string,
+        viewer?: Pick<OrganizationContext, "roleKey" | "userId">,
+    ) {
         return prisma.order.findFirst({
-            where: { id: orderId, organizationId },
+            where: {
+                id: orderId,
+                organizationId,
+                // A location's team: its own storefronts' (DEC-074).
+                ...(viewer ? orderLocationWhere(viewer) : {}),
+            },
             select: {
                 id: true,
                 organizationId: true,

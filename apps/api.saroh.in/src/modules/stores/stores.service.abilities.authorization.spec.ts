@@ -3,14 +3,18 @@
  * what the guards decide (UX audit, 10 Oct 2026). Prisma and the flag are
  * doubles, so nothing touches a database.
  *
- * Two things are pinned. The matrix: a location Admin, Manager or Editor
- * edits the location and takes and changes its orders, never the money
- * (DEC-106); a Viewer does none of it. And the agreement: for every kind
+ * Two things are pinned. The matrix: on the organization path the business
+ * role always wins (owner, 12 Nov 2026, amending DEC-048), so a location
+ * role adds nothing to it; on the older per-location path a location Admin,
+ * Manager or Editor edits the location and takes and changes its orders,
+ * never the money (DEC-106), and a Viewer does none of it. And the agreement: for every kind
  * of caller, each answer equals the guard's own function called the way
  * the write calls it, so the app can never be told something the write
  * would refuse.
  */
 jest.mock("@saroh/database", () => ({
+    // The role a location's team holds (DEC-074), narrowed by its key.
+    STOREFRONT_TEAM_ROLE_KEY: "storefront-team",
     prisma: {
         store: { findFirst: jest.fn(), findUnique: jest.fn() },
         membership: { findUnique: jest.fn() },
@@ -50,6 +54,17 @@ const STOREFRONT_TEAM_ACTIONS = [
     "store:read",
     "product-review:read",
     "order:stage",
+] as const;
+
+/**
+ * The same role as a business holds it from 13 Nov 2026 (owner): taking and
+ * changing orders and taking their payments too, narrowed to the locations
+ * the person works on (DEC-074, `orders/order-location.ts`).
+ */
+const TAKES_ORDERS = [
+    ...STOREFRONT_TEAM_ACTIONS,
+    "order:create",
+    "order:edit",
 ] as const;
 
 const STORE = "store_1";
@@ -123,14 +138,26 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("StoresService.abilities, on the organization path", () => {
     it.each(["ADMIN", "MANAGER", "EDITOR"] as const)(
-        "a location %s edits the location and takes and changes its orders, never the money",
+        "a location %s whose business role writes nothing does none of it (the business role wins)",
         async (role) => {
             given(onLocation(role));
             await expect(service(true).abilities(STORE, USER)).resolves.toEqual(
-                NO_MONEY,
+                NOTHING,
             );
         },
     );
+
+    it("a location Editor whose business role holds store:write edits the location", async () => {
+        given({
+            business: "editor",
+            stored: [...STOREFRONT_TEAM_ACTIONS, "store:write"],
+            location: "EDITOR",
+        });
+        await expect(service(true).abilities(STORE, USER)).resolves.toEqual({
+            ...NOTHING,
+            edit: true,
+        });
+    });
 
     it("a location Viewer does none of it", async () => {
         given(onLocation("VIEWER"));
@@ -175,21 +202,45 @@ describe("StoresService.abilities, on the organization path", () => {
         });
     });
 
-    it("a location Editor whose business role carries order:create takes the money too", async () => {
+    it("a location Editor whose business role carries order:create takes orders and the money, and edits nothing", async () => {
         given({
             business: "counter",
             stored: [...STOREFRONT_TEAM_ACTIONS, "order:create"],
             location: "EDITOR",
         });
+        await expect(service(true).abilities(STORE, USER)).resolves.toEqual({
+            edit: false,
+            takeOrders: true,
+            takePayments: true,
+            changeOrders: false,
+        });
+    });
+
+    it("Storefront team with order-taking takes and changes orders, and their payments, where they work", async () => {
+        given({
+            business: "storefront-team",
+            stored: TAKES_ORDERS,
+            location: "VIEWER",
+        });
+        await expect(service(true).abilities(STORE, USER)).resolves.toEqual({
+            edit: false,
+            takeOrders: true,
+            takePayments: true,
+            changeOrders: true,
+        });
+    });
+
+    it("Storefront team with order-taking does nothing at a location they don't work on", async () => {
+        given({ business: "storefront-team", stored: TAKES_ORDERS });
         await expect(service(true).abilities(STORE, USER)).resolves.toEqual(
-            EVERYTHING,
+            NOTHING,
         );
     });
 
-    it("a StoreOwner row is no way to the money here", async () => {
+    it("a StoreOwner row is no way in here", async () => {
         given({ owner: true });
         await expect(service(true).abilities(STORE, USER)).resolves.toEqual(
-            NO_MONEY,
+            NOTHING,
         );
     });
 });
@@ -229,6 +280,18 @@ describe("StoresService.abilities never disagrees with the guards", () => {
         ["location editor", onLocation("EDITOR")],
         ["location viewer", onLocation("VIEWER")],
         ["on the team, off the location", onLocation(null)],
+        [
+            "taking orders at the location",
+            {
+                business: "storefront-team",
+                stored: TAKES_ORDERS,
+                location: "EDITOR",
+            },
+        ],
+        [
+            "taking orders, off the location",
+            { business: "storefront-team", stored: TAKES_ORDERS },
+        ],
         ["store owner row", { owner: true }],
         [
             "made role with order:edit",

@@ -12,8 +12,13 @@ import { prisma } from "@saroh/database";
 
 import { appBase } from "../../common/app-url";
 import { sendStoreInvitationEmail } from "../../common/email";
+import type { OrgAction } from "../organizations/organization-actions";
 import { OrganizationContextService } from "../organizations/organization-context.service";
-import { allows, outOfReach } from "../organizations/organization-policy";
+import {
+    allows,
+    authorize,
+    outOfReach,
+} from "../organizations/organization-policy";
 import {
     joinTeamFromStorefront,
     STOREFRONT_TEAM_ROLE_KEY,
@@ -28,8 +33,12 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  * Store team management — owners (StoreOwner) and staff (StoreMembers), plus
  * email invitations (StoreInvitation). Like StoresService, every method takes
  * an explicit caller `userId` resolved from the session, never client input.
- * Management actions require the caller to be a StoreOwner; the store's
- * existence is never leaked to non-members (404, not 403).
+ * Every route asks the business permission Settings › Team asks
+ * (`member:read`, `member:role:update`, `member:remove`, `member:invite`),
+ * of the caller's resolved permissions in the store's business (audit
+ * 2026-11-12 #4): a `StoreOwner` row is neither needed nor enough. The
+ * store's existence is never leaked to someone outside the business, or
+ * who can't see its storefronts (404, not 403).
  *
  * One roster underneath (DEC-048, F16): a storefront's people are on the
  * business's team. Inviting someone to a storefront therefore also needs
@@ -55,27 +64,39 @@ export class MembersService {
         return Boolean(owner);
     }
 
-    /** True if the caller is an owner or a staff member of the store. */
-    private async hasAccess(storeId: string, userId: string): Promise<boolean> {
-        if (await this.isOwner(storeId, userId)) return true;
-        const member = await prisma.storeMembers.findUnique({
-            where: { storeId_userId: { storeId, userId } },
+    /**
+     * The caller's context in the store's business, or 404 when they aren't
+     * on its team (or can't open it now) or can't see its storefronts: a
+     * stranger learns nothing about the store.
+     */
+    private async teamContext(storeId: string, userId: string) {
+        const store = await prisma.store.findUnique({
+            where: { id: storeId },
+            select: { organizationId: true },
         });
-        return Boolean(member);
-    }
-
-    /** Throw 404 (no existence leak) unless the caller owns the store. */
-    private async requireOwner(storeId: string, userId: string): Promise<void> {
-        if (!(await this.isOwner(storeId, userId))) {
+        const ctx = store?.organizationId
+            ? await this.contexts
+                  .resolve(userId, store.organizationId)
+                  .catch(() => null)
+            : null;
+        if (!ctx || !allows(ctx, "store:read")) {
             throw new NotFoundException("Location not found");
         }
+        return ctx;
+    }
+
+    /** 404 as {@link teamContext}, then 403 unless they hold `action`. */
+    private async requirePower(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<void> {
+        authorize(await this.teamContext(storeId, userId), action);
     }
 
     /** The team: owners + staff, each with their user's email/name. */
     async listMembers(storeId: string, callerId: string) {
-        if (!(await this.hasAccess(storeId, callerId))) {
-            throw new NotFoundException("Location not found");
-        }
+        await this.requirePower(storeId, callerId, "member:read");
 
         const [owners, members] = await Promise.all([
             prisma.storeOwner.findMany({
@@ -106,14 +127,14 @@ export class MembersService {
         ];
     }
 
-    /** Change a staff member's role. Owner only; owners aren't editable here. */
+    /** Change a staff member's role (`member:role:update`); owners aren't editable here. */
     async updateMemberRole(
         storeId: string,
         callerId: string,
         targetUserId: string,
         role: MemberRole,
     ) {
-        await this.requireOwner(storeId, callerId);
+        await this.requirePower(storeId, callerId, "member:role:update");
         const member = await prisma.storeMembers.findUnique({
             where: { storeId_userId: { storeId, userId: targetUserId } },
         });
@@ -127,13 +148,13 @@ export class MembersService {
         return { userId: targetUserId, role };
     }
 
-    /** Remove a staff member. Owner only. */
+    /** Remove a staff member (`member:remove`). */
     async removeMember(
         storeId: string,
         callerId: string,
         targetUserId: string,
     ) {
-        await this.requireOwner(storeId, callerId);
+        await this.requirePower(storeId, callerId, "member:remove");
         const member = await prisma.storeMembers.findUnique({
             where: { storeId_userId: { storeId, userId: targetUserId } },
         });
@@ -144,14 +165,14 @@ export class MembersService {
         return { userId: targetUserId };
     }
 
-    /** Invite someone by email. Owner only. Sends the accept link by email. */
+    /** Invite someone by email (`member:invite`, within reach). Sends the accept link by email. */
     async createInvitation(
         storeId: string,
         callerId: string,
         email: string,
         role: MemberRole,
     ) {
-        await this.requireOwner(storeId, callerId);
+        await this.teamContext(storeId, callerId);
         await this.assertMayBringOntoTeam(storeId, callerId);
 
         // Already a member? (matched by their account email, if they have one)
@@ -219,9 +240,9 @@ export class MembersService {
         };
     }
 
-    /** Pending invitations for a store. Owner only. */
+    /** Pending invitations for a store (`member:invite`, as sending one). */
     async listInvitations(storeId: string, callerId: string) {
-        await this.requireOwner(storeId, callerId);
+        await this.requirePower(storeId, callerId, "member:invite");
         const invites = await prisma.storeInvitation.findMany({
             where: { storeId, status: "PENDING" },
             orderBy: { createdAt: "desc" },
@@ -237,13 +258,13 @@ export class MembersService {
         return invites;
     }
 
-    /** Revoke a pending invitation. Owner only. */
+    /** Revoke a pending invitation (`member:invite`, as sending one). */
     async revokeInvitation(
         storeId: string,
         callerId: string,
         invitationId: string,
     ) {
-        await this.requireOwner(storeId, callerId);
+        await this.requirePower(storeId, callerId, "member:invite");
         const invite = await prisma.storeInvitation.findFirst({
             where: { id: invitationId, storeId },
         });
@@ -371,7 +392,7 @@ export class MembersService {
      * team, so it needs what inviting to the team needs: `member:invite` in
      * the business, and a role within the inviter's reach (F19) — here the
      * "Storefront team" role as the business has it, which the owner may
-     * have widened. Checked after `requireOwner`, so a stranger still learns
+     * have widened. Checked after `teamContext`, so a stranger still learns
      * nothing about the store.
      */
     private async assertMayBringOntoTeam(

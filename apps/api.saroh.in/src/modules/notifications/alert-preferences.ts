@@ -32,6 +32,10 @@ export const ALERT_EVENTS = [
     // A member cancelled or paused their own membership, or stopped its
     // autopay at their bank (DEC-174 U19, #1150).
     "member",
+    // A new enquiry from a form, and a customer's message (audit
+    // 2026-11-12 #1–3): to whoever may read leads, or messages.
+    "enquiry",
+    "message",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -69,7 +73,11 @@ export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
             event === "site" ||
             event === "request" ||
             // Bookings with you (DEC-174, #1138): bell and email by default.
-            event === "mine"
+            event === "mine" ||
+            // Someone is waiting for an answer: emailed by default, as
+            // before these became rows (UX-042).
+            event === "enquiry" ||
+            event === "message"
         );
     }
     return false;
@@ -94,6 +102,10 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     mine: ["booking:read"],
     // Whoever reads memberships.
     member: ["subscription:read"],
+    // The notice and the email carry what was written: only to who may
+    // read it on its own screen.
+    enquiry: ["lead:read"],
+    message: ["message:read"],
 };
 
 /**
@@ -112,6 +124,9 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     mine: "APPOINTMENTS",
     // Memberships are part of Payments: their routes ask for it.
     member: "PAYMENTS",
+    // A form and a customer's account write these whichever modules are on.
+    enquiry: null,
+    message: null,
 };
 
 /** The inbox notice types each row covers. */
@@ -168,6 +183,8 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // U19 (#1150): a member's own cancel or pause, and autopay cancelled at
     // their bank. Nothing the team did themselves.
     member: ["member.cancelled", "member.paused", "member.autopay_off"],
+    enquiry: ["enquiry.new"],
+    message: ["message.new"],
 };
 
 /**
@@ -179,7 +196,7 @@ export const NOTICE_TYPE_READS: Readonly<Record<string, readonly OrgAction[]>> =
         "hours.rule-request": ["service:write"],
     };
 
-/** Which row an inbox notice type belongs to, or null (enquiries, reviews). */
+/** Which row an inbox notice type belongs to, or null (reviews). */
 export function alertEventOfType(type: string): AlertEvent | null {
     for (const event of ALERT_EVENTS) {
         if (ALERT_NOTIFICATION_TYPES[event].includes(type)) return event;

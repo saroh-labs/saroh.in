@@ -41,6 +41,7 @@ export function ordersAccess(
  * - `edit`: change it after it's placed, and make a new payment link
  *   (`order:edit`);
  * - `payLink`: make or replace a payment link — `create` or `edit`;
+ * - `record`: record a payment by hand — `edit`;
  * - `refund`: refund and cancel (`order:refund`);
  * - `export`: the CSV (`order:export`).
  *
@@ -50,13 +51,16 @@ export function ordersAccess(
  *
  * Only the role's permissions decide, never its name (DEC-098): a response
  * without them (cached or older) offers nothing. With no organization at
- * all the API decides, so nothing is withheld here.
+ * all the API decides, so nothing is withheld here. A location's team
+ * (DEC-074) holds these for its own locations' orders only; the API narrows
+ * them.
  */
 export interface OrderPowers {
     stage: boolean;
     create: boolean;
     edit: boolean;
     payLink: boolean;
+    record: boolean;
     refund: boolean;
     export: boolean;
 }
@@ -70,6 +74,7 @@ export function orderPowers(
             create: true,
             edit: true,
             payLink: true,
+            record: true,
             refund: true,
             export: true,
         };
@@ -83,6 +88,7 @@ export function orderPowers(
         create,
         edit,
         payLink: create || edit,
+        record: edit,
         refund: holds("order:refund") || holds("payment:manage"),
         export: holds("order:export") || write,
     };

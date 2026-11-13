@@ -12,7 +12,9 @@ import type {
 } from "@saroh/api-contract";
 import { prisma } from "@saroh/database";
 
+import type { OrganizationContext } from "../../common/types/organization-context";
 import { readableAnswers } from "../forms/enquiry-entries";
+import { orderLocationWhere } from "../orders/order-location";
 import {
     bookingOutcome,
     bookingStatus,
@@ -482,13 +484,18 @@ const orderView = (o: OrderRow): OrderView => ({
     updatedAt: o.updatedAt.toISOString(),
 });
 
+/** Who reads: a location's team reads its own storefronts' (DEC-074). */
+type OrderViewer = Pick<OrganizationContext, "roleKey" | "userId">;
+
 export async function ordersPage(
     organizationId: string,
     q: Paging & { status?: OrderView["status"] },
+    viewer: OrderViewer,
 ) {
     const rows = await prisma.order.findMany({
         where: {
             organizationId,
+            ...orderLocationWhere(viewer),
             ...(q.status ? { status: orderStatus.in(q.status) } : {}),
             ...afterCursor(q.cursor),
         },
@@ -498,9 +505,18 @@ export async function ordersPage(
     return pageOf(rows, q.limit, orderView);
 }
 
-export async function orderById(organizationId: string, id: string) {
+export async function orderById(
+    organizationId: string,
+    id: string,
+    /** Absent for the system (a webhook's delivery), never for a person. */
+    viewer?: OrderViewer,
+) {
     const row = await prisma.order.findFirst({
-        where: { id, organizationId },
+        where: {
+            id,
+            organizationId,
+            ...(viewer ? orderLocationWhere(viewer) : {}),
+        },
         select: ORDER,
     });
     return row ? orderView(row) : null;

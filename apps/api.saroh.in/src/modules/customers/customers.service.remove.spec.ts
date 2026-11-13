@@ -9,7 +9,11 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
@@ -19,11 +23,12 @@ import { CustomersService } from "./customers.service";
 
 const findFirst = prisma.customer.findFirst as jest.Mock;
 const remove = prisma.customer.delete as jest.Mock;
-const writableOrganization = jest.fn();
+const getForUser = jest.fn();
+const writeAllows = jest.fn();
 
 function service(): CustomersService {
     return new CustomersService(
-        { writableOrganization } as unknown as StoresService,
+        { getForUser, writeAllows } as unknown as StoresService,
         {} as ActivationEvents,
     );
 }
@@ -31,7 +36,11 @@ function service(): CustomersService {
 describe("CustomersService.remove", () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        writableOrganization.mockResolvedValue({ organizationId: "org_1" });
+        getForUser.mockResolvedValue({
+            id: "store_1",
+            organizationId: "org_1",
+        });
+        writeAllows.mockResolvedValue(true);
     });
 
     it("deletes a customer who has never ordered", async () => {
@@ -65,11 +74,36 @@ describe("CustomersService.remove", () => {
         expect(remove).not.toHaveBeenCalled();
     });
 
-    it("404s someone who may not write to the store", async () => {
-        writableOrganization.mockResolvedValue(null);
+    it("404s someone who can't see the store", async () => {
+        getForUser.mockRejectedValue(
+            new NotFoundException("Location not found"),
+        );
         await expect(
             service().remove("store_1", "cu_1", "user_1"),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(findFirst).not.toHaveBeenCalled();
+    });
+
+    // contact:write decides, never store:write (audit 2026-11-12 #6).
+    it("refuses someone whose business role lacks contact:write", async () => {
+        writeAllows.mockResolvedValue(false);
+        await expect(
+            service().remove("store_1", "cu_1", "user_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(writeAllows).toHaveBeenCalledWith(
+            "store_1",
+            "user_1",
+            "contact:write",
+        );
+        expect(findFirst).not.toHaveBeenCalled();
+    });
+
+    it("refuses an edit without contact:write too", async () => {
+        writeAllows.mockResolvedValue(false);
+        await expect(
+            service().update("store_1", "cu_1", "user_1", {
+                email: "a@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });

@@ -13,6 +13,7 @@ import { mintPayToken } from "../invoices/pay-token";
 import { assertPaymentsOn } from "../invoices/payments-on";
 import { allows, authorize } from "../organizations/organization-policy";
 import { payLinkProvider } from "../payments/pay-link-provider";
+import { assertOrdersAtOwnLocation } from "./order-location";
 import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
 
 /**
@@ -29,6 +30,9 @@ import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
  * writes the order's invoice through the usual reconciliation (DEC-023), so
  * a link never pays an invoice.
  */
+/** The step a pay link made on Order Detail leaves on the timeline. */
+export const PAY_LINK_MADE_NOTE = "Pay link made";
+
 @Injectable()
 export class OrderPayLinkService {
     /**
@@ -47,14 +51,34 @@ export class OrderPayLinkService {
             // The refusal names the power that replaces a link.
             authorize(ctx, "order:edit");
         }
+        // A location's team: its own storefronts' orders only (DEC-074).
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         await assertPaymentsOn(prisma, ctx.organizationId, "make a pay link");
         // A pay link charges online: the plan's too (403 MODULE_LOCKED).
         await assertPlanTakesOnlinePayment(ctx.organizationId);
         // A way to take money online: the business details first (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);
-        return prisma.$transaction((tx) =>
-            issueOrderPayLinkInTx(tx, ctx.organizationId, orderId, now),
-        );
+        return prisma.$transaction(async (tx) => {
+            const made = await issueOrderPayLinkInTx(
+                tx,
+                ctx.organizationId,
+                orderId,
+                now,
+            );
+            // Who made it, on the order's timeline (owner, 13 Nov 2026).
+            await tx.orderEvent.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    orderId,
+                    kind: "STATUS",
+                    actorUserId: ctx.userId,
+                    fromStatus: null,
+                    toStatus: null,
+                    note: PAY_LINK_MADE_NOTE,
+                },
+            });
+            return made;
+        });
     }
 }
 
