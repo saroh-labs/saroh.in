@@ -6695,3 +6695,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `SectionState.quiet`: Basics marks its problem quiet when only the MRP is wrong and the box hasn't been left (and Create hasn't been pressed). A quiet problem still blocks Create and Save; the header, the card and the dot don't say it until the box is left or Create is pressed. `useSection` passes the new field through (its comparison lists fields by name, so a new field must be added there too). Tests in `editor-fixes.test.tsx`.
 - **Rule:** in every editor, a problem with a field still being typed blocks but isn't said until that field is left or the action is pressed (`docs/patterns/frontend-forms.md`). A field added to a section's reported state goes through `useSection`'s destructure, its report and its dependency list.
 - **Category:** app · forms
+
+## Claude rejected list_templates after it gained two fields (13 Nov 2026)
+
+- **Symptom:** after #1382 deployed to development, calling `list_templates` from Claude failed: "Structured content does not match the tool's output schema … must NOT have additional properties", once for each template.
+- **Cause:** the MCP SDK lists each tool's output schema as Zod writes it, with `additionalProperties: false` on every object. Claude.ai keeps the tool list from when the connector connected and checks each answer against it, so `preview_url` and `picture_url`, added later, failed every call until the person reconnected. In production, every added field would have broken every connected Claude and ChatGPT user.
+- **Fix:** `src/modules/mcp/open-output.ts`: the registry lists each output schema without `additionalProperties: false`, at every depth. Answers are still checked against the contract's Zod schema. `open-output.spec.ts` checks both, and `mcp.controller.db.spec.ts` asserts that no tool in `tools/list` carries it.
+- **Rule:** a tool's answer can gain fields; it never loses one or changes one's type without a new tool name. Apps that hold an older tool list must keep working.
+- **Category:** api · mcp
