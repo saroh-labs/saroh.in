@@ -51,7 +51,7 @@ export const STOREFRONT_TEAM_ROLE_LABEL = "Storefront team";
  * the whole order with its money. The API narrows all of it to the
  * storefronts the person works on (`orders/order-location.ts`), payments at
  * the counter included; no refunds or cancels. Migrations `20261019120000_storefront_team_orders`
- * and `20270204000000_storefront_team_take_orders` gave them to every
+ * and `20270204120000_storefront_team_take_orders` gave them to every
  * business's role made before; the backfill below still treats a role
  * holding only part of this list as the untouched built-in.
  */

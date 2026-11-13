@@ -333,7 +333,7 @@ what the API allows.
   team works only its storefronts' orders.** Storefront team holds
   `order:stage`, `order:create` and `order:edit` (migrations
   `20261019120000_storefront_team_orders` and
-  `20270204000000_storefront_team_take_orders` added them to existing
+  `20270204120000_storefront_team_take_orders` added them to existing
   roles), so it reads its orders whole (`order:read` is implied). Every
   order lookup spreads `orderLocationWhere(ctx)` / `orderLocationSql`
   (`orders/order-location.ts`), keyed on the role, like `reviewerScope`:
