@@ -24,6 +24,16 @@ const instant = z
 
 const email = z.string().max(254);
 
+/**
+ * Customers' phone numbers and emails: sent when this is true. Left out,
+ * an outside AI app still gets them; Ask AI doesn't (plan 2026-11-13-001,
+ * U4), so a model sees contact details only for a question that needs them.
+ */
+export const includeContact = z
+    .boolean()
+    .optional()
+    .describe("True only when the person asks for phone numbers or emails.");
+
 export const bookingItem = z.object({
     booking_id: z.string(),
     service_id: z.string(),
@@ -47,6 +57,13 @@ export const listBookingsTool = {
             status: z.enum(BOOKING_STATUSES).optional(),
             service_id: toolId.optional(),
             customer_id: toolId.optional(),
+            staff_id: toolId.optional().describe("From list_staff."),
+            location_id: toolId
+                .optional()
+                .describe(
+                    "From list_staff: bookings with staff who work there.",
+                ),
+            include_contact: includeContact,
             ...listInput,
         })
         .strict(),
@@ -133,7 +150,17 @@ const oneOrder = z.object({
 
 export const listOrdersTool = {
     input: z
-        .object({ status: z.enum(ORDER_STATUSES).optional(), ...listInput })
+        .object({
+            status: z.enum(ORDER_STATUSES).optional(),
+            number: z
+                .string()
+                .max(40)
+                .optional()
+                .describe('The order number, like "ORD-014".'),
+            from: instant.optional().describe("Placed at or after."),
+            to: instant.optional().describe("Placed before."),
+            ...listInput,
+        })
         .strict(),
     output: z.object({ orders: z.array(orderItem), next_cursor: nextCursor }),
 };
@@ -191,7 +218,8 @@ export const updateOrderStatusTool = {
 export const customerItem = z.object({
     customer_id: z.string(),
     name: untrustedText.nullable(),
-    email: z.string(),
+    /** Null when contact details weren't asked for. */
+    email: z.string().nullable(),
     phone: z.string().nullable(),
     company: untrustedText.nullable(),
 });
@@ -207,6 +235,7 @@ export const listCustomersTool = {
                 .max(100)
                 .optional()
                 .describe("Part of a name, email, phone or company."),
+            include_contact: includeContact,
             ...listInput,
         })
         .strict(),

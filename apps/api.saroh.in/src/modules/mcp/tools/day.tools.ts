@@ -77,6 +77,13 @@ const quoted = (s: string | null) => (s ? JSON.stringify(s) : "someone");
 /** A customer typed their own name, so it is labelled like any outside text. */
 const customer = (s: string | null) =>
     s ? quoteUntrusted("Customer", s) : "someone";
+/**
+ * Whether a result carries customers' phone numbers and emails: when the
+ * call asks, else for an outside AI app but not for Ask AI (plan
+ * 2026-11-13-001, U4), whose model sees them only for a question that needs them.
+ */
+export const withContact = (call: McpCall, asked: boolean | undefined) =>
+    asked ?? call.connection.kind !== "app";
 const gone = (what: string, id: string, list: string) =>
     new ToolError(
         `There is no ${what} ${id} in this business.`,
@@ -85,7 +92,11 @@ const gone = (what: string, id: string, list: string) =>
 
 // ── Bookings ────────────────────────────────────────────────────────────────
 
-async function bookingItems(organizationId: string, views: BookingView[]) {
+async function bookingItems(
+    organizationId: string,
+    views: BookingView[],
+    contact = true,
+) {
     const services = await prisma.service.findMany({
         where: {
             organizationId,
@@ -103,8 +114,8 @@ async function bookingItems(organizationId: string, views: BookingView[]) {
         status: b.status,
         customer_id: b.contactId,
         customer_name: b.booker.name ? untrusted(b.booker.name) : null,
-        customer_email: b.booker.email,
-        customer_phone: b.booker.phone,
+        customer_email: contact ? b.booker.email : null,
+        customer_phone: contact ? b.booker.phone : null,
         staff_id: b.staffId,
     }));
 }
@@ -169,13 +180,13 @@ function orderText(
 const nameOf = (c: CustomerView) =>
     [c.firstName, c.lastName].filter(Boolean).join(" ") || null;
 /** Name, company and address are typed by the customer or for them: labelled. */
-const customerItem = (c: CustomerView) => {
+const customerItem = (c: CustomerView, contact = true) => {
     const name = nameOf(c);
     return {
         customer_id: c.id,
         name: name ? untrusted(name) : null,
-        email: c.email,
-        phone: c.phone,
+        email: contact ? c.email : null,
+        phone: contact ? c.phone : null,
         company: c.company ? untrusted(c.company) : null,
     };
 };
@@ -188,8 +199,10 @@ const customerDetail = (c: CustomerView) => {
         address: address ? untrusted(address) : null,
     };
 };
-const customerLine = (c: CustomerView) =>
-    `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`;
+const customerLine = (c: CustomerView, contact = true) =>
+    contact
+        ? `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`
+        : `${customer(nameOf(c))} (customer_id ${c.id})`;
 
 // ── Enquiries ───────────────────────────────────────────────────────────────
 
@@ -308,17 +321,20 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "list_bookings",
             title: "List bookings",
             description:
-                "Use this when the person asks who is booked, for a day, a service or a customer. Example: \"what's on tomorrow?\" → from and to around tomorrow, with the business's offset. Not for open times; use find_free_slots.",
+                "Use this when the person asks who is booked, for a day, a service, a customer, a staff member or a location (staff_id, location_id from list_staff). Example: \"what's on tomorrow?\" → from and to around tomorrow, with the business's offset. Not for open times; use find_free_slots.",
             contract: listBookingsTool,
             capability: "booking:read",
             hints: READ_ONLY,
-            async run(input, { ctx }: McpCall) {
+            async run(input, call: McpCall) {
+                const { ctx } = call;
                 const page = await bookingsPage(ctx.organizationId, {
                     limit: input.limit ?? PAGE,
                     cursor: input.cursor,
                     status: input.status,
                     serviceId: input.service_id,
                     contactId: input.customer_id,
+                    staffId: input.staff_id,
+                    storeId: input.location_id,
                     from: input.from
                         ? instantOf(input.from, "from")
                         : undefined,
@@ -327,6 +343,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                 const bookings = await bookingItems(
                     ctx.organizationId,
                     page.data,
+                    withContact(call, input.include_contact),
                 );
                 return {
                     text: [
@@ -346,10 +363,13 @@ export function dayTools(d: DayDeps): McpTool[] {
             contract: getBookingTool,
             capability: "booking:read",
             hints: READ_ONLY,
-            async run({ booking_id }, { ctx }: McpCall) {
-                const [booking] = await bookingItems(ctx.organizationId, [
-                    await d.bookingsV1.get(ctx, booking_id),
-                ]);
+            async run({ booking_id }, call: McpCall) {
+                const { ctx } = call;
+                const [booking] = await bookingItems(
+                    ctx.organizationId,
+                    [await d.bookingsV1.get(ctx, booking_id)],
+                    withContact(call, undefined),
+                );
                 return { text: `${bookingLine(booking)}.`, data: { booking } };
             },
         }),
@@ -512,7 +532,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "list_orders",
             title: "List orders",
             description:
-                'Use this when the person asks about orders: newest first with number, total, payment and step. Example: status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
+                'Use this when the person asks about orders: newest first with number, total, payment and step; filter by number, status or when placed (from, to). Example: number "ORD-014", or status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
             contract: listOrdersTool,
             capability: "order:read",
             hints: READ_ONLY,
@@ -523,6 +543,11 @@ export function dayTools(d: DayDeps): McpTool[] {
                         limit: input.limit ?? PAGE,
                         cursor: input.cursor,
                         status: input.status,
+                        number: input.number,
+                        from: input.from
+                            ? instantOf(input.from, "from")
+                            : undefined,
+                        to: input.to ? instantOf(input.to, "to") : undefined,
                     },
                     ctx,
                 );
@@ -657,20 +682,25 @@ export function dayTools(d: DayDeps): McpTool[] {
             contract: listCustomersTool,
             capability: "contact:read",
             hints: READ_ONLY,
-            async run(input, { ctx }: McpCall) {
-                const page = await customersPage(ctx.organizationId, {
+            async run(input, call: McpCall) {
+                const page = await customersPage(call.ctx.organizationId, {
                     limit: input.limit ?? PAGE,
                     cursor: input.cursor,
                     query: input.query,
                 });
+                const contact = withContact(call, input.include_contact);
                 return {
                     text: [
                         `${page.data.length} customers.`,
-                        ...page.data.map((c) => `- ${customerLine(c)}`),
+                        ...page.data.map(
+                            (c) => `- ${customerLine(c, contact)}`,
+                        ),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
-                        customers: page.data.map(customerItem),
+                        customers: page.data.map((c) =>
+                            customerItem(c, contact),
+                        ),
                         next_cursor: page.nextCursor,
                     },
                 };

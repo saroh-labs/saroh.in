@@ -26,7 +26,7 @@ export interface AiToolbox {
 
 export const AI_TOOLBOX = Symbol("AI_TOOLBOX");
 
-/** Until U4: no tools, so a turn is answer-only. */
+/** No tools: an answer-only turn (specs; the module binds the bridge). */
 export const NO_TOOLS: AiToolbox = {
     definitions: () => [],
     run: () =>

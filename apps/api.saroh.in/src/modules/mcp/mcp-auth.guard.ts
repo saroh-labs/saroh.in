@@ -57,6 +57,24 @@ export type McpConnection =
           businesses: [string];
           /** The key's scope ∩ its creator's live role, never for AI. */
           context: OrganizationContext;
+      }
+    | {
+          /**
+           * Saroh's own agent (Ask AI, plan 2026-11-13-001 U4), run
+           * in-process by `ai/tools/tool-bridge.ts` only: this guard never
+           * builds one and {@link McpAuthGuard.contextIn} refuses one. It
+           * covers exactly the business the person has open; its actions
+           * are their live role's, minus {@link NEVER_FOR_AI}, read again
+           * on every call. `API_MCP` doesn't apply (`ASK_AI` does).
+           */
+          kind: "app";
+          /** `<agent>:<userId>`: what activity rows and request ids key on. */
+          id: string;
+          /** The agent's key ("ask-ai"). */
+          agent: string;
+          clientName: string;
+          userId: string;
+          businesses: [string];
       };
 
 export interface McpRequest extends Request {
@@ -158,6 +176,8 @@ export class McpAuthGuard implements CanActivate {
         organizationId: string,
         host: string | undefined,
     ): Promise<OrganizationContext | null> {
+        // Never over HTTP: an agent's calls are built in-process.
+        if (connection.kind === "app") return null;
         if (!(connection.businesses as string[]).includes(organizationId)) {
             return null;
         }

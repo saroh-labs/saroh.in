@@ -372,6 +372,36 @@ export class McpToolRegistry {
         return server;
     }
 
+    /**
+     * A call made in-process (Ask AI's bridge), not by the MCP server: the
+     * SDK checks a remote call's input against the contract, so here the
+     * registry does, and refuses before the tool runs. `business` is
+     * dropped: the call's business is the one `target` names.
+     */
+    async callInProcess(tool: McpTool, input: unknown, target: McpCall) {
+        const own =
+            input && typeof input === "object" && !Array.isArray(input)
+                ? { ...(input as Record<string, unknown>) }
+                : null;
+        delete own?.business;
+        const parsed = tool.contract.input.safeParse(own);
+        if (!parsed.success) {
+            return toolError(
+                new ToolError(
+                    `That input doesn't fit ${tool.name}: ${parsed.error.issues
+                        .map(
+                            (i) =>
+                                `${i.path.join(".") || "input"}: ${i.message}`,
+                        )
+                        .join("; ")}.`,
+                    "Fix the input and call the tool again.",
+                ),
+                tool.name,
+            );
+        }
+        return this.call(tool, parsed.data, target, null);
+    }
+
     /** One tool call with every guardrail; never throws. */
     async call(
         tool: McpTool,

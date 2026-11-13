@@ -362,6 +362,9 @@ export async function bookingsPage(
         status?: BookingView["status"];
         serviceId?: string;
         contactId?: string;
+        staffId?: string;
+        /** A storefront: bookings with staff who work there (`StoreMembers`). */
+        storeId?: string;
         from?: Date;
         to?: Date;
     },
@@ -372,6 +375,20 @@ export async function bookingsPage(
             ...(q.status ? { status: bookingStatus.in(q.status) } : {}),
             ...(q.serviceId ? { serviceId: q.serviceId } : {}),
             ...(q.contactId ? { contactId: q.contactId } : {}),
+            ...(q.staffId ? { staffId: q.staffId } : {}),
+            ...(q.storeId
+                ? {
+                      staff: {
+                          membership: {
+                              user: {
+                                  storeMembers: {
+                                      some: { storeId: q.storeId },
+                                  },
+                              },
+                          },
+                      },
+                  }
+                : {}),
             ...(q.from || q.to
                 ? {
                       startAt: {
@@ -489,14 +506,32 @@ type OrderViewer = Pick<OrganizationContext, "roleKey" | "userId">;
 
 export async function ordersPage(
     organizationId: string,
-    q: Paging & { status?: OrderView["status"] },
+    q: Paging & {
+        status?: OrderView["status"];
+        /** The order number ("ORD-014"), any case, a leading "#" ignored. */
+        number?: string;
+        from?: Date;
+        to?: Date;
+    },
     viewer: OrderViewer,
 ) {
+    const number = q.number?.trim().replace(/^#/, "");
     const rows = await prisma.order.findMany({
         where: {
             organizationId,
             ...orderLocationWhere(viewer),
             ...(q.status ? { status: orderStatus.in(q.status) } : {}),
+            ...(number
+                ? { orderId: { equals: number, mode: "insensitive" as const } }
+                : {}),
+            ...(q.from || q.to
+                ? {
+                      createdAt: {
+                          ...(q.from ? { gte: q.from } : {}),
+                          ...(q.to ? { lt: q.to } : {}),
+                      },
+                  }
+                : {}),
             ...afterCursor(q.cursor),
         },
         ...paged(q),

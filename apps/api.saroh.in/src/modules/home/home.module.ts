@@ -31,5 +31,7 @@ import { HomeService } from "./home.service";
     ],
     controllers: [HomeController],
     providers: [HomeService, HomeInlineService, OrganizationGuard],
+    // The MCP summary tools read Home as the person (get_needs_attention).
+    exports: [HomeService],
 })
 export class HomeModule {}

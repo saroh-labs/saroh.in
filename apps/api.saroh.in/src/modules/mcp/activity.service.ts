@@ -32,6 +32,13 @@ export interface ActivityEntry {
     summary: string;
 }
 
+/** The audit target an AI write is filed under, per connection kind. */
+const TARGET_TYPE: Record<McpConnection["kind"], string> = {
+    oauth: "ai_connection",
+    key: "api_key",
+    app: "ai_agent",
+};
+
 /** A site write's activity target; a restore point's session reads it. */
 export const siteTarget = (siteId: string) => `site:${siteId}`;
 
@@ -57,7 +64,7 @@ export class McpActivityService {
             await prisma.mcpActivity.create({
                 data: {
                     organizationId: ctx.organizationId,
-                    userId: connection.kind === "oauth" ? ctx.userId : null,
+                    userId: connection.kind === "key" ? null : ctx.userId,
                     apiKeyId: connection.kind === "key" ? connection.id : null,
                     connectionId: connection.id,
                     clientName: connection.clientName ?? "AI app",
@@ -76,8 +83,10 @@ export class McpActivityService {
             actorUserId: ctx.userId,
             actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
-            targetType: connection.kind === "key" ? "api_key" : "ai_connection",
-            targetId: connection.id,
+            targetType: TARGET_TYPE[connection.kind],
+            // An agent is named by its key; a connection by its grant or key.
+            targetId:
+                connection.kind === "app" ? connection.agent : connection.id,
             outcome: AuditOutcome.Success,
             metadata: {
                 tool: entry.tool,

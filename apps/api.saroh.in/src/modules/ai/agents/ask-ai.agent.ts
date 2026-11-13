@@ -4,15 +4,19 @@ import { HOUSE_RULES } from "./house-rules";
 
 /**
  * Ask AI (DEC-220): answers a business's questions about its own data from
- * Saroh's read tools, as the person asking. The tools are wired in U4 and
- * the draft tools in U5; the order here is the order sent, and changing it
+ * Saroh's read tools, as the person asking (U4's tool bridge); the draft
+ * tools come in U5. The order here is the order sent, and changing it
  * changes the agent's version.
  */
 export const ASK_AI_TOOLS = [
+    "get_business_summary",
+    "get_needs_attention",
+    "get_whats_selling",
     "list_bookings",
     "get_booking",
     "find_free_slots",
     "get_hours",
+    "list_staff",
     "list_services",
     "list_products",
     "get_product",
@@ -20,6 +24,7 @@ export const ASK_AI_TOOLS = [
     "get_order",
     "list_customers",
     "get_customer",
+    "find_lapsed_customers",
     "list_enquiries",
     "get_enquiry",
 ] as const;
@@ -32,6 +37,31 @@ const words = (en: string, hinglish: string, hi: string): StatusWords => ({
 });
 
 const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
+    get_business_summary: words(
+        "Adding up how the business is doing…",
+        "Business ka haal jod rahe hain…",
+        "कारोबार का हाल जोड़ रहे हैं…",
+    ),
+    get_needs_attention: words(
+        "Checking what needs doing…",
+        "Kya karna baaki hai, dekh rahe hain…",
+        "क्या करना बाकी है, देख रहे हैं…",
+    ),
+    get_whats_selling: words(
+        "Seeing what sells…",
+        "Kya bik raha hai, dekh rahe hain…",
+        "क्या बिक रहा है, देख रहे हैं…",
+    ),
+    list_staff: words(
+        "Reading your team…",
+        "Team dekh rahe hain…",
+        "टीम देख रहे हैं…",
+    ),
+    find_lapsed_customers: words(
+        "Finding customers who haven't been back…",
+        "Jo customers wapas nahi aaye, unhe dhoondh rahe hain…",
+        "जो ग्राहक वापस नहीं आए, उन्हें ढूँढ रहे हैं…",
+    ),
     list_bookings: words(
         "Reading your bookings…",
         "Bookings dekh rahe hain…",
@@ -99,9 +129,11 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
     ),
 };
 
-const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: bookings, free times, opening hours, services, products, orders, customers and enquiries. Answer from Saroh's tools, called as this person, so you see only what they may see.
+const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries. Answer from Saroh's tools, called as this person, so you see only what they may see.
 
-- Call the fewest tools that answer the question; use their filters (dates, status, search) rather than reading everything.
+- Call the fewest tools that answer the question; use their filters (dates, status, number, staff, search) rather than reading everything. For "how are we doing" or "what needs doing", start with the summary tools.
+- Ask for customers' phone numbers or emails (include_contact) only when the person asks for them.
+- When a tool says a figure is not shown for this person's role, say so plainly; never guess it.
 - Lead with the answer in one or two sentences, then the few details that matter. Short lists, no tables unless asked.
 - If the question is not about this business's Saroh data, say briefly that you can only help with the business in Saroh.`;
 
