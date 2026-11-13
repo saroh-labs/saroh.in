@@ -9,7 +9,6 @@ import {
 } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
-import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
@@ -17,6 +16,7 @@ import {
     countUsage,
     METER_WORDS,
     meteredKeyOf,
+    meterWindow,
     quietAtOne,
     windowKey,
 } from "./metering";
@@ -49,12 +49,9 @@ export function limitNoticeKey(
     return `plan-limit:${moduleId}:${level}:${limit}:${window}`;
 }
 
-/** "1 Nov": the day the business's next month starts, in its zone. */
-export function nextMonthStarts(now: Date, zone: string): string {
-    return DateTime.fromJSDate(now, { zone })
-        .startOf("month")
-        .plus({ months: 1 })
-        .toFormat("d LLL");
+/** "1 Nov": the day a count's window ends (it starts again), in `zone`. */
+export function resetDay(end: Date, zone: string): string {
+    return DateTime.fromJSDate(end, { zone }).toFormat("d LLL");
 }
 
 /** What past a cap says, by key: what kept working. */
@@ -150,7 +147,8 @@ function parsePayload(payload: unknown): PlanLimitNoticePayload | null {
  *
  * Re-read, then decide: with the kill switch off since, the row unlimited
  * or off now, or the count back under 80%, it says nothing. Once per row,
- * level, limit and window (the month, for a monthly limit), claimed as a
+ * level, limit and window (the billing period's month or the calendar month,
+ * for a monthly limit), claimed as a
  * `CustomerNotice` before the inbox row is written, so a redelivered job or
  * a second write crossing the same line tells the business once. The inbox
  * is the owners' and admins' (`notification:read`).
@@ -191,17 +189,18 @@ export class PlanLimitNoticeHandler {
             return skip("one_included");
         }
 
-        const zone = await businessTimezone(prisma, p.organizationId);
+        const window = await meterWindow(prisma, p.organizationId, now);
         const eventKey = limitNoticeKey(
             p.moduleId,
             level,
             limit,
-            windowKey(row.per, now, zone),
+            windowKey(row.per, window),
         );
-        // A limit that names its own way out says when its month restarts.
+        // A limit that names its own way out says when its count restarts:
+        // the billing period's next month, or the calendar's (DEC-219).
         const resetsOn =
             METER_WORDS[key].action && row.per === "month"
-                ? nextMonthStarts(now, zone)
+                ? resetDay(window.end, window.zone)
                 : undefined;
         // Its way out is closed when the plan has no room for it (Saroh's
         // emails: connecting its own email is one more `integrations`

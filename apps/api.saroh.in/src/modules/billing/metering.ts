@@ -25,11 +25,14 @@
  * not counted here: it has no total across the business, so it is no meter
  * (`item-limits.ts`).
  *
- * A month is the business's own (its zone, `businessTimezone`): the 1st
- * starts at midnight there, not in UTC. Visits are the exception: the
- * rollup (`AnalyticsDailyAggregate`) buckets by UTC day, so a month of
- * visits is the UTC days dated in the business's month — off by the zone's
- * offset at each end, and behind by whatever the rollup hasn't reached yet.
+ * A monthly limit counts over the business's billing period when it is on a
+ * paid plan, and over its calendar month when it has none (DEC-219,
+ * {@link meterWindow}): the 1st starts at midnight in its zone
+ * (`businessTimezone`), not in UTC. Visits are the exception: the rollup
+ * (`AnalyticsDailyAggregate`) buckets by UTC day, so a window of visits is
+ * the UTC days from the date it starts on in the business's zone — off by
+ * the zone's offset at each end, and behind by whatever the rollup hasn't
+ * reached yet.
  *
  * Storage is in decimal gigabytes ({@link BYTES_PER_GB}, as a disk is sold),
  * rounded UP to the hundredth so a business with anything stored never reads
@@ -37,7 +40,12 @@
  */
 import type { Prisma } from "@saroh/database";
 import type { LimitPeriod, LimitWords } from "@saroh/pricing-catalog";
-import { LIMIT_WORDS, MODULE_MAP, quietAtLimit } from "@saroh/pricing-catalog";
+import {
+    addMonthsUtc,
+    LIMIT_WORDS,
+    MODULE_MAP,
+    quietAtLimit,
+} from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
@@ -121,26 +129,108 @@ export function meteredKeyOf(moduleId: string): MeteredLimitKey | null {
     return meteredModules().get(moduleId) ?? null;
 }
 
-/** The month a count runs over, in the business's zone. */
+/** The stretch a monthly count runs over: a billing period or a month. */
 export interface MeterWindow {
-    /** The first instant of the month there, in UTC. */
+    /** Its first instant, in UTC. */
     start: Date;
-    /** "2026-10": names the month in a notice's once-only key. */
+    /** The first instant of the next one: when the count starts again. */
+    end: Date;
+    /**
+     * Names it in a notice's once-only key: "2026-10" for a calendar month,
+     * the start's date ("2026-11-14") for a billing period.
+     */
     key: string;
 }
 
 /** The calendar month `now` falls in, in `zone`. */
 export function monthWindow(now: Date, zone: string): MeterWindow {
     const local = DateTime.fromJSDate(now, { zone }).startOf("month");
-    return { start: local.toUTC().toJSDate(), key: local.toFormat("yyyy-MM") };
+    return {
+        start: local.toUTC().toJSDate(),
+        end: local.plus({ months: 1 }).toUTC().toJSDate(),
+        key: local.toFormat("yyyy-MM"),
+    };
 }
 
 /**
- * The window a row's notice is once per: its month for a monthly limit,
+ * The month of a billing period `now` falls in: whole months on from (or
+ * back to) `periodEnd`, its renewal day clamped at a short month's end.
+ * Every step is counted from `periodEnd` itself, so a 31st is never lost to
+ * a 28th. A late renewal (`now` past `periodEnd`) steps forward. A yearly
+ * plan's monthly limits still reset monthly, on its anniversary day.
+ */
+export function periodWindow(now: Date, periodEnd: Date): MeterWindow {
+    const at = (n: number) => addMonthsUtc(periodEnd, n);
+    let n =
+        (now.getUTCFullYear() - periodEnd.getUTCFullYear()) * 12 +
+        now.getUTCMonth() -
+        periodEnd.getUTCMonth();
+    while (at(n) > now) n--;
+    while (at(n + 1) <= now) n++;
+    const start = at(n);
+    return { start, end: at(n + 1), key: start.toISOString().slice(0, 10) };
+}
+
+/**
+ * The window a business's monthly limits count over now (DEC-219): its
+ * billing period's month on a paid plan with one, else the calendar month
+ * in its zone (Free, no subscription, a cancelled one).
+ */
+export function windowFor(
+    now: Date,
+    zone: string,
+    periodEnd: Date | null,
+): MeterWindow {
+    return periodEnd ? periodWindow(now, periodEnd) : monthWindow(now, zone);
+}
+
+/**
+ * The billing period's end that sets a business's window, or null with no
+ * paid period: a subscription that isn't cancelled, on a plan with a price
+ * (`PAYING_WHERE`'s rule, trials and a payment due included), with a period
+ * end.
+ */
+export function paidPeriodEnd(
+    sub: {
+        status: string;
+        currentPeriodEnd: Date | null;
+        plan: { priceCents: number };
+    } | null,
+): Date | null {
+    if (!sub || sub.status === "CANCELLED" || sub.plan.priceCents <= 0)
+        return null;
+    return sub.currentPeriodEnd;
+}
+
+/** {@link MeterWindow} for one business, read from its subscription. */
+export async function meterWindow(
+    db: MeterDb,
+    organizationId: string,
+    now: Date,
+): Promise<MeterWindow & { zone: string }> {
+    const [zone, sub] = await Promise.all([
+        businessTimezone(db, organizationId),
+        db.subscription.findUnique({
+            where: { organizationId },
+            select: PERIOD_SELECT,
+        }),
+    ]);
+    return { ...windowFor(now, zone, paidPeriodEnd(sub)), zone };
+}
+
+/** What {@link paidPeriodEnd} reads from a subscription. */
+export const PERIOD_SELECT = {
+    status: true,
+    currentPeriodEnd: true,
+    plan: { select: { priceCents: true } },
+} as const;
+
+/**
+ * The window a row's notice is once per: its window for a monthly limit,
  * else "all" — the same total limit warns once until it changes.
  */
-export function windowKey(per: LimitPeriod, now: Date, zone: string): string {
-    return per === "month" ? monthWindow(now, zone).key : "all";
+export function windowKey(per: LimitPeriod, window: MeterWindow): string {
+    return per === "month" ? window.key : "all";
 }
 
 /** The tables the counts read: the request's client, or a transaction. */
@@ -162,15 +252,17 @@ export type MeterDb = Pick<
     | "site"
     | "media"
     | "analyticsDailyAggregate"
+    | "subscription"
 >;
 
 /**
- * The first UTC day bucket of the business's month: the calendar date its
- * month starts on there, as `AnalyticsDailyAggregate.date` stores a day.
+ * The UTC day bucket a window starting at `start` counts visits from: the
+ * date it starts on in the business's zone, as `AnalyticsDailyAggregate.date`
+ * stores a day.
  */
-export function monthFirstDay(now: Date, zone: string): Date {
-    const local = DateTime.fromJSDate(now, { zone }).startOf("month");
-    return new Date(Date.UTC(local.year, local.month - 1, 1));
+export function firstDayOf(start: Date, zone: string): Date {
+    const local = DateTime.fromJSDate(start, { zone });
+    return new Date(Date.UTC(local.year, local.month - 1, local.day));
 }
 
 /**
@@ -260,8 +352,8 @@ export function standingBookings(since: Date): Prisma.BookingWhereInput {
 }
 
 /**
- * How much of one limit a business uses now. Monthly keys count from the
- * start of this month in the business's zone.
+ * How much of one limit a business uses now. Monthly keys count over
+ * {@link meterWindow}.
  */
 export async function countUsage(
     db: MeterDb,
@@ -275,8 +367,7 @@ export async function countUsage(
                 where: { organizationId, status: { not: "ARCHIVED" } },
             });
         case "ordersPerMonth": {
-            const zone = await businessTimezone(db, organizationId);
-            const { start } = monthWindow(now, zone);
+            const { start } = await meterWindow(db, organizationId, now);
             // Through the storefront: an order from before organizationId
             // was written on orders still names its business there.
             return db.order.count({
@@ -284,8 +375,7 @@ export async function countUsage(
             });
         }
         case "bookingsPerMonth": {
-            const zone = await businessTimezone(db, organizationId);
-            const { start } = monthWindow(now, zone);
+            const { start } = await meterWindow(db, organizationId, now);
             return db.booking.count({
                 where: { organizationId, ...standingBookings(start) },
             });
@@ -342,11 +432,11 @@ export async function countUsage(
             return bytesToGb(Number(sum._sum.sizeBytes ?? 0));
         }
         case "visitsPerMonth": {
-            const zone = await businessTimezone(db, organizationId);
+            const { start, zone } = await meterWindow(db, organizationId, now);
             const sum = await db.analyticsDailyAggregate.aggregate({
                 where: {
                     organizationId,
-                    ...siteViewTotals(monthFirstDay(now, zone)),
+                    ...siteViewTotals(firstDayOf(start, zone)),
                 },
                 _sum: { count: true },
             });
