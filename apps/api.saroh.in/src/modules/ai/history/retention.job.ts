@@ -23,9 +23,9 @@ const BATCH = 500;
  * on legal hold keeps everything (DEC-122). Running it twice deletes
  * nothing more.
  *
- * Its drafts (U5, `AskAiDraft`) go with it: the foreign key cascades. What
- * else goes with a conversation, as it arrives: the text of a report about
- * an answer (U8, sealed, cleared here on the same day).
+ * Its drafts (U5, `AskAiDraft`) go with it: the foreign key cascades.
+ * Reports about an answer (U8, `AiReport`) keep their own copy and are
+ * deleted here 90 days after they were made, whatever their conversation.
  *
  * It reschedules itself (ADR-007), one waiting run at a time under the
  * advisory lock `job-chain:ai.retention`; the payload is empty. It throws
@@ -58,7 +58,7 @@ export class AiRetentionJob {
         }
     };
 
-    /** Deletes every conversation past its 90 days; returns how many. */
+    /** Deletes every conversation and report past its 90 days; returns how many. */
     async sweep(now: Date): Promise<number> {
         const before = new Date(now.getTime() - AI_RETENTION_MS);
         // Read once a run: there are few, and a hold placed mid-run is
@@ -93,7 +93,11 @@ export class AiRetentionJob {
             deleted += done.count;
             if (due.length < this.batch) break;
         }
-        return deleted;
+        // Reports: a few a day at most, so one delete.
+        const reports = await prisma.aiReport.deleteMany({
+            where: { createdAt: { lt: before }, ...notHeld },
+        });
+        return deleted + reports.count;
     }
 
     /** Leave one run waiting at `runAt`, unless one is. Never throws. */

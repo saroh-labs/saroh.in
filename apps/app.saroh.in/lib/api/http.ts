@@ -157,6 +157,42 @@ function saidBy(res: Response): Said | null {
 const NO_BODY = new Set([101, 204, 205, 304]);
 
 /**
+ * What every call to the API carries: the session cookie, where the call
+ * came from, and the business open, read from the `active_org` cookie
+ * against the person's memberships, never from the browser.
+ */
+async function apiHeaders(): Promise<Record<string, string>> {
+    const incoming = await headers();
+    const cookie = incoming.get("cookie") ?? "";
+    // The API refuses a write with no Origin (#50); say where this came from.
+    const origin = requestOrigin(incoming);
+    const activeOrgId = await getActiveOrgId();
+    return {
+        "content-type": "application/json",
+        cookie,
+        ...(origin ? { origin } : {}),
+        ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
+    };
+}
+
+/**
+ * A call whose answer is read as it arrives (Ask AI's server-sent events):
+ * {@link apiFetch}'s headers, but the response is handed back unread, so
+ * nothing is buffered, and there is no 20-second limit, so a long answer
+ * isn't cut. A network failure rejects; the caller says so.
+ */
+export async function apiStream(
+    path: string,
+    init: RequestInit,
+): Promise<Response> {
+    return fetch(`${API_URL}${path}`, {
+        ...init,
+        headers: { ...(await apiHeaders()), ...(init.headers ?? {}) },
+        cache: "no-store",
+    });
+}
+
+/**
  * A read is sent as it always was: a failure rejects, and the page's
  * failed state or boundary says so.
  *
@@ -172,20 +208,9 @@ export async function apiFetch(
     path: string,
     init?: RequestInit,
 ): Promise<Response> {
-    const incoming = await headers();
-    const cookie = incoming.get("cookie") ?? "";
-    // The API refuses a write with no Origin (#50); say where this came from.
-    const origin = requestOrigin(incoming);
-    const activeOrgId = await getActiveOrgId();
     const request: RequestInit = {
         ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(origin ? { origin } : {}),
-            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
-            ...(init?.headers ?? {}),
-        },
+        headers: { ...(await apiHeaders()), ...(init?.headers ?? {}) },
         cache: "no-store",
     };
     const method = (init?.method ?? "GET").toUpperCase();

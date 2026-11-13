@@ -113,6 +113,19 @@ describe("admin permission policy", () => {
         expect(AdminPermission.SearchPagesPublish).toBe("search-pages:publish");
     });
 
+    it("Ask AI: settings only for a Platform Owner; reports also for Support (DEC-220 U8)", () => {
+        const holders = (permission: AdminPermission) =>
+            Object.values(AdminRole)
+                .filter((role) => permissionsFor([role]).includes(permission))
+                .sort();
+        expect(holders(AdminPermission.AiSettingsWrite)).toEqual([
+            AdminRole.PlatformOwner,
+        ]);
+        expect(holders(AdminPermission.AiReportsRead)).toEqual(
+            [AdminRole.PlatformOwner, AdminRole.Support].sort(),
+        );
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,

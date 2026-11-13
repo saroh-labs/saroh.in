@@ -31,13 +31,14 @@ export function aiTextKey(): EncryptionKey {
 
 /**
  * Where a sealed text belongs. `rowId` is the message's id, the
- * conversation's for its title, or the draft's for a draft (U5).
+ * conversation's for its title, the draft's for a draft (U5), or the
+ * report's for a report (U8).
  */
 export interface AiSealBinding {
     organizationId: string;
     conversationId: string;
     rowId: string;
-    field: "body" | "title" | "draft";
+    field: "body" | "title" | "draft" | "report";
 }
 
 /** A message as sealed: its text, and the card's data when it has one. */
@@ -128,3 +129,21 @@ export const sealDraftBody = (content: unknown, b: Where) =>
 
 export const openDraftBody = <T>(sealed: EncryptedSecret, b: Where): T =>
     JSON.parse(openAiText(sealed, { ...b, field: "draft" })) as T;
+
+/** A report's sealed part (U8): the chosen question and answer, and the note. */
+export interface AiReportContent {
+    question: string;
+    answer: string;
+    note: string | null;
+}
+
+export const sealReportBody = (content: AiReportContent, b: Where) =>
+    sealAiText(JSON.stringify(content), { ...b, field: "report" });
+
+export const openReportBody = (
+    sealed: EncryptedSecret,
+    b: Where,
+): AiReportContent =>
+    JSON.parse(
+        openAiText(sealed, { ...b, field: "report" }),
+    ) as AiReportContent;

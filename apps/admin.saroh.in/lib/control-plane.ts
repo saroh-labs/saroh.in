@@ -167,7 +167,9 @@ export type AdminPermission =
     | "team:pay"
     | "commission:rates"
     | "people:sign-in-help"
-    | "search-pages:publish";
+    | "search-pages:publish"
+    | "ai-reports:read"
+    | "ai-settings:write";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

@@ -10,8 +10,8 @@ import { openAiText, openMessageBody, sealedParts } from "./history/sealing";
  * A person's own Ask AI conversations (DEC-220): read by (id, the business
  * from the request's context, the person asking), so another member's
  * conversation, or another business's, is simply not there (404). Text is
- * opened only here, on the way out. The "Use Ask AI" permission and the
- * routes come with U7 and U9; history stays readable with Ask AI off.
+ * opened only here, on the way out. History stays readable with Ask AI
+ * off (`ask-ai.controller.ts`).
  */
 
 /** A bound on one list, not a plan limit. */
@@ -82,15 +82,49 @@ function summary(row: {
 
 @Injectable()
 export class ConversationsService {
-    /** The asker's conversations in this business, newest first. */
-    async list(ctx: OrganizationContext): Promise<AiConversationSummary[]> {
+    /**
+     * The asker's conversations in this business, newest first, a page of
+     * {@link CONVERSATIONS_LISTED}; `cursor` is the last id of the page
+     * before (one not theirs reads as the first page's end: nothing).
+     */
+    async list(
+        ctx: OrganizationContext,
+        cursor?: string,
+    ): Promise<AiConversationSummary[]> {
+        const mine = { organizationId: ctx.organizationId, userId: ctx.userId };
+        if (
+            cursor &&
+            !(await prisma.aiConversation.findFirst({
+                where: { ...mine, id: cursor },
+                select: { id: true },
+            }))
+        ) {
+            return [];
+        }
         const rows = await prisma.aiConversation.findMany({
-            where: { organizationId: ctx.organizationId, userId: ctx.userId },
+            where: mine,
             orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
             take: CONVERSATIONS_LISTED,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
             select: SUMMARY,
         });
         return rows.map(summary);
+    }
+
+    /** Throws 404 unless the conversation is the asker's own in this business. */
+    async assertOwn(
+        ctx: OrganizationContext,
+        conversationId: string,
+    ): Promise<void> {
+        const row = await prisma.aiConversation.findFirst({
+            where: {
+                id: conversationId,
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+            },
+            select: { id: true },
+        });
+        if (!row) throw notFound();
     }
 
     /** One of the asker's conversations with its messages, oldest first. */

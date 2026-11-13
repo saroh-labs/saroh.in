@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
     Activity,
+    Bot,
     Building2,
     Cable,
     CircleAlert,
@@ -172,6 +173,13 @@ const GROUPS: ConsoleNavGroup[] = [
                 href: "/search-pages",
                 label: "Search pages",
                 icon: FileSearch,
+                permission: "platform:read",
+            },
+            {
+                // Ask AI's spend, halt, settings, requests and reports (DEC-220).
+                href: "/ask-ai",
+                label: "Ask AI",
+                icon: Bot,
                 permission: "platform:read",
             },
             {

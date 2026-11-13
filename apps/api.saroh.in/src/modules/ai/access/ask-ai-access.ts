@@ -48,6 +48,21 @@ async function dayHeld(
     return (sum._sum.costMicroUsd ?? 0) + running * turnCap;
 }
 
+/** The period's questions: those that counted, plus turns still running (each may count). */
+export function questionsUsed(
+    db: Pick<Prisma.TransactionClient, "aiUsage">,
+    organizationId: string,
+    since: Date,
+): Promise<number> {
+    return db.aiUsage.count({
+        where: {
+            organizationId,
+            startedAt: { gte: since },
+            OR: [{ counted: true }, { outcome: "RUNNING" }],
+        },
+    });
+}
+
 /**
  * Who may ask Ask AI, and how much (DEC-220, plan 2026-11-13-001 U7).
  *
@@ -149,13 +164,7 @@ export class AskAiAccess {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${START_LOCK}))`;
 
             if (row.limit !== null) {
-                const used = await tx.aiUsage.count({
-                    where: {
-                        organizationId: org,
-                        startedAt: { gte: window.start },
-                        OR: [{ counted: true }, { outcome: "RUNNING" }],
-                    },
-                });
+                const used = await questionsUsed(tx, org, window.start);
                 if (used >= row.limit) {
                     const requestMore = allows(ctx, "billing:read");
                     return {
@@ -228,7 +237,7 @@ export class AskAiAccess {
     }
 
     /** The owner's name, for "ask …". */
-    private async ownerName(organizationId: string): Promise<string | null> {
+    async ownerName(organizationId: string): Promise<string | null> {
         const owner = await outsideOrgContext(() =>
             runInOrgContext(organizationId, () =>
                 prisma.membership.findFirst({

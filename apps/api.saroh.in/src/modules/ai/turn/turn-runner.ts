@@ -154,7 +154,7 @@ export class TurnRunner {
         // Who may ask, before anything is read or sent (plan U7).
         const entry = await this.access.entry(ctx, now);
         if (!entry.ok) {
-            yield* refused(turnId, entry.refusal);
+            yield* refusedTurn(turnId, entry.refusal);
             return;
         }
         let prepared: Prepared;
@@ -193,7 +193,7 @@ export class TurnRunner {
             this.logger.log(
                 `ai_turn_refused turn=${turnId} org=${ctx.organizationId} reason=${refusal.reason}`,
             );
-            yield* refused(turnId, refusal);
+            yield* refusedTurn(turnId, refusal);
             return;
         }
         const state: TurnState = {
@@ -491,7 +491,10 @@ export async function askAiAvailable(
 }
 
 /** A turn not asked: the refusal, then done, not counted. */
-function* refused(turnId: string, refusal: AskAiRefusal): Generator<TurnEvent> {
+export function* refusedTurn(
+    turnId: string,
+    refusal: AskAiRefusal,
+): Generator<TurnEvent> {
     yield { type: "refused", refusal };
     yield {
         type: "done",

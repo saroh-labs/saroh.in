@@ -12,6 +12,7 @@ import { AddonsService } from "../../billing/addons.service";
 import { meterWindow } from "../../billing/metering";
 import { authorize } from "../../organizations/organization-policy";
 import { ASK_AI_MODULE, AskAiAccess } from "../access/ask-ai-access";
+import { scheduleGrantEnd } from "../ops/grant-end.job";
 
 /** A Request more as the panel shows it. */
 export interface AiRequestView {
@@ -80,9 +81,11 @@ export class AiRequestsService {
 
     /**
      * Saroh grants an open request: `packs` of the plan's `ask-ai` add-on
-     * for the business. Staff only; the console's guard checks who (U8).
-     * Claimed first, so a second grant of the same request adds nothing;
-     * put back to open when the add-on can't be added.
+     * for the business, for this period only (owner, 13 Nov 2026): their
+     * removal is queued for just before the period ends (`ai.grant.end`).
+     * Staff only; the console's guard checks who (U8). Claimed first, so a
+     * second grant of the same request adds nothing; put back to open, and
+     * anything added taken off again, when it can't be done whole.
      */
     async grant(
         requestId: string,
@@ -101,15 +104,39 @@ export class AiRequestsService {
             reason,
             packs,
         });
+        let added: string | null = null;
         try {
-            await this.addons.addBySaroh(
+            ({ addonId: added } = await this.addons.addBySaroh(
                 request.organizationId,
                 ASK_AI_MODULE,
                 packs,
                 staffUserId,
                 now,
+            ));
+            const addonId = added;
+            const window = await outsideOrgContext(() =>
+                meterWindow(prisma, request.organizationId, now),
+            );
+            await outsideOrgContext(() =>
+                prisma.$transaction((tx) =>
+                    scheduleGrantEnd(tx, {
+                        requestId,
+                        addonId,
+                        organizationId: request.organizationId,
+                        periodEnd: window.end,
+                    }),
+                ),
             );
         } catch (error) {
+            if (added) {
+                await this.addons.removeBySaroh(
+                    request.organizationId,
+                    added,
+                    packs,
+                    staffUserId,
+                    now,
+                );
+            }
             await outsideOrgContext(() =>
                 prisma.aiRequest.update({
                     where: { id: requestId },
@@ -119,6 +146,7 @@ export class AiRequestsService {
                         decidedAt: null,
                         reason: null,
                         packs: null,
+                        packsEndAt: null,
                     },
                 }),
             );

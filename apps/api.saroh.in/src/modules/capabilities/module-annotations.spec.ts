@@ -455,9 +455,18 @@ const NEVER: Record<string, string> = {
     // Plan 2026-11-13-001 U5: Ask AI's Confirm, Undo and Draft again.
     "ai/drafts/drafts.controller.ts":
         "Ask AI's drafts — the ASK_AI switch gates them, each draft's tool checks its own module",
+    // U9: the panel — a question, Stop, a person's own history and language,
+    // and the business's switch. History stays readable with anything off.
+    "ai/ask-ai.controller.ts":
+        "Ask AI's panel — the ASK_AI switch, the plan's Ask AI row and ai:use gate a question, history stays readable",
     // U7: Request more — the plan's Ask AI row and ASK_AI gate it, no module holds it.
     "ai/requests/ai-requests.controller.ts":
         "Ask AI's Request more — the ASK_AI switch and the plan gate it, no module holds it",
+    // U8: Report this answer — a person's own history, readable with anything off.
+    "ai/reports/ai-reports.controller.ts":
+        "Ask AI's Report this answer — the asker's own history, no module holds it",
+    "ai/ops/ai-admin.controller.ts":
+        "staff control plane (Ask AI's settings, halt, requests and reports), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

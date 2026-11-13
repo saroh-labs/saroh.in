@@ -230,6 +230,31 @@ export class AddonsService {
         return { addonId: addon.id };
     }
 
+    /**
+     * Saroh takes back `less` of an add-on it added ({@link addBySaroh}),
+     * through the same change as the owner's own Remove: held now, never
+     * below none, and what the period already owes stays owed. Ask AI's
+     * Request more is granted for its period only (owner, 13 Nov 2026), so
+     * its packs come off at the period's end (`ai.grant.end`).
+     */
+    async removeBySaroh(
+        organizationId: string,
+        addonId: string,
+        less: number,
+        staffUserId: string,
+        now: Date = new Date(),
+    ): Promise<void> {
+        if (!Number.isInteger(less) || less < 1) {
+            throw new BadRequestException("Take off at least one.");
+        }
+        await this.change(
+            { organizationId, userId: staffUserId, role: "OWNER" },
+            addonId,
+            (held) => Math.max(0, held - less),
+            now,
+        );
+    }
+
     /** {@link set}'s change, once the caller may make it; any payment to start. */
     private async change(
         ctx: OrganizationContext,

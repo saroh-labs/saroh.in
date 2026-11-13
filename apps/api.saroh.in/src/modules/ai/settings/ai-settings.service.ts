@@ -49,6 +49,12 @@ export interface AiSettingRecord {
     createdAt: Date;
 }
 
+/** Where a write goes: Prisma, or a transaction that also audits it (U8). */
+export type AiSettingsDb = Pick<
+    Prisma.TransactionClient,
+    "aiSetting" | "aiSettingOverride"
+>;
+
 const NEWEST = [
     { effectiveFrom: "desc" as const },
     { createdAt: "desc" as const },
@@ -149,10 +155,11 @@ export class AiSettingsService {
         reason: string,
         actor: AiSettingActor,
         effectiveFrom: Date = new Date(),
+        db: AiSettingsDb = prisma,
     ): Promise<AiSettingRecord> {
         const k = knownKey(key);
         const checked = validateAiSetting(k, value);
-        return prisma.aiSetting.create({
+        return db.aiSetting.create({
             data: {
                 key: k,
                 value: checked,
@@ -171,6 +178,7 @@ export class AiSettingsService {
         reason: string,
         actor: AiSettingActor,
         opts: { effectiveFrom?: Date; expiresAt?: Date } = {},
+        db: AiSettingsDb = prisma,
     ): Promise<void> {
         const k = knownKey(key);
         if (NOT_OVERRIDABLE.has(k)) {
@@ -185,7 +193,7 @@ export class AiSettingsService {
             );
         }
         const checked = validateAiSetting(k, value);
-        await prisma.aiSettingOverride.create({
+        await db.aiSettingOverride.create({
             data: {
                 organizationId,
                 key: k,
@@ -204,8 +212,9 @@ export class AiSettingsService {
         key: string,
         reason: string,
         actor: AiSettingActor,
+        db: AiSettingsDb = prisma,
     ): Promise<void> {
-        await prisma.aiSettingOverride.create({
+        await db.aiSettingOverride.create({
             data: {
                 organizationId,
                 key: knownKey(key),

@@ -79,6 +79,29 @@ cache.
 - No sound, no push and no service worker. The app is installable
   (`app/manifest.ts`, `lib/pwa/manifest.ts`) and nothing more.
 
+## Streaming from the API — **Current** (13 Nov 2026, Ask AI)
+
+An answer read as it arrives (Ask AI's question, plan 2026-11-13-001 U9)
+goes browser → an app route handler → the API, never browser → API.
+
+- **The API** writes `text/event-stream` from a Nest handler with `@Res()`:
+  `flushHeaders()` at once, `event:`/`data:` frames, a `:keepalive`
+  comment every 15 seconds, no compression on the route. The work behind
+  it is read to its end even when the reader leaves; only an explicit
+  request (Stop) ends it early (`ask-ai.controller.ts`).
+- **The route handler** (`app/api/ask-ai/turns/route.ts`) calls
+  `apiStream()` from `lib/api/http.ts`, not `apiFetch()`: the same headers
+  (session cookie, Origin, `x-organization-id` from `getActiveOrgId()`,
+  never from the browser), but no read of the body and no 20-second
+  limit. It returns the upstream body as is with only `content-type:
+text/event-stream`, `cache-control: no-store` and `x-accel-buffering:
+no`; never an upstream header, never `set-cookie`. A refusal before the
+  stream opens comes back as ordinary JSON with its status.
+- **The client** reads with `fetch` and the body's reader, not
+  `EventSource` (which can't POST).
+- **Test it** with a `ReadableStream` that holds its second chunk until
+  the test has read the first (`route.test.ts` beside the handler).
+
 ## Merchant sites: the page cache — **Current** (#863)
 
 `saroh.app` on its Worker keeps rendered public pages

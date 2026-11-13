@@ -125,6 +125,40 @@ export class TurnStore {
         return row?.askAiOn ?? true;
     }
 
+    /** Turns Ask AI on or off for the business (the Owner's or an Admin's switch). */
+    async setBusinessOn(ctx: OrganizationContext, on: boolean): Promise<void> {
+        const data = { askAiOn: on, updatedByUserId: ctx.userId };
+        await asBusiness(ctx.organizationId, () =>
+            prisma.aiBusinessSetting.upsert({
+                where: { organizationId: ctx.organizationId },
+                create: { organizationId: ctx.organizationId, ...data },
+                update: data,
+            }),
+        );
+    }
+
+    async setLanguage(
+        ctx: OrganizationContext,
+        language: AiLanguage,
+    ): Promise<void> {
+        await asBusiness(ctx.organizationId, () =>
+            prisma.aiPersonSetting.upsert({
+                where: {
+                    organizationId_userId: {
+                        organizationId: ctx.organizationId,
+                        userId: ctx.userId,
+                    },
+                },
+                create: {
+                    organizationId: ctx.organizationId,
+                    userId: ctx.userId,
+                    language,
+                },
+                update: { language },
+            }),
+        );
+    }
+
     async language(ctx: OrganizationContext): Promise<AiLanguage> {
         const row = await asBusiness(ctx.organizationId, () =>
             prisma.aiPersonSetting.findUnique({

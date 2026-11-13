@@ -1,5 +1,6 @@
 export * from "./ai-connections";
 export * from "./api-keys";
+export * from "./ask-ai";
 export * from "./ask-ai-drafts";
 export * from "./common";
 export * from "./mcp";

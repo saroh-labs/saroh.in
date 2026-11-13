@@ -223,6 +223,29 @@ here when you add a `Map`, a cache or a timer that outlives a request.
   alert (`code-delivery.ts`). Acceptable at two replicas behind the Cloudflare
   edge rules; move one to `LimitsService` (Redis) the day it's abused.
 
+## Ask AI's alarms — **Current** (DEC-220, plan 2026-11-13-001 U8)
+
+- **Spend alarm** (`ai/ops/spend-alarm.job.ts`, chain `ai.spend-alarm`,
+  every 15 minutes): this UTC month's recorded AI cost (every `AiUsage`
+  row, counted or not) against `ai.spendForecastMicroUsdPerMonth`. At
+  `ai.spendAlarmWarnRatio` of it, every active Platform owner is emailed
+  once a month; at `ai.spendAlarmHaltRatio` the Saroh-wide halt (`ai.halt`)
+  is set with the reason "spend alarm: …" by `system:ai-spend-alarm` and
+  they are emailed, also once a month, so a halt lifted after looking stays
+  lifted. It never touches the `ASK_AI` flag. Each email is sent behind an
+  `AiAlert` row (kind and window, unique), written first.
+- **Failure watch** (`ai/ops/failure-alarm.job.ts`, chain
+  `ai.failure-alarm`, every 10 minutes): the share of the last hour's
+  finished turns that FAILED or were CUT_OFF, above `ai.failureAlarmRatio`
+  with at least `ai.failureAlarmMinTurns` finished, emails once a UTC hour.
+- **Alerts carry numbers only** (`ai/ops/owner-alert.ts`,
+  `sendAiOwnerAlertEmail`), never a question or an answer. Unset alarm
+  settings log `ai_spend_alarm not configured` / `ai_failure_alarm not
+configured` (WARN) each run and do nothing else: set them in the
+  console's Ask AI page. Lines: `ai_spend_alarm warned|halted month=…`,
+  `ai_failure_alarm finished=… failed=…`, `ai_owner_alert email … for
+platformAdmin=…`, `ai_grant_end removed|failed request=…`.
+
 ## After a deploy — **Current** (#1192)
 
 The post-deploy watch list (sign-in pages, a merchant site, a booking, a

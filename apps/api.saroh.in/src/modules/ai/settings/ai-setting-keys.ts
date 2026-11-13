@@ -22,6 +22,8 @@ const effort = z.enum(["low", "medium", "high"]);
 const count = (max: number) => z.number().int().min(1).max(max);
 /** Millionths of a US dollar, the provider's currency. A bound, not a price. */
 const microUsd = z.number().int().min(0).max(1_000_000_000_000);
+/** A share above zero, at most `max`. */
+const ratio = (max: number) => z.number().gt(0).max(max);
 
 /** What one million tokens of each kind cost on one model, in micro-USD. */
 const modelPrices = z
@@ -68,6 +70,21 @@ export const AI_SETTING_SCHEMAS = {
     "ai.sarohDayCostCapMicroUsd": microUsd,
     /** The price table cost is worked out from, per model. */
     "ai.prices": z.partialRecord(model, modelPrices),
+    /**
+     * The spend alarm (U8): what Saroh expects AI to cost in a UTC month,
+     * and the shares of it at which the owner is warned and every agent
+     * halted (1 = the forecast itself).
+     */
+    "ai.spendForecastMicroUsdPerMonth": microUsd,
+    "ai.spendAlarmWarnRatio": ratio(10),
+    "ai.spendAlarmHaltRatio": ratio(10),
+    /**
+     * The failure watch (U8): the share of the last hour's finished turns
+     * that failed or were cut off at which the owner is emailed, once at
+     * least this many turns finished.
+     */
+    "ai.failureAlarmRatio": ratio(1),
+    "ai.failureAlarmMinTurns": count(1_000_000),
 } as const;
 
 export type AiSettingKey = keyof typeof AI_SETTING_SCHEMAS;
@@ -79,6 +96,20 @@ export type AiSettingValue<K extends AiSettingKey> = z.infer<
 export const NOT_OVERRIDABLE: ReadonlySet<AiSettingKey> = new Set([
     "ai.halt",
     "ai.sarohDayCostCapMicroUsd",
+    "ai.spendForecastMicroUsdPerMonth",
+    "ai.spendAlarmWarnRatio",
+    "ai.spendAlarmHaltRatio",
+    "ai.failureAlarmRatio",
+    "ai.failureAlarmMinTurns",
+]);
+
+/** The alarms' keys (U8): Saroh's watch, never read by a turn. */
+export const ALARM_SETTING_KEYS: ReadonlySet<AiSettingKey> = new Set([
+    "ai.spendForecastMicroUsdPerMonth",
+    "ai.spendAlarmWarnRatio",
+    "ai.spendAlarmHaltRatio",
+    "ai.failureAlarmRatio",
+    "ai.failureAlarmMinTurns",
 ]);
 
 export const AI_SETTING_KEYS = Object.keys(

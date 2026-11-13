@@ -75,7 +75,10 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import type { OrganizationContext } from "../common/types/organization-context";
 import { AiModule } from "../modules/ai/ai.module";
-import { AI_SETTING_KEYS } from "../modules/ai/settings/ai-setting-keys";
+import {
+    AI_SETTING_KEYS,
+    ALARM_SETTING_KEYS,
+} from "../modules/ai/settings/ai-setting-keys";
 import {
     AiSettingNotConfiguredError,
     AiSettingsService,
@@ -200,7 +203,7 @@ async function whyUnavailable(
         );
     }
     for (const key of AI_SETTING_KEYS) {
-        if (key === "ai.halt") continue;
+        if (key === "ai.halt" || ALARM_SETTING_KEYS.has(key)) continue;
         try {
             await settings.get(key, organizationId);
         } catch (error) {

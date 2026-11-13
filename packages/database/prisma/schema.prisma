@@ -326,6 +326,7 @@ model Organization {
   aiPersonSettings     AiPersonSetting[]
   askAiDrafts          AskAiDraft[]
   aiRequests           AiRequest[]
+  aiReports            AiReport[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
@@ -10095,11 +10096,72 @@ model AiRequest {
   decidedAt       DateTime?
   reason          String?
   packs           Int?
+  // A grant is for its period only (owner, 13 Nov): the packs come off at
+  // packsEndAt (`ai.grant.end`), and packsRemovedAt says it was done.
+  packsEndAt      DateTime?
+  packsRemovedAt  DateTime?
 
   createdAt DateTime @default(now())
 
   @@index([organizationId, status])
   @@index([status, createdAt])
+}
+
+/// Why a person reported an answer (U8).
+enum AiReportReason {
+  WRONG_NUMBER
+  DIDNT_UNDERSTAND
+  SOMETHING_ELSE
+}
+
+enum AiReportStatus {
+  OPEN
+  RESOLVED
+}
+
+// Report this answer (DEC-220, plan 2026-11-13-001 U8): the one question and
+// answer the person chose, copied at report time and sealed with their note
+// (`{ question, answer, note }`, field "report", bound to this row). Read in
+// the console with ai-reports:read, each read on the admin ledger. Deleted
+// 90 days after it was made (`ai.retention`), whatever its conversation does.
+model AiReport {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  // Where it came from; no foreign keys, so the report outlives them.
+  conversationId String
+  messageId      String       @unique
+
+  reason AiReportReason
+
+  bodyCiphertext String
+  bodyIv         String
+  bodyAuthTag    String
+
+  status           AiReportStatus @default(OPEN)
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([organizationId])
+}
+
+// Saroh's own AI alarms (U8): one row per alarm and window, written before
+// its email, so each is sent once ("spend-warn"/"spend-halt" per UTC month,
+// "failures" per UTC hour).
+model AiAlert {
+  id String @id @default(cuid())
+
+  kind      String
+  windowKey String
+  createdAt DateTime @default(now())
+
+  @@unique([kind, windowKey])
 }
 
 // One person's Ask AI settings in one business. No row: MATCH.

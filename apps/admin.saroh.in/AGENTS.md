@@ -82,7 +82,7 @@ recorded grant (the API refuses it otherwise).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,
-  `billing`, `commission`, `team-member`) import `next/headers`; a client component takes types from them,
+  `billing`, `commission`, `team-member`, `ask-ai`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
@@ -93,7 +93,16 @@ recorded grant (the API refuses it otherwise).
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
   `lib/roles-matrix.ts`, `lib/commission-words.ts`,
   `lib/own-rate-words.ts`, `lib/team-member-words.ts`,
-  `lib/search-page-words.ts`, `lib/waitlist-words.ts`.
+  `lib/search-page-words.ts`, `lib/waitlist-words.ts`, `lib/ask-ai-words.ts`.
+- **Ask AI (`/ask-ai`, DEC-220 U8)** reads with `platform:read`: today's
+  and this month's spend and failures (numbers only), the halt, and every
+  AI setting with its history (`?history=<key>`). `ai-settings:write`
+  (Platform owners only) sets a setting (the API checks the value against
+  its key), halts or lifts the halt, and grants or declines Request more
+  (one pack for this period only). Request more's list needs
+  `organization:read`; reports need `ai-reports:read` (Platform owners and
+  Support), and opening one (`/ask-ai/reports/<id>`) is on the ledger.
+  A business's override is API-only for now.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic, Open / Handled and address on
   asking. The reply goes from the team's mailbox; Mark handled / Open again

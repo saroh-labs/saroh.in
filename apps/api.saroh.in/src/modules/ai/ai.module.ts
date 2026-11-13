@@ -10,6 +10,8 @@ import { McpModule } from "../mcp/mcp.module";
 import { OrdersModule } from "../orders/orders.module";
 import { AskAiAccess } from "./access/ask-ai-access";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
+import { AskAiController } from "./ask-ai.controller";
+import { AskAiService } from "./ask-ai.service";
 import { ConversationsService } from "./conversations.service";
 import { AskAiDraftsController } from "./drafts/drafts.controller";
 import { DraftsService } from "./drafts/drafts.service";
@@ -36,8 +38,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * Stop's registry and the stuck-turn sweep. U4: the tool bridge, running
  * the MCP tools as the person asking. U5: drafts, with Confirm, Undo and
  * Draft again. U7: who may ask and how much (the plan's allowance, the
- * day's cost, one running turn a person) and Request more. Routes (U9)
- * are added here as they land.
+ * day's cost, one running turn a person) and Request more. U9: the panel's routes (`ask-ai.controller.ts`): a
+ * question as server-sent events, Stop, history, language, the switch.
  */
 @Module({
     // McpModule: the tool registry, and (via ApiKeysModule) the person's
@@ -50,9 +52,14 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OrdersModule,
         BillingModule,
     ],
-    controllers: [AskAiDraftsController, AskAiRequestsController],
+    controllers: [
+        AskAiController,
+        AskAiDraftsController,
+        AskAiRequestsController,
+    ],
     providers: [
         AskAiAccess,
+        AskAiService,
         AiRequestsService,
         DraftsService,
         { provide: AI_PROVIDER, useFactory: () => new AiSdkAdapter() },

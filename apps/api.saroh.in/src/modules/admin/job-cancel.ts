@@ -54,6 +54,10 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "The security log retention sweep runs itself again; cancelling a run would only hide it",
     "ai.retention":
         "The Ask AI history sweep runs itself again; cancelling a run would only hide it",
+    "ai.spend-alarm":
+        "Ask AI's spend alarm runs itself again; cancelling a run would only hide it",
+    "ai.failure-alarm":
+        "Ask AI's failure watch runs itself again; cancelling a run would only hide it",
     "organization.deletion.cleanup":
         "A deleted business's clean-up; cancelling it would leave its billing, domains, files and keys behind",
 };

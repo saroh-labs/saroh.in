@@ -5,6 +5,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { mountedAuth } from "./common/auth/auth";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AiModule } from "./modules/ai/ai.module";
+import { AiOpsModule } from "./modules/ai/ops/ai-ops.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { ApiKeysModule } from "./modules/api-keys/api-keys.module";
 import { AuditModule } from "./modules/audit/audit.module";
@@ -143,6 +144,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         SharePostsModule,
         // Ask AI's layer (DEC-220): settings, history, retention.
         AiModule,
+        // Its alarms, halt, reports and Request more's end (U8).
+        AiOpsModule,
         SiteAccountsModule,
         DomainsModule,
         JobsModule,
