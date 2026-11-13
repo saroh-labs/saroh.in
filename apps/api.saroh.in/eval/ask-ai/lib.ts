@@ -713,3 +713,192 @@ export function passMarks(
 }
 
 export type { BizKey };
+
+// --- The per-question report (questions.md) --------------------------------
+
+/** Every problem the code and the AI grader found in one run, in words. */
+export function runProblems(g: CodeGrade, v: Verdict | undefined): string[] {
+    return [
+        ...(g.facts && g.facts !== "exact"
+            ? [`facts ${g.facts}: expected ${g.missing.join("; ")}`]
+            : []),
+        ...(g.draft && !g.draft.ok
+            ? [`draft: ${g.draft.problems.join("; ")}`]
+            : []),
+        ...g.leaks.map((l) => `LEAK ${l}`),
+        ...g.destructive.map((d) => `DESTRUCTIVE ${d}`),
+        ...g.saved.map((s) => `SAVED without Confirm: ${s}`),
+        ...(g.overCap ? ["OVER the per-question cap"] : []),
+        ...g.forbiddenCalls.map((c) => `called ${c}`),
+        ...g.moneyFormat.map((m) => `money written ${m}`),
+        ...(g.failed ? ["turn failed"] : []),
+        ...(v && (!v.language_ok || v.money_ok === false || !v.behaviour_ok)
+            ? [`grader: ${v.reason}`]
+            : []),
+    ];
+}
+
+const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+const quote = (s: string) =>
+    (s || "(no answer text)")
+        .split("\n")
+        .map((l) => `> ${l}`)
+        .join("\n");
+const json = (v: unknown) => String(JSON.stringify(v));
+/** "bookings:this_week" → "Bookings this week". */
+const label = (key: string) => {
+    const s = key.replace(/[:_]/g, " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+};
+const median = (xs: number[]): number | null => {
+    if (!xs.length) return null;
+    const s = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+};
+const secs = (ms: number | null) =>
+    ms === null ? "-" : `${(ms / 1000).toFixed(1)}s`;
+
+/** What a right run does, in plain words, with every fact resolved. */
+function expectedLines(q: Question & { resolved: Resolved }): string[] {
+    const r = q.resolved;
+    const e = q.expect;
+    return [
+        ...r.numbers.map((n) => `${label(n.key)}: ${n.value}`),
+        ...r.mentions.map(
+            (m) => `Mentions ${label(m.key)}: ${m.value.join(", ")}`,
+        ),
+        ...(r.draft
+            ? [
+                  `Draft with ${r.draft.tool}: ${json(r.draft.input)}${r.draft.inputMentions.length ? `; input names ${r.draft.inputMentions.map((m) => m.join(" or ")).join(", ")}` : ""}`,
+              ]
+            : []),
+        ...r.forbiddenFigures.map(
+            (f) => `Must not show ${label(f.key)} (${f.value})`,
+        ),
+        ...(r.forbiddenText.length
+            ? [`Must not name: ${r.forbiddenText.join(", ")}`]
+            : []),
+        ...(r.forbiddenTools.length
+            ? [`Must not call: ${r.forbiddenTools.join(", ")}`]
+            : []),
+        ...(e.behaviour ? [`Behaviour: ${e.behaviour}`] : []),
+        ...(e.note ? [`Note: ${e.note}`] : []),
+    ];
+}
+
+/**
+ * `questions.md`: every question, its expectations and each run in full,
+ * for the owner to read through. Pure: `grade.ts` writes it.
+ */
+export function questionsMarkdown(
+    results: Results,
+    grades: readonly CodeGrade[],
+    verdicts: ReadonlyMap<string, Verdict>,
+    rupeesPerUsd: number,
+): string {
+    const rupees = (micro: number | null) =>
+        micro === null
+            ? "-"
+            : `₹${((micro / 1_000_000) * rupeesPerUsd).toFixed(2)}`;
+    const key = (id: string, run: number) => `${id}#${run}`;
+    const gradeOf = new Map(grades.map((g) => [key(g.questionId, g.run), g]));
+    const problemsOf = (run: RunRecord) => {
+        const g = gradeOf.get(key(run.questionId, run.run));
+        const v = verdicts.get(key(run.questionId, run.run));
+        return g ? runProblems(g, v) : ["not graded"];
+    };
+    const runsOf = (id: string) =>
+        results.runs
+            .filter((r) => r.questionId === id)
+            .sort((a, b) => a.run - b.run);
+    let passed = 0;
+    for (const r of results.runs) if (!problemsOf(r).length) passed++;
+
+    const summary = results.questions.map((q, i) => {
+        const runs = runsOf(q.id);
+        const ok = runs.filter((r) => !problemsOf(r).length).length;
+        const worst = runs.flatMap(problemsOf)[0] ?? "";
+        const short =
+            q.resolved.question.length > 60
+                ? `${q.resolved.question.slice(0, 57)}...`
+                : q.resolved.question;
+        const costs = runs.flatMap((r) =>
+            r.usage ? [r.usage.costMicroUsd] : [],
+        );
+        const ms = (pick: (r: RunRecord) => number | null) =>
+            secs(median(runs.flatMap((r) => pick(r) ?? [])));
+        return `| ${i + 1} | ${q.id} | ${q.business} | ${q.kind} | ${q.language} | ${q.role} | ${cell(short)} | ${ok}/${runs.length} | ${cell(worst.slice(0, 60))} | ${rupees(median(costs))} | ${ms((r) => r.firstStatusMs)} / ${ms((r) => r.firstTextMs)} |`;
+    });
+
+    const runSection = (run: RunRecord): string[] => {
+        const problems = problemsOf(run);
+        const v = verdicts.get(key(run.questionId, run.run));
+        const u = run.usage;
+        return [
+            `#### Run ${run.run}: ${problems.length ? "FAIL" : "PASS"}`,
+            "",
+            ...problems.map((p) => `- ${p}`),
+            `- AI grader: ${v ? `${v.language_ok && v.money_ok !== false && v.behaviour_ok ? "ok" : "not ok"}; ${v.reason}` : "no verdict"}`,
+            `- Status lines: ${run.statuses.length ? run.statuses.map((s) => `${s.words} (${secs(s.ms)})`).join(" · ") : "none"}`,
+            ...(run.toolCalls.length
+                ? run.toolCalls.map(
+                      (c) =>
+                          `- Tool \`${c.name}\`${c.isError ? " (error)" : ""}: \`${json(c.input).replace(/`/g, "'")}\``,
+                  )
+                : ["- Tools: none"]),
+            ...(run.card
+                ? [
+                      `- Draft card (${run.card.kind}): ${Object.entries(
+                          run.card.data,
+                      )
+                          .map(([k, val]) => `${k}: ${json(val)}`)
+                          .join("; ")}`,
+                  ]
+                : []),
+            ...(run.error ? [`- Error: ${run.error}`] : []),
+            // shortcut: no thinking-token count in the run record, add it when run.ts records one.
+            `- Tokens: in ${u?.inputTokens ?? "-"} / cache read ${u?.cacheReadTokens ?? "-"} / cache write ${u?.cacheWriteTokens ?? "-"} / out ${u?.outputTokens ?? "-"}; cost ${rupees(u?.costMicroUsd ?? null)}; first status ${secs(run.firstStatusMs)}, first text ${secs(run.firstTextMs)}`,
+            "",
+            quote(run.text),
+            "",
+        ];
+    };
+
+    const sections = BUSINESS_KEYS.flatMap((trade) => {
+        const qs = results.questions.filter((q) => q.business === trade);
+        if (!qs.length) return [];
+        return [
+            `## ${trade}`,
+            "",
+            ...qs.flatMap((q) => {
+                const expected = expectedLines(q);
+                return [
+                    `### ${q.id} · ${q.kind} · ${q.language} · as ${q.role}`,
+                    "",
+                    quote(q.resolved.question),
+                    "",
+                    "**Expected**:",
+                    "",
+                    ...(expected.length
+                        ? expected.map((l) => `- ${l}`)
+                        : ["- (nothing specific)"]),
+                    "",
+                    ...runsOf(q.id).flatMap(runSection),
+                ];
+            }),
+        ];
+    });
+
+    return [
+        "# Ask AI quality test: every question",
+        "",
+        `Run date ${results.meta.anchor}. ${results.questions.length} questions, ${results.runs.length} runs: ${passed} PASS, ${results.runs.length - passed} FAIL. Marks: see [grade.md](grade.md).`,
+        "",
+        "| # | id | trade | kind | language | role | question | passed | worst problem | median cost | first status / text |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+        ...summary,
+        "",
+        ...sections,
+    ].join("\n");
+}

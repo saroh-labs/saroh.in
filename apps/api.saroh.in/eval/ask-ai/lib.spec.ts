@@ -1,5 +1,5 @@
 import { resolveFact } from "./facts";
-import type { Question, Resolved, RunRecord } from "./lib";
+import type { Question, Resolved, Results, RunRecord } from "./lib";
 import {
     checkDraft,
     gradeRun,
@@ -8,6 +8,7 @@ import {
     mentions,
     numbersIn,
     parseVerdict,
+    questionsMarkdown,
     runWithinBudget,
     westernGroupings,
 } from "./lib";
@@ -383,5 +384,75 @@ describe("the seed's facts", () => {
             resolveFact(plan[2], "staff-bookings:arun:tomorrow", now),
         ).toBeLessThan(20);
         expect(resolveFact(plan[4], "bookings:tomorrow", now)).toBeLessThan(20);
+    });
+});
+
+describe("questionsMarkdown", () => {
+    const q = {
+        ...question("answer", {
+            question: "How many bookings this week?",
+            numbers: [{ key: "bookings:this_week", value: 14 }],
+        }),
+        resolved: resolved({
+            question: "How many | bookings this week?",
+            numbers: [{ key: "bookings:this_week", value: 14 }],
+        }),
+    };
+    const run = (n: number, text: string): RunRecord => ({
+        questionId: "salon-01",
+        run: n,
+        turnId: null,
+        text,
+        statuses: [
+            { tool: "list_bookings", words: "Looking at bookings", ms: 800 },
+        ],
+        toolCalls: [
+            {
+                name: "list_bookings",
+                input: { period: "week" },
+                isError: false,
+            },
+        ],
+        card: null,
+        outcome: "done",
+        error: null,
+        usage: {
+            inputTokens: 1000,
+            outputTokens: 50,
+            cacheReadTokens: 900,
+            cacheWriteTokens: 0,
+            costMicroUsd: 2000,
+        },
+        firstStatusMs: 800,
+        firstTextMs: 2100,
+        totalMs: 3000,
+        changed: [],
+    });
+    const runs = [
+        run(1, "You have 14 bookings.\n# Big | heading"),
+        run(2, "You have 12."),
+    ];
+    const results = {
+        meta: { anchor: "2026-11-13" },
+        questions: [q],
+        runs,
+    } as unknown as Results;
+    const md = questionsMarkdown(
+        results,
+        runs.map((r) => gradeRun(q, r, null)),
+        new Map(),
+        100,
+    );
+
+    it("escapes pipes in the table and blockquotes every answer line", () => {
+        expect(md).toContain("How many \\| bookings this week?");
+        expect(md).toContain("> You have 14 bookings.\n> # Big | heading");
+    });
+    it("resolves fact keys and counts PASS and FAIL", () => {
+        expect(md).toContain("- Bookings this week: 14");
+        expect(md).toContain("| 1/2 |");
+        expect(md).toContain("1 PASS, 1 FAIL");
+        expect(md).toContain("#### Run 2: FAIL");
+        expect(md).toContain("₹0.20");
     });
 });

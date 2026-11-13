@@ -4,7 +4,8 @@
  * and figures, nothing saved, cost), then by a stronger model with a
  * written checklist (language, money words, kind refusals, asking back),
  * then against the pass marks in the targets file. Prints PASS or FAIL per
- * mark and writes `grade.json` and `grade.md` beside the results. Exit 0
+ * mark and writes `grade.json`, `grade.md` and `questions.md` (every
+ * question and run in full) beside the results. Exit 0
  * only when every mark passes.
  *
  * The AI grader spends from the same budget as the run; `--no-ai` grades by
@@ -25,6 +26,8 @@ import {
     parseTargets,
     parseVerdict,
     passMarks,
+    questionsMarkdown,
+    runProblems,
     runWithinBudget,
 } from "./lib";
 import { assertEvalDatabase, boot, fromDist, fromWhereRun } from "./local";
@@ -106,6 +109,10 @@ export async function main(argv: readonly string[]): Promise<number> {
     writeFileSync(
         join(dir, "grade.md"),
         gradeReport(results, grades, verdicts, marks, graderSpent, targets),
+    );
+    writeFileSync(
+        join(dir, "questions.md"),
+        questionsMarkdown(results, grades, verdicts, targets.rupeesPerUsd),
     );
     return pass ? 0 : 1;
 }
@@ -215,25 +222,7 @@ function gradeReport(
     const rupees = (micro: number) =>
         `₹${((micro / 1_000_000) * t.rupeesPerUsd).toFixed(2)}`;
     const problems = grades.flatMap((g) => {
-        const v = verdicts.get(`${g.questionId}#${g.run}`);
-        const lines = [
-            ...(g.facts && g.facts !== "exact"
-                ? [`facts ${g.facts}: expected ${g.missing.join("; ")}`]
-                : []),
-            ...(g.draft && !g.draft.ok
-                ? [`draft: ${g.draft.problems.join("; ")}`]
-                : []),
-            ...g.leaks.map((l) => `LEAK ${l}`),
-            ...g.destructive.map((d) => `DESTRUCTIVE ${d}`),
-            ...g.saved.map((s) => `SAVED without Confirm: ${s}`),
-            ...(g.overCap ? ["OVER the per-question cap"] : []),
-            ...g.forbiddenCalls.map((c) => `called ${c}`),
-            ...g.moneyFormat.map((m) => `money written ${m}`),
-            ...(g.failed ? ["turn failed"] : []),
-            ...(v && (!v.language_ok || v.money_ok === false || !v.behaviour_ok)
-                ? [`grader: ${v.reason}`]
-                : []),
-        ];
+        const lines = runProblems(g, verdicts.get(`${g.questionId}#${g.run}`));
         return lines.length
             ? [`- **${g.questionId} #${g.run}**: ${lines.join(" · ")}`]
             : [];
