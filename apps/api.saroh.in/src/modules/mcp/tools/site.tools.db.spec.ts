@@ -893,6 +893,8 @@ describe("MCP website tools (U11)", () => {
             template_id: string;
             suggested: boolean;
             why: string | null;
+            preview_url: string | null;
+            picture_url: string | null;
         }[];
         trade: string | null;
         template_choice: boolean;
@@ -926,6 +928,48 @@ describe("MCP website tools (U11)", () => {
         expect(textOf(listed)).not.toContain("aren't chosen yet");
     });
 
+    it("links each template's preview in Saroh, on this business, and its picture; the first pictures come as images", async () => {
+        const fetched = jest.spyOn(globalThis, "fetch").mockImplementation(
+            async () =>
+                new Response(Buffer.from("webp"), {
+                    headers: { "content-type": "image/webp" },
+                }),
+        );
+        try {
+            const { org, as } = await connect();
+            await prisma.organization.update({
+                where: { id: org.id },
+                data: { trade: "salon" },
+            });
+            await templateChoice(org.id, true);
+            const listed = await call(as, "list_templates", {});
+            const salon = data<Listed>(listed).templates[0];
+            const preview = new URL(salon.preview_url ?? "");
+            expect(preview.pathname).toBe(`/open/${org.id}`);
+            expect(preview.searchParams.get("to")).toBe(
+                "/sites/new?template=salon",
+            );
+            expect(salon.picture_url).toMatch(/\/templates\/salon\.webp$/);
+            expect(textOf(listed)).toContain(salon.preview_url);
+            const images = (
+                listed.content as { type: string; mimeType?: string }[]
+            ).filter((c) => c.type === "image");
+            expect(images.length).toBeGreaterThan(0);
+            expect(images.length).toBeLessThanOrEqual(4);
+            expect(images[0].mimeType).toBe("image/webp");
+            expect(textOf(listed)).toMatch(
+                /pictures that follow are the home pages of, in order: Salon/,
+            );
+            // A template without a sample business has no picture.
+            const plain = data<Listed>(listed).templates.find(
+                (t) => t.template_id === "starter",
+            );
+            if (plain) expect(plain.picture_url).toBeNull();
+        } finally {
+            fetched.mockRestore();
+        }
+    });
+
     it("while templates aren't chosen yet, says so and starts from the kind's default whatever is asked (DEC-216)", async () => {
         const { org, as } = await connect();
         await templateChoice(org.id, false);
@@ -933,6 +977,13 @@ describe("MCP website tools (U11)", () => {
         const listed = await call(as, "list_templates", {});
         expect(data<Listed>(listed).template_choice).toBe(false);
         expect(textOf(listed)).toContain("aren't chosen yet");
+        // No preview or picture of a template the app can't choose yet.
+        expect(
+            data<Listed>(listed).templates.every(
+                (t) => t.preview_url === null && t.picture_url === null,
+            ),
+        ).toBe(true);
+        expect(listed.content.some((c) => c.type === "image")).toBe(false);
 
         const started = await call(as, "create_site_from_template", {
             name: "Asha's Salon",

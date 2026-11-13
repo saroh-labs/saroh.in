@@ -36,6 +36,7 @@ import type { TemplateFit } from "@saroh/templates";
 import { gatingModules, templatesByFit } from "@saroh/templates";
 import { z } from "zod";
 
+import { appBaseOf } from "../../../common/app-url";
 import { strictFetch } from "../../../common/net/ssrf";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { isModuleKey, MODULE_BY_KEY } from "../../capabilities/module-registry";
@@ -96,6 +97,13 @@ import {
     SITE_FROM_TEMPLATE_JOB,
     siteFromTemplateHandler,
 } from "./site-from-template.job";
+import {
+    hasPicture,
+    IMAGES_PER_LIST,
+    pictureData,
+    pictureUrl,
+    previewUrl,
+} from "./template-previews";
 export {
     describeSiteJob,
     SITE_FROM_TEMPLATE_JOB,
@@ -373,6 +381,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         async run({ cursor }, { ctx }: McpCall) {
             const fit = await businessFit(ctx.organizationId);
             const choice = await templateChoiceOn(ctx.organizationId);
+            const app = await appBaseOf(ctx.organizationId);
             const page = pageList(
                 templatesByFit(templateCatalogue(), fit),
                 { cursor, limit: 20 },
@@ -386,6 +395,13 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                     colourway_ids: t.colourways.map((c) => c.id),
                     suggested: where !== "also",
                     why: whyOf(t, where, fit),
+                    preview_url: choice
+                        ? previewUrl(app, ctx.organizationId, t.id)
+                        : null,
+                    picture_url:
+                        choice && hasPicture(t.id)
+                            ? pictureUrl(app, t.id)
+                            : null,
                 }),
             );
             const fallback = kindTemplate(fit.kind);
@@ -396,13 +412,33 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 `${page.data.length} templates${page.nextCursor ? `; more with cursor ${page.nextCursor}` : ""}${fit.trade ? `, ${fit.tradeOther ?? fit.trade}'s first` : ""}.`,
                 ...page.data.map(
                     (t) =>
-                        `- ${t.name} (template_id ${t.template_id})${t.suggested ? "" : " [also available]"}${t.description ? `: ${t.description}` : ""} ${t.why ?? ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}.`,
+                        `- ${t.name} (template_id ${t.template_id})${t.suggested ? "" : " [also available]"}${t.description ? `: ${t.description}` : ""} ${t.why ?? ""} For: ${t.for_kinds.join(", ") || "any business"}. Pages: ${t.pages.join(", ")}. Colourways: ${t.colourway_ids.join(", ") || "default"}. ${t.preview_url ? `Preview with the business's own details: ${t.preview_url}` : ""}${t.picture_url ? ` Picture: ${t.picture_url}` : ""}`,
                 ),
+                choice
+                    ? "Share a preview link so the person sees the template with their own business in it before choosing."
+                    : null,
             ]
                 .filter(Boolean)
                 .join("\n");
+            const pictured = (
+                await Promise.all(
+                    page.data
+                        .filter((t) => t.picture_url)
+                        .slice(0, IMAGES_PER_LIST)
+                        .map(async (t) => ({
+                            name: t.name,
+                            data: await pictureData(t.picture_url ?? ""),
+                        })),
+                )
+            ).filter((p): p is { name: string; data: string } => !!p.data);
             return {
-                text,
+                text: pictured.length
+                    ? `${text}\nThe pictures that follow are the home pages of, in order: ${pictured.map((p) => p.name).join(", ")}.`
+                    : text,
+                images: pictured.map((p) => ({
+                    data: p.data,
+                    mimeType: "image/webp" as const,
+                })),
                 data: {
                     templates: page.data,
                     next_cursor: page.nextCursor,
