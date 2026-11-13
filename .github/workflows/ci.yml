@@ -727,6 +727,10 @@ jobs:
       # Settings › API and AI apps, which the role specs list. Unset, as
       # production, hides it until the area ships (#1357).
       NEXT_PUBLIC_API_AREA: "on"
+      # Share as a post and Create post (DEC-217), in the app and the API.
+      # Unset, as production, hides the screens and the API answers 404.
+      NEXT_PUBLIC_SHARE_POSTS: "on"
+      SHARE_POSTS: "on"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.

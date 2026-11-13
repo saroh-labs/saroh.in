@@ -7,11 +7,13 @@ import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { priceLabel } from "@/lib/products/overview-rules";
 import { whereItSells } from "@/lib/products/overview-words";
+import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
 import { Notice } from "@saroh/ui/notice";
 
 import { PhoneShopMenu } from "./phone-shop-menu";
@@ -22,6 +24,12 @@ export const STATUS_BADGE = {
     DRAFT: { label: "Draft", variant: "draft" },
     ARCHIVED: { label: "Archived", variant: "neutral" },
 } as const;
+
+/** Share as a post (#1375): the live product and the live site's read. */
+export interface ProductShare {
+    item: ShareItem;
+    setup: ShareSetup;
+}
 
 const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -52,6 +60,7 @@ function ShopControls({
     view,
     shopUrl = null,
     paused,
+    share = null,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -59,6 +68,7 @@ function ShopControls({
     /** Its page on the live online shop (`shopProductUrl`); null when none. */
     shopUrl?: string | null;
     paused: boolean;
+    share?: ProductShare | null;
 }) {
     const { product } = overview;
     const note = shopNote(product.status, shopUrl, paused);
@@ -113,6 +123,10 @@ function ShopControls({
                     }}
                 />
             ) : null}
+            {shopUrl && share ? (
+                // Live, so a post about it has somewhere to send people.
+                <ShareItemButton item={share.item} setup={share.setup} />
+            ) : null}
             {shopUrl ? (
                 // Live on the shop (UX-082): open it as customers see it.
                 <Button
@@ -164,10 +178,13 @@ export function ProductHeader({
     paused = false,
     view,
     shopUrl = null,
+    share = null,
 }: {
     overview: ProductOverview;
     storeId: string;
     photosHref: string;
+    /** Share as a post; null unless the page and the site are live. */
+    share?: ProductShare | null;
     view: "team" | "customer";
     /** Its page on the live online shop (`shopProductUrl`); null when none. */
     shopUrl?: string | null;
@@ -219,6 +236,15 @@ export function ProductHeader({
                         <Badge variant={status.variant} size="sm">
                             {status.label}
                         </Badge>
+                        {shopUrl && share ? (
+                            // The desk has it by the QR code; a phone, here.
+                            <span className="sm:hidden">
+                                <ShareItemButton
+                                    item={share.item}
+                                    setup={share.setup}
+                                />
+                            </span>
+                        ) : null}
                         <PhoneShopMenu
                             productId={product.id}
                             storeId={storeId}
@@ -246,6 +272,7 @@ export function ProductHeader({
                             view={view}
                             shopUrl={shopUrl}
                             paused={paused}
+                            share={share}
                         />
                     </div>
                 }

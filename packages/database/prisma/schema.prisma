@@ -316,6 +316,7 @@ model Organization {
   siteTrackingSettings SiteTrackingSettings[]
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
+  sharePosts           SharePost[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
@@ -924,6 +925,8 @@ model Media {
   locationLogos  Store[]           @relation("LocationLogo")
   // The sites whose icon it is (Website › Settings).
   siteIcons      Site[]            @relation("SiteIcon")
+  // The posts the business made with it (Create post).
+  sharePosts     SharePost[]       @relation("SharePostMedia")
 
   @@index([organizationId])
 }
@@ -4876,6 +4879,43 @@ model QrScanDay {
 
   @@id([qrCodeId, day])
   @@index([organizationId])
+}
+
+/// A post the business wrote itself in Create post (#1378, plan
+/// 2026-11-12-003 U6): its own photo or a headline alone, drawn as a share
+/// picture by the site (`/share/own/<id>/image`). Saved, unlike a post of a
+/// product, because the picture is drawn from what is stored here. The
+/// words are the merchant's, so they are capped (CHECKed in the migration)
+/// and only ever drawn as text.
+model SharePost {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The card's big line; null for a photo with no words. At most 90.
+  headline String?
+  // The business's own photo from its media library; null for text only.
+  // Deleting the photo leaves the post as text.
+  mediaId  String?
+  media    Media?  @relation("SharePostMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  // The card picked: photo | price | offer | simple, and post | square |
+  // story (CHECKed in the migration; the site's renderer names them).
+  style String @default("photo")
+  size  String @default("post")
+
+  // What is shared beside the picture. At most 2,200 (Instagram's cap).
+  caption  String @default("")
+  // Where the link goes on the business's own site: a path, never a host.
+  linkPath String @default("/")
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, createdAt])
 }
 
 // ============================================================================

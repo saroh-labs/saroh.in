@@ -48,6 +48,11 @@ const ts = createRequire(join(root, APP, "package.json"))("typescript");
  */
 const ALLOWED = [
     {
+        file: "lib/share-item/share.ts",
+        rule: "slot",
+        why: "the booking page card's default headline, \"Book your slot\", in the owner's own words (12 Nov 2026); the API draws the same. Reword both sides together",
+    },
+    {
         file: "packages/ui/src/lib/absent.ts",
         rule: "em dash",
         why: "the mark for a value that isn't there (owner, 11 Oct): the only place the dash is written. Everything else draws it through AbsentValue or absentText()",

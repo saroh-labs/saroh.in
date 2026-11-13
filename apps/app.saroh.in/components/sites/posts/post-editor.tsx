@@ -18,6 +18,7 @@ import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { runAction } from "@/lib/api/run-action";
 import { pausedWords } from "@/lib/billing/paused";
@@ -30,6 +31,7 @@ import {
 } from "@/lib/content/actions";
 import { postParagraphs } from "@/lib/content/plain-text";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
+import type { ShareSetup } from "@/lib/share-item/share";
 import type { SiteCommentView } from "@/lib/sites/service";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
@@ -88,7 +90,13 @@ export function PostEditor({
     paused = false,
     readOnly = false,
     feedback,
+    share = null,
 }: {
+    /**
+     * Share as a post (#1375, boards SGShareBlog*): the live site and the
+     * post's live address. Shown only while the post is live.
+     */
+    share?: { setup: ShareSetup; url: string } | null;
     siteId: string;
     categories: PostCategory[];
     /** Absent when writing a new post. */
@@ -389,6 +397,22 @@ export function PostEditor({
                         >
                             Feedback{openNotes > 0 ? ` · ${openNotes}` : ""}
                         </Button>
+                    ) : null}
+                    {share && live && postId ? (
+                        <ShareItemButton
+                            setup={share.setup}
+                            item={{
+                                kind: "post",
+                                // The saved address, which the live copy has.
+                                ref: post?.slug ?? slug,
+                                name: title,
+                                price: null,
+                                url: share.url,
+                                offerId: null,
+                                hasPhoto: Boolean(image.trim()),
+                                summary: excerpt,
+                            }}
+                        />
                     ) : null}
                     <Button
                         variant="outline"

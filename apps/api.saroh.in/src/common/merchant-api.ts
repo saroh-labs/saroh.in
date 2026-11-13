@@ -15,6 +15,8 @@ export const MERCHANT_API_ROUTES = [
     "public/payments",
     "public/product-reviews",
     "public/services",
+    // A published site's share pictures (#1375): its own items, its look.
+    "public/share",
     "public/site-accounts",
     "public/sites",
 ] as const;

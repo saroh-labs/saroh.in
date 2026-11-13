@@ -248,6 +248,10 @@ export const RAW_ALLOWED = {
     "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/import/csv-import.tsx": ["input"],
+    // button: a post picture that is one button, picked from a row or swiped to (#1375)
+    "components/shared/share-item/card-picker.tsx": ["button"],
+    // button: a row that is one button, a thing to post picked from the list (#1378)
+    "components/social/create-post/pick-step.tsx": ["button"],
     // input: a native radio inside its card; label: a radio card with a timeline in it
     "components/subscriptions/plans/timing-card.tsx": ["input", "label"],
 };

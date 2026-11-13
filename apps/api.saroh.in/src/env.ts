@@ -278,6 +278,12 @@ const envSchema = z.object({
     // pages they changed. Anything else (unset included) queues nothing.
     // Switch it on before the Worker's own `SITE_PAGE_CACHE`.
     SITE_PAGE_CACHE: z.enum(["on", "off"]).optional(),
+    // Share as a post and Create post (#1375, #1378, DEC-217): `on` serves
+    // the share pictures (`public/share/...`), the signed-in booking card
+    // and own posts; anything else (unset included) answers 404 for all of
+    // them (`share-posts/share-posts-switch.ts`). Off in production until
+    // the owner opens it; the app's NEXT_PUBLIC_SHARE_POSTS hides the screens.
+    SHARE_POSTS: z.enum(["on", "off"]).optional(),
     // `on` adds `X-Robots-Tag: noindex, nofollow` to every answer
     // (`src/common/robots-header.ts`): set on the dev API (api.saroh.io) so
     // search engines never list it. Unset or `off`: no header (production).
