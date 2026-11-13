@@ -650,10 +650,12 @@ test.describe("the Plan Editor (D7)", () => {
         const sessions = page.getByRole("region", { name: "Classes included" });
         await sessions.scrollIntoViewIfNeeded();
         const before = await page.evaluate(() => window.scrollY);
+        // Marks this page's form, to know when the edit page has replaced it.
+        await sessions.evaluate((el) => el.setAttribute("data-e2e-was", "new"));
         await sessions.getByRole("radio", { name: "12" }).click();
         await expect(page).toHaveURL(/\/billing\/plans\/[^/]+\/edit$/);
-        // Long enough for the edit page to mount and settle.
-        await page.waitForTimeout(1000);
+        await expect(page.locator('[data-e2e-was="new"]')).toHaveCount(0);
+        await expect(sessions.getByRole("radio", { name: "12" })).toBeVisible();
         const after = await page.evaluate(() => window.scrollY);
         expect(after).toBeGreaterThanOrEqual(Math.max(0, before - 80));
         await expect(
