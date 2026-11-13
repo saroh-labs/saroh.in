@@ -178,6 +178,8 @@ async function usage(
 ) {
     const startedAt = over.startedAt ?? new Date(Date.now() - 60 * 60_000);
     const window = await meterWindow(prisma, ctx.organizationId, startedAt);
+    const outcome = over.outcome ?? "ANSWERED";
+    const running = outcome === "RUNNING";
     await prisma.aiUsage.create({
         data: {
             organizationId: ctx.organizationId,
@@ -190,8 +192,10 @@ async function usage(
             windowStart: window.start,
             windowKey: window.key,
             startedAt,
-            outcome: over.outcome ?? "ANSWERED",
-            counted: over.counted ?? true,
+            outcome,
+            // AiUsage_finished_check: a running turn has no finish and is never counted.
+            finishedAt: running ? null : startedAt,
+            counted: running ? false : (over.counted ?? true),
             costMicroUsd: over.costMicroUsd ?? 0,
         },
     });

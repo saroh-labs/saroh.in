@@ -11,6 +11,15 @@
  * holds; every amount is in test units, never Saroh's forecast or prices.
  * The halt is lifted again before each test ends.
  */
+// The controller's guards load Better Auth (ESM, not loadable here); these
+// tests call the controller directly, so the guards never run.
+jest.mock("../../../common/guards/better-auth.guard", () => ({
+    BetterAuthGuard: class BetterAuthGuard {},
+}));
+jest.mock("../../../common/guards/platform-admin.guard", () => ({
+    PlatformAdminGuard: class PlatformAdminGuard {},
+}));
+
 import { randomBytes, randomUUID } from "node:crypto";
 
 import {
