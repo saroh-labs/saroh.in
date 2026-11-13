@@ -191,6 +191,7 @@ async function rpc(method: string, params: Record<string, unknown> = {}) {
                 tools?: {
                     name: string;
                     annotations?: Record<string, unknown>;
+                    outputSchema?: unknown;
                 }[];
                 content?: { type: string; text: string }[];
                 structuredContent?: Record<string, unknown>;
@@ -297,6 +298,11 @@ describe("/mcp (U10)", () => {
                     "idempotentHint",
                     "openWorldHint",
                 ]),
+            );
+            // An older tool list must accept a newer answer (open-output.ts).
+            expect(t.outputSchema).toBeDefined();
+            expect(JSON.stringify(t.outputSchema)).not.toContain(
+                '"additionalProperties":false',
             );
         }
 

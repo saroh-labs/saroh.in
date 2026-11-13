@@ -16,6 +16,7 @@ import { authorize } from "../organizations/organization-policy";
 import type { McpCall } from "./activity.service";
 import { McpActivityService } from "./activity.service";
 import type { McpConnection } from "./mcp-auth.guard";
+import { openOutput } from "./open-output";
 
 export type { McpCall } from "./activity.service";
 
@@ -361,7 +362,7 @@ export class McpToolRegistry {
                     title: tool.title,
                     description: tool.description,
                     inputSchema: this.inputs.get(tool.name),
-                    outputSchema: tool.contract.output,
+                    outputSchema: openOutput(tool.contract.output),
                     annotations: { title: tool.title, ...tool.hints },
                 },
                 (input: Record<string, unknown>) =>
