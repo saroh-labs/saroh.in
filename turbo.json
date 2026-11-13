@@ -140,6 +140,8 @@
         // build, and the api's, which answers 404 while it is off.
         "NEXT_PUBLIC_SHARE_POSTS",
         "SHARE_POSTS",
+        // Ask AI's screens (DEC-220): the app's switch, read at build.
+        "NEXT_PUBLIC_ASK_AI",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",

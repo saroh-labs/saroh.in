@@ -322,6 +322,13 @@ const envSchema = z.object({
     // All five encryption keys may be a ring, `v2:<key>,v1:<key>` (DEC-214).
     APIKEY_ENC_KEY: z.string().optional(),
     WEBHOOK_SECRET_KEY: z.string().optional(),
+    // Ask AI (DEC-220): seals conversation and report text. Its own 32-byte
+    // key or ring, checked at use like the keys above; never logged.
+    AI_TEXT_ENC_KEY: z.string().optional(),
+    // Ask AI's provider (DEC-220): Anthropic's API key. Optional at boot;
+    // read only by `modules/ai/providers/ai-sdk.adapter.ts`, which refuses
+    // a call without it. Never logged, never in an example file with a value.
+    ANTHROPIC_API_KEY: z.string().optional(),
     // Durable public-API rate limits (U4, `modules/rate-limits/`). Unset, or
     // Redis down: each replica limits in process at the cap / API_REPLICAS.
     REDIS_URL: z.url().optional(),

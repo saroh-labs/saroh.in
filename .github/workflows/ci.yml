@@ -731,6 +731,8 @@ jobs:
       # Unset, as production, hides the screens and the API answers 404.
       NEXT_PUBLIC_SHARE_POSTS: "on"
       SHARE_POSTS: "on"
+      # Ask AI's screens (DEC-220). Unset, as production, hides them.
+      NEXT_PUBLIC_ASK_AI: "on"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.

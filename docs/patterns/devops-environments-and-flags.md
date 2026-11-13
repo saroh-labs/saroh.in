@@ -27,7 +27,9 @@
   key per kind of value: never reuse the payments key for staff data. Each
   of the five keys (with `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY` and
   `WEBHOOK_SECRET_KEY`) may be a ring, `v2:<key>,v1:<key>` newest first
-  (DEC-214, `runbooks/KEY_ROTATION.md`).
+  (DEC-214, `runbooks/KEY_ROTATION.md`). `AI_TEXT_ENC_KEY` (Ask AI's
+  conversation text, DEC-220) and the provider key `ANTHROPIC_API_KEY`
+  follow the same rule: optional at boot, refused at use.
 
 - **Current** — **A build-time switch that hides something is off when
   unset.** `NEXT_PUBLIC_TEMPLATES` (DEC-135) shows templates only when it is

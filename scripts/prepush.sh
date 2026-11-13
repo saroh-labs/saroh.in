@@ -396,6 +396,8 @@ e2e_stack() {
     export NEXT_PUBLIC_API_AREA=on
     # Share as a post and Create post on, as CI (DEC-217): app and API.
     export NEXT_PUBLIC_SHARE_POSTS=on SHARE_POSTS=on
+    # Ask AI's screens on, as CI (DEC-220).
+    export NEXT_PUBLIC_ASK_AI=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""

@@ -186,6 +186,17 @@ export const FlagKey = {
     API_SECRET: "API_SECRET",
     API_STOREFRONT: "API_STOREFRONT",
     API_WEBHOOKS: "API_WEBHOOKS",
+
+    /**
+     * Ask AI (DEC-220): the rollout switch, off for everyone until the owner
+     * opens it, a business's override first (Saroh's own test business).
+     * Not the Saroh-wide halt: that is an AI setting the spend alarm sets,
+     * checked before this and ignoring overrides. Not `API_MCP` either, so
+     * switching off outside AI apps leaves Ask AI alone, and the reverse.
+     * Readers: none yet; the AI module asks it at turn start, before every
+     * provider round and at Confirm (plan 2026-11-13-001, U3–U5).
+     */
+    ASK_AI: "ASK_AI",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -417,4 +428,14 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         "Webhooks",
         "webhooks to a business's own systems",
     ),
+    ASK_AI: {
+        shownAs: "Ask AI",
+        group: "feature",
+        purpose:
+            "Lets a business on a paying plan ask Ask AI about its own data and get drafts to confirm (DEC-220). Turn it on for Saroh's own test business first, and for merchants only once Anthropic has confirmed zero data retention in writing; off, Ask AI says \"Ask AI isn't available right now\" and its button stays, history is still readable, and nothing is counted.",
+        owner: "Owner",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "Ask AI has been on for every paying business on every instance for a release with no need to switch it off, and the AI module no longer asks it (the Saroh-wide halt stays).",
+    },
 };

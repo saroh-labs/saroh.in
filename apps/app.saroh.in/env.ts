@@ -77,6 +77,13 @@ export const env = createEnv({
          * `SHARE_POSTS` is the half that keeps it private.
          */
         NEXT_PUBLIC_SHARE_POSTS: z.enum(["on", "off"]).optional(),
+        /**
+         * Ask AI (DEC-220): `on` shows its button, panel and Settings tab;
+         * anything else, unset included, hides them
+         * (`lib/ask-ai/ask-ai-switch.ts`). Off in production until the
+         * owner opens it; the API's `ASK_AI` flag decides who may ask.
+         */
+        NEXT_PUBLIC_ASK_AI: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
@@ -116,6 +123,7 @@ export const env = createEnv({
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_API_AREA: process.env.NEXT_PUBLIC_API_AREA,
         NEXT_PUBLIC_SHARE_POSTS: process.env.NEXT_PUBLIC_SHARE_POSTS,
+        NEXT_PUBLIC_ASK_AI: process.env.NEXT_PUBLIC_ASK_AI,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
