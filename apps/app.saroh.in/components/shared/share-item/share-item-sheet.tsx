@@ -8,29 +8,9 @@ import { Notice } from "@saroh/ui/notice";
 import { Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import type {
-    CardSize,
-    CardStyle,
-    ShareItem,
-    ShareSetup,
-} from "@/lib/share-item/share";
-import { Field } from "@saroh/ui/field";
-import { Input } from "@saroh/ui/input";
+import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
+import { SHARE_WORDS } from "@/lib/share-item/words";
 
-import { PROFILE } from "@/lib/edition";
-import {
-    BOOK_HEADLINE,
-    cardFileName,
-    cardImageUrl,
-    cardsFor,
-    HEADLINE_MAX,
-    taggedLink,
-    withLink,
-} from "@/lib/share-item/share";
-import type { CaptionKind } from "@/lib/share-item/words";
-import { captionFor, captionKinds, SHARE_WORDS } from "@/lib/share-item/words";
-
-import { CaptionBox } from "./caption-box";
 import {
     CardCarousel,
     CardPreview,
@@ -38,16 +18,14 @@ import {
     PictureFailed,
     SizeSwitch,
 } from "./card-picker";
-import { ColourRow } from "./colour-row";
 import {
     DeskSchedule,
     ScheduleButton,
     ScheduleLine,
     SocialOffer,
 } from "./schedule-lock";
-import type { ShareParts } from "./share-actions";
 import { DeskActions, ShareNowButton } from "./share-actions";
-import { useCardImage } from "./use-card-image";
+import { ShareCaption, ShareExtras, useShareState } from "./use-share-state";
 
 /**
  * Share as a post (#1375 U2, boards SFBDesk and SFBPhone): "Share" beside
@@ -103,69 +81,13 @@ export function ShareItemButton({
  */
 function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
     const narrow = useNarrow();
-    const cards = cardsFor(item);
-    const [style, setStyle] = useState<CardStyle>(
-        cards.includes("price") && item.price !== null
-            ? "price"
-            : (cards[0] ?? "photo"),
-    );
-    const [size, setSize] = useState<CardSize>("post");
-    // The booking page's headline, typed here and never stored.
-    const [headline, setHeadline] = useState(BOOK_HEADLINE);
-    const [bg, setBg] = useState<string | null>(null);
-    // Each picture is a render: wait for typing or a colour drag to settle.
-    const look = useSettled({ bg, headline }, 500);
-    const link = taggedLink(item.url);
-    const named =
-        item.kind === "book"
-            ? { ...item, name: headline.trim() || BOOK_HEADLINE }
-            : item;
-    const kinds = captionKinds(item, PROFILE.hinglishCaptions);
-    const [kind, setKind] = useState<CaptionKind>(
-        kinds.includes("price") ? "price" : "short",
-    );
-    const [text, setText] = useState(() => captionFor(kind, named, link));
+    const share = useShareState(item, setup, narrow);
+    const { style, setStyle, size, setSize, image, retry, parts, picker } =
+        share;
     const [copiedNote, setCopiedNote] = useState(false);
     const [offer, setOffer] = useState(false);
     const offerRef = useRef<HTMLDivElement | null>(null);
-
-    const src = (s: CardStyle, w?: number) =>
-        cardImageUrl(setup, item, s, size, { ...look, w });
-    const { image, retry } = useCardImage(src(style));
-    const parts: ShareParts = {
-        caption: withLink(text, link),
-        link,
-        image,
-        fileName: cardFileName(named, style, size),
-    };
-    const pickKind = (k: CaptionKind) => {
-        setKind(k);
-        setText(captionFor(k, named, link));
-    };
-    // Thumbnails at twice the size they show: a small render, not a full one.
-    const picker = cards.map((s) => ({
-        style: s,
-        src: src(s, narrow ? 480 : 240),
-    }));
-    const extras = (
-        <>
-            {item.kind === "book" ? (
-                <Field label={SHARE_WORDS.headline}>
-                    <Input
-                        value={headline}
-                        maxLength={HEADLINE_MAX}
-                        onChange={(e) => setHeadline(e.target.value)}
-                        data-share-headline=""
-                    />
-                </Field>
-            ) : null}
-            <ColourRow
-                swatches={setup.swatches ?? []}
-                value={bg}
-                onChange={setBg}
-            />
-        </>
-    );
+    const extras = <ShareExtras item={item} setup={setup} share={share} />;
 
     // The phone's offer opens under the caption, scrolled to.
     useEffect(() => {
@@ -177,16 +99,7 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
         }
     }, [offer, narrow]);
 
-    const caption = (
-        <CaptionBox
-            kinds={kinds}
-            kind={kind}
-            onKind={pickKind}
-            text={text}
-            onText={setText}
-            showLabel={!narrow}
-        />
-    );
+    const caption = <ShareCaption share={share} showLabel={!narrow} />;
 
     if (narrow) {
         return (
@@ -285,15 +198,4 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
             </div>
         </>
     );
-}
-
-/** `value`, once it has stayed the same for `ms`. */
-function useSettled<T>(value: T, ms: number): T {
-    const [settled, setSettled] = useState(value);
-    const key = JSON.stringify(value);
-    useEffect(() => {
-        const t = setTimeout(() => setSettled(JSON.parse(key) as T), ms);
-        return () => clearTimeout(t);
-    }, [key, ms]);
-    return settled;
 }

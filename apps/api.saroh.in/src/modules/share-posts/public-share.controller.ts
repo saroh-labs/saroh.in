@@ -14,6 +14,7 @@ import { hashClientIp } from "../../common/client-ip";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { ShareQuery } from "./public-share.service";
 import { PublicShareService } from "./public-share.service";
+import { SharePostsSwitchGuard } from "./share-posts-switch";
 
 /** How long anyone may keep a picture: a price change shows within it. */
 export const SHARE_IMAGE_CACHE = "public, max-age=300";
@@ -25,7 +26,7 @@ export const SHARE_IMAGE_CACHE = "public, max-age=300";
  * A refusal is a JSON error the filter never lets anything keep.
  */
 @Controller("public/share")
-@UseGuards(PublicSiteOnlineGuard)
+@UseGuards(SharePostsSwitchGuard, PublicSiteOnlineGuard)
 export class PublicShareController {
     constructor(private readonly share: PublicShareService) {}
 

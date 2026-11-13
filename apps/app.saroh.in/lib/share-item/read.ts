@@ -12,6 +12,7 @@ import type { WebAddressLinks } from "@/lib/sites/share-links";
 
 import type { ScheduleLock, ShareSetup } from "./share";
 import { shareSwatches } from "./share";
+import { sharePostsOn } from "./share-posts-switch";
 
 /** The catalogue's module id Saroh Social's add-on will carry. */
 const SOCIAL_MODULE = "social";
@@ -19,13 +20,15 @@ const SOCIAL_MODULE = "social";
 /**
  * What a Share button needs (#1375 U2), once per render. Server-only.
  *
- * Null when there is nothing live to share from, or it can't be told
+ * Null while Share is switched off (`share-posts-switch.ts`), when there
+ * is nothing live to share from, or when it can't be told
  * (no live site, a role that can't read the sites or the web address): the
  * Share button is then left out, never broken, as the QR button is.
  */
 export const readShareSetup = cache(
     async (web: WebAddressLinks | null): Promise<ShareSetup | null> => {
-        if (!web) return null;
+        // Switched off (DEC-217): no Share button anywhere.
+        if (!web || !sharePostsOn()) return null;
         const [sites, access] = await Promise.all([
             listSites().catch(() => []),
             billingAccessOrNull(),

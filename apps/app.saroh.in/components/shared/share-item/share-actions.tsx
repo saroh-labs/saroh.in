@@ -2,8 +2,21 @@
 
 import { Button } from "@saroh/ui/button";
 import { copyText, useCopy } from "@saroh/ui/copy-button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@saroh/ui/dropdown-menu";
 import { showError } from "@saroh/ui/toast";
-import { Copy, Download, Facebook, MessageCircle, Share } from "lucide-react";
+import {
+    ChevronDown,
+    Copy,
+    Download,
+    Facebook,
+    MessageCircle,
+    Share,
+} from "lucide-react";
 
 import { facebookHref, whatsappHref } from "@/lib/share-item/share";
 import { SHARE_WORDS } from "@/lib/share-item/words";
@@ -155,5 +168,65 @@ export function ShareNowButton({
             <Share aria-hidden className="size-4" />
             {failed ? SHARE_WORDS.shareText : SHARE_WORDS.shareNow}
         </Button>
+    );
+}
+
+/**
+ * Create post's Share now at a desk (SFCLockedDesk, SGOwnDesk): the same
+ * four actions as the sheet's, in one menu at the page's foot.
+ */
+export function ShareNowMenu({ caption, link, image, fileName }: ShareParts) {
+    const { copy, copied } = useCopy();
+    const onCopy = async () => {
+        if (!(await copy(caption))) showError(SHARE_WORDS.copyFailed);
+    };
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button type="button" className="gap-2" data-share-now="">
+                    <Share aria-hidden className="size-4" />
+                    {SHARE_WORDS.shareNow}
+                    <ChevronDown aria-hidden className="size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-60">
+                <DropdownMenuItem
+                    disabled={image.state !== "ready"}
+                    onSelect={() => download(image, fileName)}
+                >
+                    <Download aria-hidden className="size-4" />
+                    {SHARE_WORDS.download}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onSelect={(e) => {
+                        e.preventDefault();
+                        void onCopy();
+                    }}
+                >
+                    <Copy aria-hidden className="size-4" />
+                    {copied ? SHARE_WORDS.copied : SHARE_WORDS.copy}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a
+                        href={whatsappHref(caption)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <MessageCircle aria-hidden className="size-4" />
+                        {SHARE_WORDS.whatsapp}
+                    </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a
+                        href={facebookHref(link)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <Facebook aria-hidden className="size-4" />
+                        {SHARE_WORDS.facebook}
+                    </a>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

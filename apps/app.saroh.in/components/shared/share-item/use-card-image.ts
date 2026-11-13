@@ -17,9 +17,10 @@ interface Settled {
  * The chosen card's PNG, fetched as a blob whenever the card or its size
  * changes, so Download and the phone's share sheet have it at hand: an
  * iPhone opens `navigator.share` only straight from the tap, with no fetch
- * in between. `retry` fetches it again after a failure.
+ * in between. `retry` fetches it again after a failure. No address yet
+ * (an own post before its first save) is loading, with nothing fetched.
  */
-export function useCardImage(url: string): {
+export function useCardImage(url: string | null): {
     image: CardImage;
     retry: () => void;
 } {
@@ -28,6 +29,7 @@ export function useCardImage(url: string): {
     const key = `${round}:${url}`;
 
     useEffect(() => {
+        if (url === null) return;
         const abort = new AbortController();
         let src: string | null = null;
         fetch(url, { signal: abort.signal })

@@ -69,6 +69,14 @@ export const env = createEnv({
          * until the area ships (#1357).
          */
         NEXT_PUBLIC_API_AREA: z.enum(["on", "off"]).optional(),
+        /**
+         * Share as a post and Create post (DEC-217): `on` shows the Share
+         * buttons, the Social rail row and its page; anything else, unset
+         * included, hides them (`lib/share-item/share-posts-switch.ts`).
+         * Off in production until the owner opens it; the API's
+         * `SHARE_POSTS` is the half that keeps it private.
+         */
+        NEXT_PUBLIC_SHARE_POSTS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
@@ -107,6 +115,7 @@ export const env = createEnv({
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_API_AREA: process.env.NEXT_PUBLIC_API_AREA,
+        NEXT_PUBLIC_SHARE_POSTS: process.env.NEXT_PUBLIC_SHARE_POSTS,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,

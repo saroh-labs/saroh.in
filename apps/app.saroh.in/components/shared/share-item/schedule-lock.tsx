@@ -173,3 +173,62 @@ export function DeskSchedule({
         </Popover>
     );
 }
+
+/**
+ * Channels, locked (SFCLocked*, SGOwn*): what Saroh Social adds to Create
+ * post, and the one way to it. The page says the offer here, once; its
+ * foot then only names Schedule.
+ */
+export function ChannelsLocked({
+    lock,
+    title,
+    what,
+}: {
+    lock: ScheduleLock;
+    title: string;
+    what: string;
+}) {
+    return (
+        <section
+            data-channels-locked={lock.tier}
+            aria-label={title}
+            className="grid gap-3 rounded-xl border border-border bg-card p-4"
+        >
+            <h2 className="flex items-center gap-2 text-[14px] font-semibold">
+                {title}
+                <span className="flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
+                    <Lock aria-hidden className="size-3" />
+                    Saroh Social
+                </span>
+            </h2>
+            <div aria-hidden className="flex gap-1.5">
+                {["IG", "f", "@"].map((mark) => (
+                    <span
+                        key={mark}
+                        className="flex size-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground"
+                    >
+                        {mark}
+                    </span>
+                ))}
+            </div>
+            <p className="text-pretty text-[13.5px] leading-[1.5] text-muted-foreground">
+                {what}
+            </p>
+            <PlanWay
+                fallback={
+                    lock.tier === "grow" ? (
+                        <p className="text-[13px] text-muted-foreground">
+                            {SHARE_WORDS.ownerCanAdd}
+                        </p>
+                    ) : undefined
+                }
+            >
+                <div>
+                    <Button asChild size="sm">
+                        <Link href={wayHref(lock)}>{wayLabel(lock)}</Link>
+                    </Button>
+                </div>
+            </PlanWay>
+        </section>
+    );
+}

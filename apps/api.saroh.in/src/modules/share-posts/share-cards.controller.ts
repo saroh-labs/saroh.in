@@ -17,6 +17,7 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { authorize } from "../organizations/organization-policy";
 import type { ShareQuery } from "./public-share.service";
 import { PublicShareService } from "./public-share.service";
+import { SharePostsSwitchGuard } from "./share-posts-switch";
 
 /**
  * The booking page's card with a headline typed in the share sheet
@@ -28,7 +29,12 @@ import { PublicShareService } from "./public-share.service";
  *       ?headline=&style=&size=&bg=&fg=&w=
  */
 @Controller("organizations/:organizationId/share")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@UseGuards(
+    SharePostsSwitchGuard,
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+)
 // Becomes SOCIAL when the Social module exists.
 @RequireModule("WEBSITE")
 export class ShareCardsController {

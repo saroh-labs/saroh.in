@@ -20,13 +20,14 @@ export type CardStyle = (typeof CARD_STYLES)[number];
 export const CARD_SIZES = ["post", "square", "story"] as const;
 export type CardSize = (typeof CARD_SIZES)[number];
 
-/** What can be shared: a product, a service, a blog post, the booking page, or an own post. */
-export type ShareItemKind = "product" | "service" | "post" | "book" | "own";
+/** What can be shared: a product, a service, a blog post, the booking page, an offer (a live discount), or an own post. */
+export type ShareItemKind =
+    "product" | "service" | "post" | "book" | "offer" | "own";
 
 /** One live thing to share. */
 export interface ShareItem {
     kind: ShareItemKind;
-    /** The API's ref: a product's or post's slug, a service's or own post's id; "page" for the booking page. */
+    /** The API's ref: a product's or post's slug, a service's, offer's or own post's id; "page" for the booking page. */
     ref: string;
     name: string;
     /** "₹360", "₹300 to ₹500"; null with no price. */
@@ -67,6 +68,11 @@ export interface CardLook {
     headline?: string | null;
     /** A thumbnail's width in pixels; none draws the full size. */
     w?: number;
+    /**
+     * A saved own post's version (its `updatedAt`): the picture is kept
+     * five minutes, so a changed post asks for a new one.
+     */
+    v?: string;
 }
 
 /** The app's own route for the booking page's card (`app/api/share/book/image`). */
@@ -100,6 +106,8 @@ export function cardsFor(item: ShareItem): CardStyle[] {
             return [...photo, "colour", "simple"];
         case "book":
             return ["colour", "photo", "simple"];
+        case "offer":
+            return ["offer", "simple", "colour"];
         case "own":
             return ["colour", "simple", ...photo];
     }
@@ -121,6 +129,7 @@ export function cardImageUrl(
     const headline = look.headline?.trim();
     if (item.kind === "book" && headline) q.set("headline", headline);
     if (look.w) q.set("w", String(look.w));
+    if (look.v) q.set("v", look.v);
     // The booking card takes a typed headline, so it is drawn through the
     // app's signed-in route, never a public address with words in it.
     if (item.kind === "book") return `${BOOK_IMAGE_PATH}?${q.toString()}`;
@@ -167,12 +176,16 @@ function tint(hex: string | null, amount: number): string | null {
         .join("")}`;
 }
 
-/** The item's page, tagged so Saroh can count visits from a post (R5). */
-export function taggedLink(url: string): string {
+/**
+ * The item's page, tagged so Saroh can count visits from a post (R5); a
+ * saved own post adds its own campaign, `post-<id>`.
+ */
+export function taggedLink(url: string, postId?: string): string {
     try {
         const u = new URL(url);
         u.searchParams.set("utm_source", "saroh-share");
         u.searchParams.set("utm_medium", "social");
+        if (postId) u.searchParams.set("utm_campaign", `post-${postId}`);
         return u.toString();
     } catch {
         return url;

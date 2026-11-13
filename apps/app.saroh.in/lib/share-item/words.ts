@@ -65,6 +65,14 @@ export function captionFor(
         }
         return `${item.name}. Read it here: ${link}`;
     }
+    if (item.kind === "offer") {
+        return kind === "hinglish"
+            ? `${item.name}. Offer dekhne ke liye yahan dekhein: ${link}`
+            : `${item.name}. See it here: ${link}`;
+    }
+    if (item.kind === "own") {
+        return `${item.name} ${link}`;
+    }
     if (item.kind === "book") {
         return kind === "hinglish"
             ? `${item.name}. Booking ke liye yahan dekhein: ${link}`
@@ -88,7 +96,7 @@ export function captionFor(
 
 export const SHARE_WORDS = {
     subtitle: (item: ShareItem) =>
-        `A post in your website's look · live on your ${item.kind === "product" ? "shop" : item.kind === "post" ? "blog" : item.kind === "own" ? "website" : "booking page"}`,
+        `A post in your website's look · live on your ${item.kind === "product" || item.kind === "offer" ? "shop" : item.kind === "post" ? "blog" : item.kind === "own" ? "website" : "booking page"}`,
     headline: "Headline on the card",
     colours: "Colours",
     siteColours: "Site colours",

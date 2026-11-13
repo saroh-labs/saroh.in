@@ -17,6 +17,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { SharePostInputDto } from "./dto";
+import { SharePostsSwitchGuard } from "./share-posts-switch";
 import type { SharePostView } from "./share-posts.service";
 import { SharePostsService } from "./share-posts.service";
 
@@ -26,7 +27,12 @@ import { SharePostsService } from "./share-posts.service";
  * (`social:read`, `social:post`); the module gate is Website for now.
  */
 @Controller("organizations/:organizationId/share-posts")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@UseGuards(
+    SharePostsSwitchGuard,
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+)
 // Becomes SOCIAL when the Social module exists.
 @RequireModule("WEBSITE")
 export class SharePostsController {
