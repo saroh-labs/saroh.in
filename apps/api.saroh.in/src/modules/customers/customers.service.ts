@@ -192,7 +192,8 @@ export class CustomersService {
      * the owning Organization id, so every create in this service can stamp
      * `organizationId` (#173). A store they can't see is a 404; one they see
      * without `contact:write` in its business is a 403 in words
-     * (`customer-access.ts`). `store:write` never decides it.
+     * (`customer-access.ts`). `store:write` never decides it; with
+     * ORG_AUTHORIZATION off the storefront's write roles do, as before.
      */
     private async requireWrite(
         storeId: string,
@@ -200,7 +201,7 @@ export class CustomersService {
     ): Promise<string | null> {
         const store = await this.stores.getForUser(storeId, userId);
         if (
-            !(await this.stores.memberAllows(storeId, userId, "contact:write"))
+            !(await this.stores.writeAllows(storeId, userId, "contact:write"))
         ) {
             throw new ForbiddenException(
                 "Your role can't change customers' details.",

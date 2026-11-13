@@ -117,7 +117,7 @@ test.describe("someone on a location's team", () => {
         await expectDenied(page, "/bookings", { thing: "Bookings" });
     });
 
-    test("sees the orders of their location only, with their money, and may take one", async ({
+    test("sees the orders of their location only, with their money", async ({
         page,
         browser,
     }, testInfo) => {
@@ -136,13 +136,12 @@ test.describe("someone on a location's team", () => {
                     .getByRole("listitem")
                     .filter({ hasText: `#${mine.orderId}` }),
             ).toBeVisible();
-            // Taking orders (owner, 13 Nov 2026); never exporting them.
-            await expect(
-                page
-                    .getByRole("button", { name: "New order" })
-                    .or(page.getByRole("link", { name: "New order" }))
-                    .first(),
-            ).toBeVisible();
+            // Never exporting them. Nor New order here: the seeded stack runs
+            // ORG_AUTHORIZATION off, where a storefront's own roles decide who
+            // takes an order there (`orderWriteOrganization`), and she is a
+            // Viewer. On the organization path Storefront team takes them at
+            // its storefronts (owner, 13 Nov 2026; `order-location.db.spec`).
+            await expectNotOffered(page, "New order");
             await expectNotOffered(page, "Export");
             await page.goto(`/commerce/orders?q=${theirs.orderId}`);
             await expect(page.getByText(/No orders match/)).toBeVisible();

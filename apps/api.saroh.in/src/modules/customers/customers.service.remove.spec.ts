@@ -24,11 +24,11 @@ import { CustomersService } from "./customers.service";
 const findFirst = prisma.customer.findFirst as jest.Mock;
 const remove = prisma.customer.delete as jest.Mock;
 const getForUser = jest.fn();
-const memberAllows = jest.fn();
+const writeAllows = jest.fn();
 
 function service(): CustomersService {
     return new CustomersService(
-        { getForUser, memberAllows } as unknown as StoresService,
+        { getForUser, writeAllows } as unknown as StoresService,
         {} as ActivationEvents,
     );
 }
@@ -40,7 +40,7 @@ describe("CustomersService.remove", () => {
             id: "store_1",
             organizationId: "org_1",
         });
-        memberAllows.mockResolvedValue(true);
+        writeAllows.mockResolvedValue(true);
     });
 
     it("deletes a customer who has never ordered", async () => {
@@ -86,11 +86,11 @@ describe("CustomersService.remove", () => {
 
     // contact:write decides, never store:write (audit 2026-11-12 #6).
     it("refuses someone whose business role lacks contact:write", async () => {
-        memberAllows.mockResolvedValue(false);
+        writeAllows.mockResolvedValue(false);
         await expect(
             service().remove("store_1", "cu_1", "user_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(memberAllows).toHaveBeenCalledWith(
+        expect(writeAllows).toHaveBeenCalledWith(
             "store_1",
             "user_1",
             "contact:write",
@@ -99,7 +99,7 @@ describe("CustomersService.remove", () => {
     });
 
     it("refuses an edit without contact:write too", async () => {
-        memberAllows.mockResolvedValue(false);
+        writeAllows.mockResolvedValue(false);
         await expect(
             service().update("store_1", "cu_1", "user_1", {
                 email: "a@example.com",

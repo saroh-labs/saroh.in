@@ -268,6 +268,24 @@ export class StoresService {
     }
 
     /**
+     * A storefront write the business role decides by `action` — a
+     * customer's details ask `contact:write`, never `store:write`. With
+     * ORG_AUTHORIZATION off (no permissions to ask) the storefront's owner or
+     * a write-capable member keeps it, as before. The same rule as an order
+     * write without money: `orderWriteOrganization`.
+     */
+    async writeAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        return (
+            (await this.orderWriteOrganization(storeId, userId, action)) !==
+            null
+        );
+    }
+
+    /**
      * Whether the caller's membership in the store's business permits an
      * action beyond the store's own read/write — `order:read` or
      * `product-review:read` on a product page that shows orders and reviews.
