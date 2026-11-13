@@ -34,6 +34,7 @@ export const CAPABILITY_GROUPS = [
     "money",
     "messaging",
     "insights",
+    "social",
 ] as const;
 
 export type CapabilityGroup = (typeof CAPABILITY_GROUPS)[number];
@@ -442,6 +443,15 @@ export const CAPABILITIES: readonly Capability[] = [
 
     // — Insights ——————————————————————————————————————————————
     { action: "analytics:read", group: "insights", label: "See insights" },
+
+    // — Social ————————————————————————————————————————————————
+    { action: "social:read", group: "social", label: "See posts" },
+    {
+        action: "social:post",
+        group: "social",
+        label: "Make and share posts",
+        note: "Posts about the business, with its pictures and words. Whoever can make posts can also see them.",
+    },
 ];
 
 /** Lookup by action, for turning a stored grant back into its label. */

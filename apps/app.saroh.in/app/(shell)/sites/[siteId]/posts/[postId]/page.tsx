@@ -7,7 +7,9 @@ import { getPost, listPostCategories } from "@/lib/content/service";
 import { recordTitle } from "@/lib/page-title";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { readShareSetup } from "@/lib/share-item/read";
 import { getSite, listComments } from "@/lib/sites/service";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
 // One read for the tab's title and the page.
 const readPost = cache((siteId: string, postId: string) =>
@@ -60,6 +62,16 @@ export default async function EditPostPage({
             : listComments(siteId),
     ]);
     if (!post) notFound();
+    // Share as a post (#1375): only while the post is live on the site.
+    const web = post.live ? await readWebAddressLinks() : null;
+    const setup = web ? await readShareSetup(web) : null;
+    const share =
+        web && setup
+            ? {
+                  setup,
+                  url: `${web.origin.replace(/\/+$/, "")}/${site.postsPrefix ?? "blog"}/${post.slug}`,
+              }
+            : null;
 
     /*
      * Changing a post is `section:write` (`posts.service.ts`), which the
@@ -74,6 +86,7 @@ export default async function EditPostPage({
             post={post}
             paused={postPaused(post, activeCut(paused, "posts"))}
             readOnly={!site.can.edit}
+            share={share}
             feedback={
                 comments
                     ? {

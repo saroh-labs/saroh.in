@@ -123,6 +123,17 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (#1378, owner 12 Nov 2026) — **Posts follow the Social
+  permissions.** `social:read` ("See posts") and `social:post` ("Make and
+  share posts", implies `social:read`) are their own group, Social, in the
+  role catalogue: Owner and Admin by default, never a Member's or a
+  Reviewer's, grantable to a role or a person (F17). Own posts
+  (`share-posts`) ask them, never `section:write` or a role's name; the
+  module gate stays WEBSITE until a Social module exists. Saroh Social
+  asks the same two. The booking page's card with a typed headline is
+  drawn only through `organizations/:id/share/book/image` (`social:read`);
+  the public share picture never draws words from its address.
+  `share-posts.permissions.spec.ts`, `share-cards.controller.spec.ts`.
 - **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
   `hours:write` ("Set hours and time off") covers a person's weekly hours,
   extra hours and time off; adding or removing people, their services, the

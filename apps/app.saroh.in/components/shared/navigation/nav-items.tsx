@@ -13,6 +13,7 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
+    Megaphone,
     Plug,
     QrCode,
     ReceiptText,
@@ -29,6 +30,10 @@ import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
+import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
+
+/** Grow › Social: Create post, while Share is switched on (DEC-217). */
+export const SOCIAL_HREF = "/social/new";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -133,7 +138,10 @@ export type NavAction =
     // invoices. Owner and Admin by default, as the API has it; changing the
     // plan is `billing:manage`, the Owner's alone, which the page asks
     // (`plan-access.ts`).
-    | "billing:read";
+    | "billing:read"
+    // Grow › Social (Create post, #1378): seeing and sharing posts. Owner and
+    // Admin by default, grantable to Members (the Social group in Roles).
+    | "social:read";
 
 /**
  * Role → what it may reach here.
@@ -182,6 +190,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "lead:read",
         "pipeline:read",
         "billing:read",
+        "social:read",
     ],
     ADMIN: [
         "org:read",
@@ -220,6 +229,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "lead:read",
         "pipeline:read",
         "billing:read",
+        "social:read",
     ],
     MEMBER: [
         "org:read",
@@ -640,6 +650,16 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: BarChart3,
                 moduleKey: "INSIGHTS",
             },
+            // Create post (#1378, DEC-217). Saroh Social will add its posts
+            // and calendar here; until then the row lands on Create post.
+            // Website until the Social module exists, as the API gates it.
+            {
+                href: SOCIAL_HREF,
+                label: "Social",
+                icon: Megaphone,
+                moduleKey: "WEBSITE",
+                action: "social:read",
+            },
         ],
         // The canvas design also shows Marketing, Automation and AI here as
         // SOON. The rail deliberately has no "coming soon" state: a nav entry
@@ -1028,8 +1048,8 @@ export function navFor({
         role,
         actions,
     );
-    const stocked =
-        stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const shared = sharePostsOn() ? tracked : withoutSocial(tracked);
+    const stocked = stockTracked === false ? withoutStockRows(shared) : shared;
     const billed =
         kindOf(kind) === "WORK" ? withoutStandaloneInvoices(stocked) : stocked;
     const groups = isLocationScopedRole(roleKey)
@@ -1070,6 +1090,16 @@ function withoutStandaloneInvoices(groups: NavGroup[]): NavGroup[] {
             items: group.items.filter(
                 (item) => !(item.href === INVOICES_HREF && item.unlessModule),
             ),
+        }))
+        .filter((group) => group.items.length > 0);
+}
+
+/** The Social row taken out while Share is switched off (DEC-217). */
+function withoutSocial(groups: NavGroup[]): NavGroup[] {
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.href !== SOCIAL_HREF),
         }))
         .filter((group) => group.items.length > 0);
 }

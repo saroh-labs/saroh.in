@@ -14,4 +14,5 @@ export const CAPABILITY_GROUP_LABEL: Readonly<Record<string, string>> = {
     money: "Money",
     messaging: "Messaging",
     insights: "Insights",
+    social: "Social",
 };

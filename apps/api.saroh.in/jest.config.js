@@ -127,6 +127,9 @@ module.exports = {
         // $transaction) that run the REAL @saroh/templates instantiate against
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
+        // Share pictures and own posts (#1375, #1378): the card renderer
+        // and the route rules, DB-free; the rows are in *.db.spec.ts.
+        "<rootDir>/src/modules/share-posts/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
         // The category refusal's words (UX-066); the rest of content's
         // specs read the dev database.
