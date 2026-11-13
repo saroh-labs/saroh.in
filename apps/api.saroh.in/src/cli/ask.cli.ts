@@ -273,6 +273,10 @@ async function ask(app: TestingModule, args: AskArgs): Promise<number> {
                 );
             } else if (event.type === "error") {
                 process.stdout.write(`\n${TAG} error: ${event.reason}\n`);
+            } else if (event.type === "refused") {
+                process.stdout.write(
+                    `\n${TAG} not asked: ${JSON.stringify(event.refusal)}\n`,
+                );
             } else {
                 process.stdout.write(
                     `\n\n${TAG} outcome ${event.outcome}, counted ${event.counted}, rounds ${event.usage.rounds}\n`,

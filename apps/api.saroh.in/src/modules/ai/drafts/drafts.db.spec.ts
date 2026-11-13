@@ -29,6 +29,7 @@ import { IdempotencyService } from "../../../common/idempotency/idempotency.serv
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { env } from "../../../env";
 import { AuditService } from "../../audit/audit.service";
+import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import { BookingsService } from "../../bookings/bookings.service";
 import { ContactsService } from "../../contacts/contacts.service";
 import { CustomerAddService } from "../../customer-workspace/customer-add.service";
@@ -54,6 +55,7 @@ import { CatalogueV1Controller } from "../../public-api/catalogue.v1.controller"
 import { CustomersV1Controller } from "../../public-api/customers.v1.controller";
 import { OrdersV1Controller } from "../../public-api/orders.v1.controller";
 import { StoresService } from "../../stores/stores.service";
+import { AskAiAccess } from "../access/ask-ai-access";
 import { ASK_AI_AGENT } from "../agents/ask-ai.agent";
 import { ConversationsService } from "../conversations.service";
 import { AiSettingsService } from "../settings/ai-settings.service";
@@ -117,14 +119,15 @@ registry.register(
 const organizations = new OrganizationContextService();
 const settings = new AiSettingsService();
 const store = new TurnStore(new ConversationsService());
-const drafts = new DraftsService(
-    registry,
-    settings,
-    flags,
-    store,
-    kitchen,
-    activity,
-);
+// Ask AI on the plan: the plan's part is `ask-ai-access.db.spec.ts`.
+const access = new AskAiAccess(settings, flags, store, {
+    resolve: () =>
+        Promise.resolve({
+            source: "catalogue",
+            modules: [{ moduleId: "ask-ai", state: "on", limit: null }],
+        }),
+} as unknown as CatalogueAccessService);
+const drafts = new DraftsService(registry, settings, access, kitchen, activity);
 const bridge = new ToolBridge(registry, organizations, [ASK_AI_AGENT], drafts);
 const live = new AbortController().signal;
 

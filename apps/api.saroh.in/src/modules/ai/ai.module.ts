@@ -2,11 +2,13 @@ import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
 import { env } from "../../env";
+import { BillingModule } from "../billing/billing.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { McpModule } from "../mcp/mcp.module";
 import { OrdersModule } from "../orders/orders.module";
+import { AskAiAccess } from "./access/ask-ai-access";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
 import { ConversationsService } from "./conversations.service";
 import { AskAiDraftsController } from "./drafts/drafts.controller";
@@ -14,6 +16,8 @@ import { DraftsService } from "./drafts/drafts.service";
 import { AI_RETENTION_TYPE, AiRetentionJob } from "./history/retention.job";
 import { AiSdkAdapter } from "./providers/ai-sdk.adapter";
 import { AI_PROVIDER } from "./providers/provider.port";
+import { AskAiRequestsController } from "./requests/ai-requests.controller";
+import { AiRequestsService } from "./requests/ai-requests.service";
 import { AiSettingsService } from "./settings/ai-settings.service";
 import { ToolBridge } from "./tools/tool-bridge";
 import { AI_TOOLBOX } from "./tools/toolbox.port";
@@ -31,14 +35,25 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * 90-day retention sweep. U13: the agents, the turn runner with its guards,
  * Stop's registry and the stuck-turn sweep. U4: the tool bridge, running
  * the MCP tools as the person asking. U5: drafts, with Confirm, Undo and
- * Draft again. Routes (U9) are added here as they land.
+ * Draft again. U7: who may ask and how much (the plan's allowance, the
+ * day's cost, one running turn a person) and Request more. Routes (U9)
+ * are added here as they land.
  */
 @Module({
     // McpModule: the tool registry, and (via ApiKeysModule) the person's
-    // live context. OrdersModule: Undo of an order's step.
-    imports: [JobsModule, FeatureFlagModule, McpModule, OrdersModule],
-    controllers: [AskAiDraftsController],
+    // live context. OrdersModule: Undo of an order's step. BillingModule:
+    // the plan's Ask AI row, and Request more's add-on.
+    imports: [
+        JobsModule,
+        FeatureFlagModule,
+        McpModule,
+        OrdersModule,
+        BillingModule,
+    ],
+    controllers: [AskAiDraftsController, AskAiRequestsController],
     providers: [
+        AskAiAccess,
+        AiRequestsService,
         DraftsService,
         { provide: AI_PROVIDER, useFactory: () => new AiSdkAdapter() },
         ToolBridge,
@@ -54,6 +69,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     ],
     exports: [
         AI_PROVIDER,
+        AskAiAccess,
+        AiRequestsService,
         AiSettingsService,
         ConversationsService,
         TurnRunner,

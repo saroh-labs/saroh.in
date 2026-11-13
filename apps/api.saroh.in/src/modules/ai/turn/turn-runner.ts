@@ -3,6 +3,8 @@ import type { AiTurnOutcome } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import type { AskAiRefusal, StartLimits } from "../access/ask-ai-access";
+import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
 import {
     agentVersion,
@@ -71,6 +73,7 @@ interface Prepared {
     conversation: TurnConversation;
     agent: AgentDefinition;
     limits: TurnLimits;
+    start: StartLimits;
     language: Awaited<ReturnType<TurnStore["language"]>>;
     system: AiSystemPart[];
     tools: AiToolDefinition[];
@@ -113,6 +116,7 @@ export class TurnRunner {
         private readonly settings: AiSettingsService,
         private readonly flags: FeatureFlagService,
         private readonly store: TurnStore,
+        private readonly access: AskAiAccess,
     ) {}
 
     /** A new conversation, with the model and effort in effect now stamped on it. */
@@ -147,6 +151,12 @@ export class TurnRunner {
     async *run(input: TurnInput): AsyncGenerator<TurnEvent> {
         const { ctx, turnId } = input;
         const now = new Date();
+        // Who may ask, before anything is read or sent (plan U7).
+        const entry = await this.access.entry(ctx, now);
+        if (!entry.ok) {
+            yield* refused(turnId, entry.refusal);
+            return;
+        }
         let prepared: Prepared;
         try {
             prepared = await this.prepare(input, now);
@@ -171,7 +181,21 @@ export class TurnRunner {
             return;
         }
         const { conversation } = prepared;
-        await this.store.start(ctx, conversation, turnId, input.question, now);
+        const refusal = await this.store.start(
+            ctx,
+            conversation,
+            turnId,
+            input.question,
+            now,
+            this.access.admit(ctx, entry.row, prepared.start, now),
+        );
+        if (refusal) {
+            this.logger.log(
+                `ai_turn_refused turn=${turnId} org=${ctx.organizationId} reason=${refusal.reason}`,
+            );
+            yield* refused(turnId, refusal);
+            return;
+        }
         const state: TurnState = {
             text: "",
             tokens: NO_TOKENS,
@@ -216,15 +240,14 @@ export class TurnRunner {
 
     private async prepare(input: TurnInput, now: Date): Promise<Prepared> {
         const { ctx } = input;
-        if (!(await this.available(ctx.organizationId)))
-            throw new Unavailable();
         const { conversation, history } = await this.store.load(
             ctx,
             input.conversationId,
         );
         const agent = this.agent(conversation.agent);
-        const [limits, language] = await Promise.all([
+        const [limits, start, language] = await Promise.all([
             this.limits(ctx.organizationId, conversation.model),
+            this.access.limits(ctx.organizationId),
             this.store.language(ctx),
         ]);
         const block = await agent.businessBlock(ctx, language, now);
@@ -232,6 +255,7 @@ export class TurnRunner {
             conversation,
             agent,
             limits,
+            start,
             language,
             // House rules and job are the same for every business: cached
             // with the tools before them. The business block follows.
@@ -464,6 +488,18 @@ export async function askAiAvailable(
     if ((await settings.halt()).halted) return false;
     if (!(await flags.isEnabled("ASK_AI", organizationId))) return false;
     return store.businessOn(organizationId);
+}
+
+/** A turn not asked: the refusal, then done, not counted. */
+function* refused(turnId: string, refusal: AskAiRefusal): Generator<TurnEvent> {
+    yield { type: "refused", refusal };
+    yield {
+        type: "done",
+        turnId,
+        outcome: refusal.reason === "daily-limit" ? "DAILY_LIMIT" : "FAILED",
+        counted: false,
+        usage: { rounds: 0, inputTokens: 0, outputTokens: 0 },
+    };
 }
 
 function end(

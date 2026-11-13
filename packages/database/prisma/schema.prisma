@@ -325,6 +325,7 @@ model Organization {
   aiBusinessSetting    AiBusinessSetting?
   aiPersonSettings     AiPersonSetting[]
   askAiDrafts          AskAiDraft[]
+  aiRequests           AiRequest[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
@@ -10064,6 +10065,41 @@ model AiBusinessSetting {
   updatedByUserId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/// Where a Request more is: waiting for Saroh, granted (an `ask-ai` add-on
+/// added), or declined.
+enum AiRequestStatus {
+  OPEN
+  GRANTED
+  DECLINED
+}
+
+// Request more (DEC-220, plan 2026-11-13-001 U7): an Owner or Admin at the
+// question allowance asks Saroh for more questions this period. One open
+// request a business; Saroh's console lists them and grants one by adding
+// `ask-ai` add-on packs, which raise the allowance and bill after the period.
+model AiRequest {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Who asked.
+  userId         String
+  // The billing period it was asked in (`meterWindow`'s key).
+  windowKey      String
+  status         AiRequestStatus @default(OPEN)
+
+  // Set when Saroh decides: who, when, why, and the packs added.
+  decidedByUserId String?
+  decidedAt       DateTime?
+  reason          String?
+  packs           Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
 }
 
 // One person's Ask AI settings in one business. No row: MATCH.

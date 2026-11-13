@@ -184,6 +184,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         EntitlementService,
         MeteringService,
         OverLimitService,
+        // Ask AI's Request more, granted as add-on packs (DEC-220).
+        AddonsService,
         SubscriptionsService,
         PlansService,
     ],

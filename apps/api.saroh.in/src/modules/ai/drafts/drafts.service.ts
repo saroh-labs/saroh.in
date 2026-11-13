@@ -18,7 +18,6 @@ import {
     PLAN_LIMIT_REACHED,
 } from "../../billing/plan-limit-errors";
 import { businessTimezone } from "../../bookings/staff-availability";
-import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { McpActivityService } from "../../mcp/activity.service";
 import type { McpCall, McpTool } from "../../mcp/tool-registry";
 import {
@@ -30,6 +29,8 @@ import {
 } from "../../mcp/tool-registry";
 import { OrderKitchenService } from "../../orders/order-kitchen.service";
 import { assertWorkspaceWrite } from "../../organizations/organization-lifecycle.gate";
+import type { AskAiRefusal } from "../access/ask-ai-access";
+import { AskAiAccess } from "../access/ask-ai-access";
 import { openDraftBody, sealDraftBody } from "../history/sealing";
 import {
     AiSettingNotConfiguredError,
@@ -37,8 +38,6 @@ import {
 } from "../settings/ai-settings.service";
 import { askAiCall, refused, textOf } from "../tools/ask-ai-call";
 import type { AiToolRun, AiTurnRef } from "../tools/toolbox.port";
-import { askAiAvailable } from "../turn/turn-runner";
-import { TurnStore } from "../turn/turn-store";
 import type { DraftSpec, ReadContext, TargetState } from "./draft-targets";
 import { DRAFT_SPECS, labelOf } from "./draft-targets";
 
@@ -69,12 +68,16 @@ const STATUS: Record<AskAiDraftStatus, AskAiDraftCard["status"]> = {
     REFUSED: "refused",
 };
 
-/**
- * Hook for the `ai:use` permission (plan U7). Until it exists every member
- * who reaches Ask AI may use it; U7 makes this `authorize(ctx, "ai:use")`.
- */
-function assertMayUseAskAi(ctx: OrganizationContext): void {
-    void ctx;
+/** Why a draft can't be acted on, in the card's words; null when it can. */
+function entryWords(refusal: AskAiRefusal): string {
+    switch (refusal.reason) {
+        case "locked":
+            return "Ask AI isn't on this business's plan now, so nothing was changed.";
+        case "no-permission":
+            return "Your role here no longer lets you use Ask AI, so nothing was changed.";
+        default:
+            return "Ask AI is off for this business now, so nothing was changed.";
+    }
 }
 
 /**
@@ -88,7 +91,7 @@ function assertMayUseAskAi(ctx: OrganizationContext): void {
  *   ends on its card: every field that will change, old → new.
  * - Confirm, Undo and Draft again take only the draft's id, looked up with
  *   the business and person from the request (another's is a 404). Each
- *   checks again: the halt, `ASK_AI`, the business's switch, the person's
+ *   checks again: the halt, `ASK_AI`, the plan, `ai:use`, the business's switch, the person's
  *   live role and the module; then that nothing changed since.
  * - Confirm re-runs the draft, refuses if the result differs from the
  *   card, takes the draft in one conditional update (a second Confirm
@@ -101,8 +104,7 @@ export class DraftsService {
     constructor(
         private readonly registry: McpToolRegistry,
         private readonly settings: AiSettingsService,
-        private readonly flags: FeatureFlagService,
-        private readonly store: TurnStore,
+        private readonly access: AskAiAccess,
         private readonly kitchen: OrderKitchenService,
         private readonly activity: McpActivityService,
     ) {}
@@ -524,13 +526,9 @@ export class DraftsService {
         ctx: OrganizationContext,
         tool: McpTool,
     ): Promise<McpCall | string> {
-        assertMayUseAskAi(ctx);
-        const org = ctx.organizationId;
-        if (
-            !(await askAiAvailable(this.settings, this.flags, this.store, org))
-        ) {
-            return "Ask AI is off for this business now, so nothing was changed.";
-        }
+        // The halt, ASK_AI, the plan, `ai:use` and the business's switch.
+        const entry = await this.access.entry(ctx);
+        if (!entry.ok) return entryWords(entry.refusal);
         const asker = askAiCall(ctx);
         if (!this.registry.allows(tool, asker.ctx)) {
             return "Your role here no longer lets you make this change, so nothing was changed.";

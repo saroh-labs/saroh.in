@@ -20,6 +20,7 @@
  * | `sites`            | websites not deleted                                                   |
  * | `storageGb`        | photos and videos uploaded and checked (`Media.status` READY), in GB  |
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
+ * | `aiQuestionsPerMonth` | Ask AI turns that counted (`AiUsage.counted`, DEC-220): answered, drafted or stopped after the answer began |
  *
  * A cap inside one thing (a product's variants, `variantsPerProduct`) is
  * not counted here: it has no total across the business, so it is no meter
@@ -63,6 +64,7 @@ export const METERED_LIMIT_KEYS = [
     "sites",
     "storageGb",
     "visitsPerMonth",
+    "aiQuestionsPerMonth",
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
 
@@ -253,6 +255,7 @@ export type MeterDb = Pick<
     | "media"
     | "analyticsDailyAggregate"
     | "subscription"
+    | "aiUsage"
 >;
 
 /**
@@ -351,6 +354,11 @@ export function standingBookings(since: Date): Prisma.BookingWhereInput {
     };
 }
 
+/** Ask AI turns that count, started from `since` (DEC-220, `ai/turn/outcome.ts`). */
+export function countedQuestions(since: Date): Prisma.AiUsageWhereInput {
+    return { counted: true, startedAt: { gte: since } };
+}
+
 /**
  * How much of one limit a business uses now. Monthly keys count over
  * {@link meterWindow}.
@@ -441,6 +449,12 @@ export async function countUsage(
                 _sum: { count: true },
             });
             return sum._sum.count ?? 0;
+        }
+        case "aiQuestionsPerMonth": {
+            const { start } = await meterWindow(db, organizationId, now);
+            return db.aiUsage.count({
+                where: { organizationId, ...countedQuestions(start) },
+            });
         }
     }
 }

@@ -15,7 +15,9 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { env } from "../../../env";
+import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import type { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import { AskAiAccess } from "../access/ask-ai-access";
 import { ASK_AI_AGENT } from "../agents/ask-ai.agent";
 import { ConversationsService } from "../conversations.service";
 import { FakeAiProvider } from "../providers/fake.provider";
@@ -36,6 +38,14 @@ const flags = {
     isEnabled: () => Promise.resolve(true),
 } as unknown as FeatureFlagService;
 const actor = { userId: "user_test_settings" };
+// Ask AI on the plan with no cap: the plan's part is `ask-ai-access.db.spec.ts`.
+const access = new AskAiAccess(settings, flags, store, {
+    resolve: () =>
+        Promise.resolve({
+            source: "catalogue",
+            modules: [{ moduleId: "ask-ai", state: "on", limit: null }],
+        }),
+} as unknown as CatalogueAccessService);
 
 let seq = 0;
 const uniq = (label: string) => `${label}-${process.pid}-${++seq}`;
@@ -64,6 +74,9 @@ async function configure(org: string, model = "claude-haiku-5-5") {
         "askAi.maxHistoryTokens": 1_000_000,
         "askAi.turnTokenCap": 1_000_000,
         "askAi.turnCostCapMicroUsd": 1_000_000,
+        "askAi.businessDayCostCapMicroUsd": 1_000_000_000,
+        "askAi.runningTurnsPerBusiness": 5,
+        "askAi.questionsPerMinutePerPerson": 100,
         "ai.prices": {
             [model]: {
                 input: 1_000_000,
@@ -79,6 +92,14 @@ async function configure(org: string, model = "claude-haiku-5-5") {
             effectiveFrom: new Date(Date.now() - 1000),
         });
     }
+    // Saroh-wide only; a test value far above anything these turns spend.
+    await settings.set(
+        "ai.sarohDayCostCapMicroUsd",
+        1_000_000_000_000,
+        "turn spec",
+        actor,
+        new Date(Date.now() - 1000),
+    );
 }
 
 function runner(rounds: ConstructorParameters<typeof FakeAiProvider>[0]) {
@@ -89,6 +110,7 @@ function runner(rounds: ConstructorParameters<typeof FakeAiProvider>[0]) {
         settings,
         flags,
         store,
+        access,
     );
 }
 

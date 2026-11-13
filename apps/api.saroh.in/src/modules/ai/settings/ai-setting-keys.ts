@@ -58,6 +58,10 @@ export const AI_SETTING_SCHEMAS = {
     "askAi.redraftsPerConversation": count(1_000),
     /** A turn still running after this many minutes is failed by the sweep. */
     "askAi.stuckTurnMinutes": count(24 * 60),
+    /** Turns running at once in one business (a person runs one at a time). */
+    "askAi.runningTurnsPerBusiness": count(1_000),
+    /** Questions one person may start in a minute. */
+    "askAi.questionsPerMinutePerPerson": count(1_000),
     /** Cost guards: one turn, one business's day, Saroh's day. */
     "askAi.turnCostCapMicroUsd": microUsd,
     "askAi.businessDayCostCapMicroUsd": microUsd,

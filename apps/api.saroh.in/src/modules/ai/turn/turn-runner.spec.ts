@@ -5,12 +5,23 @@
  * Stop, provider failures, model stamping, and logs without text. The rows
  * themselves (sealing, the RUNNING row) are `turn.db.spec.ts`.
  */
-jest.mock("@saroh/database", () => ({ prisma: {} }));
+jest.mock("@saroh/database", () => ({
+    prisma: {
+        membership: {
+            findFirst: () => Promise.resolve({ user: { name: "Meera" } }),
+        },
+    },
+    outsideOrgContext: (fn: () => unknown) => fn(),
+    runInOrgContext: (_org: string, fn: () => unknown) => fn(),
+}));
 
 import { Logger } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import type { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import type { AskAiRefusal } from "../access/ask-ai-access";
+import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
 import { FakeAiProvider } from "../providers/fake.provider";
 import type { AiEvent, AiMessage, AiUsage } from "../providers/provider.port";
@@ -71,6 +82,10 @@ function baseSettings(): Record<string, unknown> {
         "askAi.maxHistoryTokens": 1_000_000,
         "askAi.turnTokenCap": 1_000_000,
         "askAi.turnCostCapMicroUsd": 1_000_000,
+        "askAi.businessDayCostCapMicroUsd": 10_000_000,
+        "ai.sarohDayCostCapMicroUsd": 100_000_000,
+        "askAi.runningTurnsPerBusiness": 3,
+        "askAi.questionsPerMinutePerPerson": 5,
         "ai.prices": {
             "claude-haiku-5-5": {
                 input: PER_TOKEN,
@@ -109,11 +124,20 @@ interface Setup {
     history?: AiMessage[];
     toolRun?: (name: string) => AiToolRun | Promise<AiToolRun>;
     conversation?: Partial<TurnConversation>;
+    asker?: OrganizationContext;
 }
 
 function setup(s: Setup) {
     const values = s.settings ?? baseSettings();
-    const switches = { halted: false, flag: true, businessOn: true };
+    const switches = {
+        halted: false,
+        flag: true,
+        businessOn: true,
+        /** Ask AI's catalogue row: on (a paying plan) or locked (Free). */
+        plan: "on" as "on" | "locked",
+        /** What the start's checks find (`AskAiAccess.admit`, run by the store). */
+        atStart: null as AskAiRefusal | null,
+    };
     const settings = {
         get: jest.fn((key: string) => {
             if (!(key in values)) {
@@ -159,8 +183,9 @@ function setup(s: Setup) {
         language: jest.fn(() => Promise.resolve("MATCH" as const)),
         start: jest.fn(
             (_c: unknown, _v: unknown, turnId: string, question: string) => {
+                if (switches.atStart) return Promise.resolve(switches.atStart);
                 store.started.push({ turnId, question });
-                return Promise.resolve();
+                return Promise.resolve(null);
             },
         ),
         finish: jest.fn(
@@ -184,6 +209,27 @@ function setup(s: Setup) {
         ),
     };
     const provider = new FakeAiProvider(s.rounds);
+    const catalogue = {
+        resolve: jest.fn(() =>
+            Promise.resolve({
+                source: "catalogue",
+                modules: [
+                    {
+                        moduleId: "ask-ai",
+                        state: switches.plan,
+                        limit: 3,
+                        upgradeTo: switches.plan === "on" ? "" : "Plan B",
+                    },
+                ],
+            }),
+        ),
+    };
+    const access = new AskAiAccess(
+        settings as unknown as AiSettingsService,
+        flags as unknown as FeatureFlagService,
+        store as unknown as TurnStore,
+        catalogue as unknown as CatalogueAccessService,
+    );
     const runner = new TurnRunner(
         provider,
         toolbox,
@@ -191,11 +237,12 @@ function setup(s: Setup) {
         settings as unknown as AiSettingsService,
         flags as unknown as FeatureFlagService,
         store as unknown as TurnStore,
+        access,
     );
     const controller = new AbortController();
     const turn = () =>
         runner.run({
-            ctx,
+            ctx: s.asker ?? ctx,
             conversationId: conversation.id,
             question: QUESTION,
             turnId: "turn_1",
@@ -477,7 +524,11 @@ describe("TurnRunner", () => {
             const t = setup({ rounds: [] });
             t.switches.halted = true;
             const events = await collect(t.turn());
-            expect(events.map((e) => e.type)).toEqual(["error", "done"]);
+            expect(events.map((e) => e.type)).toEqual(["refused", "done"]);
+            expect(events[0]).toEqual({
+                type: "refused",
+                refusal: { reason: "unavailable" },
+            });
             expect(t.store.start).not.toHaveBeenCalled();
             expect(t.provider.requests).toHaveLength(0);
         });
@@ -598,5 +649,100 @@ describe("TurnRunner", () => {
         expect(all).not.toContain("Asha");
         expect(all).not.toContain("Kal kitni");
         expect(all).toContain("turn=turn_1");
+    });
+});
+
+describe("who may ask (plan U7)", () => {
+    const member = (actions?: string[]): OrganizationContext => ({
+        ...ctx,
+        role: "MEMBER",
+        ...(actions
+            ? { actions: new Set(actions) as OrganizationContext["actions"] }
+            : {}),
+    });
+
+    it("a plan without Ask AI is refused before any provider call", async () => {
+        const t = setup({ rounds: [[text("never"), done()]] });
+        t.switches.plan = "locked";
+        const events = await collect(t.turn());
+        expect(events[0]).toEqual({
+            type: "refused",
+            refusal: { reason: "locked", upgradeTo: "Plan B" },
+        });
+        expect(last(events)).toMatchObject({
+            outcome: "FAILED",
+            counted: false,
+        });
+        expect(t.provider.requests).toHaveLength(0);
+        expect(t.store.start).not.toHaveBeenCalled();
+    });
+
+    it("a Member without ai:use is refused; one given it asks", async () => {
+        const no = setup({
+            rounds: [[text("never"), done()]],
+            asker: member(),
+        });
+        expect((await collect(no.turn()))[0]).toEqual({
+            type: "refused",
+            refusal: { reason: "no-permission" },
+        });
+        expect(no.provider.requests).toHaveLength(0);
+
+        const yes = setup({
+            rounds: [[text("Teen."), done()]],
+            asker: member(["ai:use"]),
+        });
+        expect(last(await collect(yes.turn()))).toMatchObject({
+            outcome: "ANSWERED",
+            counted: true,
+        });
+    });
+
+    it("the business's switch off: refused, naming whom to ask", async () => {
+        const t = setup({ rounds: [[text("never"), done()]] });
+        t.switches.businessOn = false;
+        expect((await collect(t.turn()))[0]).toEqual({
+            type: "refused",
+            refusal: { reason: "business-off", askName: "Meera" },
+        });
+        expect(t.provider.requests).toHaveLength(0);
+    });
+
+    it("the start's checks refusing: nothing sent, not counted; a full day is DAILY_LIMIT", async () => {
+        const resetsAt = new Date("2026-12-01T00:00:00Z");
+        const t = setup({ rounds: [[text("never"), done()]] });
+        t.switches.atStart = {
+            reason: "allowance",
+            limit: 3,
+            resetsAt,
+            requestMore: true,
+            askName: null,
+        };
+        const events = await collect(t.turn());
+        expect(events[0]).toMatchObject({
+            type: "refused",
+            refusal: { reason: "allowance", resetsAt },
+        });
+        expect(last(events)).toMatchObject({ counted: false });
+        expect(t.provider.requests).toHaveLength(0);
+        expect(t.store.finish).not.toHaveBeenCalled();
+
+        const day = setup({ rounds: [[text("never"), done()]] });
+        day.switches.atStart = { reason: "daily-limit", scope: "business" };
+        expect(last(await collect(day.turn()))).toMatchObject({
+            outcome: "DAILY_LIMIT",
+            counted: false,
+        });
+        expect(day.provider.requests).toHaveLength(0);
+    });
+
+    it("the halt beats everything else", async () => {
+        const t = setup({ rounds: [[text("never"), done()]] });
+        t.switches.halted = true;
+        t.switches.plan = "locked";
+        expect((await collect(t.turn()))[0]).toEqual({
+            type: "refused",
+            refusal: { reason: "unavailable" },
+        });
     });
 });

@@ -88,6 +88,7 @@ describe("plan keys", () => {
                 "api-mcp",
                 "api-secret",
                 "api-storefront",
+                "ask-ai",
                 "blog",
                 "bookings",
                 "integrations",

@@ -53,6 +53,8 @@ export const ADDON_KINDS = [
     "orders",
     "bookings",
     "integrations",
+    // More Ask AI questions a month (DEC-220): how Request more is granted.
+    "ask-ai",
 ] as const;
 export type AddonKind = (typeof ADDON_KINDS)[number];
 

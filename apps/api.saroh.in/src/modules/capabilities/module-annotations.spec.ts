@@ -455,6 +455,9 @@ const NEVER: Record<string, string> = {
     // Plan 2026-11-13-001 U5: Ask AI's Confirm, Undo and Draft again.
     "ai/drafts/drafts.controller.ts":
         "Ask AI's drafts — the ASK_AI switch gates them, each draft's tool checks its own module",
+    // U7: Request more — the plan's Ask AI row and ASK_AI gate it, no module holds it.
+    "ai/requests/ai-requests.controller.ts":
+        "Ask AI's Request more — the ASK_AI switch and the plan gate it, no module holds it",
 };
 
 /** Controllers with a test of their own below, not a row above. */

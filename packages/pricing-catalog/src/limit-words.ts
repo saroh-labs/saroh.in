@@ -154,6 +154,13 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "You can't add more webhook endpoints.",
         monthly: false,
     },
+    // Ask AI (DEC-220): only questions that got an answer count.
+    aiQuestionsPerMonth: {
+        what: "Ask AI questions a month",
+        one: "Ask AI question a month",
+        paused: "You've used all of this period's Ask AI questions. Ready-made questions and drafts you already have still work.",
+        monthly: true,
+    },
 };
 
 /**

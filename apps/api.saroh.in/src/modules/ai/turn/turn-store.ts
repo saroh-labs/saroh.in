@@ -6,6 +6,7 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { meterWindow } from "../../billing/metering";
+import type { AskAiRefusal, TurnAdmit } from "../access/refusal";
 import { ConversationsService } from "../conversations.service";
 import { sealMessageBody } from "../history/sealing";
 import type { AiMessage } from "../providers/provider.port";
@@ -139,42 +140,61 @@ export class TurnStore {
         return row?.language ?? "MATCH";
     }
 
-    /** The usage row, RUNNING, and the question, sealed. */
+    /**
+     * The usage row, RUNNING, and the question, sealed, once `admit` (the
+     * start's checks, `AskAiAccess.admit`) finds room on the same
+     * transaction; the RUNNING row is what later starts see. Refused,
+     * nothing is written but a business or Saroh day at its limit, which
+     * leaves a DAILY_LIMIT row (not counted, no text) for the alarms (U8).
+     */
     start(
         ctx: OrganizationContext,
         conversation: TurnConversation,
         turnId: string,
         question: string,
         now: Date,
-    ): Promise<void> {
-        return asBusiness(ctx.organizationId, async () => {
-            const window = await meterWindow(prisma, ctx.organizationId, now);
-            const messageId = randomUUID();
-            const body = sealMessageBody(
-                { text: question },
-                {
+        admit?: TurnAdmit,
+    ): Promise<AskAiRefusal | null> {
+        return asBusiness(ctx.organizationId, () =>
+            prisma.$transaction(async (tx) => {
+                const window = await meterWindow(tx, ctx.organizationId, now);
+                const refusal = admit ? await admit(tx, window) : null;
+                const usage = {
                     organizationId: ctx.organizationId,
+                    userId: ctx.userId,
                     conversationId: conversation.id,
-                    rowId: messageId,
-                },
-            );
-            await prisma.$transaction([
-                prisma.aiUsage.create({
-                    data: {
+                    turnId,
+                    agent: conversation.agent,
+                    agentVersion: conversation.agentVersion,
+                    model: conversation.model,
+                    effort: conversation.effort,
+                    windowStart: window.start,
+                    windowKey: window.key,
+                    startedAt: now,
+                };
+                if (refusal) {
+                    if (refusal.reason === "daily-limit") {
+                        await tx.aiUsage.create({
+                            data: {
+                                ...usage,
+                                outcome: "DAILY_LIMIT",
+                                finishedAt: now,
+                            },
+                        });
+                    }
+                    return refusal;
+                }
+                const messageId = randomUUID();
+                const body = sealMessageBody(
+                    { text: question },
+                    {
                         organizationId: ctx.organizationId,
-                        userId: ctx.userId,
                         conversationId: conversation.id,
-                        turnId,
-                        agent: conversation.agent,
-                        agentVersion: conversation.agentVersion,
-                        model: conversation.model,
-                        effort: conversation.effort,
-                        windowStart: window.start,
-                        windowKey: window.key,
-                        startedAt: now,
+                        rowId: messageId,
                     },
-                }),
-                prisma.aiMessage.create({
+                );
+                await tx.aiUsage.create({ data: usage });
+                await tx.aiMessage.create({
                     data: {
                         id: messageId,
                         organizationId: ctx.organizationId,
@@ -185,13 +205,14 @@ export class TurnStore {
                         bodyAuthTag: body.authTag,
                         createdAt: now,
                     },
-                }),
-                prisma.aiConversation.update({
+                });
+                await tx.aiConversation.update({
                     where: { id: conversation.id },
                     data: { lastMessageAt: now },
-                }),
-            ]);
-        });
+                });
+                return null;
+            }),
+        );
     }
 
     /** The answer sealed (even an empty one, to carry the outcome) and the usage row finished. */

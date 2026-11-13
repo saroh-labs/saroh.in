@@ -1,5 +1,7 @@
 import type { AiTurnOutcome } from "@saroh/database";
 
+import type { AskAiRefusal } from "../access/refusal";
+
 /**
  * What a turn tells the panel, in Saroh's words (DEC-220). The stream (U9)
  * writes these as server-sent events; nothing here carries money.
@@ -26,6 +28,8 @@ export type TurnEvent =
     | { type: "text-delta"; text: string }
     | { type: "card"; kind: string; data: Record<string, unknown> }
     | { type: "error"; reason: TurnErrorReason }
+    /** Not asked (plan U7): nothing was sent and nothing counts. */
+    | { type: "refused"; refusal: AskAiRefusal }
     | {
           type: "done";
           turnId: string;
