@@ -178,6 +178,7 @@ async function booking(
             endAt: new Date(startAt.getTime() + 3_600_000),
             timezone: "UTC",
             status: "CONFIRMED",
+            snapshot: {},
             ...more,
         },
     });
