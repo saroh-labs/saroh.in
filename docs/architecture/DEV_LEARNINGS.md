@@ -6703,3 +6703,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `src/modules/mcp/open-output.ts`: the registry lists each output schema without `additionalProperties: false`, at every depth. Answers are still checked against the contract's Zod schema. `open-output.spec.ts` checks both, and `mcp.controller.db.spec.ts` asserts that no tool in `tools/list` carries it.
 - **Rule:** a tool's answer can gain fields; it never loses one or changes one's type without a new tool name. Apps that hold an older tool list must keep working.
 - **Category:** api · mcp
+## A new plan's form jumped to the top when its first save moved the address (13 Nov 2026)
+
+- **Symptom:** filming the gym tour on a phone, picking a plan's sessions (4, 8, 12) threw the page back to the top of the form, and the camera had to scroll down again. A probe in Chromium showed why: about 300 ms after the address moved from `/billing/plans/new` to `/billing/plans/<id>/edit`, the form's element was gone and the page sat at scroll 0.
+- **Cause:** the first autosave moves the address with `history.replaceState` (UX-080). Next 16 follows that write, as it must (the 20 Oct entry above), and renders the route at the new address: `[planId]/edit` is a different page from `new`, so the editor mounts again, fresh, at the top. The record is saved by then, so only the page's place is lost: its scroll and its focus.
+- **Fix:** `leavePlace` / `takePlace` (`lib/editor-shell/address.ts`): the old page leaves its scroll and focused control's id in sessionStorage for the new address, and the editor mounted there takes it once, within five seconds, and carries on from there. Unit tests in `address.test.ts`; checked in Chromium with the probe scene.
+- **Rule:** an editor whose address moves from `/new` to the record's own page (the shell's plans and packs, and any page that follows) carries the page's place across; never write the address past Next's router to avoid the remount.
+- **Category:** app · editors

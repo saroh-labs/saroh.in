@@ -636,6 +636,41 @@ test.describe("the Plan Editor (D7)", () => {
         }
     });
 
+    test("the first save moves the address and the page stays where it was", async ({
+        page,
+    }) => {
+        // The address moves from /new to the draft's own page once nobody
+        // is typing, and Next mounts that page; it carries on from the same
+        // scroll instead of jumping to the top (13 Nov 2026).
+        await onNorthwind(page);
+        await page.goto("/billing/plans/new");
+        await page
+            .getByLabel("Name")
+            .fill(`E2E scroll ${ownStamp(test.info())}`);
+        const sessions = page.getByRole("region", { name: "Classes included" });
+        await sessions.scrollIntoViewIfNeeded();
+        const before = await page.evaluate(() => window.scrollY);
+        await sessions.getByRole("radio", { name: "12" }).click();
+        await expect(page).toHaveURL(/\/billing\/plans\/[^/]+\/edit$/);
+        // Long enough for the edit page to mount and settle.
+        await page.waitForTimeout(1000);
+        const after = await page.evaluate(() => window.scrollY);
+        expect(after).toBeGreaterThanOrEqual(Math.max(0, before - 80));
+        await expect(
+            sessions.getByRole("radio", { name: "12" }),
+        ).toBeInViewport();
+
+        await page
+            .getByRole("button", { name: "Delete draft" })
+            .first()
+            .click();
+        await page
+            .getByRole("alertdialog")
+            .getByRole("button", { name: "Delete draft" })
+            .click();
+        await expect(page).toHaveURL(/\/billing\/subscriptions\?tab=plans$/);
+    });
+
     test("a draft nobody bought can be deleted", async ({ page }) => {
         await onNorthwind(page);
         await page.goto("/billing/plans/new");
