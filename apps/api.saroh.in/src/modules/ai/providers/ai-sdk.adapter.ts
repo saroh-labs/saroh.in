@@ -69,7 +69,13 @@ export class AiSdkAdapter implements AiProvider {
                 instructions: systemOf(request),
                 messages: messagesOf(request.messages),
                 tools: toolsOf(request),
+                ...(request.toolChoice
+                    ? { toolChoice: request.toolChoice }
+                    : {}),
                 maxOutputTokens: request.maxTokens,
+                ...(request.maxRetries === undefined
+                    ? {}
+                    : { maxRetries: request.maxRetries }),
                 abortSignal: signal,
                 providerOptions: {
                     anthropic: {

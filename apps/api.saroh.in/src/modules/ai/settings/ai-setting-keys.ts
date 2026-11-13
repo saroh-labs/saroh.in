@@ -50,6 +50,12 @@ export const AI_SETTING_SCHEMAS = {
     "askAi.maxPromptTokens": count(1_000_000),
     /** The longest tool result passed to the model, in characters. */
     "askAi.maxToolResultChars": count(1_000_000),
+    /** The conversation kept in a round's prompt, in tokens; older parts are trimmed. */
+    "askAi.maxHistoryTokens": count(1_000_000),
+    /** All tokens one turn may use over its rounds (input, cache and output). */
+    "askAi.turnTokenCap": count(100_000_000),
+    /** A turn still running after this many minutes is failed by the sweep. */
+    "askAi.stuckTurnMinutes": count(24 * 60),
     /** Cost guards: one turn, one business's day, Saroh's day. */
     "askAi.turnCostCapMicroUsd": microUsd,
     "askAi.businessDayCostCapMicroUsd": microUsd,

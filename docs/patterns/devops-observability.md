@@ -209,6 +209,12 @@ here when you add a `Map`, a cache or a timer that outlives a request.
   over-limit caches in `billing/`, link previews, analytics labels and facts,
   parsed catalogue versions (immutable), auth instances per host, and the
   last-used throttles (`touched`) on keys and AI connections.
+- **Per process, and one replica assumed:** Ask AI's running turns
+  (`ai/turn/turn-registry.ts`), which Stop aborts by turn id. With two
+  replicas a Stop that lands on the other one finds nothing and the turn
+  runs to its end; move it to Redis pub/sub before scaling. The stuck-turn
+  sweep (`ai/usage/stuck-turns.ts`) runs on a timer in every replica, which
+  is safe: one conditional update fails each row once.
 - **Per process, and N times looser with N replicas** (each also starts empty
   on every deploy): every `FixedWindowRateLimiter` (public booking, enquiry,
   payments, reviews, tools, shop reads, …), Better Auth's own sign-in and code

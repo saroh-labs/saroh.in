@@ -60,6 +60,14 @@ export interface AiStreamRequest {
     maxTokens: number;
     /** Automatic caching of the conversation's tail, after the last breakpoint. */
     cacheTail?: boolean;
+    /**
+     * Retries after a failed call; the library's default when absent. A
+     * turn passes 0: a retry delays Stop and the answer, and the person can
+     * ask again.
+     */
+    maxRetries?: number;
+    /** "none": the tools stay (and the cache with them) but the model must answer. */
+    toolChoice?: "auto" | "none";
 }
 
 /** Raw token counts as the provider reported them, for cost (U13). */
