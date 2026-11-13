@@ -60,6 +60,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "An invitation to join Saroh's team (DEC-169, admin console U24), for someone who may have no account yet. Saroh's staff, not a business.",
     SarohLead:
         "Saroh's own sales lead (DEC-169, U20): someone who may become a business, from a saroh.in enquiry, the waitlist or a manager. Saroh's, not a business; the business it became is a plain wonOrganizationId.",
+    AiSetting:
+        "Saroh-wide AI settings (DEC-220): the model, effort, caps and prices every business's Ask AI runs on; a business's own change is an AiSettingOverride, which has its own policy.",
     CommissionRate:
         "A commission rate for one kind of account-manager link (DEC-169, U21), set in the console; Saroh's own terms with its team, the same for every business.",
     CommissionPayout:
