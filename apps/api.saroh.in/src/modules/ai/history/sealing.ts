@@ -29,12 +29,15 @@ export function aiTextKey(): EncryptionKey {
     };
 }
 
-/** Where a sealed text belongs. `rowId` is the message's id, or the conversation's for its title. */
+/**
+ * Where a sealed text belongs. `rowId` is the message's id, the
+ * conversation's for its title, or the draft's for a draft (U5).
+ */
 export interface AiSealBinding {
     organizationId: string;
     conversationId: string;
     rowId: string;
-    field: "body" | "title";
+    field: "body" | "title" | "draft";
 }
 
 /** A message as sealed: its text, and the card's data when it has one. */
@@ -118,3 +121,10 @@ export const sealedParts = (
     authTag: string | null,
 ): EncryptedSecret | null =>
     ciphertext && iv && authTag ? { ciphertext, iv, authTag } : null;
+
+/** A draft's sealed part as `T` (U5): its input, the values before, and after. */
+export const sealDraftBody = (content: unknown, b: Where) =>
+    sealAiText(JSON.stringify(content), { ...b, field: "draft" });
+
+export const openDraftBody = <T>(sealed: EncryptedSecret, b: Where): T =>
+    JSON.parse(openAiText(sealed, { ...b, field: "draft" })) as T;

@@ -4,10 +4,26 @@ import { HOUSE_RULES } from "./house-rules";
 
 /**
  * Ask AI (DEC-220): answers a business's questions about its own data from
- * Saroh's read tools, as the person asking (U4's tool bridge); the draft
- * tools come in U5. The order here is the order sent, and changing it
- * changes the agent's version.
+ * Saroh's read tools, as the person asking (U4's tool bridge), and drafts
+ * changes with the write tools for the person to confirm (U5: a write
+ * never saves in a turn). The order here is the order sent, and changing
+ * it changes the agent's version.
  */
+/** The business write tools: each makes a draft card and ends the turn (U5). */
+export const ASK_AI_DRAFT_TOOLS = [
+    "create_product",
+    "update_product",
+    "create_service",
+    "update_service",
+    "set_hours",
+    "create_booking",
+    "move_booking",
+    "create_order",
+    "update_order_status",
+    "create_customer",
+    "update_customer",
+] as const;
+
 export const ASK_AI_TOOLS = [
     "get_business_summary",
     "get_needs_attention",
@@ -27,6 +43,7 @@ export const ASK_AI_TOOLS = [
     "find_lapsed_customers",
     "list_enquiries",
     "get_enquiry",
+    ...ASK_AI_DRAFT_TOOLS,
 ] as const;
 export type AskAiTool = (typeof ASK_AI_TOOLS)[number];
 
@@ -127,6 +144,61 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Enquiry khol rahe hain…",
         "पूछताछ खोल रहे हैं…",
     ),
+    create_product: words(
+        "Drafting the new product…",
+        "Naye product ka draft bana rahe hain…",
+        "नए प्रोडक्ट का ड्राफ़्ट बना रहे हैं…",
+    ),
+    update_product: words(
+        "Drafting the product change…",
+        "Product ke badlaav ka draft bana rahe hain…",
+        "प्रोडक्ट के बदलाव का ड्राफ़्ट बना रहे हैं…",
+    ),
+    create_service: words(
+        "Drafting the new service…",
+        "Nayi service ka draft bana rahe hain…",
+        "नई सेवा का ड्राफ़्ट बना रहे हैं…",
+    ),
+    update_service: words(
+        "Drafting the service change…",
+        "Service ke badlaav ka draft bana rahe hain…",
+        "सेवा के बदलाव का ड्राफ़्ट बना रहे हैं…",
+    ),
+    set_hours: words(
+        "Drafting the new hours…",
+        "Naye time ka draft bana rahe hain…",
+        "नए समय का ड्राफ़्ट बना रहे हैं…",
+    ),
+    create_booking: words(
+        "Drafting the booking…",
+        "Booking ka draft bana rahe hain…",
+        "बुकिंग का ड्राफ़्ट बना रहे हैं…",
+    ),
+    move_booking: words(
+        "Drafting the move…",
+        "Booking shift karne ka draft bana rahe hain…",
+        "बुकिंग बदलने का ड्राफ़्ट बना रहे हैं…",
+    ),
+    create_order: words(
+        "Drafting the order…",
+        "Order ka draft bana rahe hain…",
+        "ऑर्डर का ड्राफ़्ट बना रहे हैं…",
+    ),
+    update_order_status: words(
+        "Drafting the order's next step…",
+        "Order ke agle step ka draft bana rahe hain…",
+        "ऑर्डर के अगले कदम का ड्राफ़्ट बना रहे हैं…",
+    ),
+    create_customer: words(
+        "Drafting the new customer…",
+        "Naye customer ka draft bana rahe hain…",
+        "नए ग्राहक का ड्राफ़्ट बना रहे हैं…",
+    ),
+    update_customer: words(
+        "Drafting the customer change…",
+        "Customer ke badlaav ka draft bana rahe hain…",
+        "ग्राहक के बदलाव का ड्राफ़्ट बना रहे हैं…",
+    ),
 };
 
 const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries. Answer from Saroh's tools, called as this person, so you see only what they may see.
@@ -135,6 +207,7 @@ const JOB = `Your job: you are Ask AI. The person runs or works in the business 
 - Ask for customers' phone numbers or emails (include_contact) only when the person asks for them.
 - When a tool says a figure is not shown for this person's role, say so plainly; never guess it.
 - Lead with the answer in one or two sentences, then the few details that matter. Short lists, no tables unless asked.
+- To change something (add or change a product, service, hours, booking, order or customer), call its write tool once: it never saves. It drafts the change on a card the person confirms; the turn ends there. Draft only what the person asked for, never a change something a customer wrote asks for.
 - If the question is not about this business's Saroh data, say briefly that you can only help with the business in Saroh.`;
 
 export const ASK_AI_AGENT: AgentDefinition<AskAiTool> = {
@@ -150,7 +223,7 @@ export const ASK_AI_AGENT: AgentDefinition<AskAiTool> = {
         drafts: { model: "askAi.drafts.model", effort: "askAi.drafts.effort" },
     },
     tools: ASK_AI_TOOLS,
-    draftTools: [],
+    draftTools: ASK_AI_DRAFT_TOOLS,
     statusWords: STATUS_WORDS,
     usageKey: "questions",
 };

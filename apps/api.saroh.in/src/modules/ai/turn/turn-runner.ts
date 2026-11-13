@@ -135,12 +135,13 @@ export class TurnRunner {
     }
 
     /** Whether a turn may run now: not halted, rolled out here, the business's switch on. */
-    async available(organizationId: string): Promise<boolean> {
-        if ((await this.settings.halt()).halted) return false;
-        if (!(await this.flags.isEnabled("ASK_AI", organizationId))) {
-            return false;
-        }
-        return this.store.businessOn(organizationId);
+    available(organizationId: string): Promise<boolean> {
+        return askAiAvailable(
+            this.settings,
+            this.flags,
+            this.store,
+            organizationId,
+        );
     }
 
     async *run(input: TurnInput): AsyncGenerator<TurnEvent> {
@@ -381,7 +382,10 @@ export class TurnRunner {
                     tool: call.name,
                     words: statusWordsFor(p.agent, call.name, p.language),
                 };
-                const run = await this.toolbox.run(ctx, call, signal);
+                const run = await this.toolbox.run(ctx, call, signal, {
+                    conversationId: p.conversation.id,
+                    turnId: input.turnId,
+                });
                 if (run.card && p.agent.draftTools.includes(call.name)) {
                     state.card = run.card;
                     yield { type: "card", ...run.card };
@@ -444,6 +448,22 @@ export class TurnRunner {
             );
         }
     }
+}
+
+/**
+ * Whether Ask AI may act in a business now: not halted, rolled out there
+ * (`ASK_AI`), and the business's own switch on. A turn asks before every
+ * round; a draft's Confirm and Undo ask again (U5).
+ */
+export async function askAiAvailable(
+    settings: Pick<AiSettingsService, "halt">,
+    flags: Pick<FeatureFlagService, "isEnabled">,
+    store: Pick<TurnStore, "businessOn">,
+    organizationId: string,
+): Promise<boolean> {
+    if ((await settings.halt()).halted) return false;
+    if (!(await flags.isEnabled("ASK_AI", organizationId))) return false;
+    return store.businessOn(organizationId);
 }
 
 function end(

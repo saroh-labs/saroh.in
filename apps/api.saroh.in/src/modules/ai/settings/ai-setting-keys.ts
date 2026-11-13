@@ -54,6 +54,8 @@ export const AI_SETTING_SCHEMAS = {
     "askAi.maxHistoryTokens": count(1_000_000),
     /** All tokens one turn may use over its rounds (input, cache and output). */
     "askAi.turnTokenCap": count(100_000_000),
+    /** Draft again (U5): free re-drafts one conversation may ask for. */
+    "askAi.redraftsPerConversation": count(1_000),
     /** A turn still running after this many minutes is failed by the sweep. */
     "askAi.stuckTurnMinutes": count(24 * 60),
     /** Cost guards: one turn, one business's day, Saroh's day. */

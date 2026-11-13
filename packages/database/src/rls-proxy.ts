@@ -67,6 +67,53 @@ export function outsideOrgContext<T>(fn: () => T): T {
     return activeTxStore.exit(() => orgContextStore.exit(fn));
 }
 
+/** Thrown inside {@link rolledBack}'s transaction to undo it; never escapes. */
+class RollBack extends Error {}
+
+/** Set while {@link rolledBack} runs: code with effects outside the database skips them. */
+const rollingBackStore = new AsyncLocalStorage<true>();
+
+/**
+ * Run `fn` as it would run, then undo every database write it made: one
+ * transaction that every ambient `prisma` call inside joins (a service's
+ * own `$transaction` participates), rolled back at the end. For a dry run
+ * through the normal services (Ask AI's drafts, plan 2026-11-13-001 U5):
+ * the same checks, nothing saved. Jobs and outbox rows it queues go with
+ * it; code that reaches outside the database checks {@link inRolledBack}.
+ * Refused inside a transaction, which it would roll back too.
+ */
+export async function rolledBack<T>(
+    client: PrismaClient,
+    fn: () => Promise<T>,
+    options: TransactionOptions = { maxWait: 5_000, timeout: 20_000 },
+): Promise<T> {
+    if (activeTxStore.getStore()) {
+        throw new Error("rolledBack can't run inside a transaction");
+    }
+    let out: { value: T } | undefined;
+    try {
+        await client.$transaction(async (tx) => {
+            const run = () => rollingBackStore.run(true, fn);
+            // Under an organization context the proxy already published
+            // the transaction; otherwise publish it here.
+            const value = await (activeTxStore.getStore()
+                ? run()
+                : activeTxStore.run(tx, run));
+            out = { value };
+            throw new RollBack();
+        }, options);
+    } catch (error) {
+        if (!(error instanceof RollBack)) throw error;
+    }
+    if (!out) throw new Error("rolledBack finished without a result");
+    return out.value;
+}
+
+/** True inside {@link rolledBack}: nothing done here will be kept. */
+export function inRolledBack(): boolean {
+    return rollingBackStore.getStore() === true;
+}
+
 /** True when RLS enforcement is switched on via env (default OFF). */
 export function isRlsEnforcementEnabled(): boolean {
     const v = process.env.RLS_ENFORCEMENT;

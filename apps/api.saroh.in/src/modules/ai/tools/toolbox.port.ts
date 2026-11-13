@@ -21,7 +21,15 @@ export interface AiToolbox {
         ctx: OrganizationContext,
         call: AiToolCall,
         signal: AbortSignal,
+        /** The turn it runs in: a draft is kept against it (U5). */
+        turn?: AiTurnRef,
     ): Promise<AiToolRun>;
+}
+
+/** Where a tool call was made: the conversation and the turn. */
+export interface AiTurnRef {
+    conversationId: string;
+    turnId: string;
 }
 
 export const AI_TOOLBOX = Symbol("AI_TOOLBOX");

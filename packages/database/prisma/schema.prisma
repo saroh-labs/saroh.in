@@ -324,6 +324,7 @@ model Organization {
   aiSettingOverrides   AiSettingOverride[]
   aiBusinessSetting    AiBusinessSetting?
   aiPersonSettings     AiPersonSetting[]
+  askAiDrafts          AskAiDraft[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
@@ -9933,6 +9934,7 @@ model AiConversation {
 
   messages AiMessage[]
   usages   AiUsage[]
+  drafts   AskAiDraft[]
 
   @@index([organizationId, userId, lastMessageAt])
   @@index([lastMessageAt])
@@ -10077,4 +10079,60 @@ model AiPersonSetting {
   updatedAt DateTime   @updatedAt
 
   @@unique([organizationId, userId])
+}
+
+/// Where an Ask AI draft is (U5). DRAFTED until the person confirms it;
+/// REFUSED when Saroh wouldn't save it (the card says why).
+enum AskAiDraftStatus {
+  DRAFTED
+  CONFIRMED
+  UNDONE
+  EXPIRED
+  REFUSED
+}
+
+// A change Ask AI drafted for the person to confirm (DEC-220, plan
+// 2026-11-13-001 U5), unrelated to website drafts (DEC-043). Confirm and
+// Undo name only its id, looked up with the business and person from the
+// request. Deleted with its conversation (the 90-day sweep).
+model AskAiDraft {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Its owner: the only person who may confirm or undo it.
+  userId         String
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  turnId         String
+
+  // The write tool it saves through ("update_product").
+  tool    String
+  status  AskAiDraftStatus @default(DRAFTED)
+  // Why it was refused: plan-limit, duplicate, missing, changed or other.
+  refusal String?
+
+  // The record an edit touches (null for a create until it is confirmed,
+  // then what it made), and its updatedAt when drafted, then after the save.
+  targetId        String?
+  targetUpdatedAt DateTime?
+
+  // `{ input, previous, card, applied? }` sealed: the validated input, the
+  // values before, the card shown and the values after the save carry
+  // names and words customers wrote.
+  bodyCiphertext String
+  bodyIv         String
+  bodyAuthTag    String
+
+  // Draft again: the draft this one was made from.
+  redraftOfId String?
+
+  // The end of the business's day it was drafted on: no Confirm or Undo after.
+  expiresAt   DateTime
+  confirmedAt DateTime?
+  undoneAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([organizationId, userId, createdAt])
+  @@index([conversationId])
 }

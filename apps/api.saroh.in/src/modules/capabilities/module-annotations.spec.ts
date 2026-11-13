@@ -452,6 +452,9 @@ const NEVER: Record<string, string> = {
     // U10: `/mcp` — each tool is authorized by its own capability.
     "mcp/mcp.controller.ts":
         "the MCP endpoint — the API_MCP switch gates it, each tool checks its own capability",
+    // Plan 2026-11-13-001 U5: Ask AI's Confirm, Undo and Draft again.
+    "ai/drafts/drafts.controller.ts":
+        "Ask AI's drafts — the ASK_AI switch gates them, each draft's tool checks its own module",
 };
 
 /** Controllers with a test of their own below, not a row above. */

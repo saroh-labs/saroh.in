@@ -242,6 +242,33 @@ export const RESEAL_TARGETS: AnyTarget[] = [
             ).count === 1,
     }),
     target({
+        label: "Ask AI drafts",
+        key: aiTextKey,
+        page: (cursor) =>
+            prisma.askAiDraft.findMany({
+                ...page,
+                where: after(cursor),
+                select: {
+                    id: true,
+                    bodyCiphertext: true,
+                    bodyIv: true,
+                    bodyAuthTag: true,
+                },
+            }),
+        values: (r) => [sealed(r.bodyCiphertext, r.bodyIv, r.bodyAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.askAiDraft.updateMany({
+                    where: { id: r.id, bodyCiphertext: r.bodyCiphertext },
+                    data: {
+                        bodyCiphertext: must(next).ciphertext,
+                        bodyIv: must(next).iv,
+                        bodyAuthTag: must(next).authTag,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
         label: "queued WhatsApp messages",
         key: messagingKey,
         page: (cursor) =>

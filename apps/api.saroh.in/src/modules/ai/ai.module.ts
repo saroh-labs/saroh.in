@@ -6,8 +6,11 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { McpModule } from "../mcp/mcp.module";
+import { OrdersModule } from "../orders/orders.module";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
 import { ConversationsService } from "./conversations.service";
+import { AskAiDraftsController } from "./drafts/drafts.controller";
+import { DraftsService } from "./drafts/drafts.service";
 import { AI_RETENTION_TYPE, AiRetentionJob } from "./history/retention.job";
 import { AiSdkAdapter } from "./providers/ai-sdk.adapter";
 import { AI_PROVIDER } from "./providers/provider.port";
@@ -27,13 +30,16 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * its port, the AI settings store, a person's own conversations, and the
  * 90-day retention sweep. U13: the agents, the turn runner with its guards,
  * Stop's registry and the stuck-turn sweep. U4: the tool bridge, running
- * the MCP tools as the person asking. Drafts (U5) and routes (U9) are
- * added here as they land.
+ * the MCP tools as the person asking. U5: drafts, with Confirm, Undo and
+ * Draft again. Routes (U9) are added here as they land.
  */
 @Module({
-    // McpModule: the tool registry, and (via ApiKeysModule) the person's live context.
-    imports: [JobsModule, FeatureFlagModule, McpModule],
+    // McpModule: the tool registry, and (via ApiKeysModule) the person's
+    // live context. OrdersModule: Undo of an order's step.
+    imports: [JobsModule, FeatureFlagModule, McpModule, OrdersModule],
+    controllers: [AskAiDraftsController],
     providers: [
+        DraftsService,
         { provide: AI_PROVIDER, useFactory: () => new AiSdkAdapter() },
         ToolBridge,
         { provide: AI_TOOLBOX, useExisting: ToolBridge },

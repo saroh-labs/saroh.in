@@ -25,6 +25,7 @@ import { quoteUntrusted } from "../../mcp/untrusted";
 import type { OrgAction } from "../../organizations/organization-actions";
 import type { OrganizationContextService } from "../../organizations/organization-context.service";
 import type { AgentDefinition } from "../agents/agent-definition";
+import type { DraftsService } from "../drafts/drafts.service";
 import { ToolBridge } from "./tool-bridge";
 
 const ORG = "org_a";
@@ -73,6 +74,7 @@ const write = defineTool({
 function bridge(
     actions: () => OrgAction[] | Error,
     off: string[] = [],
+    drafts?: DraftsService,
 ): ToolBridge {
     const registry = new McpToolRegistry(
         {} as McpActivityService,
@@ -102,8 +104,9 @@ function bridge(
             "read_notes",
             "create_booking",
         ],
+        draftTools: drafts ? ["create_booking"] : [],
     } as unknown as AgentDefinition;
-    return new ToolBridge(registry, organizations, [agent]);
+    return new ToolBridge(registry, organizations, [agent], drafts);
 }
 
 const live = new AbortController().signal;
@@ -244,5 +247,58 @@ describe("ToolBridge", () => {
         );
         expect(run).toMatchObject({ isError: true });
         expect(seen).toHaveLength(0);
+    });
+
+    describe("draft tools (U5)", () => {
+        const turn = { conversationId: "conv_1", turnId: "turn_1" };
+        const card = { kind: "draft", data: { draftId: "d1" } };
+        const drafts = () =>
+            ({
+                draft: jest.fn(() =>
+                    Promise.resolve({ output: "Drafted.", card }),
+                ),
+            }) as unknown as DraftsService & { draft: jest.Mock };
+
+        it("lists a draft tool and hands its call to the drafts, never running it", async () => {
+            const d = drafts();
+            const b = bridge(
+                () => ["booking:write", "customer:sensitive"],
+                [],
+                d,
+            );
+            expect(b.definitions(["create_booking"])).toHaveLength(1);
+            const run = await b.run(
+                asker,
+                call("create_booking", { business: "org_b" }),
+                live,
+                turn,
+            );
+            expect(run).toEqual({ output: "Drafted.", card });
+            expect(seen).toHaveLength(0);
+            const [asked, tool, input, at] = d.draft.mock.calls[0] as [
+                McpCall,
+                { name: string },
+                unknown,
+                unknown,
+            ];
+            expect(tool.name).toBe("create_booking");
+            expect(input).toEqual({ business: "org_b" });
+            expect(at).toEqual(turn);
+            // The open business, the live role, less what AI may never have.
+            expect(asked.ctx.organizationId).toBe(ORG);
+            expect(asked.connection).toMatchObject({ kind: "app" });
+            expect([...(asked.ctx.actions ?? [])]).toEqual(["booking:write"]);
+        });
+
+        it("refuses a draft outside a turn", async () => {
+            const d = drafts();
+            const run = await bridge(() => ["booking:write"], [], d).run(
+                asker,
+                call("create_booking"),
+                live,
+            );
+            expect(run).toMatchObject({ isError: true });
+            expect(d.draft).not.toHaveBeenCalled();
+        });
     });
 });

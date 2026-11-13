@@ -23,9 +23,9 @@ const BATCH = 500;
  * on legal hold keeps everything (DEC-122). Running it twice deletes
  * nothing more.
  *
- * What else goes with a conversation, as it arrives: Ask AI's drafts (U5,
- * `AskAiDraft`, which should cascade from the conversation) and the text
- * of a report about an answer (U8, sealed, cleared here on the same day).
+ * Its drafts (U5, `AskAiDraft`) go with it: the foreign key cascades. What
+ * else goes with a conversation, as it arrives: the text of a report about
+ * an answer (U8, sealed, cleared here on the same day).
  *
  * It reschedules itself (ADR-007), one waiting run at a time under the
  * advisory lock `job-chain:ai.retention`; the payload is empty. It throws

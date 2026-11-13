@@ -116,6 +116,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AiConnectionsService,
         ApiKeysModule,
         McpToolRegistry,
+        // Ask AI records an Undo it makes outside a tool (U5).
+        McpActivityService,
     ],
 })
 export class McpModule implements OnModuleInit, OnModuleDestroy {
