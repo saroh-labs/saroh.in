@@ -441,7 +441,9 @@ preview under its fields, from the draft.
   have been left and shows a field's problem from then on (the Service
   Editor: `serviceFieldProblems`, `problemFor`), and calls
   `focusFirstError(form)` when Save is pressed. The product editor's Basics
-  says what is wrong once a field is left (`seen`). Gap: its Details,
+  says what is wrong once a field is left (`seen`), and its header, section
+  card and jump dot stay quiet about an MRP still being typed: the section
+  reports `quiet`, which still blocks Create and Save (13 Nov 2026). Gap: its Details,
   Description and Made-by sections still check as you type.
 - **Current** — **A main button is never off without saying why.** A short
   form keeps it on and explains on submit (Create location, Create site,

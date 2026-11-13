@@ -134,10 +134,16 @@ export function BasicsSection({
     const priceBox = form.register("price");
     const mrpBox = form.register("mrp");
     const v = form.watch();
-    const problem = basicsProblem(v, creating, gstRateNeeded, {
-        businessMode: businessPriceMode,
-        currency,
-    });
+    const gstWay = { businessMode: businessPriceMode, currency };
+    const problem = basicsProblem(v, creating, gstRateNeeded, gstWay);
+    // Only the MRP is wrong, and it is still being typed: it blocks, but
+    // isn't said until the box is left or Create is pressed.
+    const quiet =
+        problem !== "" &&
+        !tried &&
+        !seen("mrp") &&
+        basicsProblem({ ...v, mrp: "" }, creating, gstRateNeeded, gstWay) ===
+            "";
     // What one of it costs to pay, where GST is added to the price: the
     // MRP is compared with that, never with the price before GST.
     const pricing: MrpPricing = {
@@ -166,6 +172,7 @@ export function BasicsSection({
         {
             dirty: isDirty,
             problem,
+            quiet,
             // The problem names only the first; creating says them all.
             missing: creating
                 ? joinAnd(

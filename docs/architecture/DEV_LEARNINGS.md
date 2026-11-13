@@ -6687,3 +6687,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `timeZone={PROFILE.defaultZone}`, the edition's default, which is India's until a business saves its own (the time zone decision in DECISIONS.md). `lib/language/intl-time-zone.test.tsx` server-renders the providers and fails on the report.
 - **Rule:** an intl provider always gets a `timeZone`; a test of it renders on the server, because use-intl only checks there.
 - **Category:** app · i18n
+
+## A new product said "MRP can't be lower than the price" while the MRP was still being typed (13 Nov 2026)
+
+- **Symptom:** filming the gym tour, typing an MRP of 2,999 under a price of 2,499 flashed the header's red "MRP can't be lower than the price it sells for." at the first "2". The MRP box itself already waited until it was left.
+- **Cause:** the product editor's sections report one `problem` that both blocks Create/Save and is what the header, the section card and the jump dots say. Basics worked its problem out from the values as typed, so a half-typed MRP was "wrong" on the first keystroke. The same rule had been fixed for the plan and pack editors on 12 Nov (an untouched field says nothing while others are typed), but this editor has its own section state.
+- **Fix:** `SectionState.quiet`: Basics marks its problem quiet when only the MRP is wrong and the box hasn't been left (and Create hasn't been pressed). A quiet problem still blocks Create and Save; the header, the card and the dot don't say it until the box is left or Create is pressed. `useSection` passes the new field through (its comparison lists fields by name, so a new field must be added there too). Tests in `editor-fixes.test.tsx`.
+- **Rule:** in every editor, a problem with a field still being typed blocks but isn't said until that field is left or the action is pressed (`docs/patterns/frontend-forms.md`). A field added to a section's reported state goes through `useSection`'s destructure, its report and its dependency list.
+- **Category:** app · forms
