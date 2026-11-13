@@ -342,6 +342,8 @@ const NEVER: Record<string, string> = {
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "messaging/msg91-webhook.controller.ts":
         "Saroh's own MSG91 delivery reports, across businesses",
+    "messaging/meta-webhook.controller.ts":
+        "Saroh's own WhatsApp delivery reports from Meta, across businesses",
     // P1: the buyer's browser reports a payment the moment the provider's
     // window closes. Never module-gated: a payment already taken is settled
     // whatever the business has switched off since.

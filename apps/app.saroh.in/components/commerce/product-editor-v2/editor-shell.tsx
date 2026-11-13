@@ -207,7 +207,11 @@ function EditorBody({
     // Creating: a name and a price, and nothing anywhere that needs a fix.
     const missing = creating ? (states.basics?.missing ?? "") : "";
     const createBad = SECTION_ORDER.some((k) => problems[k]);
-    const firstBad = SECTION_ORDER.map((k) => problems[k]).find(Boolean) ?? "";
+    // What the header says: a problem still being typed stays quiet.
+    const firstBad =
+        SECTION_ORDER.filter((k) => !states[k]?.quiet)
+            .map((k) => problems[k])
+            .find(Boolean) ?? "";
 
     const guard = useLeaveGuard({
         dirty: canEdit && dirty.length > 0 && !creatingNow,
@@ -274,14 +278,18 @@ function EditorBody({
     }
 
     const hint = creating
-        ? createBad
+        ? createBad && (missing || firstBad)
             ? missing
                 ? `Add ${missing} to create it.`
                 : firstBad
             : createStatus === "PUBLISHED"
               ? "Goes live as soon as it is created."
               : "It will be created as a draft. Only the team will see it."
-        : saveHint(dirty, stuck, names);
+        : saveHint(
+              dirty,
+              stuck.filter((k) => !states[k]?.quiet),
+              names,
+          );
     const showHeaderSave = canWrite && (creating || dirty.length > 1);
     // Creating, the button is never off: pressed early, it says what is
     // missing. Busy only while it creates.
@@ -340,7 +348,7 @@ function EditorBody({
                             role="status"
                             className={cn(
                                 "max-w-[340px] text-pretty text-[12px]",
-                                creating && createBad && !missing
+                                creating && firstBad && !missing
                                     ? "text-destructive"
                                     : "text-muted-foreground",
                             )}
@@ -406,11 +414,13 @@ function EditorBody({
                             {!creating && dirty.includes(k) ? (
                                 <span
                                     aria-label={
-                                        problems[k] ? "needs a fix" : "unsaved"
+                                        problems[k] && !states[k]?.quiet
+                                            ? "needs a fix"
+                                            : "unsaved"
                                     }
                                     className={cn(
                                         "size-[7px] rounded-full",
-                                        problems[k]
+                                        problems[k] && !states[k]?.quiet
                                             ? "bg-destructive"
                                             : "bg-foreground",
                                     )}

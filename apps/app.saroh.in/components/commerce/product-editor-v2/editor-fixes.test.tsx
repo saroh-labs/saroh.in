@@ -7,7 +7,9 @@
  *   held note, not a red field, and the rest of the section still saves
  *   without it;
  * - a SKU the API refuses (another product has it) is said under that
- *   row's SKU box, not on the section's bar.
+ *   row's SKU box, not on the section's bar;
+ * - an MRP still being typed ("2" on the way to 2,999) isn't called lower
+ *   than the price until its box is left or Create is pressed (13 Nov 2026).
  *
  * `react-dom/client` + `act` directly, as the other component tests do.
  */
@@ -199,6 +201,40 @@ describe("New product: Create draft", () => {
         const name = host.querySelector<HTMLInputElement>("#pe-name");
         expect(name?.getAttribute("aria-invalid")).toBe("true");
         expect(document.activeElement).toBe(name);
+    });
+
+    const box = (id: string) => {
+        const el = host.querySelector<HTMLInputElement>(`#${id}`);
+        if (!el) throw new Error(`no #${id}`);
+        return el;
+    };
+    const MRP_LOW = "MRP can't be lower than the price it sells for.";
+
+    it("says nothing about an MRP still being typed, and says it once the box is left", () => {
+        renderNew();
+        type(box("pe-name"), "Whey protein");
+        type(box("pe-price"), "2499");
+        // "2" on the way to 2,999: lower than the price, but not a mistake yet.
+        type(box("pe-mrp"), "2");
+        expect(text()).not.toContain(MRP_LOW);
+        act(() => {
+            box("pe-mrp").dispatchEvent(
+                new FocusEvent("focusout", { bubbles: true }),
+            );
+        });
+        expect(text()).toContain(MRP_LOW);
+        type(box("pe-mrp"), "2999");
+        expect(text()).not.toContain(MRP_LOW);
+    });
+
+    it("still won't create with a half-typed MRP, and says why when pressed", () => {
+        renderNew();
+        type(box("pe-name"), "Whey protein");
+        type(box("pe-price"), "2499");
+        type(box("pe-mrp"), "2");
+        act(() => button("Create draft")?.click());
+        expect(createProduct).not.toHaveBeenCalled();
+        expect(text()).toContain(MRP_LOW);
     });
 
     it("shows the path it will really get when the name is taken", async () => {

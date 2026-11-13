@@ -60,10 +60,12 @@ export function SectionCard({
     const creating = mode === "create";
     const dirty = !creating && (state?.dirty ?? false);
     const problem = state?.problem ?? "";
-    const chip = creating ? null : dirty ? (problem ? "bad" : "unsaved") : null;
+    // A problem with a field still being typed blocks Save but isn't said yet.
+    const said = state?.quiet ? "" : problem;
+    const chip = creating ? null : dirty ? (said ? "bad" : "unsaved") : null;
     const busy = saving.includes(k);
-    const note = problem || (state?.note ?? SAVES[k]);
-    const noteBad = !!problem || !!state?.noteIsError;
+    const note = said || (state?.note ?? SAVES[k]);
+    const noteBad = !!said || !!state?.noteIsError;
 
     return (
         <section
@@ -71,7 +73,7 @@ export function SectionCard({
             className={cn(
                 "scroll-mt-[176px] rounded-[12px] border bg-card max-desk:scroll-mt-[230px]",
                 dirty
-                    ? problem
+                    ? said
                         ? "border-destructive"
                         : "border-border-strong"
                     : "border-border",

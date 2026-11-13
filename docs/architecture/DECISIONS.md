@@ -2874,6 +2874,18 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The API accepts each module's setup with any field blank or absent, makes nothing it wasn't asked for, and still takes the full payload the sheet sent before.
 - Known limit: Bookings' hours live on its services, so hours set in the sheet with no first service are not kept. They are set again on the first service.
 
+## DEC-213 Saroh's own WhatsApp sender goes to Meta's Cloud API directly
+
+**Status: Accepted — 2026-11-10** · owner · amends DEC-191's sender
+
+- Decision (owner, 10 Nov 2026): Saroh's own WhatsApp sender (sign-in and verification codes, utility templates, replies inside the 24-hour window) moves from MSG91 to Meta's WhatsApp Cloud API, called directly. The WhatsApp account already belongs to Saroh Labs, so nothing migrates: the same number, display name and approved templates.
+- **SMS and the MSG91 phone sign-in widget stay on MSG91.** The Meta adapter hands `sendSms` and the widget's token check to the MSG91 adapter unchanged.
+- **The switch is one server setting, `MESSAGING_PROVIDER=meta`.** MSG91 stays the default until the cut-over day, so nothing changes in production on merge.
+- Meta's delivery reports and inbound messages come to Saroh's own webhook, checked by Meta's signature over the raw body, and change the same records MSG91's do: a verification send charged once or given back, statuses forward only, the 24-hour reply window.
+- Trade-off: no partner fee and direct control over the number. In exchange Saroh runs the webhook, template approvals and Meta support itself.
+- **MSG91's WhatsApp code path is kept, not deleted**, until Meta has run in production for a while.
+- Rules: `apps/api.saroh.in/src/modules/messaging/providers/meta-cloud.provider.ts`, `meta-webhook.controller.ts`, `delivery-reports.ts`; setup in `docs/architecture/MESSAGING_MSG91.md`.
+
 ## DEC-214 Encryption keys are key rings in the server settings
 
 **Status: Accepted — 2026-11-12** · owner
