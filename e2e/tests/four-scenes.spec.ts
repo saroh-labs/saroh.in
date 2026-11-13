@@ -68,6 +68,24 @@ async function overlappingControls(page: Page) {
             const r = el.getBoundingClientRect();
             return r.width > 0 && r.height > 0;
         });
+        // What can be seen of a control: its box cut to every scrolling
+        // ancestor's, so a rail row scrolled out of sight under the rail's
+        // foot isn't counted as touching it.
+        const seen = (el: HTMLElement) => {
+            const r = el.getBoundingClientRect();
+            let { left, top, right, bottom } = r;
+            for (let p = el.parentElement; p; p = p.parentElement) {
+                const o = getComputedStyle(p);
+                if (/(auto|scroll|hidden)/.test(o.overflowY + o.overflowX)) {
+                    const c = p.getBoundingClientRect();
+                    left = Math.max(left, c.left);
+                    top = Math.max(top, c.top);
+                    right = Math.min(right, c.right);
+                    bottom = Math.min(bottom, c.bottom);
+                }
+            }
+            return { left, top, right, bottom };
+        };
 
         // The phone tab bar and Home's + float over the page, which scrolls
         // beneath them by design (a setup line at Home's foot sits under
@@ -88,8 +106,8 @@ async function overlappingControls(page: Page) {
                 if (fixed.some((f) => f.contains(a) !== f.contains(b))) {
                     continue;
                 }
-                const ra = a.getBoundingClientRect();
-                const rb = b.getBoundingClientRect();
+                const ra = seen(a);
+                const rb = seen(b);
                 if (
                     ra.left < rb.right - 1 &&
                     rb.left < ra.right - 1 &&

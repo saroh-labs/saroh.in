@@ -74,6 +74,7 @@ const MENU: readonly MenuRow[] = [
     { label: "Leads", href: "/leads" },
     { label: "Pipeline", href: "/pipeline" },
     { label: "Insights", href: "/analytics" },
+    { label: "Social", href: "/social/new" },
     { label: "Settings", href: "/settings" },
 ];
 

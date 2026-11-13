@@ -231,7 +231,10 @@ describe("what the card says", () => {
                 cardTree({ ...input, style, offer: OFFER }, FONTS),
             );
             expect(
-                lines.some((t) => t.text.endsWith("rye-and-co.example.com")),
+                lines.some(
+                    (t) =>
+                        t.text.split(" · ").at(-1) === "rye-and-co.example.com",
+                ),
             ).toBe(true);
             for (const t of lines)
                 expect(t.style.fontFamily).toBe("'Noto Sans'");
