@@ -80,6 +80,9 @@
         // Settings › API and AI apps (#1357): "on" here, on development.
         // Production leaves it out, which is off: no tab, no page.
         "NEXT_PUBLIC_API_AREA": "on",
+        // Share as a post and Create post (DEC-217): "on" here, on
+        // development. Production leaves it out, which is off.
+        "NEXT_PUBLIC_SHARE_POSTS": "on",
     },
     "env": {
         "production": {

@@ -260,7 +260,7 @@ async function wordNote(
         where: {
             organizationId_userId: { organizationId, userId: c.authorUserId },
         },
-        select: { role: true },
+        select: { role: true, extraActions: true },
     });
     if (!member) return null;
     const custom = await tx.organizationRole.findFirst({
@@ -268,9 +268,11 @@ async function wordNote(
         select: { actions: true },
     });
     if (
-        resolveCapabilities(member.role, custom?.actions ?? null).has(
-            "site:publish",
-        )
+        resolveCapabilities(
+            member.role,
+            custom?.actions ?? null,
+            member.extraActions,
+        ).has("site:publish")
     ) {
         return null;
     }

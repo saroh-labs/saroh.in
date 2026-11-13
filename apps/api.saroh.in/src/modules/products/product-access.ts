@@ -72,6 +72,16 @@ type WhenUnnamed = "first" | "refuse";
 export class ProductAccess {
     constructor(private readonly stores: StoresService) {}
 
+    /**
+     * The caller's role key: the context's on the organization route, read
+     * from their membership on a storefront route, which carries none.
+     */
+    roleKeyOf(scope: ProductScope): Promise<string | null> {
+        return scope.roleKey
+            ? Promise.resolve(scope.roleKey)
+            : this.stores.roleKeyAt(scope.storeId, scope.userId);
+    }
+
     /** The business, for a caller who can read its products. */
     business(ctx: OrganizationContext): {
         organizationId: string;

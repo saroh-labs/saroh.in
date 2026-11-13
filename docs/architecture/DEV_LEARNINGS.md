@@ -6695,3 +6695,28 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `SectionState.quiet`: Basics marks its problem quiet when only the MRP is wrong and the box hasn't been left (and Create hasn't been pressed). A quiet problem still blocks Create and Save; the header, the card and the dot don't say it until the box is left or Create is pressed. `useSection` passes the new field through (its comparison lists fields by name, so a new field must be added there too). Tests in `editor-fixes.test.tsx`.
 - **Rule:** in every editor, a problem with a field still being typed blocks but isn't said until that field is left or the action is pressed (`docs/patterns/frontend-forms.md`). A field added to a section's reported state goes through `useSection`'s destructure, its report and its dependency list.
 - **Category:** app · forms
+
+## Claude rejected list_templates after it gained two fields (13 Nov 2026)
+
+- **Symptom:** after #1382 deployed to development, calling `list_templates` from Claude failed: "Structured content does not match the tool's output schema … must NOT have additional properties", once for each template.
+- **Cause:** the MCP SDK lists each tool's output schema as Zod writes it, with `additionalProperties: false` on every object. Claude.ai keeps the tool list from when the connector connected and checks each answer against it, so `preview_url` and `picture_url`, added later, failed every call until the person reconnected. In production, every added field would have broken every connected Claude and ChatGPT user.
+- **Fix:** `src/modules/mcp/open-output.ts`: the registry lists each output schema without `additionalProperties: false`, at every depth. Answers are still checked against the contract's Zod schema. `open-output.spec.ts` checks both, and `mcp.controller.db.spec.ts` asserts that no tool in `tools/list` carries it.
+- **Rule:** a tool's answer can gain fields; it never loses one or changes one's type without a new tool name. Apps that hold an older tool list must keep working.
+- **Category:** api · mcp
+
+## A new plan's form jumped to the top when its first save moved the address (13 Nov 2026)
+
+- **Symptom:** filming the gym tour on a phone, picking a plan's sessions (4, 8, 12) threw the page back to the top of the form, and the camera had to scroll down again. A probe in Chromium showed why: about 300 ms after the address moved from `/billing/plans/new` to `/billing/plans/<id>/edit`, the form's element was gone and the page sat at scroll 0.
+- **Cause:** the first autosave moves the address with `history.replaceState` (UX-080). Next 16 follows that write, as it must (the 20 Oct entry above), and renders the route at the new address: `[planId]/edit` is a different page from `new`, so the editor mounts again, fresh, at the top. The record is saved by then, so only the page's place is lost: its scroll and its focus.
+- **Fix:** `leavePlace` / `takePlace` (`lib/editor-shell/address.ts`): the old page leaves its scroll and focused control's id in sessionStorage for the new address, and the editor mounted there takes it once, within five seconds, and carries on from there. Unit tests in `address.test.ts`; checked in Chromium with the probe scene.
+- **Then:** carried across, the editor at the new address took the draft for one opened again and said every problem at once: an untouched empty price turned red. It now reads `placeWaiting` on its first render (`continued`), so a record it carries on keeps the quiet rule (12 Nov) until its fields are reached or Publish is pressed.
+- **Rule:** an editor whose address moves from `/new` to the record's own page (the shell's plans and packs, and any page that follows) carries the page's place across; never write the address past Next's router to avoid the remount.
+- **Category:** app · editors
+
+## Share card thumbnails showed as broken pictures (13 Nov 2026)
+
+- **Symptom:** on saroh.io, Create post's style picker (Photo, Price tag, Simple, Colour) showed four broken images, while the large previews beside them drew. Fetching the same address answered 200 with a PNG.
+- **Cause:** Helmet adds `Cross-Origin-Resource-Policy: same-origin` to every API answer. The previews fetch the picture with CORS and show a blob, so they pass; the thumbnails are plain `<img>` tags on app.saroh.io, and the browser refuses a same-origin resource from api.saroh.io. Any other site showing the card (a post, a chat preview) would be refused the same way. The unit test checked the headers the handler set, never what Helmet adds.
+- **Fix:** `public-share.controller.ts` sends `Cross-Origin-Resource-Policy: cross-origin` with each public card; the controller spec asserts it.
+- **Rule:** an API answer meant to be shown on another site (a public picture, a file link) sets `Cross-Origin-Resource-Policy: cross-origin` itself; `Access-Control-Allow-Origin` alone covers `fetch`, not `<img>`.
+- **Category:** api · share

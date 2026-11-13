@@ -38,6 +38,7 @@ import {
     whoCanBook,
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
+import type { ShareSetup } from "@/lib/share-item/share";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 import { AlsoSell } from "./also-sell";
 import { BookingLinkRow } from "./booking-link-row";
@@ -83,7 +84,10 @@ export function ServicesScreen({
     missingRates = null,
     canNewCourse = false,
     bookingLink = null,
+    shareSetup = null,
 }: {
+    /** Share as a post (#1375): the live site, for the booking page's card. */
+    shareSetup?: ShareSetup | null;
     /**
      * "Your booking page" (DEC-175): where it is and whether customers can
      * open it; null leaves the row out (it couldn't be read).
@@ -264,7 +268,11 @@ export function ServicesScreen({
             <MissingRatesNotice missing={missingRates} className="mb-3" />
             {/* The page customers book on, read first (DEC-175). */}
             {bookingLink ? (
-                <BookingLinkRow view={bookingLink} className="mb-3" />
+                <BookingLinkRow
+                    view={bookingLink}
+                    shareSetup={shareSetup}
+                    className="mb-3"
+                />
             ) : null}
             {!hasRows ? (
                 <EmptyState

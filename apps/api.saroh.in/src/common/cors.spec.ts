@@ -58,6 +58,18 @@ describe("corsOptionsFor (U19)", () => {
             corsOptionsFor("/public/sites/site_1/today/extra", TRUSTED),
         ).toEqual({ origin: true, credentials: false });
     });
+
+    it('answers any origin with "*" on a share picture (#1375)', () => {
+        for (const path of [
+            "/public/share/site_1/product/bun/image?style=price",
+            "/public/share/own/sp_1/image",
+        ]) {
+            expect(corsOptionsFor(path, TRUSTED)).toEqual({
+                origin: "*",
+                credentials: false,
+            });
+        }
+    });
 });
 
 describe("the keyed public API's CORS (plan 2026-11-10-001, U6)", () => {

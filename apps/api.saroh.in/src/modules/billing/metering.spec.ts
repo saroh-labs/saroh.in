@@ -25,6 +25,7 @@ const tx = {
     site: { count: jest.fn() },
     media: { aggregate: jest.fn() },
     analyticsDailyAggregate: { aggregate: jest.fn() },
+    subscription: { findUnique: jest.fn() },
 };
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
@@ -58,13 +59,16 @@ import {
     bytesToGb,
     type countSeats,
     countUsage,
+    firstDayOf,
     isMeteredLimitKey,
     METERED_LIMIT_KEYS,
     meteredKeyOf,
     meteredModules,
-    monthFirstDay,
     monthWindow,
+    paidPeriodEnd,
+    periodWindow,
     quietAtOne,
+    windowFor,
     windowKey,
 } from "./metering";
 import {
@@ -115,6 +119,7 @@ beforeEach(() => {
     tx.businessProfile.findUnique.mockResolvedValue({
         timezone: "Asia/Kolkata",
     });
+    tx.subscription.findUnique.mockResolvedValue(null);
 });
 
 describe("the business's month", () => {
@@ -122,15 +127,100 @@ describe("the business's month", () => {
         const now = new Date("2026-10-01T00:10:00+05:30");
         expect(monthWindow(now, "Asia/Kolkata")).toEqual({
             start: new Date("2026-09-30T18:30:00.000Z"),
+            end: new Date("2026-10-31T18:30:00.000Z"),
             key: "2026-10",
         });
         expect(monthWindow(now, "UTC").key).toBe("2026-09");
     });
 
-    it("names the month only for a monthly limit", () => {
+    it("names the window only for a monthly limit", () => {
         const now = new Date("2026-10-15T00:00:00Z");
-        expect(windowKey("month", now, "Asia/Kolkata")).toBe("2026-10");
-        expect(windowKey("", now, "Asia/Kolkata")).toBe("all");
+        const w = monthWindow(now, "Asia/Kolkata");
+        expect(windowKey("month", w)).toBe("2026-10");
+        expect(windowKey("", w)).toBe("all");
+    });
+});
+
+describe("the billing period's month (DEC-219)", () => {
+    const end = new Date("2026-12-14T10:00:00Z");
+
+    it("is the paid month now falls in, named by its start", () => {
+        expect(periodWindow(new Date("2026-11-20T00:00:00Z"), end)).toEqual({
+            start: new Date("2026-11-14T10:00:00Z"),
+            end,
+            key: "2026-11-14",
+        });
+        // Just before the renewal instant is still the old month.
+        expect(
+            periodWindow(new Date("2026-11-14T09:59:59Z"), end).start,
+        ).toEqual(new Date("2026-10-14T10:00:00Z"));
+    });
+
+    it("steps forward when the renewal is late", () => {
+        expect(periodWindow(new Date("2026-12-20T00:00:00Z"), end)).toEqual({
+            start: end,
+            end: new Date("2027-01-14T10:00:00Z"),
+            key: "2026-12-14",
+        });
+    });
+
+    it("resets a yearly plan monthly, on its anniversary day", () => {
+        const yearEnd = new Date("2027-03-05T00:00:00Z");
+        const w = periodWindow(new Date("2026-08-10T00:00:00Z"), yearEnd);
+        expect(w.start).toEqual(new Date("2026-08-05T00:00:00Z"));
+        expect(w.end).toEqual(new Date("2026-09-05T00:00:00Z"));
+    });
+
+    it("clamps a 31st to a short month's last day, and keeps the 31st after", () => {
+        // A period from 31 Jan: its months end 28 Feb, then 31 Mar.
+        const endMar = new Date("2026-03-31T00:00:00Z");
+        expect(periodWindow(new Date("2026-02-15T00:00:00Z"), endMar)).toEqual({
+            start: new Date("2026-01-31T00:00:00Z"),
+            end: new Date("2026-02-28T00:00:00Z"),
+            key: "2026-01-31",
+        });
+        expect(periodWindow(new Date("2026-03-01T00:00:00Z"), endMar)).toEqual({
+            start: new Date("2026-02-28T00:00:00Z"),
+            end: endMar,
+            key: "2026-02-28",
+        });
+    });
+
+    it("keeps the calendar month with no paid period", () => {
+        const now = new Date("2026-11-20T00:00:00Z");
+        const sub = (over: object) => ({
+            status: "ACTIVE",
+            currentPeriodEnd: end,
+            plan: { priceCents: 100 },
+            ...over,
+        });
+        expect(paidPeriodEnd(null)).toBeNull();
+        expect(paidPeriodEnd(sub({ plan: { priceCents: 0 } }))).toBeNull();
+        expect(paidPeriodEnd(sub({ status: "CANCELLED" }))).toBeNull();
+        expect(paidPeriodEnd(sub({ currentPeriodEnd: null }))).toBeNull();
+        expect(paidPeriodEnd(sub({ status: "TRIALING" }))).toEqual(end);
+        expect(windowFor(now, "Asia/Kolkata", null).key).toBe("2026-11");
+        expect(windowFor(now, "Asia/Kolkata", end).key).toBe("2026-11-14");
+    });
+
+    it("counts a paying business's orders from its period's month", async () => {
+        tx.subscription.findUnique.mockResolvedValue({
+            status: "ACTIVE",
+            currentPeriodEnd: end,
+            plan: { priceCents: 100 },
+        });
+        tx.order.count.mockResolvedValue(1);
+        await countUsage(
+            tx as never,
+            "org",
+            "ordersPerMonth",
+            new Date("2026-11-20T00:00:00Z"),
+        );
+        expect(tx.order.count).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                createdAt: { gte: new Date("2026-11-14T10:00:00Z") },
+            }),
+        });
     });
 });
 
@@ -329,16 +419,20 @@ describe("what each count asks", () => {
         ).toBe(0);
     });
 
-    it("starts visits on the UTC day dated the 1st of the business's month", () => {
+    it("starts visits on the UTC day the window starts on in the business's zone", () => {
         // 1 Oct 00:10 in India is still 30 Sep in UTC: India's month, and
         // its rollup day, is October's.
         const now = new Date("2026-10-01T00:10:00+05:30");
-        expect(monthFirstDay(now, "Asia/Kolkata")).toEqual(
-            new Date("2026-10-01T00:00:00.000Z"),
-        );
-        expect(monthFirstDay(now, "UTC")).toEqual(
+        expect(
+            firstDayOf(monthWindow(now, "Asia/Kolkata").start, "Asia/Kolkata"),
+        ).toEqual(new Date("2026-10-01T00:00:00.000Z"));
+        expect(firstDayOf(monthWindow(now, "UTC").start, "UTC")).toEqual(
             new Date("2026-09-01T00:00:00.000Z"),
         );
+        // A period that renews at 20:00 UTC on 13 Nov starts 14 Nov in India.
+        expect(
+            firstDayOf(new Date("2026-11-13T20:00:00Z"), "Asia/Kolkata"),
+        ).toEqual(new Date("2026-11-14T00:00:00.000Z"));
     });
 
     it("adds connected messaging to connected payment providers", async () => {

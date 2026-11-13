@@ -53,7 +53,7 @@ export function corsOptionsFor(
     // caller's own origin: one kept answer serves every site's address
     // (its saroh.app one, its own domain, the editor's preview), and an
     // answer naming the first caller's origin would be refused by the rest.
-    if (EDGE_KEPT_READ.test(bare)) {
+    if (EDGE_KEPT_READ.test(bare) || SHARE_IMAGE.test(bare)) {
         return { origin: "*", credentials: false };
     }
     if (bare.startsWith("/public/") && !bare.startsWith(`/${WEBHOOK_ROUTE}/`)) {
@@ -136,6 +136,13 @@ export const MCP_EXPOSED_HEADERS = [
  */
 export const EDGE_KEPT_READ =
     /^\/public\/sites\/[^/]+\/(today|timetable|shop\/stock)\/?$/;
+
+/**
+ * A share picture (#1375): public, kept five minutes by whoever fetched
+ * it, and fetched by the workspace, a merchant's site and a phone's share
+ * sheet alike, so "*" for the same reason.
+ */
+export const SHARE_IMAGE = /^\/public\/share\/.+\/image\/?$/;
 
 /**
  * What a first-party page may read off a response besides its body. The

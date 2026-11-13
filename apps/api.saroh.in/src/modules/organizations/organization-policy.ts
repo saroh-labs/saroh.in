@@ -175,6 +175,12 @@ export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
     "billing:manage",
     // API keys (R7): a key acts for the business with no person behind it.
     "apikey:manage",
+    // Labels only (audit 2026-11-12 #14, #15): both are decided by the
+    // Owner role where they are used (`publish-approval.ts`,
+    // `closing-notice.ts`), and listed here so the Roles screen shows them
+    // as Owner only, never grantable or an extra.
+    "site:approval:override",
+    "org:export",
 ];
 
 const OWNER_ONLY: ReadonlySet<OrgAction> = new Set(OWNER_ONLY_ACTIONS);
@@ -501,6 +507,8 @@ function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("hours:write")) set.add("service:read");
     if (set.has("pack:write")) set.add("pack:sell");
     if (set.has("pack:sell")) set.add("pack:read");
+    // Making a post means seeing the posts (#1378).
+    if (set.has("social:post")) set.add("social:read");
     if (set.has("order:write")) {
         for (const part of ORDER_WRITE_PARTS) set.add(part);
     }

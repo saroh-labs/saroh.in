@@ -123,6 +123,17 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (#1378, owner 12 Nov 2026) — **Posts follow the Social
+  permissions.** `social:read` ("See posts") and `social:post` ("Make and
+  share posts", implies `social:read`) are their own group, Social, in the
+  role catalogue: Owner and Admin by default, never a Member's or a
+  Reviewer's, grantable to a role or a person (F17). Own posts
+  (`share-posts`) ask them, never `section:write` or a role's name; the
+  module gate stays WEBSITE until a Social module exists. Saroh Social
+  asks the same two. The booking page's card with a typed headline is
+  drawn only through `organizations/:id/share/book/image` (`social:read`);
+  the public share picture never draws words from its address.
+  `share-posts.permissions.spec.ts`, `share-cards.controller.spec.ts`.
 - **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
   `hours:write` ("Set hours and time off") covers a person's weekly hours,
   extra hours and time off; adding or removing people, their services, the
@@ -289,8 +300,10 @@ what the API allows.
   `Membership` in the store's business, in the same transaction, in the
   narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
   `member:read`, `module:read`, `media:read`, `store:read`,
-  `product-review:read`, and since DEC-074 `order:stage` for its own
-  storefronts — no customers, bookings or money), unless
+  `product-review:read`, since DEC-074 `order:stage` and since 13 Nov 2026
+  `order:create` and `order:edit` (payments at the counter included), all
+  for its own storefronts — no customers, bookings, refunds, cancels,
+  export or payment settings), unless
   the person already holds a role, which is never lowered or replaced. The
   rule is `joinTeamFromStorefront` in `@saroh/database`
   (`backfill/store-members-to-memberships.ts`, shared with the one-off
@@ -299,16 +312,43 @@ what the API allows.
   `StoreOwner` check, and the Storefront team role as the business has it
   must be within the inviter's reach. Removing someone from the team deletes
   their `StoreMembers` rows in that business's storefronts, in the removal's
-  serializable transaction. What anyone does inside a storefront still comes
-  from their storefront role.
-- **Current** (DEC-074) — **A location's team works only its storefronts'
-  orders.** Storefront team holds `order:stage` (migration
-  `20261019120000_storefront_team_orders` added it to existing roles), and
-  every order lookup spreads `orderLocationWhere(ctx)` /
-  `orderLocationSql` (`orders/order-location.ts`), keyed on the role, like
-  `reviewerScope`: another storefront's order is a 404 to read, and every
-  move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
-  spreads the same; Home, the calendar and New order alerts follow it.
+  serializable transaction.
+- **Current** (owner, 12 Nov 2026, amends DEC-048 and F16) — **The business
+  role always wins over a storefront role.** On the organization path
+  (`ORG_AUTHORIZATION` on) `StoresService` asks the caller's resolved
+  permissions and nothing else: a `StoreOwner` row or a storefront Admin,
+  Manager or Editor never opens, edits or takes orders where the business
+  role denies it (no `store:write`, no product or price edits). The roster
+  fallback is gone; storefront roles and their rows stay (their future is
+  the owner's to decide). The storefront team routes (`members.service.ts`)
+  ask `member:read`, `member:role:update`, `member:remove` and
+  `member:invite` in the store's business, like Settings › Team; a stranger
+  to the business gets 404. The legacy store customers route
+  (`customers.service.ts`) creates, edits and deletes on `contact:write`,
+  never `store:write`. Who is emailed or shown an alert follows resolved
+  permissions with extras too (`organizations/team-powers.ts`,
+  `notifications/alert-recipients.ts`): New enquiry (`lead:read`) and
+  Customer messages (`message:read`) are alert rows like the others.
+- **Current** (DEC-074; order-taking, owner 13 Nov 2026) — **A location's
+  team works only its storefronts' orders.** Storefront team holds
+  `order:stage`, `order:create` and `order:edit` (migrations
+  `20261019120000_storefront_team_orders` and
+  `20270204120000_storefront_team_take_orders` added them to existing
+  roles), so it reads its orders whole (`order:read` is implied). Every
+  order lookup spreads `orderLocationWhere(ctx)` / `orderLocationSql`
+  (`orders/order-location.ts`), keyed on the role, like `reviewerScope`:
+  another storefront's order is a 404 to read, and every move or change
+  asks `assertOrdersAtOwnLocation` (a 403). The storefront-scoped order
+  routes ask the same of the storefront in `StoresService.orgAllows` (an
+  order action for this role, money included, needs a `StoreMembers` row
+  there), so a new order or a payment is taken only where they work. It
+  takes payments for those orders (owner, 13 Nov 2026): with a new order,
+  marked paid, recorded by hand, or a pay link; refunds and cancels stay
+  `order:refund`'s, which it lacks. The storefront customer list stays
+  refused (no `contact:read`). A new order
+  read or write spreads the same; Home, the calendar, search, the product
+  page's orders, the review invitation, the closing notice, `/v1` and the
+  MCP order tools and New order alerts follow it.
 - **Current** (#868, owner decision 2026-10-08) — **A diary person given a
   login is Calendar only by default.** Someone taking bookings with no login
   (DEC-105) is invited from Team by naming them (`staffId` on the invite,

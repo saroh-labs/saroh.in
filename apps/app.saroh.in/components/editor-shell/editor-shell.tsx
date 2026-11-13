@@ -166,7 +166,8 @@ export function EditorShell<V extends Record<string, unknown>>(
                 initial,
                 initial ? problemsOf(initial.values, initial) : [],
             ),
-        draftReopened: initial !== null && initial.published === null,
+        draftReopened:
+            initial !== null && initial.published === null && !editor.continued,
         save,
         refused,
     });

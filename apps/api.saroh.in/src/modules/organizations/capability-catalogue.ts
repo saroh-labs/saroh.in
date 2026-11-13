@@ -34,6 +34,7 @@ export const CAPABILITY_GROUPS = [
     "money",
     "messaging",
     "insights",
+    "social",
 ] as const;
 
 export type CapabilityGroup = (typeof CAPABILITY_GROUPS)[number];
@@ -89,6 +90,13 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "business",
         label: "Change the web address",
         note: "The old address forwards to the new one for 90 days.",
+        ownerOnly: true,
+    },
+    {
+        action: "org:export",
+        group: "business",
+        label: "Download all the business's data",
+        note: "Every customer, order and record, in one download.",
         ownerOnly: true,
     },
     {
@@ -242,6 +250,13 @@ export const CAPABILITIES: readonly Capability[] = [
         note: "For someone checking the wording: they can comment without being able to change anything.",
     },
     { action: "site:approve", group: "website", label: "Sign a website off" },
+    {
+        action: "site:approval:override",
+        group: "website",
+        label: "Publish without approval",
+        note: "Goes live without a sign-off, and turns “Publishing needs approval” on or off.",
+        ownerOnly: true,
+    },
     { action: "section:write", group: "website", label: "Edit page sections" },
     { action: "media:read", group: "website", label: "See the media library" },
     {
@@ -428,6 +443,15 @@ export const CAPABILITIES: readonly Capability[] = [
 
     // — Insights ——————————————————————————————————————————————
     { action: "analytics:read", group: "insights", label: "See insights" },
+
+    // — Social ————————————————————————————————————————————————
+    { action: "social:read", group: "social", label: "See posts" },
+    {
+        action: "social:post",
+        group: "social",
+        label: "Make and share posts",
+        note: "Posts about the business, with its pictures and words. Whoever can make posts can also see them.",
+    },
 ];
 
 /** Lookup by action, for turning a stored grant back into its label. */

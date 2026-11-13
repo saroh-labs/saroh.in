@@ -6,7 +6,8 @@
  * storefront grants, on both authorization paths, before and after joining
  * — the same, no more and no less. Then the join itself: accepting a
  * storefront invite makes a "Storefront team" membership (never a Member),
- * which can't open Customers, a contact, Bookings or an order; an existing
+ * which can't open Customers, a contact or Bookings, and takes and reads
+ * only its own storefronts' orders (DEC-074, owner 13 Nov 2026); an existing
  * role is never lowered; removing someone from Team removes their
  * storefront roles; and a storefront invite needs `member:invite`, within
  * the inviter's reach. Runs in the integration project (TEST_DATABASE_URL).
@@ -166,9 +167,10 @@ describe("storefront people join the team (DB, F16)", () => {
     });
 
     describe("characterisation: a storefront role through the storefront grants", () => {
-        // Before F16, a storefront member had no membership. What they reach
-        // comes from StoreMembers alone: every role reads, Viewer can't write.
-        it("a legacy storefront member with no membership reads, and writes unless a Viewer", async () => {
+        // Before F16, a storefront member had no membership. On the older
+        // per-store path what they reach comes from StoreMembers alone:
+        // every role reads, Viewer can't write.
+        it("a legacy storefront member with no membership reaches the storefront on the older path only", async () => {
             for (const role of STOREFRONT_ROLES) {
                 const id = users.LEGACY!;
                 await prisma.storeMembers.upsert({
@@ -176,13 +178,20 @@ describe("storefront people join the team (DB, F16)", () => {
                     create: { storeId, userId: id, role },
                     update: { role },
                 });
+                await expect(
+                    legacyStores.getForUser(storeId, id),
+                ).resolves.toMatchObject({ id: storeId });
+                expect(await legacyStores.canWrite(storeId, id)).toBe(
+                    role !== "VIEWER",
+                );
+                // On the organization path the business role always wins
+                // (owner, 12 Nov 2026, amending DEC-048): with none, the
+                // storefront role opens nothing.
+                await expect(
+                    orgStores.getForUser(storeId, id),
+                ).rejects.toBeInstanceOf(NotFoundException);
+                expect(await orgStores.canWrite(storeId, id)).toBe(false);
                 for (const stores of [legacyStores, orgStores]) {
-                    await expect(
-                        stores.getForUser(storeId, id),
-                    ).resolves.toMatchObject({ id: storeId });
-                    expect(await stores.canWrite(storeId, id)).toBe(
-                        role !== "VIEWER",
-                    );
                     // Another storefront of the business: not theirs.
                     await expect(
                         stores.getForUser(otherStoreId, id),
@@ -220,8 +229,11 @@ describe("storefront people join the team (DB, F16)", () => {
                     "org:read",
                     "product-review:read",
                     "store:read",
-                    // DEC-074: their storefront's orders, the kitchen's view.
+                    // DEC-074: their storefront's orders; taking and
+                    // changing them (owner, 13 Nov 2026).
                     "order:stage",
+                    "order:create",
+                    "order:edit",
                 ].sort(),
             );
 
@@ -251,19 +263,22 @@ describe("storefront people join the team (DB, F16)", () => {
             });
         });
 
-        it("keeps exactly what each storefront role reached, on both paths", async () => {
+        it("reads the storefront on both paths, and writes only where the business role allows", async () => {
             for (const role of STOREFRONT_ROLES) {
                 const id = users[role]!;
                 for (const stores of [legacyStores, orgStores]) {
                     await expect(
                         stores.getForUser(storeId, id),
                     ).resolves.toMatchObject({ id: storeId });
-                    expect(await stores.canWrite(storeId, id)).toBe(
-                        role !== "VIEWER",
-                    );
                 }
-                // Managing the storefront's people stays the storefront
-                // owner's: joining the team gives no one that.
+                expect(await legacyStores.canWrite(storeId, id)).toBe(
+                    role !== "VIEWER",
+                );
+                // The business role wins (owner, 12 Nov 2026): Storefront
+                // team holds no store:write, whatever the storefront role.
+                expect(await orgStores.canWrite(storeId, id)).toBe(false);
+                // Managing the storefront's people is the business's
+                // `member:*` powers: Storefront team holds no member:invite.
                 await expect(
                     members.createInvitation(
                         storeId,
@@ -271,19 +286,21 @@ describe("storefront people join the team (DB, F16)", () => {
                         `x-${tag}@example.com`,
                         "VIEWER",
                     ),
-                ).rejects.toBeInstanceOf(NotFoundException);
+                ).rejects.toBeInstanceOf(ForbiddenException);
             }
         });
 
-        it("can't open Customers, a contact, Bookings or an order's money", async () => {
+        it("can't open Customers, a contact or Bookings, and reads their storefront's orders whole", async () => {
             const ctx = await as("VIEWER");
-            // DEC-074: the kitchen's view of their storefront's orders.
+            // DEC-074, and order-taking (owner, 13 Nov 2026).
             expect(allows(ctx, "order:stage")).toBe(true);
+            expect(allows(ctx, "order:create")).toBe(true);
+            expect(allows(ctx, "order:read")).toBe(true);
             for (const action of [
                 "contact:read",
                 "booking:read",
                 "service:read",
-                "order:read",
+                "order:refund",
                 "payment:read",
                 "invoice:read",
                 "subscription:read",
@@ -302,9 +319,10 @@ describe("storefront people join the team (DB, F16)", () => {
             await expect(
                 new BookingsService().listBookings(ctx),
             ).rejects.toBeInstanceOf(ForbiddenException);
-            // Their storefront's order, in the kitchen's view: no money.
+            // Their storefront's order, whole: the money they take, and the
+            // customer by name only (no contact:read).
             const read = await new OrderKitchenService().read(ctx, orderId);
-            expect(read.money).toBeNull();
+            expect(read.money).not.toBeNull();
             expect(read.customer?.email).toBeUndefined();
         });
 
@@ -418,6 +436,8 @@ describe("storefront people join the team (DB, F16)", () => {
                         "store:read",
                         "product-review:read",
                         "order:stage",
+                        "order:create",
+                        "order:edit",
                     ],
                 },
             });

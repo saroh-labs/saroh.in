@@ -1,7 +1,8 @@
 /**
  * The plans catalogue's counts for many businesses at once (the admin's
  * `ImpactService`): the same rules as `countUsage` (`metering.ts`, which
- * says what each key counts), one query per zone for the monthly keys.
+ * says what each key counts), one query per window start for the monthly
+ * keys (DEC-219: a billing period's, else the calendar month's).
  */
 import { IANAZone } from "luxon";
 
@@ -10,16 +11,18 @@ import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
     countSeats,
+    firstDayOf,
     loginlessStaff,
-    monthFirstDay,
-    monthWindow,
     openInvitations,
+    paidPeriodEnd,
+    PERIOD_SELECT,
     SEAT_INVITE_SELECT,
     SHOP_KIND,
     siteViewTotals,
     standingBookings,
     standingOrders,
     STORED,
+    windowFor,
 } from "./metering";
 
 /** What the cross-business counts read (the admin's, outside any business). */
@@ -108,9 +111,41 @@ async function zonesOf(
 }
 
 /**
+ * The businesses grouped by where their monthly count starts
+ * (`meterWindow`'s rule, DEC-219), keyed by `start(window, zone)`'s time:
+ * one subscription read and one zone read for all of them.
+ */
+async function groupByWindow(
+    db: MeterAcrossDb,
+    organizationIds: readonly string[],
+    now: Date,
+    start: (window: { start: Date }, zone: string) => Date,
+): Promise<Map<number, string[]>> {
+    const [zones, subs] = await Promise.all([
+        zonesOf(db, organizationIds),
+        db.subscription.findMany({
+            where: { organizationId: { in: [...organizationIds] } },
+            select: { organizationId: true, ...PERIOD_SELECT },
+        }),
+    ]);
+    const subOf = new Map(subs.map((s) => [s.organizationId, s]));
+    const out = new Map<number, string[]>();
+    for (const [org, zone] of zones) {
+        const window = windowFor(
+            now,
+            zone,
+            paidPeriodEnd(subOf.get(org) ?? null),
+        );
+        const at = start(window, zone).getTime();
+        out.set(at, [...(out.get(at) ?? []), org]);
+    }
+    return out;
+}
+
+/**
  * One limit's usage for many businesses at once: business id → count (a
  * business with none is absent). The same rules as {@link countUsage}, one
- * query per zone for the monthly keys.
+ * query per window start for the monthly keys.
  *
  * CROSS-TENANT READ: only the admin's `ImpactService` calls it, behind the
  * admin guards. It returns counts, never what was counted.
@@ -138,14 +173,10 @@ export async function countUsageAcross(
             );
         case "ordersPerMonth":
         case "bookingsPerMonth": {
-            const zones = await zonesOf(db, ids);
-            const byZone = new Map<string, string[]>();
-            for (const [org, zone] of zones) {
-                byZone.set(zone, [...(byZone.get(zone) ?? []), org]);
-            }
+            const byStart = await groupByWindow(db, ids, now, (w) => w.start);
             const out = new Map<string, number>();
-            for (const [zone, orgs] of byZone) {
-                const { start } = monthWindow(now, zone);
+            for (const [at, orgs] of byStart) {
+                const start = new Date(at);
                 if (key === "bookingsPerMonth") {
                     tally(
                         await db.booking.groupBy({
@@ -307,12 +338,9 @@ export async function countUsageAcross(
             return out;
         }
         case "visitsPerMonth": {
-            const zones = await zonesOf(db, ids);
-            const byDay = new Map<number, string[]>();
-            for (const [org, zone] of zones) {
-                const day = monthFirstDay(now, zone).getTime();
-                byDay.set(day, [...(byDay.get(day) ?? []), org]);
-            }
+            const byDay = await groupByWindow(db, ids, now, (w, zone) =>
+                firstDayOf(w.start, zone),
+            );
             const out = new Map<string, number>();
             for (const [day, orgs] of byDay) {
                 const rows = await db.analyticsDailyAggregate.groupBy({

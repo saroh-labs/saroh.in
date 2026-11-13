@@ -82,6 +82,8 @@ export interface EditionProfile {
      * edition spans many. A business's stored zone always wins.
      */
     defaultZone: string;
+    /** Whether a share caption offers Hinglish (Hindi in Latin letters) beside English, for customers who write that way. */
+    hinglishCaptions: boolean;
 }
 
 export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
@@ -108,6 +110,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
             codes: "codes@saroh.in",
         },
         defaultZone: "Asia/Kolkata",
+        hinglishCaptions: true,
     },
     GLOBAL: {
         taxSystem: "named-line",
@@ -132,6 +135,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
             codes: "codes@saroh.tech",
         },
         defaultZone: "UTC",
+        hinglishCaptions: false,
     },
 };
 

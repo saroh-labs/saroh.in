@@ -7,13 +7,16 @@
  * role (`joinTeamFromStorefront`, as the API makes it) and a Viewer's
  * `StoreMembers` row on Hill Road alone. He:
  *
- * - lists Hill Road's orders, never Market's, with no money and no
+ * - lists Hill Road's orders, never Market's, with their money and no
  *   customer email or phone;
- * - reads a Hill Road order in the kitchen's view (no money, no prices),
- *   and Market's is a 404;
+ * - reads a Hill Road order whole (money and prices), and Market's is a 404;
  * - moves a Hill Road order to Ready and back, and records its courier; a
  *   Market order's move, Undo, courier and bulk move are each a 403;
- * - takes, changes, cancels, pays or exports nothing.
+ * - takes and changes Hill Road's orders (owner, 13 Nov 2026), with his
+ *   name on each step, and none at Market;
+ * - takes payment for Hill Road's orders (owner, 13 Nov 2026), named on
+ *   the timeline, and none for Market's;
+ * - cancels, refunds, exports and lists customers never.
  *
  * Someone on the team with no storefront left sees no orders, never every
  * one; a Member is not narrowed. Runs in the integration project.
@@ -42,6 +45,7 @@ import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { CustomersService } from "../customers/customers.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { readStaffNarrow } from "../home/home-staff";
 import { mayHearAbout } from "../notifications/alert-preferences";
@@ -65,7 +69,7 @@ import { OrderKitchenService } from "./order-kitchen.service";
 import { OTHER_LOCATION_REFUSAL } from "./order-location";
 import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrderStageBatchService } from "./order-stage-batch.service";
-import { OrdersService } from "./orders.service";
+import { ORDER_TAKEN_NOTE, OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -211,16 +215,29 @@ beforeAll(async () => {
 });
 
 describe("the Storefront team role a storefront invite makes", () => {
-    it("holds order:stage, and no order:read", async () => {
+    it("takes, changes and moves orders, which reads them; no customers, refunds or export", async () => {
         const ctx = await as(raviId);
         expect(ctx.roleKey).toBe(STOREFRONT_TEAM_ROLE_KEY);
-        expect(ctx.actions?.has("order:stage")).toBe(true);
-        expect(ctx.actions?.has("order:read")).toBe(false);
-        expect(ctx.actions?.has("contact:read")).toBe(false);
+        for (const action of [
+            "order:stage",
+            "order:create",
+            "order:edit",
+            "order:read",
+        ] as const) {
+            expect([action, ctx.actions?.has(action)]).toEqual([action, true]);
+        }
+        for (const action of [
+            "contact:read",
+            "order:refund",
+            "order:export",
+            "payment:read",
+        ] as const) {
+            expect([action, ctx.actions?.has(action)]).toEqual([action, false]);
+        }
     });
 });
 
-describe("the Orders list: their storefront's, without money", () => {
+describe("the Orders list: their storefront's, with its money", () => {
     it("lists Hill Road's orders and never Market's", async () => {
         const mine = await orderAt(hill);
         const theirs = await orderAt(market);
@@ -233,13 +250,12 @@ describe("the Orders list: their storefront's, without money", () => {
         expect(page.counts.all).toBe(page.rows.length);
     });
 
-    it("sends no money, and the customer by name only", async () => {
+    it("sends the money, and the customer by name only", async () => {
         const mine = await orderAt(hill);
         const page = await controller.list(await as(raviId));
         const row = page.rows.find((r) => r.id === mine);
         expect(row).toBeDefined();
-        expect(row?.total).toBeUndefined();
-        expect(row?.unpaidAmount).toBeUndefined();
+        expect(row?.total).toBeDefined();
         expect(row?.customer?.name).toContain("Asha");
         expect(row?.customer?.email).toBeUndefined();
         expect(row?.customer?.phone).toBeUndefined();
@@ -278,13 +294,13 @@ describe("the Orders list: their storefront's, without money", () => {
     });
 });
 
-describe("Order Detail: the kitchen's view of their storefront's order", () => {
-    it("reads a Hill Road order with no money and no prices", async () => {
+describe("Order Detail: their storefront's order, whole", () => {
+    it("reads a Hill Road order with its money and prices, and no invoices", async () => {
         const mine = await orderAt(hill);
         const read = await controller.read(await as(raviId), mine);
-        expect(read.money).toBeNull();
+        expect(read.money).not.toBeNull();
         expect(read.invoices).toBeNull();
-        expect(read.items[0]).not.toHaveProperty("price");
+        expect(read.items[0]).toHaveProperty("price");
         expect(read.customer?.name).toContain("Asha");
         expect(read.customer?.email).toBeUndefined();
         expect(read.customer?.phone).toBeNull();
@@ -406,35 +422,197 @@ describe("moving orders: their storefront's, and a 403 for another's", () => {
     });
 });
 
-describe("nothing beyond the kitchen", () => {
-    it("takes, changes, cancels, pays and exports nothing", async () => {
+describe("taking and changing orders: their storefront's only (owner, 13 Nov 2026)", () => {
+    const walkIn = (store: typeof hill, payment = "LATER") =>
+        ({
+            items: [{ productId: store.product, quantity: 1 }],
+            fulfilment: "PICKUP",
+            walkIn: { name: "Asha" },
+            payment: { kind: payment },
+        }) as CreateOrderDto;
+
+    it("takes an order at Hill Road, and its timeline names him", async () => {
+        const made = await orders.create(hill.id, raviId, walkIn(hill));
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: made.id },
+            select: { storeId: true },
+        });
+        expect(order.storeId).toBe(hill.id);
+        const taken = await prisma.orderEvent.findFirst({
+            where: { orderId: made.id, note: ORDER_TAKEN_NOTE },
+        });
+        expect(taken?.actorUserId).toBe(raviId);
+    });
+
+    it("takes none at Market, and no order is made", async () => {
+        const before = await prisma.order.count({
+            where: { storeId: market.id },
+        });
+        expect(
+            await refusal(() =>
+                orders.create(market.id, raviId, walkIn(market)),
+            ),
+        ).toBe("403");
+        expect(
+            await prisma.order.count({ where: { storeId: market.id } }),
+        ).toBe(before);
+    });
+
+    it("changes a Hill Road order, named on its timeline; Market's is a 403", async () => {
         const mine = await orderAt(hill);
+        const theirs = await orderAt(market);
         const ctx = await as(raviId);
         expect(
             await refusal(() => controller.edit(ctx, mine, { notes: "Hi" })),
+        ).toBe("allowed");
+        const edit = await prisma.orderEvent.findFirst({
+            where: { orderId: mine, kind: "EDIT" },
+            orderBy: { createdAt: "desc" },
+        });
+        expect(edit?.actorUserId).toBe(raviId);
+        expect(
+            await refusal(() => controller.edit(ctx, theirs, { notes: "Hi" })),
         ).toBe("403");
+        expect(
+            await refusal(() =>
+                controller.changeFulfilment(ctx, theirs, {
+                    fulfilment: "LOCAL_DELIVERY",
+                    shipping: "0",
+                }),
+            ),
+        ).toBe("403");
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: theirs } }))
+                .notes,
+        ).not.toBe("Hi");
+    });
+
+    it("the storefront routes: Hill Road's orders with totals, Market's refused", async () => {
+        const mine = await orderAt(hill);
+        const theirs = await orderAt(market);
+        expect(await refusal(() => orders.list(hill.id, raviId))).toBe(
+            "allowed",
+        );
+        expect(await refusal(() => orders.get(hill.id, mine, raviId))).toBe(
+            "allowed",
+        );
+        expect(await refusal(() => orders.list(market.id, raviId))).toBe("403");
+        expect(await refusal(() => orders.get(market.id, theirs, raviId))).toBe(
+            "403",
+        );
+        expect(
+            await refusal(() =>
+                orders.updateStatus(market.id, theirs, raviId, {
+                    status: "PROCESSING",
+                }),
+            ),
+        ).toBe("403");
+    });
+
+    it("takes payment for Hill Road's orders, and the timeline names him (owner, 13 Nov 2026)", async () => {
+        // Paid at the counter with a new order.
+        const cash = await orders.create(hill.id, raviId, {
+            ...walkIn(hill),
+            payment: { kind: "CASH", received: "180" },
+        } as CreateOrderDto);
+        const paidStep = await prisma.orderEvent.findFirst({
+            where: {
+                orderId: cash.id,
+                kind: "STATUS",
+                note: { not: ORDER_TAKEN_NOTE },
+            },
+        });
+        expect(paidStep?.actorUserId).toBe(raviId);
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: cash.id } }))
+                .paymentStatus,
+        ).toBe("PAID");
+
+        // Marked paid later, by hand.
+        const unpaid = (await orders.create(hill.id, raviId, walkIn(hill))).id;
+        expect(
+            await refusal(() =>
+                orders.updateStatus(hill.id, unpaid, raviId, {
+                    paymentStatus: "PAID",
+                }),
+            ),
+        ).toBe("allowed");
+        const marked = await prisma.orderEvent.findFirst({
+            where: {
+                orderId: unpaid,
+                kind: "STATUS",
+                amountCents: { not: null },
+            },
+        });
+        expect(marked?.actorUserId).toBe(raviId);
+
+        // A pay link and a payment by hand pass the role's guards here; what
+        // follows (a provider, something owed) is the order's own rule.
+        const ctx = await as(raviId);
+        const another = (await orders.create(hill.id, raviId, walkIn(hill))).id;
+        expect(
+            await refusal(() => controller.payLink(ctx, another)),
+        ).not.toMatch(/^40[34]$/);
+        const paid = await orderAt(hill);
+        expect(
+            await refusal(() =>
+                controller.recordDifference(ctx, paid, { kind: "CASH" }),
+            ),
+        ).not.toMatch(/^40[34]$/);
+    });
+
+    it("takes no payment for Market's orders", async () => {
+        const ctx = await as(raviId);
+        expect(
+            await refusal(() =>
+                orders.create(market.id, raviId, {
+                    ...walkIn(market),
+                    payment: { kind: "CASH", received: "180" },
+                } as CreateOrderDto),
+            ),
+        ).toBe("403");
+        const unpaid = (await orders.create(market.id, ownerId, walkIn(market)))
+            .id;
+        expect(
+            await refusal(() =>
+                orders.updateStatus(market.id, unpaid, raviId, {
+                    paymentStatus: "PAID",
+                }),
+            ),
+        ).toBe("403");
+        expect(await refusal(() => controller.payLink(ctx, unpaid))).toBe(
+            "403",
+        );
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: unpaid } }))
+                .paymentStatus,
+        ).toBe("UNPAID");
+        expect(
+            await refusal(async () =>
+                controller.recordDifference(ctx, await orderAt(market), {
+                    kind: "CASH",
+                }),
+            ),
+        ).toBe("403");
+    });
+
+    it("cancels, refunds, exports and lists customers never", async () => {
+        const mine = await orderAt(hill);
+        const ctx = await as(raviId);
         expect(
             await refusal(() =>
                 controller.cancel(ctx, mine, { idempotencyKey: `x-${mine}` }),
             ),
         ).toBe("403");
-        expect(await refusal(() => controller.payLink(ctx, mine))).toBe("403");
         expect(
             await refusal(() => controller.list(ctx, { export: "true" })),
         ).toBe("403");
         expect(
             await refusal(() => payments.initiateRefund(ctx, mine, {})),
         ).toBe("403");
-        // The storefront-scoped order routes send totals: refused.
-        expect(await refusal(() => orders.list(hill.id, raviId))).toBe("403");
         expect(
             await refusal(() =>
-                orders.create(hill.id, raviId, {
-                    items: [{ productId: hill.product, quantity: 1 }],
-                    fulfilment: "PICKUP",
-                    walkIn: { name: "Asha" },
-                    payment: { kind: "LATER" },
-                } as CreateOrderDto),
+                new CustomersService(stores).list(hill.id, raviId),
             ),
         ).toBe("403");
     });

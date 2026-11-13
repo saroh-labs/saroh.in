@@ -127,6 +127,9 @@ module.exports = {
         // $transaction) that run the REAL @saroh/templates instantiate against
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
+        // Share pictures and own posts (#1375, #1378): the card renderer
+        // and the route rules, DB-free; the rows are in *.db.spec.ts.
+        "<rootDir>/src/modules/share-posts/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
         // The category refusal's words (UX-066); the rest of content's
         // specs read the dev database.
@@ -184,7 +187,11 @@ module.exports = {
         // they last bought — is pure serialization over rows handed to it.
         "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
+        // Storefront team routes ask business permissions (audit 2026-11-12 #4).
+        "<rootDir>/src/modules/members/members.permissions.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        // DEC-074: a location's team's orders, narrowed, and no payments.
+        "<rootDir>/src/modules/orders/order-location.spec.ts",
         // ADR-008 kitchen flow (U6): the pure stage machine, refund-by-line
         // arithmetic, the order read's money hiding, and the kitchen service
         // with a jest-mocked Prisma.

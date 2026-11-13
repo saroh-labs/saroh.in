@@ -257,3 +257,19 @@ describe("the public API powers (plan 2026-11-10-001, U2)", () => {
         expect(isNeverExtra("webhook:manage")).toBe(false);
     });
 });
+
+describe("the Social powers (#1378, owner 12 Nov 2026)", () => {
+    it("lists See posts and Make and share posts under Social, grantable", () => {
+        expect(CAPABILITY_GROUPS).toContain("social");
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["social:read", "See posts"],
+            ["social:post", "Make and share posts"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("social");
+            expect(grantable).toContain(action);
+            expect(isNeverExtra(action)).toBe(false);
+        }
+    });
+});

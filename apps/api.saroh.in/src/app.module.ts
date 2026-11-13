@@ -56,6 +56,7 @@ import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchPagesModule } from "./modules/search-pages/search-pages.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
+import { SharePostsModule } from "./modules/share-posts/share-posts.module";
 import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
 import { SiteAccountsModule } from "./modules/site-accounts/site-accounts.module";
 import { SitesModule } from "./modules/sites/sites.module";
@@ -137,6 +138,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ContentModule,
         MediaModule,
         SitesModule,
+        // Share pictures and own posts (#1375, #1378).
+        SharePostsModule,
         SiteAccountsModule,
         DomainsModule,
         JobsModule,

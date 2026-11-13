@@ -5,7 +5,7 @@
   "author": "Saroh Team",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development portless api.saroh nest start --watch",
+    "dev": "NODE_ENV=development SHARE_POSTS=${SHARE_POSTS:-on} portless api.saroh nest start --watch",
     "dev:app": "NODE_ENV=development nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
@@ -40,6 +40,7 @@
     "@saroh/object-storage": "workspace:*",
     "@saroh/pricing-catalog": "workspace:*",
     "@saroh/templates": "workspace:*",
+    "@takumi-rs/core": "2.20.0",
     "@thallesp/nestjs-better-auth": "^2.7.0",
     "better-auth": "1.7.19",
     "class-transformer": "^0.5.1",

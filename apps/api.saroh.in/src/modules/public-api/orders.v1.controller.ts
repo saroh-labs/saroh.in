@@ -60,7 +60,7 @@ export class OrdersV1Controller {
         @Query(new ZodContractPipe(listOrdersQuery)) query: ListOrdersQuery,
     ) {
         authorize(ctx, "order:read");
-        return ordersPage(ctx.organizationId, query);
+        return ordersPage(ctx.organizationId, query, ctx);
     }
 
     @ContractRoute(v1GetOrder)
@@ -124,7 +124,7 @@ export class OrdersV1Controller {
     }
 
     private async order(ctx: OrganizationContext, orderId: string) {
-        const found = await orderById(ctx.organizationId, orderId);
+        const found = await orderById(ctx.organizationId, orderId, ctx);
         if (!found) throw notFound("order");
         return found;
     }

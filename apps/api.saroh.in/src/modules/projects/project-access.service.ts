@@ -6,11 +6,8 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type {
-    OrganizationContext,
-    OrgRole,
-} from "../../common/types/organization-context";
-import { authorize } from "../organizations/organization-policy";
+import type { OrganizationContext } from "../../common/types/organization-context";
+import { allows, authorize } from "../organizations/organization-policy";
 import type { ProjectRole } from "./project-role";
 import { isProjectRole, strongestProjectRole } from "./project-role";
 
@@ -26,8 +23,10 @@ export interface AccessibleProject {
  * Project-level access resolution and management (S1-010).
  *
  * Two read paths (ADR-001):
- *  - OWNER/ADMIN implicitly see EVERY Project in their org and act as MANAGER on
- *    each (no grant required).
+ *  - Whoever holds `project:access:manage` (Owner and Admin by default, or
+ *    any role or person given it) sees EVERY Project in their org and acts as
+ *    MANAGER on each (no grant required). Asked of the resolved permissions,
+ *    never the role's name.
  *  - a MEMBER sees only Projects granted to them directly OR via a Team, and
  *    their effective role is the STRONGEST of every granting path
  *    (MANAGER > EDITOR > VIEWER).
@@ -43,20 +42,20 @@ export class ProjectAccessService {
     // ------------------------------------------------------------------ reads
 
     /**
-     * Projects the caller can access. OWNER/ADMIN → all projects in the org;
-     * MEMBER → the de-duplicated union of directly-granted and Team-granted
+     * Projects the caller can access. `project:access:manage` → all projects
+     * in the org; anyone else → the de-duplicated union of directly-granted and Team-granted
      * projects, each carrying the caller's strongest effective role.
      */
     async listAccessibleProjects(
         ctx: OrganizationContext,
     ): Promise<AccessibleProject[]> {
-        if (ctx.role === "OWNER" || ctx.role === "ADMIN") {
+        if (allows(ctx, "project:access:manage")) {
             const projects = await prisma.project.findMany({
                 where: { organizationId: ctx.organizationId },
                 orderBy: { name: "asc" },
                 select: { id: true, name: true, slug: true },
             });
-            // OWNER/ADMIN act with full (MANAGER-equivalent) capability.
+            // They act with full (MANAGER-equivalent) capability.
             return projects.map((project) => ({ ...project, role: "MANAGER" }));
         }
 
@@ -119,17 +118,15 @@ export class ProjectAccessService {
 
     /**
      * The caller's effective role on one Project, or `null` if they have no
-     * access. OWNER/ADMIN → MANAGER (full). Otherwise the strongest of the
-     * user's direct grant and any Team grant on that project.
+     * access. `project:access:manage` → MANAGER (full). Otherwise the
+     * strongest of the user's direct grant and any Team grant on that project.
      */
     async resolveProjectRole(
-        userId: string,
+        ctx: OrganizationContext,
         projectId: string,
-        orgRole: OrgRole,
     ): Promise<ProjectRole | null> {
-        if (orgRole === "OWNER" || orgRole === "ADMIN") {
-            return "MANAGER";
-        }
+        if (allows(ctx, "project:access:manage")) return "MANAGER";
+        const { userId } = ctx;
 
         const grants = await prisma.projectAccess.findMany({
             where: {
