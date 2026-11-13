@@ -895,6 +895,7 @@ describe("MCP website tools (U11)", () => {
             why: string | null;
             preview_url: string | null;
             picture_url: string | null;
+            pages: string[];
         }[];
         trade: string | null;
         template_choice: boolean;
@@ -965,6 +966,11 @@ describe("MCP website tools (U11)", () => {
                 (t) => t.template_id === "starter",
             );
             if (plain) expect(plain.picture_url).toBeNull();
+            // The pages a site starts with, its added Contact page among them.
+            expect(plain?.pages).toEqual(
+                expect.arrayContaining(["Home", "Contact"]),
+            );
+            expect(textOf(listed)).toMatch(/Pages: Home, About, .*Contact/);
         } finally {
             fetched.mockRestore();
         }

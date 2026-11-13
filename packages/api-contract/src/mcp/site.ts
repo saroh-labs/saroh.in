@@ -86,6 +86,7 @@ export const listTemplatesTool = {
                 name: z.string(),
                 description: z.string().nullable(),
                 for_kinds: z.array(z.string()),
+                /** The pages a new site starts with, for this business: its own, then any Shop, Book, Prices or Contact page it adds. */
                 pages: z.array(z.string()),
                 colourway_ids: z.array(z.string()),
                 /** For this business first: its trade's, or its kind's (DEC-216). */
