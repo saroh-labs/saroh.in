@@ -48,6 +48,51 @@ export const orgIdOf = (biz: BizKey) => idOf(biz, "org", "main");
 export const userIdOf = (biz: BizKey, role: TeamRole) =>
     idOf(biz, "user", role);
 
+/** TEST-ONLY questions a month for the eval businesses: not a real plan limit. */
+export const EVAL_QUESTIONS = 100000;
+
+/**
+ * The base seed's catalogue has no `ask-ai` row, so Ask AI reads locked
+ * (it fails closed). Give every plan on the businesses' version the row,
+ * with {@link EVAL_QUESTIONS}: only ever in an `-eval` database.
+ */
+async function addAskAiRow(version: number): Promise<void> {
+    const row = await prisma.pricingCatalogVersion.findUnique({
+        where: { version },
+        select: { catalog: true },
+    });
+    if (!row) throw new Error(`[eval seed] no catalogue version ${version}`);
+    const catalog = row.catalog as {
+        plans: { id: string }[];
+        modules: Record<string, unknown>[];
+    };
+    if (catalog.modules.some((m) => m.id === "ask-ai")) return;
+    catalog.modules.push({
+        id: "ask-ai",
+        name: "Ask AI",
+        group: catalog.modules[0]?.group ?? "site",
+        pricing: "hidden",
+        what: "Questions about the business, answered (eval only).",
+        cells: Object.fromEntries(
+            catalog.plans.map((p) => [
+                p.id,
+                {
+                    inc: true,
+                    text: "Eval",
+                    card: "",
+                    limit: EVAL_QUESTIONS,
+                    per: "month",
+                    soft: false,
+                },
+            ]),
+        ),
+    });
+    await prisma.pricingCatalogVersion.update({
+        where: { version },
+        data: { catalog: catalog as Prisma.InputJsonObject },
+    });
+}
+
 export async function main(): Promise<number> {
     const target = assertEvalDatabase();
     console.info(`[eval seed] database: ${target.database} on ${target.host}`);
@@ -65,12 +110,13 @@ export async function main(): Promise<number> {
     // The plan the base seed's business is on, so entitlements match a real one.
     const base = await prisma.subscription.findFirst({
         where: { organization: { slug: "demo-org" } },
-        select: { planId: true },
+        select: { planId: true, plan: { select: { version: true } } },
     });
     if (!base)
         console.info(
             "[eval seed] no base seed (demo-org): the businesses get no plan",
         );
+    else await addAskAiRow(base.plan.version);
     for (const key of FLAGS) {
         await prisma.featureFlag.upsert({
             where: { key },
