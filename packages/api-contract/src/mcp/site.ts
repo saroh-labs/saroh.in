@@ -92,6 +92,10 @@ export const listTemplatesTool = {
                 suggested: z.boolean(),
                 /** Why it sits where it does; null for a plain suggestion. */
                 why: z.string().nullable(),
+                /** Opens it in Saroh on this business, previewing the business's own site in it; null while templates aren't chosen. */
+                preview_url: z.string().nullable(),
+                /** Its card picture; null for a template without one. */
+                picture_url: z.string().nullable(),
             }),
         ),
         next_cursor: z.string().nullable(),

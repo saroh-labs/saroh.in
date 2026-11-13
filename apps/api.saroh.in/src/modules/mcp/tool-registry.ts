@@ -43,6 +43,8 @@ export interface ToolResult<O> {
     text: string;
     /** `structuredContent`, checked against the contract's output. */
     data: O;
+    /** Pictures the app sees beside the text (MCP image content), as base64. */
+    images?: { data: string; mimeType: "image/webp" | "image/png" }[];
     /** A write's activity row; `summary` defaults to the text's first line. */
     activity?: { target?: string; summary?: string };
 }
@@ -429,7 +431,13 @@ export class McpToolRegistry {
                 );
             }
             return {
-                content: [{ type: "text" as const, text: result.text }],
+                content: [
+                    { type: "text" as const, text: result.text },
+                    ...(result.images ?? []).map((i) => ({
+                        type: "image" as const,
+                        ...i,
+                    })),
+                ],
                 structuredContent: result.data,
             };
         } catch (error) {
