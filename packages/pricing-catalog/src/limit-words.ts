@@ -40,7 +40,7 @@ export interface LimitWords {
     one: string;
     /** What stops at the limit, the notice's first sentence. */
     paused: string;
-    /** Counted per calendar month in the business's zone, not in total. */
+    /** Counted per month (billing period, else calendar month: DEC-219), not in total. */
     monthly: boolean;
     /** The notice's primary action, before an upgrade; none offers an add-on. */
     action?: LimitAction;

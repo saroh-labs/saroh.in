@@ -24,7 +24,8 @@ const PAYING_STATUSES = new Set(["ACTIVE", "PAST_DUE"]);
 /**
  * The catalogue modules whose usage {@link ImpactService} counts: every row
  * metering counts (U13, `billing/metering.ts`) — products, orders and
- * bookings this month in each business's zone, blog posts, team members and
+ * bookings over each business's month (billing period, else calendar month in
+ * its zone: DEC-219), blog posts, team members and
  * integrations. The admin's usage lines, its impact and the merchant's
  * `GET …/billing/access` count the same way.
  */

@@ -31,7 +31,7 @@ import { FlagKey } from "../feature-flags/flags";
 import { ImpactService } from "../pricing/impact.service";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, monthFirstDay, monthWindow } from "./metering";
+import { countUsage, firstDayOf, monthWindow } from "./metering";
 import { countUsageAcross } from "./metering-across";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import {
@@ -64,6 +64,10 @@ async function install(
         planRows: planRows(catalog, version),
     });
 }
+
+/** The rollup day this calendar month's visits count from, in `zone`. */
+const monthFirstDay = (now: Date, zone: string) =>
+    firstDayOf(monthWindow(now, zone).start, zone);
 
 /**
  * A business on `planId`@V (or `over.version`), with the kill switch on (or
@@ -334,10 +338,37 @@ describe("what each limit counts (DB, U13)", () => {
         const now = new Date("2026-10-01T00:10:00+05:30");
         expect(monthWindow(now, "Asia/Kolkata")).toEqual({
             start: new Date("2026-09-30T18:30:00.000Z"),
+            end: new Date("2026-10-31T18:30:00.000Z"),
             key: "2026-10",
         });
         // The same instant is still September in UTC.
         expect(monthWindow(now, "UTC").key).toBe("2026-09");
+    });
+
+    it("counts a paying business's orders over its billing period, not the calendar month (DEC-219)", async () => {
+        const { orgId, storeId } = await business("grow", {
+            zone: "Asia/Kolkata",
+        });
+        await prisma.subscription.update({
+            where: { organizationId: orgId },
+            data: { currentPeriodEnd: new Date("2026-11-14T10:00:00Z") },
+        });
+        const now = new Date("2026-10-20T00:00:00Z");
+        // October in India, but before the period's month began (14 Oct).
+        await order(orgId, storeId, {
+            createdAt: new Date("2026-10-10T00:00:00Z"),
+        });
+        await order(orgId, storeId, {
+            createdAt: new Date("2026-10-15T00:00:00Z"),
+        });
+        expect(await countUsage(prisma, orgId, "ordersPerMonth", now)).toBe(1);
+        const across = await countUsageAcross(
+            prisma,
+            "ordersPerMonth",
+            [orgId],
+            now,
+        );
+        expect(across.get(orgId)).toBe(1);
     });
 
     it("counts posts live on a site that isn't deleted", async () => {

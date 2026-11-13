@@ -13,7 +13,7 @@ import { RaiseLimitDialog } from "../plan-actions";
 import { OverviewCard } from "./overview-card";
 
 /**
- * Usage this month against its limits (U3, R2), with Raise a limit… for
+ * Usage this period against its limits (U3, R2), with Raise a limit… for
  * `subscription:override` holders: the Billing tab's raise dialog, opened
  * over Overview. After it goes through the card updates (the action
  * refreshes the page) and wears the highlight.
@@ -47,7 +47,7 @@ export function UsageCard({
     return (
         <OverviewCard
             id="usage"
-            title="Usage this month"
+            title="Usage this period"
             description="What it uses against its limits."
             data={usage}
             highlighted={feedback.isHighlighted("usage")}

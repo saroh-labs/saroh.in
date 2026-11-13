@@ -2,8 +2,8 @@ import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 
-import { businessTimezone } from "../bookings/staff-availability";
-import { countUsage, meteredKeyOf, windowKey } from "./metering";
+import type { MeterWindow } from "./metering";
+import { countUsage, meteredKeyOf, meterWindow, windowKey } from "./metering";
 import { planMeter } from "./metering.service";
 import type { LimitLevel } from "./plan-limit-notice.handler";
 import {
@@ -77,7 +77,7 @@ export interface ClearDeps {
         moduleId: string,
         now: Date,
     ) => Promise<number>;
-    zone: (organizationId: string) => Promise<string>;
+    window: (organizationId: string, now: Date) => Promise<MeterWindow>;
 }
 
 const defaultDeps: ClearDeps = {
@@ -89,7 +89,7 @@ const defaultDeps: ClearDeps = {
             ? countUsage(prisma, organizationId, key, now)
             : Promise.resolve(0);
     },
-    zone: (organizationId) => businessTimezone(prisma, organizationId),
+    window: (organizationId, now) => meterWindow(prisma, organizationId, now),
 };
 
 /**
@@ -109,7 +109,7 @@ export async function clearStaleLimitNotices(
         });
         if (told.length === 0) return 0;
 
-        let zone: string | null = null;
+        let window: MeterWindow | null = null;
         const stale: typeof told = [];
         for (const notice of told) {
             const parsed = parseLimitNoticeKey(notice.eventKey);
@@ -121,12 +121,12 @@ export async function clearStaleLimitNotices(
                 continue;
             }
             if (row.per === "month") {
-                zone ??= await deps.zone(organizationId);
+                window ??= await deps.window(organizationId, now);
             }
             const cleared = limitNoticeCleared(parsed, {
                 limit,
                 used: await deps.used(organizationId, parsed.moduleId, now),
-                window: windowKey(row.per, now, zone ?? "UTC"),
+                window: window ? windowKey(row.per, window) : "all",
             });
             if (cleared) stale.push(notice);
         }

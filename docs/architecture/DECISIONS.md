@@ -2948,3 +2948,13 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Saroh Social later adds channels and scheduling to the same Create post page; until then Channels and Schedule are drawn locked, and Share now still works.
 - It ships dark: `SHARE_POSTS` (API, 404 while off) and `NEXT_PUBLIC_SHARE_POSTS` (app) are on in development and off in production until the owner opens it.
 - Rules: `apps/api.saroh.in/src/modules/share-posts/`, `apps/app.saroh.in/components/shared/share-item/`, `apps/app.saroh.in/components/social/create-post/`, `docs/plans/2026-11-12-003-feat-share-cards-and-create-post-plan.md`.
+
+## DEC-219 Monthly plan limits count over the billing period
+
+**Status: Accepted — 2026-11-13** · owner
+
+- Decision (owner, 13 Nov 2026): "Limits reset when the billing cycle resets." Every monthly plan limit (orders, bookings and visits a month, and any monthly limit added later) counts over the business's current billing period when it is on a paid plan, a trial or a payment due included.
+- A business with no billing period (Free, no subscription, a cancelled one, the legacy floor) keeps the calendar month in its own zone, as before.
+- A yearly plan's monthly limits still reset every month, on its anniversary day (the day its period starts), not once a year. A period that starts on a day a short month hasn't got (the 31st) resets on that month's last day.
+- A limit notice is told once per window, so a new period (or a move between Free and a paid plan) can tell it again; its "resets on" date is the window's end, in the business's zone.
+- One rule for every limit, in one place: `meterWindow` in `apps/api.saroh.in/src/modules/billing/metering.ts`. Enforcement, usage on Plan and billing, limit notices and the admin's impact counts all read it.
