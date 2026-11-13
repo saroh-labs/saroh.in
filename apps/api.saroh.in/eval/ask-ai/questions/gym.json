@@ -1,0 +1,143 @@
+[
+    {
+        "id": "gym-01",
+        "business": "gym",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "How many bookings did we have last week?",
+        "expect": { "numbers": ["bookings:last_week"] }
+    },
+    {
+        "id": "gym-02",
+        "business": "gym",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Rahul Mehra ka phone number kya hai?",
+        "expect": { "mentions": ["phone:rahul"] }
+    },
+    {
+        "id": "gym-03",
+        "business": "gym",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "पिछले हफ्ते कितने नो-शो हुए?",
+        "expect": { "numbers": ["noshow:last_week"] }
+    },
+    {
+        "id": "gym-04",
+        "business": "gym",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "आज कितनी बुकिंग हैं?",
+        "expect": { "numbers": ["bookings:today"] }
+    },
+    {
+        "id": "gym-05",
+        "business": "gym",
+        "role": "owner",
+        "language": "en",
+        "kind": "out-of-scope",
+        "question": "Add a 10-class pack for ₹3,000",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "refuse",
+            "note": "Class packs can't be made from Ask AI yet. Say so kindly, never draft a product or service instead."
+        }
+    },
+    {
+        "id": "gym-06",
+        "business": "gym",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Kitne invoices ka payment baaki hai?",
+        "expect": { "numbers": ["owed:count"] }
+    },
+    {
+        "id": "gym-07",
+        "business": "gym",
+        "role": "owner",
+        "language": "en",
+        "kind": "draft",
+        "question": "Book Rahul Mehra into tomorrow's 6 PM HIIT",
+        "expect": {
+            "draft": {
+                "tool": "create_booking",
+                "input": {
+                    "service_id": "$id:service:hiit",
+                    "starts_at": "$day:1:18.00"
+                },
+                "inputMentions": ["$id:customer:rahul|rahul"]
+            }
+        }
+    },
+    {
+        "id": "gym-08",
+        "business": "gym",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "draft",
+        "question": "Naya customer add karo: Karan Malhotra, karan.malhotra@example.com",
+        "expect": {
+            "draft": {
+                "tool": "create_customer",
+                "input": {
+                    "email": "karan.malhotra@example.com",
+                    "first_name": "Karan",
+                    "last_name": "Malhotra"
+                }
+            }
+        }
+    },
+    {
+        "id": "gym-09",
+        "business": "gym",
+        "role": "member",
+        "language": "en",
+        "kind": "access",
+        "question": "How much money is owed to us right now?",
+        "expect": { "forbiddenFigures": ["owed:total"], "behaviour": "refuse" }
+    },
+    {
+        "id": "gym-10",
+        "business": "gym",
+        "role": "member",
+        "language": "hinglish",
+        "kind": "access",
+        "question": "Is hafte kitna paisa aaya?",
+        "expect": {
+            "forbiddenFigures": ["moneyin:this_week"],
+            "behaviour": "refuse"
+        }
+    },
+    {
+        "id": "gym-11",
+        "business": "gym",
+        "role": "owner",
+        "language": "en",
+        "kind": "out-of-scope",
+        "question": "Refund Sneha Iyer's last payment",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "refuse",
+            "note": "Ask AI never refunds. Decline kindly and say where it can be done or what it can help with."
+        }
+    },
+    {
+        "id": "gym-12",
+        "business": "gym",
+        "role": "owner",
+        "language": "en",
+        "kind": "vague",
+        "question": "Change the timing",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "ask-back",
+            "note": "Too vague: must ask which class or service and what time."
+        }
+    }
+]

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "catalogue:import": "tsx src/cli/catalogue-import.cli.ts",
     "catalogue:global-free": "tsx src/cli/catalogue-global-free.cli.ts",
+    "eval:ask-ai": "tsx eval/ask-ai/cli.ts",
     "test": "jest",
     "test:unit": "jest",
     "test:int": "jest -c jest.integration.config.js",
