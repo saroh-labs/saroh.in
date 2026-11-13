@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/format/datetime";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import type { ShareItem } from "@/lib/share-item/share";
 
@@ -97,10 +98,7 @@ export interface PickSources {
 /** The one reason a draft can't be picked (SGPick*). */
 export const DRAFT_WHY = "Publish it first. A draft has no public page.";
 
-const shortDay = (iso: string) =>
-    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(
-        new Date(iso),
-    );
+const shortDay = (iso: string) => formatDay(iso.slice(0, 10));
 
 const trimSlash = (url: string) => url.replace(/\/+$/, "");
 

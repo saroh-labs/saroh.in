@@ -1,3 +1,5 @@
+import { formatNumber } from "@/lib/format/money";
+
 /**
  * Every word Create post says (boards SGPick*, SGOwn*, SFCLocked*). The
  * Share sheet's own words (cards, sizes, captions, Schedule) are
@@ -71,4 +73,4 @@ export const POST_WORDS = {
 
 /** "28 / 90", "126 / 2,200". */
 export const counted = (n: number, max: number) =>
-    `${n.toLocaleString("en-US")} / ${max.toLocaleString("en-US")}`;
+    `${formatNumber(n)} / ${formatNumber(max)}`;
