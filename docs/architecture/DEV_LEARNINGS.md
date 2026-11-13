@@ -6036,6 +6036,7 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `scripts/check-content-dates.test.mjs` builds a throwaway repo in a temp folder and runs `git init/add/commit/tag` there. Inside `.husky/pre-push` (a worktree), git exports `GIT_DIR` and related variables, which win over `cwd`, so those commands ran against the real repo.
 - **Fix:** the branch was reset to its last real commit (files untouched) and the tag deleted; the test now runs git with every `GIT_*` variable removed (`ENV`), and passes with `GIT_DIR` set to the real repo.
 - **Rule:** any script or test that runs git in a repo of its own passes an env without `GIT_*`. Run it once with `GIT_DIR=$(git rev-parse --git-dir)` set to prove it.
+- **Again, 12 Nov 2026:** `scripts/check-edition-branches.test.mjs` ("fails when it scans nothing") listed the real repo from inside the pre-push hook and blocked a worktree push; fixed the same way.
 
 ## Local pentest: two low access-control gaps on the API (24 Oct 2026)
 
