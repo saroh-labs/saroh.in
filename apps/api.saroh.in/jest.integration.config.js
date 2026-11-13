@@ -30,13 +30,16 @@ const OWNER_DDL_SPECS = rlsMode
 
 module.exports = {
     preset: "ts-jest",
-    // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
-    // them natively; Jest's CommonJS runtime needs them transformed too.
+    // sanitize-html 2.17.7 uses ESM-only HTML parser packages, and the AI SDK
+    // (`ai`, `@ai-sdk/*` and two of its dependencies, DEC-220) ships ESM only,
+    // and loads zod's locale by its ESM file (zod's own `.cjs` files never
+    // match the transform, so only that is transformed). Node 24 loads them natively; Jest's CommonJS runtime needs them
+    // transformed too.
     transform: {
         "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
     },
     transformIgnorePatterns: [
-        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)(?:@|/))",
+        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|ai|@ai-sdk[+/][^/]+|@vercel[+/]oidc|@workflow[+/]serde|zod)(?:@|/))",
     ],
     testEnvironment: "node",
     rootDir: ".",
@@ -99,6 +102,8 @@ module.exports = {
         "<rootDir>/src/modules/public-api/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/mcp/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/outbound-webhooks/(?!.*\\.db\\.spec\\.ts$)",
+        // The AI layer: pure specs in the unit project; only its db specs here.
+        "<rootDir>/src/modules/ai/(?!.*\\.db\\.spec\\.ts$)",
         // DB-free specs that mock @saroh/database and run in the unit project:
         // the discount redemption core and the storefront settings spec.
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
