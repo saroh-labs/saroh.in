@@ -6720,3 +6720,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `public-share.controller.ts` sends `Cross-Origin-Resource-Policy: cross-origin` with each public card; the controller spec asserts it.
 - **Rule:** an API answer meant to be shown on another site (a public picture, a file link) sets `Cross-Origin-Resource-Policy: cross-origin` itself; `Access-Control-Allow-Origin` alone covers `fetch`, not `<img>`.
 - **Category:** api · share
+
+## A new section scrolled sideways on a 320px phone, seen only in CI (14 Nov 2026)
+
+- **Symptom:** PR #1408's browser suite failed "every page … doesn't roll sideways at 390 or 320" on `/features/website`: the new templates preview figure was 336px wide in a 278px column. The visual pass had compared every new page with its board and passed.
+- **Cause:** the visual pass shot pages at 1440 and 390 only, though `frontend-verification.md` names 320px as the floor. Inside the figure, an auto grid column sized to the browser frame's address bar, and the swatch row couldn't wrap.
+- **Fix:** the figure's grid takes `grid-cols-[minmax(0,1fr)]`, the frame `min-w-0`, and the swatch row wraps (`feature-templates.tsx`). Also in that run: `/developers` joined the sitemap spec's Resources list, and the AI assistants spec expects the copy-address step only where the API has an `api.` host (CI's localhost has none).
+- **Rule:** a visual pass, or a brief for one, shoots 320 as well as 390 and 1440, and checks that nothing inside `main` passes the viewport's right edge at 320. A drawn figure in a grid gets `minmax(0,1fr)` columns.
+- **Category:** frontend · verification
