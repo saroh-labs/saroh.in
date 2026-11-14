@@ -140,7 +140,7 @@ export function AskAiHost({
                     show(false);
                 }
             }}
-            className="fixed bottom-0 right-0 top-[61px] z-40 flex w-[440px] max-w-full flex-col border-l border-border bg-neutral-50 shadow-[-12px_0_32px_rgba(0,0,0,0.10)] outline-none dark:bg-background print:hidden"
+            className={`fixed bottom-0 right-0 top-[61px] z-40 ${open ? "flex" : "hidden"} w-[440px] max-w-full flex-col border-l border-border bg-neutral-50 shadow-[-12px_0_32px_rgba(0,0,0,0.10)] outline-none dark:bg-background print:hidden`}
         >
             {panel}
         </aside>
