@@ -127,6 +127,40 @@ export function periodWindows(
     };
 }
 
+/**
+ * A span of days someone named (Ask AI's shared period, `mcp/tools/period.ts`),
+ * from `fromDate` to `toDate` inclusive, against the same number of days
+ * just before it, as {@link periodWindows} gives a named period.
+ */
+export function spanWindows(
+    period: SellsPeriod,
+    fromDate: string,
+    toDate: string,
+    now: Date,
+    zone: string,
+): PeriodWindows {
+    const from = DateTime.fromISO(fromDate, { zone }).startOf("day");
+    const end = DateTime.fromISO(toDate, { zone })
+        .startOf("day")
+        .plus({ days: 1 });
+    const days = daysBetween(fromDate, toDate) + 1;
+    const beforeFrom = from.minus({ days });
+    const at = DateTime.fromJSDate(now, { zone });
+    return {
+        period,
+        days,
+        from: from.toJSDate(),
+        to: end.toJSDate(),
+        beforeFrom: beforeFrom.toJSDate(),
+        fromDate,
+        toDate,
+        beforeFromDate: beforeFrom.toISODate() ?? "",
+        beforeToDate: from.minus({ days: 1 }).toISODate() ?? "",
+        beforeLastStart: from.minus({ days: 1 }).toJSDate(),
+        beforeSoFar: at < end ? at.minus({ days }).toJSDate() : from.toJSDate(),
+    };
+}
+
 /** Which window a date falls in, or null for neither. */
 export function dayIn(
     w: Pick<

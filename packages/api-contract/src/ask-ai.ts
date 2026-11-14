@@ -139,6 +139,12 @@ export const askAiProductsCard = z.object({
 });
 export type AskAiProductsCard = z.infer<typeof askAiProductsCard>;
 
+/** One of the app's own pages ("/commerce/orders/abc"), never another site. */
+export const askAiAppHref = z
+    .string()
+    .max(512)
+    .regex(/^\/(?![/\\])[^\s\\]*$/, "an app route");
+
 /** A small table (bills, orders, bookings, customers): every cell text. */
 export const askAiTableCard = z.object({
     title: z.string(),
@@ -146,6 +152,8 @@ export const askAiTableCard = z.object({
     /** Which columns hold figures, right-aligned. */
     numeric: z.array(z.number()).optional(),
     rows: z.array(z.array(z.string())).max(ASK_AI_CARD_ITEMS),
+    /** Each row's own record in the app, by index; null for none. */
+    hrefs: z.array(askAiAppHref.nullable()).max(ASK_AI_CARD_ITEMS).optional(),
     /** Rows not shown. */
     more: z.number().optional(),
     link: z.object({ label: z.string(), href: z.string() }).optional(),

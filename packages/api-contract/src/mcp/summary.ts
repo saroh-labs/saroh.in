@@ -3,6 +3,8 @@ import { z } from "zod";
 import { listInput, nextCursor } from "./catalogue";
 import { untrustedText } from "./core";
 import { includeContact } from "./day";
+import type { RANGE_PERIODS } from "./periods";
+import { periodInput } from "./periods";
 
 /**
  * The summary tools (plan 2026-11-13-001, U4): the business at a glance,
@@ -69,15 +71,29 @@ export const SELLING_PERIODS = [
     "last_month",
 ] as const;
 
+/** get_whats_selling's own periods, then the shared ones it also takes. */
+export const SELLS_ANY_PERIODS = [
+    ...SELLING_PERIODS,
+    "today",
+    "this_week",
+    "last_week",
+    "last_6_months",
+    "this_year",
+] as const satisfies readonly (
+    (typeof SELLING_PERIODS)[number] | (typeof RANGE_PERIODS)[number]
+)[];
+
 export const getWhatsSellingTool = {
     input: z
         .object({
             period: z
-                .enum(SELLING_PERIODS)
+                .enum(SELLS_ANY_PERIODS)
                 .optional()
                 .describe(
-                    "Default last_4_weeks. this_month and last_month are calendar months in the business's time zone.",
+                    "Default last_4_weeks. this_month and last_month are calendar months in the business's time zone. Or from and to.",
                 ),
+            from: periodInput.from,
+            to: periodInput.to,
         })
         .strict(),
     output: z.object({

@@ -45,6 +45,7 @@ import { DayTools } from "./tools/day.tools";
 // Ask AI's U4 (plan 2026-11-13-001): the summary tools read Home and Insights.
 import { SellsService } from "../analytics/sells.service";
 import { HomeModule } from "../home/home.module";
+import { PeriodSummaryTools } from "./tools/period-summary.tools";
 import { SummaryTools } from "./tools/summary.tools";
 
 /** How often a stopped sweep chain is looked for and restarted. */
@@ -98,6 +99,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         CatalogueTools,
         DayTools,
         SummaryTools,
+        PeriodSummaryTools,
         SellsService,
         // U12: U8's handlers as plain providers (their routes stay in
         // PublicApiModule), and what they need.

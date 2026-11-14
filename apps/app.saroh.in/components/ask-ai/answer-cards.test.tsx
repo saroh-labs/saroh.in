@@ -161,4 +161,44 @@ describe("table card", () => {
         expect(host.textContent).toContain("+4 more");
         expect(hrefs()).toEqual(["/billing/invoices?view=unpaid"]);
     });
+
+    it("links each row's first cell to its own record, a real focusable link", () => {
+        render({
+            kind: "table",
+            data: {
+                ...TABLE.data,
+                rows: [
+                    ["INV-1", "Asha", "INR 500.00", "13 days late"],
+                    ["INV-2", "Ravi", "INR 90.00", "2 days late"],
+                ],
+                hrefs: ["/billing/invoices/inv1", null],
+                link: undefined,
+            },
+        });
+        const rows = host.querySelectorAll("tbody tr");
+        const first = rows[0].querySelector("td a");
+        expect(first?.getAttribute("href")).toBe("/billing/invoices/inv1");
+        expect(first?.textContent).toBe("INV-1");
+        // Only the first cell links; a row without a record has none.
+        expect(rows[0].querySelectorAll("a")).toHaveLength(1);
+        expect(rows[1].querySelectorAll("a")).toHaveLength(0);
+    });
+
+    it("never links a row off the app", () => {
+        render({
+            kind: "table",
+            data: {
+                title: "Orders",
+                columns: ["Order"],
+                rows: [["A"], ["B"], ["C"], ["D"]],
+                hrefs: [
+                    "https://evil.com",
+                    "//evil.com",
+                    "/\\evil.com",
+                    "javascript:alert(1)",
+                ],
+            },
+        });
+        expect(hrefs()).toEqual([]);
+    });
 });

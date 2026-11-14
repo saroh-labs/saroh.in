@@ -184,7 +184,10 @@ describe("table card", () => {
         ]);
         expect(card.data.rows).toHaveLength(8);
         expect(card.data.more).toBe(4);
-        expect(card.data.link?.href).toBe("/billing/invoices?view=unpaid");
+        expect(card.data.link?.href).toBe("/billing/invoices?view=owed");
+        // Each row opens its own bill, one href per row shown.
+        expect(card.data.hrefs).toHaveLength(8);
+        expect(card.data.hrefs?.[0]).toBe("/billing/invoices/inv1");
     });
 
     it("leaves out amounts a role doesn't see, and draws nothing for one without bills", () => {
@@ -263,5 +266,224 @@ describe("table card", () => {
                 MEDIA,
             ),
         ).toBeNull();
+    });
+});
+
+const span = {
+    period: "last_3_months",
+    timezone: "Asia/Kolkata",
+    from: "2026-08-15",
+    to: "2026-11-14",
+    before_from: "2026-05-15",
+    before_to: "2026-08-14",
+};
+const who = (text: string) => ({ untrusted: true as const, text });
+
+describe("period summary cards", () => {
+    it("orders: the newest, each row its order, linked to Orders filtered to the days", () => {
+        const card = answerCard(
+            "summarise_orders",
+            {
+                span,
+                orders: 12,
+                first: Array.from({ length: 8 }, (_, i) => ({
+                    order_id: `o${i}`,
+                    number: `ORD-${i}`,
+                    customer: who("Asha"),
+                    total: "₹900",
+                    status: "DELIVERED",
+                    placed_on: "2026-10-02",
+                })),
+            },
+            new Map(),
+            MEDIA,
+        );
+        expect(askAiInfoCard.parse(card)).toEqual(card);
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.columns).toEqual([
+            "Order",
+            "Customer",
+            "Total",
+            "Status",
+            "Placed",
+        ]);
+        expect(card.data.rows[0]).toEqual([
+            "ORD-0",
+            "Asha",
+            "₹900",
+            "Delivered",
+            "2 Oct",
+        ]);
+        expect(card.data.more).toBe(4);
+        expect(card.data.hrefs?.[7]).toBe("/commerce/orders/o7");
+        expect(card.data.link?.href).toBe(
+            "/commerce/orders?date=custom&from=2026-08-15&to=2026-11-14",
+        );
+    });
+
+    it("invoices: rows open their invoice; the link keeps to a status tab the list has", () => {
+        const first = [
+            {
+                invoice_id: "i1",
+                number: "INV-1",
+                customer: who("Ravi"),
+                amount: null,
+                status: "overdue",
+                issued_on: "2026-10-01",
+            },
+        ];
+        const card = answerCard(
+            "summarise_invoices",
+            {
+                span,
+                invoices: 1,
+                by_status: [{ status: "overdue", count: 1, amount: null }],
+                first,
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.columns).toEqual([
+            "Bill",
+            "Customer",
+            "Status",
+            "Issued",
+        ]);
+        expect(card.data.hrefs).toEqual(["/billing/invoices/i1"]);
+        expect(card.data.link?.href).toBe("/billing/invoices?tab=overdue");
+        const mixed = answerCard(
+            "summarise_invoices",
+            {
+                span,
+                invoices: 2,
+                by_status: [
+                    { status: "paid", count: 1, amount: null },
+                    { status: "cancelled", count: 1, amount: null },
+                ],
+                first,
+            },
+            new Map(),
+            MEDIA,
+        );
+        expect(mixed?.kind === "table" && mixed.data.link?.href).toBe(
+            "/billing/invoices",
+        );
+    });
+
+    it("stock: products on hand, each row its product, linked to Stock", () => {
+        const card = answerCard(
+            "summarise_stock",
+            {
+                span,
+                products: 3,
+                top: [
+                    {
+                        product_id: "p1",
+                        name: "Rose oil",
+                        on_hand: 12,
+                        value: "₹1,200",
+                    },
+                ],
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.rows[0]).toEqual(["Rose oil", "12", "₹1,200"]);
+        expect(card.data.numeric).toEqual([1, 2]);
+        expect(card.data.hrefs).toEqual(["/commerce/products/p1"]);
+        expect(card.data.more).toBe(2);
+        expect(card.data.link?.href).toBe("/commerce/stock?tab=levels");
+    });
+
+    it("bookings: rows open the booking; one day opens that day, a range the list", () => {
+        const first = [
+            {
+                booking_id: "b1",
+                when: "Thu 1 Oct, 10:00",
+                service: "Haircut",
+                customer: who("Mira"),
+                status: "Came",
+            },
+        ];
+        const card = answerCard(
+            "summarise_bookings",
+            { span, bookings: 1, cancelled: 0, first },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.hrefs).toEqual(["/bookings/b1"]);
+        expect(card.data.link?.href).toBe("/bookings/all?view=all");
+        const day = answerCard(
+            "summarise_bookings",
+            {
+                span: { ...span, from: "2026-11-14", to: "2026-11-14" },
+                bookings: 1,
+                cancelled: 0,
+                first,
+            },
+            new Map(),
+            MEDIA,
+        );
+        expect(day?.kind === "table" && day.data.link?.href).toBe(
+            "/bookings?date=2026-11-14",
+        );
+    });
+
+    it("row links are app routes only: an id can't make one leave the app", () => {
+        const card = answerCard(
+            "list_orders",
+            {
+                orders: [
+                    {
+                        order_id: "//evil.com",
+                        number: "ORD-1",
+                        created_at: "2026-10-01T00:00:00Z",
+                        stage: "new",
+                        payment_status: "paid",
+                        total: "₹1",
+                    },
+                    {
+                        order_id: "../../x y",
+                        number: "ORD-2",
+                        created_at: "2026-10-01T00:00:00Z",
+                        stage: "new",
+                        payment_status: "paid",
+                        total: "₹1",
+                    },
+                ],
+                next_cursor: null,
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        for (const href of card.data.hrefs ?? []) {
+            expect(href).toMatch(/^\/commerce\/orders\/[^/]+$/);
+        }
+        expect(card.data.hrefs?.[0]).toBe("/commerce/orders/%2F%2Fevil.com");
+        expect(askAiInfoCard.parse(card)).toEqual(card);
+        // The contract refuses anything that isn't an app route.
+        for (const bad of [
+            "https://evil.com",
+            "//evil.com",
+            "/\\evil.com",
+            "javascript:alert(1)",
+            "/a b",
+        ]) {
+            expect(
+                askAiInfoCard.safeParse({
+                    kind: "table",
+                    data: {
+                        title: "t",
+                        columns: ["a"],
+                        rows: [["x"]],
+                        hrefs: [bad],
+                    },
+                }).success,
+            ).toBe(false);
+        }
     });
 });

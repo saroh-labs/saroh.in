@@ -1,6 +1,10 @@
 import type { OnModuleInit } from "@nestjs/common";
 import { Injectable } from "@nestjs/common";
-import type { SELLING_PERIODS, SUMMARY_PERIODS } from "@saroh/api-contract";
+import type {
+    RangePeriod,
+    SELLING_PERIODS,
+    SUMMARY_PERIODS,
+} from "@saroh/api-contract";
 import {
     findLapsedCustomersTool,
     getBusinessSummaryTool,
@@ -47,6 +51,7 @@ import {
 } from "../tool-registry";
 import { quoteUntrusted, untrusted } from "../untrusted";
 import { withContact } from "./day.tools";
+import { resolveSpan } from "./period";
 import { money, PAGE } from "./v1-bridge";
 
 /**
@@ -286,11 +291,8 @@ const SELLING_WORDS: Record<SellingPeriod, string> = {
  * Best sellers said plainly when there are none, with the last sale, so
  * an answer never stands in a product list for them (Northwind, 14 Nov).
  */
-export function noSalesLine(
-    period: SellingPeriod,
-    lastSaleOn: string | null,
-): string {
-    const none = `No products sold ${SELLING_WORDS[period]}`;
+export function noSalesLine(period: string, lastSaleOn: string | null): string {
+    const none = `No products sold ${(SELLING_WORDS as Partial<Record<string, string>>)[period] ?? "in that period"}`;
     return lastSaleOn
         ? `${none}; the last sale was on ${lastSaleOn}.`
         : `${none}; no product has sold yet.`;
@@ -471,14 +473,41 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             name: "get_whats_selling",
             title: "What sells",
             description:
-                'Use this when the person asks what sells or is booked most (best sellers, top products, top services), who their best customers are (new or returning), or their busiest and quietest times. Example: "top products this month?" → period this_month; "what sold best lately?" → last_4_weeks. Not for totals of money in (get_business_summary). Never answer best sellers from list_products.',
+                'Use this when the person asks what sells or is booked most (best sellers, top products, top services), who their best customers are (new or returning), or their busiest and quietest times. Example: "top products this month?" → period this_month; "what sold best lately?" → last_4_weeks; "products sold in the last 3 months" → last_3_months. Not for totals of money in (get_business_summary). Never answer best sellers from list_products.',
             contract: getWhatsSellingTool,
             capability: "analytics:read",
             module: "INSIGHTS",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const period = input.period ?? "last_4_weeks";
-                const r = await d.sells.read(ctx, INSIGHTS_PERIOD[period]);
+                const own = (
+                    INSIGHTS_PERIOD as Partial<Record<string, SellsPeriod>>
+                )[input.period ?? "last_4_weeks"];
+                const period =
+                    input.from || input.to
+                        ? "custom"
+                        : (input.period ?? "last_4_weeks");
+                // A shared period (or from/to) is read as its exact days.
+                const span =
+                    own && !input.from && !input.to
+                        ? undefined
+                        : resolveSpan(
+                              {
+                                  period: input.period as RangePeriod,
+                                  from: input.from,
+                                  to: input.to,
+                              },
+                              new Date(),
+                              await businessTimezone(
+                                  prisma,
+                                  ctx.organizationId,
+                              ),
+                          );
+                const r = await d.sells.read(
+                    ctx,
+                    own ?? "4w",
+                    new Date(),
+                    span && { from: span.firstDay, to: span.lastDay },
+                );
                 const lastSale = r.bestSellers.rows.length
                     ? null
                     : await prisma.$queryRaw<{ day: string | null }[]>(

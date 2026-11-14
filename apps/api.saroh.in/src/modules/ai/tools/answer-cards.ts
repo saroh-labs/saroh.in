@@ -10,8 +10,12 @@ import type {
     listOrdersTool,
     listProductsTool,
     listUnpaidBillsTool,
+    summariseBookingsTool,
+    summariseInvoicesTool,
+    summariseOrdersTool,
+    summariseStockTool,
 } from "@saroh/api-contract";
-import { ASK_AI_CARD_ITEMS } from "@saroh/api-contract";
+import { ASK_AI_CARD_ITEMS, askAiAppHref } from "@saroh/api-contract";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 import type { z } from "zod";
@@ -70,8 +74,28 @@ export function ownMediaUrl(
     }
 }
 
-const productHref = (id: string) =>
-    `/commerce/products/${encodeURIComponent(id)}`;
+/** A record's page in the app; null unless it is an app route. */
+const route = (base: string, id: string | null | undefined) => {
+    if (!id) return null;
+    const href = `${base}/${encodeURIComponent(id)}`;
+    return askAiAppHref.safeParse(href).success ? href : null;
+};
+const productHref = (id: string) => route("/commerce/products", id) ?? "";
+const invoiceHref = (id: string) => route("/billing/invoices", id);
+const orderHref = (id: string) => route("/commerce/orders", id);
+const bookingHref = (id: string) => route("/bookings", id);
+const contactHref = (id: string | null) => route("/contacts", id);
+
+/** The Invoices screen's tab for a summary's status, where it has one. */
+const INVOICE_TAB: Record<string, string> = {
+    paid: "paid",
+    unpaid: "due",
+    overdue: "overdue",
+};
+export const invoicesHref = (status?: string) =>
+    status && INVOICE_TAB[status]
+        ? `/billing/invoices?tab=${INVOICE_TAB[status]}`
+        : "/billing/invoices";
 
 // shortcut: an instant is read on its own offset (the tools send UTC), so near midnight it can be the business's next or last day; pass the zone in if that matters.
 function day(iso: string | null): string {
@@ -102,13 +126,23 @@ function products(
 }
 
 function table(
-    card: Omit<AskAiTableCard, "rows" | "more">,
+    card: Omit<AskAiTableCard, "rows" | "more" | "hrefs">,
     rows: string[][],
     total = rows.length,
+    hrefs?: (string | null)[],
 ): AskAiInfoCard | null {
     if (!rows.length) return null;
     const { shown, more } = capped(rows, total);
-    return { kind: "table", data: { ...card, rows: shown, ...withMore(more) } };
+    const links = hrefs?.slice(0, shown.length);
+    return {
+        kind: "table",
+        data: {
+            ...card,
+            rows: shown,
+            ...(links?.some(Boolean) ? { hrefs: links } : {}),
+            ...withMore(more),
+        },
+    };
 }
 
 /** Columns a role or the question left out (all null) are dropped. */
@@ -226,11 +260,12 @@ export function answerCard(
                     numeric: numericOf(t.columns, ["Owed"]),
                     link: {
                         label: "Open in Invoices",
-                        href: "/billing/invoices?view=unpaid",
+                        href: "/billing/invoices?view=owed",
                     },
                 },
                 t.rows,
                 d.total ?? d.bills.length,
+                d.bills.map((b) => invoiceHref(b.invoice_id)),
             );
         }
         case "list_orders": {
@@ -256,6 +291,8 @@ export function answerCard(
                     link: { label: "Open in Orders", href: "/commerce/orders" },
                 },
                 t.rows,
+                d.orders.length,
+                d.orders.map((o) => orderHref(o.order_id)),
             );
         }
         case "list_bookings": {
@@ -283,6 +320,8 @@ export function answerCard(
                     link: { label: "Open in Bookings", href: "/bookings" },
                 },
                 t.rows,
+                d.bookings.length,
+                d.bookings.map((b) => bookingHref(b.booking_id)),
             );
         }
         case "find_lapsed_customers": {
@@ -303,9 +342,11 @@ export function answerCard(
                 {
                     title: `Not seen for ${d.days} days or more`,
                     columns: t.columns,
-                    link: { label: "Open in Customers", href: "/customers" },
+                    link: { label: "Open in Customers", href: "/contacts" },
                 },
                 t.rows,
+                d.customers.length,
+                d.customers.map((c) => contactHref(c.customer_id)),
             );
         }
         case "list_customers": {
@@ -326,9 +367,133 @@ export function answerCard(
                 {
                     title: "Customers",
                     columns: t.columns,
-                    link: { label: "Open in Customers", href: "/customers" },
+                    link: { label: "Open in Customers", href: "/contacts" },
                 },
                 t.rows,
+                d.customers.length,
+                d.customers.map((c) => contactHref(c.customer_id)),
+            );
+        }
+        case "summarise_orders": {
+            const d = data as Out<typeof summariseOrdersTool>;
+            const t = present(
+                [
+                    { name: "Order", cell: (o) => o.number },
+                    { name: "Customer", cell: (o) => o.customer?.text ?? "" },
+                    { name: "Total", cell: (o) => o.total },
+                    { name: "Status", cell: (o) => words(o.status) },
+                    { name: "Placed", cell: (o) => day(o.placed_on) },
+                ] satisfies {
+                    name: string;
+                    cell: (o: (typeof d.first)[number]) => string | null;
+                }[],
+                d.first,
+            );
+            return table(
+                {
+                    title: `Orders, ${day(d.span.from)} to ${day(d.span.to)}`,
+                    columns: t.columns,
+                    numeric: numericOf(t.columns, ["Total"]),
+                    link: {
+                        label: "Open in Orders",
+                        href: `/commerce/orders?date=custom&from=${d.span.from}&to=${d.span.to}`,
+                    },
+                },
+                t.rows,
+                d.orders,
+                d.first.map((o) => orderHref(o.order_id)),
+            );
+        }
+        case "summarise_invoices": {
+            const d = data as Out<typeof summariseInvoicesTool>;
+            const t = present(
+                [
+                    { name: "Bill", cell: (i) => i.number ?? "Bill" },
+                    { name: "Customer", cell: (i) => i.customer?.text ?? "" },
+                    { name: "Amount", cell: (i) => i.amount },
+                    { name: "Status", cell: (i) => words(i.status) },
+                    { name: "Issued", cell: (i) => day(i.issued_on) },
+                ] satisfies {
+                    name: string;
+                    cell: (i: (typeof d.first)[number]) => string | null;
+                }[],
+                d.first,
+            );
+            const only = d.by_status.length === 1 ? d.by_status[0] : null;
+            return table(
+                {
+                    title: `Invoices, ${day(d.span.from)} to ${day(d.span.to)}`,
+                    columns: t.columns,
+                    numeric: numericOf(t.columns, ["Amount"]),
+                    // The list has no issued-date filter: a status tab only.
+                    link: {
+                        label: "Open in Invoices",
+                        href: invoicesHref(only?.status),
+                    },
+                },
+                t.rows,
+                d.invoices ?? d.first.length,
+                d.first.map((i) => invoiceHref(i.invoice_id)),
+            );
+        }
+        case "summarise_stock": {
+            const d = data as Out<typeof summariseStockTool>;
+            const t = present(
+                [
+                    { name: "Product", cell: (p) => p.name },
+                    { name: "On hand", cell: (p) => String(p.on_hand) },
+                    { name: "Value", cell: (p) => p.value },
+                ] satisfies {
+                    name: string;
+                    cell: (p: (typeof d.top)[number]) => string | null;
+                }[],
+                d.top,
+            );
+            return table(
+                {
+                    title: "Stock on hand",
+                    columns: t.columns,
+                    numeric: numericOf(t.columns, ["On hand", "Value"]),
+                    link: {
+                        label: "Open in Stock",
+                        href: "/commerce/stock?tab=levels",
+                    },
+                },
+                t.rows,
+                d.products,
+                d.top.map((p) => route("/commerce/products", p.product_id)),
+            );
+        }
+        case "summarise_bookings": {
+            const d = data as Out<typeof summariseBookingsTool>;
+            const t = present(
+                [
+                    { name: "When", cell: (b) => b.when },
+                    { name: "Service", cell: (b) => b.service },
+                    { name: "Customer", cell: (b) => b.customer?.text ?? "" },
+                    { name: "Status", cell: (b) => b.status },
+                ] satisfies {
+                    name: string;
+                    cell: (b: (typeof d.first)[number]) => string | null;
+                }[],
+                d.first,
+            );
+            return table(
+                {
+                    title: `Bookings, ${day(d.span.from)} to ${day(d.span.to)}`,
+                    columns: t.columns,
+                    // The list has no date range; one day opens that day.
+                    link: {
+                        label: "Open in Bookings",
+                        href:
+                            d.span.from === d.span.to
+                                ? `/bookings?date=${d.span.from}`
+                                : "/bookings/all?view=all",
+                    },
+                },
+                t.rows,
+                d.bookings + d.cancelled,
+                d.first.map((b) => bookingHref(b.booking_id)),
             );
         }
         default:

@@ -29,6 +29,10 @@ export const ASK_AI_TOOLS = [
     "get_needs_attention",
     "list_unpaid_bills",
     "get_whats_selling",
+    "summarise_orders",
+    "summarise_invoices",
+    "summarise_stock",
+    "summarise_bookings",
     "list_bookings",
     "get_booking",
     "find_free_slots",
@@ -74,6 +78,26 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Seeing what sells…",
         "Kya bik raha hai, dekh rahe hain…",
         "क्या बिक रहा है, देख रहे हैं…",
+    ),
+    summarise_orders: words(
+        "Adding up your orders…",
+        "Orders jod rahe hain…",
+        "ऑर्डर जोड़ रहे हैं…",
+    ),
+    summarise_invoices: words(
+        "Adding up your invoices…",
+        "Invoices jod rahe hain…",
+        "बिल जोड़ रहे हैं…",
+    ),
+    summarise_stock: words(
+        "Adding up your stock…",
+        "Stock jod rahe hain…",
+        "स्टॉक जोड़ रहे हैं…",
+    ),
+    summarise_bookings: words(
+        "Adding up your bookings…",
+        "Bookings jod rahe hain…",
+        "बुकिंग जोड़ रहे हैं…",
     ),
     list_staff: words(
         "Reading your team…",
@@ -212,6 +236,7 @@ const JOB = `Your job: you are Ask AI. The person runs or works in the business 
 - Call the fewest tools that answer the question; use their filters (dates, status, number, staff, search) rather than reading everything. Call the reads you need together in one round. For "how are we doing" or "what needs doing", start with the summary tools.
 - Ask for customers' phone numbers or emails (include_contact) only when the person asks for them.
 - For best sellers, top products or what sold most, call get_whats_selling (this_month or last_month for a calendar month); never answer it with list_products. If nothing sold in the period, say so and when the last sale was.
+- For any question over a period (orders, invoices or bills, stock, bookings "this month", "last 3 months", "this year", or between dates), call its summary tool once: summarise_orders, summarise_invoices, summarise_stock or summarise_bookings; products sold over a period is get_whats_selling. Saroh adds the figures up: never page through a list tool to count or total anything yourself. Say the exact dates the tool used, and offer the card's link for the full list.
 - For "is <someone> free at <time>", read that person's bookings then (list_bookings with staff_id) and give the booking as the reason; never give a reason no tool gave.
 - Lead with the answer in one or two sentences, the figure asked for first (before any date range or total), then the few details that matter. Answer only what was asked: no extra figures. Short lists, no tables unless asked.
 - When a tool's result says the person sees it as a card, answer in a sentence or two and don't repeat the list: the card shows it.

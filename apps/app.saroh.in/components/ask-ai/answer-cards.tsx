@@ -36,7 +36,8 @@ export function mediaSrc(url: string | null): string | null {
 
 /** An app route ("/commerce/orders"), never another site. */
 const appHref = (href: string | undefined) =>
-    href && href.startsWith("/") && !href.startsWith("//") ? href : null;
+    // A backslash or a second slash would leave the app ("/\\evil.com").
+    href && /^\/(?![/\\])[^\s\\]*$/.test(href) ? href : null;
 
 export function AnswerCard({ card }: { card: AskAiInfoCard }) {
     return card.kind === "products" ? (
@@ -147,6 +148,7 @@ function ProductsCard({ card }: { card: AskAiProductsCard }) {
 
 function TableCard({ card }: { card: AskAiTableCard }) {
     const numeric = new Set(card.numeric ?? []);
+    const rowHref = (r: number) => appHref(card.hrefs?.[r] ?? undefined);
     return (
         <section className="flex flex-col gap-2">
             <div className={cn(listTable.frame, "overflow-x-auto")}>
@@ -189,7 +191,17 @@ function TableCard({ card }: { card: AskAiTableCard }) {
                                                     "max-w-[64px] truncate sm:max-w-[112px]",
                                         )}
                                     >
-                                        {cell}
+                                        {/* The first cell carries the row's link, as DataView's rows. */}
+                                        {i === 0 && rowHref(r) ? (
+                                            <Link
+                                                href={rowHref(r) ?? ""}
+                                                className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                            >
+                                                {cell}
+                                            </Link>
+                                        ) : (
+                                            cell
+                                        )}
                                     </td>
                                 ))}
                             </tr>
