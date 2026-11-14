@@ -153,6 +153,23 @@ export interface Point {
     notYet?: boolean;
 }
 
+/**
+ * The Website page's "Pick a template for your trade" (DEC-216, board
+ * VSWebsite): drawn between How it works and What it does, only while the
+ * site's templates switch is on.
+ */
+export interface FeatureTemplates {
+    title: string;
+    lead: string;
+    /** Gallery template slugs the drawn picker shows; the first is suggested. */
+    picks: string[];
+    /** The picker's first chip and the suggested card's line ("Suggested for salons"). */
+    suggested: string;
+    points: Point[];
+    /** The link to the gallery's words ("See every template"). */
+    linkLabel: string;
+}
+
 export interface Feature extends SearchWords {
     slug: FeatureSlug;
     /** "Dashboard", "Products"…: menu, breadcrumb, cards, "See {name} →". */
@@ -168,6 +185,8 @@ export interface Feature extends SearchWords {
     hero: ShotRef;
     howTitle: string;
     steps: FeatureStep[];
+    /** Website only: the templates section, while templates are on. */
+    templates?: FeatureTemplates;
     points: Point[];
     worksLead: string;
     /** Other features, by slug; the test fails on a missing one. */

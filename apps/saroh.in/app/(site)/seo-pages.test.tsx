@@ -138,7 +138,10 @@ describe("/features/website, before launch", () => {
     it("says nothing about a template, in either mode's words (DEC-135)", async () => {
         const { container } = await page();
         expect(words(container)).not.toMatch(/template/i);
-        expect(JSON.stringify(features.website)).not.toMatch(/template/i);
+        // Only the templates section, drawn while NEXT_PUBLIC_TEMPLATES is
+        // on (DEC-216, `features/[slug]/page.test.tsx`), names one.
+        const { templates: _, ...rest } = features.website;
+        expect(JSON.stringify(rest)).not.toMatch(/template/i);
     });
 
     it("claims nothing that waits for a switch: no shop, no account area, no second language", () => {

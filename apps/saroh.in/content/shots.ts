@@ -129,8 +129,11 @@ const designed = {
     "g-subs": pending(
         "Memberships at Pulse Fitness (demo gym) with their next charge",
     ),
-    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until U3
-    // to U5 capture or draw them. Not built while their switch is off.
+    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until
+    // captured. Share's specs are in `e2e/marketing-shots/shots.config.ts`;
+    // Ask AI's wait for its screens (plan 2026-11-13-001), and the release
+    // check refuses its switch while any is a placeholder. Not built while
+    // their switch is off. The demo salon is the seed's Gulmohar.
     "ai-hero": pending(
         "An AI assistant adding a section to the home page of Rye & Co. (demo bakery) as a draft",
     ),
@@ -147,7 +150,7 @@ const designed = {
         "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
     ),
     "ask-hero": pending(
-        "Ask AI at Kesar Salon (demo salon) answering how the week went",
+        "Ask AI at Gulmohar Salon & Bridal (demo salon) answering how the week went",
     ),
     "ask-start": pending(
         "Ask AI at Pulse Fitness (demo gym) before a question, with ready questions",
@@ -156,9 +159,11 @@ const designed = {
         "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish",
     ),
     "ask-confirm": pending(
-        "Ask AI at Kesar Salon (demo salon): a new service card to check before it is added",
+        "Ask AI at Gulmohar Salon & Bridal (demo salon): a new service card to check before it is added",
     ),
-    "ask-history": pending("Ask AI's history at Kesar Salon (demo salon)"),
+    "ask-history": pending(
+        "Ask AI's history at Gulmohar Salon & Bridal (demo salon)",
+    ),
     "sh-sheet": pending(
         "The Share sheet for a product at Rye & Co. (demo bakery): a card in the bakery's look, its sizes and caption",
     ),
@@ -166,10 +171,10 @@ const designed = {
         "A live product at Rye & Co. (demo bakery) with its Share button",
     ),
     "sh-cards": pending(
-        "Card styles for a service at Kesar Salon (demo salon) in the salon's own colours",
+        "Card styles for a service at Gulmohar Salon & Bridal (demo salon) in the salon's own colours",
     ),
     "sh-phone": pending(
-        "A phone's share sheet with a class card from Pulse Fitness (demo gym)",
+        "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
     ),
     "sh-post": pending(
         "Create post at Rye & Co. (demo bakery): a headline, a link and the card drawn in the bakery's look",

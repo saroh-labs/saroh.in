@@ -10,8 +10,10 @@ import { featuresOff } from "@/lib/feature-switches";
 import FeaturePage, { generateMetadata, generateStaticParams } from "./page";
 
 // jsdom reads as a browser, so the server env is mocked: no preview, and
-// no built-routes list (every route counts as built).
-vi.mock("@/env", () => ({ env: {} }));
+// no built-routes list (every route counts as built). Every release switch
+// is off (unset outside `next dev`) unless a test sets one.
+const env = vi.hoisted((): Record<string, string | undefined> => ({}));
+vi.mock("@/env", () => ({ env }));
 vi.mock("next/navigation", () => ({
     notFound: () => {
         throw new Error("NEXT_NOT_FOUND");
@@ -25,9 +27,15 @@ vi.mock("@/lib/pricing", () => ({
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
+function found<T>(x: T | null | undefined): T {
+    if (x == null) throw new Error("not found");
+    return x;
+}
+
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    for (const key of Object.keys(env)) delete env[key];
 });
 
 /** The page as it renders at `iso` (no preview; every route counts as built). */
@@ -127,5 +135,86 @@ describe("/features/[slug]", () => {
         expect(meta.openGraph?.title).toBe(
             "Orders: Every order in one list, and none slip.",
         );
+    });
+
+    describe("Website's templates section (DEC-216, board VSWebsite)", () => {
+        const section = () =>
+            screen
+                .queryByRole("heading", {
+                    level: 2,
+                    name: "Pick a template for your trade.",
+                })
+                ?.closest("section");
+
+        it("is absent while templates are off, today's production", async () => {
+            render(await FeaturePage(params("website")));
+            expect(section()).toBeFalsy();
+            expect(document.querySelector('a[href="/templates"]')).toBeNull();
+        });
+
+        it("sits between How it works and What it does when on, linking to /templates", async () => {
+            env.NEXT_PUBLIC_TEMPLATES = "on";
+            render(await FeaturePage(params("website")));
+            const s = found(section());
+            const how = found(
+                screen
+                    .getByRole("heading", { name: features.website.howTitle })
+                    .closest("section"),
+            );
+            const what = found(
+                screen
+                    .getByRole("heading", { name: "What it does" })
+                    .closest("section"),
+            );
+            const after = (a: Node, b: Node) =>
+                Boolean(
+                    a.compareDocumentPosition(b) &
+                    Node.DOCUMENT_POSITION_FOLLOWING,
+                );
+            expect(after(how, s)).toBe(true);
+            expect(after(s, what)).toBe(true);
+            expect(
+                within(s)
+                    .getByRole("link", { name: /See every template/ })
+                    .getAttribute("href"),
+            ).toBe("/templates");
+            // Three points, and the two drawings say what they are.
+            expect(s.querySelectorAll("ul > li")).toHaveLength(3);
+            expect(s.querySelectorAll("figure figcaption")).toHaveLength(2);
+        });
+
+        it("draws only gallery templates, and claims no lossless switching", async () => {
+            const { galleryTemplate } = await import("@/content/templates");
+            const words = found(features.website.templates);
+            for (const slug of words.picks) {
+                expect(galleryTemplate(slug), slug).toBeTruthy();
+            }
+            expect(JSON.stringify(words)).not.toMatch(
+                /without losing|any ?time/i,
+            );
+        });
+    });
+
+    it("/features/social and /features/ask-ai render every step", async () => {
+        for (const slug of ["social", "ask-ai"] as const) {
+            const { unmount } = render(await FeaturePage(params(slug)));
+            const how = screen
+                .getByRole("heading", { name: features[slug].howTitle })
+                .closest("section");
+            expect(how?.querySelectorAll("ol > li")).toHaveLength(
+                features[slug].steps.length,
+            );
+            unmount();
+        }
+    });
+
+    it("Works with never links a switched-off feature", async () => {
+        // Ask AI works with AI apps; with AI apps off the card is not drawn.
+        expect(features["ask-ai"].worksWith).toContain("ai-apps");
+        const { container } = render(await FeaturePage(params("ask-ai")));
+        const shown = new Set(featureList.map((f) => `/features/${f.slug}`));
+        for (const a of container.querySelectorAll('a[href^="/features/"]')) {
+            expect(shown).toContain(a.getAttribute("href"));
+        }
     });
 });

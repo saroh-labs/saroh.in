@@ -283,6 +283,27 @@ describe("the shot manifest", () => {
  * The repo is public: no prices and no plan limits in content (MKT brief).
  * Plans appear by name only; prices render a placeholder.
  */
+describe("Share and Ask AI say only what's true (MARKETING_CLAIMS.md)", () => {
+    const words = (slug: "social" | "ask-ai") => JSON.stringify(features[slug]);
+
+    it("Share claims no posting for you and no plan line", () => {
+        const w = words("social");
+        expect(w).not.toMatch(
+            /automatic(ally)? post|posts? for you|publish(es)? for you|schedul/i,
+        );
+        expect(w).not.toMatch(/\b(Saroh|it) posts? (to|on)\b/i);
+        // "Free on every plan" waits on the catalogue, not this file.
+        expect(w).not.toMatch(/every plan|\bFree\b/);
+    });
+
+    it("Ask AI names no plan, allowance or model provider", () => {
+        const w = words("ask-ai");
+        expect(w).not.toMatch(
+            /\b(Free|Grow|Pro)\b|questions each|Anthropic|Claude|train/,
+        );
+    });
+});
+
 describe("no prices or plan limits", () => {
     const everything = JSON.stringify({
         features,

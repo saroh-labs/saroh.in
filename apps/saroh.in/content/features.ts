@@ -531,6 +531,9 @@ export const features: Record<FeatureSlug, Feature> = {
      * nothing about choosing a template (DEC-135), the online shop
      * (`SITE_SHOP`) or the customer's account area (`SITE_ACCOUNT_AREA`).
      * Both shots are of a demo business's own site and booking page.
+     * `templates` (DEC-216, board VSWebsite) is drawn only while templates
+     * are switched on (`NEXT_PUBLIC_TEMPLATES`), so the rule above still
+     * holds in production until then.
      */
     website: {
         slug: "website",
@@ -563,6 +566,27 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "g-book",
             },
         ],
+        templates: {
+            title: "Pick a template for your trade.",
+            lead: "Tell Saroh what kind of place it is when you set up, and the templates made for your trade come first. Each one is already wired to your services, products or classes, with its own type and colours.",
+            picks: ["salon", "bakery", "gym", "store"],
+            suggested: "Suggested for salons",
+            points: [
+                {
+                    title: "Your trade first",
+                    body: "Setup asks what kind of place it is: a salon, gym, clinic, coach, food, shop or creator. The templates made for it come first, and All is one press away.",
+                },
+                {
+                    title: "See your own site before you choose",
+                    body: "Press a template to see it with your business's name and details, on a computer and a phone, in each of its colourways. Choosing is a separate press.",
+                },
+                {
+                    title: "Change it later",
+                    body: "Pick another template in the editor. Saroh shows you the preview first, then asks before it replaces any pages.",
+                },
+            ],
+            linkLabel: "See every template",
+        },
         points: [
             {
                 title: "Your own domain",
@@ -785,13 +809,13 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Changes come as a card you confirm",
                 body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
-                who: "Kesar Salon (demo salon)",
+                who: "Gulmohar Salon & Bridal (demo salon)",
                 shot: "ask-confirm",
             },
             {
                 title: "Go back to an earlier question",
                 body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
-                who: "Kesar Salon (demo salon)",
+                who: "Gulmohar Salon & Bridal (demo salon)",
                 shot: "ask-history",
             },
         ],
@@ -815,7 +839,7 @@ export const features: Record<FeatureSlug, Feature> = {
         ],
         worksLead:
             "Ask AI reads from everything else in Saroh, so its answers match your screens.",
-        worksWith: ["dashboard", "insights", "bookings"],
+        worksWith: ["dashboard", "insights", "bookings", "ai-apps"],
         usedBy: ["shops", "salons", "gyms", "clinics"],
         closer: "Ask your business, in your words.",
     },
@@ -844,7 +868,7 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Pick a card and a size",
                 body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
-                who: "Kesar Salon (demo salon)",
+                who: "Gulmohar Salon & Bridal (demo salon)",
                 shot: "sh-cards",
             },
             {
