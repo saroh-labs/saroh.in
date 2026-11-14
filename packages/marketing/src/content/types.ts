@@ -98,6 +98,7 @@ export const SHOT_KEYS = [
     "sh-cards",
     "sh-phone",
     "sh-post",
+    "sh-post-card",
 ] as const;
 export type ShotKey = (typeof SHOT_KEYS)[number];
 

@@ -173,13 +173,16 @@ const designed = {
         "A live product at Rye & Co. (demo bakery) with its Share button",
     ),
     "sh-cards": pending(
-        "Card styles for a service at Gulmohar Salon & Bridal (demo salon) in the salon's own colours",
+        "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
     ),
     "sh-phone": pending(
-        "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
+        "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
     ),
     "sh-post": pending(
         "Create post at Rye & Co. (demo bakery): a headline, a link and the card drawn in the bakery's look",
+    ),
+    "sh-post-card": pending(
+        "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
     ),
 } satisfies Record<string, Shot>;
 

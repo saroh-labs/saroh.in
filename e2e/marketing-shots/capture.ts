@@ -183,7 +183,23 @@ async function settle(page: Page) {
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
     await page.addStyleTag({ content: STILL });
-    await page.waitForTimeout(400);
+    await loaded(page);
+}
+
+/**
+ * Every picture drawn and the page quiet, then a beat more: a shot taken
+ * sooner caught skeletons and half-drawn previews (owner, 14 Nov 2026).
+ */
+async function loaded(page: Page) {
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page
+        .waitForFunction(
+            () => [...document.images].every((i) => i.complete),
+            undefined,
+            { timeout: 15_000 },
+        )
+        .catch(() => undefined);
+    await page.waitForTimeout(1500);
 }
 
 /** Open the shot's business: the workspace's own cookie, in this context. */
@@ -233,7 +249,7 @@ async function capture(
             await page.locator(step.waitFor).first().waitFor();
         }
     }
-    await page.waitForTimeout(300);
+    await loaded(page);
     if (!shot.clip) {
         const whole = { x: 0, y: 0, ...shot.viewport };
         const mark = await markOf(page, shot, whole);

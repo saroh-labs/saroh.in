@@ -37,6 +37,7 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "sh-cards": NOT_YET_SHOWN,
     "sh-phone": NOT_YET_SHOWN,
     "sh-post": NOT_YET_SHOWN,
+    "sh-post-card": NOT_YET_SHOWN,
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */

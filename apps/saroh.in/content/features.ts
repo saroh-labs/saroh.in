@@ -887,7 +887,7 @@ export const features: Record<FeatureSlug, Feature> = {
             "Share a product, service, offer or post as a card in your look, or make a post of your own.",
         headline: "Turn what you sell into a post in a minute.",
         sub: "Social media posts made from what you sell. Share a product, a service or class, an offer, a blog post or your booking page as a ready post, drawn in your website's own colours, fonts and logo. Pick a card, check the caption, then post it yourself on WhatsApp, Instagram or Facebook from your phone or computer.",
-        hero: { shot: "sh-sheet" },
+        hero: { shot: "sh-post" },
         howTitle: "From your page to their feed.",
         steps: [
             {
@@ -899,20 +899,20 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Pick a card and a size",
                 body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
-                who: "Gulmohar Salon & Bridal (demo salon)",
+                who: "Rye & Co. (demo bakery)",
                 shot: "sh-cards",
             },
             {
                 title: "Post it from your phone",
                 body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Rye & Co. (demo bakery)",
                 shot: "sh-phone",
             },
             {
                 title: "Or make your own post",
                 body: "In Social, Create post takes a headline, your own photo or both, and a link to any page on your site. Your own posts are saved, so you can share them again.",
                 who: "Rye & Co. (demo bakery)",
-                shot: "sh-post",
+                shot: "sh-post-card",
             },
         ],
         points: [

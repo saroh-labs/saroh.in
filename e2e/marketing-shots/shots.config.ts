@@ -1471,7 +1471,7 @@ const SHARE_SHOTS: Shot[] = [
         steps: [
             ...OPEN_SHARE,
             { click: '[role="dialog"] [data-card="price"]' },
-            { waitFor: '[role="dialog"] [data-preview] img' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
         ],
         clip: { selector: '[role="dialog"]' },
         alt: "The Share sheet for the Sourdough loaf at Rye & Co. (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
@@ -1484,39 +1484,50 @@ const SHARE_SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: RYE_SOURDOUGH_PAGE,
-        viewport: DESK,
+        // Taken at 900 wide, so the page lays out in about the width a
+        // step's half draws it at, and cropped from the breadcrumb through
+        // the photos: Share and "On the online shop" read at near full size
+        // (owner, 14 Nov 2026).
+        viewport: { width: 900, height: 1300 },
+        clip: {
+            selector: 'main nav[aria-label="Breadcrumb"]',
+            until: 'main [role="tabpanel"] div.bg-card:has-text("Photos and videos")',
+            pad: 12,
+        },
         alt: "The Sourdough loaf's page at Rye & Co. (demo bakery), live on the shop, with the Share button beside QR",
         caption:
             "A live product page in Saroh, Cardamom bun box, with the Share button beside QR",
         gap: "The Sourdough loaf, not a Cardamom bun box.",
     },
     {
+        // The same Sourdough loaf as the hero (owner, 14 Nov 2026: one
+        // example through the page), its weekend offer on the Offer card.
         key: "sh-cards",
-        business: "gulmohar",
+        business: "rye",
         role: "owner",
-        route: "/services/seed_sc_ns_service_hair-spa",
+        route: RYE_SOURDOUGH_PAGE,
         viewport: DESK,
         steps: [
             ...OPEN_SHARE,
             { click: '[role="dialog"] button:has-text("Square")' },
+            { click: '[role="dialog"] [data-card="offer"]' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
         ],
         clip: { selector: '[role="dialog"]' },
-        alt: "Card styles for Hair spa at Gulmohar Salon & Bridal (demo salon) in the salon's own look, with Square chosen",
+        alt: "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
         caption:
-            "Card styles for Kesar Salon's Hair spa in the salon's own plum colours, Square chosen, and the Offer card greyed out because there's no live offer",
-        gap: "The board's Kesar Salon is the seed's Gulmohar Salon & Bridal; with no live offer the Offer card is not offered at all.",
+            "The Sourdough loaf's card styles in Rye & Co.'s colours, Square chosen, and the Offer card showing its weekend discount",
     },
     {
         key: "sh-phone",
-        business: "pulse",
+        business: "rye",
         role: "owner",
-        // HIIT class (`data.ts`, PULSE services[1]).
-        route: "/services/seed_sc_pulse_service_1",
+        route: RYE_SOURDOUGH_PAGE,
         viewport: PHONE,
         steps: OPEN_SHARE,
-        alt: "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
+        alt: "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
         caption:
-            "A phone share sheet with a Morning HIIT card in Pulse Fitness's navy, a note saying the caption is copied for Instagram, and WhatsApp, Instagram, Facebook and More",
+            "A phone share sheet with the Sourdough loaf's card in Rye & Co.'s colours, a note saying the caption is copied for Instagram, and Share now",
         gap: "The phone's own share sheet can't be captured; this is Saroh's sheet before Share now opens it.",
     },
     {
@@ -1539,6 +1550,34 @@ const SHARE_SHOTS: Shot[] = [
         caption:
             "Create post with Text only chosen, the headline We're hiring a morning baker, a link to the Work with us page, and the card drawn in the bakery's green",
         gap: "The link is left as offered; the seed may have no Work with us page.",
+    },
+    {
+        // Step 4's close-up of the hero's post, finished (owner, 14 Nov
+        // 2026): narrower than DESK and cropped to the form and its card.
+        key: "sh-post-card",
+        business: "rye",
+        role: "owner",
+        route: "/social/new",
+        viewport: { width: 1100, height: 1000 },
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            {
+                fill: "[data-own-headline]",
+                value: "We're hiring a morning baker",
+            },
+            {
+                fill: "[data-own-caption]",
+                value: "Early starts, good pay and all the bread you can eat. Come and see us on Hill Road.",
+            },
+            { click: 'main [role="radiogroup"] label:has-text("Shop")' },
+            // Out of the field, so no focus ring is in the picture.
+            { click: "main h1" },
+        ],
+        clip: { selector: "[data-own-composer]", pad: 20 },
+        alt: "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+        caption:
+            "Create post filled in: the headline We're hiring a morning baker, a short caption, the Shop link chosen, and the card drawn in the bakery's colours",
     },
 ];
 

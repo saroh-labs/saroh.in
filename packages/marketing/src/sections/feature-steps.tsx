@@ -73,9 +73,11 @@ export function FeatureSteps({
                             <div
                                 className={cn(
                                     "grid content-center gap-3",
-                                    pictured
-                                        ? "flex-[1_1_320px]"
-                                        : "max-w-[68ch]",
+                                    step.shot && !step.drawn
+                                        ? HALF
+                                        : pictured
+                                          ? "flex-[1_1_320px]"
+                                          : "max-w-[68ch]",
                                 )}
                             >
                                 <span
@@ -104,12 +106,19 @@ export function FeatureSteps({
                                     {step.drawn}
                                 </div>
                             ) : step.shot ? (
-                                <ScreenshotFrame
-                                    shot={step.shot}
-                                    zoomable
-                                    sizes="(min-width: 1280px) 680px, 100vw"
-                                    className="flex-[1.4_1_420px]"
-                                />
+                                // Its half, the shot centred in it at its own width.
+                                <div
+                                    className={cn(HALF, "flex justify-center")}
+                                >
+                                    <ScreenshotFrame
+                                        shot={step.shot}
+                                        zoomable
+                                        sizes={SHAPE[shapeOf(step.shot)].sizes}
+                                        className={
+                                            SHAPE[shapeOf(step.shot)].className
+                                        }
+                                    />
+                                </div>
                             ) : null}
                         </li>
                     );
@@ -133,4 +142,29 @@ export function FeatureSteps({
             ) : null}
         </section>
     );
+}
+
+type ShotShape = "wide" | "upright" | "phone";
+
+/**
+ * How wide a step's shot is drawn in its half. A desk screen fills it; a
+ * sheet taller than wide, or a phone screen, stood taller than the screen
+ * that way, so each keeps its own width, centred (owner, 14 Nov 2026).
+ */
+const SHAPE: Record<ShotShape, { sizes: string; className: string }> = {
+    wide: {
+        sizes: "(min-width: 1280px) 560px, 100vw",
+        className: "w-full",
+    },
+    upright: { sizes: "480px", className: "w-full max-w-[480px]" },
+    phone: { sizes: "300px", className: "w-full max-w-[300px]" },
+};
+
+/** A pictured step's two halves: equal, side by side until they wrap. */
+const HALF = "min-w-0 flex-[1_1_380px]";
+
+export function shapeOf(shot: ShotView): ShotShape {
+    const { width, height } = shot.image;
+    if (height > width * 1.6) return "phone";
+    return height > width ? "upright" : "wide";
 }

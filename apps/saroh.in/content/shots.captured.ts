@@ -306,7 +306,7 @@ export const CAPTURED: Record<
     },
     "help-take-deposit-1": {
         src: "/shots/help/help-take-deposit-1.webp",
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
+        alt: "Services at Kavi Dental (demo clinic): a row each, with its length, price and who takes it, and the root canal's row marked",
         width: 2048,
         height: 1520,
         mark: { x: 0.1064, y: 0.8191, w: 0.0704, h: 0.0658 },
@@ -320,7 +320,7 @@ export const CAPTURED: Record<
     },
     "help-take-deposit-3": {
         src: "/shots/help/help-take-deposit-3.webp",
-        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save at the top right",
         width: 2048,
         height: 1120,
         mark: { x: 0.8482, y: 0.1337, w: 0.1342, h: 0.0893 },
@@ -523,7 +523,7 @@ export const CAPTURED: Record<
     },
     "help-add-gstin-1": {
         src: "/shots/help/help-add-gstin-1.webp",
-        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Edit button",
+        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Change button on the GST row",
         width: 2048,
         height: 1120,
         mark: { x: 0.9011, y: 0.651, w: 0.0608, h: 0.0786 },
@@ -663,7 +663,7 @@ export const CAPTURED: Record<
     },
     "help-add-sizes-1": {
         src: "/shots/help/help-add-sizes-1.webp",
-        alt: "Product settings › Options at Rye & Co. (demo bakery): Size, Grind and Pack with their values, and 1kg typed into Size's new value",
+        alt: "Product settings › Options at Rye & Co. (demo bakery): the Edit Size sheet with its values, and 1kg typed into the box for a new value",
         width: 1816,
         height: 1214,
         mark: { x: 0.2822, y: 0.274, w: 0.2004, h: 0.0658 },
@@ -730,5 +730,41 @@ export const CAPTURED: Record<
         width: 2048,
         height: 1120,
         mark: { x: 0.4631, y: 0.4203, w: 0.0745, h: 0.075 },
+    },
+    "sh-sheet": {
+        src: "/shots/v2/sh-sheet.webp",
+        alt: "The Share sheet for the Sourdough loaf at Rye & Co. (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
+        width: 1480,
+        height: 1800,
+    },
+    "sh-button": {
+        src: "/shots/v2/sh-button.webp",
+        alt: "The Sourdough loaf's page at Rye & Co. (demo bakery), live on the shop, with the Share button beside QR",
+        width: 1608,
+        height: 1188,
+    },
+    "sh-cards": {
+        src: "/shots/v2/sh-cards.webp",
+        alt: "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
+        width: 1480,
+        height: 1800,
+    },
+    "sh-phone": {
+        src: "/shots/v2/sh-phone.webp",
+        alt: "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
+        width: 780,
+        height: 1688,
+    },
+    "sh-post": {
+        src: "/shots/v2/sh-post.webp",
+        alt: "Create post at Rye & Co. (demo bakery): Text only, the headline We're hiring a morning baker, a link and the card drawn in the bakery's look",
+        width: 2880,
+        height: 1800,
+    },
+    "sh-post-card": {
+        src: "/shots/v2/sh-post-card.webp",
+        alt: "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+        width: 2024,
+        height: 1604,
     },
 };
