@@ -911,7 +911,8 @@ export function runProblems(g: CodeGrade, v: Verdict | undefined): string[] {
     ];
 }
 
-const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+const cell = (s: string) =>
+    s.replace(/[\\|]/g, "\\$&").replace(/\s*\n\s*/g, " ");
 const quote = (s: string) =>
     (s || "(no answer text)")
         .split("\n")
