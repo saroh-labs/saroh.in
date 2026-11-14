@@ -93,6 +93,35 @@ describe("the scripted Ask AI provider", () => {
         });
     });
 
+    it("drafts it in the location the question names", async () => {
+        const events = await all(
+            ask([
+                {
+                    role: "user",
+                    text: "Add a product called Mug 7 at 250 in seed_store",
+                },
+            ]),
+        );
+        expect(events[0]).toMatchObject({
+            call: {
+                name: "create_product",
+                input: {
+                    name: "Mug 7",
+                    price: 250,
+                    storefront_id: "seed_store",
+                },
+            },
+        });
+    });
+
+    it("stops at once when Stop came before the wait", async () => {
+        const stop = new AbortController();
+        stop.abort();
+        expect(
+            await all(ask([{ role: "user", text: "Stop test" }]), stop.signal),
+        ).toEqual([{ type: "aborted" }]);
+    });
+
     it("stops at once while it waits", async () => {
         const stop = new AbortController();
         const run = all(

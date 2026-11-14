@@ -45,10 +45,16 @@ export const FAKE_SCRIPT: readonly Line[] = [
     },
     { match: /^Stop test$/i, waitMs: 60_000, text: "Too late to stop." },
     {
-        match: /^Add a product called (.+) at (\d+)$/i,
+        // "in <location id>": a business with several locations must name one
+        // (`ProductAccess.storefrontFor`), as seeded Northwind has.
+        match: /^Add a product called (.+) at (\d+)(?: in (\S+))?$/i,
         tool: (m) => ({
             name: "create_product",
-            input: { name: m[1], price: Number(m[2]) },
+            input: {
+                name: m[1],
+                price: Number(m[2]),
+                ...(m[3] ? { storefront_id: m[3] } : {}),
+            },
         }),
         // Not reached: a draft ends the turn with its card.
         text: "The draft is above.",
@@ -79,6 +85,8 @@ const USAGE: AiUsage = {
 /** Resolves after `ms`, or at once when the signal fires. */
 function wait(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((done) => {
+        // Stop can land before the wait starts (between the runner's checks).
+        if (signal.aborted) return done();
         const timer = setTimeout(done, ms);
         signal.addEventListener(
             "abort",

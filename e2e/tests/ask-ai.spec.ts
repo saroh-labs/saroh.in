@@ -2,7 +2,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { stamp } from "../fixtures/own-data";
+import { NW_STORE, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG } from "../playwright.config";
@@ -171,7 +171,8 @@ test.describe("Ask AI: asking", { tag: "@serial" }, () => {
         // A create is Added with Open it; Undo is for a change (DEC-220).
         const name = `Ask AI mug ${stamp(testInfo)}`;
         const { panel } = await openPanel(page, isMobile);
-        await ask(panel, `Add a product called ${name} at 250`);
+        // Northwind has several locations, so the draft names one.
+        await ask(panel, `Add a product called ${name} at 250 in ${NW_STORE}`);
         await panel.getByRole("button", { name: "Add product" }).click();
         await expect(panel.getByText(`Added · ${name}`)).toBeVisible();
         await expect(
