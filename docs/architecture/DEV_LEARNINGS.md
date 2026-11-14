@@ -6728,3 +6728,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the figure's grid takes `grid-cols-[minmax(0,1fr)]`, the frame `min-w-0`, and the swatch row wraps (`feature-templates.tsx`). Also in that run: `/developers` joined the sitemap spec's Resources list, and the AI assistants spec expects the copy-address step only where the API has an `api.` host (CI's localhost has none).
 - **Rule:** a visual pass, or a brief for one, shoots 320 as well as 390 and 1440, and checks that nothing inside `main` passes the viewport's right edge at 320. A drawn figure in a grid gets `minmax(0,1fr)` columns.
 - **Category:** frontend · verification
+
+## A new catalogue row never reached businesses on an older version (14 Nov 2026)
+
+- **Symptom:** after Ask AI's row was published on saroh.io, a business on Grow still read Ask AI as locked. Its subscription sits on an older catalogue version, as every existing business's does after a `keep` publish.
+- **Cause:** `withLiveAdditions` (DEC-186) only turned on cells of rows the older version already had. A row added since, such as `ask-ai`, was missing entirely, and Ask AI fails closed on a missing row. Its tests covered only rows present in both versions.
+- **Fix:** `withLiveAdditions` appends any live row the older version lacks, as the live version has it; `moves.test.ts` covers it.
+- **Rule:** a rule that merges two catalogue versions is tested with a row only the newer one has, as well as with a changed cell.
+- **Category:** billing · catalogue
