@@ -12,6 +12,7 @@ import {
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
 
 /**
  * Settings › API and AI apps › Connections (API keys): the Owner's
@@ -22,6 +23,7 @@ import { requireSession } from "@/lib/session";
 export const metadata = { title: "Connections · API and AI apps · Settings" };
 
 export default async function KeysPage() {
+    if (!apiAreaOn()) notFound();
     const session = await requireSession();
     const [org, usage] = await Promise.all([
         resolveActiveOrganization(),

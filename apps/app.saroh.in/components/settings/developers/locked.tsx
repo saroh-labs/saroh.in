@@ -33,18 +33,19 @@ export function DevelopersLocked({
     plan?: string | null;
     href: string;
     beforePaidPlans: boolean;
-    docsHref: string;
+    /** Left out where there is no page to read yet (Ask AI). */
+    docsHref?: string;
 }) {
     const [busy, setBusy] = useState(false);
     const [asked, setAsked] = useState(false);
-    const docs = (
+    const docs = docsHref ? (
         <Button asChild variant="outline" size="sm">
             <a href={docsHref} target="_blank" rel="noreferrer">
                 What this is for{" "}
                 <ExternalLink aria-hidden className="size-3.5" />
             </a>
         </Button>
-    );
+    ) : undefined;
     if (!beforePaidPlans && !plansShown()) {
         // No plans to show (DEC-136): the lock, and what it's for.
         return (

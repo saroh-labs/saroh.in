@@ -48,7 +48,36 @@ describe("API and AI apps tabs", () => {
         ]);
     });
 
+    it("puts Ask AI first for whoever may switch modules, when it is on", () => {
+        const owner = ["module:manage", "apikey:manage", "webhook:manage"];
+        expect(
+            developersTabsFor(owner, usage(), {
+                apiArea: true,
+                askAi: true,
+            }).map((t) => t.tab),
+        ).toEqual(["ask-ai", "ai", "keys", "webhooks", "usage"]);
+        // Off by default.
+        expect(tabs(owner)).not.toContain("ask-ai");
+        // A Member never has it.
+        expect(
+            developersTabsFor([], usage(), { apiArea: true, askAi: true }).map(
+                (t) => t.tab,
+            ),
+        ).toEqual(["ai", "usage"]);
+    });
+
+    it("with the API area off, Ask AI is the only tab", () => {
+        const on = { apiArea: false, askAi: true };
+        expect(
+            developersTabsFor(["module:manage", "apikey:manage"], null, on).map(
+                (t) => t.tab,
+            ),
+        ).toEqual(["ask-ai"]);
+        expect(developersTabsFor([], null, on)).toEqual([]);
+    });
+
     it("reads the tab off the address", () => {
+        expect(developersTabOf("/settings/developers/ask-ai")).toBe("ask-ai");
         expect(developersTabOf("/settings/developers")).toBe("index");
         expect(developersTabOf("/settings/developers/ai")).toBe("ai");
         expect(developersTabOf("/settings/developers/webhooks")).toBe(
