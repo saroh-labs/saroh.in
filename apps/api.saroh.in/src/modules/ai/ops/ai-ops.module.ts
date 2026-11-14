@@ -5,6 +5,7 @@ import { env } from "../../../env";
 import { BillingModule } from "../../billing/billing.module";
 import { JobHandlerRegistry } from "../../jobs/job-handler.registry";
 import { JobsModule } from "../../jobs/jobs.module";
+import { OrganizationContextModule } from "../../organizations/organization-context.module";
 import { AiModule } from "../ai.module";
 import { AskAiReportsController } from "../reports/ai-reports.controller";
 import { AiReportsService } from "../reports/ai-reports.service";
@@ -25,7 +26,7 @@ const CHAIN_CHECK_MS = 60 * 60_000;
  * module behind its guards).
  */
 @Module({
-    imports: [JobsModule, BillingModule, AiModule],
+    imports: [JobsModule, BillingModule, AiModule, OrganizationContextModule],
     controllers: [AskAiReportsController],
     providers: [
         OwnerAlertSender,
