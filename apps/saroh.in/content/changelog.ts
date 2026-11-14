@@ -11,7 +11,7 @@ import { formatDay } from "@/lib/format/day";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-14";
 
 /**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its

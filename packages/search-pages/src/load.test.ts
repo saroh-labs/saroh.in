@@ -143,7 +143,7 @@ describe("content", () => {
             family: "Beauty",
             familySlug: "beauty",
             search: "salon software",
-            updated: "2026-11-04",
+            updated: "2026-11-14",
         });
         expect(Object.keys(salons ?? {}).sort()).toEqual([
             "description",
