@@ -3,6 +3,7 @@
 import type {
     AskAiDraftCard,
     AskAiEvent,
+    AskAiInfoCard,
     AskAiOutcome,
     AskAiRefusal,
 } from "@saroh/api-contract";
@@ -35,6 +36,7 @@ import { runAction } from "@/lib/api/run-action";
 import { askForMoreQuestions } from "@/lib/ask-ai/panel-actions";
 import { upgradeHref } from "@/lib/billing/access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { AnswerCard } from "./answer-cards";
 import { DraftCard } from "./draft-card";
 import { ReportAnswer } from "./report-sheet";
 import { SafeText } from "./safe-text";
@@ -59,6 +61,8 @@ export interface Turn {
     status?: string;
     text: string;
     cards: AskAiDraftCard[];
+    /** What the tools found, under the answer (products, a table). */
+    infoCards?: AskAiInfoCard[];
     refusal?: AskAiRefusal;
     error?: Extract<AskAiEvent, { type: "error" }>["reason"];
     outcome?: AskAiOutcome;
@@ -183,6 +187,9 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
                     <SafeText text={turn.text} cursor={turn.running} />
                 </div>
             ) : null}
+            {turn.infoCards?.map((card, i) => (
+                <AnswerCard key={i} card={card} />
+            ))}
             {turn.cards.map((card) => (
                 <DraftCard key={card.draftId} card={card} phone={ctx.phone} />
             ))}

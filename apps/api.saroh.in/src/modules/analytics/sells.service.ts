@@ -5,7 +5,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { businessTimezone } from "../bookings/staff-availability";
 import { allows, authorize } from "../organizations/organization-policy";
 import { businessCurrency } from "../stores/currency";
-import type { InsightsPeriod } from "./period";
+import type { SellsPeriod } from "./period";
 import { daysBetween, periodWindows } from "./period";
 import type {
     BookedRow,
@@ -39,7 +39,7 @@ import { firstSaleSql } from "./takings.sql";
 export class SellsService {
     async read(
         ctx: OrganizationContext,
-        period: InsightsPeriod,
+        period: SellsPeriod,
         now: Date = new Date(),
     ): Promise<SellsRead> {
         authorize(ctx, "analytics:read");

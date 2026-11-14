@@ -24,7 +24,7 @@ import { openOutput } from "../open-output";
 import type { McpTool } from "../tool-registry";
 import { McpToolRegistry } from "../tool-registry";
 import type { SummaryDeps } from "./summary.tools";
-import { summaryTools, summaryWindow } from "./summary.tools";
+import { noSalesLine, summaryTools, summaryWindow } from "./summary.tools";
 
 const tools: McpTool[] = summaryTools({} as SummaryDeps);
 
@@ -75,6 +75,23 @@ describe("summary tool definitions", () => {
             expect(model.length / 4).toBeLessThan(350);
         },
     );
+});
+
+describe("get_whats_selling with nothing sold", () => {
+    it("says so plainly, with the day of the last sale", () => {
+        expect(noSalesLine("this_month", "2026-09-29")).toBe(
+            "No products sold this month; the last sale was on 2026-09-29.",
+        );
+        expect(noSalesLine("last_4_weeks", "2026-09-29")).toBe(
+            "No products sold in the last 4 weeks; the last sale was on 2026-09-29.",
+        );
+    });
+
+    it("says no product has sold yet when there never was a sale", () => {
+        expect(noSalesLine("last_month", null)).toBe(
+            "No products sold last month; no product has sold yet.",
+        );
+    });
 });
 
 describe("summaryWindow", () => {

@@ -2,13 +2,21 @@ import { HttpException, Inject, Injectable, Optional } from "@nestjs/common";
 import { z } from "zod";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { env } from "../../../env";
 import type { McpTool } from "../../mcp/tool-registry";
 import { McpToolRegistry, toolError } from "../../mcp/tool-registry";
 import { OrganizationContextService } from "../../organizations/organization-context.service";
+import { allows } from "../../organizations/organization-policy";
 import type { AgentDefinition } from "../agents/agent-definition";
 import { DraftsService } from "../drafts/drafts.service";
 import type { AiToolCall, AiToolDefinition } from "../providers/provider.port";
 import { AI_AGENTS } from "../turn/turn-runner";
+import {
+    answerCard,
+    PRODUCT_CARD_TOOLS,
+    productFacts,
+    productIdsOf,
+} from "./answer-cards";
 import { askAiCall, refused, textOf } from "./ask-ai-call";
 import type { AiToolbox, AiToolRun, AiTurnRef } from "./toolbox.port";
 
@@ -29,7 +37,13 @@ import type { AiToolbox, AiToolRun, AiTurnRef } from "./toolbox.port";
  * - Input is checked against the tool's contract before it runs.
  * - The model gets the tool's text, never JSON; what customers or the
  *   website wrote is already quoted as untrusted by the tool.
+ * - A list or product read also draws a card (`answer-cards.ts`) from the
+ *   tool's structured result, and the model is told the person sees it.
  */
+/** Told to the model under a result the person also sees as a card. */
+export const CARD_SHOWN =
+    "The person sees this as a card under your answer. Answer in a sentence or two; don't list it again.";
+
 @Injectable()
 export class ToolBridge implements AiToolbox {
     private readonly allowed: ReadonlySet<string>;
@@ -97,9 +111,39 @@ export class ToolBridge implements AiToolbox {
             }
             return this.drafts.draft(asker, tool, call.input, turn);
         }
-        return textOf(
-            await this.registry.callInProcess(tool, call.input, asker),
+        const result = await this.registry.callInProcess(
+            tool,
+            call.input,
+            asker,
         );
+        const run = textOf(result);
+        if (run.isError || !("structuredContent" in result)) return run;
+        const card = await this.cardOf(
+            live,
+            tool.name,
+            result.structuredContent,
+        );
+        return card ? { output: `${run.output}\n${CARD_SHOWN}`, card } : run;
+    }
+
+    /** The card a read draws, or null; a card that can't be read is left out, never the answer. */
+    private async cardOf(
+        ctx: OrganizationContext,
+        name: string,
+        data: unknown,
+    ): Promise<AiToolRun["card"] | null> {
+        try {
+            const facts =
+                PRODUCT_CARD_TOOLS.has(name) && allows(ctx, "store:read")
+                    ? await productFacts(
+                          ctx.organizationId,
+                          productIdsOf(name, data),
+                      )
+                    : new Map();
+            return answerCard(name, data, facts, env.R2_PUBLIC_BASE_URL);
+        } catch {
+            return null;
+        }
     }
 
     /**

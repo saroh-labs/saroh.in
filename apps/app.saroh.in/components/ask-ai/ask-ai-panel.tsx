@@ -7,7 +7,11 @@ import type {
     AskAiLanguage,
     AskAiState,
 } from "@saroh/api-contract";
-import { ASK_AI_QUESTION_MAX, askAiDraftCard } from "@saroh/api-contract";
+import {
+    ASK_AI_QUESTION_MAX,
+    askAiDraftCard,
+    askAiInfoCard,
+} from "@saroh/api-contract";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -115,6 +119,14 @@ const LANGUAGES: { value: AskAiLanguage; name: string; line?: string }[] = [
 let keys = 0;
 const nextKey = () => `t${++keys}`;
 
+/** The answer cards Saroh knows, each checked; any other is left out. */
+export function infoCardsOf(cards: readonly unknown[] | undefined) {
+    return (cards ?? []).flatMap((c) => {
+        const card = askAiInfoCard.safeParse(c);
+        return card.success ? [card.data] : [];
+    });
+}
+
 /** A saved conversation as turns: each question with the answer after it. */
 export function turnsOf(conversation: AskAiConversation): Turn[] {
     const turns: Turn[] = [];
@@ -132,10 +144,13 @@ export function turnsOf(conversation: AskAiConversation): Turn[] {
         }
         const turn = turns.at(-1);
         if (!turn) continue;
-        const card = askAiDraftCard.safeParse(m.card);
+        // Kept as the event carried it, `{ kind: "draft", data }`.
+        const draft = (m.card as { data?: unknown } | undefined)?.data;
+        const card = askAiDraftCard.safeParse(draft ?? m.card);
         Object.assign(turn, {
             text: m.text,
             cards: card.success ? [card.data] : [],
+            infoCards: infoCardsOf(m.cards),
             outcome: m.outcome ?? "ANSWERED",
             messageId: m.id,
         });
@@ -281,6 +296,24 @@ export function AskAiPanel({
                 );
                 return;
             case "card": {
+                if (event.kind === "products" || event.kind === "table") {
+                    const info = infoCardsOf([event]);
+                    if (!info.length) return;
+                    setTurns((all) =>
+                        all.map((t) =>
+                            t.key === key
+                                ? {
+                                      ...t,
+                                      infoCards: [
+                                          ...(t.infoCards ?? []),
+                                          ...info,
+                                      ],
+                                  }
+                                : t,
+                        ),
+                    );
+                    return;
+                }
                 const card = askAiDraftCard.safeParse(event.data);
                 if (!card.success) return;
                 setTurns((all) =>

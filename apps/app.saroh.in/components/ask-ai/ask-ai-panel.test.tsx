@@ -6,7 +6,11 @@
  * question ends says its own words. Free sees the lock; the meter shows
  * only with 20% or less left.
  */
-import type { AskAiState } from "@saroh/api-contract";
+import type {
+    AskAiConversation,
+    AskAiInfoCard,
+    AskAiState,
+} from "@saroh/api-contract";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
@@ -42,7 +46,7 @@ vi.mock("next/link", () => ({
     ),
 }));
 
-import { AskAiPanel } from "./ask-ai-panel";
+import { AskAiPanel, turnsOf } from "./ask-ai-panel";
 
 const STATE: AskAiState = {
     available: true,
@@ -538,5 +542,50 @@ describe("the full page, /ask (board AI 9)", () => {
         expect(text()).toContain("Ask AI comes with Grow");
         expect(host.querySelector("nav")).toBeNull();
         expect(host.querySelector("textarea")).toBeNull();
+    });
+});
+
+const TABLE: AskAiInfoCard = {
+    kind: "table",
+    data: {
+        title: "Unpaid bills",
+        columns: ["Bill", "Customer"],
+        rows: [["INV-1", "Asha"]],
+        link: {
+            label: "Open in Invoices",
+            href: "/billing/invoices?view=unpaid",
+        },
+    },
+};
+
+describe("a saved conversation", () => {
+    it("brings back the answer's cards, leaving out any it doesn't know", () => {
+        const conversation = {
+            id: "c1",
+            agent: "ask-ai",
+            title: "Who hasn't paid?",
+            lastMessageAt: "2026-11-14T10:00:00Z",
+            createdAt: "2026-11-14T10:00:00Z",
+            messages: [
+                {
+                    id: "m1",
+                    role: "USER",
+                    outcome: null,
+                    text: "Who hasn't paid?",
+                    createdAt: "2026-11-14T10:00:00Z",
+                },
+                {
+                    id: "m2",
+                    role: "ASSISTANT",
+                    outcome: "ANSWERED",
+                    text: "Five bills are unpaid.",
+                    cards: [TABLE, { kind: "chart", data: {} }],
+                    createdAt: "2026-11-14T10:00:01Z",
+                },
+            ],
+        } satisfies AskAiConversation;
+        const [turn] = turnsOf(conversation);
+        expect(turn.infoCards).toEqual([TABLE]);
+        expect(turn.text).toBe("Five bills are unpaid.");
     });
 });

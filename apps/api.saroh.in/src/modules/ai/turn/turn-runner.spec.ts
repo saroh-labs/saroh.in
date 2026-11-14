@@ -375,6 +375,41 @@ describe("TurnRunner", () => {
         expect(t.provider.requests).toHaveLength(1);
     });
 
+    it("shows a read's card whole under the answer and keeps it with the answer", async () => {
+        const card = { kind: "table", data: { title: "Bookings" } };
+        const t = setup({
+            rounds: [toolRound(), [text("Three tomorrow."), done()]],
+            toolRun: () => ({ output: "3 bookings tomorrow.", card }),
+        });
+        const events = await collect(t.turn());
+        expect(events.map((e) => e.type)).toEqual([
+            "status",
+            "text-delta",
+            "card",
+            "done",
+        ]);
+        expect(events[2]).toEqual({ type: "card", ...card });
+        expect(t.store.finished[0]).toMatchObject({
+            text: "Three tomorrow.",
+            cards: [card],
+            outcome: "ANSWERED",
+        });
+        expect(t.store.finished[0].card).toBeUndefined();
+    });
+
+    it("drops a read's card when the turn ends without text", async () => {
+        const t = setup({
+            rounds: [toolRound(), [done()]],
+            toolRun: () => ({
+                output: "3 bookings tomorrow.",
+                card: { kind: "table", data: {} },
+            }),
+        });
+        const events = await collect(t.turn());
+        expect(events.some((e) => e.type === "card")).toBe(false);
+        expect(t.store.finished[0].cards).toBeUndefined();
+    });
+
     describe("guards", () => {
         it("round cap: the last round is answer-only and no round past it is sent", async () => {
             const t = setup({

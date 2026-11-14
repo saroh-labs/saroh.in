@@ -65,6 +65,8 @@ export const SELLING_PERIODS = [
     "last_7_days",
     "last_4_weeks",
     "last_3_months",
+    "this_month",
+    "last_month",
 ] as const;
 
 export const getWhatsSellingTool = {
@@ -73,7 +75,9 @@ export const getWhatsSellingTool = {
             period: z
                 .enum(SELLING_PERIODS)
                 .optional()
-                .describe("Default last_4_weeks."),
+                .describe(
+                    "Default last_4_weeks. this_month and last_month are calendar months in the business's time zone.",
+                ),
         })
         .strict(),
     output: z.object({
@@ -89,6 +93,8 @@ export const getWhatsSellingTool = {
                 amount: z.string().nullable(),
             }),
         ),
+        /** With no best sellers: the day of the last product sold, or null for none ever. */
+        last_sale_on: z.string().nullable(),
         booked: z.array(
             z.object({
                 service_id: z.string(),

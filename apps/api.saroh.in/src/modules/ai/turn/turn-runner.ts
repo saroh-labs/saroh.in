@@ -81,9 +81,20 @@ interface Prepared {
 }
 
 /** How the turn is going; `outcome` is set once it has ended. */
+interface TurnCard {
+    kind: string;
+    data: Record<string, unknown>;
+}
+
+/** The most read cards one answer shows; a tool called again replaces its own. */
+const ANSWER_CARDS = 3;
+
 interface TurnState {
     text: string;
-    card?: { kind: string; data: Record<string, unknown> };
+    /** A draft's card: the turn ended on it. */
+    card?: TurnCard;
+    /** Reads' cards by tool, shown under the answer once it is done. */
+    cards: Map<string, TurnCard>;
     tokens: TurnTokens;
     rounds: number;
     over100k: boolean;
@@ -119,10 +130,12 @@ export class TurnRunner {
         private readonly access: AskAiAccess,
     ) {}
 
-    /** A new conversation, with the model and effort in effect now stamped on it. */
+    /** A new conversation, with the model and effort in effect now stamped on it, titled by its first question. */
     async openConversation(
         ctx: OrganizationContext,
         agentKey: string,
+        /** Its title, sealed. */
+        firstQuestion?: string,
     ): Promise<TurnConversation> {
         const agent = this.agent(agentKey);
         const keys = agent.models.questions;
@@ -130,12 +143,16 @@ export class TurnRunner {
             this.settings.get(keys.model, ctx.organizationId),
             this.settings.get(keys.effort, ctx.organizationId),
         ]);
-        return this.store.createConversation(ctx, {
-            agent: agent.key,
-            agentVersion: agentVersion(agent),
-            model,
-            effort,
-        });
+        return this.store.createConversation(
+            ctx,
+            {
+                agent: agent.key,
+                agentVersion: agentVersion(agent),
+                model,
+                effort,
+            },
+            firstQuestion,
+        );
     }
 
     /** Whether a turn may run now: not halted, rolled out here, the business's switch on. */
@@ -198,6 +215,7 @@ export class TurnRunner {
         }
         const state: TurnState = {
             text: "",
+            cards: new Map(),
             tokens: NO_TOKENS,
             rounds: 0,
             over100k: false,
@@ -218,6 +236,8 @@ export class TurnRunner {
             await this.finish(input, prepared, state);
         }
         const outcome = state.outcome ?? "FAILED";
+        // Whole, under the text, once it is done (never under a draft).
+        for (const card of answerCards(state)) yield { type: "card", ...card };
         if (state.reason) yield { type: "error", reason: state.reason };
         yield {
             type: "done",
@@ -416,6 +436,10 @@ export class TurnRunner {
                     end(state, "DRAFT");
                     return;
                 }
+                if (run.card) {
+                    state.cards.delete(call.name);
+                    state.cards.set(call.name, run.card);
+                }
                 results.push({
                     toolCallId: call.id,
                     toolName: call.name,
@@ -454,6 +478,9 @@ export class TurnRunner {
             await this.store.finish(input.ctx, p.conversation, input.turnId, {
                 text: state.text,
                 ...(state.card ? { card: state.card } : {}),
+                ...(answerCards(state).length
+                    ? { cards: answerCards(state) }
+                    : {}),
                 outcome,
                 counted,
                 stopped:
@@ -503,6 +530,12 @@ export function* refusedTurn(
         counted: false,
         usage: { rounds: 0, inputTokens: 0, outputTokens: 0 },
     };
+}
+
+/** The reads' cards an answer shows: only under some text, never a draft's turn. */
+function answerCards(state: TurnState): TurnCard[] {
+    if (!state.text || state.outcome === "DRAFT") return [];
+    return [...state.cards.values()].slice(-ANSWER_CARDS);
 }
 
 function end(

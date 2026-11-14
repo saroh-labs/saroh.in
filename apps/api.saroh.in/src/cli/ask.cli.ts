@@ -245,7 +245,8 @@ async function ask(app: TestingModule, args: AskArgs): Promise<number> {
     const runner = app.get(TurnRunner);
     const registry = app.get(TurnRegistry);
     const conversationId =
-        args.conversation ?? (await runner.openConversation(ctx, AGENT)).id;
+        args.conversation ??
+        (await runner.openConversation(ctx, AGENT, args.question)).id;
     console.info(`${TAG} conversation ${conversationId}`);
     console.info(`\n> ${args.question}\n`);
 

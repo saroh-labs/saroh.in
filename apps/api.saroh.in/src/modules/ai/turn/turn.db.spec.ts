@@ -197,6 +197,23 @@ describe("a turn's rows", () => {
         ]);
     });
 
+    it("titles a new conversation with its first question, sealed at rest", async () => {
+        const ctx = await owner();
+        await configure(ctx.organizationId);
+        const question = `Top products this month? ${uniq("title")}`;
+        const open = await runner([]).openConversation(ctx, "ask-ai", question);
+        const row = await prisma.aiConversation.findUniqueOrThrow({
+            where: { id: open.id },
+        });
+        expect(row.titleCiphertext).toBeTruthy();
+        expect(JSON.stringify(row)).not.toContain("Top products");
+        expect((await conversations.list(ctx))[0]).toMatchObject({
+            id: open.id,
+            title: question,
+        });
+        expect((await conversations.get(ctx, open.id)).title).toBe(question);
+    });
+
     it("stamps the model on a conversation when it starts", async () => {
         const ctx = await owner();
         await configure(ctx.organizationId, "claude-haiku-5-5");

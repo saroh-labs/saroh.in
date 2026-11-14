@@ -76,7 +76,11 @@ export const askAiEvent = z.discriminatedUnion("type", [
         words: z.string(),
     }),
     z.object({ type: z.literal("text-delta"), text: z.string() }),
-    /** A draft to confirm: `data` is an `AskAiDraftCard`. */
+    /**
+     * A card: `kind` "draft" is a draft to confirm (`data` an
+     * `AskAiDraftCard`); "products" and "table" are {@link askAiInfoCard}s
+     * a tool's result showed, sent whole once the answer is done.
+     */
     z.object({
         type: z.literal("card"),
         kind: z.string(),
@@ -100,6 +104,60 @@ export const askAiEvent = z.discriminatedUnion("type", [
     }),
 ]);
 export type AskAiEvent = z.infer<typeof askAiEvent>;
+
+/** The most items or rows a card shows; the rest are `more`. */
+export const ASK_AI_CARD_ITEMS = 8;
+
+/**
+ * Products a tool read (best sellers, a product list, one product), drawn
+ * as small cards. `imageUrl` is only ever the product's cover on Saroh's
+ * own media host (the API drops any other); `href` is the product in the
+ * app. Figures are null when the person's role doesn't show them.
+ */
+export const askAiProductsCard = z.object({
+    title: z.string(),
+    items: z
+        .array(
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                imageUrl: z.string().nullable(),
+                price: z.string().nullable(),
+                /** Units sold in the period; null outside best sellers. */
+                sold: z.number().nullable(),
+                /** What they brought in; null without payments. */
+                amount: z.string().nullable(),
+                /** Units in stock; null when not counted or not shown. */
+                stock: z.number().nullable(),
+                href: z.string(),
+            }),
+        )
+        .max(ASK_AI_CARD_ITEMS),
+    /** Items not shown. */
+    more: z.number().optional(),
+    link: z.object({ label: z.string(), href: z.string() }).optional(),
+});
+export type AskAiProductsCard = z.infer<typeof askAiProductsCard>;
+
+/** A small table (bills, orders, bookings, customers): every cell text. */
+export const askAiTableCard = z.object({
+    title: z.string(),
+    columns: z.array(z.string()),
+    /** Which columns hold figures, right-aligned. */
+    numeric: z.array(z.number()).optional(),
+    rows: z.array(z.array(z.string())).max(ASK_AI_CARD_ITEMS),
+    /** Rows not shown. */
+    more: z.number().optional(),
+    link: z.object({ label: z.string(), href: z.string() }).optional(),
+});
+export type AskAiTableCard = z.infer<typeof askAiTableCard>;
+
+/** A card under an answer, as the `card` event and a saved message carry it. */
+export const askAiInfoCard = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("products"), data: askAiProductsCard }),
+    z.object({ kind: z.literal("table"), data: askAiTableCard }),
+]);
+export type AskAiInfoCard = z.infer<typeof askAiInfoCard>;
 
 /** Stop's answer: false when the turn had already ended. */
 export const askAiStopResult = z.object({ stopped: z.boolean() });
@@ -132,8 +190,17 @@ export const askAiMessage = z.object({
     role: z.enum(["USER", "ASSISTANT"]),
     outcome: askAiOutcome.nullable(),
     text: z.string(),
-    /** A draft's card, when the answer was one. */
+    /** A draft's card, when the answer was one: `{ kind: "draft", data }`. */
     card: z.record(z.string(), z.unknown()).optional(),
+    /** The answer's cards (`{ kind, data }`, each an {@link askAiInfoCard}). */
+    cards: z
+        .array(
+            z.object({
+                kind: z.string(),
+                data: z.record(z.string(), z.unknown()),
+            }),
+        )
+        .optional(),
     createdAt: z.string(),
 });
 export type AskAiMessage = z.infer<typeof askAiMessage>;

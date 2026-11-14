@@ -15,9 +15,10 @@ import { DateTime } from "luxon";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { OwedByAge } from "../../analytics/owed-by-age";
 import { foldOwedByAge, readOwedByAge } from "../../analytics/owed-by-age";
-import type { InsightsPeriod } from "../../analytics/period";
+import type { SellsPeriod } from "../../analytics/period";
 import { DAY_PARTS } from "../../analytics/sells";
 import { SellsService } from "../../analytics/sells.service";
+import { lastProductSaleSql } from "../../analytics/sells.sql";
 import type { TakingsDayRow } from "../../analytics/takings";
 import { takingsByDaySql } from "../../analytics/takings.sql";
 import { ownBookingsWhere, ownDiaryOf } from "../../bookings/own-diary";
@@ -257,11 +258,35 @@ async function businessSummary(
     return { text, data };
 }
 
-const INSIGHTS_PERIOD: Record<SellingPeriod, InsightsPeriod> = {
+const INSIGHTS_PERIOD: Record<SellingPeriod, SellsPeriod> = {
     last_7_days: "7d",
     last_4_weeks: "4w",
     last_3_months: "3m",
+    this_month: "this_month",
+    last_month: "last_month",
 };
+
+const SELLING_WORDS: Record<SellingPeriod, string> = {
+    last_7_days: "in the last 7 days",
+    last_4_weeks: "in the last 4 weeks",
+    last_3_months: "in the last 3 months",
+    this_month: "this month",
+    last_month: "last month",
+};
+
+/**
+ * Best sellers said plainly when there are none, with the last sale, so
+ * an answer never stands in a product list for them (Northwind, 14 Nov).
+ */
+export function noSalesLine(
+    period: SellingPeriod,
+    lastSaleOn: string | null,
+): string {
+    const none = `No products sold ${SELLING_WORDS[period]}`;
+    return lastSaleOn
+        ? `${none}; the last sale was on ${lastSaleOn}.`
+        : `${none}; no product has sold yet.`;
+}
 
 const WEEKDAYS = [
     "Monday",
@@ -438,7 +463,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             name: "get_whats_selling",
             title: "What sells",
             description:
-                'Use this when the person asks what sells or is booked most, who their best customers are (new or returning), or their busiest and quietest times. Example: "what sold best this month?" → period last_4_weeks. Not for totals of money in (get_business_summary).',
+                'Use this when the person asks what sells or is booked most (best sellers, top products, top services), who their best customers are (new or returning), or their busiest and quietest times. Example: "top products this month?" → period this_month; "what sold best lately?" → last_4_weeks. Not for totals of money in (get_business_summary). Never answer best sellers from list_products.',
             contract: getWhatsSellingTool,
             capability: "analytics:read",
             module: "INSIGHTS",
@@ -446,6 +471,15 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             async run(input, { ctx }: McpCall) {
                 const period = input.period ?? "last_4_weeks";
                 const r = await d.sells.read(ctx, INSIGHTS_PERIOD[period]);
+                const lastSale = r.bestSellers.rows.length
+                    ? null
+                    : await prisma.$queryRaw<{ day: string | null }[]>(
+                          lastProductSaleSql(
+                              ctx.organizationId,
+                              r.zone,
+                              new Date(),
+                          ),
+                      );
                 const amount = (minor: number | null) =>
                     minor !== null && r.currency
                         ? money({ currency: r.currency, amountMinor: minor })
@@ -461,6 +495,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                         sold_before: p.soldBefore,
                         amount: amount(p.amountMinor),
                     })),
+                    last_sale_on: lastSale?.[0]?.day ?? null,
                     booked: r.booked.rows.map((s) => ({
                         service_id: s.serviceId,
                         name: s.name,
@@ -491,16 +526,14 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 };
                 const text = [
                     `${r.window.from} to ${r.window.to}, against the same number of days before.`,
-                    `Best sellers: ${
-                        data.best_sellers.length
-                            ? data.best_sellers
-                                  .map(
-                                      (p) =>
-                                          `${JSON.stringify(p.name)} ${p.sold} sold (${p.sold_before} before)${p.amount ? `, ${p.amount}` : ""}`,
-                                  )
-                                  .join("; ")
-                            : "nothing sold"
-                    }.`,
+                    data.best_sellers.length
+                        ? `Best sellers: ${data.best_sellers
+                              .map(
+                                  (p) =>
+                                      `${JSON.stringify(p.name)} (product_id ${p.product_id}) ${p.sold} sold (${p.sold_before} before)${p.amount ? `, ${p.amount}` : ""}`,
+                              )
+                              .join("; ")}.`
+                        : noSalesLine(period, data.last_sale_on),
                     `Booked most: ${
                         data.booked.length
                             ? data.booked

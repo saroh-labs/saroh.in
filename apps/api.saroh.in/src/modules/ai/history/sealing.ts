@@ -41,10 +41,11 @@ export interface AiSealBinding {
     field: "body" | "title" | "draft" | "report";
 }
 
-/** A message as sealed: its text, and the card's data when it has one. */
+/** A message as sealed: its text, a draft's card, and the reads' cards under it. */
 export interface AiMessageContent {
     text: string;
     card?: Record<string, unknown>;
+    cards?: { kind: string; data: Record<string, unknown> }[];
 }
 
 interface Envelope {

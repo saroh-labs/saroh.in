@@ -80,7 +80,11 @@ export class AskAiService {
         const entry = await this.access.entry(ctx);
         if (!entry.ok) return { conversationId: null, refusal: entry.refusal };
         try {
-            const c = await this.runner.openConversation(ctx, ASK_AI_AGENT.key);
+            const c = await this.runner.openConversation(
+                ctx,
+                ASK_AI_AGENT.key,
+                body.question,
+            );
             return { conversationId: c.id, refusal: null };
         } catch (error) {
             if (!(error instanceof AiSettingNotConfiguredError)) throw error;

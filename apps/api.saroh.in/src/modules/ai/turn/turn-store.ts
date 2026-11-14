@@ -8,7 +8,7 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { meterWindow } from "../../billing/metering";
 import type { AskAiRefusal, TurnAdmit } from "../access/refusal";
 import { ConversationsService } from "../conversations.service";
-import { sealMessageBody } from "../history/sealing";
+import { sealAiText, sealMessageBody } from "../history/sealing";
 import type { AiMessage } from "../providers/provider.port";
 import type { TurnTokens } from "./guards";
 
@@ -32,6 +32,8 @@ export interface TurnConversation {
 export interface TurnFinish {
     text: string;
     card?: { kind: string; data: Record<string, unknown> };
+    /** Reads' cards shown under the answer, kept with it. */
+    cards?: { kind: string; data: Record<string, unknown> }[];
     outcome: AiTurnOutcome;
     counted: boolean;
     stopped: boolean;
@@ -39,6 +41,21 @@ export interface TurnFinish {
     tokens: TurnTokens;
     costMicroUsd: number;
     over100k: boolean;
+}
+
+/** A title's longest, before it is cut on a word. */
+const TITLE_MAX = 60;
+
+/**
+ * A conversation's title from its first question: one line, cut on a
+ * word boundary to about {@link TITLE_MAX} characters, with "…" when cut.
+ */
+export function conversationTitle(question: string): string {
+    const line = question.replace(/\s+/g, " ").trim();
+    if (line.length <= TITLE_MAX) return line;
+    const cut = line.slice(0, TITLE_MAX);
+    const space = cut.lastIndexOf(" ");
+    return `${(space > TITLE_MAX / 2 ? cut.slice(0, space) : cut).replace(/[\s,.;:!?-]+$/, "")}…`;
 }
 
 const asBusiness = <T>(organizationId: string, fn: () => Promise<T>) =>
@@ -57,16 +74,36 @@ const CONVERSATION = {
 export class TurnStore {
     constructor(private readonly conversations: ConversationsService) {}
 
+    /** A new conversation; `firstQuestion` becomes its title, sealed. */
     createConversation(
         ctx: OrganizationContext,
         data: Omit<TurnConversation, "id" | "organizationId">,
+        firstQuestion?: string,
     ): Promise<TurnConversation> {
+        const id = randomUUID();
+        const title = firstQuestion ? conversationTitle(firstQuestion) : "";
+        const sealed = title
+            ? sealAiText(title, {
+                  organizationId: ctx.organizationId,
+                  conversationId: id,
+                  rowId: id,
+                  field: "title",
+              })
+            : null;
         return asBusiness(ctx.organizationId, () =>
             prisma.aiConversation.create({
                 data: {
                     ...data,
+                    id,
                     organizationId: ctx.organizationId,
                     userId: ctx.userId,
+                    ...(sealed
+                        ? {
+                              titleCiphertext: sealed.ciphertext,
+                              titleIv: sealed.iv,
+                              titleAuthTag: sealed.authTag,
+                          }
+                        : {}),
                 },
                 select: CONVERSATION,
             }),
@@ -260,7 +297,11 @@ export class TurnStore {
             const now = new Date();
             const messageId = randomUUID();
             const body = sealMessageBody(
-                { text: f.text, ...(f.card ? { card: f.card } : {}) },
+                {
+                    text: f.text,
+                    ...(f.card ? { card: f.card } : {}),
+                    ...(f.cards?.length ? { cards: f.cards } : {}),
+                },
                 {
                     organizationId: ctx.organizationId,
                     conversationId: conversation.id,

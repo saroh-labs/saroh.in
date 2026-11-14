@@ -10,7 +10,10 @@ export interface AiToolRun {
     /** Text for the model, never JSON (spec §2.3). */
     output: string;
     isError?: boolean;
-    /** A draft tool's card to confirm (U5). */
+    /**
+     * A draft tool's card to confirm (U5), which ends the turn; or a read's
+     * card (`answer-cards.ts`), shown under the answer.
+     */
     card?: { kind: string; data: Record<string, unknown> };
 }
 
