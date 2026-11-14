@@ -11,6 +11,10 @@ import {
 } from "@/content/contact-page";
 import { UPDATED as CUSTOMERS_UPDATED } from "@/content/customers";
 import {
+    DEVELOPERS_PATH,
+    UPDATED as DEVELOPERS_UPDATED,
+} from "@/content/developers";
+import {
     featureHref,
     featureList,
     UPDATED as FEATURES_UPDATED,
@@ -175,6 +179,7 @@ const PAGE_DAYS: Readonly<Record<string, string>> = {
     [INTEGRATIONS_PATH]: INTEGRATIONS_UPDATED,
     "/changelog": CHANGELOG_UPDATED,
     [TEMPLATES_PATH]: TEMPLATES_UPDATED,
+    [DEVELOPERS_PATH]: DEVELOPERS_UPDATED,
     "/tools/link-preview": LINK_PREVIEW_UPDATED,
     "/tools/qr-code-maker": QR_CODE_MAKER_UPDATED,
 };

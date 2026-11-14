@@ -16,6 +16,9 @@
  *   `next.config.js`), so a page listed here before its route lands never
  *   links to a 404.
  *
+ * Developers (`/developers`, plan 2026-11-13-002 U6) waits for its own
+ * switch the same way.
+ *
  * Templates (`/templates`, plan U6) is listed now the industry templates
  * exist: its gallery shows only templates a merchant can pick
  * (`content/templates.ts`), and its detail pages follow it into the
@@ -38,12 +41,14 @@ export interface ResourcePage {
     menu?: "tools";
     /**
      * Pages under it the sitemap lists with it, each shown only when its
-     * route exists (`/integrations/razorpay` needs `/integrations/[provider]`).
+     * route exists (`/integrations/razorpay` needs `/integrations/[provider]`)
+     * and, for one that names a release switch, while that switch is on
+     * (`/integrations/claude` waits for `ai-apps`, plan 2026-11-13-002 U7).
      */
-    children?: readonly string[];
+    children?: readonly (string | { href: string; waitsFor: string })[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, Templates, then the Tools menu's free tools (Link preview, QR code maker). */
+/** In the plan's order: Help, Integrations, Changelog, Templates, Developers, then the Tools menu's free tools (Link preview, QR code maker). */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -60,6 +65,9 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         href: "/integrations",
         publishOn: "2026-10-05",
         children: [
+            // The AI apps' pages wait for their switch (plan 2026-11-13-002 U7).
+            { href: "/integrations/claude", waitsFor: "ai-apps" },
+            { href: "/integrations/chatgpt", waitsFor: "ai-apps" },
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
@@ -79,6 +87,15 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         href: "/templates",
         // With early access, as Help (industry templates plan U13).
         publishOn: "2026-10-17",
+    },
+    {
+        // The API and webhooks (plan 2026-11-13-002, U6): shown only while
+        // `NEXT_PUBLIC_DEVELOPERS` is on, whatever the date.
+        id: "developers",
+        name: "Developers",
+        line: "The Saroh API and webhooks, for building on a business's data.",
+        href: "/developers",
+        publishOn: "2026-11-14",
     },
     {
         id: "link-preview",
@@ -197,13 +214,20 @@ function unpublishedTool(href: string, ctx: PublishContext): boolean {
     return !!ctx.live && href.startsWith("/tools/") && !ctx.live.includes(href);
 }
 
-/** Whether `href` is a switched-off Resources page, or a page under one. */
+/** Whether `href` is a switched-off Resources page, a page under one, or a child waiting for its own switch. */
 function switchedOff(href: string, ctx: PublishContext): boolean {
-    if (!ctx.off || ctx.off.length === 0) return false;
+    const off = ctx.off;
+    if (!off || off.length === 0) return false;
     return RESOURCE_PAGES.some(
         (p) =>
-            ctx.off?.includes(p.id) &&
-            (href === p.href || href.startsWith(`${p.href}/`)),
+            (off.includes(p.id) &&
+                (href === p.href || href.startsWith(`${p.href}/`))) ||
+            (p.children ?? []).some(
+                (c) =>
+                    typeof c !== "string" &&
+                    c.href === href &&
+                    off.includes(c.waitsFor),
+            ),
     );
 }
 
@@ -223,11 +247,16 @@ export function routeExists(
     });
 }
 
-/** Whether a dated page is live: published (or previewed) at `ctx.now`. */
+/**
+ * Whether a dated page is live: published (or previewed) at `ctx.now`. One
+ * that waits for a release switch (a changelog entry's `waitsFor`, plan
+ * 2026-11-13-002 U11) is never live while that switch is off, preview or not.
+ */
 export function isLive(
-    page: { publishOn: IsoDay },
+    page: { publishOn: IsoDay; waitsFor?: string },
     ctx: PublishContext,
 ): boolean {
+    if (page.waitsFor && ctx.off?.includes(page.waitsFor)) return false;
     return ctx.preview || isPublished(page.publishOn, ctx.now);
 }
 
@@ -276,7 +305,9 @@ export function resourcePaths(ctx: PublishContext): string[] {
         if (!isShown(page, ctx)) continue;
         paths.push(page.href);
         for (const child of page.children ?? []) {
-            if (routeExists(child, ctx.routes)) paths.push(child);
+            const href = typeof child === "string" ? child : child.href;
+            if (switchedOff(href, ctx)) continue;
+            if (routeExists(href, ctx.routes)) paths.push(href);
         }
     }
     return paths;
@@ -294,7 +325,11 @@ export function linkShown(href: string, ctx: PublishContext): boolean {
         (p) => path === p.href || path.startsWith(`${p.href}/`),
     );
     if (!page) return true;
-    return isShown(page, ctx) && routeExists(path, ctx.routes);
+    return (
+        isShown(page, ctx) &&
+        !switchedOff(path, ctx) &&
+        routeExists(path, ctx.routes)
+    );
 }
 
 /** The Resources page a path is in, for the breadcrumbs and the nav's underline. */

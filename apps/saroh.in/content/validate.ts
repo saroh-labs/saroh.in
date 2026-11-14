@@ -100,7 +100,10 @@ export function contentErrors({
  * (Resources plan U3, audit R4), as readable lines; empty means sound.
  * `integrations.test.ts` runs it on the real pages and on broken copies.
  *
- * - each live card has a page, and each page says it is that card's;
+ * - each card that links to /integrations/ has that page, and the page
+ *   says it is that card's, in the card's group; a card without one (an AI
+ *   app before it earns a page, U7) links to its part of the help article
+ *   for other AI apps, and says whether its dev sign-in walk is done;
  * - a payments page's webhook path is the API's own (`webhookPath` from
  *   `@saroh/integrations`, which `webhook-setup.ts` builds the address
  *   with), and every webhook address written anywhere in the file is it;
@@ -113,7 +116,13 @@ export function integrationErrors({
     planned,
     pages,
 }: {
-    live: readonly { slug: string; name: string }[];
+    live: readonly {
+        slug: string;
+        name: string;
+        category?: string;
+        href?: string;
+        liveOnDev?: boolean;
+    }[];
     planned: readonly object[];
     pages: Partial<
         Record<string, { frontmatter: IntegrationFrontmatter; source: string }>
@@ -121,14 +130,30 @@ export function integrationErrors({
 }): string[] {
     const errors: string[] = [];
     for (const card of live) {
+        const at = `integration ${card.slug}`;
+        const own = `/integrations/${card.slug}`;
+        if (card.category === "AI apps" && card.liveOnDev === undefined) {
+            errors.push(`${at}: says nothing of its dev sign-in walk`);
+        }
+        if (card.href !== undefined && card.href !== own) {
+            const anchor = `/help/connect-other-ai-apps#${card.slug}`;
+            if (card.category !== "AI apps" || card.href !== anchor) {
+                errors.push(`${at}: links to ${card.href}`);
+            }
+            if (pages[card.slug])
+                errors.push(`${at}: has a page it doesn't link to`);
+            continue;
+        }
         const page = pages[card.slug];
         if (!page) {
             errors.push(`integration ${card.slug}: no page`);
             continue;
         }
         const fm = page.frontmatter;
-        const at = `integration ${card.slug}`;
         if (fm.slug !== card.slug) errors.push(`${at}: slug says ${fm.slug}`);
+        if (card.category !== undefined && fm.category !== card.category) {
+            errors.push(`${at}: page is in ${fm.category}`);
+        }
         for (const link of fm.links) {
             if (link.href === `/integrations/${card.slug}`) {
                 errors.push(`${at}: links to itself`);

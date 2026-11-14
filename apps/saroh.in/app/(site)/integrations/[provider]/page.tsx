@@ -5,14 +5,18 @@ import { notFound } from "next/navigation";
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { helpHref, liveArticles, summarise } from "@/content/help";
 import {
-    INTEGRATION_SLUGS,
     integrationHref,
     INTEGRATIONS_PATH,
     isIntegrationSlug,
+    shownIntegrationSlugs,
 } from "@/content/integrations";
+import { featuresOff } from "@/lib/feature-switches";
 import { numberWord } from "@/lib/format/number-words";
+import { helpArticles } from "@/lib/help-docs";
 import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
+import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { Arrow } from "@saroh/marketing/arrow";
@@ -34,11 +38,19 @@ import { textLinkClasses } from "@saroh/marketing/text-link";
  * contains until Pricing is published (DESIGN.md, DEC-078), and plan
  * contents are set in the admin (MARKETING_CLAIMS D3). The design's
  * "Help: Connect …" link waits for Help (U5, 17 Oct).
+ *
+ * The AI apps' pages (Claude, ChatGPT; plan 2026-11-13-002 U7) are built
+ * only while the `ai-apps` switch is on, and point to what AI apps can do.
+ * A link to a Help article is drawn only once that article is live, so the
+ * pages can name their Help before it is written (U9).
  */
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return INTEGRATION_SLUGS.map((provider) => ({ provider }));
+    // Only the shown pages: a switched-off one is never built (404).
+    return shownIntegrationSlugs(featuresOff()).map((provider) => ({
+        provider,
+    }));
 }
 
 interface Props {
@@ -59,10 +71,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function IntegrationPage({ params }: Props) {
     const { provider } = await params;
-    if (!isIntegrationSlug(provider)) notFound();
+    if (
+        !isIntegrationSlug(provider) ||
+        !shownIntegrationSlugs(featuresOff()).includes(provider)
+    ) {
+        notFound();
+    }
     const { frontmatter: fm, Body } = await loadIntegration(provider);
     const self = integrationHref(provider);
-    const links = fm.links.filter((l) => l.href !== self);
+    const liveHelp = liveArticles(
+        helpArticles().map(summarise),
+        resourcesContext(),
+    ).map((a) => helpHref(a.slug));
+    const links = fm.links.filter(
+        (l) =>
+            l.href !== self &&
+            (!l.href.startsWith("/help/") || liveHelp.includes(l.href)),
+    );
     const stepsTitle = `Connect it in ${numberWord(fm.steps.length)} steps`;
 
     return (
@@ -91,6 +116,18 @@ export default async function IntegrationPage({ params }: Props) {
                         src={`integrations-${provider}`}
                         className="h-[50px] px-[22px] text-[15px]"
                     />
+                    {fm.category === "AI apps" ? (
+                        <Link
+                            href="/features/ai-apps"
+                            className={textLinkClasses({
+                                className:
+                                    "inline-flex min-h-11 items-center text-[15px]",
+                            })}
+                        >
+                            See what AI apps can do
+                            <Arrow />
+                        </Link>
+                    ) : null}
                 </div>
                 <section
                     aria-labelledby="does"

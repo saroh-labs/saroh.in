@@ -43,6 +43,7 @@
         "./shot-image": "./src/media/shot-image.tsx",
         "./screenshot-frame": "./src/media/screenshot-frame.tsx",
         "./cta-band": "./src/sections/cta-band.tsx",
+        "./code-sample": "./src/sections/code-sample.tsx",
         "./product-hero": "./src/sections/product-hero.tsx",
         "./coming-list": "./src/sections/coming-list.tsx",
         "./home-hero": "./src/sections/home-hero.tsx",

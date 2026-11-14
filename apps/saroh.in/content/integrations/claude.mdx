@@ -1,0 +1,104 @@
+---
+# Saroh's own screens and words below are copied from the code. Sources,
+# from the repo root:
+#   PICK     apps/accounts.saroh.in/lib/oauth-sign-in.ts (OAUTH_WORDS)
+#   CAN      apps/api.saroh.in/src/modules/mcp/ai-apps.ts (SCOPE_WORDS)
+#   TOOLS    apps/api.saroh.in/src/modules/mcp/tools/
+#   PUBLISH  apps/api.saroh.in/src/modules/mcp/publish-requests.ts (DEC-215)
+#   SETTINGS apps/app.saroh.in/components/settings/developers/ai-apps.tsx
+#   SWEEP    apps/api.saroh.in/src/modules/mcp/ai-connections-sweep.job.ts
+#   ADDRESS  apps/app.saroh.in/lib/ai-connections/mcp-address.ts
+# Claude's own screens aren't confirmed yet (plan 2026-11-13-002, deferred to
+# the dev sign-in walk), so its step names no menu or field of its own.
+slug: claude
+name: Claude
+category: AI apps
+title: "Connect Claude to Saroh: use your business from Claude · Saroh"
+description: "Connect Claude to your business on Saroh in four steps. Ask it to add a product, move a booking or draft a page. Website changes wait for you to publish."
+intro: "Connect Claude to your business on Saroh and ask in your own words: add a product, look up Saturday's bookings, or start a new page for your site. Claude acts as you, so it can only do what you can do in Saroh."
+updated: "2026-11-14"
+doesTitle: What it does in Saroh
+panelPath: [Claude, Connectors]
+initialStep: 0
+steps:
+    # ADDRESS: production's address, from api.saroh.in. SETTINGS: "Connect in
+    # Claude" opens Claude's connectors (CONNECT_IN.claude).
+    - title: Add Saroh as a custom connector
+      cta: Add
+      body: "In Claude, open your connectors and add a custom connector. Name it Saroh and paste the address. Or press Connect in Claude in Saroh's Settings › API and AI apps, which opens the same place. On a plan your company manages, an admin may add it once for everyone, then each person connects."
+      rows:
+          - { label: Name, value: Saroh, done: true }
+          - {
+                label: Address,
+                value: "https://mcp.saroh.in/mcp",
+                note: Copy,
+                tone: ok,
+                mono: true,
+                done: true,
+            }
+    # PICK: the sign-in page, then "Which businesses should … work with?",
+    # "All my businesses" and "Continue".
+    - title: Sign in to Saroh
+      panelPath: [Saroh, Sign in]
+      cta: Continue
+      body: "Claude opens Saroh's sign-in page. Sign in as you always do, with the email or phone you use for Saroh."
+      rows:
+          - { label: Email, value: asha@example.com, done: true }
+    - title: Pick your businesses
+      panelPath: [Saroh, Connect an app]
+      cta: Continue
+      body: "Tick the businesses Claude may work with: one, several or all of yours. In each, it can only do what you can do there."
+      rows:
+          - { label: "Which businesses should Claude work with?", value: All my businesses }
+          - { value: Green Leaf Salon, note: Ticked, tone: ok, done: true }
+          - { value: Green Leaf Academy }
+    # PICK: "Allow an app", the consent title, "It will be able to" (CAN) and
+    # the role note; "Allow".
+    - title: Read what it may do, and allow it
+      panelPath: [Saroh, Allow an app]
+      cta: Allow
+      body: "Saroh lists what Claude will be able to do, and what it never can. Press Allow and you're back in Claude, with Saroh connected. Try asking: “Who's booked on Saturday?”"
+      rows:
+          - { label: "Let Claude work with Green Leaf Salon?", value: "See your business: products, bookings, orders, customers, enquiries and your website" }
+          - { label: Never more than you can do yourself, value: "It can't see sensitive customer notes, change billing or manage API keys." }
+faq:
+    - q: Which Claude plans can add it?
+      a: "Any Claude plan that lets you add your own connector. On a plan your company manages, an admin may need to allow it first."
+    # PUBLISH: a request and a link into Saroh; Publish, Send for approval
+    # or Don't publish there.
+    - q: Can Claude publish my website?
+      a: "No. When you ask it to, it shows you what will go live and gives you a link into Saroh, where you choose Publish or Don't publish. If your business needs a reviewer, it goes to them instead."
+    # PICK: dataLine and roleNote.
+    - q: What does Claude see?
+      a: "Only what you can see in the businesses you ticked, and never sensitive customer details. What it reads is sent to Anthropic, the company behind Claude, under its own terms."
+    # SETTINGS: the owner sees every connection; "Disconnect from this
+    # business". SWEEP: a connection unused for 90 days ends.
+    - q: How do I disconnect it?
+      a: "Open Settings › API and AI apps › AI assistants, choose the connection and press Disconnect from this business. An owner can end anyone's connection. A connection also ends after 90 days without use."
+links:
+    - { label: How AI apps work with Saroh, href: /features/ai-apps }
+    - { label: "Help: connect Claude", href: /help/connect-claude }
+    - { label: Use ChatGPT instead, href: /integrations/chatgpt }
+---
+
+{/*
+Each line below is backed by a tool or a screen (TOOLS, PUBLISH, SETTINGS)
+and matches the AI apps page (content/features.ts "ai-apps"): pages, sections,
+the look, menu and footer, images (add_page, edit_page, update_page,
+remove_section, update_site_settings, upload_image); products, services,
+hours (create_/update_product, create_/update_service, set_hours); bookings
+(list_, get_, create_, move_booking); orders (list_, get_, create_order,
+update_order_status); customers (list_, get_, create_, update_customer);
+enquiries (list_, get_enquiry). The can't list is the consent page's and
+AI assistants' "can't" (CAN, SETTINGS); the roll back is rollBackAiSiteDraft.
+*/}
+
+**Your website, as a draft.** Claude can build and change pages, sections, the look, the menu and the footer, and add images. Every change is a draft with a preview link. It can't publish: it gives you a link into Saroh, and you choose Publish or Don't publish there.
+
+**Your catalogue.** Products, services, prices, stock and opening hours.
+
+**Your day.** Read, make and move bookings. Read, make and update orders. Read and change customers, and read enquiries.
+
+**What it can't do.** Cancel bookings, refund, touch billing or payment settings, change the team, or see sensitive customer details like health notes.
+
+**Every change on record.** Each change Claude makes is listed under its connection in Settings › API and AI apps, and you can roll its website draft back.

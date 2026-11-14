@@ -69,6 +69,14 @@ export const INTEGRATION_CARDS: Record<
         name: "Cashfree",
         intro: "Saroh's Cashfree integration takes payments through your own Cashfree account, for a business that already uses Cashfree. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it.",
     },
+    chatgpt: {
+        name: "ChatGPT",
+        intro: "Connect ChatGPT to your business on Saroh and ask in your own words: add a product, look up Saturday's bookings, or start a new page for your site. ChatGPT acts as you, so it can only do what you can do in Saroh.",
+    },
+    claude: {
+        name: "Claude",
+        intro: "Connect Claude to your business on Saroh and ask in your own words: add a product, look up Saturday's bookings, or start a new page for your site. Claude acts as you, so it can only do what you can do in Saroh.",
+    },
     email: {
         name: "Your own email",
         intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect Resend, SendGrid or an SMTP relay, choose the address it comes from, and invoices and reminders go out as you.",

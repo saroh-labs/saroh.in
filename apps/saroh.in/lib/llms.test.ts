@@ -68,6 +68,9 @@ describe("llmsText", () => {
             "/integrations",
             "/changelog",
             "/tools/link-preview",
+            // No switch is off in this context: the AI apps' pages too (U7).
+            "/integrations/claude",
+            "/integrations/chatgpt",
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
@@ -76,6 +79,16 @@ describe("llmsText", () => {
         ]);
         expect(paths.some((p) => p.startsWith("/help"))).toBe(false);
         expect(paths).not.toContain("/changelog/saroh-is-open");
+    });
+
+    it("lists no AI app's page while its switch is off, and no card that links into Help", () => {
+        const text = llmsText(BASE, at(AFTER, { off: ["ai-apps"] }), articles);
+        expect(text).not.toMatch(/Claude|ChatGPT/);
+        const on = linked(llmsText(BASE, at(AFTER), articles));
+        expect(on).toContain("/integrations/claude");
+        expect(
+            on.some((p) => p.startsWith("/help/connect-other-ai-apps")),
+        ).toBe(false);
     });
 
     it("from midnight in India on 17 Oct, adds Help, every article and the launch entry", () => {
